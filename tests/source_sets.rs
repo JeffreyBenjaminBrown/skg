@@ -108,7 +108,7 @@ fn all_tests
 /// PIN (the override-substitution-across-switch case discussed in
 /// TODO/strip-inactive-node-fields-progress.org): a drawn override
 /// substitute whose source goes inactive on a source-set switch
-/// becomes an anonymous '(inactiveNode)'; the rerender draws the
+/// becomes an anonymous bare-atom 'inactiveNode'; the rerender draws the
 /// original directly (an inactive overrider does not substitute) with
 /// NO leak of the overrider's title or id, retaining the overrider's
 /// active descendant; and the container's contains still saves to the
@@ -185,7 +185,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
           . viewuri_to_view (&uri)
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest, config) ? };
-      assert! ( view_public . contains ("(inactiveNode)"),
+      assert! ( view_public . contains ("inactiveNode"),
         "the overrider should become an anonymous placeholder:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-original"),

@@ -447,10 +447,11 @@ fn phantomUnknown_metadata_to_string (
                             unknown_node . id . 0 ));
   parts . join (" ") }
 
-/// Render an inactive placeholder as bare '(inactiveNode)'. It carries
-/// no id/source/etc. -- those describe content the user hid by
-/// restricting the source-set, so emitting them would leak (see
-/// InactiveNode).
+/// Render an inactive placeholder as the bare atom 'inactiveNode',
+/// like the other dataless scaffold markers (aliasCol, subscribeeCol,
+/// ...). It carries no id/source/etc. -- those describe content the
+/// user hid by restricting the source-set, so emitting them would leak
+/// (see InactiveNode).
 fn inactive_node_metadata_to_string (
   focused       : bool,
   folded        : bool,
@@ -460,7 +461,7 @@ fn inactive_node_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( "(inactiveNode)" . to_string () );
+  parts . push ( "inactiveNode" . to_string () );
   parts . join (" ") }
 
 /// Render metadata for a DeletedScaff:

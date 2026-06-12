@@ -215,9 +215,10 @@ pub fn herald_rule_table () -> HeraldRule {
       crule (Orange, "unknownNode", vec! [
         s ("Parent references unknown node."),
         vac ("id") ]),
-      // An inactive placeholder is anonymous and dataless: bare
-      // '(inactiveNode)' (see InactiveNode). Its id/source would leak
-      // hidden content, so they are not emitted.
+      // An inactive placeholder is anonymous and dataless: the bare
+      // atom 'inactiveNode' (see InactiveNode), like the other dataless
+      // scaffold markers. Its id/source would leak hidden content, so
+      // they are not emitted.
       crule (Blue, "inactiveNode", vec! [
         s ("node from inactive source") ]),
       interc (Some (Green), "", Some ("staged"), vec! [

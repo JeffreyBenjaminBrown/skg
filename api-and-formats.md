@@ -352,7 +352,7 @@ A buffer whose marker the server would not have drawn (the carrier
 is not the ownership-gated, visibility-UNGATED resolution of N)
 aborts the save with an explanation. A source-set switch that makes a
 drawn substitute's source inactive turns it into an anonymous
-`(inactiveNode)` (the marker does not survive -- an inactive node is
+`inactiveNode` (the marker does not survive -- an inactive node is
 dataless); the original it stood for is preserved in its container's
 contains by the disk merge.
 
@@ -546,7 +546,7 @@ as an anonymous placeholder, so its active descendants are not
 orphaned:
 
 ```
-(skg (inactiveNode))
+(skg inactiveNode)
 ```
 
 The placeholder is DATALESS by design: an inactive node's id, source,

@@ -344,6 +344,11 @@ pub fn parse_metadata_to_viewnodemd (
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
           "bodyFolded" => result . body_folded = true,
+          // An inactive placeholder is a dataless bare-atom marker
+          // (see InactiveNode). The legacy field-bearing list form
+          // '(inactiveNode ...)' is still tolerated by the List arm
+          // above so a stale buffer round-trips.
+          "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), membership: MembershipAxes::default() } ) ),
           "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
@@ -535,11 +540,12 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
-/// Parse '(inactiveNode)'. An inactive placeholder is an anonymous,
-/// dataless marker (see InactiveNode), so it has no contents. Any
-/// legacy children (id/source/membership/overridesHere) emitted by an
-/// older server are tolerated and discarded, so a stale buffer still
-/// round-trips.
+/// Parse the LEGACY list form '(inactiveNode ...)'. The server now
+/// emits the bare atom 'inactiveNode' (handled in the atom arm), but an
+/// older server's field-bearing list form is tolerated here -- its
+/// children (id/source/membership/overridesHere) are discarded -- so a
+/// stale buffer still round-trips. An inactive placeholder is an
+/// anonymous, dataless marker (see InactiveNode).
 fn parse_inactivenode_sexp (
   _items   : &[Sexp],
   metadata : &mut ViewnodeMetadata,

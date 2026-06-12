@@ -101,6 +101,25 @@
     typedef itself carries the de-novo-scope doc Jeff asked for
     (added in step 7).
 
+*** Step 10 (this commit): emit inactiveNode as a bare ATOM, not (inactiveNode)
+    Bug found by the Emacs tests (the Rust suite missed it). Step 7
+    rendered the dataless marker as the empty LIST '(inactiveNode)',
+    but a herald rule with no sub-rules is a BARE-ATOM rule (like
+    'aliasCol'), so it matched the atom 'inactiveNode', not the list --
+    the client rendered nothing for it, leaking the raw metadata.
+    Fixed: 'org_to_text' emits the bare atom 'inactiveNode' (consistent
+    with the other dataless scaffold markers), and the parser's atom
+    arm accepts it; the legacy list form '(inactiveNode ...)' is still
+    tolerated for stale buffers. Updated the herald test (bare atom),
+    the pin test's render assertion, and the docs. Full Rust suite
+    green (443); all 225 Emacs tests pass.
+
+    Lesson: the Rust 'elisp_fixture_matches_the_live_table' test pins
+    the rule TABLE, but nothing pinned that 'org_to_text''s OUTPUT
+    matches those rules -- so a bare-atom rule vs. a list emission
+    slipped through. A round-trip "every emitted form heralds to
+    non-nil" check would have caught it.
+
 ** Changes to the plan's envisioned order
    - Step 7 added a ripple the plan under-specified: 'Vognode::id'
      and 'pid_and_source' had to become/stay Option-returning (None

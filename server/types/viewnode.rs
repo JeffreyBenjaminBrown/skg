@@ -162,7 +162,7 @@ pub struct PhantomUnknown {
 /// Being dataless, it is inert everywhere: it emits no save intention
 /// (its membership is owned by the disk weave), is not a collateral
 /// pid, is irrelevant to every reconciler (preserved as-is, never
-/// goal-matched), and renders as bare '(inactiveNode)'.
+/// goal-matched), and renders as the bare atom 'inactiveNode'.
 #[derive( Debug, Clone, PartialEq )]
 pub struct InactiveNode;
 

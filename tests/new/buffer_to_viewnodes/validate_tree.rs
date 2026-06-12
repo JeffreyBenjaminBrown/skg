@@ -742,7 +742,7 @@ fn inactive_placeholder_does_not_collide_with_content () {
     indoc! {"
       * (skg (node (id root) (source main))) parent
       ** (skg (node (id hidden) (source main))) active child
-      ** (skg (inactiveNode))
+      ** (skg inactiveNode)
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)

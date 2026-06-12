@@ -115,10 +115,10 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 
 #[test]
 fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
-  // The server emits bare '(inactiveNode)'; a legacy field-bearing
-  // form is tolerated (parsed leniently, fields discarded) so a stale
-  // buffer still round-trips. Either way it is an anonymous, dataless,
-  // titleless placeholder.
+  // The server emits the bare atom 'inactiveNode'; this legacy
+  // field-bearing list form is tolerated (parsed leniently, fields
+  // discarded) so a stale buffer still round-trips. Either way it is
+  // an anonymous, dataless, titleless placeholder.
   let input: &str =
     indoc! {"
             * (skg (inactiveNode (id hidden) (source private) (unstaged newM)))

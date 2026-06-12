@@ -166,11 +166,14 @@
       (should (string-match "-M" result)))))
 
 (ert-deftest test-heralds-inactive-node-display ()
-  "Inactive-node metadata should be masked by a blue placeholder herald."
+  "An anonymous inactive-node placeholder displays as a blue herald.
+The server emits the bare atom `inactiveNode' (like the other
+dataless scaffold markers) -- it carries no id/source, because those
+would leak content the user hid by restricting the source-set."
   (with-temp-buffer
-    (insert "(skg (inactiveNode (id hidden) (source private)))")
+    (insert "(skg inactiveNode)")
     (let ((result (heralds-from-metadata
-                   "(skg (inactiveNode (id hidden) (source private)))")))
+                   "(skg inactiveNode)")))
       (should (equal (substring-no-properties result)
                      "node from inactive source"))
       (should (eq (get-text-property 0 'face result)
