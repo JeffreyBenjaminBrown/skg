@@ -4,32 +4,44 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::dbs::typedb::paths::path_containerward_to_first_nonlinearity;
 use skg::types::misc::{ID, SkgConfig};
 
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_a_mess_of_stuff
+fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_shared_test_db (
     "skg-test-content-view",
-    "tests/content_view/fixtures",
-    "/tmp/tantivy-test-content-view",
-    |config, driver, _tantivy| Box::pin ( async move {
-      run_path_and_root_tests ( config, driver ) . await
-    } )) }
-
-#[test]
-fn test_multi_root_view
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-multi-root-view",
-    "tests/content_view/fixtures-2",
-    "/tmp/tantivy-test-multi-root-view",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_multi_root_view_logic ( config, driver ) . await
-    } )) }
+    |s| Box::pin ( async move {
+      s . reset ("run_path_and_root_tests (a mess of stuff)",
+                 "tests/content_view/fixtures") . await ?;
+      run_path_and_root_tests (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("test_multi_root_view_logic",
+                 "tests/content_view/fixtures-2") . await ?;
+      test_multi_root_view_logic (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("test_single_root_view_with_cycle",
+                 "tests/typedb/fixtures") . await ?;
+      test_single_root_view_with_cycle (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("test_multi_root_view_with_shared_nodes",
+                 "tests/typedb/fixtures") . await ?;
+      test_multi_root_view_with_shared_nodes (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("test_multi_root_view_with_node_limit",
+                 "tests/typedb/fixtures") . await ?;
+      test_multi_root_view_with_node_limit (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("test_limit_with_multiple_sibling_groups",
+                 "tests/content_view/fixtures-3") . await ?;
+      test_limit_with_multiple_sibling_groups (
+        &s . config, &s . driver ) . await ?;
+      Ok (( )) } )) }
 
 async fn run_path_and_root_tests (
   config : &SkgConfig,
@@ -125,14 +137,11 @@ async fn test_multi_root_view_logic (
 
   Ok (( )) }
 
-#[test]
-fn test_single_root_view_with_cycle
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-single-root-view-cycle",
-    "tests/typedb/fixtures",
-    "/tmp/tantivy-test-single-root-view-cycle",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_single_root_view_with_cycle (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  {
       // Test with node "a" which has a cycle (a -> b -> c -> b)
       let (result, _pids, _)
         : (String, Vec<ID>, _)
@@ -152,16 +161,13 @@ fn test_single_root_view_with_cycle
       assert_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
 
-      Ok (( )) } )) }
+      Ok (( )) }}
 
-#[test]
-fn test_multi_root_view_with_shared_nodes
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-multi-root-view-shared",
-    "tests/typedb/fixtures",
-    "/tmp/tantivy-test-multi-root-view-shared",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_multi_root_view_with_shared_nodes (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  {
       // Test with multiple roots that share a node
       let focii = vec![
         ID ( "1" . to_string () ),
@@ -198,16 +204,13 @@ fn test_multi_root_view_with_shared_nodes
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
 
-      Ok (( )) } )) }
+      Ok (( )) }}
 
-#[test]
-fn test_multi_root_view_with_node_limit
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-multi-root-view-limit",
-    "tests/typedb/fixtures",
-    "/tmp/tantivy-test-multi-root-view-limit",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_multi_root_view_with_node_limit (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  {
       // Test with two roots that share a node, with node limit
       // Tree structure: 1 -> (2, 3), 2 (standalone root)
       // Generations: 1: [1, 2], 2: [2 (repeated), 3]
@@ -248,16 +251,13 @@ fn test_multi_root_view_with_node_limit
       assert_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");
 
-      Ok (( )) } )) }
+      Ok (( )) }}
 
-#[test]
-fn test_limit_with_multiple_sibling_groups
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-multiple-sibling-groups",
-    "tests/content_view/fixtures-3",
-    "/tmp/tantivy-test-multiple-sibling-groups",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_limit_with_multiple_sibling_groups (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  {
       // Test that truncation correctly stops at sibling group boundaries
       // Tree structure:
       //   1 (gen 1)
@@ -299,4 +299,4 @@ fn test_limit_with_multiple_sibling_groups
       assert_eq!(result, expected,
                  "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");
 
-      Ok (( )) } )) }
+      Ok (( )) }}
