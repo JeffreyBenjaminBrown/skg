@@ -1,0 +1,7 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+
+[[sources]]
+name = "owned"
+path = "owned"
+user_owns_it = true

@@ -163,6 +163,17 @@ override_substitution, multi_source_errors, validate_foreign_nodes,
 override_invariants, partner_col_matrix); all mechanical
 '(errors)' -> '{ errors, .. }'.  178 tests across the affected
 targets pass.
+**** commit 6: init/rebuild refusal wiring (tests/init_refusal.rs)
+A cheap entry point WAS found, so the test was written (not deferred
+to problems.org as the plan's fallback allowed).
+'wipe_then_init_typedb_db' -- the shared TypeDB-population function
+that server start and "rebuild dbs" both reach -- calls
+'error_unless_override_invariants_hold' before touching TypeDB.
+The test feeds it disk data (owned/ N, R1, R2 where R1 and R2 both
+override N, all user-owned) and asserts it refuses with an error
+naming the collision; no database is created (the check precedes
+'overwrite_new_empty_typedb_db').  Runs in ~0.06s -- far cheaper than
+booting a server.
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
