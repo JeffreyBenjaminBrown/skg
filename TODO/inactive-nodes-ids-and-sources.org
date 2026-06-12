@@ -137,10 +137,101 @@ add a regression test for the stale-buffer resurrection? Confirm
 you accept the behavior change: a retained inactive placeholder can
 no longer be repositioned by the user (correct read-only
 semantics, but visible).
-*** TODO Jeff speaking : Yes, and
+*** ONGOING Jeff speaking : Yes, and
 also remove every data field from InactiveNode.
 If that turns out to be dumb, push back,
 but I don't see how any of it could be used any more.
 If this merits drawing up a plan first, plesae do;
 otherwise please simply execute, knowing you are free to backtrack
 if you discover it's a bad idea.
+**** TODO Claude: did the revert; pushing back on the field removal
+DONE, committed (c94180e6): the save-intention revert +
+weave/validation comment fixes + tests. Inactive nodes now emit
+nothing for any container; the weave owns invisible members.
+
+On removing every field: I tried it (emptied the struct, built) and
+am backing out. Your premise holds for the SAVE path -- after the
+revert, nothing in save extraction reads an InactiveNode field. But
+the fields are load-bearing on the VIEW/render side, which is
+independent of save. Emptying the struct breaks 37 build sites across
+15 files. After setting aside pure plumbing (render in
+'org_to_text.rs', parse in 'parse_metadata_sexp.rs', the
+'mk_inactive_viewnode' constructor, the 'collected_id' impl),
+***** the genuine consumers are:
+****** id
+******* 'pids_from_viewforest' (types/views_state.rs, via 'Vognode::id')
+    -- COLLATERAL re-render: a save elsewhere that touches this node
+    re-renders views showing it.
+******** TODO but what for?
+In the collateral view it should already be being turned into an InactiveNode
+there too, and as such I believe there is nothing to update.
+******* 'convert_inactive_to_deleted_if_deleted'
+    (update_buffer/complete.rs) -- turns an inactive node deleted by
+    a save into a Deleted placeholder. Needs the id to match
+    'deleted_by_this_save_pids'.
+******** TODO but that's a (minor) privacy leak, and useless
+Regarding being a leak:
+If it's inactive we don't want the screen to reveal anything about it.
+The only reason we hold onto it at all is that it might have active descendents.
+
+Regarding uselessness: That it became deleted is not interesting to the user;
+they have asked for these nodes not to be visible,
+so they aren't trying to know.
+******* diff render (to_org/render/diff.rs x2) -- stamps membership axes
+    and anchors removed-member phantoms by id.
+******** TODO But should it?
+Source restriction and diff mode cannot be enabled simultaneously.
+******* view reconciliation (reconcile/mod.rs 'retained_inactive_children',
+    complete/partner_col/child_data.rs) -- keys goal-list matching so
+    a retained inactive node (and the visible children parked under
+    it) stays correctly placed on rebuild.
+******** TODO inactive nodes should not be part of any goal list
+The source reduction means the user is trying to reduce what's visible.
+Making them a goal means trying to make them visible.
+******* 'validate_view_roots' / override-mismatch validation
+    (buffer_to_viewnodes/validate_tree.rs).
+******** TODO please restate this (and always speak) in full sentences
+I do not know what your pushback here intends to say.
+But if the point is 'we validate this thing',
+and yet we never use it, that validation is silly.
+****** source: the inactive->Deleted conversion (complete.rs) needs it
+  because the node's .skg is already gone, so it cannot be re-derived
+  from disk; plus the reconcile orderkey source map
+  (reconcile/content.rs) and 'pid_and_source'.
+******* TODO inactive->deleted is a useless leak
+as described above
+****** membership: diff render stamps +/- axes onto inactive nodes
+  (to_org/render/diff.rs). ('inactiveNode_is_phantom' also read it,
+  but the revert made that predicate production-dead -- see below.)
+******* TODO but inactive nodes + diff mode are incompatible
+as described above
+****** overridesHere: 'collected_id' (still read by the reconcile orderkey
+  for a source-switch-converted substitute) and the override-mismatch
+  validator.
+******* TODO but we don't want inactive nodes in goal lists
+as described above
+***** The single most user-facing reason: 'org_to_text'
+renders '(inactiveNode (id X) (source S) ...)' so the client tells the user
+WHICH node from WHICH source is hidden there, and can navigate to it.
+Strip id+source and the placeholder is an anonymous "something
+inactive is here" blob -- and the collateral / diff / deletion
+machinery silently loses the ability to track it.
+
+So removing the fields is not free cleanup; it is "delete the inactive
+node's view-side features" (identification, navigation, collateral
+re-render, diff axes, inactive->Deleted) and would be a UX regression
+plus a multi-file redesign. Recommendation: KEEP all four fields.
+****** TODO no, the user can't
+If the node is inactive, it cannot be visited.
+The anonymous blob should in general not appear;
+we only need it when we reduced the source set
+and an already-drawn buffer has now-inactive nodes with active descendents.
+
+***** 'inactiveNode_is_phantom'
+(local_instruction_collection/predicates.rs) is now production-dead
+(only its own unit test calls it). It reads 'membership', which still
+survives via diff, so deleting the predicate frees no field -- it just
+removes a dead pub fn + its test. Happy to do that if you want; left
+it for now since it documents the membership sign convention.
+****** TODO yes please, delete it
+and any tests that were just for it
