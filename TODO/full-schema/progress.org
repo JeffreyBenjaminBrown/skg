@@ -187,6 +187,55 @@ same target in commit 8.
 Ride-along: renamed 'test_every_kind_of_col' ->
 'test_subscribee_and_filter_cols' in tests/hidden_from_subscriptions.rs
 (the old name overstated its coverage).
+**** commit 8: production change (2) + expansion part 2 + doc
+Generalized the no-substitution-for-immediate-children rule from the
+single plan-11 overridden-as-such case to every raw-drawn position.
+
+Change ('server/update_buffer/reconcile/content.rs'): replaced
+'is_overridden_as_such' with 'is_overridden_drawn_raw'. The new
+predicate fires when 'node' is OVERRIDDEN (ownership-gated,
+visibility-UNGATED: 'resolve_override (config, graph, None, id)') AND
+drawn raw BY ITS POSITION -- a member of any PartnerCol except the
+writable subscribeeCol (whose subscribees-as-such DO substitute), or a
+view root -- and carries no overridesHere marker. Then substitution is
+disabled for its immediate children.
+
+***** the depth-one subtlety (why the plan's one-line predicate is not enough)
+The plan described the predicate as "the parent is overridden and
+carries no overridesHere marker."  Taken literally that CASCADES: a
+child drawn raw under a raw-drawn overridden parent is itself
+overridden-and-markerless, so it would disable substitution for ITS
+children, and so on -- violating the decided DEPTH=one-level.  The
+depth-one behavior comes from a POSITION test, exactly as the original
+structural 'is_overridden_as_such' (parentIs=affected child of an
+overriddenCol) achieved it: a content child is NOT a raw-drawn
+position, so substitution resumes there.  So 'is_overridden_drawn_raw'
+is position-aware (PartnerCol-member-except-subscribee OR view root),
+which both generalizes correctly and preserves depth-one.  Recorded as
+a deviation in HOW (the predicate is richer than the plan's one-liner);
+the decided BEHAVIOR (general scope, depth one, strict edge case) is
+exactly met.
+
+***** a second seam fact found during execution
+The view root is detected during completion as a child of the
+BufferRoot sentinel, NOT by 'parentIs == Absent' -- that stamp is
+applied only later, at render ('to_org/util.rs').  The first cut of
+the predicate used 'parentIs == Absent' and silently did nothing for
+roots (substitution still fired); switching to the BufferRoot-ancestor
+check fixed it.
+
+Test 'raw_drawn_overridden_root_children_are_raw'
+(tests/expand_raw_overridden_children.rs, its own target -- installs
+the global handle).  The docs/forks.md shape: R overrides X, R1
+overrides X1, X contains X1.  Opening X as a raw root draws X1 RAW (no
+'overridesHere', R1 does not stand in for X1).
+
+Doc: api-and-formats.md's bypass note and the override-substitution
+section now state the one-level-raw rule (general scope, strict edge
+case) instead of "recursive content still substitutes".
+
+Full 'cargo nextest run' green after the change (no regression across
+the override suite).
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
