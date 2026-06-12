@@ -1,4 +1,16 @@
 * ONGOING [[./TODO/full-schema]]
+* consolidate tests
+Welcome, Claude!
+
+The test suite is too slow. I think a lot of tests can be bundled.
+It makes too many databases, and I suspsect that's the main time cost.
+A simple solution is to bundle similar tests to use a single database.
+That database can consist of many independent graphs.
+
+If you can figure out how to minimize diff churn in so doing,
+that would be awesome.
+I'm hoping merely unifying tests within the same file,
+keeping them in the same order, will by itself knock the time down by a lot.
 * DONE , probably :: Phantom = Diff | Deleted | Unknown
 [[./TODO/DONE/phantom-enum/]]
 claude --resume 51f722b5-8564-4c61-9d86-c1b98945f07a
