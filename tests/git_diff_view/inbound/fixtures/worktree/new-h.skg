@@ -1,0 +1,4 @@
+pid: 'new-h'
+title: "new-h"
+hides_from_its_subscriptions:
+  - "HN"

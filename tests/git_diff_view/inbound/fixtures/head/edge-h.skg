@@ -1,0 +1,4 @@
+pid: 'edge-h'
+title: "edge-h"
+hides_from_its_subscriptions:
+  - "HN"

@@ -1,0 +1,9 @@
+pid: 'S'
+title: "S"
+subscribes_to:
+  - "B"
+hides_from_its_subscriptions:
+  - "h1"
+  - "h3"
+  - "h4"
+  - "h6"

@@ -1,0 +1,4 @@
+pid: 'new-s'
+title: "new-s"
+subscribes_to:
+  - "SN"

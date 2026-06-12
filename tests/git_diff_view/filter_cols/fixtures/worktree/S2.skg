@@ -1,0 +1,4 @@
+pid: 'S2'
+title: "S2"
+subscribes_to:
+  - "B2"

@@ -1,0 +1,4 @@
+pid: 'ES'
+title: "ES"
+subscribes_to:
+  - "EB"

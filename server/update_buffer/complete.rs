@@ -280,7 +280,8 @@ async fn visit_normal_node (
       maybe_add_partnerCol_branches (
         tree, treeid, &context . env . config,
         &context . env . driver,
-        context . active_source_set ) . await ?; } }
+        context . active_source_set,
+        context . source_diffs ) . await ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_truenode_view_requests (
@@ -289,7 +290,8 @@ async fn visit_normal_node (
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
-    tree, treeid, &context . env . config, &context . env . driver ) . await ?;
+    tree, treeid, &context . env . config, &context . env . driver,
+    context . source_diffs ) . await ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Active node (content, cols, view requests), so process_truenode_diff

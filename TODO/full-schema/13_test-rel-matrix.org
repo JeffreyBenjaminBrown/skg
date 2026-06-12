@@ -1,0 +1,723 @@
+* plan : test the relationship matrix
+This plan covers the metaplan_2.org step "test the relationship
+matrix".  The matrix comes from metaplan 1 ("Test the relationship
+matrix"): for every collection type, cover initial rendering,
+definitive expansion, save after reorder, insertion of independent
+children, deletion or mutation of generated members, source-set
+restricted rendering, and collateral rerender after save; plus an
+override-specific list and a warnings list.
+
+Stages 8 through 12 each shipped with tests, so much of the matrix
+is already covered.  This plan is therefore mostly an AUDIT (which
+cells are covered, and by which test) plus a bounded list of new
+tests that fill the real gaps.  Writing tests for already-covered
+cells would only slow the suite; the audit names the covering test
+instead, so a future reader can check the claim.
+
+* glossary
+Plain-language definitions of every term of art this plan uses.
+- "relationship matrix" :: the grid of test obligations: one row per
+  collection type, one column per behavior (the seven listed above).
+- "relation" :: one of the five connection types in schema.tql:
+  'contains', 'textlinks_to', 'subscribes',
+  'hides_from_its_subscriptions', 'overrides_view_of'.
+- "PartnerCol" :: a generated headline in a view that groups the
+  nodes related to its owner by one relation, in one direction.
+  Example: under node N, a "subscriberCol" lists the nodes that
+  subscribe to N.  There are eight kinds.
+- "outbound / inbound" :: direction of the relation relative to the
+  col's owner.  Outbound: the owner points at the members (the
+  owner subscribes to them).  Inbound: the members point at the
+  owner (they subscribe to the owner).
+- "writable col" :: a PartnerCol whose membership the user can edit
+  by editing the buffer: subscribeeCol and overriddenCol.  Adding,
+  removing or reordering members there changes the graph on save.
+- "read-only set" :: a PartnerCol whose membership is computed from
+  the graph and cannot be edited through the col: subscriberCol,
+  overriderCol, hiderCol, hiddenCol.  Edits to it are repaired on
+  save (members restored, intruders relabeled) with a warning.
+- "read-only filter col" :: hiddenInSubscribeeCol and
+  hiddenOutsideOfSubscribeeCol.  Their membership is derived from
+  hide state rather than read directly off one relation.
+- "QualCol" :: the alias and ID collections (AliasCol, IDCol).
+  Their children are strings about the owner, not graph nodes.
+- "member" :: a node listed inside a col because the graph really
+  relates it to the col's owner.
+- "independent child" :: a headline the user parked somewhere (for
+  example inside a col) that is NOT a member; it carries
+  '(parentIs independent)' and does not affect the owner on save.
+- "definitive / indefinitive" :: a definitive viewnode is editable
+  and shows its full content; an indefinitive one is a read-only
+  mention (herald "☮").  Col members render indefinitive.
+- "definitive expansion" :: asking the server to turn an
+  indefinitive viewnode into a definitive one, in place, showing
+  its content.
+- "subscribee-as-such / overridden-as-such" :: a member sitting
+  under a subscribeeCol / overriddenCol, shown in that role.
+  Expanding a subscribee-as-such applies the subscriber's hides;
+  expanding an overridden-as-such shows the raw original.
+- "substitution" :: when rendering would create a viewnode for node
+  N as ordinary content but N has a visible user-owned overrider R,
+  the view draws R instead, marked '(overridesHere N)'.
+- "monogamy" :: the validation rule that no node may have more than
+  one user-owned overrider.
+- "chain" :: X overrides Y and Y overrides Z with X and Y both
+  user-owned; rejected at save and rebuild.
+- "the menu" :: the override-choice buffer offered when the user
+  asks to open a node that something overrides.
+- "source set" :: the set of sources currently visible.  A node
+  whose source is outside it is "inactive": omitted from cols,
+  retained read-only in already-open views if it has visible
+  children, never written by a save.
+- "the weave / the set-difference merge" :: the save-time
+  operations that put invisible (inactive-source) members back
+  into a saved list so a restricted view cannot delete what it
+  cannot show.  The weave preserves order ('contains',
+  'subscribes_to'); the set-difference merge handles the
+  order-free 'overrides_view_of'.
+- "goal list" :: the member list reconciliation steers a col
+  toward: graph truth, in some order.
+- "demotion" :: reconciliation's treatment of a stale member that
+  has children: it is kept but relabeled independent.  A stale
+  member with no children is deleted.
+- "collateral rerender" :: after a save, every other open view
+  sharing a node with the saved one is re-rendered and pushed to
+  Emacs.
+- "phantom" :: a diff-mode-only line showing something that existed
+  at an earlier git stage but not now.  Phantoms define nothing on
+  save.
+- "seam" :: a function boundary at which a behavior can be tested
+  in isolation.  This plan uses three:
+  - the "extraction seam": 'collect_instructions_locally' and its
+    pure lowering, reachable without TypeDB via
+    'definenodes_from_tree' (tests/new/local_instruction_collection/
+    extraction.rs).  Tests what a buffer's text means for the graph.
+  - the "reconciliation seam": the pure helpers under
+    'server/update_buffer/reconcile/' (for example
+    'view_order_preserving_goal_list'), tested in tests/unit/.
+    Tests how a view is repaired toward graph truth.
+  - the "pipeline seam" (end-to-end): a real save through
+    'update_from_and_rerender_buffer' against a real TypeDB
+    database, usually via 'server/test_utils.rs'
+    ('run_with_test_db', 'update_from_and_rerender_buffer_test').
+    Slow; reserved for wiring that the pure seams cannot reach.
+- "the global graph handle" :: a process-wide snapshot of the
+  in-Rust graph ('try_init_global_handle' / 'snapshot_global').
+  Some features read it (substitution, gO/gS stats, marker
+  validation).  A test that installs it should live in its own
+  test target, because under plain 'cargo test' (one process per
+  target) it leaks into sibling tests; 'cargo nextest run' (one
+  process per test) is immune.
+- "test target" :: one 'tests/NAME.rs' file, possibly pulling in a
+  'tests/NAME/' directory of submodules and fixtures.  Cargo
+  compiles each target as its own binary.
+
+* scope
+** covered
+- The audit: every matrix cell mapped to a covering test or marked
+  as a gap.
+- New tests for the gaps, written at the cheapest seam that
+  genuinely exercises the behavior.
+- The override-specific checklist and the warnings checklist from
+  metaplan 1, audited and filled the same way.
+- The four named regressions from metaplan_2's step text, verified
+  present (three already exist) or added.
+** not covered
+- No production code changes, except trivial test hooks if a seam
+  needs one (none anticipated).  If a test exposes a bug, fixing it
+  is in scope only if small; otherwise it is recorded in
+  TODO/problems.org and the test pins current behavior with a
+  comment.
+- No new Emacs-side (elisp or integration) tests, unless a decision
+  below says otherwise.  The behaviors in this matrix are
+  server-side; the Emacs wiring they ride (save responses, rerender
+  streams, warning display) already has tests.
+- The documentation step (next metaplan step) stays separate.
+
+* the audit, by relation and role
+Each subsection lists the seven matrix behaviors with their status.
+"Covered" claims name the test; I verified each named test exists
+and read the load-bearing ones.  Cells marked N/A include the
+reason.  Cells marked GAP are collected into "new tests to write"
+below.
+
+** contains (ordinary content)
+- initial rendering: covered.  tests/content_view.rs,
+  tests/initial_view_bfs.rs (level-order budget).
+- definitive expansion: covered.
+  tests/definitive_view_cascade_and_budget.rs (ample budget, tight
+  budgets, cascades, cycles, repeats).
+- save after reorder: covered at the extraction seam
+  (tests/new/local_instruction_collection/extraction.rs,
+  'inactive_placeholder_moves_reorder_contains' among others) and
+  end-to-end by the content-view-and-save integration test.
+- insertion of independent children: covered.
+  'extraction_preserves_content_and_independent_children'.
+- deletion or mutation of generated members: covered.  tests/save/
+  and tests/delete_strips_references_from_neighbors.rs.
+- source-set restricted rendering: covered.  tests/source_sets.rs
+  ('content_view_omits_inactive_contained_nodes',
+  'saving_inactive_placeholder_moves_and_deletes_update_contains',
+  'weave_preserves_omitted_inactive_content_members').
+- collateral rerender after save: covered.  The three
+  save_collateral_* integration tests; tests/idempotence.rs.
+
+** textlinks_to
+This relation has no PartnerCol; links live in body text, and the
+inbound direction surfaces as sourceward ancestry.  Most matrix
+columns do not apply.
+- rendering of the relation: covered.  tests/textlinks.rs (parsing
+  and extraction), tests/rebuild/sourceward_ancestry.rs, the
+  sourceward-view-request integration test.
+- source-set restricted rendering: covered.  tests/source_sets.rs
+  ('sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks').
+- diff behavior: covered.  tests/git_diff_view/text,
+  tests/diff_analysis.rs (inbound textlink changes in the report).
+- everything else: N/A (no col, no membership to reorder, insert
+  into, or delete from).
+
+** subscribes, outbound: subscribeeCol (writable)
+- initial rendering: covered.
+  tests/subscribee_col.rs ('test_subscribee_col_appears_for_subscribers').
+- definitive expansion (subscribee-as-such, hides applied):
+  covered.  tests/hidden_from_subscriptions.rs
+  ('test_every_kind_of_col' and around ten others);
+  tests/overridden_as_such.rs
+  ('subscribee_as_such_expansion_hides_and_substitutes').
+- save after reorder: GAP at both seams.  Nothing asserts that
+  reordering subscribees persists the new order to the owner's
+  'subscribes_to' list on disk.  (The nearby
+  'subscribee_hiderel_intents_preserve_subscribee_tree_order'
+  tests hide-intent order, not membership order.)
+- insertion of independent children: covered generically (an
+  independent child affects nothing; extraction tests pin that
+  independent children never join any collection).  But adding a
+  MEMBER (a new subscription, the writable col's whole point) is
+  only covered at the extraction seam
+  ('extraction_collects_subscribees_without_hidden_branches');
+  end-to-end it is a GAP.
+- deletion of generated members: the delete-all case is covered
+  end-to-end (tests/subscribee_col_empty_persists.rs: an emptied
+  col persists and means "explicit empty set").  Deleting ONE
+  member while keeping others: GAP end-to-end.
+- source-set restricted rendering: covered.  tests/source_sets.rs
+  ('inactive_subscribee_placeholder_counts_positionally',
+  'stale_inactive_placeholders_under_cols_save_without_error') and
+  the weave unit tests (tests/unit/weave.rs).
+- collateral rerender after save: covered for subscribee content
+  (tests/hidden_from_subscriptions.rs, the two collateral tests).
+  Collateral update of the col membership itself is a GAP shared
+  with subscriberCol below; one test covers both (see new tests).
+
+** subscribes, inbound: subscriberCol (read-only set)
+- initial rendering: covered.  tests/partner_col_order.rs renders
+  it; tests/idempotence.rs includes it in the fixpoint fixture.
+- definitive expansion of a member: GAP, and the behavior itself is
+  not written down anywhere I could find (see problems).
+- save after reorder: covered.
+  tests/partner_col_order.rs ('readonly_col_order_is_preserved',
+  including across a second save).
+- insertion of independent children: covered.
+  tests/partner_col_warnings.rs (an inserted non-member is demoted
+  to independent, with a warning).
+- deletion of generated members: covered.  Same test (deleted
+  member restored, with a warning); demotion-vs-deletion of stale
+  members at the reconciliation seam in
+  tests/unit/reconcile_partner_col.rs.
+- source-set restricted rendering: partially covered.  Omission of
+  inactive col members was implemented in stage 9 and the
+  source_sets.rs omission tests cover content and diff surfaces,
+  but no test renders a subscriberCol whose member is inactive and
+  asserts the member is omitted (not placeholder-ized).  GAP
+  (cheap, one render).
+- collateral rerender after save: GAP.  No test opens a view of N,
+  then saves a different view that adds or removes a subscription
+  to N, and asserts N's subscriberCol updated in the collateral
+  stream.  The machinery for this exists
+  ('save_buffer_and_read_collateral_views' in
+  tests/hidden_from_subscriptions.rs).
+
+** overrides_view_of, outbound: overriddenCol (writable)
+- initial rendering: covered.  tests/overridden_as_such.rs and
+  tests/view_stats_sharing.rs render it (with gS and Op stats).
+- definitive expansion (overridden-as-such, raw, no hides, no
+  cascade): covered.  tests/overridden_as_such.rs
+  ('overridden_as_such_expansion_is_raw_and_unhidden',
+  'col_members_never_substitute').
+- save after reorder: N/A by decision.  'overrides_view_of' is
+  order-free (that is why the set-difference merge is sound), so
+  there is nothing to assert beyond "reorder does not corrupt",
+  which the extraction tests' set semantics already imply.  One
+  cheap extraction assertion is included anyway (see new tests) so
+  the property is pinned rather than implied.
+- insertion of members (creating an override edge through the
+  buffer): covered at the extraction seam
+  ('extraction_collects_overridden_col'); end-to-end GAP, folded
+  into the monogamy-rejection end-to-end test below (the accepting
+  and rejecting cases make one natural pair).
+- deletion of generated members: covered at the extraction seam
+  ('empty_overridden_col_means_empty_override_set'); the
+  end-to-end single-member case rides the same new test pair.
+- source-set restricted rendering: the set-difference merge is
+  covered at its own seam (tests/unit/weave.rs), but no test drives
+  a restricted save of a buffer whose overriddenCol omitted an
+  inactive member through the real pipeline and then reads disk.
+  GAP.
+- collateral rerender after save: GAP, same shape as subscriberCol;
+  the one new collateral test below uses a subscription, and the
+  col-update path it exercises ('reconcile_partnerCol_children') is
+  shared by all eight cols, so I do not propose repeating it per
+  relation (see the sampling decision under problems).
+
+** overrides_view_of, inbound: overriderCol (read-only set)
+- initial rendering: covered.  tests/override_menu.rs fixtures and
+  tests/git_diff_view/inbound render it (the latter in diff mode).
+- definitive expansion of a member: same GAP/spec question as
+  subscriberCol.
+- save after reorder, insertion, deletion: covered at the shared
+  seams: all four read-only sets go through one reconciler and one
+  extraction rule ('read_only_col_members_save_themselves_but_not_
+  their_owner' covers subscriberCol, overriderCol, hiderCol and
+  hiddenCol in one test).  The end-to-end representative is
+  subscriberCol (partner_col_order, partner_col_warnings).  Whether
+  that sampling satisfies the matrix is a decision (see problems).
+- source-set restricted rendering: covered for the menu
+  ('inactive_overriders_are_omitted_and_can_empty_the_menu'); the
+  col rides the same omission code as subscriberCol; the new
+  omission render test below includes an overriderCol line so both
+  directions of omission are pinned.
+- collateral rerender: see the sampling decision.
+
+** hides_from_its_subscriptions, outbound: hiddenCol (read-only set)
+Note the asymmetry: hiddenCol is outbound (the owner hides its
+members) yet read-only; hiding is edited through subscribee trees,
+never through this col.
+- initial rendering: GAP outside diff mode.  Diff-mode rendering is
+  covered (tests/git_diff_view.rs, the outbound goal-list work of
+  stage 12), but I found no plain render asserting a hiddenCol with
+  its members.  Cheap; folded into the one new render test.
+- definitive expansion of a member: same spec question as the other
+  read-only cols.
+- reorder / insertion / deletion: covered at the shared seams (the
+  same one reconciler and the same extraction test).  Plus a
+  specific guarantee that deleting from a derived hide surface does
+  not unhide is covered for the filter cols
+  ('test_deleting_from_hiddenin_col_does_not_unhide',
+  'test_adding_to_hiddenoutside_col_does_not_hide'); the analogous
+  hiddenCol case ("deleting from hiddenCol does not unhide") is a
+  GAP at the extraction seam, cheap to add.
+- source-set restricted rendering: rides the shared omission code;
+  pinned by the new omission render test.
+- collateral rerender: see the sampling decision.
+
+** hides_from_its_subscriptions, inbound: hiderCol (read-only set)
+- initial rendering: diff mode covered (tests/git_diff_view/inbound);
+  plain mode folded into the new render test.
+- everything else: same shared-seam coverage and same sampling
+  decision as overriderCol.
+
+** the read-only filter cols (hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol)
+- initial rendering and expansion: covered, thoroughly.
+  tests/hidden_from_subscriptions.rs ('test_every_kind_of_col',
+  'test_hidden_within_but_none_without',
+  'test_hidden_without_but_none_within',
+  'test_overlapping_hidden_within').
+- mutation of members: covered ('test_deleting_from_hiddenin_col_
+  does_not_unhide', 'test_adding_to_hiddenoutside_col_does_not_
+  hide', the move-to-unhide tests).
+- diff behavior: covered (tests/git_diff_view/filter_cols,
+  tests/unit/three_snapshots.rs).
+- source-set restricted rendering: GAP in principle (a hidden
+  member from an inactive source), but the omission code is shared;
+  the new omission render test includes one filter-col line.
+- collateral rerender: covered
+  ('test_collateral_view_reflects_newly_hidden_subscribee_content'
+  and the unhide twin).
+
+** AliasCol (writable QualCol)
+- initial rendering: covered (tests/content_view.rs fixtures,
+  tests/idempotence.rs).
+- definitive expansion: N/A (alias leaves do not expand); budget
+  neutrality covered ('test_budget_aliascol_is_neutral').
+- save after reorder / insertion / deletion: covered.
+  Extraction tests ('test_extract_nonmergeSavePlan_with_aliases',
+  '..._no_aliases', '..._multiple_alias_cols');
+  tests/rebuild/complete_aliascol.rs (dedup, disk order).
+- source-set restricted rendering: N/A (aliases are strings on the
+  owner, not nodes with sources).
+- collateral / diff: covered (tests/git_diff_view/aliases).
+
+** IDCol (read-only QualCol)
+- initial rendering: covered (tests/idempotence.rs,
+  tests/git_diff_view/ids).
+- definitive expansion: N/A (ID leaves do not expand).
+- reorder: covered (reordering saves fine; stage 8's tests in
+  tests/git_diff_view/ids assert this).
+- insertion / deletion (membership edits): covered (the same
+  stage-8 tests assert the save aborts with an explanation).
+- source-set restricted rendering: N/A (IDs are strings on the
+  owner).
+- collateral / diff: covered (tests/git_diff_view/ids).
+
+* the override-specific checklist, audited
+From metaplan 1, adjusted by metaplan 2.
+- one valid user-owned overrider:
+  covered.  tests/dbs/in_rust_graph/override_resolution.rs
+  ('a_single_owned_overrider_substitutes'),
+  tests/override_substitution.rs ('de_novo_draws_the_overrider_marked').
+- two user-owned overriders rejected at rebuild:
+  half-covered.  The validator is well tested at its own seam
+  (tests/dbs/in_rust_graph/override_invariants.rs, including
+  multi-collision reporting).  But nothing tests the WIRING: that
+  'error_unless_override_invariants_hold' actually stops init /
+  rebuild ('server/dbs/init.rs', 'rebuild_dbs.rs') when the disk
+  data is bad.  GAP; see new tests and the decision under problems.
+- two user-owned overriders rejected at save:
+  half-covered.  Covered at the simulation seam
+  (tests/save/override_invariants.rs).  Not covered through the
+  buffer pipeline: no test saves a buffer whose overriddenCol edit
+  would create the second overrider and asserts the save response
+  carries the error.  GAP (one test, paired with the accepting
+  case).
+- foreign overriders displayed but not substituted:
+  covered.  'foreign_overriders_are_ignored' (resolution),
+  'menu_appears_for_foreign_only_overriders' (menu),
+  'ownership_and_visibility_gate_substitution' (substitution).
+- user-owned chains rejected:
+  covered at both validator and save-simulation seams.
+- invalid or cyclic legacy data displayed safely in the menu:
+  covered.  'menu_stops_cycles_with_the_cycle_viewstat';
+  'a_cycle_is_detected_and_substitutes_nothing' (resolution);
+  compound chains warn ('tests/override_chain_notice.rs').
+- extra-ID resolution before monogamy:
+  covered for extra-IDs
+  ('extra_id_targets_are_resolved_before_monogamy_check',
+  'extra_id_input_and_extra_id_edge_both_resolve').  The MERGE
+  half is a GAP: 'validate_override_invariants_after_save'
+  simulates nodeMerge instructions too (server/save.rs applies
+  'nodeMerge_definenodes' to the simulated graph), but both
+  existing tests pass an empty merge list.  A merge that fuses two
+  overridden nodes into one, colliding their user-owned overriders,
+  should be rejected; no test says so.  Cheap at the simulation
+  seam.
+- direct visit menu behavior:
+  covered.  tests/override_menu.rs
+  ('handler_precedence_and_menu_dedup' and others), the
+  override-menu integration test, and the elisp bypass unit tests.
+- overriddenCol definitive-view bypass:
+  covered.  tests/overridden_as_such.rs.
+- diff views raw, without substitution:
+  covered.  'diff_mode_disables_substitution',
+  'marked_view_is_shape_stable_across_diff_toggle',
+  'menu_still_offered_in_diff_mode',
+  'open_menu_survives_diff_mode_toggle',
+  'diff_analysis_reports_override_changes_on_raw_nodes'.
+
+* the warnings checklist, audited
+- successful save with warnings:
+  covered.  tests/partner_col_warnings.rs
+  ('readonly_col_repairs_warn': restored member, demoted intruder,
+  and the discarded col-headline-text warning, all in one save).
+- failed save with both warnings and errors:
+  GAP, and underspecified.  Parse-time warnings (for example col
+  headline text) are produced before validation can fail, but I
+  found no statement or test of whether a failed save's response
+  carries them alongside the errors.  See the decision under
+  problems; the test follows the decision.
+- single-root content view warning delivery:
+  covered.  tests/override_chain_notice.rs (a fresh view's
+  compound-chain notice arrives in the content-view response).
+- rerender-all warning delivery:
+  reinterpreted, then GAP.  Stage 8 deliberately made collateral
+  rerenders and rerender-all repair SILENTLY (a repair there is not
+  the user's edit), so the original matrix cell ("rerender-all
+  delivers warnings") is obsolete.  The cell that should exist
+  instead: a save whose COLLATERAL view needs repair must not
+  blame the saver -- the save response's warnings stay scoped to
+  the saved view.  Stage 8 enforced this by construction but
+  skipped the test as too heavy; the collateral harness in
+  tests/hidden_from_subscriptions.rs has since made it cheap.  One
+  new test.
+
+* the four regressions named in metaplan 2's step text
+Three of the four were added by the stages that fixed the underlying
+behavior; this stage only had to verify they exist.
+- a buffer with an inactive member under a writable col is savable:
+  exists.  tests/source_sets.rs
+  ('stale_inactive_placeholders_under_cols_save_without_error',
+  'inactive_subscribee_placeholder_counts_positionally').
+- inactive-member preservation across a restricted save:
+  exists for 'contains' and 'subscribes_to'
+  ('weave_preserves_omitted_inactive_content_members' plus the
+  weave unit tests).  For 'overrides_view_of' the preservation is
+  covered only at the merge's own seam (tests/unit/weave.rs,
+  set-difference cases); the pipeline-level test is one of the new
+  tests below.
+- warning delivery on a successful save:
+  exists.  tests/partner_col_warnings.rs.
+- order preservation of a reordered read-only set across save:
+  exists.  tests/partner_col_order.rs.
+
+* new tests to write, in order
+Grouped by seam, cheapest first.  Names are suggestions; fixture
+sketches use the title-equals-ID convention the suite already uses.
+
+** at the extraction seam (pure, fast; extend tests/new/local_instruction_collection/extraction.rs)
+- 'reordering_subscribees_reorders_subscribes_to': owner with
+  subscribeeCol members [a, b, c] reordered to [c, a, b]; the
+  emitted SetSubscribesTo (visible in the lowered DefineNode)
+  lists [c, a, b].
+- 'removing_one_subscribee_keeps_the_rest': members [a, b, c] with
+  b deleted; emitted list is [a, c] (not empty, not unspecified).
+- 'reordering_overridden_col_is_harmless': overriddenCol members
+  [a, b] reordered to [b, a]; the emitted override set is equal as
+  a set and nothing else about the owner changed.  (Pins the
+  order-free property the set-difference merge depends on.)
+- 'deleting_from_hiddenCol_emits_no_hide_change': owner with a
+  hiddenCol member deleted; no intent touches the owner's
+  'hides_from_its_subscriptions'.  (The filter cols have this
+  guarantee tested; the plain hiddenCol does not.)
+
+** at the save-simulation seam (pure-ish, fast; extend tests/save/override_invariants.rs)
+- 'merge_that_collides_two_overriders_is_rejected': disk-shaped
+  graph where R1 overrides N1 and R2 overrides N2, all user-owned;
+  a save whose nodeMerge list merges N2 into N1; expect the
+  monogamy violation.  Exercises the 'nodeMerge_definenodes' arm of
+  'validate_override_invariants_after_save', currently untested.
+
+** one plain render of the under-rendered cols (one new TypeDB test)
+Target: a new small test target, suggested name
+tests/readonly_col_render.rs, one fixture in which node N is
+subscribed to by S, overridden by O (foreign, so no substitution
+complicates the render), hides H, and is hidden by Z.  One
+single-root view of N asserts all four read-only cols
+(subscriberCol, overriderCol, hiderCol, hiddenCol) appear with the
+right members, indefinitive, in sorted-ID order.  This closes the
+"initial rendering" cells for hiderCol and hiddenCol and
+double-pins the other two outside diff mode.
+
+** omission of inactive col members (extend tests/source_sets.rs, one test)
+Same fixture shape as above but multi-source: one member of each
+of subscriberCol, overriderCol, hiddenCol, and one hidden-in
+filter member, each from a source outside the active set.  Render
+N; assert each inactive member is OMITTED (no placeholder line),
+while a same-col active member still shows.  Closes the
+restricted-rendering cells for the read-only and filter cols in
+one render.
+
+** writable-col membership, end-to-end (one new TypeDB target, suggested name tests/writable_col_membership.rs)
+Four tests through 'update_from_and_rerender_buffer_test', each
+asserting both the rerendered view and the owner's .skg file on
+disk:
+- add a subscription by inserting a member line under
+  subscribeeCol; disk 'subscribes_to' gains it; the rerendered col
+  shows it.
+- remove one subscription the same way; disk loses exactly it.
+- reorder subscriptions; disk order follows the buffer.
+- add an override edge by inserting a member under overriddenCol
+  (no competing overrider in the fixture); disk gains it; then a
+  second save in the same test adds a second user-owned overrider
+  for the same target via another owner's overriddenCol and
+  asserts the save RESPONSE carries the monogamy error and disk is
+  unchanged.  (This is the buffer-level half of the
+  rejected-at-save checklist item.)
+This target does not need the global graph handle unless the
+fixture trips substitution; keeping all overriders foreign-or-
+unique avoids that.
+
+** restricted save preserves invisible override targets (extend tests/source_sets.rs, one test)
+Owner with 'overrides_view_of' = [v, i] where i's source is
+inactive.  Render under the restricted set (col shows only v),
+save the buffer unmodified, read disk: the override list still
+contains i.  Then delete v and save: disk holds exactly [i].
+Closes the pipeline-level half of the second named regression.
+
+** collateral col update (extend tests/partner_col_warnings.rs's harness style or hidden_from_subscriptions's, one test)
+Open a view of N (its subscriberCol shows S).  In a second view,
+edit S's subscribeeCol to drop N, and save.  Assert the collateral
+stream re-renders N's view with S gone from its subscriberCol.
+Closes the collateral cell for the col-membership path that all
+eight cols share.
+
+** saved-view-only warning scoping (one test beside the previous one)
+Arrange a repair that occurs in the COLLATERAL view (for example
+the collateral view holds a stale intruder under its
+subscriberCol) while the saved buffer is clean.  Assert the save
+response carries no repair warning for the collateral view's col.
+(What the collateral STREAM shows is the repaired view; that is
+already its job.)
+
+** init/rebuild refusal wiring (one new TypeDB test, pending the decision below)
+Fixture directory whose .skg files give one node two user-owned
+overriders; assert the init path 'error_unless_override_invariants_
+hold' is reached through the real entry point used by
+'rebuild dbs' / server start, and that the error text lists the
+collision.  How heavy this is depends on which entry point is
+testable without spawning a server; if only the full server boot
+reaches it, the cost-benefit changes (see decision).
+
+** expansion of read-only col members (one test, pending the spec decision below)
+After the decision: request a definitive view of a subscriberCol
+member; assert whatever the decision says (lean: ordinary
+expansion of the member in place, raw content, no
+subscription-hides applied since those are scoped to
+subscribee-as-such, substitution applying to NEW content beneath
+it as everywhere).
+
+* suite-cost accounting
+New pure tests: about seven (extraction, simulation).  New
+TypeDB-backed tests: about eight, of which two reuse existing
+targets' fixtures.  Two new test targets (readonly_col_render,
+writable_col_membership) plus possibly one for init refusal.  No
+new integration (bash/Emacs) tests.  This respects the metaplan's
+instruction to prefer the pure seams; every end-to-end test above
+exists because the behavior it pins lives in wiring (disk writes,
+response contents, the collateral stream) that the pure seams
+cannot see.
+
+* test-suite hygiene rules for this stage
+- A test that installs the global graph handle goes in its own
+  target (precedent: tests/override_chain_notice.rs).  None of the
+  planned tests should need it; if one turns out to (substitution
+  sneaking into a fixture), isolate it rather than share.
+- Every test that saves and then reads Tantivy must call
+  'wait_for_tantivy_writes_idle' first (common-gotchas.md).  The
+  planned tests read disk and rendered views, not Tantivy, so this
+  should not arise.
+- Unique database names per test ('skg-test-...'), since tests run
+  in parallel under nextest.
+- Known pre-existing flakes (the 'ids::save' group under plain
+  'cargo test'; the once-seen 'test_title_diff_staged...' failure)
+  are recorded in TODO/problems.org; do not chase them here, and
+  run the suite via 'cargo nextest run' as the stages before did.
+
+* problems
+Anything incompletely specified, dangerous, inelegant, awkward, or
+otherwise problematic, found while auditing.  Decisions Jeff must
+make are marked TODO.
+
+** ONGOING decision: is policy-class sampling acceptable, or must every col get every end-to-end cell?
+The four read-only sets share one reconciler, one extraction rule,
+one omission filter and one warning channel; the audit above
+covers each MECHANISM once (usually via subscriberCol) plus cheap
+per-col renders, rather than repeating reorder/insert/delete/
+collateral end-to-end four times.  Risk accepted under sampling: a
+future per-col special case (a match arm that singles out, say,
+hiderCol) would not be caught by the subscriberCol tests.  The
+ColPolicy consolidation from stage 8 makes such drift much harder
+than it used to be, which is why I think sampling is sound.  If
+you want exhaustive instead, the writable_col_membership pattern
+extends mechanically (about twelve more TypeDB tests, noticeably
+slower suite).
+
+*** TODO we can test them all but batch into one test
+The test suite is already unwieldy, so we want to tread lightly.
+But we can run a test like
+'does removal work right in every col?',
+where the saved buffer before and after
+is represented as actual org-text in a before and an after file,
+so easy to eyeball for correctness,
+and easy to modify if the behaivor under some kind of col should change.
+
+That reduces our number of new tests from n x k to k.
+
+But we can go even further and make it one test
+that reads pairs of files in serial.
+I *imagine* the expensive thing about each test
+is that it has to build a new TypeDB db each time;
+this avoids that. There can be one db for the whole test,
+consisting if necessary of independent graphs
+that the test tests in serial.
+** DONE decision: how hard to test the init/rebuild refusal wiring
+The validator is thoroughly tested; what is not tested is that
+init and 'rebuild dbs' CALL it.  An end-to-end test costs a
+bad-data fixture plus whatever the cheapest real entry point is;
+if that turns out to be "boot the whole server", it becomes the
+most expensive test in the suite for one line of wiring.  Options:
+(a) test through the cheapest real entry point if it is callable
+as a function (my lean -- 'server/dbs/init.rs' line 95 region
+looks callable, but I have not proven it from a test context);
+(b) skip the test and record the untested wiring in
+TODO/problems.org; (c) full server boot test.
+*** TODO agreed
+** DONE decision: what should a FAILED save do with warnings?
+Today's shape: parse warnings are produced early; validation
+errors abort the save; I could not find code or test that says
+whether the error response also carries the warnings collected
+before the abort.  The metaplan 1 matrix asked for "failed save
+with both warnings and errors" as a test, which presumes both
+travel together.  Options: (a) pin whatever the code currently
+does, with a test, and move on (my lean: if it already carries
+both, this is free); (b) decide warnings should always accompany
+errors and change the pipeline if needed; (c) decide a failed save
+sends only errors (warnings about a buffer that did not save may
+mislead).  The test will be written to match your choice.
+*** TODO (b)
+** ONGOING decision: what does definitive expansion of a read-only col member mean?
+Expanding a subscribee-as-such applies the subscriber's hides;
+expanding an overridden-as-such shows raw content; but for members
+of subscriberCol, overriderCol, hiderCol and hiddenCol no document
+states the expansion semantics, and no test pins one.  My lean:
+plain expansion, identical to expanding any indefinitive node --
+no hides applied (those are scoped to subscriptions being viewed
+as such), substitution applied to NEW content created beneath the
+member (the member line itself already exists, and col members
+draw raw).  If you confirm, the one test above pins it; if you
+want something else (for example refusing expansion inside
+read-only cols), say so and the test changes.
+*** TODO Yes, but also only apply overriding to children if the parent was itself drawn that way.
+I don't know if that constraint is recorded anywhere but it should apply.
+It would be strange to see an overridden's title over its overrider's children.
+** DONE decision: are Emacs-side tests wanted for any of this?
+Everything in this plan is server-observable (responses, disk,
+streams), and the Emacs handlers for those streams already have
+tests.  My lean is no new elisp or integration tests this stage.
+Veto if you want, for example, a user-visible warning-display
+integration test.
+*** DONE skip it
+** (incompletely specified) the matrix's "collateral rerender" column predates per-col warnings scoping
+Metaplan 1 asked for "rerender-all warning delivery" before stage
+8 decided rerender-all repairs silently.  This plan reinterprets
+the cell as "warnings stay scoped to the saved view" (see the
+warnings audit).  If you meant something else by the original
+cell, the reinterpretation is the thing to correct.
+
+** (awkward) 'test_every_kind_of_col' does not test every kind of col
+It covers subscribeeCol and the two filter cols.  The four
+inbound/outbound read-only relation cols are absent from it.  The
+name predates stage 6's col additions.  Either rename it (my
+lean: 'test_subscribee_and_filter_cols') or extend its fixture;
+renaming is one line and removes a trap for future readers who
+might take the name as evidence of coverage (I nearly did).
+
+** (awkward) coverage of one behavior is scattered across targets named for features, not for matrix cells
+This is the natural result of test-as-you-go staging, and this
+plan deepens it slightly (new cells go into existing
+feature-named targets where the fixtures already fit).  The audit
+section above is the only map from matrix cell to test.  If that
+map should outlive this file, the documentation step (next in the
+metaplan) could carry a maintained version of it; otherwise
+accept that the map decays into the tests themselves.
+
+** (inelegant) the writable cols' end-to-end membership tests arrive this late
+Stage 6 built writable cols, but adding and removing single
+members through a real save apparently never got an end-to-end
+test -- the gap this plan's largest new target fills.  Nothing
+suggests the behavior is broken (the extraction seam is well
+covered and idempotence holds), but if the new tests DO find a
+bug, per the scope rule it lands in TODO/problems.org and the fix
+is its own decision.
+
+** (pre-existing, recorded) two flaky-test families and one process-global race
+The 'ids::save' flake, the one-shot 'test_title_diff_staged...'
+failure, and the plain-'cargo test' race on the global graph
+handle are all recorded in TODO/problems.org already.  This plan
+works around them (nextest, own-target isolation) rather than
+fixing them; a dedicated de-flaking pass would be its own small
+stage if you ever want one.
+
+* open questions
+The TODO decisions above, gathered for answering convenience; each
+is self-contained there.  Nothing else blocks; per
+when-to-stop.org, everything below the decisions is execute-as-
+planned.

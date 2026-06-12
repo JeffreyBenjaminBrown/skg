@@ -183,6 +183,157 @@ fn inactive_overriders_are_omitted_and_can_empty_the_menu
                 "{}", menu );
       Ok (( )) } )) }
 
+/// The shape signature of a rendered org buffer: (depth, id) per
+/// headline, ignoring decoration (e.g. notInGit, diff axes), so
+/// shape-stability across a diff-mode toggle is assertable without
+/// pinning every decoration detail.
+fn shape_signature (
+  buf : &str,
+) -> Vec<(usize, String)> {
+  buf . lines ()
+    . map ( |l| {
+        let id : String =
+          l . find ("(id ")
+          . map ( |start| l [start + 4 ..]
+                  . chars ()
+                  . take_while ( |c| *c != ')' )
+                  . collect () )
+          . unwrap_or_default ();
+        ( org_depth (l), id ) } )
+    . collect () }
+
+/// Stage 11 decided the override-choice menu appears in diff mode
+/// too; stage 12-2 pins it: visiting an overridden node with
+/// diff_mode_enabled still yields the menu, not a content view.
+#[test]
+fn menu_still_offered_in_diff_mode
+  () -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-override-menu-diff-mode",
+    "tests/override_menu/fixtures-multi/skgconfig.toml",
+    "/tmp/tantivy-test-override-menu-diff-mode",
+    |config, driver, tantivy| Box::pin ( async move {
+      let graph = graph_handle_from_config (config) ?;
+      skg::dbs::in_rust_graph::try_init_global_handle (
+        graph_handle_from_config (config) ? );
+      let env : SkgEnv =
+        skg_env_from_parts (
+          config, Arc::clone (driver), tantivy, &graph );
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName::from ("all")) ?;
+      let mut views_state : ViewsState =
+        ViewsState {
+          diff_mode_enabled : true,
+          open_views        : OpenViews::new (), };
+      let (mut server, client) =
+        connected_tcp_stream_pair () ?;
+      std::thread::scope ( |scope| {
+        scope . spawn ( || {
+          handle_single_root_view_request (
+            &mut server,
+            "((request . \"single root content view\") \
+              (id . \"Z\") (view-uri . \"diff-menu-uuid\"))",
+            &env, &mut views_state, &active ); } ); } );
+      let response : String = {
+        let mut reader : std::io::BufReader<TcpStream> =
+          std::io::BufReader::new (client);
+        read_lp_message ( &mut reader ) ? };
+      assert! ( response . contains ("override-menu:Z"),
+        "diff mode still offers the menu:\n{}", response );
+      assert! ( response . contains (
+          "The requested node is overridden" ),
+        "{}", response );
+      Ok (( )) } )) }
+
+/// An open menu survives a diff-mode toggle intact: its generated
+/// indefinitive lines neither phantom nor duplicate (decoration like
+/// notInGit may appear; the shape -- depths and ids -- must not
+/// change).
+#[test]
+fn open_menu_survives_diff_mode_toggle
+  () -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-override-menu-toggle",
+    "tests/override_menu/fixtures-multi/skgconfig.toml",
+    "/tmp/tantivy-test-override-menu-toggle",
+    |config, driver, tantivy| Box::pin ( async move {
+      let graph = graph_handle_from_config (config) ?;
+      skg::dbs::in_rust_graph::try_init_global_handle (
+        graph_handle_from_config (config) ? );
+      let env : SkgEnv =
+        skg_env_from_parts (
+          config, Arc::clone (driver), tantivy, &graph );
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName::from ("all")) ?;
+      let mut views_state : ViewsState =
+        ViewsState {
+          diff_mode_enabled : false,
+          open_views        : OpenViews::new (), };
+      let menu_before : String = {
+        // Open the menu through the handler, registering it.
+        let (mut server, client) =
+          connected_tcp_stream_pair () ?;
+        std::thread::scope ( |scope| {
+          scope . spawn ( || {
+            handle_single_root_view_request (
+              &mut server,
+              "((request . \"single root content view\") \
+                (id . \"Z\") (view-uri . \"toggle-menu-uuid\"))",
+              &env, &mut views_state, &active ); } ); } );
+        let mut reader : std::io::BufReader<TcpStream> =
+          std::io::BufReader::new (client);
+        read_lp_message ( &mut reader ) ? };
+      let toggle = |views_state : &mut ViewsState| -> Vec<String> {
+        let (mut server, client) =
+          connected_tcp_stream_pair () . unwrap ();
+        std::thread::scope ( |scope| {
+          scope . spawn ( || {
+            skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
+              &mut server, &env, views_state, &active ); } ); } );
+        drop (server);
+        let mut reader : std::io::BufReader<TcpStream> =
+          std::io::BufReader::new (client);
+        let mut messages : Vec<String> = Vec::new ();
+        while let Ok (m) = skg::test_utils::read_lp_message (&mut reader) {
+          messages . push (m); }
+        messages };
+      let menu_view_of = |messages : &[String]| -> String {
+        messages . iter ()
+          . find ( |m| m . contains ("rerender-view")
+                       && m . contains ("override-menu:Z") )
+          . cloned ()
+          . unwrap_or_else ( || panic! (
+              "the open menu rerenders on toggle: {:?}", messages )) };
+      { // Toggle ON: the menu rerenders, shape unchanged.
+        let messages : Vec<String> = toggle (&mut views_state);
+        assert! ( views_state . diff_mode_enabled );
+        let rerendered : String = menu_view_of (&messages);
+        for (depth, id) in shape_signature (&menu_before) {
+          if id . is_empty () { continue; }
+          assert! (
+            shape_signature (&rerendered) . contains (
+              & (depth, id . clone ()) ),
+            "menu line (depth {}, id {}) survives the toggle:\n{}",
+            depth, id, rerendered ); }
+        assert_eq! (
+          rerendered . matches ("(id Z)") . count (),
+          menu_before . matches ("(id Z)") . count (),
+          "no duplicate or phantom Z:\n{}", rerendered ); }
+      { // Toggle OFF: still intact.
+        let messages : Vec<String> = toggle (&mut views_state);
+        assert! ( ! views_state . diff_mode_enabled );
+        let rerendered : String = menu_view_of (&messages);
+        for (depth, id) in shape_signature (&menu_before) {
+          if id . is_empty () { continue; }
+          assert! (
+            shape_signature (&rerendered) . contains (
+              & (depth, id . clone ()) ),
+            "menu line (depth {}, id {}) survives the toggle:\n{}",
+            depth, id, rerendered ); }}
+      Ok (( )) } )) }
+
 #[test]
 fn handler_precedence_and_menu_dedup
   () -> Result<(), Box<dyn Error>> {

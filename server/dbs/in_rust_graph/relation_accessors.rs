@@ -2,6 +2,8 @@ use std::collections::HashSet;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
+use crate::types::git::NodeChanges;
+use crate::types::list::Diff_Item;
 use crate::types::misc::ID;
 use crate::types::nodes::rust::NodeRust;
 
@@ -43,6 +45,28 @@ impl NodeRelation {
         Some (Self::OverridesViewOf),
       _ => None,
     } }
+
+  /// The per-stage diff of this relation's outbound list within a
+  /// NodeChanges, or None for a relation NodeChanges does not diff
+  /// (textlinks are inferred from node text, not stored as a list).
+  /// Membership-sign consumers (e.g. 'phantom_axes') call this with
+  /// the one relation their col represents, so a sign can never be
+  /// read from a different relation that involves the same ID.
+  pub fn diff_in_nodechanges<'a> (
+    self,
+    nc : &'a NodeChanges,
+  ) -> Option<&'a [Diff_Item<ID>]> {
+    match self {
+      Self::Contains =>
+        Some ( & nc . contains_diff ),
+      Self::Subscribes =>
+        Some ( & nc . subscribes_to_diff ),
+      Self::HidesFromItsSubscriptions =>
+        Some ( & nc . hides_diff ),
+      Self::OverridesViewOf =>
+        Some ( & nc . overrides_view_of_diff ),
+      Self::TextlinksTo =>
+        None, } }
 
   pub fn roles (self) -> (&'static str, &'static str) {
     let relation_name : &'static str = self . typeql_name ();

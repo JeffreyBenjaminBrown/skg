@@ -1,0 +1,6 @@
+pid: 'E'
+title: "E"
+overrides_view_of:
+  - "EZ"
+hides_from_its_subscriptions:
+  - "EH"

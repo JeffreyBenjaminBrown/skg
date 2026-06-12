@@ -20,3 +20,17 @@ mod newhere_cycle;
 
 #[path = "git_diff_view/collateral/mod.rs"]
 mod collateral;
+
+#[path = "git_diff_view/inbound/mod.rs"]
+mod inbound;
+
+#[path = "git_diff_view/filter_cols/mod.rs"]
+mod filter_cols;
+
+// The outbound-col diff tests (git_diff_view/overrides/) live in
+// their own target, tests/git_diff_view_partner_cols.rs: their de
+// novo renders install the process-global graph handle, which must
+// not leak into this target's save tests (or the coherence
+// debug_assert in save_buffer.rs) under plain 'cargo test', where
+// one process hosts a whole target. The inbound tests save without
+// the global handle, so they live here.

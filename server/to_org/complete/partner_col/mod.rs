@@ -1,18 +1,27 @@
 pub mod child_data;
 pub mod goal_list;
+pub mod inverse_scan;
 pub mod kind;
 
 use crate::source_sets::ActiveSourceSet;
 use crate::types::phantom::source_from_disk;
 use crate::update_buffer::reconcile::omit_inactive_members;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
   what_nodes_contain };
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{
   ChildData, reconcile_partnerCol_children_against_goal_list };
+use crate::to_org::complete::partner_col::goal_list::{
+  goal_list_for_hiddeninsubscribee_col,
+  goal_list_for_hiddenoutsideof_subscribeecol,
+  goal_list_for_outbound_col };
+use crate::to_org::complete::partner_col::inverse_scan::inverse_scan_for_inbound_col;
 use crate::to_org::util::nodecomplete_and_viewnode_from_id;
+use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol};
@@ -106,6 +115,7 @@ pub async fn maybe_add_subscribeeCol_branch (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
@@ -127,6 +137,15 @@ pub async fn maybe_add_subscribeeCol_branch (
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
     pids_for_subscriber_and_its_subscribees ( tree, node_id, config ) ?;
+  let subscriber_source : SourceName =
+    read_at_node_in_tree (
+      tree, node_id,
+      |vn| match &vn . kind {
+        ViewNodeKind::Vognode (Vognode::Active (t))
+          => Some ( t . source . clone () ),
+        _ => None } )
+    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
+    . ok_or ("maybe_add_subscribeeCol_branch: expected TrueNode") ?;
   let subscribee_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: inactive
     // subscribees are omitted at de novo creation (no retained
@@ -139,8 +158,18 @@ pub async fn maybe_add_subscribeeCol_branch (
                  . and_then ( |g| g . pid_and_source (id)
                                   . map ( |(_pid, src)| src ))
                  . or_else ( || source_from_disk (id, config) ));
-  if subscribee_ids . is_empty () { // Skip because it would be empty.
-    return Ok (( )); }
+  if subscribee_ids . is_empty () {
+    // Skip because it would be empty -- unless, in diff mode, the
+    // HEAD side of the membership is non-empty: a col emptied since
+    // HEAD still renders, so its phantoms have a home (the col is
+    // created bare; its own BFS visit reconciles the phantoms in).
+    let head_side_occupied : bool =
+      source_diffs . is_some ()
+      && ! goal_list_for_outbound_col (
+             &subscriber_pid, &subscriber_source,
+             NodeRelation::Subscribes,
+             source_diffs, &subscribee_ids ) . 0 . is_empty ();
+    if ! head_side_occupied { return Ok (( )); }}
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content
@@ -168,7 +197,24 @@ pub async fn maybe_add_subscribeeCol_branch (
       tree, subscribee_col_nid,
       PartnerCol::Subscribee,
       &goal, &data ) ?; }
-  if ! hidden_outside_content . is_empty () {
+  let hidden_outside_head_side_occupied : bool =
+    // Diff-mode col existence: a hiddenOutside membership emptied
+    // since HEAD still warrants the col, for its phantoms.
+    hidden_outside_content . is_empty ()
+    && source_diffs . is_some ()
+    && { let wt_hides : Vec<ID> =
+           nodecomplete_rustFirst_by_pid_and_source (
+             config, &subscriber_pid, &subscriber_source )
+           . ok ()
+           . map ( |skg| skg . hides_from_its_subscriptions
+                         . or_default () . to_vec () )
+           . unwrap_or_default ();
+         ! goal_list_for_hiddenoutsideof_subscribeecol (
+             &subscriber_pid, &subscriber_source,
+             &wt_hides, &subscribee_ids,
+             source_diffs, config ) . 0 . is_empty () };
+  if ! hidden_outside_content . is_empty ()
+     || hidden_outside_head_side_occupied {
     // HiddenOutsideOfSubscribeeCol presents last, if it exists.
     let hidden_outside_col_nid : NodeId =
       insert_scaffold_as_child (
@@ -195,6 +241,7 @@ pub async fn maybe_add_partnerCol_branches (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
@@ -210,7 +257,8 @@ pub async fn maybe_add_partnerCol_branches (
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   maybe_add_subscribeeCol_branch (
-    tree, node_id, config, driver, active_source_set) . await ?;
+    tree, node_id, config, driver, active_source_set,
+    source_diffs ) . await ?;
   let Some (graph) = snapshot_global () else {
     return Ok (( )); };
   for kind in [
@@ -221,7 +269,7 @@ pub async fn maybe_add_partnerCol_branches (
     PartnerCol::Hidden,
   ] { maybe_add_one_partnerCol (
         tree, node_id, kind, config, driver, &graph,
-        active_source_set ) . await ?; }
+        active_source_set, source_diffs ) . await ?; }
   Ok (( )) }
 
 /// Add a generated PartnerCol for `node_id` if it would
@@ -235,18 +283,19 @@ async fn maybe_add_one_partnerCol (
   driver  : &TypeDBDriver,
   graph   : &Arc<InRustGraph>,
   active_source_set : Option<&ActiveSourceSet>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   if unique_scaffold_child_of_viewnode (
       tree, node_id, &ViewNodeKind::PartnerCol (kind)
     )? . is_some ()
   { // There already is one. Don't draw a new one.
     return Ok (( )); }
-  let owner_pid : ID =
+  let (owner_pid, owner_source) : (ID, SourceName) =
     read_at_node_in_tree (
       tree, node_id,
       |vn| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
-          => Ok (t . id . clone ()),
+          => Ok (( t . id . clone (), t . source . clone () )),
         _ => Err ("expected TrueNode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
@@ -266,8 +315,23 @@ async fn maybe_add_one_partnerCol (
                  . map ( |(_pid, src)| src )
                  . or_else ( || source_from_disk (id, config) ));
   if member_ids . is_empty () {
-    // It would be empty, so don't draw it.
-    return Ok (( )); }
+    // It would be empty, so don't draw it -- unless, in diff mode,
+    // the HEAD side of the membership is non-empty: a col emptied
+    // since HEAD still renders, so its phantoms have a home (the
+    // col is created bare; its own BFS visit reconciles the
+    // phantoms in).
+    let head_side_occupied : bool =
+      source_diffs . is_some ()
+      && if owner_role . is_first_role () { // outbound
+           ! goal_list_for_outbound_col (
+               &owner_pid, &owner_source, member_role . relation,
+               source_diffs, &member_ids ) . 0 . is_empty ()
+         } else { // inbound: the inverse scan
+           inverse_scan_for_inbound_col (
+             &owner_pid, member_role . relation, source_diffs )
+           . values ()
+           . any ( |axes| ! axes . net_is_present () ) };
+    if ! head_side_occupied { return Ok (( )); }}
   let col_nid : NodeId =
     insert_scaffold_as_child (
       tree, node_id, ViewNodeKind::PartnerCol (kind), true) ?;
@@ -288,6 +352,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   subscribee_treeid : NodeId,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
+  source_diffs      : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
@@ -307,7 +372,40 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
         & config . db_name, driver,
         & subscriber_pid, & subscribee_pid ) . await ?;
   if hidden_in_content . is_empty () {
-    return Ok (( )); }
+    // Skip because it would be empty -- unless, in diff mode, the
+    // HEAD-side DERIVED membership is non-empty: a hidden-in
+    // membership emptied since HEAD still warrants the col, for its
+    // phantoms (created bare; the BFS reconciles them in).
+    let head_side_occupied : bool =
+      source_diffs . is_some ()
+      && { let source_of = | pid : &ID | -> SourceName {
+             snapshot_global ()
+               . and_then ( |g| g . pid_and_source (pid)
+                                . map ( |(_p, src)| src ))
+               . or_else ( || source_from_disk (pid, config) )
+               . unwrap_or_else ( SourceName::not_found ) };
+           let subscribee_source : SourceName =
+             source_of (&subscribee_pid);
+           let subscriber_source : SourceName =
+             source_of (&subscriber_pid);
+           let subscribee_contains : Vec<ID> =
+             nodecomplete_rustFirst_by_pid_and_source (
+               config, &subscribee_pid, &subscribee_source )
+             . ok () . map ( |skg| skg . contains )
+             . unwrap_or_default ();
+           let subscriber_hides : Vec<ID> =
+             nodecomplete_rustFirst_by_pid_and_source (
+               config, &subscriber_pid, &subscriber_source )
+             . ok ()
+             . map ( |skg| skg . hides_from_its_subscriptions
+                           . or_default () . to_vec () )
+             . unwrap_or_default ();
+           ! goal_list_for_hiddeninsubscribee_col (
+               &subscribee_pid, &subscribee_source,
+               &subscriber_pid, &subscriber_source,
+               &subscribee_contains, &subscriber_hides,
+               source_diffs ) . 0 . is_empty () };
+    if ! head_side_occupied { return Ok (( )); }}
   let hidden_in_ids : Vec<ID> =
     hidden_in_content . into_iter () . collect ();
   let hidden_col_nid : NodeId =

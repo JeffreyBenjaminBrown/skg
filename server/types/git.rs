@@ -96,13 +96,17 @@ pub struct NodeChanges {
   pub aliases_diff  : Vec<Diff_Item<String>>,
   pub ids_diff      : Vec<Diff_Item<ID>>,
   pub contains_diff : Vec<Diff_Item<ID>>,
-  /// §C: per-stage diff of the node's sharing relations, so a PartnerCol
-  /// member removed from subscribes_to / hides can carry a PER-STAGE membership
-  /// axis (staged vs unstaged) instead of only the net-removal fallback. A
-  /// member appears in exactly one of contains/subscribes_to/hides, so
-  /// phantom_axes consults all three.
-  pub subscribes_to_diff : Vec<Diff_Item<ID>>,
-  pub hides_diff         : Vec<Diff_Item<ID>>,
+  /// Per-stage diffs of the node's sharing relations, so a PartnerCol
+  /// member added to or removed from one of them carries a PER-STAGE
+  /// membership axis (staged vs unstaged) instead of only the
+  /// net-removal fallback.  Each membership-sign consumer names which
+  /// relation its col represents and reads exactly that diff
+  /// ('NodeRelation::diff_in_nodechanges'): one owner can bear the
+  /// same ID in two relations, changed in different stages, and a
+  /// phantom's stage label must come from its own col's relation.
+  pub subscribes_to_diff      : Vec<Diff_Item<ID>>,
+  pub hides_diff              : Vec<Diff_Item<ID>>,
+  pub overrides_view_of_diff  : Vec<Diff_Item<ID>>,
 }
 
 //

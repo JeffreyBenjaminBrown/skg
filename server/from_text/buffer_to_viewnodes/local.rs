@@ -390,10 +390,20 @@ fn validate_gnode_identity_and_structure (
   if !source_valid {
     errors . push( format!(
       "{} must have a source that exists in the config.", label) ); }
+  let is_subscribee_as_such : bool =
+    // A subscribee-as-such (gnode child of a SubscribeeCol) is the
+    // one gnode position that legitimately carries a
+    // HiddenInSubscribeeCol; rendering puts the col there, so a
+    // saved buffer must round-trip it.
+    tree . get (node_id)
+    . and_then ( |n| n . parent () )
+    . map ( |p| matches! ( & p . value () . kind,
+              MpViewnodeKind::PartnerCol (PartnerCol::Subscribee) ))
+    . unwrap_or (false);
   if !generation_includes_only(
     tree, node_id, 1, true,
-    |node| !cannot_be_child_of_gnode (node))
-    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol.", label) ); }
+    |node| !cannot_be_child_of_gnode (node, is_subscribee_as_such))
+    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol (outside a subscribee-as-such), or HiddenOutsideOfSubscribeeCol.", label) ); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
   errors }
@@ -430,12 +440,17 @@ fn validate_phantom (
 
 fn cannot_be_child_of_gnode (
   node : &MpViewnode,
+  parent_is_subscribee_as_such : bool,
 ) -> bool {
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
     MpViewnodeKind::Qual (Qual::Alias { .. } | Qual::ID { .. }) |
-    MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee |
-                                         PartnerCol::HiddenOutsideOfSubscribee)) }
+    MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee))
+  || ( ! parent_is_subscribee_as_such
+       // validate_hiddenin REQUIRES a gnode parent; a
+       // subscribee-as-such is the position that warrants one.
+       && matches!(&node . kind,
+            MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)) ) }
 
 /// Check if an MpTruenode has an ID.
 pub fn has_id ( t : &MpTruenode ) -> bool {
