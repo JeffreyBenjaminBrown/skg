@@ -106,6 +106,35 @@ runs before the FS write).
   already preserves the inactive member); the omission preservation
   cell therefore deletes the visible member to force a real change and
   prove the invisible one survives.
+**** commit 4: source-set / collateral / warning-scoping tests (three)
+- 'restricted_save_preserves_invisible_override_targets'
+  (tests/source_sets.rs, +3 fixture nodes): a node overrides
+  [ovr-visible, ovr-inactive]; under the restricted "public" set the
+  set-difference merge keeps ovr-inactive across a restricted save,
+  and deleting the visible member leaves exactly [ovr-inactive].
+  Closes the pipeline-level half of the second named regression.
+  Built with hand-written buffers (not a render) because the
+  overriddenCol render needs the global handle, which source_sets.rs
+  deliberately does not install.
+- collateral col-membership update + warning scoping, in a NEW target
+  tests/collateral_partner_col.rs (its own target because it installs
+  the global handle for the inbound subscriberCol). One function: a
+  view of N shows subscriberCol=[S]; a save of a second view that
+  drops S's subscription re-renders N collaterally with S gone and the
+  empty col dropped; and the save response carries no col-repair
+  warning (scoping).
+***** deviation: the two collateral cells are ONE test, and the
+  warning-scoping cell is the WEAKER observable form.  The plan wanted
+  a collateral view holding an UNREPAIRED stale member so the
+  collateral rerender performs a real repair that, unscoped, would
+  warn.  That state is not reachable through 'register_view': every
+  registered viewforest comes from a render or a save and is therefore
+  already reconciled (clean).  So the strong form stays enforced by
+  construction (stage 8 passes no warning sink to collateral
+  rerenders).  The test pins the observable consequence instead -- a
+  collateral col change does not add a warning to the saver's response
+  -- which is the property the cell exists to protect.  Reversible if
+  a viewforest-from-edited-text registration helper is ever added.
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
