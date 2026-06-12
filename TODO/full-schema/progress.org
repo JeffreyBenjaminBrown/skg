@@ -8,6 +8,36 @@ marked 'Affected'. Stage 7 was never executed as written; parts of
 its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
+** stage 13 : test the relationship matrix
+*** planned
+Wrote 'TODO/full-schema/13_test-rel-matrix.org', covering the
+metaplan_2.org step "test the relationship matrix".  Because stages
+8 through 12 shipped tests with their features, the plan is mostly
+an AUDIT: every matrix cell (collection type x behavior, plus the
+override and warnings checklists from metaplan 1) is mapped to the
+existing test that covers it, or marked as a gap.  Three of the
+four regressions named in the metaplan step already exist
+(stale-inactive-placeholder savability, save-success warning
+delivery, read-only-set order preservation); the fourth
+(invisible-override-target preservation through the real pipeline)
+is among the gaps.
+
+The new tests fill gaps at the cheapest seam that reaches each
+behavior: about seven pure tests (extraction-level writable-col
+membership semantics; the untested nodeMerge arm of
+'validate_override_invariants_after_save') and about eight
+TypeDB-backed tests (writable-col add/remove/reorder end-to-end
+with buffer-level monogamy rejection; a plain render and an
+inactive-omission render covering the under-rendered read-only
+cols; restricted-save preservation of invisible override targets;
+collateral col-membership update; saved-view-only warning scoping).
+
+Ends with a glossary (at the top) and a problems section.
+TODO-marked decisions: policy-class sampling versus exhaustive
+per-col end-to-end coverage; how hard to test the init/rebuild
+refusal wiring; what a failed save does with warnings; the
+unspecified semantics of expanding a read-only col member; whether
+any Emacs-side tests are wanted.
 ** stage 12 : diff-mode policy for the full schema
 *** implemented (2026-06-11)
 Six commits on branch 'full-schema', executing
