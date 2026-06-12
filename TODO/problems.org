@@ -47,14 +47,21 @@
    clear body, set indef_or_def to Indefinitive,
    update parentIs — but keep everything else.
 
-** 'path_from_pid_and_source' uses .expect() and can panic
+** DONE 'path_from_pid_and_source' uses .expect() and can panic
+   Verified fixed 2026-06-12: server/util.rs:6 already returns
+   'Result<String, String>' via '.ok_or_else()'; no '.expect()'.
    server/util.rs. Already noted in MEMORY.md.
    If an invalid source reaches this function (e.g. from a search view),
    the server crashes. Should return Result.
 
 * Problems found during the staged/unstaged diff axis refactor
 
-** (partly fixed) 'node_changes_for_truenode' merges the two stages
+** DONE 'node_changes_for_truenode' merges the two stages
+   Verified fully fixed 2026-06-12: the bare 'node_changes_for_truenode'
+   no longer exists in server/ (only 'per_stage_node_changes_for_truenode'
+   remains). Every former caller (aliascol.rs, id_col.rs, goal_list.rs)
+   now reads both stages; 'content_goal_list' (reconcile/content.rs) was
+   refactored off it. The migration-then-delete plan below is complete.
    server/types/git.rs.
    Picks the unstaged stage when both have changes, losing the
    per-stage distinction. Worse, when a save rewrites a file with
@@ -115,7 +122,12 @@
    Worth renaming to 'before_node' or similar; would save future
    debugging.
 
-** 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes
+** (dormant) 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes
+   Dormant as of 2026-06-12: 'mk_removed_child_viewnode' now lives in
+   server/to_org/expand/unused_but_nice.rs ("Held for someday, not
+   currently wired in"), so the bug is unreachable in the current
+   renderer. NOT closed: the per-stage-sign fix must land before that
+   module is ever revived.
    server/to_org/expand/definitive.rs lines 394, 398.
    When a parent .skg file is deleted, its children are loaded from
    git HEAD and rendered as phantoms. Both existence and membership
@@ -138,7 +150,12 @@
    files does 3N parses. At current sizes this is fine but worth
    measuring on a larger garden.
 
-** 'compute_nodecomplete_diff' silently swallows YAML parse errors
+** DONE 'compute_nodecomplete_diff' silently swallows YAML parse errors
+   Verified fixed 2026-06-12: 'nodefs_as_nodecomplete_with_default_source'
+   (server/git_ops/diff.rs:108-121) now logs 'tracing::warn!' with path
+   and origin on parse failure before returning None -- the "surface to
+   logs" the entry asked for. (Callers still can't distinguish
+   corrupt-from-absent, but that was not requested.)
    server/git_ops/diff.rs.
    load_from_head / load_from_index / load_from_disk return None on
    parse failure (via '.ok()'), indistinguishable from "file absent".
@@ -287,8 +304,20 @@
    does not exist in the repository. Either the file was renamed or
    the reference is stale.
 
-** 'compute_interleaved_diff' can collide for large unique-item lists
+** DONE 'compute_interleaved_diff' can collide for large unique-item lists
    WARNING: TODO.org refers to the headline title verbatim.
+   (Kept verbatim: TODO.org's copy is also prefixed "DONE ".)
+
+   Fixed 2026-06-12: rewrote 'compute_interleaved_diff'
+   (server/types/list.rs) to diff the items directly via
+   'similar::capture_diff_slices' instead of mapping each item to a
+   Unicode scalar. There is no scalar encoding left to collide, so
+   distinct items can never be conflated regardless of list length.
+   Added 'Ord' to the bound (and to 'net_diff_from_per_stage', the one
+   generic caller). Regression test:
+   'git_ops::test_interleaved_diff_many_distinct_items_do_not_collide'
+   swaps two items deep in the old collision band and asserts the swap
+   is seen.
 
    server/types/list.rs maps each unique item to a Unicode scalar and
    feeds the resulting strings to 'similar::TextDiff::from_chars'.
@@ -397,7 +426,12 @@
   Found while answering the open questions in
   TODO/local-view-update/problems.org. Each is cross-referenced there.
 
-** Merge silently discards the acquiree's aliases
+** DONE Merge silently discards the acquiree's aliases
+   Verified fixed 2026-06-12: 'three_nodeMerged_nodecompletes'
+   (server/nodeMerge/nodeMergeInstructionTriple.rs:178-185) now unions
+   the acquiree's aliases into the acquirer, parallel to extra_ids, with
+   a comment. The "decide what merge preserves" question is decided:
+   union (stay findable by the acquiree's old aliases).
    server/merge/mergeInstructionTriple.rs.
    'three_merged_nodecompletes' (line 162) clones the acquirer and unions
    extra_ids, contains, subscribes_to, hides_from_its_subscriptions, and
@@ -413,7 +447,14 @@
    the same way, or the behavior should be a documented decision. Decide
    what "merge" should preserve.
 
-** Inactive nodes are never converted to Vognode::Deleted
+** DONE (obsolete) Inactive nodes are never converted to Vognode::Deleted
+   Obsolete 2026-06-12: the strip-inactive-node-fields work
+   deliberately REMOVED the inactive->Deleted conversion
+   ('convert_inactive_to_deleted_if_deleted' is deleted; complete.rs:190
+   documents the no-op), because flipping an inactive node to a DELETED
+   marker leaks that a hidden node vanished. An inactive placeholder is
+   now anonymous and lingers until the next full rerender. The entry's
+   premise (that the conversion should happen) is reversed by decision.
    server/update_buffer/complete_preorder/truenode.rs.
    When a save in one buffer deletes a node, collateral views convert a
    matching Normal vognode to Vognode::Deleted via
@@ -621,7 +662,12 @@
    from col display; merge visible-subset edits with disk's
    inactive members at save; assert no instruction touches an
    inactive source).
-** 'complete_relevant_children_in_viewnodetree' panics on non-Active relevant children
+** DONE 'complete_relevant_children_in_viewnodetree' panics on non-Active relevant children
+   Verified fixed 2026-06-12: the orderkey extractor is now typed
+   'View : Fn(&ViewNode) -> Result<Orderkey, String>'
+   (server/update_buffer/util.rs:140); the formerly-panicking closure
+   (to_org/complete/partner_col/child_data.rs:151-155) returns 'Err(...)'.
+   No panic path with that message remains. "Returning Err" was taken.
    Its orderkey closure panics ("relevant child not a normal graph
    node") if the relevance predicate ever admits a non-Active
    viewnode. Today every caller's predicate requires
@@ -847,7 +893,14 @@
    in its render-heavy function only.
 
 * Problems found while reviewing inactive-node save treatment (2026-06-12)
-** Retained inactive nodes emit positional save intentions for their container
+** DONE Retained inactive nodes emit positional save intentions for their container
+   Verified fixed 2026-06-12 by the strip-inactive-node-fields work:
+   'content_members', 'subscribeeCol_members' and 'partnerCol_members'
+   (traverse.rs:331-407) now all collect only 'Vognode::Active' children;
+   the inactive arm of 'visit' (traverse.rs:76-81) emits nothing;
+   'InactiveNode::collected_id' is deleted. The proposed fix (collect
+   only Active; let the weave own invisible members) is what shipped,
+   and content_members' comment now cites this entry.
    server/from_text/local_instruction_collection/traverse.rs.
    The metaplan-2 model for source-set safety (this file, "Sharing-col
    members from inactive sources make a buffer unsavable", and

@@ -1,0 +1,135 @@
+* Progress: clearing the easy correctness + doc wins from problems.org
+  Started 2026-06-12 (Claude). Jeff asked me to do all the "easy wins"
+  I found while auditing TODO/problems.org, commit as I go, fix any
+  documentation problems too, and stop only per when-to-stop.org
+  (i.e. only for an unanticipated architecture decision or a genuine
+  stumper).
+
+  This file is written in plain English on purpose. There is a
+  glossary at the bottom; when I use a project-specific word I try to
+  keep it in the glossary.
+
+* The short story so far
+  Before touching code I re-checked every correctness-flavoured item in
+  problems.org against the actual source. Most of the scary-sounding
+  ones were already fixed by earlier work (especially the recent
+  "make inactive nodes a fieldless marker" effort). I marked those as
+  DONE in problems.org with a one-line note and the evidence I checked.
+  The full reasoning lives in TODO/a-juicy-correctness-fix.org.
+
+  What was genuinely still broken, and that I am now fixing, is a
+  smaller list: one real (if hard-to-trigger) bug in a list-diffing
+  helper, one latent trap in the Emacs client, and a handful of stale
+  documentation references.
+
+* Done
+
+** The list-diff helper could silently give a wrong answer (FIXED)
+*** What was wrong
+    'compute_interleaved_diff' (server/types/list.rs) compares two
+    lists and reports which items were added, removed, or unchanged.
+    To do that it gave every distinct item its own "stand-in"
+    character and then diffed the resulting strings. The problem: there
+    is a band of character codes (the Unicode "surrogate" range) that
+    cannot be used, and the code quietly replaced any item that landed
+    there with a single shared '?' character. Once a list had enough
+    distinct items to reach that band (around 55,000), several
+    genuinely different items looked identical to the diff. The result
+    was a silently wrong diff -- no error, no warning, just a wrong
+    answer.
+
+*** Why it mattered (and how much)
+    In practice every caller diffs one node's own relationship / alias
+    / id list, and no node has anywhere near 55,000 entries, so this
+    could not actually bite today. But it is a general-purpose helper
+    in a shared file, the failure is silent, and the fix is cheap and
+    provably safe, so it was the cleanest "guarantee correctness" win
+    available.
+
+*** The fix
+    Stopped encoding items as characters. The 'similar' crate (already
+    a dependency) can diff slices of any comparable items directly, via
+    'capture_diff_slices'. So now we diff the items themselves. There
+    is no stand-in character left to collide, so distinct items can
+    never be conflated, no matter how long the list is. The rewrite is
+    also a bit shorter and allocates less.
+
+    One ripple: 'capture_diff_slices' needs its items to be orderable
+    ('Ord' in Rust terms). The items we diff (IDs, strings) already are
+    orderable, so I just added that requirement to the helper's
+    signature, and to the one generic function that forwards to it
+    ('net_diff_from_per_stage' in server/types/git.rs).
+
+*** Proof it works
+    Added a regression test
+    ('test_interleaved_diff_many_distinct_items_do_not_collide' in
+    tests/git_ops.rs): it builds two 60,000-item lists that differ by
+    swapping two items sitting right in the old collision band, and
+    checks that the swap actually shows up as a removal and an
+    addition. Under the old code those two items both became '?', so
+    the swap was invisible and the test would fail; under the fix it
+    passes. The four pre-existing diff tests still pass unchanged,
+    confirming ordinary diffs are unaffected.
+
+    Run: 'cargo nextest run --test grouped_unit -E "test(git_ops::test_interleaved)"'
+    -> 5 passed.
+
+* Still to do (in rough order)
+  - Emacs client: 'skg-strip-heralds-from-sexp' fabricates a fake
+    '(node ...)' part when cleaning up a metadata expression that did
+    not have one. Harmless today (no caller is fooled yet) but a trap.
+  - Documentation fixes:
+    - 'coding-advice/ai-agents.org' points at 'good-refactors.md';
+      the real file is 'some-good-refactors.md'.
+    - A stale code comment in server/types/viewnode.rs names a function
+      ('convert_inactive_to_deleted_if_deleted') that was deleted.
+    - Mark the doc problems that turned out already-fixed
+      (development-process.md link, tests/USAGE.md wording,
+      docs/setup.org's example-data/ reference) as DONE in problems.org.
+    - A sweep for any other broken doc references I can find.
+
+* Changes to the plan's envisioned order
+  None yet. (I did the list-diff fix first because it was the one with
+  a real, testable bug.)
+
+* Unanticipated costs / benefits
+  - Benefit: the new code is simpler and drops two string allocations
+    and a hashmap per diff call.
+  - Cost: a slightly stronger trait requirement ('Ord') on a generic
+    helper. No current caller is affected; a hypothetical future caller
+    diffing non-orderable items would have to derive an ordering. Cheap
+    and easy to reverse if it ever bites.
+
+* Open questions
+  None so far.
+
+* Glossary (plain-English meanings of words I use above)
+  - diff: a comparison of two lists (or texts) that says which parts
+    are the same, which were added, and which were removed.
+  - interleaved diff: a diff whose output keeps everything in order,
+    with the removed and added items sitting in their natural
+    positions among the unchanged ones.
+  - helper / generic helper: a small reusable function. "Generic"
+    means it works on lists of any item type, not one specific type.
+  - caller: any piece of code that calls a given function.
+  - the 'similar' crate: a third-party Rust library for computing
+    diffs; we already depend on it.
+  - capture_diff_slices: the function in that library that diffs two
+    slices (lists) of items directly.
+  - Unicode surrogate range: a block of character codes that are
+    reserved and cannot stand for real characters; trying to use one
+    fails, which is what the old code papered over with '?'.
+  - Ord / orderable: a Rust requirement that items can be sorted
+    (put in a definite order). IDs and strings satisfy it.
+  - regression test: a test that fails on the old (buggy) code and
+    passes on the fixed code, so the bug cannot silently come back.
+  - metadata expression / sexp: the parenthesized '(skg ...)' tag that
+    rides in front of each headline in a view and tells the client and
+    server how to treat that line. "sexp" is just "s-expression", the
+    Lisp term for such a parenthesized form.
+  - herald: a small visual marker the Emacs client draws from metadata
+    (for example, a count or a coloured letter). Herald fields are
+    display-only; the server discards them when reading a buffer back.
+  - node (in a metadata sexp): the '(node ...)' part of a '(skg ...)'
+    tag, present when the line stands for a real graph node (a
+    "TrueNode") rather than a display-only scaffold.

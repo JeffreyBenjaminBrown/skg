@@ -114,3 +114,43 @@ fn test_interleaved_diff() {
           Diff_Item::Removed   ("b"),
           Diff_Item::New       ("d"),
           Diff_Item::Unchanged ("c") ]); }
+
+#[test]
+fn test_interleaved_diff_many_distinct_items_do_not_collide() {
+  // Pins the fix for the silent-collision bug: a per-item scalar
+  // encoding would map distinct items past ~55k onto the same '?'
+  // (the Unicode surrogate range), so a change among such items would
+  // be invisibly reported as Unchanged. We build long lists that swap
+  // two distinct items deep in that range and assert the swap is seen.
+  let n : usize = 60_000;
+  let old : Vec<String> =
+    (0 .. n) . map ( |i| i . to_string() ) . collect();
+  let new : Vec<String> = { // swap two neighbors at index 56_000
+    let mut v : Vec<String> = old . clone();
+    v . swap ( 56_000, 56_001 );
+    v };
+  let diff : Vec<Diff_Item<String>> =
+    compute_interleaved_diff ( &old, &new );
+  { // The two swapped items must surface as Removed and New, not be
+    // silently swallowed as Unchanged.
+    let removed : Vec<&String> =
+      diff . iter() . filter_map ( |d| match d {
+        Diff_Item::Removed (x) => Some (x),
+        _ => None } ) . collect();
+    let added : Vec<&String> =
+      diff . iter() . filter_map ( |d| match d {
+        Diff_Item::New (x) => Some (x),
+        _ => None } ) . collect();
+    assert! ( removed . contains ( &&"56000" . to_string() )
+              || removed . contains ( &&"56001" . to_string() ),
+              "a swapped item should be Removed, got {:?}", removed );
+    assert! ( added . contains ( &&"56000" . to_string() )
+              || added . contains ( &&"56001" . to_string() ),
+              "a swapped item should be New, got {:?}", added ); }
+  { // Round-trip: the New+Unchanged stream must reconstruct `new`
+    // exactly, item for item -- no item dropped or mislabeled.
+    let rebuilt : Vec<String> =
+      diff . iter() . filter_map ( |d| match d {
+        Diff_Item::Unchanged (x) | Diff_Item::New (x) => Some (x . clone()),
+        Diff_Item::Removed (_) => None } ) . collect();
+    assert_eq! ( rebuilt, new ); }}

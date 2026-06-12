@@ -106,7 +106,7 @@ in the buffer it was copied from
 I had created a big tree of new nodes.
 ** What's the second blue { in the herald for?
 Saw it looking at 'address', common to Valentina and Maps.
-** 'compute_interleaved_diff' can collide for large unique-item lists
+** DONE 'compute_interleaved_diff' can collide for large unique-item lists
 WARNING: That is a verbatim heading title from TODO/problems.org
 * maybe
 ** a way to present more nodes on one line

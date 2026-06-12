@@ -1,7 +1,7 @@
 /// Generic list diff types and utilities.
 
-use similar::{ChangeTag, TextDiff};
-use std::collections::{HashMap, HashSet};
+use similar::{Algorithm, ChangeTag, DiffOp, capture_diff_slices};
+use std::collections::HashSet;
 
 //
 // Types
@@ -24,57 +24,29 @@ pub enum Diff_Item<T> {
 //
 
 /// Compute an interleaved diff showing removed-here and new-here positions.
-/// Uses LCS-based algorithm via the `similar` crate.
+/// Uses the LCS-based slice diff from the `similar` crate, comparing the
+/// items themselves. Distinct items are never conflated, regardless of how
+/// many the lists hold.
 pub fn compute_interleaved_diff<T> (
   old : &[T],
   new : &[T],
 ) -> Vec<Diff_Item<T>>
 where
-  T: Clone + Eq + std::hash::Hash,
-{ // Use the similar crate for efficient LCS-based diff
-  // We need to convert to strings for similar, then map back
-  // Build strings that represent the sequences for diff
-  // Each unique item gets a unique character representation
-  let mut item_to_char : HashMap<&T, char> =
-    HashMap::new();
-  let mut char_counter : u32 =
-    0x100; // Start from extended ASCII
-  for item in old . iter() . chain ( new . iter() ) {
-    if ! item_to_char . contains_key (item) {
-      item_to_char . insert ( item, char::from_u32 (char_counter) . unwrap_or ('?') );
-      char_counter += 1; }}
-  let old_str : String =
-    old . iter()
-      . map ( |item| item_to_char . get (item) . copied() . unwrap_or ('?') )
-      . collect();
-  let new_str : String =
-    new . iter()
-      . map ( |item| item_to_char . get (item) . copied() . unwrap_or ('?') )
-      . collect();
-  let diff : TextDiff<str> = // Use similar crate for the actual diff
-    TextDiff::from_chars ( &old_str, &new_str );
+  T: Clone + Eq + std::hash::Hash + Ord,
+{
+  let ops : Vec<DiffOp> =
+    capture_diff_slices ( Algorithm::Myers, old, new );
   let mut result : Vec<Diff_Item<T>> =
     Vec::new();
-  let mut old_idx : usize = 0;
-  let mut new_idx : usize = 0;
-  for change in diff . iter_all_changes() {
-    match change . tag() {
-      ChangeTag::Equal => {
-        if new_idx < new . len() {
-          result . push ( Diff_Item::Unchanged (
-            new[new_idx] . clone() )); }
-        old_idx += 1;
-        new_idx += 1; },
-      ChangeTag::Delete => {
-        if old_idx < old . len() {
-          result . push ( Diff_Item::Removed (
-            old[old_idx] . clone() )); }
-        old_idx += 1; },
-      ChangeTag::Insert => {
-        if new_idx < new . len() {
-          result . push ( Diff_Item::New (
-            new[new_idx] . clone() )); }
-        new_idx += 1; }}}
+  for op in &ops {
+    for change in op . iter_changes ( old, new ) {
+      match change . tag() {
+        ChangeTag::Equal =>
+          result . push ( Diff_Item::Unchanged ( change . value() )),
+        ChangeTag::Delete =>
+          result . push ( Diff_Item::Removed ( change . value() )),
+        ChangeTag::Insert =>
+          result . push ( Diff_Item::New ( change . value() )), }}}
   result }
 
 /// From a diff, extract:

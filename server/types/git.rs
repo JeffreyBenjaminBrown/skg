@@ -325,7 +325,7 @@ pub fn existence_axes_in_source_diff (
 ///
 /// Used by consumers that need a flat "what changed HEAD vs worktree" view. For
 /// the per-stage signs separately, use 'axes_from_per_stage_diffs'.
-pub fn net_diff_from_per_stage<T: Clone + Eq + std::hash::Hash> (
+pub fn net_diff_from_per_stage<T: Clone + Eq + std::hash::Hash + Ord> (
   staged_diff   : Option<&[Diff_Item<T>]>,
   unstaged_diff : Option<&[Diff_Item<T>]>,
 ) -> Vec<Diff_Item<T>> {
