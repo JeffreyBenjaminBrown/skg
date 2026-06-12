@@ -174,6 +174,19 @@ override N, all user-owned) and asserts it refuses with an error
 naming the collision; no database is created (the check precedes
 'overwrite_new_empty_typedb_db').  Runs in ~0.06s -- far cheaper than
 booting a server.
+**** commit 7: expansion of a read-only col member, part 1 (+ ride-along)
+'expanding_subscriberCol_member_is_plain_expansion'
+(tests/expand_partner_col_member.rs, its own target -- it installs the
+global handle for the subscriberCol).  N's subscriberCol shows S
+(indef); requesting S's definitive view expands it IN PLACE: S becomes
+definitive, stays a raw subscriberCol member, its own content (C with
+its body) appears, and NO subscription-hides apply (no
+hiddenIn/OutsideOfSubscribeeCol).  Confirmed the plain-expansion
+semantics (2026-06-12).  Part 2 (production change 2) lands in the
+same target in commit 8.
+Ride-along: renamed 'test_every_kind_of_col' ->
+'test_subscribee_and_filter_cols' in tests/hidden_from_subscriptions.rs
+(the old name overstated its coverage).
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
