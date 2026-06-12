@@ -215,9 +215,9 @@ pub fn find_children_by_ids (
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree . get (parent_treeid) . unwrap() . children() {
     match &child . value() . kind {
-      ViewNodeKind::Vognode (v @ Vognode::Active (_)) =>
-        if target_skgids . contains (v . id ())
-        { result . insert (v . id () . clone (), child . id()); },
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        if target_skgids . contains (&t . id)
+        { result . insert (t . id . clone (), child . id()); },
       ViewNodeKind::Phantom (p @ (Phantom::Diff (_)
                                   | Phantom::Deleted (_))) =>
         if target_skgids . contains (p . id ())

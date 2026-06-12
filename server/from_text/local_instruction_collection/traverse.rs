@@ -73,16 +73,12 @@ fn visit (
   match &node_ref . value() . kind {
     ViewNodeKind::Vognode (Vognode::Active (t)) =>
       visit_active_vognode (node_ref, t, context, collected),
-    ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
-      // An Inactive vognode emits nothing itself; the parent's
-      // contains predicate is what counts it.
-      recurse_under_gnode (
-        node_ref,
-        Some ( DefiningColOwner {
-          id               : i . id . clone(),
-          is_definitive    : false,
-          is_saveEligible : false } ),
-        None, collected),
+    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+      // An Inactive vognode is anonymous and emits nothing; its
+      // membership is owned by the disk weave, not extraction. With no
+      // identity it owns no defining col, so (like a DeadScaffold) any
+      // col found under it stays silent.
+      recurse_under_gnode (node_ref, None, None, collected),
     ViewNodeKind::Phantom (p) =>
       recurse_under_gnode (
         node_ref,

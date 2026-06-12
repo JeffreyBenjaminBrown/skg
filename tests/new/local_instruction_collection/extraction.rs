@@ -1397,35 +1397,6 @@ fn would_be_diff_phantom_child_is_excluded_from_contains (
     vec![ID::from ("a")]); }
 
 #[test]
-fn inactive_child_with_negative_membership_is_excluded_from_contains (
-) {
-  let input : &str =
-    indoc! {"
-            * (skg (node (id root) (source main))) root
-            ** (skg (node (id a) (source main))) a
-            ** (skg (inactiveNode (id hidden) (source private)))
-        "};
-  let mut viewforest : Tree<ViewNode> =
-    checked_viewforest_from_org (input);
-  { let inactive_treeid : ego_tree::NodeId =
-      viewforest . nodes()
-      . find ( |n| matches!(
-          &n . value() . kind,
-          ViewNodeKind::Vognode (Vognode::Inactive (i))
-            if i . id == ID::from ("hidden") ))
-      . map ( |n| n . id() )
-      . expect ("inactive node not found");
-    if let ViewNodeKind::Vognode (Vognode::Inactive (i)) =
-      &mut viewforest . get_mut (inactive_treeid) . unwrap()
-        . value() . kind
-    { i . membership . staged = Some (Sign::Minus); }}
-  let instructions : Vec<DefineNode> =
-    definenodes_from_tree (viewforest) . unwrap ();
-  assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
-    vec![ID::from ("a")]); }
-
-#[test]
 fn toDelete_member_is_excluded_from_subscribees (
 ) {
   let input : &str =

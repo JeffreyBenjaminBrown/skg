@@ -5,7 +5,6 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
@@ -468,7 +467,9 @@ pub fn get_id_from_treenode (
       tree, treeid, |viewnode| viewnode . kind . clone() )?;
   match node_kind {
     ViewNodeKind::Vognode (v)
-      => Ok ( v . id () . clone () ),
+      => v . id () . cloned () . ok_or_else (
+           || "get_id_from_treenode: inactive vognode has no id"
+              . into () ),
     _ => Err ( "get_id_from_treenode: caller must pass a vognode" . into() ),
   }}
 
@@ -520,9 +521,7 @@ pub async fn make_and_append_child_pair_with_source_set (
       {
         if ! active . contains_source (&source) {
           let inactive : ViewNode =
-            mk_inactive_viewnode (
-              child_skgid . clone (), source,
-              MembershipAxes::default (), None );
+            mk_inactive_viewnode ();
           let child_treeid : NodeId =
             with_node_mut (
               tree, parent_treeid,

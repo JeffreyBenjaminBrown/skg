@@ -1,7 +1,6 @@
 use super::*;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::ID;
 use crate::types::viewnode::{ mk_inactive_viewnode, viewforest_root_viewnode };
-use crate::types::git::MembershipAxes;
 use ego_tree::Tree;
 
 // The orderkey closure is fallible: a relevant child whose kind the
@@ -14,8 +13,7 @@ fn relevant_child_of_wrong_kind_yields_err_not_panic () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   t . get_mut (root) . unwrap () . append (
-    mk_inactive_viewnode ( ID::from ("x"), SourceName::from ("main"),
-                           MembershipAxes::default (), None ) );
+    mk_inactive_viewnode () );
   let result : Result<RepairSummary<ID>, Box<dyn Error>> =
     complete_relevant_children_in_viewnodetree (
       &mut t, root,

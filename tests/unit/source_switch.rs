@@ -51,7 +51,7 @@ fn conversion_and_retention () {
     "a childless now-inactive node is pruned" );
   assert! ( matches! (
       &t . get (kept) . unwrap () . value () . kind,
-      ViewNodeKind::Vognode (Vognode::Inactive (i)) if i . id == ID::from ("kept") ),
+      ViewNodeKind::Vognode (Vognode::Inactive (_)) ),
     "a now-inactive node with an active child is retained as an InactiveNode" );
   assert! (
     t . get (kept) . unwrap () . children () . count () == 1,

@@ -2,8 +2,7 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::git::Sign;
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::ID;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
 use skg::types::viewnode::ParentIs;
@@ -116,6 +115,10 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 
 #[test]
 fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
+  // The server emits bare '(inactiveNode)'; a legacy field-bearing
+  // form is tolerated (parsed leniently, fields discarded) so a stale
+  // buffer still round-trips. Either way it is an anonymous, dataless,
+  // titleless placeholder.
   let input: &str =
     indoc! {"
             * (skg (inactiveNode (id hidden) (source private) (unstaged newM)))
@@ -126,13 +129,9 @@ fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
   let tree_roots: Vec<_> =
     viewforest . root() . children() . collect();
   assert_eq!(tree_roots . len(), 1);
-  let inactive = match &tree_roots[0] . value() . kind {
-    MpViewnodeKind::Vognode (
-      MpVognode::Inactive (inactive)) => inactive,
-    _ => panic!("expected InactiveNode") };
-  assert_eq!(inactive . id, ID::from ("hidden"));
-  assert_eq!(inactive . source, SourceName::from ("private"));
-  assert_eq!(inactive . membership . unstaged, Some (Sign::Plus));
+  assert!( matches!( &tree_roots[0] . value() . kind,
+    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) ),
+    "expected an InactiveNode" );
   assert_eq!(tree_roots[0] . value() . title(), "");
   assert_eq!(tree_roots[0] . value() . body(), None);
 }

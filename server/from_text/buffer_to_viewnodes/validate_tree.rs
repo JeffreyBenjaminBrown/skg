@@ -186,11 +186,9 @@ fn overridesHere_marker_errors (
             Some (original) =>
               ( t . id . clone (), original . clone () ),
             None => continue },
-        MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
-          match &i . overridesHere {
-            Some (original) =>
-              ( Some ( i . id . clone () ), original . clone () ),
-            None => continue },
+        // An inactive placeholder is anonymous: it carries no override
+        // marker, so it can never mismatch.
+        MpViewnodeKind::Vognode (MpVognode::Inactive (_)) => continue,
         _ => continue };
     let effective : Option<ID> =
       graph . as_ref () . map ( |g|

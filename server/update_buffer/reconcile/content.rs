@@ -2,7 +2,6 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::viewnode::{mk_inactive_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
@@ -499,9 +498,7 @@ fn complete_content_children (
                   Some ( id . clone() ); }
               vn }},
         ContentReality::Inactive =>
-          mk_inactive_viewnode (
-            id . clone(), d . source . clone(),
-            MembershipAxes::default (), None ),
+          mk_inactive_viewnode (),
         ContentReality::Unknown =>
           mk_unknown_viewnode ( id . clone() ) } ) },
   ) . map ( |_summary| () ) }
@@ -620,9 +617,9 @@ fn build_child_creation_data (
           ViewNodeKind::Phantom (Phantom::Diff (p))
             => { m . insert( p . id . clone(),
                              p . source . clone()); },
-          ViewNodeKind::Vognode (Vognode::Inactive (i))
-            => { m . insert( i . collected_id (),
-                             i . source . clone()); },
+          // No Inactive arm: an inactive child is never a goal member
+          // (omit_inactive_members drops it), so it needs no
+          // already-present entry here.
           _ => {}, }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();

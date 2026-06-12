@@ -215,16 +215,11 @@ pub fn herald_rule_table () -> HeraldRule {
       crule (Orange, "unknownNode", vec! [
         s ("Parent references unknown node."),
         vac ("id") ]),
+      // An inactive placeholder is anonymous and dataless: bare
+      // '(inactiveNode)' (see InactiveNode). Its id/source would leak
+      // hidden content, so they are not emitted.
       crule (Blue, "inactiveNode", vec! [
-        s ("node from inactive source"),
-        vac ("id"),
-        vac ("source"),
-        crule (Red, "overridesHere", vec! [
-          // A retained substitute: drawn in place of the (swallowed)
-          // original ID, like the viewStats form of the same name.
-          any (vec! [ s ("Oh") ]) ]),
-        vac ("staged"),
-        vac ("unstaged") ]),
+        s ("node from inactive source") ]),
       interc (Some (Green), "", Some ("staged"), vec! [
         s ("staged:"),
         leaf (Green, "newM",     "M"),
@@ -369,7 +364,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "focused", "folded", "bodyFolded",
     // Form heads, from org_to_text.rs:
     "node", "deleted", "unknownNode", "inactiveNode", "deletedScaffold",
-    // Keys inside node / deleted / unknownNode / inactiveNode forms:
+    // Keys inside node / deleted / unknownNode forms:
     "id", "source",
     "parentIs", "birth", "indef", "notInGit",
     "graphStats", "viewStats", "editRequest", "viewRequests",
@@ -418,7 +413,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       grandparentOverrides : _,
       grandparentSubscribes : _,
       overridesParent : _,
-      overridesHere : _, // keyed form; also emitted inside inactiveNode
+      overridesHere : _, // keyed form (a viewStats sub-form)
     } = v; }
   let _ = guard;
   vec! [ "cycle", "containsParent", "sourceHerald",

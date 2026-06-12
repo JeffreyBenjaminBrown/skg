@@ -144,19 +144,27 @@ pub struct PhantomUnknown {
   pub id : ID,
 }
 
+/// An anonymous "something from an inactive source is/was here"
+/// placeholder. It carries NO data on purpose: an inactive node's id,
+/// source, title, etc. describe content the user hid by restricting
+/// the active source-set, so rendering any of it would leak.
+///
+/// SCOPE: an InactiveNode arises ONLY from a source-set REDUCTION of an
+/// already-drawn buffer ('update_buffer/source_switch.rs' converts
+/// now-inactive Active nodes in place), where it is kept to host
+/// already-drawn active descendants. A de-novo render under a
+/// restricted set NEVER creates one: inactive content members are
+/// omitted from goal lists ('omit_inactive_members') and their content
+/// is never expanded (completion does nothing at an inactive node's
+/// visit). So a public node reachable only through a private parent
+/// simply does not appear on a fresh restricted view.
+///
+/// Being dataless, it is inert everywhere: it emits no save intention
+/// (its membership is owned by the disk weave), is not a collateral
+/// pid, is irrelevant to every reconciler (preserved as-is, never
+/// goal-matched), and renders as bare '(inactiveNode)'.
 #[derive( Debug, Clone, PartialEq )]
-pub struct InactiveNode {
-  pub id         : ID,
-  pub source     : SourceName,
-  pub membership : MembershipAxes,
-  /// Carried over from a TrueNode's 'viewStats.overridesHere' when a
-  /// source-set switch converts a drawn substitute to an
-  /// InactiveNode. Without it the marker would die in conversion and
-  /// the retained node's own ID would reach its parent's collected
-  /// contains, rewriting the original member (see plan 11,
-  /// "SOURCE-SET SWITCHES").
-  pub overridesHere : Option<ID>,
-}
+pub struct InactiveNode;
 
 pub type TrueNode            = TrueNode_Generic < ID, SourceName >;
 pub type MpTruenode = TrueNode_Generic < Option < ID >,
@@ -491,14 +499,6 @@ impl TrueNode {
     . unwrap_or_else ( || self . id . clone () ) }
 }
 
-impl InactiveNode {
-  /// As 'TrueNode::collected_id': a retained substitute (converted
-  /// by a source-set switch) still stands for the original member.
-  pub fn collected_id (&self) -> ID {
-    self . overridesHere . clone ()
-    . unwrap_or_else ( || self . id . clone () ) }
-}
-
 impl MpTruenode {
   /// As 'TrueNode::collected_id', for the maybe-placed stage (the
   /// node might not have an ID yet; a marker, if present, wins).
@@ -618,10 +618,12 @@ impl Qual {
 }
 
 impl Vognode {
-  pub fn id (&self) -> &ID {
+  /// None for an Inactive vognode: it is an anonymous placeholder with
+  /// no id (see InactiveNode).
+  pub fn id (&self) -> Option<&ID> {
     match self {
-      Vognode::Active   (t) => &t . id,
-      Vognode::Inactive (i) => &i . id,
+      Vognode::Active   (t) => Some (&t . id),
+      Vognode::Inactive (_) => None,
     } }
 
   pub fn pid_and_source (
@@ -629,7 +631,7 @@ impl Vognode {
   ) -> Option<(&ID, &SourceName)> {
     match self {
       Vognode::Active   (t) => Some ((&t . id, &t . source)),
-      Vognode::Inactive (i) => Some ((&i . id, &i . source)),
+      Vognode::Inactive (_) => None,
     } }
 }
 
@@ -746,7 +748,7 @@ impl ViewNode {
 
   pub fn id_if_vognode (&self) -> Option<&ID> {
     match &self . kind {
-      ViewNodeKind::Vognode (v) => Some (v . id ()),
+      ViewNodeKind::Vognode (v) => v . id (),
       _ => None,
     }}
 
@@ -919,18 +921,13 @@ pub fn mk_unknown_viewnode (
   }}
 
 pub fn mk_inactive_viewnode (
-  id            : ID,
-  source        : SourceName,
-  membership    : MembershipAxes,
-  overridesHere : Option<ID>, // Some only when converting a drawn substitute (see the field's comment on InactiveNode); fresh placeholders pass None.
 ) -> ViewNode {
   ViewNode {
     focused     : false,
     folded      : false,
     body_folded : false,
     kind        : ViewNodeKind::Vognode (
-      Vognode::Inactive ( InactiveNode {
-        id, source, membership, overridesHere } ) ),
+      Vognode::Inactive ( InactiveNode ) ),
   }}
 
 /// Create an indefinitive ViewNode from disk data.

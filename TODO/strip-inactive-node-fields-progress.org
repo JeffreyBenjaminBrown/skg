@@ -47,6 +47,36 @@
     unreachable: diff mode requires the "all" source set, under which
     nothing is inactive. Full suite green (443).
 
+*** Step 7 (this commit): anonymize the wire + strip the struct
+    'InactiveNode' is now a fieldless unit struct with a doc comment
+    recording the de-novo-scope fact Jeff asked for. Ripples handled:
+    - 'mk_inactive_viewnode ()' takes no args; all 4 call sites
+      (source_switch, source_sets, to_org/util, reconcile/content)
+      updated; the source_sets 'Treatment::Convert' lost its payload.
+    - render: 'org_to_text' emits bare '(inactiveNode)'.
+    - parse: '(inactiveNode)' parses with no required fields; legacy
+      field-bearing forms are tolerated and discarded (stale buffers
+      still round-trip). Dropped the 'inactive_membership' /
+      'inactive_overridesHere' ViewnodeMetadata fields.
+    - 'Vognode::id' now returns 'Option<&ID>' (None for inactive) and
+      'pid_and_source' returns None for inactive; callers updated
+      ('id_if_vognode', 'get_id_from_treenode',
+      'viewnode_nodecomplete', the ancestor pid/source readers Err on
+      an inactive ancestor, which is correct).
+    - deleted 'InactiveNode::collected_id'; inactive arms removed from
+      content distinctness, the override-mismatch validator, the
+      reconcile already-present map, the save-path DefiningColOwner
+      (an inactive node owns no defining col), and the maybe-placed
+      id_opt/error_label.
+    - heralds: the rule table emits bare '(inactiveNode)'; updated the
+      elisp fixture 'tests/elisp/herald-rules.sexp' to match.
+    Tests updated: uninterpreted2 (asserts anonymous parse + leniency),
+    deleted the obsolete negative-membership extraction test,
+    source_switch + update_buffer_util unit tests, and repurposed the
+    duplicate-inactive validation test to assert NO collision (an
+    inactive placeholder is not a content member). Full suite green
+    (442).
+
 ** Changes to the plan's envisioned order
    None yet.
 

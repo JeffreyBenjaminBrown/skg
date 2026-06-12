@@ -69,12 +69,9 @@ pub struct ViewnodeMetadata {
   // When Some, this is an PhantomUnknown (a placeholder for a missing
   // referent). Carries only the id; no source/title/body apply.
   pub unknown_node_id: Option<ID>,
-  // When true, this is an inactive-source placeholder. It carries id,
-  // source, and relationship-position membership axes, but no editable
-  // node content.
+  // When true, this is an inactive-source placeholder: an anonymous,
+  // dataless marker (see InactiveNode). It carries no id/source/etc.
   pub is_inactive_node : bool,
-  pub inactive_membership : MembershipAxes,
-  pub inactive_overridesHere : Option<ID>,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -101,9 +98,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     is_deleted_node: false,
     is_dead_scaffold: false,
     unknown_node_id: None,
-    is_inactive_node: false,
-    inactive_membership: MembershipAxes::default(),
-    inactive_overridesHere: None, }}
+    is_inactive_node: false, }}
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
@@ -134,15 +129,7 @@ pub fn viewnode_from_metadata (
               . to_string () ))
           } else { None };
         ( MpViewnodeKind::Vognode (
-            MpVognode::Inactive (
-              InactiveNode {
-              id         : metadata . id . clone ()
-                           . unwrap_or_else ( || ID::from ("")),
-              source     : metadata . source . clone ()
-                           . unwrap_or_else ( || SourceName::from ("")),
-              membership : metadata . inactive_membership,
-              overridesHere : metadata . inactive_overridesHere
-                              . clone () } ) ),
+            MpVognode::Inactive ( InactiveNode ) ),
           error, None )
       } else if metadata . is_dead_scaffold {
         ( MpViewnodeKind::DeadScaffold, None, None )
@@ -548,66 +535,16 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
-/// Parse the (inactiveNode (id X) (source S) [(staged M)] [(unstaged M)])
-/// s-expression contents.
+/// Parse '(inactiveNode)'. An inactive placeholder is an anonymous,
+/// dataless marker (see InactiveNode), so it has no contents. Any
+/// legacy children (id/source/membership/overridesHere) emitted by an
+/// older server are tolerated and discarded, so a stale buffer still
+/// round-trips.
 fn parse_inactivenode_sexp (
-  items    : &[Sexp],
+  _items   : &[Sexp],
   metadata : &mut ViewnodeMetadata,
 ) -> Result<(), String> {
-  let mut id : Option<ID> = None;
-  let mut source : Option<SourceName> = None;
-  let mut membership : MembershipAxes =
-    MembershipAxes::default ();
-  for element in items {
-    match element {
-      Sexp::List (subitems) if subitems . len () >= 1 => {
-        let key : String =
-          atom_to_string ( &subitems[0] ) ?;
-        match key . as_str () {
-          "id" => {
-            if subitems . len () != 2 {
-              return Err (
-                "inactiveNode id requires exactly one value"
-                . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            id = Some ( ID::from (value)); },
-          "source" => {
-            if subitems . len () != 2 {
-              return Err (
-                "inactiveNode source requires exactly one value"
-                . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            source = Some ( SourceName::from (value)); },
-          "staged" => {
-            apply_axis_atoms_to_membership_scaffold (
-              &subitems[1..], true, &mut membership ) ?; },
-          "unstaged" => {
-            apply_axis_atoms_to_membership_scaffold (
-              &subitems[1..], false, &mut membership ) ?; },
-          "overridesHere" => {
-            if subitems . len () != 2 {
-              return Err (
-                "inactiveNode overridesHere requires exactly one value"
-                . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . inactive_overridesHere =
-              Some ( ID::from (value)); },
-          _ => { return Err ( format! (
-            "Unknown inactiveNode key: {}", key )); }} },
-      _ => { return Err (
-        "Unexpected element in inactiveNode sexp"
-        . to_string () ); }}}
-  metadata . id =
-    Some ( id . ok_or (
-      "inactiveNode requires an id" . to_string () )? );
-  metadata . source =
-    Some ( source . ok_or (
-      "inactiveNode requires a source" . to_string () )? );
   metadata . is_inactive_node = true;
-  metadata . inactive_membership = membership;
   Ok (( )) }
 
 /// Parse the (deleted (id X) (source S)) s-expression contents.

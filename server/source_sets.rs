@@ -9,7 +9,6 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::sources::create_all_sources;
 use crate::org_to_text::viewforest_to_string;
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 pub use crate::types::misc::SourceSetName;
 use crate::types::nodes::complete::NodeComplete;
@@ -127,20 +126,14 @@ pub fn apply_source_set_to_viewforest (
     . map ( |n| n . id () )
     . collect ();
   for id in ids {
-    enum Treatment { Convert (ID, SourceName, MembershipAxes,
-                              Option<ID>), // overridesHere: an Active substitute keeps its marker; phantoms carry none
-                     Detach }
+    enum Treatment { Convert, Detach }
     let treatment : Option<Treatment> = {
       let Some (n) = viewforest . get (id) else { continue; }; // already detached with an ancestor
       let has_children : bool = n . has_children ();
       match &n . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
           if ! active . contains_source (&t . source)
-          => Some ( Treatment::Convert ( t . id . clone (),
-                                         t . source . clone (),
-                                         t . membership,
-                                         t . viewStats . overridesHere
-                                           . clone () )),
+          => Some ( Treatment::Convert ),
         ViewNodeKind::Phantom (Phantom::Diff (p))
           if ! active . contains_source (&p . source)
           // TODO/full-schema/9-2_source-set-safety.org (interim,
@@ -149,22 +142,16 @@ pub fn apply_source_set_to_viewforest (
           // quietly omitted, like every other inactive member. One
           // with children (e.g. an attached ancestry) is converted
           // instead, so nothing active is silently dropped.
-          => if has_children {
-               Some ( Treatment::Convert ( p . id . clone (),
-                                           p . source . clone (),
-                                           p . membership,
-                                           None )) }
+          => if has_children { Some ( Treatment::Convert ) }
              else { Some ( Treatment::Detach ) },
         _ => None } };
     match treatment {
       None => {},
-      Some (Treatment::Convert (pid, source, membership,
-                                overridesHere)) => {
+      Some (Treatment::Convert) => {
         let mut node_mut : NodeMut<ViewNode> =
           viewforest . get_mut (id) . unwrap ();
         node_mut . value () . kind =
-          mk_inactive_viewnode (pid, source, membership,
-                                overridesHere) . kind; },
+          mk_inactive_viewnode () . kind; },
       Some (Treatment::Detach) => {
         let mut node_mut : NodeMut<ViewNode> =
           viewforest . get_mut (id) . unwrap ();

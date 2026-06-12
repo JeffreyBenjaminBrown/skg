@@ -410,8 +410,8 @@ impl MpViewnode {
         format!("deleted:{}", d . id . 0),
       MpViewnodeKind::DeadScaffold =>
         "deadScaffold" . to_string (),
-      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
-        format!("inactive:{}", i . id . 0),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
+        "inactive" . to_string (),
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
         format!("unknown:{}", u . id . 0), }}
 
@@ -442,8 +442,9 @@ impl MpViewnode {
         => p . id . as_ref(),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
         Some (&d . id),
-      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
-        Some (&i . id),
+      // An inactive placeholder is anonymous: no id.
+      MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
+        None,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
         Some (&u . id),
       MpViewnodeKind::QualCol (_)

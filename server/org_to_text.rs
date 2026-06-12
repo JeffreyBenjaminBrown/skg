@@ -3,7 +3,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, TrueNode, PhantomDiff,
-  PhantomDeleted, PhantomUnknown, InactiveNode, EditRequest, GraphNodeStats,
+  PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats,
   Birth, ParentIs,
 };
 
@@ -171,10 +171,10 @@ pub fn viewnode_to_string (
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
-    ViewNodeKind::Vognode (Vognode::Inactive (inactive_node)) =>
+    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       Ok ( inactive_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, inactive_node )) } }
+        viewnode . body_folded )) } }
 
 fn non_vognode_atom_metadata_to_string (
   focused     : bool,
@@ -447,29 +447,20 @@ fn phantomUnknown_metadata_to_string (
                             unknown_node . id . 0 ));
   parts . join (" ") }
 
+/// Render an inactive placeholder as bare '(inactiveNode)'. It carries
+/// no id/source/etc. -- those describe content the user hid by
+/// restricting the source-set, so emitting them would leak (see
+/// InactiveNode).
 fn inactive_node_metadata_to_string (
   focused       : bool,
   folded        : bool,
   body_folded   : bool,
-  inactive_node : &InactiveNode,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  let mut inactive_parts : Vec<String> =
-    vec! [
-      "inactiveNode" . to_string (),
-      format! ("(id {})", inactive_node . id . 0),
-      format! ("(source {})", inactive_node . source) ];
-  if let Some (ref original) = inactive_node . overridesHere {
-    inactive_parts . push ( format! ("(overridesHere {})",
-                                      original . 0 )); }
-  append_membership_stage_forms (
-    &mut inactive_parts,
-    &inactive_node . membership );
-  parts . push ( format! (
-    "({})", inactive_parts . join (" ") ));
+  parts . push ( "(inactiveNode)" . to_string () );
   parts . join (" ") }
 
 /// Render metadata for a DeletedScaff:

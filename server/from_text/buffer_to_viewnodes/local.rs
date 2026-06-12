@@ -4,7 +4,6 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::git::Sign;
 use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, PartnerCol, Qual, QualCol};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
@@ -497,10 +496,9 @@ pub fn nonignored_children_have_distinct_ids (
         MpViewnodeKind::Vognode (MpVognode::Active (t))
           if t . parentIs == ParentIs::Affected
           => t . collected_id (),
-        MpViewnodeKind::Vognode (MpVognode::Inactive (i))
-          if i . membership . staged != Some (Sign::Minus)
-          && i . membership . unstaged != Some (Sign::Minus)
-          => Some (i . collected_id ()),
+        // An inactive placeholder is not a content member (its
+        // membership is owned by the disk weave), so it does not
+        // participate in content-id distinctness.
         _ => None };
     if let Some (id) = content_id {
       if !seen . insert(id) {

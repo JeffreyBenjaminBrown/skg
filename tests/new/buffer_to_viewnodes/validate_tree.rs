@@ -732,12 +732,17 @@ fn test_inactive_placeholder_under_truenode_allowed_locally () {
 }
 
 #[test]
-fn test_duplicate_inactive_placeholder_content_rejected_locally () {
+fn inactive_placeholder_does_not_collide_with_content () {
+  // An inactive placeholder is anonymous and is not a content member
+  // (its membership is owned by the disk weave), so it cannot
+  // duplicate a real content child's id -- the buffer validates even
+  // when an active child happens to be the very node the placeholder
+  // stands in for.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
       ** (skg (node (id hidden) (source main))) active child
-      ** (skg (inactiveNode (id hidden) (source private)))
+      ** (skg (inactiveNode))
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -751,15 +756,9 @@ fn test_duplicate_inactive_placeholder_content_rejected_locally () {
   let root_id = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
-  let error = validate_local_structure (
-      &viewforest, root_id, &config)
-    . expect_err (
-      "Duplicate active/inactive content IDs should fail validation");
-  assert!(
-    error . message . contains ("non-ignored content children must be unique"),
-    "Unexpected duplicate-content validation error: {:?}",
-    error );
-  assert_eq! (error . id . 0, "root");
+  validate_local_structure (&viewforest, root_id, &config)
+    . expect (
+      "an inactive placeholder must not collide with content");
 }
 
 #[test]
