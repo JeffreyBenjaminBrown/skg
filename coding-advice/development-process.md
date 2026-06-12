@@ -5,7 +5,7 @@ but if you're an AI, I think it's helpful:
 
 How to run the three kinds of tests
 (Rust unit, Emacs unit, and integration)
-is described in [ai-agents.md](../ai-agents.md).
+is described in [tests/USAGE.md](../tests/USAGE.md).
 Sometimes the path of least resistance might seem to be
 to code a giant mess of changes and then try to compile them all.
 That's usually less effective than interleaving small edits

@@ -29,6 +29,8 @@ Options:
 
 Environment:
   SKG_CARGO_BUILD_JOBS       Cargo build jobs. Default: 2.
+  SKG_NEXTEST_BUILD_JOBS     Build jobs for the nextest phase.
+                             Default: half the cores, capped at 8.
   SKG_NEXTEST_JOBS           Nextest jobs. Default: 1.
   SKG_TYPEDB_CONCURRENT_TRANSACTIONS
                              TypeDB operation fanout. Default: 4.
@@ -67,12 +69,14 @@ mkdir -p "$RESULTS_DIR"
 
 T_START=$SECONDS
 BUILD_JOBS="$(skg_positive_int_or_default "${SKG_CARGO_BUILD_JOBS:-}" 2)"
+NEXTEST_BUILD_JOBS="$(skg_positive_int_or_default \
+  "${SKG_NEXTEST_BUILD_JOBS:-}" "$(skg_default_jobs 8)")"
 NEXTEST_JOBS="$(skg_positive_int_or_default "${SKG_NEXTEST_JOBS:-}" 1)"
 export SKG_TYPEDB_CONCURRENT_TRANSACTIONS="$(
   skg_positive_int_or_default "${SKG_TYPEDB_CONCURRENT_TRANSACTIONS:-}" 4)"
 
 echo -e "${BOLD}=== All Tests ===${NC}"
-echo -e "${DIM}Build jobs: $BUILD_JOBS; nextest jobs: $NEXTEST_JOBS; integration: sequential; TypeDB fanout: $SKG_TYPEDB_CONCURRENT_TRANSACTIONS${NC}"
+echo -e "${DIM}Build jobs: $BUILD_JOBS (nextest phase: $NEXTEST_BUILD_JOBS); nextest jobs: $NEXTEST_JOBS; integration: sequential; TypeDB fanout: $SKG_TYPEDB_CONCURRENT_TRANSACTIONS${NC}"
 echo ""
 
 # ── Phase 1: Build ──────────────────────────────────────────────
@@ -117,7 +121,13 @@ T_NEXTEST=$SECONDS
 echo -n "  Nextest ... "
 if (
   cd "$PROJECT_ROOT"
-  skg_low_priority cargo nextest run --jobs "$NEXTEST_JOBS" --no-fail-fast
+  # --build-jobs: without it, cargo compiles/links with every core.
+  # The test binaries are large (debug, ~quarter-GB each), so unbounded
+  # parallel linking is the heaviest load a test run puts on the
+  # machine; nice/ionice govern priority, not RAM.
+  skg_low_priority cargo nextest run \
+    --build-jobs "$NEXTEST_BUILD_JOBS" \
+    --jobs "$NEXTEST_JOBS" --no-fail-fast
 ) >"$RESULTS_DIR/nextest.log" 2>&1; then
   EXIT_NEXTEST=0
   echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_NEXTEST))s)${NC}"
