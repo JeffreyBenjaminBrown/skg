@@ -1,8 +1,13 @@
-* THE TAIL OF THIS IS OBSOLETE
-It is supplanted by metaplan_2.org.
-The portions here marked DONE really were done,
-but the rest are stale -- the code has drifted
-from the assumptions they make.
+* HISTORICAL -- supplanted by metaplan_2.org
+The full-schema effort is complete: metaplan_2.org executed every
+step (stages 1-14, logged in ../progress.org) and supersedes this
+file.  The portions here marked DONE really were done, but the rest
+is stale -- the code drifted from the assumptions they make
+(notably 'parentIs=collector', which no longer exists).  Read
+metaplan_2.org, not this, for the plan as carried out; read
+api-and-formats.md, glossary.md, schema.tql and docs/sharing-model.md
+for the model as built.  This file is kept only as a record of the
+original decomposition.
 * What's this "metaplan"?
 Each section is large enough to deserve its own dedicated sub-plan.
 * metaplan : full schema UI

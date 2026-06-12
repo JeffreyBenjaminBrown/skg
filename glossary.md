@@ -18,6 +18,54 @@ The reason for this is that the map from the child-parent relationship in an Ema
 
 in some type definitions or enum varieties.
 
+## PartnerCol, and the col-policy vocabulary
+
+A **PartnerCol** is the general concept of a generated org-collection
+that gathers the members of one schema relation under a node, in one
+role.  It is the `ViewNodeKind::PartnerCol` variant and the payload
+type of the same name.  ("role col", "relation col" and bare "sharing
+col" are retired as names for the general concept; "sharing-col" may
+survive only where it genuinely denotes the subscribee-related
+completers.)
+
+There are eight PartnerCols, named by their external scaffold atom:
+
+- writable: `subscribeeCol`, `overriddenCol`;
+- read-only inbound: `subscriberCol`, `overriderCol`, `hiderCol`,
+  `hiddenCol`;
+- read-only filter: `hiddenInSubscribeeCol`,
+  `hiddenOutsideOfSubscribeeCol`.
+
+Each kind's behavior is decided by one method, `PartnerCol::policy`
+(`server/types/viewnode.rs`), returning a **ColPolicy**.  This single
+arbiter is consulted by reconciliation dispatch, save extraction's
+read-only treatment, and herald/warning gating, so a new relation
+cannot acquire inconsistent policies in different layers:
+
+- **WritableSet** (`subscribeeCol`, `overriddenCol`): membership edits
+  are graph edits.  An absent col means "no opinion" (its field lowers
+  to `MSV::Unspecified`, filled from disk); a present-but-empty col
+  means an explicit empty set (`MSV::Specified(vec![])`).
+- **ReadOnlySet** (`subscriberCol`, `overriderCol`, `hiderCol`,
+  `hiddenCol`): membership is generated from graph facts; the user's
+  order is respected view-locally; repairs warn.  See [read-only set](#read-only-set).
+- **ReadOnlyFilter** (`hiddenInSubscribeeCol`,
+  `hiddenOutsideOfSubscribeeCol`): membership is derived from hide
+  state rather than from a single relation role.
+
+The stale-member rule is uniform across all eight kinds (decided
+2026-06-10, demote-not-discard): a stale `parentIs=Affected` member
+that is a leaf is deleted; one with children is demoted to
+`parentIs=Independent` so the user keeps any subtree they built under
+it; duplicates are deleted; missing graph members are restored.
+
+**Independent children jump above the members.**  An `Independent`
+(non-member) child parked inside any col is reordered above the
+generated members on save (`complete_relevant_children` moves
+irrelevant children to the front).  This is deliberate, not a bug: the
+membership is generated and ordered, so a note you park inside a col is
+kept but visibly separated from the live membership.
+
 ## ephem = ephemeral
 
 Some data regarding a node is ephemeral --
@@ -47,8 +95,16 @@ the buffer's viewforest, in which each position reads only itself and
 its direct children, plus a context that flows down from its
 ancestors. Each visit emits per-field intents into a map keyed by
 node ID; downstream stages (validation, lowering, visibility
-resolution, disk supplementation) consume the map. Lives in
-`server/from_text/local_instruction_collection/`.
+resolution, disk supplementation, the noop filter) consume the map.
+Lives in `server/from_text/local_instruction_collection/`, entered
+via `extract_nonmergeSavePlan_locally`.
+
+This entry is the canonical sketch of the save pipeline; the
+"save-buffer pipeline" section of
+`coding-advice/claude-to-claude.org`, which lists the surrounding
+stages (parse, enrich, validate, place, extract here, foreign-node
+validation, nodeMerge build, graph update, rerender), links back to
+this definition rather than re-explaining extraction.
 
 ## lp = length-prefixed
 

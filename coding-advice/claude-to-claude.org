@@ -63,6 +63,11 @@ There are three ways to test the code:
 
 * The save-buffer pipeline
 
+  The canonical definition of step 5, "local instruction
+  collection", lives in 'glossary.md'; this section lists the
+  surrounding stages and links there rather than re-explaining
+  extraction.
+
   The central pipeline. When Emacs saves a buffer, the server:
 
   1. Parses buffer text -> ViewNode tree ('org_to_uninterpreted_nodes')
@@ -106,15 +111,21 @@ There are three ways to test the code:
   - contains: parent -> child ordering (Vec<ID>, order matters)
   - subscribes: subscriber -> subscribee (forking foreign data)
   - hides_from_its_subscriptions: filtering within subscriptions
-  - overrides_view_of: replacing a node in views (not yet fully implemented)
+  - overrides_view_of: an overrider node is drawn in place of the
+    overridden node wherever it would appear as recursive content
+    (override substitution; see glossary.md and docs/sharing-model.md)
   - textlinks_to: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral scaffolding rebuilt every save:
   - TrueNode: corresponds to an NodeComplete, can be Definitive (editable) or Indefinitive (read-only)
-  - Scaffold: display-only nodes (AliasCol, IDCol, SubscribeeCol, HiddenInSubscribeeCol, etc.)
-  - 'complete_viewtree' does two DFS passes:
-    preorder (parent-first): reconcile children, add subscription scaffolds
-    postorder (child-first): expand aliases, IDs, hidden collections
+  - Scaffold: display-only nodes; the relation collections are
+    PartnerCols (subscribeeCol, subscriberCol, overriddenCol, ...),
+    plus AliasCol, IDCol, etc. (see glossary.md, "PartnerCol")
+  - 'complete_viewforest' (server/update_buffer/complete.rs) is one
+    level-order BFS used for both de novo views and post-save
+    rerendering; per-collection reconcilers add and reconcile the
+    scaffolds. (The older two-DFS-pass 'complete_viewtree' is gone;
+    see TODO/DONE/local-view-update/plan_v2.org.)
 
 * Recovery and source of truth
 

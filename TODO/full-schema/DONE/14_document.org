@@ -1,0 +1,93 @@
+* plan/record : document the resulting model
+This is the final step of [[../metaplan_2.org]], "document the
+resulting model".  Per Jeff's instruction, documentation has no
+useful plan/execute split, so this file is a RECORD of what was
+written, not a plan written ahead of execution.  Progress is logged
+in [[../progress.org]] (stage 14).
+
+* scope (from the metaplan)
+The metaplan asked for: schema.tql comments; api-and-formats.md (new
+stats metadata, override-choice behavior, diff-mode refusals,
+visible-subset save semantics); glossary.md (col-policy vocabulary
+and override resolution terms; "PartnerCol" naming decision; save
+pipeline made canonical); sharing docs; command docs for
+override-choice navigation; mark vision.org and metaplan 1
+historical; note 7_saving-readonly-cols.org superseded; document the
+independent-children-above-members col ordering at
+'complete_relevant_children' and in user docs; documentation to use
+graph-role vocabulary throughout.
+
+Most per-feature doc was already written incrementally as each
+feature shipped (stage 2: the warning channel + "read-only set"
+glossary entry; stage 9: source-set omission/retention/visible-subset
+save semantics in api-and-formats.md; stage 10: herald-rules endpoint;
+stage 11: override substitution + marker + override-choice + the
+override vocabulary in glossary.md + COMMANDS.org; stage 12: diff-mode
+refusals).  So this step was mostly GAP-FILLING and reconciliation.
+
+* what was written / where
+** api-and-formats.md
+- New "Stats metadata: graphStats and viewStats" section enumerating
+  every graphStats atom (counts; aliasing, extraIDs, overriding "O",
+  subscribing "S", hiding "H") and viewStats atom (cycle,
+  containsParent "}", sourceHerald, grandparentOverrides "gO",
+  grandparentSubscribes "gS", overridesParent "Op", and the keyed
+  '(overridesHere N)' "Oh"), with heralds.  Atom names taken from
+  'GraphNodeStats'/'ViewNodeStats' and 'server/heralds.rs' (the source
+  of truth), and the section says so.  The override-choice,
+  diff-mode-refusal and visible-subset items the metaplan names were
+  already present from stages 9/11/12.
+** glossary.md
+- New "PartnerCol, and the col-policy vocabulary" entry: records the
+  PartnerCol naming decision (retires "role col"/"relation col"/bare
+  "sharing col"), lists the eight cols, defines ColPolicy
+  (WritableSet / ReadOnlySet / ReadOnlyFilter) as the one arbiter, the
+  uniform demote-not-discard stale rule, and the
+  independent-children-above-members ordering.
+- "local instruction collection" entry made the canonical save-pipeline
+  sketch; claude-to-claude.org links to it.
+** schema.tql
+- Enriched the subscribes / hides_from_its_subscriptions /
+  overrides_view_of comments: per-relation gloss in graph-role
+  vocabulary, the override-substitution semantics, the user-owned
+  monogamy + acyclicity invariants (validated at save and
+  init/rebuild), foreign edges display-only, and the PartnerCol
+  surfacing.
+** docs/sharing-model.md
+- Added "Overriding: seeing your version where the original would
+  appear" (round-trip-on-save, one-level-deep, foreign-never-
+  substitutes, visibility-gates) and "The read-only collections"
+  (subscriberCol/overriderCol/hiderCol as read-only sets), in
+  graph-role vocabulary.
+** docs/data-model-skg-extensions.md
+- Corrected two now-stale lines that said following a link to an
+  overridden node silently shows the overrider; the shipped behavior
+  opens the override-choice menu (substitution applies to recursive
+  content, not to fresh link-follows).
+** coding-advice/claude-to-claude.org
+- Save-pipeline section now links to the glossary canonical entry.
+- Fixed the stale "overrides_view_of ... (not yet fully implemented)"
+  and the stale two-DFS-pass 'complete_viewtree' description (the
+  pipeline is now the level-order BFS 'complete_viewforest').
+** server/update_buffer/util.rs
+- Comment at 'complete_relevant_children' documenting the
+  user-facing consequence: an Independent (non-member) child parked in
+  a col is reordered above the generated members on save, deliberately.
+** historical / housekeeping
+- vision.org marked HISTORICAL (retired Og/Se/On herald names called
+  out; points readers at the shipped docs).
+- DONE/metaplan_1.org's banner strengthened to HISTORICAL and "fully
+  executed via metaplan_2".
+- 7_saving-readonly-cols.org moved OUT of DONE/ (back to
+  TODO/full-schema/): it was never executed, DONE/ holds executed
+  plans, and the file's own header already said it belonged outside
+  DONE/.  It already carried the SUPERSEDED note.
+- COMMANDS.org already documented skg-goto's menu behavior and
+  skg-goto-bypassOverride (stage 11); verified coherent, left as-is.
+
+* notes
+- No code behavior changed; the only non-doc file touched is a comment
+  in util.rs.
+- "Documentation should use graph-role vocabulary" was honored in all
+  new prose (overrider/overridden, subscriber/subscribee, hider/hidden
+  for graph facts; parent/child only for org/view structure).

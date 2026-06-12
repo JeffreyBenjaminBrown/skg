@@ -8,6 +8,89 @@ marked 'Affected'. Stage 7 was never executed as written; parts of
 its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
+** stage 14 : document the resulting model
+*** final report (2026-06-12)
+The last step of metaplan_2.org.  Documentation only; no code
+behavior changed (the sole non-doc edit is a comment in
+'server/update_buffer/util.rs').  Record in
+[[./DONE/14_document.org]].  With this, metaplan_2.org is fully
+executed (stages 1-14).
+
+**** what's done and went well
+- The earlier stages had already documented their own features
+  incrementally (stage 2's "read-only set" glossary entry and warning
+  channel; stage 9's source-set omission/retention/visible-subset
+  save semantics; stage 10's herald-rules endpoint; stage 11's
+  override substitution, marker, menu, glossary vocabulary and
+  COMMANDS.org; stage 12's diff-mode refusals).  So this step was
+  gap-filling and reconciliation, not writing from scratch -- exactly
+  the cheap tail the metaplan's "documentation pass" framing implied.
+- The genuinely-missing piece was the STATS METADATA: api-and-formats.md
+  had no enumeration of the graphStats/viewStats atoms.  Added a
+  section listing every atom (O/S/H, gO/gS/Op/Oh, containsParent,
+  sourceHerald, cycle, counts) with its herald, taken from the Rust
+  source of truth ('GraphNodeStats'/'ViewNodeStats',
+  'server/heralds.rs') and saying so.
+- glossary.md gained the one missing concept-home: "PartnerCol, and
+  the col-policy vocabulary" (the naming decision, ColPolicy, the
+  uniform stale rule, the independent-children ordering).  The
+  "local instruction collection" entry is now the canonical
+  save-pipeline sketch, with claude-to-claude.org linking to it.
+- schema.tql's sharing-relation comments now describe override
+  substitution and its monogamy/acyclicity invariants and the
+  PartnerCol surfacing, in graph-role vocabulary.
+- docs/sharing-model.md gained "Overriding" and "read-only
+  collections" sections.
+- 'complete_relevant_children' now carries the comment the metaplan
+  asked for (independent children jump above col members on save,
+  deliberately), cross-referenced to the user docs.
+- vision.org and metaplan_1.org are clearly marked HISTORICAL.
+
+**** changes to the plan's envisioned order
+- The metaplan envisioned documentation as one final pass over all
+  files.  In practice most of it was already done by the feature
+  stages, so the real work was (a) the stats-metadata section and
+  (b) reconciling inconsistencies, not authoring whole docs.
+- One item the metaplan framed as "note that 7_saving-readonly-cols.org
+  was superseded" was already satisfied (it carried the note since
+  stage 8).  The residual work was a LOCATION inconsistency: the file
+  sat in DONE/ while its own header (and the convention "DONE/ holds
+  executed plans") said it belonged outside DONE/, and it was never
+  executed.  Resolved by moving it back to TODO/full-schema/.  Cheap
+  and reversible.
+- Ride-along beyond the metaplan's explicit file list: corrected two
+  stale lines in docs/data-model-skg-extensions.md (link-follow to an
+  overridden node now opens the override-choice menu, it does not
+  silently show the overrider) and two stale claims in
+  claude-to-claude.org (overrides "not yet implemented"; the retired
+  two-DFS-pass 'complete_viewtree').  These actively misdescribed
+  shipped behavior, so fixing them is squarely "document the resulting
+  model".
+
+**** unanticipated future potential costs and benefits
+- COST/AWARENESS: the new api-and-formats.md stats section names atoms
+  that the Rust enums own.  The herald conformance test
+  ('herald_rules_cover_the_emittable_vocabulary') pins the elisp herald
+  side to those atoms, but NOT this prose -- so if an atom is renamed,
+  the doc can drift silently.  Acceptable (the section says the Rust
+  types are the source of truth); a generated table could close the gap
+  if it ever matters.
+- BENEFIT: glossary.md now has one home for the PartnerCol/ColPolicy
+  vocabulary, so the next relation documents itself by adding a kind
+  rather than by re-deriving policy across layers -- the same
+  single-arbiter discipline the code now enforces.
+
+**** open questions
+None blocking (per when-to-stop.org: no unanticipated architectural
+decisions, no stumper mysteries).  One trivial, reversible call made
+without asking, flagged only for the record:
+***** TODO (Jeff, trivial): 7_saving-readonly-cols.org moved out of DONE/
+I moved it back to TODO/full-schema/ rather than editing its header to
+claim DONE/ membership, because it was never executed and DONE/ holds
+executed plans (and its own header already said so).  If you would
+rather it live in DONE/ as a graveyard, 'git mv' it back and I will
+adjust the header.
+
 ** stage 13 : test the relationship matrix
 *** final report (2026-06-12)
 The plan is fully executed: all eight commits in the plan's order,

@@ -527,7 +527,10 @@ matrix itself is unchanged and is not repeated here (see metaplan 1,
   member under a writable col), inactive-member preservation across
   a restricted save, warning delivery on a successful save, and
   order preservation of a reordered read-only set across save.
-** document the resulting model
+** DONE document the resulting model
+Executed 2026-06-12; record in [[./DONE/14_document.org]], logged in
+[[./progress.org]] (stage 14).  This was the last step; with it,
+metaplan_2.org is fully executed (stages 1-14).
 As metaplan 1 specified: 'schema.tql' comments, 'api-and-formats.md'
 (new stats metadata, override-choice behavior, diff-mode refusals,
 visible-subset save semantics), 'glossary.md' (read-only set is

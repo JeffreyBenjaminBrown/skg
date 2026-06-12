@@ -33,12 +33,34 @@ define
   #   hides_from_its_subscriptions, and
   #   overrides_view_of,
   # see `docs/sharing-model.md`.
+  #
+  # In a view, each of these surfaces as a generated org-collection
+  # called a PartnerCol (see `glossary.md`): a node's outbound,
+  # user-writable members under subscribeeCol / overriddenCol, and its
+  # inbound, read-only members under subscriberCol / overriderCol /
+  # hiderCol / hiddenCol.
+
+  # A subscriber forks a subscribee: it clones the subscribee's
+  # content and stays subscribed, so the subscribee's later additions
+  # appear in the subscriber's view as unintegrated content.
   relation subscribes,
     relates subscriber,
     relates subscribee;
+  # A hider hides one of its subscribed nodes from its own view of a
+  # subscription. Recorded explicitly on save when the user deletes a
+  # subscribee-as-such's child; ordinary integrated content is hidden
+  # implicitly.
   relation hides_from_its_subscriptions,
     relates hider,
     relates hidden;
+  # An overrider stands in for the overridden node wherever the
+  # overridden node would be drawn as recursive content (override
+  # substitution; see `docs/sharing-model.md` and `glossary.md`).
+  # Invariants on USER-OWNED edges, validated at save and at
+  # init/rebuild: monogamy (at most one user-owned overrider per
+  # overridden node) and acyclicity (no user-owned override chains).
+  # Foreign override edges are display-only facts and never
+  # substitute.
   relation overrides_view_of,
     relates overrider,
     relates overridden;

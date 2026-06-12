@@ -16,7 +16,7 @@ As is evident from the [schema](../schema.tql), there are a number of ways nodes
 ## Each node of a document is a separate file.
 This is unusual -- in most applications, the entire tree of text would be a single document. The one-file model has the advantage that a document can be easily read without special software. But the Skg model makes it possible to share granularly (see [the sharing model](sharing-model.md), and [easy to understand changes](diffs-are-clearer-in-skg.md).
 ## The overrides_view_of relationship
-A file F can override the view of file O. If it does, then by default when the user opens a link to O, they will see F instead. (The override is not silent -- it will be visibly announced, and the user can still visit the overridden file if they like.)
+A file F can override the view of file O. The override is not silent: when the user opens a fresh view of O -- for instance by following a link to it -- Skg does not choose for them, but offers an *override-choice menu* (O as root, each overrider beneath what it overrides) and announces this in the minibuffer. The user picks the overrider they want, or bypasses the menu to visit O itself. Separately, wherever O would appear as recursive *content* of a node already in view, F is drawn in its place automatically; this is *override substitution* (see [the sharing model](sharing-model.md)).
 
 Overriding is useful for both sharing and privacy, as is explained below.
 
@@ -26,7 +26,7 @@ When you "edit" a note N that you don't own, what actually happens is you gain a
 
 Because nodes in Skg are represented as flat files, N' duplicates very little data. For instance, if N consisted of two big branches, then the file representing N would only contain some text and two nodes. If you changed their order, you would have to duplicate N (with its text and its two nodes), but you would not have to duplicate anything inside either branch.
 
-The overrides relationship causes Skg to show you N' when you follow links to N.
+The overrides relationship is what makes Skg draw N' wherever N would appear as content; opening a fresh view of N (say, by following a link) offers the override-choice menu, from which you reach N'.
 
 When new content appears in N, it will appear in your N' as "unintegrated subscribed content" (which you can proceed to integrate if you like). If you delete the subscription, this stops being true. You can also subscribe N' to other nodes apart from N.
 

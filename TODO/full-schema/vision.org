@@ -1,3 +1,17 @@
+* HISTORICAL -- superseded by metaplan_2.org
+This is an early vision document for the full-schema UI.  It is kept
+as a record of the original thinking, but it is NOT load-bearing and
+should not be executed or trusted on details:
+- the codebase was overhauled after it was written (local instruction
+  collection, local view update, the PartnerCol vocabulary);
+- it uses a retired herald-name generation (Og / Se / On) that the
+  shipped code does not use -- the live names are Oh / gO / gS / Op
+  (see api-and-formats.md and server/heralds.rs);
+- the work it envisioned shipped across stages 1-14 of
+  [[./metaplan_2.org]], whose prose supersedes this file wherever they
+  disagree.
+The model as actually built is documented in api-and-formats.md,
+glossary.md, schema.tql and docs/sharing-model.md.
 * implementing a UI for the full schema
 ** status
 Currently, the 'contains' and 'textlinks_to' relations

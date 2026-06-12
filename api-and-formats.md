@@ -276,6 +276,51 @@ node participates in the collection represented by its visible parent:
 - `(birth containsParent)` marks containerward ancestry;
 - `(birth linksToParent)` marks sourceward link-source ancestry.
 
+## Stats metadata: graphStats and viewStats
+
+Two keyed forms decorate a `(node ...)` with statistics. Both are
+generated, never save intent; the client renders them as heralds (the
+rule table in `server/heralds.rs`; see "Herald rules"). The atom names
+below are the single source of truth, derived from `GraphNodeStats`
+and `ViewNodeStats` in `server/types/viewnode.rs`.
+
+`(graphStats ...)` holds graph-wide facts about the node, independent
+of where it is drawn:
+
+- keyed counts (emitted only when informative):
+  `(containers N)`, `(contents N)`,
+  `(linksInFromContainers N)`, `(linksInFromLeaves N)`;
+- bare booleans, each present only when true:
+  - `aliasing` — the node has aliases;
+  - `extraIDs` — the node has extra IDs (from a merge);
+  - `overriding` — herald blue "O"; the node plays either role of
+    `overrides_view_of` anywhere;
+  - `subscribing` — herald blue "S"; either role of `subscribes`;
+  - `hiding` — herald blue "H"; either role of
+    `hides_from_its_subscriptions`.
+
+`(viewStats ...)` holds facts that depend on the node's position in
+this view (the same graph node can warrant different viewStats under
+different parents):
+
+- `cycle` — this position repeats an ancestor's ID;
+- `containsParent` — herald "}"; the node's visible org-parent
+  contains it (`parentIsContent`);
+- `(sourceHerald ⌂:LABEL)` — the node sits at a source boundary (a
+  root, or a source differing from its nearest truenode ancestor);
+- `grandparentOverrides` — herald red "gO"; computed only for a
+  subscribee-as-such (an Affected child of a `subscribeeCol`) whose
+  col owner also overrides it. Not emitted under an `overriddenCol`,
+  where the col already says it.
+- `grandparentSubscribes` — herald red "gS"; computed only for an
+  Affected child of an `overriddenCol` whose col owner also
+  subscribes to it. Not emitted under a `subscribeeCol`.
+- `overridesParent` — herald red "Op"; this node overrides the node
+  of its visible org-parent. Like `containsParent`, necessarily a
+  view stat, since the same node can sit under different parents.
+- `(overridesHere N)` — herald red "Oh"; the load-bearing
+  substitution marker, documented in the next subsection.
+
 ## Override substitution and the overridesHere marker
 
 When view completion would CREATE a viewnode for node N as

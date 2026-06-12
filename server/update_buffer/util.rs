@@ -212,6 +212,12 @@ where Relevant : Fn (&ViewNode) -> bool,
 ///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
+///   USER-FACING CONSEQUENCE for PartnerCols: an Independent (non-member)
+///   child a user parks inside a col is "irrelevant" here, so it is moved
+///   ABOVE the generated members on save. This is deliberate -- the
+///   membership is generated and ordered, so a parked note stays but is
+///   visibly separated from the live membership. Documented in glossary.md
+///   ("PartnerCol") and docs/sharing-model.md.
 /// - Returns a RepairSummary of what it created, demoted and detached.
 pub fn complete_relevant_children
 <Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
