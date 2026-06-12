@@ -262,7 +262,11 @@
    Windows packaging plan should explicitly copy them from the private
    =data/bash/= source.
 
-** =docs/setup.org= refers to =example-data/=, but no =example-data/= is present
+** DONE (obsolete) =docs/setup.org= refers to =example-data/=, but no =example-data/= is present
+   Obsolete 2026-06-12: an 'example-data/' directory now exists and is
+   git-tracked (skgconfig.toml, README.md, public/ and private/
+   .gitkeep placeholders). The setup.org reference -- and the two in
+   api-and-formats.md -- now resolve. Nothing to do.
    The setup doc says "See example-data/ for how" when describing the
    data folder. This checkout does not contain an =example-data/=
    directory. New install packaging will need a tracked starter data
@@ -309,7 +313,9 @@
    DELETE-only instructions, or short-circuit when the target lacks
    '(node ...)' to begin with.
 
-** 'coding-advice/ai-agents.org' refers to a missing file
+** DONE 'coding-advice/ai-agents.org' refers to a missing file
+   Fixed 2026-06-12: the reference now reads
+   'coding-advice/some-good-refactors.md', the actual filename.
    It says to see 'coding-advice/good-refactors.md', but that file
    does not exist in the repository. Either the file was renamed or
    the reference is stale.
@@ -1012,7 +1018,10 @@
    (inactive_suppression, partner_col_matrix), and
    collateral_source_move's local setup.
 
-** 'coding-advice/development-process.md' links to a missing file
+** DONE (obsolete) 'coding-advice/development-process.md' links to a missing file
+   Verified 2026-06-12: the current development-process.md already
+   links '[tests/USAGE.md](../tests/USAGE.md)', not the missing
+   'ai-agents.md'. Resolved before this audit; nothing to do.
    It says the three kinds of tests are "described in
    [ai-agents.md](../ai-agents.md)", but no 'ai-agents.md' exists at
    the repo root. The real file is 'coding-advice/ai-agents.org'
@@ -1020,7 +1029,10 @@
    tests; 'tests/USAGE.md' does. Same family as the already-reported
    stale 'good-refactors.md' reference.
 
-** 'tests/USAGE.md' says "Emacs tests" twice
+** DONE (obsolete) 'tests/USAGE.md' says "Emacs tests" twice
+   Verified 2026-06-12: tests/USAGE.md's second paragraph already reads
+   "some ways to run the Rust tests include". Resolved before this
+   audit; nothing to do.
    Its second paragraph introduces 'cargo test' with "Similarly, some
    ways to run the Emacs tests include" -- copy-paste slip for "Rust
    tests".

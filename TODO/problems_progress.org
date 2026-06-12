@@ -110,31 +110,60 @@
     non-skg list passed through. The whole Emacs test suite passes
     (230 tests, 0 unexpected).
 
-* Still to do (in rough order)
-  - Documentation fixes:
-    - 'coding-advice/ai-agents.org' points at 'good-refactors.md';
-      the real file is 'some-good-refactors.md'.
-    - A stale code comment in server/types/viewnode.rs names a function
-      ('convert_inactive_to_deleted_if_deleted') that was deleted.
-    - Mark the doc problems that turned out already-fixed
-      (development-process.md link, tests/USAGE.md wording,
-      docs/setup.org's example-data/ reference) as DONE in problems.org.
-    - A sweep for any other broken doc references I can find.
+** Documentation fixes (DONE)
+*** What I changed
+    - 'coding-advice/ai-agents.org' pointed readers at
+      'coding-advice/good-refactors.md', which does not exist; the real
+      file is 'coding-advice/some-good-refactors.md'. Corrected the
+      reference.
+    - A code comment in server/types/viewnode.rs (on the Deleted view
+      node) still described a deleted function
+      ('convert_inactive_to_deleted_if_deleted') and claimed an
+      inactive node gets turned into a "DELETED" marker. That behaviour
+      was removed (it would leak that a hidden node vanished). Rewrote
+      the comment to say what actually happens now: only active content
+      children flip to Deleted; an inactive placeholder just lingers
+      until the next full rerender.
+*** Doc problems that were already fixed (marked DONE, no change needed)
+    Three problems.org "doc fix" items turned out to already be
+    resolved when I checked the current files:
+    - 'coding-advice/development-process.md' already links
+      'tests/USAGE.md' (not the missing 'ai-agents.md').
+    - 'tests/USAGE.md' already says "run the Rust tests" in its second
+      paragraph (not "Emacs tests" twice).
+    - 'example-data/' now exists and is git-tracked, so
+      'docs/setup.org' (and api-and-formats.md) no longer point at a
+      missing folder.
+*** Sweep for other broken references
+    I scanned README, api-and-formats, glossary, architecture, all of
+    coding-advice/, and the main docs/ files for file links that do not
+    resolve. The only real one was the 'good-refactors.md' reference
+    above. (The scan also flagged things like '[[sources]]' and
+    '[[id:...]]' -- those are TOML headers and org-roam link examples,
+    not file references, so they are fine.)
+
+* Everything in this pass is now done
+  Three commits: the list-diff fix, the Emacs herald-stripper fix, and
+  the documentation fixes. All tests green (Rust: the interleaved-diff
+  group; Emacs: full 230-test suite).
 
 * Changes to the plan's envisioned order
-  None yet. (I did the list-diff fix first because it was the one with
-  a real, testable bug.)
+  I did the list-diff fix first because it was the one with a real,
+  testable bug, then the Emacs fix, then docs. No surprises that
+  changed the plan.
 
 * Unanticipated costs / benefits
-  - Benefit: the new code is simpler and drops two string allocations
-    and a hashmap per diff call.
-  - Cost: a slightly stronger trait requirement ('Ord') on a generic
-    helper. No current caller is affected; a hypothetical future caller
-    diffing non-orderable items would have to derive an ordering. Cheap
-    and easy to reverse if it ever bites.
+  - Benefit: the new list-diff code is simpler and drops two string
+    allocations and a hashmap per call. The new Emacs stripper is also
+    simpler and no longer depends on the general edit DSL.
+  - Cost: a slightly stronger requirement ('Ord', i.e. "can be sorted")
+    on the list-diff helper. No current caller is affected; a
+    hypothetical future caller diffing non-sortable items would have to
+    supply an ordering. Cheap and easy to reverse if it ever bites.
 
 * Open questions
-  None so far.
+  None. Nothing here needed your input; everything was either a clear
+  fix or an easily-reversible local decision.
 
 * Glossary (plain-English meanings of words I use above)
   - diff: a comparison of two lists (or texts) that says which parts

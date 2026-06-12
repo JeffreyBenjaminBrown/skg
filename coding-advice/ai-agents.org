@@ -13,7 +13,7 @@ ditto.
 
 * Try refactoring sequential to nested definitions
 
-See 'coding-advice/good-refactors.md'.
+See 'coding-advice/some-good-refactors.md'.
 Do this to everything you write,
 and look for opportunities to do it in everything you use.
 

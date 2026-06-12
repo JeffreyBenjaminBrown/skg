@@ -91,10 +91,11 @@ pub enum Phantom {
 /// ARISES: during post-save / collateral re-render (NOT in git diff mode), when
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Active content child flips here via
-/// `mutate_truenode_to_deletednode`; an Inactive node via
-/// `convert_inactive_to_deleted_if_deleted`. So it marks a node that genuinely
-/// no longer exists in the graph, killed by a completed save (this buffer's or a
-/// shared one's) -- not a git artifact.
+/// `mutate_truenode_to_deletednode`. (An Inactive node is NOT flipped: it is an
+/// anonymous placeholder, and turning it into a DELETED marker would leak that a
+/// hidden node vanished, so it just lingers until the next full rerender drops
+/// it.) So it marks a node that genuinely no longer exists in the graph, killed
+/// by a completed save (this buffer's or a shared one's) -- not a git artifact.
 ///
 /// USED: inert -- it generates no save instructions and is excluded from its
 /// parent's contains list. It is never "completed", yet it retains its children
