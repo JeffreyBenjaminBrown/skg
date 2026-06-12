@@ -43,7 +43,6 @@
 use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
-  inactiveNode_is_phantom,
   member_counts_for_partnerCol };
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, DefiningColOwner, LocalContext, NodeIntent_Local,
@@ -344,48 +343,52 @@ fn partnerCol_members (
         members . push (t . id . clone()); }}}
   dedup_vector (members) }
 
-/// This returns the members of a SubscribeeCol.  Unlike the
-/// OverriddenCol, subscribee order matters, so a buffer-present
-/// InactiveNode (a retained placeholder) counts as a positional
-/// member, mirroring 'content_members'
-/// (TODO/full-schema/9-2_source-set-safety.org).
+/// This returns the members of a SubscribeeCol: its Active children
+/// that pass the PartnerCol membership predicate, deduplicated. Like
+/// 'content_members' (and for the same reason), inactive children
+/// contribute nothing: 'subscribes_to' is order-meaningful, but the
+/// disk merge ('weave') already restores invisible subscribees at
+/// their disk position, so a buffer-present inactive placeholder must
+/// not feed this list.
 #[allow(non_snake_case)]
 fn subscribeeCol_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<ID> {
   let mut members : Vec<ID> = Vec::new();
   for child in node_ref . children() {
-    match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) => {
-        if member_counts_for_partnerCol (t) {
-          members . push (t . id . clone()); }},
-      ViewNodeKind::Vognode (Vognode::Inactive (i)) => {
-        if ! inactiveNode_is_phantom (i) {
-          members . push (i . id . clone()); }},
-      _ => {}, }}
+    if let ViewNodeKind::Vognode (Vognode::Active (t))
+      = &child . value() . kind
+    { if member_counts_for_partnerCol (t) {
+        members . push (t . id . clone()); }}}
   dedup_vector (members) }
 
 /// This returns the content of a definitive vognode: its Active
-/// children that pass the contains predicate, plus its non-phantom
-/// Inactive children. It does not dedup, because validation
-/// ('nonignored_children_have_distinct_ids') already guarantees
-/// distinctness.
+/// children that pass the contains predicate. It does not dedup,
+/// because validation ('nonignored_children_have_distinct_ids')
+/// already guarantees distinctness.
+///
+/// Inactive children contribute NOTHING here: an inactive node emits
+/// no save intention for its container. Its membership in the
+/// container's contains is owned entirely by the disk merge
+/// ('preserve_invisible_members' -> weave in from_text/weave.rs),
+/// which restores invisible members from disk at their disk position.
+/// Including a buffer-present inactive child would let a stale or
+/// concurrently-edited buffer resurrect a member that was
+/// authoritatively removed, and would persist reorderings of a
+/// read-only placeholder. (See TODO/problems.org, "Retained inactive
+/// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<ID> {
   let mut contents : Vec<ID> = Vec::new();
   for child in node_ref . children() {
-    match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) => {
-        if active_child_counts_as_content (t) {
-          contents . push (
-            // collected_id, not id: a drawn overrider stands for
-            // the original member it was drawn in place of.
-            t . collected_id ()); }},
-      ViewNodeKind::Vognode (Vognode::Inactive (i)) => {
-        if ! inactiveNode_is_phantom (i) {
-          contents . push (i . collected_id ()); }},
-      _ => {}, }}
+    if let ViewNodeKind::Vognode (Vognode::Active (t))
+      = &child . value() . kind
+    { if active_child_counts_as_content (t) {
+        contents . push (
+          // collected_id, not id: a drawn overrider stands for
+          // the original member it was drawn in place of.
+          t . collected_id ()); }}}
   contents }
 
 /// This returns the children that the buffer presents as visible

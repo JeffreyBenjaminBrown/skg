@@ -276,7 +276,13 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 }
 
 #[test]
-fn inactive_placeholders_are_saved_as_content_positions () {
+fn inactive_placeholders_emit_neither_savenode_nor_contains () {
+  // Raw extraction (no source set / weave): an inactive placeholder
+  // emits no save intention at all. It produces no SaveNode, and it
+  // does NOT appear in its container's extracted contains -- the
+  // container's membership of an invisible node is owned by the disk
+  // merge (weave), exercised under a restricted source set in
+  // tests/source_sets.rs. Position in the buffer is irrelevant here.
   let input : &str =
     indoc! {"
             * (skg (node (id root) (source main))) root
@@ -295,48 +301,8 @@ fn inactive_placeholders_are_saved_as_content_positions () {
     "inactive placeholders should not produce SaveNodes");
   assert_eq!(
     saved_node_by_id (&instructions, "root") . contains,
-    vec![ID::from ("active-a"),
-         ID::from ("hidden"),
-         ID::from ("active-b")]);
-}
-
-#[test]
-fn inactive_placeholder_moves_reorder_contains () {
-  let input : &str =
-    indoc! {"
-            * (skg (node (id root) (source main))) root
-            ** (skg (node (id active-a) (source main))) active A
-            ** (skg (node (id active-b) (source main))) active B
-            ** (skg (inactiveNode (id hidden) (source private)))
-        "};
-  let viewforest : Tree<ViewNode> =
-    checked_viewforest_from_org (input);
-  let instructions : Vec<DefineNode> =
-    definenodes_from_tree (viewforest) . unwrap ();
-
-  assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
-    vec![ID::from ("active-a"),
-         ID::from ("active-b"),
-         ID::from ("hidden")]);
-}
-
-#[test]
-fn inactive_placeholder_deletions_remove_contains () {
-  let input : &str =
-    indoc! {"
-            * (skg (node (id root) (source main))) root
-            ** (skg (node (id active-a) (source main))) active A
-            ** (skg (node (id active-b) (source main))) active B
-        "};
-  let viewforest : Tree<ViewNode> =
-    checked_viewforest_from_org (input);
-  let instructions : Vec<DefineNode> =
-    definenodes_from_tree (viewforest) . unwrap ();
-
-  assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
-    vec![ID::from ("active-a"), ID::from ("active-b")]);
+    vec![ID::from ("active-a"), ID::from ("active-b")],
+    "an inactive placeholder is not an extracted content member");
 }
 
 #[test]

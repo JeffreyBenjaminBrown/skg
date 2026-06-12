@@ -7,9 +7,13 @@
 ///   source-set.  Unresolvable members (dangling references) count
 ///   as invisible, hence are preserved: the user could not have
 ///   seen them, so they cannot have deliberately deleted them.
-/// - A disk member is POSITIONED iff it appears in the buffer list
-///   (this includes retained InactiveNodes, which the user can see
-///   and move).
+/// - A disk member is POSITIONED iff it appears in the buffer list.
+///   Only visible members ever do: save extraction never puts an
+///   inactive (invisible) member into a container's list (see
+///   'content_members' / 'subscribeeCol_members' in
+///   local_instruction_collection/traverse.rs), so every invisible
+///   disk member is non-positioned and the weave alone decides its
+///   presence and position.
 /// - A visible disk member absent from the buffer was DELETED by
 ///   the user; an invisible one absent from the buffer was OMITTED
 ///   by rendering and must survive.

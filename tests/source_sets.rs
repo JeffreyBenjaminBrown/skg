@@ -73,8 +73,8 @@ fn all_tests
       s . reset ("search_filters_inactive_sources_before_ranking_and_truncation", fixtures) . await ?;
       search_filters_inactive_sources_before_ranking_and_truncation (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("saving_inactive_placeholder_moves_and_deletes_update_contains", fixtures) . await ?;
-      saving_inactive_placeholder_moves_and_deletes_update_contains (
+      s . reset ("inactive_placeholder_in_buffer_does_not_drive_contains", fixtures) . await ?;
+      inactive_placeholder_in_buffer_does_not_drive_contains (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("saving_edits_to_inactive_placeholder_content_are_rejected", fixtures) . await ?;
       saving_edits_to_inactive_placeholder_content_are_rejected (
@@ -91,8 +91,8 @@ fn all_tests
       s . reset ("stale_inactive_placeholders_under_cols_save_without_error", fixtures) . await ?;
       stale_inactive_placeholders_under_cols_save_without_error (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("inactive_subscribee_placeholder_counts_positionally", fixtures) . await ?;
-      inactive_subscribee_placeholder_counts_positionally (
+      s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to", fixtures) . await ?;
+      inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("weave_preserves_omitted_inactive_content_members", fixtures) . await ?;
       weave_preserves_omitted_inactive_content_members (
@@ -352,42 +352,66 @@ async fn search_filters_inactive_sources_before_ranking_and_truncation (
          and display truncation" );
       Ok (( )) }
 
-async fn saving_inactive_placeholder_moves_and_deletes_update_contains (
+async fn inactive_placeholder_in_buffer_does_not_drive_contains (
   config   : &SkgConfig,
   driver   : &Arc<TypeDBDriver>,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let moved_buffer = indoc! {"
-        * (skg (node (id root) (source public))) root
-        ** (skg (node (id active-b) (source public))) active-b
-        ** (skg (inactiveNode (id private-a) (source private)))
-      "};
-      let moved_instructions : Vec<DefineNode> =
-        buffer_to_validated_saveplan (
-          moved_buffer, config, driver, None ) . await?
-        . 1 . define_nodes;
-      assert_eq! (
-        saved_node_by_id (&moved_instructions, "root") . contains,
-        vec![ID::from ("active-b"), ID::from ("private-a")],
-        "moving an inactive placeholder should reorder the active \
-         container's contains list" );
-      assert! (
-        ! save_ids (&moved_instructions) . contains (&ID::from ("private-a")),
-        "inactive placeholder should not produce a SaveNode" );
-
-      let deleted_buffer = indoc! {"
-        * (skg (node (id root) (source public))) root
-        ** (skg (node (id active-b) (source public))) active-b
-      "};
-      let deleted_instructions : Vec<DefineNode> =
-        buffer_to_validated_saveplan (
-          deleted_buffer, config, driver, None ) . await?
-        . 1 . define_nodes;
-      assert_eq! (
-        saved_node_by_id (&deleted_instructions, "root") . contains,
-        vec![ID::from ("active-b")],
-        "deleting an inactive placeholder should remove that inactive \
-         ID from contains" );
+  // An inactive placeholder is read-only: it emits no save intention
+  // for its container. Its presence and position in the container's
+  // contains are owned by the disk merge (weave), not the buffer. So
+  // reordering the placeholder cannot move its disk member, and a
+  // stale placeholder for a node absent from disk is not resurrected.
+  // (Disk root.contains = [active-a, private-a, active-b]; private-a's
+  // source is inactive under the "public" set.)
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName ("public" . to_string ())) ?;
+      { // The user drags the placeholder to the end. The save keeps
+        // private-a at its DISK position (after active-a), not the
+        // buffer position, and writes no SaveNode for it.
+        let reordered = indoc! {"
+          * (skg (node (id root) (source public))) root
+          ** (skg (node (id active-a) (source public) indef)) active-a
+          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (inactiveNode (id private-a) (source private)))
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            reordered, config, driver, Some (&active) ) . await?
+          . 1 . define_nodes;
+        assert_eq! (
+          saved_node_by_id (&instructions, "root") . contains,
+          vec![ ID::from ("active-a"), ID::from ("private-a"),
+                ID::from ("active-b") ],
+          "reordering a read-only placeholder must not move its disk \
+           member" );
+        assert! (
+          ! save_ids (&instructions) . contains (&ID::from ("private-a")),
+          "an inactive placeholder must not produce a SaveNode" ); }
+      { // A stale placeholder for a node NOT in root's disk contains
+        // (private-removed) must not be resurrected into contains; the
+        // real invisible member (private-a) is still preserved.
+        let stale = indoc! {"
+          * (skg (node (id root) (source public))) root
+          ** (skg (node (id active-a) (source public) indef)) active-a
+          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (inactiveNode (id private-removed) (source private)))
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            stale, config, driver, Some (&active) ) . await?
+          . 1 . define_nodes;
+        let contains : Vec<ID> =
+          saved_node_by_id (&instructions, "root") . contains . clone ();
+        assert_eq! (
+          contains,
+          vec![ ID::from ("active-a"), ID::from ("private-a"),
+                ID::from ("active-b") ],
+          "a stale placeholder absent from disk must not be resurrected" );
+        assert! (
+          ! contains . contains (&ID::from ("private-removed")),
+          "private-removed must not appear in contains" ); }
       Ok (( )) }
 
 async fn saving_edits_to_inactive_placeholder_content_are_rejected (
@@ -734,14 +758,17 @@ async fn stale_inactive_placeholders_under_cols_save_without_error (
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
-async fn inactive_subscribee_placeholder_counts_positionally (
+async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
   config   : &SkgConfig,
   driver   : &Arc<TypeDBDriver>,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/full-schema/9-2_source-set-safety.org: subscribee order
-  // matters, so a buffer-present placeholder is a positional member
-  // of the subscribeeCol.
+  // An inactive placeholder emits no subscribes_to membership, just as
+  // it emits no contains membership: 'subscribes_to' is
+  // order-meaningful, but the disk merge (weave) owns invisible
+  // subscribees, so a buffer-present placeholder must not feed the
+  // owner's subscribeeCol. (root has no subscribes_to on disk, so the
+  // active member is the only one written.)
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg subscribeeCol)
@@ -758,8 +785,8 @@ async fn inactive_subscribee_placeholder_counts_positionally (
       assert_eq! (
         saved_node_by_id (&instructions, "root")
           . subscribes_to . or_default (),
-        &[ ID::from ("private-a"), ID::from ("active-b") ],
-        "the placeholder must count as a positional subscribee" );
+        &[ ID::from ("active-b") ],
+        "the inactive placeholder must not be a subscribee member" );
       Ok (( )) }
 
 async fn weave_preserves_omitted_inactive_content_members (

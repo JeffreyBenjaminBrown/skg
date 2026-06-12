@@ -222,7 +222,7 @@ fn validate_subscribeecol (
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee is a positional member (TODO/full-schema/9-2_source-set-safety.org)
+                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_source-set-safety.org)
                       | MpViewnodeKind::PartnerCol (
                           PartnerCol::HiddenOutsideOfSubscribee) ))
     { errors . push( "SubscribeeCol's children must include only TrueNodes, inactive placeholders or HiddenOutsideOfSubscribeeCol." . to_string()); }

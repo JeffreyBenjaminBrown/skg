@@ -253,7 +253,10 @@ async fn pipeline_inactive_subtree (
         vec![ ID::from ("root"), ID::from ("stowaway") ]);
       assert_eq!(
         saved_node_by_id (&plan . define_nodes, "root") . contains,
-        vec![ID::from ("hidden")] );
+        Vec::<ID>::new(),
+        "the inactive node emits no contains membership; under a \
+         restricted set the weave restores it from disk (see \
+         tests/source_sets.rs)" );
       Ok (( )) }
 
 async fn pipeline_phantom_subtree (

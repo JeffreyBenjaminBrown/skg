@@ -188,7 +188,9 @@ fn definitive_child_of_inactive_vognode_emits () {
   assert!( collected . by_pid . get (&ID::from ("hidden")) . is_none(),
            "the inactive node itself emits nothing" );
   assert_eq!( entry (&collected, "root") . contains,
-              Some (vec![ID::from ("hidden")]) ); }
+              Some (vec![]),
+              "the inactive node is not content of its parent; its \
+               membership is owned by the disk weave" ); }
 
 #[test]
 fn definitive_node_inside_diff_phantom_subtree_emits () {
