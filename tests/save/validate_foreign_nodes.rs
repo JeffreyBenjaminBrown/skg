@@ -2,20 +2,62 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::test_utils::run_with_test_db_from_config;
+use skg::test_utils::run_with_shared_test_db;
 use skg::types::errors::{SaveError, BufferValidationError};
+use skg::types::misc::SkgConfig;
 
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use std::error::Error;
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 
 #[test]
-fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-unmodified",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-save-validate-foreign-nodes",
+    |s| Box::pin ( async move {
+      s . reset_from_config ("test_unmodified_foreign_node_allowed", CONFIG_PATH) . await ?;
+      test_unmodified_foreign_node_allowed (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_modified_foreign_node_rejected", CONFIG_PATH) . await ?;
+      test_modified_foreign_node_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_modified_foreign_node_body_rejected", CONFIG_PATH) . await ?;
+      test_modified_foreign_node_body_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_indefinitive_foreign_node_filtered", CONFIG_PATH) . await ?;
+      test_indefinitive_foreign_node_filtered (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_owned_node_unchanged_behavior", CONFIG_PATH) . await ?;
+      test_owned_node_unchanged_behavior (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_delete_foreign_node_rejected", CONFIG_PATH) . await ?;
+      test_delete_foreign_node_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_new_foreign_node_rejected", CONFIG_PATH) . await ?;
+      test_new_foreign_node_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_mixed_owned_and_foreign_nodes", CONFIG_PATH) . await ?;
+      test_mixed_owned_and_foreign_nodes (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_merge_with_foreign_acquirer_rejected", CONFIG_PATH) . await ?;
+      test_merge_with_foreign_acquirer_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_merge_with_foreign_acquiree_rejected", CONFIG_PATH) . await ?;
+      test_merge_with_foreign_acquiree_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("test_merge_with_both_owned_allowed", CONFIG_PATH) . await ?;
+      test_merge_with_both_owned_allowed (
+        &s . config, &s . driver ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_unmodified_foreign_node_allowed (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       let org_text: &str = indoc! {"
         * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
         This is a foreign node
@@ -28,15 +70,12 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
       assert_eq!(save_plan . define_nodes . len(), 0,
                  "Unmodified foreign nodes should be filtered out");
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-modified",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_modified_foreign_node_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Try to save buffer with modified foreign node (title changed)
       let org_text: &str = indoc! {"
         * (skg (node (id foreign2) (source foreign))) MODIFIED TITLE
@@ -56,15 +95,12 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
             other => panic!("Expected ModifiedForeignNode error, got {:?}", other), } }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-body",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_modified_foreign_node_body_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Try to save buffer with modified foreign node (body changed)
       let org_text: &str = indoc! {"
         * (skg (node (id foreign2) (source foreign))) Foreign node to modify
@@ -80,15 +116,12 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
             e, BufferValidationError::ModifiedForeignNode(_, _)))); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-indefinitive",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_indefinitive_foreign_node_filtered (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Save buffer with indef foreign node
       let org_text: &str = indoc! {"
         * (skg (node (id foreign3) (source foreign) indef)) Foreign indef node
@@ -102,15 +135,12 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
       assert_eq!(save_plan . define_nodes . len(), 0,
                  "Indefinitive foreign nodes should be filtered out");
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-owned",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_owned_node_unchanged_behavior (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Save buffer with owned node
       let org_text: &str = indoc! {"
         * (skg (node (id node1) (source main))) Modified owned node
@@ -126,15 +156,12 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
       assert!(save_plan . define_nodes . len() > 0,
               "Owned node should be included in save instructions");
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-delete",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_delete_foreign_node_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Try to delete a foreign node
       let org_text: &str = indoc! {"
         * (skg (node (id foreign1) (source foreign) (editRequest delete))) Foreign node unchanged
@@ -151,15 +178,12 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
             "Should have ModifiedForeignNode error"); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-new",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_new_foreign_node_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Try to create a new node in foreign source
       let org_text: &str = indoc! {"
         * (skg (node (id new_foreign) (source foreign))) New foreign node
@@ -176,15 +200,12 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
             "Should have CreatedForeignNode error"); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-foreign-mixed",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_mixed_owned_and_foreign_nodes (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Save buffer with mix of owned and unmodified foreign nodes
       let org_text: &str = indoc! {"
         * (skg (node (id node1) (source main))) Modified owned node
@@ -209,15 +230,12 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
             source . as_str() };
         assert_eq!( source, "main", "Only owned (in this case from source main) nodes should be in instructions"); }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-merge-foreign-acquirer",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_merge_with_foreign_acquirer_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Try to merge where the acquirer is foreign
       // Format: (skg (node ... (editRequest (merge ID)))) - acquiree merges into acquirer
       let org_text: &str = indoc! {"
@@ -236,15 +254,12 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
             "Should have ModifiedForeignNode error for foreign acquirer"); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-merge-foreign-acquiree",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_merge_with_foreign_acquiree_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // Try to merge where the acquiree is foreign
       let org_text: &str = indoc! {"
         * (skg (node (id foreign1) (source foreign) (editRequest (merge node1)))) Foreign merging into owned
@@ -262,15 +277,12 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
             "Should have ModifiedForeignNode error for foreign acquiree"); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
-    } ))
-}
+    }
 
-#[test]
-fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config(
-    "skg-test-merge-owned",
-    CONFIG_PATH,
-    |config, driver| Box::pin(async move {
+async fn test_merge_with_both_owned_allowed (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
       // NodeMerge where both nodes are owned - should work
       let org_text: &str = indoc! {"
         * (skg (node (id node1) (source main) (editRequest (merge child1)))) Node merging into child
@@ -281,5 +293,4 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
       // Should succeed - both nodes are owned
       assert!(result . is_ok(), "NodeMerge with both owned nodes should be allowed");
       Ok(())
-    } ))
-}
+    }

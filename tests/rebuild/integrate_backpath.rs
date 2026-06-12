@@ -6,8 +6,8 @@ use skg::to_org::expand::backpath::{
   build_and_integrate_containerward_path};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_test_db;
-use skg::types::misc::{ID, SkgConfig};
+use skg::test_utils::run_with_shared_test_db;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
 
 use skg::org_to_text::viewforest_to_string;
@@ -15,18 +15,37 @@ use skg::org_to_text::viewforest_to_string;
 use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
 use std::error::Error;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_path_with_cycle() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-integrate-backpath-cycle",
-    "tests/rebuild/fixtures",
-    "/tmp/tantivy-test-integrate-backpath-cycle",
-    |config, driver, _tantivy| Box::pin(async move {
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/rebuild/fixtures";
+  run_with_shared_test_db (
+    "skg-test-rebuild-integrate-backpath",
+    |s| Box::pin ( async move {
+      s . reset ("test_path_with_cycle", fixtures) . await ?;
+      test_path_with_cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_path_with_branches_no_cycle", fixtures) . await ?;
+      test_path_with_branches_no_cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_path_with_branches_with_cycle", fixtures) . await ?;
+      test_path_with_branches_with_cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_fork_expansion_at_origin",
+                 "tests/rebuild/fixtures-fork-expansion") . await ?;
+      test_fork_expansion_at_origin (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_path_with_cycle (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       test_path_with_cycle_impl(config, driver) . await
-    })
-  )
 }
 
 async fn test_path_with_cycle_impl(
@@ -87,16 +106,12 @@ async fn test_path_with_cycle_impl(
   Ok(())
 }
 
-#[test]
-fn test_path_with_branches_no_cycle(
+async fn test_path_with_branches_no_cycle (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-integrate-backpath-branches-no-cycle",
-    "tests/rebuild/fixtures",
-    "/tmp/tantivy-test-integrate-backpath-branches-no-cycle",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_path_with_branches_no_cycle_impl(config, driver) . await
-    } )) }
+      test_path_with_branches_no_cycle_impl(config, driver) . await }
 
 async fn test_path_with_branches_no_cycle_impl(
   config: &SkgConfig,
@@ -170,16 +185,12 @@ async fn test_path_with_branches_no_cycle_impl(
   Ok(())
 }
 
-#[test]
-fn test_path_with_branches_with_cycle(
+async fn test_path_with_branches_with_cycle (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-integrate-backpath-branches-with-cycle",
-    "tests/rebuild/fixtures",
-    "/tmp/tantivy-test-integrate-backpath-branches-with-cycle",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_path_with_branches_with_cycle_impl(config, driver) . await
-    } )) }
+      test_path_with_branches_with_cycle_impl(config, driver) . await }
 
 async fn test_path_with_branches_with_cycle_impl(
   config: &SkgConfig,
@@ -254,16 +265,12 @@ async fn test_path_with_branches_with_cycle_impl(
   Ok(())
 }
 
-#[test]
-fn test_fork_expansion_at_origin(
+async fn test_fork_expansion_at_origin (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-integrate-backpath-fork-expansion",
-    "tests/rebuild/fixtures-fork-expansion",
-    "/tmp/tantivy-test-integrate-backpath-fork-expansion",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_fork_expansion_at_origin_impl(config, driver) . await
-    } )) }
+      test_fork_expansion_at_origin_impl(config, driver) . await }
 
 async fn test_fork_expansion_at_origin_impl(
   config: &SkgConfig,

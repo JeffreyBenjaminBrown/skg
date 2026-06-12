@@ -7,24 +7,39 @@ use std::error::Error;
 use skg::update_buffer::reconcile::aliascol::reconcile_alias_col_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
 use skg::types::misc::SourceName;
+use skg::types::misc::TantivyIndex;
 use skg::types::git::SourceDiff;
 
 use ego_tree::{Tree, NodeId};
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_reconcile_alias_col_children
-  () -> Result < (), Box<dyn Error> > {
-  run_with_test_db (
-    "skg-test-complete-aliascol",
-    "tests/rebuild/complete_aliascol/fixtures",
-    "/tmp/tantivy-test-complete-aliascol",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_reconcile_alias_col_children_logic ( config, driver ) . await
-    } )) }
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/rebuild/complete_aliascol/fixtures";
+  run_with_shared_test_db (
+    "skg-test-rebuild-complete-aliascol",
+    |s| Box::pin ( async move {
+      s . reset ("test_reconcile_alias_col_children", fixtures) . await ?;
+      test_reconcile_alias_col_children (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_reconcile_alias_col_children_duplicate_aliases_different_orders",
+                 fixtures) . await ?;
+      test_reconcile_alias_col_children_duplicate_aliases_different_orders (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_reconcile_alias_col_children (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result < (), Box<dyn Error> > {
+      test_reconcile_alias_col_children_logic ( config, driver ) . await }
 
 async fn test_reconcile_alias_col_children_logic (
   config : &SkgConfig,
@@ -154,16 +169,13 @@ async fn test_reconcile_alias_col_children_logic (
 
   Ok (( )) }
 
-#[test]
-fn test_reconcile_alias_col_children_duplicate_aliases_different_orders
-  () -> Result < (), Box<dyn Error> > {
-  run_with_test_db (
-    "skg-test-complete-aliascol-duplicates",
-    "tests/rebuild/complete_aliascol/fixtures",
-    "/tmp/tantivy-test-complete-aliascol-duplicates",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result < (), Box<dyn Error> > {
       test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
-        config, driver ) . await } )) }
+        config, driver ) . await }
 
 async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,

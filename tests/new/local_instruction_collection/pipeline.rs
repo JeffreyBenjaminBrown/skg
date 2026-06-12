@@ -16,20 +16,20 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::local_instruction_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::run_with_test_db_from_config;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode,
   maybePlaced_to_placed_tree,
   maybePlaced_to_placed_viewforest };
-use skg::types::misc::{ID, MSV, SkgConfig};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
 use std::error::Error;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 const SUBSCRIBEE_EDIT_CONFIG : &str =
@@ -76,13 +76,46 @@ fn saved_node_by_id<'a> (
   panic! ("SaveNode not found: {}", id) }
 
 #[test]
-fn pipeline_basic_mixed_tree (
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-new-lic-pipeline",
+    |s| Box::pin ( async move {
+      s . reset ("pipeline_basic_mixed_tree",
+                 "tests/merge/merge_nodes/fixtures") . await ?;
+      pipeline_basic_mixed_tree (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset_from_config ("pipeline_subscribee_hiderels",
+                             SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      pipeline_subscribee_hiderels (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("pipeline_readonly_col_member_edits",
+                 "tests/merge/merge_nodes/fixtures") . await ?;
+      pipeline_readonly_col_member_edits (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("pipeline_inactive_subtree",
+                 "tests/merge/merge_nodes/fixtures") . await ?;
+      pipeline_inactive_subtree (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("pipeline_phantom_subtree",
+                 "tests/merge/merge_nodes/fixtures") . await ?;
+      pipeline_phantom_subtree (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("pipeline_nodeMerge_requests",
+                 "tests/merge/merge_nodes/fixtures") . await ?;
+      pipeline_nodeMerge_requests (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset_from_config ("pipeline_rejects_text_claim_mismatch",
+                             SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      pipeline_rejects_text_claim_mismatch (
+        &s . config, &s . driver ) . await ?;
+      Ok (( )) } )) }
+
+async fn pipeline_basic_mixed_tree (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-pipeline-basic",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-pipeline-basic",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id root) (source main))) root
@@ -140,15 +173,12 @@ fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![]) ); }
       assert!( plan . source_moves . is_empty() );
       assert!( nodeMerge_acquisitions . is_empty() );
-      Ok (( )) })) }
+      Ok (( )) }
 
-#[test]
-fn pipeline_subscribee_hiderels (
+async fn pipeline_subscribee_hiderels (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-pipeline-hiderels",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id r) (source owned))) r
@@ -170,18 +200,15 @@ fn pipeline_subscribee_hiderels (
         ! save_ids (&plan . define_nodes)
           . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode" );
-      Ok (( )) })) }
+      Ok (( )) }
 
-#[test]
-fn pipeline_readonly_col_member_edits (
+async fn pipeline_readonly_col_member_edits (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // This tests the new recursion surface: definitive members of
   // read-only cols (and their subtrees) save their own edits.
-  run_with_test_db (
-    "skg-test-pipeline-readonly",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-pipeline-readonly",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id owner) (source main))) owner
@@ -204,16 +231,13 @@ fn pipeline_readonly_col_member_edits (
       assert_eq!(
         saved_node_by_id (&plan . define_nodes, "intruder") . contains,
         vec![ID::from ("intruder-child")] );
-      Ok (( )) })) }
+      Ok (( )) }
 
-#[test]
-fn pipeline_inactive_subtree (
+async fn pipeline_inactive_subtree (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-pipeline-inactive",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-pipeline-inactive",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id root) (source main))) root
@@ -230,16 +254,13 @@ fn pipeline_inactive_subtree (
       assert_eq!(
         saved_node_by_id (&plan . define_nodes, "root") . contains,
         vec![ID::from ("hidden")] );
-      Ok (( )) })) }
+      Ok (( )) }
 
-#[test]
-fn pipeline_phantom_subtree (
+async fn pipeline_phantom_subtree (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-pipeline-phantom",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-pipeline-phantom",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id root) (source main))) root
@@ -277,16 +298,13 @@ fn pipeline_phantom_subtree (
       assert_eq!(
         saved_node_by_id (&plan . define_nodes, "root") . contains,
         Vec::<ID>::new() );
-      Ok (( )) })) }
+      Ok (( )) }
 
-#[test]
-fn pipeline_nodeMerge_requests (
+async fn pipeline_nodeMerge_requests (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-pipeline-nodemerge",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-pipeline-nodemerge",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id 1) (source main) (editRequest (merge 2)))) 1
@@ -310,15 +328,12 @@ fn pipeline_nodeMerge_requests (
       assert_eq!( nodeMerges [0] . acquiree_id(), &ID::from ("2") );
       assert_eq!( nodeMerges [0] . acquiree_text_preserver . 0 . title,
                   "MERGED: 2" );
-      Ok (( )) })) }
+      Ok (( )) }
 
-#[test]
-fn pipeline_rejects_text_claim_mismatch (
+async fn pipeline_rejects_text_claim_mismatch (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-pipeline-claim-rejection",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
             * (skg (node (id r) (source owned))) r
@@ -335,4 +350,4 @@ fn pipeline_rejects_text_claim_mismatch (
         . err() . expect ("the title edit should be rejected")
         . to_string();
       assert!( error . contains ("Cannot edit title/body") );
-      Ok (( )) })) }
+      Ok (( )) }

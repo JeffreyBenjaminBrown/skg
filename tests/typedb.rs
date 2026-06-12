@@ -24,9 +24,9 @@ use skg::dbs::typedb::sources::{
 use skg::dbs::typedb::util::ConceptRowStream;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::{run_with_test_db, run_with_test_db_from_config};
+use skg::test_utils::run_with_shared_test_db;
 use skg::to_org::render::content_view::single_root_view;
-use skg::types::misc::{ID, SkgConfig, SourceName};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -36,6 +36,7 @@ use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Phantom};
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::error::Error;
+use std::sync::Arc;
 use typedb_driver::{
   answer::{ ConceptRow, QueryAnswer },
   Transaction,
@@ -43,61 +44,74 @@ use typedb_driver::{
   TypeDBDriver, };
 
 #[test]
-fn test_typedb_all_relationships (
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-typedb-toplevel",
+    |s| Box::pin ( async move {
+      s . reset ("test_typedb_all_relationships",
+                 "tests/typedb/fixtures") . await ?;
+      test_typedb_all_relationships (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_typedb_recursive_document",
+                 "tests/typedb/fixtures") . await ?;
+      test_typedb_recursive_document (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_typedb_create_only_nodes",
+                 "tests/typedb/fixtures") . await ?;
+      test_typedb_create_only_nodes (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_typedb_delete_out_links",
+                 "tests/typedb/fixtures-2") . await ?;
+      test_typedb_delete_out_links (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset_from_config ("test_typedb_source_entities_and_node_sources",
+                             "tests/save/validate_foreign_nodes/skgconfig.toml") . await ?;
+      test_typedb_source_entities_and_node_sources (
+        &s . config, &s . driver ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_typedb_all_relationships (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-relationships",
-    "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb-relationships",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_all_relationships ( config, driver ) . await ?;
-      Ok (( )) } ) ) }
+      Ok (( )) }
 
-#[test]
-fn test_typedb_recursive_document (
+async fn test_typedb_recursive_document (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-recursive",
-    "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb-recursive",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_recursive_document ( driver, config ) . await ?;
-      Ok (( )) } ) ) }
+      Ok (( )) }
 
-#[test]
-fn test_typedb_create_only_nodes (
+async fn test_typedb_create_only_nodes (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-create-nodes",
-    "tests/typedb/fixtures",
-    "/tmp/tantivy-test-typedb-create-nodes",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_create_only_nodes_with_no_ids_present (
         & config . db_name, driver ) . await ?;
-      Ok (( )) } ) ) }
+      Ok (( )) }
 
-#[test]
-fn test_typedb_delete_out_links (
+async fn test_typedb_delete_out_links (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-delete-links",
-    "tests/typedb/fixtures-2",
-    "/tmp/tantivy-test-typedb-delete-links",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_delete_out_links_contains_container (
         & config . db_name, driver ) . await ?;
-      Ok (( )) } ) ) }
+      Ok (( )) }
 
-#[test]
-fn test_typedb_source_entities_and_node_sources (
+async fn test_typedb_source_entities_and_node_sources (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-typedb-source-entities",
-    "tests/save/validate_foreign_nodes/skgconfig.toml",
-    |config, driver| Box::pin ( async move {
       test_source_entities_and_node_sources (
         &config . db_name, driver ) . await ?;
-      Ok (( )) } ) ) }
+      Ok (( )) }
 
 async fn test_all_relationships (
   config : &SkgConfig,

@@ -164,9 +164,12 @@ pub struct SharedDbSession {
 
 impl SharedDbSession {
   /// Restore a pristine state for the next sub-test: wipe all data,
-  /// copy `fixtures_folder` to the temp dir, point a single-source
-  /// ("main") config at it, repopulate, fresh Tantivy index.
-  /// The schema and the database object survive.
+  /// copy `fixtures_folder` to the temp dir, point a config at it,
+  /// repopulate, fresh Tantivy index. If the fixtures contain a
+  /// 'skgconfig.toml' (multi-source setups), that config is loaded
+  /// from the temp copy; otherwise a single-source ("main") config
+  /// is built around the copy. The schema and the database object
+  /// survive.
   /// `subtest_name` is printed so a failing group identifies which
   /// sub-test died (libtest replays captured stdout on failure).
   pub async fn reset (
@@ -181,19 +184,28 @@ impl SharedDbSession {
       Path::new (fixtures_folder),
       &self . temp_fixtures ) ?;
     self . config = {
-      let mut sources : HashMap<SourceName, SkgfileSource> =
-        HashMap::new ();
-      sources . insert (
-        SourceName::from ("main"),
-        SkgfileSource {
-          name         : SourceName::from ("main"),
-          abbreviation : None,
-          path         : self . temp_fixtures . clone (),
-          user_owns_it : true, });
-      SkgConfig::fromSourcesAndDbName (
-        sources,
-        &self . db_name,
-        self . tantivy_folder . to_str () . unwrap () ) };
+      let copied_config : PathBuf =
+        self . temp_fixtures . join ("skgconfig.toml");
+      if copied_config . exists () {
+        let mut config : SkgConfig = load_config_with_overrides (
+          copied_config . to_str () . unwrap (),
+          Some ( &self . db_name ), &[] ) ?;
+        config . tantivy_folder = self . tantivy_folder . clone ();
+        config
+      } else {
+        let mut sources : HashMap<SourceName, SkgfileSource> =
+          HashMap::new ();
+        sources . insert (
+          SourceName::from ("main"),
+          SkgfileSource {
+            name         : SourceName::from ("main"),
+            abbreviation : None,
+            path         : self . temp_fixtures . clone (),
+            user_owns_it : true, });
+        SkgConfig::fromSourcesAndDbName (
+          sources,
+          &self . db_name,
+          self . tantivy_folder . to_str () . unwrap () ) }};
     self . wipe_then_repopulate () . await }
 
   /// Like 'reset', but loads a (possibly multi-source) config from a

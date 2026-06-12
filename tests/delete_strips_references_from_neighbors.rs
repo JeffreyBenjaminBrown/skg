@@ -31,7 +31,7 @@ use skg::dbs::filesystem::one_node::{
   nodecomplete_from_pid_and_source as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
@@ -43,16 +43,32 @@ use skg::util::path_from_pid_and_source;
 use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_delete_strips_references_from_neighbors
+fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_shared_test_db (
     "skg-test-delete-strips-references-from-neighbors",
-    "tests/delete_strips_references_from_neighbors/fixtures",
-    "/tmp/tantivy-test-delete-strips-references-from-neighbors",
-    |config, driver, tantivy| Box::pin ( async move {
+    |s| Box::pin ( async move {
+      s . reset ("test_delete_strips_references_from_neighbors",
+                 "tests/delete_strips_references_from_neighbors/fixtures") . await ?;
+      test_delete_strips_references_from_neighbors (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_strip_pass_amends_user_supplied_savenode",
+                 "tests/delete_strips_references_from_neighbors/fixtures-with-existing-save") . await ?;
+      test_strip_pass_amends_user_supplied_savenode (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_strip_pass_handles_extra_ids",
+                 "tests/delete_strips_references_from_neighbors/fixtures-extra-ids") . await ?;
+      test_strip_pass_handles_extra_ids (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_delete_strips_references_from_neighbors (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       delete_strips_references_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        config, driver, tantivy ) . await }
 
 async fn delete_strips_references_impl (
   config  : &SkgConfig,
@@ -146,17 +162,13 @@ async fn delete_strips_references_impl (
 // save even though the user-supplied SaveNode said otherwise.
 // ----------------------------------------------------------------
 
-#[test]
-fn test_strip_pass_amends_user_supplied_savenode
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-delete-strip-pass-amends-savenode",
-    "tests/delete_strips_references_from_neighbors/fixtures-with-existing-save",
-    "/tmp/tantivy-test-delete-strip-pass-amends-savenode",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_strip_pass_amends_user_supplied_savenode (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       strip_pass_amends_user_supplied_savenode_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        config, driver, tantivy ) . await }
 
 async fn strip_pass_amends_user_supplied_savenode_impl (
   config  : &SkgConfig,
@@ -207,17 +219,13 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
 // Expected: referencer.contains becomes [].
 // ----------------------------------------------------------------
 
-#[test]
-fn test_strip_pass_handles_extra_ids
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-delete-strip-pass-extra-ids",
-    "tests/delete_strips_references_from_neighbors/fixtures-extra-ids",
-    "/tmp/tantivy-test-delete-strip-pass-extra-ids",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_strip_pass_handles_extra_ids (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       strip_pass_handles_extra_ids_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        config, driver, tantivy ) . await }
 
 async fn strip_pass_handles_extra_ids_impl (
   config  : &SkgConfig,

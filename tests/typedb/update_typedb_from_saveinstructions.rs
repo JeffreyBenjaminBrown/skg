@@ -1,11 +1,11 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
-use skg::types::misc::SourceName;
+use skg::types::misc::{SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -21,15 +21,34 @@ use indoc::indoc;
 
 use std::collections::HashSet;
 use std::error::Error;
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_update_nodes_and_relationships2 (
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-typedb-update-from-saveinstructions",
+    |s| Box::pin ( async move {
+      s . reset ("test_update_nodes_and_relationships2",
+                 "tests/typedb/update_typedb_from_saveinstructions/fixtures") . await ?;
+      test_update_nodes_and_relationships2 (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("delta_writes_only_the_changed_edges",
+                 "tests/typedb/update_typedb_from_saveinstructions/fixtures") . await ?;
+      delta_writes_only_the_changed_edges (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("delta_with_empty_in_rust_graph_clears_stale_edges",
+                 "tests/typedb/update_typedb_from_saveinstructions/fixtures") . await ?;
+      delta_with_empty_in_rust_graph_clears_stale_edges (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_update_nodes_and_relationships2 (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-update2",
-    "tests/typedb/update_typedb_from_saveinstructions/fixtures",
-    "/tmp/tantivy-test-update2",
-    |config, driver, _tantivy| Box::pin ( async move {
 
     // Simulate user saving this org buffer:
     let org_text = indoc! {"
@@ -123,21 +142,17 @@ fn test_update_nodes_and_relationships2 (
       "Node 2 should only contain node 1, but contains: {:?}",
       node2_contains );
 
-      Ok (( )) } )
-  ) }
+      Ok (( )) }
 
 /// The incremental (Some(old_graph)) relationship path writes only the
 /// edge delta: an added child is created, a removed child's edge is
 /// dropped (but the child node itself survives), an unchanged child is
 /// left alone, and no edge is duplicated.
-#[test]
-fn delta_writes_only_the_changed_edges (
+async fn delta_writes_only_the_changed_edges (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-delta-edges",
-    "tests/typedb/update_typedb_from_saveinstructions/fixtures",
-    "/tmp/tantivy-test-delta-edges",
-    |config, driver, _tantivy| Box::pin ( async move {
       let nc = |pid : &str, contains : &[&str]| -> NodeComplete {
         let mut n : NodeComplete = empty_node_complete ();
         n . pid = ID::from (pid);
@@ -186,22 +201,18 @@ fn delta_writes_only_the_changed_edges (
       ) . await ?;
       assert! ( still_exists . contains ("db"),
         "db should still exist as a node after being un-contained" );
-      Ok (( )) } )
-  ) }
+      Ok (( )) }
 
 /// Regression: even when the in-Rust 'old' snapshot is EMPTY while
 /// TypeDB already holds the node's edges (a recovery, or a test that
 /// loads fixtures into TypeDB but starts from an empty in-Rust graph),
 /// the incremental path must still land the exact new edge set — clear
 /// the stale edge it drops, and not duplicate the one it keeps.
-#[test]
-fn delta_with_empty_in_rust_graph_clears_stale_edges (
+async fn delta_with_empty_in_rust_graph_clears_stale_edges (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-delta-empty-graph",
-    "tests/typedb/update_typedb_from_saveinstructions/fixtures",
-    "/tmp/tantivy-test-delta-empty-graph",
-    |config, driver, _tantivy| Box::pin ( async move {
       let nc = |pid : &str, contains : &[&str]| -> NodeComplete {
         let mut n : NodeComplete = empty_node_complete ();
         n . pid = ID::from (pid);
@@ -240,5 +251,4 @@ fn delta_with_empty_in_rust_graph_clears_stale_edges (
         "with an empty in-Rust snapshot ec must still end up containing \
          exactly {{ea, ed}} (eb cleared, ea not duplicated), got {:?}",
         ec_contains );
-      Ok (( )) } )
-  ) }
+      Ok (( )) }

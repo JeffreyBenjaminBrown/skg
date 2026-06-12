@@ -16,7 +16,7 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
@@ -27,16 +27,27 @@ use skg::types::misc::{SkgConfig, TantivyIndex};
 use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_empty_subscribee_col_persists
+fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  let fixtures : &str = "tests/subscribee_col_empty_persists/fixtures";
+  run_with_shared_test_db (
     "skg-test-subscribee-col-empty-persists",
-    "tests/subscribee_col_empty_persists/fixtures",
-    "/tmp/tantivy-test-subscribee-col-empty-persists",
-    |config, driver, tantivy| Box::pin ( async move {
+    |s| Box::pin ( async move {
+      s . reset ("test_empty_subscribee_col_persists", fixtures) . await ?;
+      test_empty_subscribee_col_persists (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_empty_subscriber_col_is_removed", fixtures) . await ?;
+      test_empty_subscriber_col_is_removed (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_empty_subscribee_col_persists (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       empty_subscribee_col_persists_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        config, driver, tantivy ) . await }
 
 async fn empty_subscribee_col_persists_impl (
   config  : &SkgConfig,
@@ -81,17 +92,13 @@ async fn empty_subscribee_col_persists_impl (
 // Contrast (plan_v2 §3.4/§6.8): an empty *read-only* PartnerCol -- here a
 // subscriberCol -- IS removed by the postorder prune sweep, because (unlike the
 // SubscribeeCol) it is not an editable interface; an emptied one is just noise.
-#[test]
-fn test_empty_subscriber_col_is_removed
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-subscriber-col-empty-removed",
-    "tests/subscribee_col_empty_persists/fixtures",
-    "/tmp/tantivy-test-subscriber-col-empty-removed",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_empty_subscriber_col_is_removed (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       empty_subscriber_col_removed_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        config, driver, tantivy ) . await }
 
 async fn empty_subscriber_col_removed_impl (
   config  : &SkgConfig,
