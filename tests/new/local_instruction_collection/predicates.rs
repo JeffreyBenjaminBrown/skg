@@ -6,12 +6,11 @@
 use skg::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
-  inactiveNode_is_phantom,
   member_counts_for_partnerCol };
-use skg::types::git::{MembershipAxes, Sign};
+use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::viewnode::{
-  default_truenode, EditRequest, IndefOrDef, InactiveNode, ParentIs,
+  default_truenode, EditRequest, IndefOrDef, ParentIs,
   TrueNode };
 
 fn base_truenode (
@@ -105,24 +104,3 @@ fn visible_content_membership_conditions () {
     t . membership . unstaged = Some (Sign::Minus);
     t . existence  . unstaged = Some (Sign::Minus);
     assert!( active_child_counts_as_visible_content (&t) ); }}
-
-#[test]
-fn inactive_phantomhood_conditions () {
-  let inactive = | membership : MembershipAxes | -> InactiveNode {
-    InactiveNode {
-      id         : ID::from ("i"),
-      source     : SourceName::from ("private"),
-      membership,
-      overridesHere : None } };
-  assert!( ! inactiveNode_is_phantom ( &inactive (
-    MembershipAxes::default() )));
-  assert!( inactiveNode_is_phantom ( &inactive (
-    MembershipAxes { staged   : Some (Sign::Minus),
-                     unstaged : None } )));
-  assert!( inactiveNode_is_phantom ( &inactive (
-    MembershipAxes { staged   : None,
-                     unstaged : Some (Sign::Minus) } )));
-  // Positive axes are not phantomhood.
-  assert!( ! inactiveNode_is_phantom ( &inactive (
-    MembershipAxes { staged   : Some (Sign::Plus),
-                     unstaged : Some (Sign::Plus) } ))); }

@@ -9,8 +9,7 @@
 /// error ('nonignored_children_have_distinct_ids'), and duplicate
 /// defining-col members are silently deduplicated at emission.
 
-use crate::types::git::Sign;
-use crate::types::viewnode::{EditRequest, InactiveNode, ParentIs, TrueNode};
+use crate::types::viewnode::{EditRequest, ParentIs, TrueNode};
 
 /// This returns true iff the given Active vognode counts as a
 /// member of the writeable PartnerCol (a SubscribeeCol or
@@ -49,13 +48,3 @@ pub fn active_child_counts_as_visible_content (
   t . parentIs == ParentIs::Affected
     && !matches!( t . edit_request (),
                   Some (&EditRequest::Delete)) }
-
-/// This returns true iff the given Inactive vognode should be
-/// treated as a phantom -- that is, excluded from its parent's
-/// content -- because some membership axis is negative.
-#[allow(non_snake_case)]
-pub fn inactiveNode_is_phantom (
-  inactive : &InactiveNode,
-) -> bool {
-  inactive . membership . staged == Some (Sign::Minus)
-  || inactive . membership . unstaged == Some (Sign::Minus) }
