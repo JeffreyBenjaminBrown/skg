@@ -77,8 +77,23 @@
     inactive placeholder is not a content member). Full suite green
     (442).
 
+*** Step 8 (this commit): doc sweep
+    Updated api-and-formats.md: the retention section now shows bare
+    '(inactiveNode)' and describes the dataless/anonymous/inert
+    placeholder (dropped the stale "moving it within its parent is
+    honored" claim -- it no longer is); the override-marker section
+    now says a switch turns a drawn substitute into an anonymous
+    '(inactiveNode)' and the original is preserved by the disk merge.
+    glossary.md had no inactiveNode wire references. The InactiveNode
+    typedef itself carries the de-novo-scope doc Jeff asked for
+    (added in step 7).
+
 ** Changes to the plan's envisioned order
-   None yet.
+   - Step 7 added a ripple the plan under-specified: 'Vognode::id'
+     and 'pid_and_source' had to become/stay Option-returning (None
+     for inactive), touching ~6 call sites. Mechanical, no surprises.
+   - Discovered and removed a lib-test wiring ('tests/unit/complete.rs'
+     via '#[path]') in step 4; noted the full-suite caveat below.
 
 ** Test-harness note
    'tests/unit/*.rs' files are '#[path]'-included into the lib's
@@ -91,6 +106,161 @@
    - Benefit: the retention rule is now structural ("an inactive child
      is preserved because it is irrelevant"), not identity-based, which
      is what lets the id go in step 7.
+   - Benefit: the privacy hole is closed -- a restricted render no
+     longer emits the id or source of hidden content anywhere.
+   - NOT a cost after all: the override-substitution-across-switch case
+     I flagged turned out to be correct behavior, not a regression
+     (resolved below -- R is a fork, so there is no duplicated subtree;
+     N draws once and an active-descendant R is legitimately retained).
+   - Cost (accepted): a retained inactive subtree jumps to the front of
+     its siblings on rerender (the "irrelevant" consequence Jeff OK'd).
 
-** Open questions
-   None blocking.
+** DONE Open questions
+*** DONE Override substitution across a source-set switch: resolved, behavior is correct
+discussion follows, most recent at bottom
+**** the question
+    plan-11 put an 'overridesHere' marker on InactiveNode for exactly
+    one case, which step 7 removed. THE CASE: override substitution
+    draws overrider R in place of original N as recursive content of a
+    container C (glossary "override substitution"). If a source-set
+    switch then makes R's source inactive while N stays active, the
+    OLD code converted R to an InactiveNode that still carried the
+    marker, so it kept standing for N (collected_id = N): C showed one
+    node, R-standing-for-N, cleanly.
+
+    NOW R becomes an ANONYMOUS inactive placeholder (no marker). On the
+    post-switch rerender, the content reconciler no longer sees R as
+    satisfying goal member N (R is irrelevant, provides no orderkey),
+    so it CREATES N alongside the retained anonymous R. Net effect: C
+    shows BOTH the anonymous placeholder AND N (and, if N's content is
+    active, that subtree is drawn under both). It self-heals on the
+    next de-novo render (an inactive overrider does not substitute, so
+    N is drawn directly, once).
+
+    SEVERITY: cosmetic. NO data loss -- I traced it: on save,
+    'content_members(C)' excludes the irrelevant inactive node, so
+    C.contains extracts to [N] and the weave keeps N. The anonymous
+    placeholder is view-only; it never reaches disk. (I did NOT build
+    an integration test for this -- the scenario needs an
+    override-edge fixture drawn in content position, which the
+    source_sets fixtures lack. The reasoning is the evidence.)
+
+    OPTIONS:
+    1. Accept it (it self-heals; the scenario is narrow -- override
+       substitution + a switch that splits R's and N's sources). Add a
+       comment somewhere and move on.
+    2. Fix it cleanly in the prepass: in
+       'convert_now_inactive_actives' / 'apply_source_set_to_viewforest',
+       when the now-inactive Active node has 'viewStats.overridesHere
+       = Some(_)', DETACH it instead of converting -- it is a drawn
+       substitute, and an inactive overrider does not substitute, so
+       the rerender should redraw the original. The marker is read
+       from the ACTIVE node's viewStats at switch time, so no field on
+       InactiveNode is needed. EDGE CASE: any INDEPENDENT children the
+       user parked under the substitute (not part of N's content)
+       would be dropped by the detach; acceptable?
+
+    My recommendation: option 2 (it restores the clean plan-11
+    behavior without re-adding a field), but it is a real behavior
+    change with the noted edge case, so I am flagging it rather than
+    deciding for you. If you want it, I will implement it and build a
+    fixture+test for the override-substitution-across-switch path.
+**** Jeff : better yet
+Since the overrider is still active, and it's just the way we got there
+that has become inactive, let's just change its IsParent value to Independent.
+I think that clears up the whole problem, but let me know if not.
+**** Claude: I don't think parentIs=Independent alone clears it -- here's why
+I think your instinct is right that R is "really" still the user's
+node and only the route to it went inactive, but as literally stated
+the proposal has two snags. Let me lay them out, because the fix is
+close.
+
+WHO IS WHAT (so we're agreed on terms): R is the overrider, drawn in
+place of the original N as content of container C. The node whose
+SOURCE went inactive on the switch is R (that is why the prepass
+touches it); N's source is still active.
+
+Snag 1 -- privacy. If we keep R an ACTIVE node (which we must, to give
+it a parentIs to set), then R's title/body still render. But R's
+source is now inactive -- it is exactly the private content the user
+restricted the source-set to HIDE (e.g. they switched to "public"
+while screen-sharing, and R is their private fork). Showing R would
+leak it. So R has to be hidden, not shown-as-Independent.
+
+Snag 2 -- the double persists anyway. Whether R is Independent-active
+or anonymous-inactive, it is IRRELEVANT to the content reconciler
+(only parentIs=Affected Active children are relevant). So it is
+preserved as-is AND, because N is still in C's goal list, N is
+created beside it. C ends up showing both. Independent doesn't remove
+that; it only relabels R.
+
+Also a mechanical note: an inactive node is now fieldless, so it has
+no parentIs to set -- "set parentIs=Independent" can only apply to a
+node we keep ACTIVE, which is snag 1.
+
+WHAT I THINK YOU'RE PROTECTING, and that it's safe: I read your
+"better yet" as "don't just delete R; the user might have parked work
+under it." Good news: there is NO data loss in any option. A node the
+user parked under R with parentIs=Independent is saved as a standalone
+graph node (Independent means it is not a member of R or C), so it
+keeps existing in the graph regardless of what this view does with R.
+Detaching R only drops R (and the parked node's VIEW position under
+R), never graph data. The substitute's "real" children are N's
+content and are redrawn under N on the rerender.
+
+So the clean, correct, privacy-respecting result is: R should
+DISAPPEAR from this position and N should show, once. R was never a
+containment member of C here -- it was only N's display stand-in, and
+an inactive overrider does not substitute -- so dropping it is right,
+not lossy.
+
+PROPOSAL (option 2, refined): in the source-switch prepass, when the
+now-inactive Active node carries viewStats.overridesHere = Some(_),
+DETACH it instead of converting it to an inactive placeholder. The
+rerender then draws N directly, once; nothing leaks; no double; no
+graph data lost. (The marker is read off the still-Active node at
+switch time, so no field returns to InactiveNode.)
+
+Does that match what you were after? If you specifically want R's
+parked Independent children to stay VISIBLE in this view after the
+switch, I can, before detaching R, reparent its Independent children
+up to C -- but that is the only thing detach "loses", and only
+view-side. Tell me if it's worth it; otherwise I'll do the plain
+detach and add the override-substitution-across-switch fixture+test.
+**** DONE Jeff: Ah, I misunderstood.
+C contains N and both are active, but R had overridden N and is now inactive
+-- that's what we're talking about, right?
+
+In that case, R should become inactive but remain on screen
+if it has active descendents (no new code for this -- it's already coded).
+Completion will not recognize it as a child (good),
+and will try to replace N (good).
+But it won't try to replace N with the overrider R,
+because R is from a no-longer-active source,
+so it will just populate the view with N.
+***** Claude: agreed -- yes, same scenario, and no fix needed
+Yes, exactly that scenario (C contains N, both active; R overrode N;
+R's source went inactive on the switch).
+
+And you've caught a real error in my "regression" framing: I wrote
+that N's subtree would be "drawn under both", which is WRONG. R is a
+FORK of N, so R's content is R's OWN edits, not N's content. There is
+no duplicated subtree -- completion draws N with N's content, and R,
+if it has active descendants of its own, is retained as an anonymous
+inactive marker hosting THOSE (active, legitimately visible)
+descendants. Both are correct and distinct:
+- N appears as the real container member (R, inactive, does not
+  substitute); on save C.contains extracts to [N] (verified).
+- R survives only if it has active descendants to host -- the ordinary
+  "inactive node with active children is retained" rule, already
+  coded, which I did not break; a leaf / all-inactive R is pruned.
+No leak (R anonymized; its visible descendants are active), no data
+loss. So I withdraw the "cosmetic regression" -- it is the intended,
+correct behavior. And detaching R (my option 2) would be WRONG: it
+would drop R's active descendants, which retention deliberately keeps.
+
+No code change. One offer: this override-substitution-across-switch
+path has no dedicated test (the source_sets fixtures lack an override
+edge drawn in content position). I can add a fixture+test to PIN the
+agreed behavior (R -> anonymous-inactive-retained, N drawn once,
+C.contains == [N]); say the word, else the work is done.

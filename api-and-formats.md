@@ -350,9 +350,11 @@ instead of being rewritten to the overrider. Edits to the drawn
 node itself (title, body, cols) still save to the drawn node.
 A buffer whose marker the server would not have drawn (the carrier
 is not the ownership-gated, visibility-UNGATED resolution of N)
-aborts the save with an explanation. When a source-set switch
-converts a drawn substitute to an InactiveNode, the marker survives
-inside the `(inactiveNode ...)` form.
+aborts the save with an explanation. A source-set switch that makes a
+drawn substitute's source inactive turns it into an anonymous
+`(inactiveNode)` (the marker does not survive -- an inactive node is
+dataless); the original it stood for is preserved in its container's
+contains by the disk merge.
 
 # skgconfig.toml
 
@@ -538,20 +540,25 @@ for `overrides_view_of`. Edits to visible members, including
 deletions, are honored.
 
 The one place an inactive node still appears is RETENTION: when a
-source-set switch is applied to an open view, an inactive node with
-active view-children stays on screen as an InactiveNode placeholder:
+source-set switch is applied to an OPEN view (an already-drawn
+buffer), an inactive node with active view-children stays on screen
+as an anonymous placeholder, so its active descendants are not
+orphaned:
 
 ```
-(skg (inactiveNode (id NODE_ID) (source SOURCE)))
+(skg (inactiveNode))
 ```
 
-The headline text is empty/generic; herald rules must not display
-the source, and title lookup/readable-ID helpers must not resolve
-the ID to a title while its source is inactive. The retained node is
-read-only (editing its title, body, metadata, source, or ID is a
-buffer validation error), its children remain editable, moving it
-within its parent is honored on save, and deleting its subtree edits
-only the view -- the graph relationship survives.
+The placeholder is DATALESS by design: an inactive node's id, source,
+and title all describe content the user hid by restricting the
+source-set, so emitting any of it would leak. It carries no id or
+source and renders titleless. It is inert: it emits NO save intention
+(its membership in its parent's list is owned entirely by the disk
+merge, not the buffer), it is not a collateral re-render target, and
+editing its (empty) title/body is a buffer validation error. Its
+active children remain fully editable. A de-novo render under a
+restricted set never produces one -- inactive members are omitted and
+their content is never expanded.
 
 Edits to inactive nodes themselves are SUPPRESSED at save, not
 fatal: any instruction that would write an inactive source is
