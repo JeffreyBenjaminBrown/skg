@@ -74,10 +74,43 @@
     Run: 'cargo nextest run --test grouped_unit -E "test(git_ops::test_interleaved)"'
     -> 5 passed.
 
+** The Emacs herald-stripper invented data (FIXED)
+*** What was wrong
+    When the Emacs client reads the little '(skg ...)' tag in front of
+    a line, it first cleans out the "herald" fields -- display-only
+    bits whose values contain characters (like '{' and '⌂:') that
+    confuse Emacs's parenthesis navigation. The old cleaner did this by
+    handing the tag to a general-purpose edit helper with a "delete
+    these nested fields" instruction. But that helper, when told to
+    edit a part of the tag that wasn't there, would CREATE it. So a tag
+    that was not a real node -- a phantom, a scaffold, a search result
+    -- came out with a freshly-invented '(node ...)' part bolted on,
+    and a real node that simply had no statistics came out with
+    nonsense '(graphStats (DELETE ...))' text inserted.
+*** Why it mattered
+    Various checks ask "is this line a real node?" by testing whether
+    the tag contains '(node ...)'. Because the cleaner invented one,
+    those checks could answer "yes" for things that are not nodes.
+    Today no caller actually tripped over it (the ones that check go on
+    to also require an id, which the invented node lacks), so it was a
+    latent trap rather than a live bug -- but exactly the kind of trap
+    that bites the next person who writes a check.
+*** The fix
+    Replaced the cleaner with a small, self-contained routine that
+    walks the tag and removes the herald fields only where they
+    actually appear, and never adds anything. A tag with no '(node ...)'
+    now comes back untouched. I deliberately did NOT change the shared
+    edit helper, since other code relies on its current behaviour;
+    the fix is local to the cleaner.
+*** Proof it works
+    Added five tests (in tests/elisp/test-skg-sexpr-search.el) covering:
+    heralds removed where present, an all-herald stats block dropped, a
+    non-node tag left untouched (and confirmed to NOT look like a node
+    afterwards), a node-without-stats left untouched, and a plain
+    non-skg list passed through. The whole Emacs test suite passes
+    (230 tests, 0 unexpected).
+
 * Still to do (in rough order)
-  - Emacs client: 'skg-strip-heralds-from-sexp' fabricates a fake
-    '(node ...)' part when cleaning up a metadata expression that did
-    not have one. Harmless today (no caller is fooled yet) but a trap.
   - Documentation fixes:
     - 'coding-advice/ai-agents.org' points at 'good-refactors.md';
       the real file is 'some-good-refactors.md'.

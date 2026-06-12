@@ -284,7 +284,17 @@
    PID files under the data root's logs/run directory, and split TypeDB
    lifecycle management from Skg server lifecycle management.
 
-** 'skg-first-sexpr-on-line' fabricates a (node ...) child
+** DONE 'skg-first-sexpr-on-line' fabricates a (node ...) child
+   Fixed 2026-06-12: rewrote 'skg-strip-heralds-from-sexp'
+   (elisp/skg-sexpr/skg-sexpr-search.el) as a self-contained recursive
+   stripper that removes the herald subfields where present and adds
+   NOTHING. A sexp without a '(node ...)' is returned unchanged, so a
+   non-truenode never gains a fabricated node and never matches
+   '(skg (node))'. It also no longer injects '(graphStats (DELETE ...))'
+   junk into a truenode that lacked stats (a second fabrication the
+   original DSL-merge approach produced). The shared edit DSL is left
+   untouched. Five regression tests added to
+   tests/elisp/test-skg-sexpr-search.el; full elisp suite green (230).
    elisp/skg-sexpr/skg-sexpr-search.el / skg-strip-heralds-from-sexp.
    The stripper calls 'skg-edit-nested-sexp' with instructions
    '(skg (node (graphStats (DELETE ...)) (viewStats (DELETE ...))))'.

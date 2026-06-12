@@ -119,4 +119,47 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
             (ert-fail (format "Should have errored at position %d, got: %S"
                               pos result))))))))
 
+;;
+;; skg-strip-heralds-from-sexp: remove herald subfields where present,
+;; but fabricate nothing (regression for the (node ...) fabrication bug).
+;;
+
+(ert-deftest test-strip-heralds-removes-herald-subfields ()
+  "Heralds (containsHerald, linksHerald, sourceHerald) are removed; a
+stats form emptied by the removal is dropped, other data is kept."
+  (should (equal
+           (skg-strip-heralds-from-sexp
+            '(skg (node (id x)
+                        (graphStats (containers 3) (containsHerald 0{5)
+                                    (linksHerald 4→))
+                        (viewStats (sourceHerald ⌂:priv) cycle))))
+           '(skg (node (id x) (graphStats (containers 3))
+                       (viewStats cycle))))))
+
+(ert-deftest test-strip-heralds-drops-stats-form-with-only-heralds ()
+  "A graphStats/viewStats holding only herald subfields is dropped."
+  (should (equal
+           (skg-strip-heralds-from-sexp
+            '(skg (node (id x) (viewStats (sourceHerald ⌂:priv)))))
+           '(skg (node (id x))))))
+
+(ert-deftest test-strip-heralds-does-not-fabricate-node ()
+  "A non-TrueNode sexp (no (node ...)) is returned unchanged, so it
+never gains a fabricated (node ...) and never matches (skg (node))."
+  (let ((stripped (skg-strip-heralds-from-sexp '(skg (id x)))))
+    (should (equal stripped '(skg (id x))))
+    (should-not (skg-sexp-subtree-p stripped '(skg (node))))))
+
+(ert-deftest test-strip-heralds-truenode-without-stats-unchanged ()
+  "A TrueNode lacking stats keeps exactly its fields -- no fabricated
+graphStats/viewStats."
+  (should (equal
+           (skg-strip-heralds-from-sexp '(skg (node (id x) (source y))))
+           '(skg (node (id x) (source y))))))
+
+(ert-deftest test-strip-heralds-passes-through-non-skg ()
+  "A sexp that does not start with skg is returned unchanged."
+  (should (equal (skg-strip-heralds-from-sexp '(a (b c) d))
+                 '(a (b c) d))))
+
 (provide 'test-skg-sexpr-search)

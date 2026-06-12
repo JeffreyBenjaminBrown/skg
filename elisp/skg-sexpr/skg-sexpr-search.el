@@ -66,15 +66,54 @@ Moves point to the end of the sexp."
      (read (substring line-text 0 sexp-end-in-text)))))
 
 (defun skg-strip-heralds-from-sexp (sexp)
-  "Remove output-only herald fields from SEXP.
-Herald fields (containsHerald, linksHerald, sourceHerald) use
-characters like { that confuse Emacs sexp navigation.
-Rust discards them on parse anyway."
-  (skg-edit-nested-sexp
-   sexp
-   '(skg (node (graphStats (DELETE (containsHerald)
-                                   (linksHerald) ))
-               (viewStats  (DELETE (sourceHerald) )) )) ))
+  "Return SEXP with output-only herald fields removed, fabricating nothing.
+The herald fields -- containsHerald and linksHerald inside graphStats,
+sourceHerald inside viewStats -- carry characters like { and ⌂: that
+confuse Emacs sexp navigation; Rust discards them on parse anyway.
+They live only inside a (node ...) form, so a SEXP that has none -- a
+phantom, scaffold, or search viewnode -- is returned unchanged. In
+particular nothing is ever added, so a non-TrueNode never gains a
+(node ...) and so never falsely matches the pattern (skg (node))."
+  (if (not (and (consp sexp) (eq (car sexp) 'skg)))
+      sexp
+    (cons 'skg
+          (mapcar #'skg--strip-heralds-in-skg-child (cdr sexp)))))
+
+(defun skg--strip-heralds-in-skg-child (child)
+  "Strip heralds from CHILD, one element of a (skg ...) form.
+Only a (node ...) element carries heralds; everything else is
+returned unchanged."
+  (if (not (and (consp child) (eq (car child) 'node)))
+      child
+    (cons 'node
+          (delq nil (mapcar #'skg--strip-heralds-in-node-child
+                            (cdr child))))))
+
+(defun skg--strip-heralds-in-node-child (child)
+  "Strip herald subfields from CHILD, one element of a (node ...) form.
+For a (graphStats ...) or (viewStats ...) element, drop its herald
+subfields and return nil if nothing else remains (so the caller drops
+the now-empty stats form). Every other element is returned unchanged."
+  (cond
+   ((and (consp child) (eq (car child) 'graphStats))
+    (skg--nonempty-stats-or-nil
+     (cons 'graphStats
+           (skg--remove-keyed-elements
+            (cdr child) '(containsHerald linksHerald)))))
+   ((and (consp child) (eq (car child) 'viewStats))
+    (skg--nonempty-stats-or-nil
+     (cons 'viewStats
+           (skg--remove-keyed-elements (cdr child) '(sourceHerald)))))
+   (t child)))
+
+(defun skg--remove-keyed-elements (elements keys)
+  "Return ELEMENTS without any list whose car is a member of KEYS."
+  (seq-remove (lambda (e) (and (consp e) (memq (car e) keys)))
+              elements))
+
+(defun skg--nonempty-stats-or-nil (stats-form)
+  "Return STATS-FORM, or nil if it holds only its label (no data)."
+  (and (cdr stats-form) stats-form))
 
 (defun skg-find-sexp-end (text &optional start-pos)
   "Find the position after the closing paren of the first s-expression in TEXT.
