@@ -2,33 +2,39 @@
 /// See fixtures/ for the test scenario.
 
 use super::common::*;
+use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
 
 #[test]
-fn test_title_diff_shows_text_changed_scaffolds()
-  -> Result<(), Box<dyn Error>>
-{
-  let db_name = "skg-test-git-diff-title";
-  let tantivy_folder = "/tmp/tantivy-test-git-diff-title";
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-git-diff-text-view",
+    |s| Box::pin ( async move {
+      test_title_diff_shows_text_changed_scaffolds (s) . await ?;
+      test_title_diff_staged_shows_staged_scaffolds (s) . await ?;
+      Ok (( )) } )) }
 
+async fn test_title_diff_shows_text_changed_scaffolds (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
+{
   let temp_dir = TempDir::new()?;
   let repo_path = temp_dir . path();
   setup_git_repo_with_fixtures (repo_path)?;
+  s . reset_with_source_path (
+    "test_title_diff_shows_text_changed_scaffolds",
+    repo_path ) . await ?;
+  let (config, driver, _tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
 
-  block_on(async {
-    let (config, driver, _tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+  let root_ids = vec![ID("1" . to_string())];
+  let (actual, _pids, _) : (String, Vec<ID>, _) =
+    multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
-    let root_ids = vec![ID("1" . to_string())];
-    let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+  assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
-    assert_buffer_contains(&actual, GIT_DIFF_VIEW);
-
-    cleanup_test_dbs(db_name, &driver,
-                     Some(Path::new (tantivy_folder))
-                    ) . await?;
-    Ok(())
-  })
+  Ok(())
 }
 
 /// Same scenario but with the text changes staged rather than
@@ -36,30 +42,25 @@ fn test_title_diff_shows_text_changed_scaffolds()
 /// 'unstaged'. Exercises the per-stage scaffold emission after a
 /// 'git add' that matches what the save-rerender path would see
 /// when the worktree has been rewritten to match the index.
-#[test]
-fn test_title_diff_staged_shows_staged_scaffolds()
-  -> Result<(), Box<dyn Error>>
+async fn test_title_diff_staged_shows_staged_scaffolds (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
-  let db_name = "skg-test-git-diff-title-staged";
-  let tantivy_folder = "/tmp/tantivy-test-git-diff-title-staged";
-
   let temp_dir = TempDir::new()?;
   let repo_path = temp_dir . path();
   setup_git_repo_with_fixtures_staged (repo_path)?;
+  s . reset_with_source_path (
+    "test_title_diff_staged_shows_staged_scaffolds",
+    repo_path ) . await ?;
+  let (config, driver, _tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
 
-  block_on(async {
-    let (config, driver, _tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+  let root_ids = vec![ID("1" . to_string())];
+  let (actual, _pids, _) : (String, Vec<ID>, _) =
+    multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
-    let root_ids = vec![ID("1" . to_string())];
-    let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+  assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
 
-    assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
-
-    cleanup_test_dbs(db_name, &driver,
-                     Some(Path::new (tantivy_folder))
-                    ) . await?;
-    Ok(())
-  })
+  Ok(())
 }

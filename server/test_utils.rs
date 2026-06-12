@@ -80,6 +80,15 @@ where
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
+  let _groups_lock : std::sync::MutexGuard<()> =
+    // Serializes against other db tests in this process (see
+    // SHARED_DB_GROUPS_MUTEX): under plain 'cargo test' a binary's
+    // tests share one process, and unserialized db tests race on
+    // process-global state (the in-Rust graph OnceLock, the Tantivy
+    // background writer) -- the historical flake family in
+    // TODO/problems.org. Uncontended under nextest.
+    SHARED_DB_GROUPS_MUTEX . lock ()
+    . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let temp_fixtures : PathBuf =
     // Copy fixtures to temp so saves don't corrupt originals
     PathBuf::from(format!("/tmp/{}-fixtures", db_name));
@@ -121,6 +130,10 @@ where
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
+  let _groups_lock : std::sync::MutexGuard<()> =
+    // See the twin lock in run_with_test_db.
+    SHARED_DB_GROUPS_MUTEX . lock ()
+    . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   block_on(async {
     let config: SkgConfig =
       load_config_with_overrides(config_path, Some (db_name), &[])?;
@@ -140,11 +153,12 @@ where
   } )
 }
 
-/// Serializes shared-db test GROUPS within one process. Under
-/// nextest every test is its own process, so this is uncontended
-/// there; under plain 'cargo test' (threads in one process) it keeps
-/// groups from racing on process-global state (the in-Rust graph
-/// OnceLock, the Tantivy background writer).
+/// Serializes db-using tests (shared-db groups AND the per-test
+/// run_with_test_db family) within one process. Under nextest every
+/// test is its own process, so this is uncontended there; under
+/// plain 'cargo test' (threads in one process) it keeps db tests
+/// from racing on process-global state (the in-Rust graph OnceLock,
+/// the Tantivy background writer).
 static SHARED_DB_GROUPS_MUTEX : std::sync::Mutex<()> =
   std::sync::Mutex::new (( ));
 
@@ -206,6 +220,31 @@ impl SharedDbSession {
           sources,
           &self . db_name,
           self . tantivy_folder . to_str () . unwrap () ) }};
+    self . wipe_then_repopulate () . await }
+
+  /// Like 'reset', but for sub-tests that prepare their own source
+  /// directory (e.g. a git repo in a TempDir): no fixture copy; the
+  /// single-source ("main") config points at `source_path` directly.
+  pub async fn reset_with_source_path (
+    &mut self,
+    subtest_name : &str,
+    source_path  : &Path,
+  ) -> Result<(), Box<dyn Error>> {
+    println! ("-- sub-test: {}", subtest_name);
+    self . config = {
+      let mut sources : HashMap<SourceName, SkgfileSource> =
+        HashMap::new ();
+      sources . insert (
+        SourceName::from ("main"),
+        SkgfileSource {
+          name         : SourceName::from ("main"),
+          abbreviation : None,
+          path         : source_path . to_path_buf (),
+          user_owns_it : true, });
+      SkgConfig::fromSourcesAndDbName (
+        sources,
+        &self . db_name,
+        self . tantivy_folder . to_str () . unwrap () ) };
     self . wipe_then_repopulate () . await }
 
   /// Like 'reset', but loads a (possibly multi-source) config from a
