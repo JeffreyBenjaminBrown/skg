@@ -8,14 +8,30 @@
 
 use super::common::*;
 use std::sync::Arc;
+use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-git-diff-ids-save",
+    |s| Box::pin ( async move {
+      test_delete_id_col_scaffold_respawns (s) . await ?;
+      test_delete_id_scaffolds_aborts (s) . await ?;
+      test_edit_id_scaffold_aborts (s) . await ?;
+      test_reorder_id_scaffolds_saves (s) . await ?;
+      test_move_id_scaffolds_to_child_aborts (s) . await ?;
+      test_delete_id_col_scaffold_respawns_staged (s) . await ?;
+      Ok (( )) } )) }
 
 /// Deleting an idCol scaffold should be a no-op.
 /// The scaffold respawns in the returned buffer.
-#[test]
-fn test_delete_id_col_scaffold_respawns()
-  -> Result<(), Box<dyn Error>>
+async fn test_delete_id_col_scaffold_respawns (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
+    s,
     "skg-test-save-del-idcol",
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User deletes the entire idCol scaffold (and its children)
@@ -47,16 +63,17 @@ fn test_delete_id_col_scaffold_respawns()
       // BUFFER: idCol scaffold should respawn
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
-      Ok(()) }) })
+      Ok(()) }) }) . await
 }
 
 /// Deleting individual id scaffolds (keeping the idCol) aborts the
 /// save with an IDCol_Edited error, and the disk is untouched.
-#[test]
-fn test_delete_id_scaffolds_aborts()
-  -> Result<(), Box<dyn Error>>
+async fn test_delete_id_scaffolds_aborts (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
+    s,
     "skg-test-save-del-ids",
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User deletes the id scaffolds but keeps the idCol
@@ -85,16 +102,17 @@ fn test_delete_id_scaffolds_aborts()
       let node_1 = read_nodecomplete(repo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      Ok(()) }) })
+      Ok(()) }) }) . await
 }
 
 /// Editing an id scaffold's text aborts the save with an
 /// IDCol_Edited error, and the disk is untouched.
-#[test]
-fn test_edit_id_scaffold_aborts()
-  -> Result<(), Box<dyn Error>>
+async fn test_edit_id_scaffold_aborts (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
+    s,
     "skg-test-save-edit-id",
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User tries to change an id value in the scaffold
@@ -125,16 +143,17 @@ fn test_edit_id_scaffold_aborts()
         "1.skg should still have id '2''");
       assert!(!node_1 . all_ids () . any(|id| id == &ID("2-modified" . to_string())),
         "1.skg should not have the modified id");
-      Ok(()) }) })
+      Ok(()) }) }) . await
 }
 
 /// Reordering id scaffolds passes the membership check (multiset
 /// equality); the rerender re-sorts them anyway.
-#[test]
-fn test_reorder_id_scaffolds_saves()
-  -> Result<(), Box<dyn Error>>
+async fn test_reorder_id_scaffolds_saves (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
+    s,
     "skg-test-save-reorder-ids",
     |config, driver, tantivy, _repo_path| { Box::pin(async move {
       let input = GIT_DIFF_VIEW
@@ -155,16 +174,17 @@ fn test_reorder_id_scaffolds_saves()
         &Err ( String::new () ), &mut views_state ) . await?;
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
-      Ok(()) }) })
+      Ok(()) }) }) . await
 }
 
 /// Moving the idCol to another node aborts the save: the receiving
 /// node's real ID list does not match the moved idCol's claims.
-#[test]
-fn test_move_id_scaffolds_to_child_aborts()
-  -> Result<(), Box<dyn Error>>
+async fn test_move_id_scaffolds_to_child_aborts (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
+    s,
     "skg-test-save-move-ids",
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User moves id scaffolds to be children of 'child' node
@@ -207,7 +227,7 @@ fn test_move_id_scaffolds_to_child_aborts()
       let node_1 = read_nodecomplete(repo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      Ok(()) }) })
+      Ok(()) }) }) . await
 }
 
 /// Same as 'test_delete_id_col_scaffold_respawns' but with the fixture
@@ -216,11 +236,12 @@ fn test_move_id_scaffolds_to_child_aborts()
 /// save-rerender pipeline (reconcile_id_col_children + complete_viewforest) honors the
 /// staged/unstaged distinction instead of merging stages and defaulting
 /// to unstaged.
-#[test]
-fn test_delete_id_col_scaffold_respawns_staged()
-  -> Result<(), Box<dyn Error>>
+async fn test_delete_id_col_scaffold_respawns_staged (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
   run_save_test_staged(
+    s,
     "skg-test-save-del-idcol-staged",
     |config, driver, tantivy, _repo_path| { Box::pin(async move {
       let input = without_lines_containing(
@@ -239,14 +260,18 @@ fn test_delete_id_col_scaffold_respawns_staged()
 
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW_STAGED);
-      Ok(()) }) })
+      Ok(()) }) }) . await
 }
 
 //
 // Test runner helpers
 //
 
-fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
+async fn run_save_test<F>(
+  s: &mut SharedDbSession,
+  subtest_name: &str,
+  test_fn: F,
+) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
@@ -256,10 +281,14 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    db_name, setup_git_repo_with_fixtures, test_fn)
+    s, subtest_name, setup_git_repo_with_fixtures, test_fn) . await
 }
 
-fn run_save_test_staged<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
+async fn run_save_test_staged<F>(
+  s: &mut SharedDbSession,
+  subtest_name: &str,
+  test_fn: F,
+) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
@@ -269,11 +298,12 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    db_name, setup_git_repo_with_fixtures_staged, test_fn)
+    s, subtest_name, setup_git_repo_with_fixtures_staged, test_fn) . await
 }
 
-fn run_save_test_with_setup<S, F>(
-  db_name : &str,
+async fn run_save_test_with_setup<S, F>(
+  s: &mut SharedDbSession,
+  subtest_name: &str,
   setup   : S,
   test_fn : F,
 ) -> Result<(), Box<dyn Error>>
@@ -286,19 +316,10 @@ where
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
-  let tantivy_folder = format!("/tmp/tantivy-{}", db_name);
-
   let temp_dir = TempDir::new()?;
   let repo_path = temp_dir . path();
   setup (repo_path)?;
+  s . reset_with_source_path (subtest_name, repo_path) . await ?;
 
-  block_on(async {
-    let (config, driver, mut tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), &tantivy_folder) . await?;
-
-    let result = test_fn(&config, &driver, &mut tantivy, repo_path) . await;
-
-    cleanup_test_dbs(db_name, &driver, Some(Path::new (&tantivy_folder))) . await?;
-    result
-  })
+  test_fn(&s . config, &s . driver, &mut s . tantivy, repo_path) . await
 }

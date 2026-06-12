@@ -23,11 +23,32 @@ use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerende
 use skg::serve::handlers::source_sets::handle_source_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::source_sets::{
-  ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
+  ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
+use skg::test_utils::run_with_shared_test_db;
 use skg::types::env::SkgEnv;
+use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::OpenViews;
+use typedb_driver::TypeDBDriver;
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/source_sets/fixtures";
+  run_with_shared_test_db (
+    "skg-test-diff-mode-refusals",
+    |s| Box::pin ( async move {
+      s . reset ("toggle_refused_under_restricted_set_and_allowed_at_all", fixtures) . await ?;
+      toggle_refused_under_restricted_set_and_allowed_at_all (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("switch_refusals_take_the_unwinding_shape", fixtures) . await ?;
+      switch_refusals_take_the_unwinding_shape (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("refusal_first_messages_parse_and_read_as_documented", fixtures) . await ?;
+      refusal_first_messages_parse_and_read_as_documented (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 fn connected_tcp_stream_pair (
 ) -> Result<(TcpStream, TcpStream), Box<dyn Error>> {
@@ -60,14 +81,11 @@ fn read_first_then_assert_empty_stream (
             "the done carries no errors or warnings: {}", done );
   Ok (first) }
 
-#[test]
-fn toggle_refused_under_restricted_set_and_allowed_at_all (
+async fn toggle_refused_under_restricted_set_and_allowed_at_all (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-diff-refusal-toggle",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-diff-refusal-toggle",
-    |config, driver, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
@@ -132,16 +150,13 @@ fn toggle_refused_under_restricted_set_and_allowed_at_all (
         assert! ( messages [0] . contains ("Git diff mode disabled"),
                   "{}", messages [0] );
         assert! ( ! views_state . diff_mode_enabled ); }
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn switch_refusals_take_the_unwinding_shape (
+async fn switch_refusals_take_the_unwinding_shape (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-diff-refusal-switch",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-diff-refusal-switch",
-    |config, driver, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
@@ -252,19 +267,16 @@ fn switch_refusals_take_the_unwinding_shape (
                   "{}", messages [0] );
         assert_eq! ( active . name,
                      SourceSetName::from ("private") ); }
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn refusal_first_messages_parse_and_read_as_documented (
+async fn refusal_first_messages_parse_and_read_as_documented (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The quiet shape end to end, on a live reader rather than a
   // drained message list: first message, then exactly the empty
   // stream trio, then EOF.
-  run_with_source_set_test_db (
-    "skg-test-diff-refusal-shape",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-diff-refusal-shape",
-    |config, driver, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
@@ -291,4 +303,4 @@ fn refusal_first_messages_parse_and_read_as_documented (
                                    first") , "{}", first );
       assert! ( read_lp_message (&mut reader) . is_err (),
                 "nothing follows the empty stream" );
-      Ok (( )) } )) }
+      Ok (( )) }

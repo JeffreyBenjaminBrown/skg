@@ -19,7 +19,8 @@ use skg::source_sets::{
   SourceSetName,
   filter_path_to_active_sources_for_test,
   filter_branches_to_active_sources_for_test,
-  run_with_source_set_test_db};
+  prepare_git_diff_fixture};
+use skg::test_utils::run_with_shared_test_db;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
@@ -29,7 +30,7 @@ use skg::to_org::expand::backpath::{
 use skg::to_org::render::content_view::multi_root_view_with_source_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, MSV, SourceName};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
@@ -47,6 +48,59 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use typedb_driver::TypeDBDriver;
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/source_sets/fixtures";
+  run_with_shared_test_db (
+    "skg-test-source-sets",
+    |s| Box::pin ( async move {
+      s . reset ("source_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) . await ?;
+      source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("content_view_omits_inactive_contained_nodes", fixtures) . await ?;
+      content_view_omits_inactive_contained_nodes (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset_with_fixture_prep (
+        // prepare_git_diff_fixture leaves the public source with a
+        // real worktree-vs-HEAD diff, which this sub-test renders.
+        "diff_view_omits_inactive_members_without_content_leak", fixtures,
+        |root| prepare_git_diff_fixture (root) ) . await ?;
+      diff_view_omits_inactive_members_without_content_leak (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("search_filters_inactive_sources_before_ranking_and_truncation", fixtures) . await ?;
+      search_filters_inactive_sources_before_ranking_and_truncation (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("saving_inactive_placeholder_moves_and_deletes_update_contains", fixtures) . await ?;
+      saving_inactive_placeholder_moves_and_deletes_update_contains (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("saving_edits_to_inactive_placeholder_content_are_rejected", fixtures) . await ?;
+      saving_edits_to_inactive_placeholder_content_are_rejected (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("restricted_source_search_and_save_work_together_end_to_end", fixtures) . await ?;
+      restricted_source_search_and_save_work_together_end_to_end (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) . await ?;
+      containerward_expansion_truncates_before_inactive_container (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) . await ?;
+      sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("stale_inactive_placeholders_under_cols_save_without_error", fixtures) . await ?;
+      stale_inactive_placeholders_under_cols_save_without_error (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("inactive_subscribee_placeholder_counts_positionally", fixtures) . await ?;
+      inactive_subscribee_placeholder_counts_positionally (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("weave_preserves_omitted_inactive_content_members", fixtures) . await ?;
+      weave_preserves_omitted_inactive_content_members (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) . await ?;
+      restricted_save_preserves_invisible_override_targets (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 fn save_ids (
   instructions : &[DefineNode],
@@ -135,16 +189,13 @@ fn config_rejects_reserved_all_source_and_source_set_names (
 	    "user-defined source-set named all must be rejected" );
 }
 
-#[test]
-fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: a switch RE-RENDERS
   // open views in place instead of closing them.
-  run_with_source_set_test_db (
-    "skg-test-source-sets-switch-rerenders",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-switch-rerenders",
-    |config, driver, tantivy| Box::pin ( async move {
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
       let env : skg::types::env::SkgEnv =
@@ -202,19 +253,16 @@ fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
       assert! (
         search_cancelled . load (Ordering::SeqCst),
         "source-set switch should cancel in-flight search enrichment" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn content_view_omits_inactive_contained_nodes (
+async fn content_view_omits_inactive_contained_nodes (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: rendering OMITS
   // inactive children (no placeholders); the weave preserves their
   // memberships at save.
-  run_with_source_set_test_db (
-    "skg-test-source-sets-content-placeholder",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-content-placeholder",
-    |config, driver, _tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -239,16 +287,13 @@ fn content_view_omits_inactive_contained_nodes (
         ! pids . contains (&ID::from ("private-a")),
         "an omitted inactive node is not in the view, so not in its pid set: {:?}",
         pids );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn diff_view_omits_inactive_members_without_content_leak (
+async fn diff_view_omits_inactive_members_without_content_leak (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-diff-placeholder",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-diff-placeholder",
-    |config, driver, _tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -282,16 +327,13 @@ fn diff_view_omits_inactive_members_without_content_leak (
           actual ); }
       assert! ( actual . contains ("active-a"),
         "active content still renders: {}", actual );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn search_filters_inactive_sources_before_ranking_and_truncation (
+async fn search_filters_inactive_sources_before_ranking_and_truncation (
+  config  : &SkgConfig,
+  _driver : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-search-filtering",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-search-filtering",
-    |config, _driver, tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -308,16 +350,13 @@ fn search_filters_inactive_sources_before_ranking_and_truncation (
         vec![ID::from ("active-search-hit")],
         "inactive high-scoring hits must be filtered before ranking \
          and display truncation" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn saving_inactive_placeholder_moves_and_deletes_update_contains (
+async fn saving_inactive_placeholder_moves_and_deletes_update_contains (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-save-placeholders",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-save-placeholders",
-    |config, driver, _tantivy| Box::pin ( async move {
       let moved_buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg (node (id active-b) (source public))) active-b
@@ -349,16 +388,13 @@ fn saving_inactive_placeholder_moves_and_deletes_update_contains (
         vec![ID::from ("active-b")],
         "deleting an inactive placeholder should remove that inactive \
          ID from contains" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn saving_edits_to_inactive_placeholder_content_are_rejected (
+async fn saving_edits_to_inactive_placeholder_content_are_rejected (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-save-placeholder-edit",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-save-placeholder-edit",
-    |config, driver, _tantivy| Box::pin ( async move {
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg (inactiveNode (id private-a) (source private))) edited title
@@ -371,16 +407,13 @@ fn saving_edits_to_inactive_placeholder_content_are_rejected (
         matches! ( result, Err (SaveError::BufferValidationErrors { .. }) ),
         "editing inactive placeholder title/body should be rejected: {:?}",
         result );
-	      Ok (( )) } )) }
+	      Ok (( )) }
 
-#[test]
-fn restricted_source_search_and_save_work_together_end_to_end (
+async fn restricted_source_search_and_save_work_together_end_to_end (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-search-save-e2e",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-search-save-e2e",
-    |config, driver, tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -428,7 +461,7 @@ fn restricted_source_search_and_save_work_together_end_to_end (
         saved_node_by_id (&instructions, "active-b") . title,
         "active-b edited through restricted view",
         "restricted save should still write active-source edits" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
 #[test]
 fn backward_path_truncates_before_first_inactive_node (
@@ -480,14 +513,11 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
     "fully inactive forks should not render an empty fork scaffold" );
   Ok (( )) }
 
-#[test]
-fn containerward_expansion_truncates_before_inactive_container (
+async fn containerward_expansion_truncates_before_inactive_container (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-containerward-truncation",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-containerward-truncation",
-    |config, driver, _tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -521,16 +551,13 @@ fn containerward_expansion_truncates_before_inactive_container (
         ! rendered . contains ("active-root-after-private"),
         "nodes beyond the first inactive container should be unreachable: {}",
         rendered );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-source-sets-sourceward-fork-truncation",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-sourceward-fork-truncation",
-    |config, driver, _tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -582,7 +609,7 @@ fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         . is_empty (),
         "all-inactive sourceward forks should not leave children or \
          empty fork scaffolding" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
 #[test]
 fn search_enrichment_truncates_ancestry_before_inactive_container (
@@ -682,17 +709,14 @@ fn titles_by_ids_omits_inactive_source_titles (
     "inactive-source title lookup must omit private-a" );
   Ok (( )) }
 
-#[test]
-fn stale_inactive_placeholders_under_cols_save_without_error (
+async fn stale_inactive_placeholders_under_cols_save_without_error (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: the formerly-unsavable
   // buffer. A buffer rendered before a source-set switch can hold
   // InactiveNodes under cols; saving it must not error.
-  run_with_source_set_test_db (
-    "skg-test-source-sets-stale-col-placeholder",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-stale-col-placeholder",
-    |config, driver, _tantivy| Box::pin ( async move {
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg subscriberCol)
@@ -708,19 +732,16 @@ fn stale_inactive_placeholders_under_cols_save_without_error (
       assert! ( result . is_ok (),
         "an InactiveNode under a col must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn inactive_subscribee_placeholder_counts_positionally (
+async fn inactive_subscribee_placeholder_counts_positionally (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: subscribee order
   // matters, so a buffer-present placeholder is a positional member
   // of the subscribeeCol.
-  run_with_source_set_test_db (
-    "skg-test-source-sets-subscribee-placeholder",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-subscribee-placeholder",
-    |config, driver, _tantivy| Box::pin ( async move {
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg subscribeeCol)
@@ -739,19 +760,16 @@ fn inactive_subscribee_placeholder_counts_positionally (
           . subscribes_to . or_default (),
         &[ ID::from ("private-a"), ID::from ("active-b") ],
         "the placeholder must count as a positional subscribee" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn weave_preserves_omitted_inactive_content_members (
+async fn weave_preserves_omitted_inactive_content_members (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: under a restricted
   // set, a buffer that omits inactive members must not delete them;
   // visible edits (reorder, delete) still land.
-  run_with_source_set_test_db (
-    "skg-test-source-sets-weave-contains",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-weave-contains",
-    |config, driver, _tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName ("public" . to_string ())) ?;
@@ -802,11 +820,13 @@ fn weave_preserves_omitted_inactive_content_members (
           saved_node_by_id (&instructions, "root") . contains,
           vec![ ID::from ("private-a"), ID::from ("active-b") ],
           "visible deletion lands; invisible member survives" ); }
-      Ok (( )) } )) }
+      Ok (( )) }
 
 
-#[test]
-fn restricted_save_preserves_invisible_override_targets (
+async fn restricted_save_preserves_invisible_override_targets (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The pipeline-level half of the second named regression
   // (TODO/full-schema/13_test-rel-matrix.org): a node overrides
@@ -814,11 +834,6 @@ fn restricted_save_preserves_invisible_override_targets (
   // inactive. Rendering restricted shows only ovr-visible; the
   // set-difference merge must keep ovr-inactive across a restricted
   // save, even when the visible member is deleted.
-  run_with_source_set_test_db (
-    "skg-test-source-sets-override-preservation",
-    "tests/source_sets/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-source-sets-override-preservation",
-    |config, driver, _tantivy| Box::pin ( async move {
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config, SourceSetName::from ("public") )?;
@@ -861,4 +876,4 @@ fn restricted_save_preserves_invisible_override_targets (
           vec![ID::from ("ovr-inactive")],
           "deleting the visible override member must leave exactly the \
            invisible one" ); }
-      Ok (( )) } )) }
+      Ok (( )) }

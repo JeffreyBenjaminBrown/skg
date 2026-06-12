@@ -18,19 +18,52 @@ use std::error::Error;
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::source_sets::{
-  ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
+  ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
+use skg::test_utils::run_with_shared_test_db;
 use skg::to_org::render::override_menu::override_menu_view;
 use skg::types::env::SkgEnv;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{ParentIs, mk_indefinitive_viewnode};
 use skg::types::misc::SourceName;
 use skg::types::views_state::{OpenViews, ViewUri};
+use typedb_driver::TypeDBDriver;
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/override_menu/fixtures-multi";
+  run_with_shared_test_db (
+    "skg-test-override-menu",
+    |s| Box::pin ( async move {
+      s . reset ("menu_shows_all_edges_with_op_heralds", fixtures) . await ?;
+      menu_shows_all_edges_with_op_heralds (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("menu_appears_for_foreign_only_overriders", fixtures) . await ?;
+      menu_appears_for_foreign_only_overriders (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("menu_stops_cycles_with_the_cycle_viewstat", fixtures) . await ?;
+      menu_stops_cycles_with_the_cycle_viewstat (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("inactive_overriders_are_omitted_and_can_empty_the_menu", fixtures) . await ?;
+      inactive_overriders_are_omitted_and_can_empty_the_menu (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("menu_still_offered_in_diff_mode", fixtures) . await ?;
+      menu_still_offered_in_diff_mode (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("open_menu_survives_diff_mode_toggle", fixtures) . await ?;
+      open_menu_survives_diff_mode_toggle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("handler_precedence_and_menu_dedup", fixtures) . await ?;
+      handler_precedence_and_menu_dedup (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 fn connected_tcp_stream_pair (
 ) -> Result<(TcpStream, TcpStream), Box<dyn Error>> {
@@ -56,16 +89,13 @@ fn line_with_id<'a> (
     . find ( |l| l . contains (&needle) )
     . map ( |l| (org_depth (l), l) ) }
 
-#[test]
-fn menu_shows_all_edges_with_op_heralds
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-shape",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-shape",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn menu_shows_all_edges_with_op_heralds (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -98,18 +128,15 @@ fn menu_shows_all_edges_with_op_heralds
         assert_eq! ( f2_depth, 3, "{}", menu );
         assert! ( f2_line . contains ("overridesParent"),
                   "{}", menu ); }
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn menu_appears_for_foreign_only_overriders
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-foreign-only",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-foreign-only",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn menu_appears_for_foreign_only_overriders (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -120,18 +147,15 @@ fn menu_appears_for_foreign_only_overriders
         . expect ("the menu fires for ANY overrider, foreign too");
       assert! ( line_with_id (&menu, "F3") . is_some (),
                 "{}", menu );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn menu_stops_cycles_with_the_cycle_viewstat
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-cycle",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-cycle",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn menu_stops_cycles_with_the_cycle_viewstat (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -150,18 +174,15 @@ fn menu_stops_cycles_with_the_cycle_viewstat
         "the repeat carries the cycle viewstat:\n{}", menu );
       assert_eq! ( menu . lines () . count (), 3,
         "the branch stops at the repeat:\n{}", menu );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn inactive_overriders_are_omitted_and_can_empty_the_menu
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-visibility",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-visibility",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn inactive_overriders_are_omitted_and_can_empty_the_menu (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -181,7 +202,7 @@ fn inactive_overriders_are_omitted_and_can_empty_the_menu
         . expect ("under 'all', RO is visible");
       assert! ( line_with_id (&menu, "RO") . is_some (),
                 "{}", menu );
-      Ok (( )) } )) }
+      Ok (( )) }
 
 /// The shape signature of a rendered org buffer: (depth, id) per
 /// headline, ignoring decoration (e.g. notInGit, diff axes), so
@@ -205,16 +226,13 @@ fn shape_signature (
 /// Stage 11 decided the override-choice menu appears in diff mode
 /// too; stage 12-2 pins it: visiting an overridden node with
 /// diff_mode_enabled still yields the menu, not a content view.
-#[test]
-fn menu_still_offered_in_diff_mode
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-diff-mode",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-diff-mode",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn menu_still_offered_in_diff_mode (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -244,22 +262,19 @@ fn menu_still_offered_in_diff_mode
       assert! ( response . contains (
           "The requested node is overridden" ),
         "{}", response );
-      Ok (( )) } )) }
+      Ok (( )) }
 
 /// An open menu survives a diff-mode toggle intact: its generated
 /// indefinitive lines neither phantom nor duplicate (decoration like
 /// notInGit may appear; the shape -- depths and ids -- must not
 /// change).
-#[test]
-fn open_menu_survives_diff_mode_toggle
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-toggle",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-toggle",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn open_menu_survives_diff_mode_toggle (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -332,18 +347,15 @@ fn open_menu_survives_diff_mode_toggle
               & (depth, id . clone ()) ),
             "menu line (depth {}, id {}) survives the toggle:\n{}",
             depth, id, rerendered ); }}
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn handler_precedence_and_menu_dedup
-  () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
-    "skg-test-override-menu-handler",
-    "tests/override_menu/fixtures-multi/skgconfig.toml",
-    "/tmp/tantivy-test-override-menu-handler",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn handler_precedence_and_menu_dedup (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
@@ -450,4 +462,4 @@ fn handler_precedence_and_menu_dedup
           respond (&mut views_state, &bad_request);
         assert! ( response . contains ("Unknown override-choice"),
                   "{}", response ); }
-      Ok (( )) } )) }
+      Ok (( )) }

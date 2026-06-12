@@ -24,6 +24,7 @@
 
 use super::common::*;
 use skg::test_utils::graph_handle_from_config;
+use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
 
 fn setup_filter_fixtures (
   repo_path : &Path,
@@ -76,22 +77,31 @@ const EXPECTED_STAGED : &str = "\
 **** (skg (node (id h6) (source main) indef (staged removedM))) h6
 ";
 
-fn run_filter_col_test (
-  db_name  : &str,
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-git-diff-filter-cols",
+    |s| Box::pin ( async move {
+      filter_cols_show_exact_phantoms_and_newM_unstaged (s) . await ?;
+      emptied_filter_cols_still_render_in_diff_mode (s) . await ?;
+      filter_cols_show_exact_phantoms_and_newM_staged (s) . await ?;
+      Ok (( )) } )) }
+
+async fn run_filter_col_test (
+  s            : &mut SharedDbSession,
+  subtest_name : &str,
   staged   : bool,
   expected : &str,
 ) -> Result<(), Box<dyn Error>> {
-  let tantivy_folder : String =
-    format! ("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   if staged { setup_filter_fixtures_staged (repo_path)?; }
   else      { setup_filter_fixtures        (repo_path)?; }
-  block_on ( async {
-    let (config, driver, tantivy) =
-      setup_test_dbs (
-        db_name, repo_path . to_str () . unwrap (),
-        &tantivy_folder ) . await ?;
+  s . reset_with_source_path (subtest_name, repo_path) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
@@ -117,43 +127,37 @@ fn run_filter_col_test (
         vec! [ ID::from ("h1"), ID::from ("h2"),
                ID::from ("h3"), ID::from ("h5") ],
         "filter-col phantoms must not edit the hides list" ); }
-    cleanup_test_dbs (
-      db_name, &driver, Some (Path::new (&tantivy_folder))
-    ) . await ?;
-    Ok (( )) } ) }
+    Ok (( )) }
 
-#[test]
-fn filter_cols_show_exact_phantoms_and_newM_unstaged (
+async fn filter_cols_show_exact_phantoms_and_newM_unstaged (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
   run_filter_col_test (
-    "skg-test-git-diff-filter-unstaged", false,
-    EXPECTED_UNSTAGED ) }
+    s, "skg-test-git-diff-filter-unstaged", false,
+    EXPECTED_UNSTAGED ) . await }
 
 /// Col existence for the filter cols: a DERIVED membership emptied
 /// since HEAD (S2 stopped hiding x2 and y2; x2 was hidden-in B2, y2
 /// hidden-outside) still yields each col, holding only phantoms.
 /// Outside diff mode the emptied cols do not appear.
-#[test]
-fn emptied_filter_cols_still_render_in_diff_mode (
+async fn emptied_filter_cols_still_render_in_diff_mode (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
-  let db_name : &str =
-    "skg-test-git-diff-filter-existence";
-  let tantivy_folder : String =
-    format! ("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_filter_fixtures (repo_path)?;
+  s . reset_with_source_path (
+    "emptied_filter_cols_still_render_in_diff_mode",
+    repo_path ) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
   let input : &str = "\
 * (skg (node (id S2) (source main))) S2
 ** (skg subscribeeCol)
 *** (skg (node (id B2) (source main))) B2
 **** (skg (node (id x2) (source main))) x2
 ";
-  block_on ( async {
-    let (config, driver, tantivy) =
-      setup_test_dbs (
-        db_name, repo_path . to_str () . unwrap (),
-        &tantivy_folder ) . await ?;
     let graph = graph_handle_from_config (&config)?;
     { let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
@@ -182,14 +186,11 @@ fn emptied_filter_cols_still_render_in_diff_mode (
         assert! ( ! response . saved_view . contains (col),
           "an empty {} must not render outside diff mode:\n{}",
           col, response . saved_view ); }}
-    cleanup_test_dbs (
-      db_name, &driver, Some (Path::new (&tantivy_folder))
-    ) . await ?;
-    Ok (( )) } ) }
+    Ok (( )) }
 
-#[test]
-fn filter_cols_show_exact_phantoms_and_newM_staged (
+async fn filter_cols_show_exact_phantoms_and_newM_staged (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
   run_filter_col_test (
-    "skg-test-git-diff-filter-staged", true,
-    EXPECTED_STAGED ) }
+    s, "skg-test-git-diff-filter-staged", true,
+    EXPECTED_STAGED ) . await }

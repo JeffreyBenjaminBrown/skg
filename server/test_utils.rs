@@ -191,12 +191,30 @@ impl SharedDbSession {
     subtest_name    : &str,
     fixtures_folder : &str,
   ) -> Result<(), Box<dyn Error>> {
+    self . reset_with_fixture_prep (
+      subtest_name, fixtures_folder, |_| Ok (( )) ) . await }
+
+  /// Like 'reset', but runs `prep` on the temp fixture copy BEFORE
+  /// the config is loaded and the database populated -- for
+  /// sub-tests whose fixtures need mutation that the database must
+  /// reflect (e.g. git-initializing a source and leaving a
+  /// worktree-vs-HEAD diff).
+  pub async fn reset_with_fixture_prep<P> (
+    &mut self,
+    subtest_name    : &str,
+    fixtures_folder : &str,
+    prep            : P,
+  ) -> Result<(), Box<dyn Error>>
+  where
+    P : FnOnce (&Path) -> Result<(), Box<dyn Error>>,
+  {
     println! ("-- sub-test: {}", subtest_name);
     if self . temp_fixtures . exists () {
       fs::remove_dir_all ( &self . temp_fixtures ) ?; }
     copy_dir_all (
       Path::new (fixtures_folder),
       &self . temp_fixtures ) ?;
+    prep ( &self . temp_fixtures ) ?;
     self . config = {
       let copied_config : PathBuf =
         self . temp_fixtures . join ("skgconfig.toml");
