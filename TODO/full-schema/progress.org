@@ -25,6 +25,24 @@ Appended to tests/new/local_instruction_collection/extraction.rs:
   covered but the plain hiddenCol did not).
 All four pass via 'cargo nextest run --test new'.  No surprises; the
 pure seam reaches all four behaviors exactly as the plan predicted.
+**** commit 2: save-simulation nodeMerge monogamy arm
+Added 'merge_that_collides_two_overriders_is_rejected' to
+tests/save/override_invariants.rs.  R1 overrides N1, R2 overrides N2
+(all owned, monogamy holds); a nodeMerge fuses N2 into N1, so R2's
+override of N2 resolves to N1 and collides with R1.  Passes.
+NOTE (non-blocking, recorded): the touched-scoped validator catches
+this ONLY because the acquiree's override-neighbor (R2) rides along
+in 'save_instructions' as a neighbor savenode, which is what makes
+the colliding edge "touched".  The validator never inspects the
+acquirer's inbound overriders directly.  So if a future refactor
+ever stopped re-saving an acquiree's inbound-edge neighbors (today
+'neighbor_savenodes_for_nodeMerges' does, via
+'affected_neighbors_of_nodeMerge' over OUTBOUND_RELATIONSHIP_TYPES),
+this class of collision would slip past the save-time check (init/
+rebuild's whole-graph 'validate_override_invariants' would still
+catch it on next boot).  The test reproduces the real wiring (R2 in
+the nonmerge save list) so it pins the behavior as it actually
+ships, not an idealized version.  Logged to TODO/problems.org.
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
