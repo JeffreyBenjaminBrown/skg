@@ -1,0 +1,143 @@
+* Plan: make InactiveNode a fieldless marker
+  Goal (Jeff, 2026-06-12): remove every data field from InactiveNode
+  (id, source, membership, overridesHere), so an inactive placeholder
+  is an anonymous "something inactive is/was here" marker that exists
+  ONLY to host already-drawn active descendants after a source-set
+  reduction.
+
+  I (Claude) conceded the argument. My earlier "keep the fields"
+  pushback rested on view-side features that are themselves either
+  privacy leaks, dead code, or behaviors that contradict the point of
+  source restriction. See the rebuttal trail in
+  [[file:inactive-nodes-ids-and-sources.org]].
+
+** Two facts I verified (they make the removal sound)
+   - DIFF MODE AND SOURCE RESTRICTION ARE MUTUALLY EXCLUSIVE, enforced:
+     'diff_analysis.rs' refuses unless the active set is "all"
+     ("Diff analysis requires active source-set all"), and
+     'source_sets.rs' refuses a restricted switch while diff mode is on
+     ("git diff mode is on, and it requires active source-set all").
+     Under "all" there are no inactive nodes. So every InactiveNode arm
+     in 'to_org/render/diff.rs' is unreachable dead code.
+   - COMPLETION NEVER EXPANDS INACTIVE CONTENT. At an inactive node's
+     BFS visit ('complete.rs') the only action is the deleted-check;
+     it never reconciles the node's own content. So completion never
+     needs the inactive id to fetch contents. (This is exactly Jeff's
+     "don't complete the content of an inactive node -- that's a leak"
+     principle, already honored.)
+
+** Where inactive placeholders come from (so retention is well-scoped)
+   - DE NOVO render under a restricted set: an inactive content member
+     is OMITTED from the goal list ('omit_inactive_members') and never
+     created. Its active descendants, reachable only through it, do not
+     appear -- correct, and already true today.
+   - SOURCE-SET REDUCTION of an already-drawn buffer
+     ('update_buffer/source_switch.rs'): active nodes from now-inactive
+     sources are converted in place to InactiveNodes; their
+     already-drawn subtrees are kept. THIS is the only way a "retained
+     inactive node with active descendants" exists. The children
+     pre-exist in the tree; nothing is fetched by id.
+
+** The one real refactor: id-free retention
+   Today a retained inactive node survives reconciliation because its
+   id is injected into the parent's goal list
+   ('retained_inactive_children' -> 'omit_inactive_members' retained
+   set), so the reconciler treats it as a RELEVANT child and matches it
+   to that goal id. That is the only structural use of the id.
+
+   Replacement: make inactive nodes IRRELEVANT in the reconcilers'
+   'relevant' predicates ('reconcile/content.rs', and the partner-col
+   path via 'complete/partner_col/child_data.rs'). 'complete_relevant_
+   children' preserves irrelevant children as-is (it only stale-checks
+   relevant ones), so a retained inactive node survives WITHOUT a goal
+   id. Then:
+   - 'omit_inactive_members' drops its 'retained' parameter and simply
+     omits every inactive goal id (it resolves each id's source from
+     the graph/disk, never from an InactiveNode field).
+   - 'retained_inactive_children' is deleted.
+
+   CONSEQUENCE (open question 1): irrelevant children are reordered to
+   the FRONT of their siblings. So on rerender a retained inactive
+   subtree jumps above its active siblings. Acceptable under the
+   read-only-position rule we already adopted, but visible.
+
+** Commit sequence (each builds green; fields stay until the last)
+   1. DONE (c94180e6): inactive nodes emit no save intention; weave
+      owns invisible members.
+   2. DONE (25adab0e): delete the now-dead 'inactiveNode_is_phantom'.
+   3. Id-free retention: inactive -> irrelevant in the two reconcilers;
+      simplify 'omit_inactive_members'; delete
+      'retained_inactive_children'. (De-risks the hard part; fields
+      untouched.)
+   4. Drop the inactive->Deleted feature: delete
+      'convert_inactive_to_deleted_if_deleted' and its call
+      ('update_buffer/complete.rs'); the BFS inactive arm becomes a
+      no-op. (It is a privacy leak + useless per Jeff.) Removes id+source
+      consumers there.
+   5. Drop inactive from collateral: 'pids_from_viewforest'
+      ('types/views_state.rs') skips inactive vognodes. (An anonymous
+      blob does not change on rerender; its active descendants track
+      their own collateral.)
+   6. Delete the dead inactive arms in 'to_org/render/diff.rs'
+      (unreachable, per the verified fact above).
+   7. Anonymize the wire + strip the struct (atomic):
+      - 'InactiveNode' becomes a unit struct (or 'Vognode::Inactive'
+        becomes a fieldless variant).
+      - 'mk_inactive_viewnode' takes no data; its 4 call sites stop
+        passing any.
+      - 'org_to_text' renders bare '(inactiveNode)'.
+      - 'parse_metadata_sexp' accepts bare '(inactiveNode)' (no
+        required id/source).
+      - remove 'collected_id' on InactiveNode; the orderkey arms that
+        called it are already dead after step 3.
+      - 'validate_view_roots' checks only the variant; drop the
+        inactive arm of the override-mismatch validator.
+      - update 'maybe_placed_viewnode.rs' mirror + label.
+      - update the elisp herald spec 'tests/elisp/herald-rules.sexp'
+        (and any elisp) from '(BLUE inactiveNode "..." (id) (source)
+        (RED overridesHere ...) (staged) (unstaged))' to '(BLUE
+        inactiveNode "node from inactive source")'.
+   8. Sweep: glossary.md "PartnerCol"/inactive notes, api-and-formats.md
+      inactiveNode grammar, and the InactiveNode doc comments.
+
+** Tests to update / add
+   - Existing inactive integration tests live in 'tests/source_sets.rs'
+     and 'tests/partner_col_matrix.rs'. The omitted-member + weave
+     cases are unaffected. The switch-rerender retained case must still
+     show the active descendants (now via irrelevant retention); assert
+     it, and assert the placeholder renders WITHOUT id/source (no
+     leak).
+   - A privacy-regression test: a restricted render of a node whose
+     contents include an inactive-source member must not contain that
+     member's id or source string anywhere in the buffer.
+   - Drop/repurpose any test asserting an inactive node converts to
+     Deleted, or that a collateral view re-renders on an inactive
+     node's change.
+
+** Open questions for Jeff                                         :TODO:
+*** Front-positioning: OK that a retained inactive subtree jumps to
+      the front of its siblings on rerender (the natural result of
+      "irrelevant")? Alternative is extra logic to hold its place; I'd
+      rather not unless you want it.
+**** TODO okay
+*** Anonymous render: is bare '(inactiveNode)' with herald "node from
+      inactive source" the right client presentation, or do you want a
+      different label / a count of hidden-but-present descendants?
+**** TODO the former, please
+*** inactive->Deleted: confirm you want it GONE entirely (step 4) --
+      i.e. when a save deletes an inactive node, its placeholder just
+      lingers until the next full rerender drops it, rather than
+      flipping to a "DELETED" marker.
+**** TODO yes
+*** Should I keep executing straight through steps 3-8 now, or do you
+      want to eyeball step 3 (the retention refactor) before I go on?
+**** TODO Please proceed as described in when-to-stop.org.
+** TODO
+You wrote
+```
+  - De-novo scope: inactive members (and their active descendants) only ever appear via
+  a source-set reduction of an already-drawn buffer — never in a fresh render. That's
+  already true today, but worth stating: a public node reachable only through a private
+  parent simply won't show on a de-novo restricted view.
+```
+We should comment that this is true in the typedef for InactiveNode.
