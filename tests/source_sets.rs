@@ -368,7 +368,7 @@ fn saving_edits_to_inactive_placeholder_content_are_rejected (
         buffer_to_validated_saveplan (
           buffer, config, driver, None ) . await;
       assert! (
-        matches! ( result, Err (SaveError::BufferValidationErrors (_)) ),
+        matches! ( result, Err (SaveError::BufferValidationErrors { .. }) ),
         "editing inactive placeholder title/body should be rejected: {:?}",
         result );
 	      Ok (( )) } )) }

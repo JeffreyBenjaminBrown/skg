@@ -53,7 +53,7 @@ fn assert_override_validation_error (
     . expect ("error should remain a SaveError");
   assert! (matches!(
     save_error,
-    SaveError::BufferValidationErrors (errors)
+    SaveError::BufferValidationErrors { errors, .. }
       if matches!(
         errors . first (),
         Some (BufferValidationError::OverrideInvariantViolation (_)))

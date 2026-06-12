@@ -603,7 +603,7 @@ fn buffer_save_rejects_second_user_owned_overrider
           || panic! ("expected a SaveError, got: {}", err) );
       assert! ( matches! (
         save_error,
-        SaveError::BufferValidationErrors (errors)
+        SaveError::BufferValidationErrors { errors, .. }
           if errors . iter () . any (
             |e| matches! (
               e, BufferValidationError::OverrideInvariantViolation (_) )) ),

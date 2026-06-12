@@ -47,7 +47,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Modified foreign node should be rejected");
       match result . unwrap_err() {
-        SaveError::BufferValidationErrors (errors) => {
+        SaveError::BufferValidationErrors { errors, .. } => {
           assert_eq!(errors . len(), 1, "Should have one validation error");
           match &errors[0] {
             BufferValidationError::ModifiedForeignNode(id, source) => {
@@ -75,7 +75,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Foreign node with modified body should be rejected");
       match result . unwrap_err() {
-        SaveError::BufferValidationErrors (errors) => {
+        SaveError::BufferValidationErrors { errors, .. } => {
           assert!(errors . iter() . any(|e| matches!(
             e, BufferValidationError::ModifiedForeignNode(_, _)))); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
@@ -145,7 +145,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Deleting foreign node should be rejected");
       match result . unwrap_err() {
-        SaveError::BufferValidationErrors (errors) => {
+        SaveError::BufferValidationErrors { errors, .. } => {
           assert!(errors . iter() . any(|e| matches!(
             e, BufferValidationError::ModifiedForeignNode(_, _))),
             "Should have ModifiedForeignNode error"); }
@@ -170,7 +170,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       // Should fail with CreatedForeignNode error
       assert!(result . is_err(), "Creating new foreign node should be rejected");
       match result . unwrap_err() {
-        SaveError::BufferValidationErrors (errors) => {
+        SaveError::BufferValidationErrors { errors, .. } => {
           assert!(errors . iter() . any(|e| matches!(
             e, BufferValidationError::CreatedForeignNode(_, _))),
             "Should have CreatedForeignNode error"); }
@@ -230,7 +230,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
       // Should fail - can't merge into foreign node (would modify it)
       assert!(result . is_err(), "NodeMerge into foreign acquirer should be rejected");
       match result . unwrap_err() {
-        SaveError::BufferValidationErrors (errors) => {
+        SaveError::BufferValidationErrors { errors, .. } => {
           assert!(errors . iter() . any(|e| matches!(
             e, BufferValidationError::ModifiedForeignNode(_, _))),
             "Should have ModifiedForeignNode error for foreign acquirer"); }
@@ -256,7 +256,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
       // Should fail - can't merge foreign node (would delete it)
       assert!(result . is_err(), "NodeMerge with foreign acquiree should be rejected");
       match result . unwrap_err() {
-        SaveError::BufferValidationErrors (errors) => {
+        SaveError::BufferValidationErrors { errors, .. } => {
           assert!(errors . iter() . any(|e| matches!(
             e, BufferValidationError::ModifiedForeignNode(_, _))),
             "Should have ModifiedForeignNode error for foreign acquiree"); }

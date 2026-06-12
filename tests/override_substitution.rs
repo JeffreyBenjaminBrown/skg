@@ -275,7 +275,7 @@ fn extraction_honors_the_marker
           ** (skg (node (id M) (source main) (viewStats (overridesHere W)) indef)) M
         "};
         match define_nodes_from (buffer, config, driver) . await {
-          Err (SaveError::BufferValidationErrors (errors)) => {
+          Err (SaveError::BufferValidationErrors { errors, .. }) => {
             assert! ( errors . iter () . any ( |e| matches! (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),
               "expected OverridesHere_Mismatch, got: {:?}", errors ); },

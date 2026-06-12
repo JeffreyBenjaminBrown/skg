@@ -135,6 +135,34 @@ runs before the FS write).
   collateral col change does not add a warning to the saver's response
   -- which is the property the cell exists to protect.  Reversible if
   a viewforest-from-edited-text registration helper is ever added.
+**** commit 5: production change (1) -- failed saves carry warnings
+Decided 2026-06-12 (option b): a failed save's response carries its
+warnings alongside its errors.  Today's behavior did NOT comply (the
+parse warnings were collected and then dropped on the abort), so the
+production change landed.
+
+Change: 'SaveError::BufferValidationErrors' became a struct variant
+'{ errors, warnings }'.  'buffer_to_validated_saveplan' attaches the
+parse-time warnings at every validation-error return; the save
+handler's error path passes them to 'empty_response_sexp' (was a
+hardcoded '&[]'); and 'update_from_and_rerender_buffer' back-fills the
+save's parse warnings onto any post-parse validation error (e.g. the
+override-invariant check) via 'backfill_parse_warnings', so the
+"warnings always accompany errors" rule holds for every error path,
+not just the buffer-validation one.
+
+Test 'failed_save_carries_warnings_with_errors'
+(tests/partner_col_warnings.rs): a buffer with leftover text on a
+subscriberCol headline (parse warning) AND an idCol claiming an id
+node n lacks (IDCol_Edited error) -- the returned SaveError carries
+both.
+
+Ripple: the struct-variant change touched ~9 match sites across
+production (2 format fns) and tests (move_source, source_sets,
+override_substitution, multi_source_errors, validate_foreign_nodes,
+override_invariants, partner_col_matrix); all mechanical
+'(errors)' -> '{ errors, .. }'.  178 tests across the affected
+targets pass.
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:

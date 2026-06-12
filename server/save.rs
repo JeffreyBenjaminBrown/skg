@@ -223,10 +223,15 @@ pub fn validate_override_invariants_after_save (
   if violations . is_empty () {
     Ok (( ))
   } else {
-    Err (Box::new (SaveError::BufferValidationErrors (vec![
-      BufferValidationError::OverrideInvariantViolation (
-        format_override_invariant_violations (&violations))
-    ] ))) }}
+    Err (Box::new (SaveError::BufferValidationErrors {
+      errors : vec![
+        BufferValidationError::OverrideInvariantViolation (
+          format_override_invariant_violations (&violations)) ],
+      // This check runs after parsing, so no parse warnings are in
+      // scope here; the buffer-validation path (from_text) carries
+      // them. update_from_and_rerender_buffer also back-fills the
+      // save's parse warnings onto any post-parse validation error.
+      warnings : vec![], } )) }}
 
 /// Update the DB from a batch of `DefineNode`s:
 /// 1) Delete all nodes marked Delete, using delete_nodes_from_pids

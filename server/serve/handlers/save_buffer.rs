@@ -122,10 +122,17 @@ pub fn handle_save_buffer_request (
                 & save_response . to_sexp_string () )); }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
+              // Warnings always accompany errors (decided 2026-06-12):
+              // a failed validation carries the parse-time warnings it
+              // collected before aborting.
+              let warnings : &[String] = match save_error {
+                SaveError::BufferValidationErrors { warnings, .. } =>
+                  warnings,
+                _ => &[], };
               let response_sexp : String =
                 empty_response_sexp (
                   & format_save_error_as_org (save_error),
-                  &[],
+                  warnings,
                   & save_point_position )
                 . to_string ();
               send_response_with_length_prefix (
@@ -228,6 +235,25 @@ fn nat_from_request (
 ) -> Option<usize> {
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
+/// If 'err' is a buffer-validation SaveError that carries no warnings
+/// of its own, attach the save's parse-time warnings so a failed save
+/// still reports them. A no-op for other errors or when there are no
+/// parse warnings.
+fn backfill_parse_warnings (
+  err            : Box<dyn Error>,
+  parse_warnings : &[String],
+) -> Box<dyn Error> {
+  if parse_warnings . is_empty () { return err; }
+  match err . downcast::<SaveError> () {
+    Ok (boxed) => match *boxed {
+      SaveError::BufferValidationErrors { errors, warnings } => {
+        let warnings : Vec<String> =
+          if warnings . is_empty () { parse_warnings . to_vec () }
+          else { warnings };
+        Box::new (SaveError::BufferValidationErrors { errors, warnings }) }
+      other => Box::new (other), },
+    Err (err) => err, } }
+
 /// PURPOSE: Process the buffer that a user wants to save.
 /// - "save": Update dbs and filesystem.
 /// - "rerender": Create a new buffer for the user.
@@ -282,7 +308,11 @@ pub async fn update_from_and_rerender_buffer (
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
-      &env . in_rust_graph ) . await ?; }
+      &env . in_rust_graph ) . await
+    // Warnings always accompany errors: a post-parse validation
+    // failure (e.g. the override-invariant check) back-fills the
+    // save's parse-time warnings, which the error itself did not see.
+    . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ?; }
 
   let define_nodes : Vec<DefineNode> = // includes the nodeMerges
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
