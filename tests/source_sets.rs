@@ -19,7 +19,10 @@ use skg::source_sets::{
   SourceSetName,
   filter_path_to_active_sources_for_test,
   filter_branches_to_active_sources_for_test,
-  prepare_git_diff_fixture};
+  prepare_git_diff_fixture,
+  run_with_source_set_test_db};
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::run_with_shared_test_db;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -100,6 +103,123 @@ fn all_tests
       s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) . await ?;
       restricted_save_preserves_invisible_override_targets (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+/// PIN (the override-substitution-across-switch case discussed in
+/// TODO/strip-inactive-node-fields-progress.org): a drawn override
+/// substitute whose source goes inactive on a source-set switch
+/// becomes an anonymous '(inactiveNode)'; the rerender draws the
+/// original directly (an inactive overrider does not substitute) with
+/// NO leak of the overrider's title or id, retaining the overrider's
+/// active descendant; and the container's contains still saves to the
+/// original, never to the overrider.
+///
+/// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
+/// private 'ovr-sub-overrider' (R) overrides ovr-sub-original and
+/// contains the public 'ovr-sub-child' (D). Under "all" R substitutes
+/// for N; switching to "public" makes R inactive.
+///
+/// Installs the process-global graph handle (override resolution reads
+/// it), so it assumes per-test process isolation (nextest), like
+/// tests/override_substitution.rs.
+#[test]
+fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-ovr-sub-switch",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-ovr-sub-switch",
+    |config, driver, tantivy| Box::pin ( async move {
+      install_or_swap_global_handle (
+        skg::test_utils::graph_handle_from_config (config) ? );
+
+      // 1. Under "all", R is drawn in place of N (substitution).
+      let (view_all, _pids, tree_all)
+        : (String, Vec<ID>, Tree<ViewNode>) =
+        multi_root_view (
+          driver, config, Some (tantivy),
+          &[ ID::from ("ovr-sub-container") ], false ) . await ?;
+      assert! (
+        view_all . contains ("(overridesHere ovr-sub-original)"),
+        "under 'all' the overrider should substitute for N:\n{}",
+        view_all );
+      assert! (
+        view_all . contains ("private overrider title must not leak"),
+        "under 'all' the active overrider is drawn:\n{}", view_all );
+
+      // 2. Switch to "public": R goes inactive; the view re-renders.
+      let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
+        skg::test_utils::graph_handle_from_config (config) ?;
+      let env : skg::types::env::SkgEnv =
+        skg::test_utils::skg_env_from_parts (
+          config, Arc::clone (driver), tantivy, &graph );
+      let mut active : ActiveSourceSet =
+        ActiveSourceSet::named (config, SourceSetName::from ("all")) ?;
+      let mut views_state : ViewsState =
+        ViewsState { diff_mode_enabled : false,
+                     open_views        : OpenViews::new () };
+      let uri : ViewUri =
+        ViewUri::SearchView ("ovr-sub" . to_string ());
+      views_state . open_views . views . insert (
+        uri . clone (),
+        ViewState { viewforest : tree_all . into (),
+                    pids       : HashSet::new () });
+      let enrichment_slot
+        : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
+        Arc::new (Mutex::new (None));
+      let search_cancelled : Arc<AtomicBool> =
+        Arc::new (AtomicBool::new (false));
+      let (mut server_stream, _client_stream) =
+        connected_tcp_stream_pair ()?;
+      std::thread::scope ( |scope| {
+        scope . spawn ( || {
+          handle_source_set_request (
+            &mut server_stream,
+            "((request . \"set active source set\") (name . \"public\"))",
+            &env, &mut views_state, &mut active,
+            &enrichment_slot, &search_cancelled); } ); } );
+
+      // 3. The re-rendered view: N drawn directly, R anonymized.
+      let view_public : String = {
+        let forest = views_state . open_views
+          . viewuri_to_view (&uri)
+          . expect ("the switched view should still be registered");
+        viewforest_to_string (forest, config) ? };
+      assert! ( view_public . contains ("(inactiveNode)"),
+        "the overrider should become an anonymous placeholder:\n{}",
+        view_public );
+      assert! ( view_public . contains ("ovr-sub-original"),
+        "the original N should be drawn directly:\n{}", view_public );
+      assert! (
+        ! view_public . contains ("private overrider title must not leak"),
+        "the inactive overrider's title must not leak:\n{}", view_public );
+      assert! ( ! view_public . contains ("ovr-sub-overrider"),
+        "the inactive overrider's id must not leak:\n{}", view_public );
+      assert! ( ! view_public . contains ("overridesHere"),
+        "an anonymous placeholder carries no override marker:\n{}",
+        view_public );
+      assert! ( view_public . contains ("ovr-sub-child"),
+        "the overrider's active descendant is retained:\n{}",
+        view_public );
+
+      // 4. Saving the switched view keeps N in the container's
+      //    contains, and the inactive overrider writes nothing.
+      let public : ActiveSourceSet =
+        ActiveSourceSet::named (config, SourceSetName::from ("public")) ?;
+      let plan = buffer_to_validated_saveplan (
+        &view_public, config, driver, Some (&public) ) . await ? . 1;
+      if let Some (c) = plan . define_nodes . iter () . find_map (
+        |i| match i {
+          DefineNode::Save (SaveNode (n))
+            if n . pid == ID::from ("ovr-sub-container") => Some (n),
+          _ => None } ) {
+        assert_eq! ( c . contains,
+          vec![ ID::from ("ovr-sub-original") ],
+          "the container keeps the original in contains, not R" ); }
+      assert! (
+        ! save_ids (&plan . define_nodes)
+          . contains (&ID::from ("ovr-sub-overrider")),
+        "the inactive overrider produces no SaveNode" );
       Ok (( )) } )) }
 
 fn save_ids (

@@ -1,0 +1,6 @@
+pid: ovr-sub-overrider
+title: private overrider title must not leak
+overrides_view_of:
+- ovr-sub-original
+contains:
+- ovr-sub-child

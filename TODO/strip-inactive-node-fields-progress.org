@@ -77,6 +77,19 @@
     inactive placeholder is not a content member). Full suite green
     (442).
 
+*** Step 9 (this commit): pin the override-substitution-across-switch behavior
+    Added 'override_substitute_across_source_switch_anonymizes_and_keeps_original'
+    (tests/source_sets.rs) + four fixtures (ovr-sub-container -> N;
+    private overrider R -> active D). It renders the container under
+    "all" (R substitutes for N, marker present, R's title shown), drives
+    a real source-set switch to "public" through 'handle_source_set_request',
+    and asserts the re-rendered view: R is now bare '(inactiveNode)', N
+    is drawn directly, R's private title and id do NOT leak, no override
+    marker remains, and R's active descendant D is retained. Then it
+    saves the switched view and asserts the container's contains keeps
+    the original (never R) and R emits no SaveNode. Full suite green
+    (443). This is the end-to-end evidence the earlier discussion lacked.
+
 *** Step 8 (this commit): doc sweep
     Updated api-and-formats.md: the retention section now shows bare
     '(inactiveNode)' and describes the dataless/anonymous/inert
