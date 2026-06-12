@@ -21,8 +21,28 @@
     source-switch retained case (source_sets::all_tests) and the
     omitted-inactive + weave case (partner_col_matrix).
 
+*** Step 4 (this commit): drop the inactive->Deleted feature
+    Deleted 'convert_inactive_to_deleted_if_deleted' and its BFS call
+    ('update_buffer/complete.rs'); the inactive arm is now the shared
+    no-op. When a save deletes an inactive node its anonymous
+    placeholder just lingers until the next full rerender drops it,
+    rather than flipping to a leaky "DELETED" marker. This reverses the
+    earlier fix recorded in TODO/problems.org ("Inactive nodes are
+    never converted to Vognode::Deleted") -- deliberately, since that
+    conversion is a privacy leak and uninteresting to a user who hid
+    the source. Removed its unit test ('tests/unit/complete.rs', whose
+    only test was for this feature) and the '#[path]' mod that included
+    it. Full suite green (443).
+
 ** Changes to the plan's envisioned order
    None yet.
+
+** Test-harness note
+   'tests/unit/*.rs' files are '#[path]'-included into the lib's
+   'cfg(test)' modules, so they compile only under a bare
+   'cargo nextest run' (no '--test' filter) -- the per-target runs
+   ('--test grouped_*') skip them. Always run the FULL suite (443
+   tests) before declaring a step green.
 
 ** Unanticipated future potential costs and benefits
    - Benefit: the retention rule is now structural ("an inactive child

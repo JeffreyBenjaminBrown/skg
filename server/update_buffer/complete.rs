@@ -11,14 +11,14 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
-use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree};
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol, ViewRequest, IndefOrDef, PhantomDeleted};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol, ViewRequest, IndefOrDef};
 use crate::types::viewnode::{Vognode, Phantom, QualCol};
 use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
@@ -186,15 +186,13 @@ async fn dispatch_node_update (
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::reconcile::id_col::reconcile_id_col_children (
         treeid, tree, context . source_diffs, &context . env . config ) ?,
-    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
-      // TODO/DONE/local-view-update/plan_v2.org §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted,
-      // parallel to the Normal-node deletion in expand_true_content_at_truenode.
-      convert_inactive_to_deleted_if_deleted (
-        tree, treeid, context . deleted_by_this_save_pids ) ?,
     _ => {
-      // No-op for: Unknown (unresolvable-id placeholder), Deleted,
-      // DeadScaffold, Qual leaves, BufferRoot, and Diff phantom (a diff-only
-      // placeholder, inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
+      // No-op for: Inactive (an anonymous placeholder -- it carries no
+      // identity, and flipping it to a "DELETED" marker would leak that
+      // a hidden node vanished; it just lingers until the next full
+      // rerender drops it), Unknown (unresolvable-id placeholder),
+      // Deleted, DeadScaffold, Qual leaves, BufferRoot, and Diff phantom
+      // (a diff-only placeholder, inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
 
@@ -369,34 +367,6 @@ fn prune_self_deletable_when_empty (
   }
   Ok (( )) }
 
-/// TODO/DONE/local-view-update/plan_v2.org §6.4/§6.6/§16: convert an Inactive node whose pid is in
-/// `deleted_by_this_save_pids` into a Deleted node, mirroring the Normal-node
-/// conversion in expand_true_content_at_truenode. An InactiveNode carries no
-/// title/body of its own (its .skg is now gone), so the Deleted placeholder is
-/// built with an empty title. Inert thereafter; the TODO/DONE/local-view-update/plan_v2.org §6.6 prune removes it if it
-/// ends childless.
-fn convert_inactive_to_deleted_if_deleted (
-  tree                      : &mut Tree<ViewNode>,
-  treeid                    : NodeId,
-  deleted_by_this_save_pids : &HashSet<ID>,
-) -> Result<(), Box<dyn Error>> {
-  let to_delete : Option<(ID, SourceName)> =
-    read_at_node_in_tree ( tree, treeid,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Inactive (i))
-          if deleted_by_this_save_pids . contains (&i . id) =>
-            Some (( i . id . clone (), i . source . clone () )),
-        _ => None } )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  if let Some ((id, source)) = to_delete {
-    write_at_node_in_tree ( tree, treeid,
-      |vn : &mut ViewNode| {
-        vn . kind = ViewNodeKind::Phantom ( Phantom::Deleted (
-          PhantomDeleted { id, source,
-                        title : String::new (), body : None } )); } )
-      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  Ok (( )) }
-
 fn collect_matching_nodeids<Predicate> (
   tree      : &Tree<ViewNode>,
   predicate : Predicate,
@@ -414,7 +384,3 @@ where Predicate : Fn (&ViewNode) -> bool {
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (result) }
-
-#[cfg(test)]
-#[path = "../../tests/unit/complete.rs"]
-mod tests;
