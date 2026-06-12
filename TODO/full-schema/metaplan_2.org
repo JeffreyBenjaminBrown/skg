@@ -505,7 +505,9 @@ is disabled in diff mode and absent from diff analysis.  "No
 substitution" must not mean "ignore override relationship diffs":
 the relationship changes themselves are precisely what diff surfaces
 must show.
-** test the relationship matrix
+** DONE test the relationship matrix
+Executed 2026-06-12; plan in [[./DONE/13_test-rel-matrix.org]],
+logged in [[./progress.org]] (stage 13).
 Organize by relationship and role, as metaplan 1 specified; the
 matrix itself is unchanged and is not repeated here (see metaplan 1,
 "Test the relationship matrix").  Adjustments for the new code:
