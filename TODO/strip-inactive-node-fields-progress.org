@@ -41,6 +41,12 @@
     descendants register themselves. Updated the 'ViewState.pids' doc.
     Full suite green (443).
 
+*** Step 6 (this commit): delete dead inactive arms in diff render
+    Removed the two 'Vognode::Inactive' arms in 'to_org/render/diff.rs'
+    (membership stamping + removed-member phantom anchoring). They are
+    unreachable: diff mode requires the "all" source set, under which
+    nothing is inactive. Full suite green (443).
+
 ** Changes to the plan's envisioned order
    None yet.
 

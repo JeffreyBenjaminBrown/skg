@@ -212,8 +212,10 @@ fn mark_membership_on_existing_children (
       match &mut child . value() . kind {
         ViewNodeKind::Vognode (Vognode::Active (t)) =>
           Some ((t . id . clone (), &mut t . membership)),
-        ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
-          Some ((i . id . clone (), &mut i . membership)),
+        // No Inactive arm: diff mode requires the "all" source set
+        // (diff_analysis.rs and source_sets.rs refuse otherwise), under
+        // which no node is inactive, so inactive placeholders never
+        // reach diff rendering.
         _ => None };
     if let Some ((id, membership)) = child_id_and_membership {
       if let Some (m) = by_id . get (&id) {
@@ -255,8 +257,8 @@ fn insert_phantoms_for_missing_contains (
           => { m . insert ( t . id . clone (), c . id () ); },
         ViewNodeKind::Phantom (Phantom::Diff (p))
           => { m . insert ( p . id . clone (), c . id () ); },
-        ViewNodeKind::Vognode (Vognode::Inactive (i))
-          => { m . insert ( i . id . clone (), c . id () ); },
+        // No Inactive arm: inactive placeholders never reach diff
+        // rendering (diff mode requires the "all" source set).
         _ => {}, }}
     m };
   for (id, anchor) in plan {
