@@ -665,7 +665,7 @@
    handler test did not assert col re-creation, so it passed.
    Fixed 2026-06-11 (one line: pass the flag through). The heralds
    stage's progress notes record the verification.
-** Flaky test: 'ids::save' group in tests/git_diff_view.rs
+** (probably fixed) Flaky test: 'ids::save' group in tests/git_diff_view.rs
    'test_delete_id_scaffolds_respawns' (since renamed
    'test_delete_id_scaffolds_aborts') fails intermittently when the
    whole 'git_diff_view' target (or even just its 'ids::save' group)
@@ -777,14 +777,14 @@
    phantom ('normal_to_phantom').  Mentioned here because the flip
    path is reachable only through that stale-buffer gesture, so a
    test exercising it directly would need to fabricate the state.
-** Flaky test: whole-suite 'cargo nextest run' failed once in text::view
+** (probably fixed) Flaky test: whole-suite 'cargo nextest run' failed once in text::view
    'text::view::test_title_diff_staged_shows_staged_scaffolds'
    failed once during a full parallel 'cargo nextest run'
    (2026-06-11), then passed on every retry (5x in isolation, full
    suite re-run).  Same family as the pre-existing 'ids::save'
    flake above: per-test dbs, so the shared resource is something
    else.  Not chased.
-** 'cargo test --test override_substitution' races on the global graph handle
+** (fixed) 'cargo test --test override_substitution' races on the global graph handle
    Pre-existing (reproduces at the parent of this stage's commits):
    several tests in that target install the process-global in-Rust
    graph handle from DIFFERENT fixture sets; under plain 'cargo
@@ -794,6 +794,9 @@
    process per test) all pass.  The target's header documents the
    nextest assumption; a fix would mean per-test fixture-compatible
    globals or a resettable handle.
+   Fixed 2026-06-12 (faster-tests): install_or_swap_global_handle
+   swaps the OnceLock's ArcSwap CONTENTS, each sub-test installs its
+   own fixture graph, and the target is one sequential group.
 ** Save-time override-monogamy check depends on neighbor re-saving
    Found while writing the stage-13 nodeMerge monogamy test
    ('merge_that_collides_two_overriders_is_rejected' in
@@ -845,7 +848,7 @@
 * Problems found while investigating test-suite speed (2026-06-12)
   See TODO/faster-tests.org for the full investigation.
 
-** 'all-tests.sh' bounds build parallelism only for phase 1
+** (fixed) 'all-tests.sh' bounds build parallelism only for phase 1
    bash/all-tests.sh. The script's stated purpose is "to keep an
    interactive machine usable", and 'SKG_CARGO_BUILD_JOBS' (default 2)
    is applied to the phase-1 'cargo build'. But the phase-2
@@ -857,8 +860,12 @@
    script's 'nice 15' (which governs CPU priority, not RAM or IO).
    One-line fix: pass '--build-jobs "$BUILD_JOBS"' (nextest accepts
    it) or export 'CARGO_BUILD_JOBS' for the phase-2 invocation.
+   Fixed 2026-06-12 (faster-tests commit 1): SKG_NEXTEST_BUILD_JOBS,
+   default half-the-cores capped at 8, in both all-tests.sh and
+   nextest.sh. Binary grouping (faster-tests 10) then shrank the
+   thing being built from 52 binaries to 7.
 
-** Six near-duplicate test-db setup paths
+** (mostly fixed) Six near-duplicate test-db setup paths
    The same connect / create-db / define-schema / populate / teardown
    sequence is implemented in: 'run_with_test_db' and
    'run_with_test_db_from_config' (server/test_utils.rs),
@@ -871,6 +878,13 @@
    whether fixtures are copied to /tmp. Quasi-duplication worth
    collapsing -- and the natural moment is the shared-db-session
    refactor proposed in TODO/faster-tests.org.
+   Mostly fixed 2026-06-12: hidden_from_subscriptions' and
+   move_source's private helpers are deleted (their tests use
+   SharedDbSession). Still alive, each with remaining callers:
+   'setup_test_dbs' in git_diff_view/common.rs (the two unconverted
+   single-test files), 'run_with_source_set_test_db'
+   (inactive_suppression, partner_col_matrix), and
+   collateral_source_move's local setup.
 
 ** 'coding-advice/development-process.md' links to a missing file
    It says the three kinds of tests are "described in

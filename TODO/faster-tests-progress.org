@@ -2,6 +2,27 @@
   Started 2026-06-12. The plan file is unchanged (per when-to-stop.org);
   deviations are recorded here.
 
+* Headline results (this container, 16 cores; measured 2026-06-12)
+  | metric                                   | before      | after  |
+  |------------------------------------------+-------------+--------|
+  | nextest, serial (-j 1), full Rust suite  | 60.9s       | 30.4s  |
+  | rebuild all test binaries after a        | ~91s        | 18.7s  |
+  |   server/ change                         | (16 jobs)   | (8 jobs) |
+  | test binaries                            | 52          | 7      |
+  | TypeDB databases created per run         | ~179        | ~40    |
+  | target/ after a full build               | 38GB        | 8.9GB  |
+  | tests reported                           | 491         | 447 (every former test still runs; grouped sub-tests count as one) |
+  The "before" timings are the 2026-06-06 run recorded in
+  tests/results/ plus the plan's measurements; the machines may
+  differ, but both columns are honest for their own machine.
+
+  Final validation: a full 'bash/all-tests.sh' run (2026-06-12,
+  results in tests/results/): Build 0s (warm), Emacs tests 1s PASS,
+  Nextest 34s PASS (447 tests; the phase was 152s on the recorded
+  baseline), all 30 integration tests PASS on the primary run (no
+  retries). The integration suite was untouched by this work, as the
+  plan recommended (deferring server-sharing there).
+
 * what's done and went well
   (updated as work lands; see git log, commits prefixed "faster-tests N:")
 
@@ -58,6 +79,38 @@
      duplicate setup paths) were deleted; its sub-tests use the
      session.
 
+** faster-tests 8-9: the custom-setup binaries
+   - git_diff_view: every multi-test module converted; sub-tests take
+     '&mut SharedDbSession' and call 'reset_with_source_path' after
+     building their TempDir git repo. The collateral/save conversion
+     surfaced a latent lifetime dependency (the old block_on scope
+     dropped the TCP write end, giving the collateral reader its EOF);
+     an explicit drop(stream) now documents it.
+   - source_sets (13), override_menu (7), diff_mode_refusals (3),
+     move_source (8) converted; move_source's and
+     hidden_from_subscriptions' private setup helpers deleted.
+   - 'reset_with_fixture_prep' added so
+     diff_view_omits_inactive_members_without_content_leak keeps
+     exercising a REAL worktree-vs-HEAD git diff (the plain reset had
+     silently dropped that; caught reviewing an agent's report).
+   - run_with_test_db / run_with_test_db_from_config now take the same
+     process-wide mutex as shared groups: under plain 'cargo test'
+     ALL db tests in a binary serialize, closing the historical
+     flake family (see the updated problems.org entries).
+
+** faster-tests 10: binary grouping
+   - Cargo.toml: autotests = false; 7 [[test]] targets (grouped_unit,
+     grouped_views, grouped_overrides, grouped_saves, grouped_sources,
+     git_diff_view, git_diff_view_partner_cols). Group files include
+     members via #[path]; nested #[path] and inline-mod resolution
+     verified empirically before adopting.
+   - graphnodestats_hiding sits in grouped_unit, away from the
+     global-handle installers (grouped_overrides), preserving its
+     TypeDB-path test's relies-on-no-handle semantics under plain
+     'cargo test'.
+   - Member-file header comments now name the grouped invocation,
+     e.g. cargo nextest run --test grouped_views -E 'test(content_view::)'.
+
 * Changes to the plan's envisioned order
   - None of substance. Work proceeded roughly in the plan's order
     (quick knob first, then machinery, then conversions heaviest-first,
@@ -66,6 +119,12 @@
     every sub-test; for git_diff_view the sub-tests instead take the
     whole '&mut SharedDbSession', because each must build its git repo
     BEFORE the reset that points the db at it.
+  - The plan left "fold the 1-test files into groups" open; the
+    executed choice was per-FILE groups only (files with >= 2 db
+    tests), accepting ~20 residual one-test db setups.
+  - An unplanned incident: the disk filled (target/ at 38GB plus
+    parallel builds); 'cargo clean' freed 46GB and the grouping keeps
+    target/ at ~9GB.
 
 * what's imperfect about what's done
   - Files with exactly ONE db-creating test were left on
