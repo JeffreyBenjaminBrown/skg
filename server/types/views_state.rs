@@ -37,8 +37,8 @@ pub struct OpenViews {
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
   pub viewforest : ViewForest,
-  pub pids   : HashSet<ID>, // the Normal + Inactive vognodes in the buffer (the
-                            // kinds backed by a real graph node; see
+  pub pids   : HashSet<ID>, // the Active (Normal) vognodes in the buffer (the
+                            // kind this view renders meaningfully; see
                             // pids_from_viewforest)
 }
 
@@ -163,20 +163,22 @@ impl OpenViews {
 //
 
 /// The pids a view "contains" for collateral detection (views_containing): the
-/// primary ids of its Normal and Inactive vognodes -- the kinds backed by a
-/// real, current graph node. Deleted / Unknown / Diff phantom are excluded: they
-/// are not graph members, so a save can change nothing a view showing them would
-/// need to reflect. The single source of which kinds count: update_view derives
-/// its pids through it, and the de-novo caller (multi_root_view_via_env) computes
-/// the pids it passes to register_view through it too.
+/// primary ids of its Active (Normal) vognodes -- the only kind backed by a
+/// real, current graph node that this view renders meaningfully. Inactive
+/// placeholders are excluded: they are anonymous markers whose rerender shows
+/// nothing about the node, so a save touching that node need not re-render this
+/// view (its active descendants register themselves). Deleted / Unknown / Diff
+/// phantom are excluded too: they are not graph members. The single source of
+/// which kinds count: update_view derives its pids through it, and the de-novo
+/// caller (multi_root_view_via_env) computes the pids it passes to register_view
+/// through it too.
 pub fn pids_from_viewforest (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
-      ViewNodeKind::Vognode (
-        v @ (Vognode::Active (_) | Vognode::Inactive (_))) =>
-        Some ( v . id () . clone () ),
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        Some ( t . id . clone () ),
       _ => None } )
     . collect () }
 

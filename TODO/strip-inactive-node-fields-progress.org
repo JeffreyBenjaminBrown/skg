@@ -34,6 +34,13 @@
     only test was for this feature) and the '#[path]' mod that included
     it. Full suite green (443).
 
+*** Step 5 (this commit): drop inactive from collateral
+    'pids_from_viewforest' ('types/views_state.rs') now collects only
+    Active vognodes. An inactive placeholder is anonymous, so a save
+    touching its node need not re-render views that show it; its active
+    descendants register themselves. Updated the 'ViewState.pids' doc.
+    Full suite green (443).
+
 ** Changes to the plan's envisioned order
    None yet.
 
