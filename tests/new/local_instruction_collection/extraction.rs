@@ -1562,3 +1562,107 @@ fn duplicate_members_of_defining_cols_are_silently_deduplicated (
   assert_eq!(
     owner . overrides_view_of,
     MSV::Specified (vec![ID::from ("o1"), ID::from ("o2")])); }
+
+// The next four tests pin the writable-col membership semantics that
+// the relationship matrix (stage 13) asks for at the cheapest seam:
+// subscribeeCol order and one-member removal persist to
+// subscribes_to; overriddenCol order does not matter (the
+// set-difference merge depends on this); and the read-only hiddenCol
+// never writes the owner's hides.
+
+#[test]
+fn reordering_subscribees_reorders_subscribes_to (
+) {
+  // A subscribeeCol is writable: its member order is the owner's
+  // subscribes_to order. Members [c, a, b] (a reorder of [a, b, c])
+  // emit subscribes_to = [c, a, b].
+  let input : &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg subscribeeCol)
+            *** (skg (node (id c) (source main))) c
+            *** (skg (node (id a) (source main))) a
+            *** (skg (node (id b) (source main))) b
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "owner") . subscribes_to,
+    MSV::Specified (vec![
+      ID::from ("c"), ID::from ("a"), ID::from ("b")])); }
+
+#[test]
+fn removing_one_subscribee_keeps_the_rest (
+) {
+  // Deleting one member of a writable col (b, from [a, b, c]) leaves
+  // the rest: subscribes_to = [a, c], neither empty nor unspecified.
+  let input : &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg subscribeeCol)
+            *** (skg (node (id a) (source main))) a
+            *** (skg (node (id c) (source main))) c
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "owner") . subscribes_to,
+    MSV::Specified (vec![ID::from ("a"), ID::from ("c")])); }
+
+#[test]
+fn reordering_overridden_col_is_harmless (
+) {
+  // overrides_view_of is order-free (the set-difference merge relies
+  // on this). overriddenCol members [b, a] (a reorder of [a, b]) emit
+  // the same set, and nothing else about the owner changes.
+  let input : &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg overriddenCol)
+            *** (skg (node (id b) (source main))) b
+            *** (skg (node (id a) (source main))) a
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  let owner : &NodeComplete =
+    saved_node_by_id (&instructions, "owner");
+  let overridden : &Vec<ID> = match &owner . overrides_view_of {
+    MSV::Specified (ids) => ids,
+    other => panic! (
+      "expected Specified override set, got {:?}", other), };
+  assert_eq!(overridden . len(), 2);
+  assert!(overridden . contains (&ID::from ("a")));
+  assert!(overridden . contains (&ID::from ("b")));
+  assert_eq!(owner . contains, Vec::<ID>::new());
+  assert_eq!(owner . subscribes_to, MSV::Unspecified);
+  assert_eq!(owner . hides_from_its_subscriptions, MSV::Unspecified); }
+
+#[test]
+fn deleting_from_hiddenCol_emits_no_hide_change (
+) {
+  // hiddenCol is read-only: its membership is never collected into
+  // the owner's hides_from_its_subscriptions. A member shown there
+  // (and, equally, a member deleted from there) emits no hide intent;
+  // the owner's hides stay Unspecified (no opinion), preserving
+  // whatever disk holds. The filter cols have this guarantee tested;
+  // the plain hiddenCol did not.
+  let input : &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg hiddenCol)
+            *** (skg (node (id hidden) (source main))) hidden
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "owner")
+      . hides_from_its_subscriptions,
+    MSV::Unspecified); }

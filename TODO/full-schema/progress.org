@@ -9,6 +9,22 @@ its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
 ** stage 13 : test the relationship matrix
+*** executing (2026-06-12)
+Running log of execution, newest commits appended.  The plan's
+"order of execution and commits" is the spine; deviations and bad
+news are flagged here as they surface.
+**** commit 1: pure extraction-seam tests (four)
+Appended to tests/new/local_instruction_collection/extraction.rs:
+- 'reordering_subscribees_reorders_subscribes_to' (buffer order
+  [c,a,b] persists to subscribes_to),
+- 'removing_one_subscribee_keeps_the_rest' ([a,c], not empty/unspec),
+- 'reordering_overridden_col_is_harmless' (order-free set; owner's
+  other fields untouched),
+- 'deleting_from_hiddenCol_emits_no_hide_change' (read-only hiddenCol
+  never writes the owner's hides; pins the gap the filter cols had
+  covered but the plain hiddenCol did not).
+All four pass via 'cargo nextest run --test new'.  No surprises; the
+pure seam reaches all four behaviors exactly as the plan predicted.
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
