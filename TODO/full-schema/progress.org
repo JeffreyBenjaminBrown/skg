@@ -9,6 +9,85 @@ its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
 ** stage 13 : test the relationship matrix
+*** final report (2026-06-12)
+The plan is fully executed: all eight commits in the plan's order,
+plus the ride-along rename.  Full 'cargo nextest run': 606/606 pass.
+(No Emacs tests run -- this stage added none, and the two production
+changes are server-internal with an UNCHANGED save-result wire format,
+so the elisp save/render handlers are unaffected.)
+
+**** what's done and went well
+- The audit held up: every "covered" cell the plan named was real,
+  and the gaps it named were the real gaps.  The cheap seams reached
+  almost everything first try.
+- The batched matrix target carries ~20 col-cell scenarios on one
+  database build via an accumulating-failure harness, exactly the
+  cost the plan budgeted.
+- Both production changes landed cleanly and the full suite stayed
+  green; (2) in particular touched core substitution and broke
+  nothing.
+
+**** bad news / the plan turned out incomplete in two places
+1. The plan claimed the matrix target "should not need the global
+   graph handle."  FALSE: PartnerCol scaffolds are created from
+   snapshot_global, so the inbound cols (and even hiddenCol /
+   overriddenCol) render as NOTHING without it.  Worked around
+   (installer isolated to one function); recorded in TODO/problems.org
+   as a doc/seam mismatch worth fixing (route col creation through the
+   env graph, or document the dependency).
+2. Production change (2)'s one-line predicate as written would CASCADE
+   (disabling substitution all the way down), violating the decided
+   depth-one.  Depth-one requires a POSITION test, which the original
+   structural rule had and the one-liner dropped.  Implemented
+   position-aware; behavior matches the decision.  (Also: a view root
+   is detected by its BufferRoot parent during completion, not by
+   parentIs=Absent, which is stamped only at render -- a seam fact the
+   plan could not have known.)
+Plus one recorded fragility (TODO/problems.org): the save-time
+override-monogamy check catches a nodeMerge collision only because
+the acquiree's inbound-override neighbor is re-saved as a neighbor
+savenode (making the edge "touched"); narrowing neighbor re-saving
+would let that collision slip past the save-time check until the next
+init/rebuild.
+
+**** changes to the plan's envisioned order
+- The matrix target's two functions split the global-handle installer
+  (matrix function only) so plain 'cargo test' never double-installs.
+- The collateral and warning-scoping cells became ONE function in a
+  new target (tests/collateral_partner_col.rs) rather than two tests
+  in an existing file, because they need the global handle.
+- The expansion test's two parts live in two targets
+  (expand_partner_col_member, expand_raw_overridden_children) for the
+  same global-handle isolation reason.
+- Scenarios use the render-then-edit-then-assert style (and
+  buffer_to_validated_saveplan for disk lists) rather than the plan's
+  before.org/after.org file pairs -- metadata stays always-correct.
+None of these change WHAT is covered.
+
+**** unanticipated future potential costs and benefits
+- BENEFIT: 'is_overridden_drawn_raw' is one predicate covering every
+  raw-drawn position; any future raw position (new col kind, new root
+  origin) gets the no-substitution-of-children rule for free if it is
+  a non-subscribee PartnerCol member or a BufferRoot child.
+- COST/AWARENESS: that predicate now does one 'resolve_override' walk
+  per expanding definitive node in a raw position (O(1) lookups per
+  hop).  Negligible, but it is a per-node graph touch that did not
+  exist before.
+- CONSTRAINT: 'SaveError::BufferValidationErrors' is now a struct
+  variant '{ errors, warnings }'.  Every future construction/match
+  must carry warnings (the back-fill helper covers post-parse errors).
+- CONSTRAINT: the matrix / collateral / expansion targets install the
+  process-global graph handle; under plain 'cargo test' each such
+  target must have at most one installing test (verified).  Prefer
+  'cargo nextest run'.
+
+**** open questions
+None blocking (per when-to-stop.org: no unanticipated architectural
+decisions I could not resolve, no stumper mysteries).  The plan's one
+open confirmation (commit-staging of production change 2) was already
+answered by Jeff ("your interpretation is good"); production change
+(2) shipped as commit 8 within this stage as written.
+
 *** executing (2026-06-12)
 Running log of execution, newest commits appended.  The plan's
 "order of execution and commits" is the spine; deviations and bad
