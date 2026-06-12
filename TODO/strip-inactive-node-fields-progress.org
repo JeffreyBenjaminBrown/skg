@@ -1,0 +1,33 @@
+* Progress: make InactiveNode a fieldless marker
+  Executing [[file:strip-inactive-node-fields.org]] per when-to-stop.org
+  (proceed through; stop only for architecture surprises or stumpers).
+  Jeff's answers: front-positioning OK; bare '(inactiveNode)' render
+  with herald "node from inactive source"; inactive->Deleted gone
+  entirely; document the de-novo-scope fact on the InactiveNode typedef.
+
+** What's done and went well
+*** Step 1 (c94180e6) + Step 2 (25adab0e)
+    Save-intention revert and dead-predicate removal (pre-this-session
+    in the plan's numbering; committed earlier).
+*** Step 3 (this commit): id-free retention
+    Made InactiveNode IRRELEVANT in both content-reconcile
+    ('update_buffer/reconcile/content.rs') and the partner-col path
+    ('to_org/complete/partner_col/child_data.rs'). The reconciler
+    preserves irrelevant children as-is, so a retained placeholder
+    survives without a goal id. 'omit_inactive_members'
+    ('update_buffer/reconcile/mod.rs') lost its 'retained' parameter
+    (all 9 call sites updated) and 'retained_inactive_children' is
+    deleted. Full Rust suite green (352 tests), including the
+    source-switch retained case (source_sets::all_tests) and the
+    omitted-inactive + weave case (partner_col_matrix).
+
+** Changes to the plan's envisioned order
+   None yet.
+
+** Unanticipated future potential costs and benefits
+   - Benefit: the retention rule is now structural ("an inactive child
+     is preserved because it is irrelevant"), not identity-based, which
+     is what lets the id go in step 7.
+
+** Open questions
+   None blocking.

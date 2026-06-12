@@ -153,7 +153,6 @@ pub async fn maybe_add_subscribeeCol_branch (
     omit_inactive_members (
       subscribee_ids,
       active_source_set,
-      &std::collections::HashSet::new (),
       |id : &ID| snapshot_global ()
                  . and_then ( |g| g . pid_and_source (id)
                                   . map ( |(_pid, src)| src ))
@@ -310,7 +309,6 @@ async fn maybe_add_one_partnerCol (
     omit_inactive_members (
       graph . other_member_pids (&owner_pid, owner_role),
       active_source_set,
-      &std::collections::HashSet::new (),
       |id : &ID| graph . pid_and_source (id)
                  . map ( |(_pid, src)| src )
                  . or_else ( || source_from_disk (id, config) ));

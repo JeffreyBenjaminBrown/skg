@@ -63,7 +63,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     // TODO/full-schema/9-2_source-set-safety.org: omit inactive
     // members; no retention for this filter col.
     omit_inactive_members (
-      goal_list, active_source_set, &HashSet::new (),
+      goal_list, active_source_set,
       |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all

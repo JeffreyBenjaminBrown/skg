@@ -2,7 +2,7 @@ use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list};
-use crate::update_buffer::reconcile::{omit_inactive_members, retained_inactive_children};
+use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::to_org::complete::partner_col::goal_list::{goal_list_for_outbound_col, outbound_member_axes};
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::phantom::phantom_axes;
@@ -55,12 +55,12 @@ pub async fn reconcile_subscribee_col_children (
       NodeRelation::Subscribes,
       source_diffs, &context . worktree_subscribees );
   let goal_list : Vec<ID> =
-    // TODO/full-schema/9-2_source-set-safety.org: omit inactive
-    // subscribees, except retained placeholders (InactiveNode
-    // children with view-children), which are positional members.
+    // TODO/full-schema/9-2_source-set-safety.org: omit every inactive
+    // subscribee from the goal (the weave preserves them at save). A
+    // retained inactive placeholder already in the tree survives anyway
+    // -- the col reconciler treats it as irrelevant, not goal-matched.
     omit_inactive_members (
       goal_list, active_source_set,
-      &retained_inactive_children (tree, node),
       |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
 
   // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not

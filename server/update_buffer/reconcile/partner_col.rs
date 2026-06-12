@@ -79,7 +79,6 @@ pub fn reconcile_partnerCol_children (
       omit_inactive_members (
         graph_snap . other_member_pids (&owner_pid, owner_role),
         active_source_set,
-        &HashSet::new (),
         source_resolver );
     if outbound && source_diffs . is_some () {
       // Diff mode, outbound col: the owner's per-stage relation diff
@@ -94,8 +93,7 @@ pub fn reconcile_partnerCol_children (
           source_diffs, &graph_members );
       let goal : Vec<ID> = // phantoms can be inactive too
         omit_inactive_members (
-          goal, active_source_set, &HashSet::new (),
-          source_resolver );
+          goal, active_source_set, source_resolver );
       (goal, removed)
     } else {
       let mut goal : Vec<ID> = match kind . policy () {
@@ -130,7 +128,7 @@ pub fn reconcile_partnerCol_children (
             . collect () };
         tail = // phantoms of inactive members are omitted too
           omit_inactive_members (
-            tail, active_source_set, &HashSet::new (),
+            tail, active_source_set,
             |id : &ID| env . find_source (
               id, deleted_since_head_pid_src_map ));
         tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );

@@ -21,7 +21,7 @@ use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_fr
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree};
-use crate::update_buffer::reconcile::{omit_inactive_members, retained_inactive_children};
+use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
     partition_children,
@@ -233,12 +233,12 @@ fn reconcile_content_children (
   let apparent_content_ids : Vec<ID> =
     content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
   let apparent_content_ids : Vec<ID> =
-    // TODO/full-schema/9-2_source-set-safety.org: rendering omits
-    // inactive members (the weave preserves them at save), except
-    // InactiveNode children retained for their view-children.
+    // TODO/full-schema/9-2_source-set-safety.org: rendering omits every
+    // inactive member from the goal (the weave preserves them at save).
+    // A retained inactive placeholder already in the tree survives
+    // anyway -- it is irrelevant to this reconciler, not goal-matched.
     omit_inactive_members (
       apparent_content_ids, active_source_set,
-      &retained_inactive_children (tree, node),
       |id : &ID| graph_snap . pid_and_source (id)
                  . map ( |(_pid, src)| src )
                  . or_else ( || source_from_disk (id, config) ));
@@ -454,22 +454,23 @@ fn complete_content_children (
       ViewNodeKind::Phantom (Phantom::Diff (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
-      ViewNodeKind::Vognode (Vognode::Inactive (_))
-        => true,
+      // An InactiveNode is IRRELEVANT: never matched against the goal
+      // list, so it is preserved as-is (a retained placeholder hosting
+      // already-drawn active descendants) and needs no id. The goal
+      // omits every inactive member (omit_inactive_members), so it is
+      // never created here either.
       _ => false },
     |vn : &ViewNode| match &vn . kind {
-      // All three kinds participate in child-list reconciliation.
-      // COLLECTED ids (the overridesHere original when present), so
-      // goal lists stay in original IDs, an existing drawn
-      // substitute satisfies its original goal member, and only
-      // genuinely missing members are created. This is also what
-      // keeps post-save rerendering stable (idempotent saves).
+      // Only Active and Diff-phantom children participate (the
+      // 'relevant' predicate above excludes everything else). COLLECTED
+      // ids (the overridesHere original when present), so goal lists
+      // stay in original IDs, an existing drawn substitute satisfies
+      // its original goal member, and only genuinely missing members
+      // are created -- which keeps post-save rerendering stable.
       ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . collected_id () ),
       ViewNodeKind::Phantom (Phantom::Diff (p))
         => Ok ( p . id . clone() ),
-      ViewNodeKind::Vognode (Vognode::Inactive (i))
-        => Ok ( i . collected_id () ),
       _ => Err(
         "complete_content_children: relevant child had no content ID"
         . to_string() ) },
