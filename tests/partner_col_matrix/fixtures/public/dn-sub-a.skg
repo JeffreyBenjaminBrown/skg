@@ -1,0 +1,4 @@
+pid: dn-sub-a
+title: dn-sub-a
+subscribes_to:
+- dn-owner

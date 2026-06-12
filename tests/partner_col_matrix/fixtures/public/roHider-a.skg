@@ -1,0 +1,4 @@
+pid: roHider-a
+title: roHider-a
+hides_from_its_subscriptions:
+- roHider-owner

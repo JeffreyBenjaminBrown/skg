@@ -1,0 +1,6 @@
+pid: wSub-owner
+title: wSub-owner
+subscribes_to:
+- wSub-a
+- wSub-b
+- wSub-c

@@ -43,6 +43,69 @@ rebuild's whole-graph 'validate_override_invariants' would still
 catch it on next boot).  The test reproduces the real wiring (R2 in
 the nonmerge save list) so it pins the behavior as it actually
 ships, not an idealized version.  Logged to TODO/problems.org.
+**** commit 3: the batched matrix target (tests/partner_col_matrix.rs)
+Both functions of the plan's matrix target, plus a 43-file
+multi-source fixture (public owned, private owned-but-inactive,
+foreign read-only) of mutually independent subgraphs.
+
+Function 'relationship_matrix' (one DB, one in-Rust graph, scenarios
+serial, failures ACCUMULATED then reported once):
+- de novo render of all four read-only cols on one owner
+  (subscriberCol, overriderCol, hiderCol, hiddenCol): members
+  indefinitive, sorted-ID order -- closes the plain-mode rendering
+  gaps for hiderCol and hiddenCol;
+- per read-only col: save after reorder (order preserved view-locally,
+  no repair warning), insertion of a non-member (demoted to
+  independent, with warning), deletion of a member (restored, with
+  warning) -- subscriberCol/overriderCol/hiderCol/hiddenCol each;
+- writable subscribeeCol: reorder/delete-one/insert persist to
+  subscribes_to (via buffer_to_validated_saveplan, no disk write);
+- writable overriddenCol: reorder is order-free, delete-one and insert
+  edit overrides_view_of;
+- hiddenCol delete does not unhide on disk;
+- omission under the restricted "public" set: a read-only
+  subscriberCol and a writable subscribeeCol each hold an
+  inactive-source member beside an active one; the inactive member is
+  omitted (no placeholder), and deleting the visible member then
+  saving restricted still preserves the invisible one via the weave.
+Function 'buffer_save_rejects_second_user_owned_overrider' (its own
+DB): adding a second user-owned overrider through an overriddenCol is
+rejected with the monogamy error, and disk is unchanged (the check
+runs before the FS write).
+
+***** TWO deviations from the plan (recorded; reversal cheap)
+1. The plan asserted the target "should not need the global graph
+   handle".  FALSE, and surprising: the PartnerCol scaffolds are
+   created from snapshot_global(), so WITHOUT the installed handle the
+   inbound cols (subscriberCol/overriderCol/hiderCol) and even the
+   outbound hiddenCol and overriddenCol render as NOTHING -- the owner
+   alone, no col.  (Only the subscribeeCol, built from the owner's own
+   outbound subscribes_to, appears without it.)  So the matrix
+   function installs the global handle; the monogamy function does NOT
+   (its override check reads the save's own handle, its buffer is
+   hand-written), so the two never double-install -- verified by
+   running the target under plain 'cargo test' as well as nextest.
+   Logged to TODO/problems.org as a doc/plan mismatch.
+2. The plan envisioned before.org/after.org file pairs per scenario.
+   I used the render-then-edit-then-assert style of
+   partner_col_order / partner_col_warnings instead: each scenario
+   renders de novo, edits the REAL rendered text, saves, and asserts
+   on the saved view, its warnings, or (for writable cols) the
+   would-be disk lists.  This keeps the metadata always correct (no
+   hand-authored sexps to drift); coverage matches the plan's cells.
+   A small accumulating-failure harness (struct Fails) honors the
+   plan's "failures accumulate, report once" requirement.
+***** notes
+- The overriderCol's read-only members are foreign; an unchanged
+  foreign member saves fine (no-op-filtered before foreign
+  validation), so reorder/delete work.  A would-be intruder for that
+  col must be a fresh PUBLIC node, not cloned from a foreign member
+  line (else the save tries to move it public->foreign and refuses) --
+  one fixture bug found and fixed during execution.
+- The restricted save of an UNCHANGED buffer is a no-op (the weave
+  already preserves the inactive member); the omission preservation
+  cell therefore deletes the visible member to force a real change and
+  prove the invisible one survives.
 *** decisions folded (2026-06-12)
 Jeff answered the plan's five decisions; four closed and are
 folded into the plan body:
