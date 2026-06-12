@@ -85,7 +85,7 @@ impl std::fmt::Display for SaveError {
         write!(f, "Database error: {}", err),
       SaveError::IoError (err) =>
         write!(f, "IO error: {}", err),
-      SaveError::BufferValidationErrors (errors) => {
+      SaveError::BufferValidationErrors { errors, .. } => {
         write!(f, "Buffer validation errors: {} error(s) found",
                errors . len()) }} }}
 
@@ -112,7 +112,7 @@ pub fn format_save_error_as_org (
     SaveError::IoError (err) => {
       format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               err) },
-    SaveError::BufferValidationErrors (errors) => {
+    SaveError::BufferValidationErrors { errors, .. } => {
       let mut content : String =
         String::from ("* NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n");
       for (i, error) in errors . iter() . enumerate() {

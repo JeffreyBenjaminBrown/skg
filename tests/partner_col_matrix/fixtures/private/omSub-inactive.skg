@@ -1,0 +1,4 @@
+pid: omSub-inactive
+title: omSub-inactive
+subscribes_to:
+- omSub-owner

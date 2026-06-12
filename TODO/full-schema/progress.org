@@ -9,6 +9,338 @@ its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
 ** stage 13 : test the relationship matrix
+*** final report (2026-06-12)
+The plan is fully executed: all eight commits in the plan's order,
+plus the ride-along rename.  Full 'cargo nextest run': 606/606 pass.
+(No Emacs tests run -- this stage added none, and the two production
+changes are server-internal with an UNCHANGED save-result wire format,
+so the elisp save/render handlers are unaffected.)
+
+**** what's done and went well
+- The audit held up: every "covered" cell the plan named was real,
+  and the gaps it named were the real gaps.  The cheap seams reached
+  almost everything first try.
+- The batched matrix target carries ~20 col-cell scenarios on one
+  database build via an accumulating-failure harness, exactly the
+  cost the plan budgeted.
+- Both production changes landed cleanly and the full suite stayed
+  green; (2) in particular touched core substitution and broke
+  nothing.
+
+**** bad news / the plan turned out incomplete in two places
+1. The plan claimed the matrix target "should not need the global
+   graph handle."  FALSE: PartnerCol scaffolds are created from
+   snapshot_global, so the inbound cols (and even hiddenCol /
+   overriddenCol) render as NOTHING without it.  Worked around
+   (installer isolated to one function); recorded in TODO/problems.org
+   as a doc/seam mismatch worth fixing (route col creation through the
+   env graph, or document the dependency).
+2. Production change (2)'s one-line predicate as written would CASCADE
+   (disabling substitution all the way down), violating the decided
+   depth-one.  Depth-one requires a POSITION test, which the original
+   structural rule had and the one-liner dropped.  Implemented
+   position-aware; behavior matches the decision.  (Also: a view root
+   is detected by its BufferRoot parent during completion, not by
+   parentIs=Absent, which is stamped only at render -- a seam fact the
+   plan could not have known.)
+Plus one recorded fragility (TODO/problems.org): the save-time
+override-monogamy check catches a nodeMerge collision only because
+the acquiree's inbound-override neighbor is re-saved as a neighbor
+savenode (making the edge "touched"); narrowing neighbor re-saving
+would let that collision slip past the save-time check until the next
+init/rebuild.
+
+**** changes to the plan's envisioned order
+- The matrix target's two functions split the global-handle installer
+  (matrix function only) so plain 'cargo test' never double-installs.
+- The collateral and warning-scoping cells became ONE function in a
+  new target (tests/collateral_partner_col.rs) rather than two tests
+  in an existing file, because they need the global handle.
+- The expansion test's two parts live in two targets
+  (expand_partner_col_member, expand_raw_overridden_children) for the
+  same global-handle isolation reason.
+- Scenarios use the render-then-edit-then-assert style (and
+  buffer_to_validated_saveplan for disk lists) rather than the plan's
+  before.org/after.org file pairs -- metadata stays always-correct.
+None of these change WHAT is covered.
+
+**** unanticipated future potential costs and benefits
+- BENEFIT: 'is_overridden_drawn_raw' is one predicate covering every
+  raw-drawn position; any future raw position (new col kind, new root
+  origin) gets the no-substitution-of-children rule for free if it is
+  a non-subscribee PartnerCol member or a BufferRoot child.
+- COST/AWARENESS: that predicate now does one 'resolve_override' walk
+  per expanding definitive node in a raw position (O(1) lookups per
+  hop).  Negligible, but it is a per-node graph touch that did not
+  exist before.
+- CONSTRAINT: 'SaveError::BufferValidationErrors' is now a struct
+  variant '{ errors, warnings }'.  Every future construction/match
+  must carry warnings (the back-fill helper covers post-parse errors).
+- CONSTRAINT: the matrix / collateral / expansion targets install the
+  process-global graph handle; under plain 'cargo test' each such
+  target must have at most one installing test (verified).  Prefer
+  'cargo nextest run'.
+
+**** open questions
+None blocking (per when-to-stop.org: no unanticipated architectural
+decisions I could not resolve, no stumper mysteries).  The plan's one
+open confirmation (commit-staging of production change 2) was already
+answered by Jeff ("your interpretation is good"); production change
+(2) shipped as commit 8 within this stage as written.
+
+*** executing (2026-06-12)
+Running log of execution, newest commits appended.  The plan's
+"order of execution and commits" is the spine; deviations and bad
+news are flagged here as they surface.
+**** commit 1: pure extraction-seam tests (four)
+Appended to tests/new/local_instruction_collection/extraction.rs:
+- 'reordering_subscribees_reorders_subscribes_to' (buffer order
+  [c,a,b] persists to subscribes_to),
+- 'removing_one_subscribee_keeps_the_rest' ([a,c], not empty/unspec),
+- 'reordering_overridden_col_is_harmless' (order-free set; owner's
+  other fields untouched),
+- 'deleting_from_hiddenCol_emits_no_hide_change' (read-only hiddenCol
+  never writes the owner's hides; pins the gap the filter cols had
+  covered but the plain hiddenCol did not).
+All four pass via 'cargo nextest run --test new'.  No surprises; the
+pure seam reaches all four behaviors exactly as the plan predicted.
+**** commit 2: save-simulation nodeMerge monogamy arm
+Added 'merge_that_collides_two_overriders_is_rejected' to
+tests/save/override_invariants.rs.  R1 overrides N1, R2 overrides N2
+(all owned, monogamy holds); a nodeMerge fuses N2 into N1, so R2's
+override of N2 resolves to N1 and collides with R1.  Passes.
+NOTE (non-blocking, recorded): the touched-scoped validator catches
+this ONLY because the acquiree's override-neighbor (R2) rides along
+in 'save_instructions' as a neighbor savenode, which is what makes
+the colliding edge "touched".  The validator never inspects the
+acquirer's inbound overriders directly.  So if a future refactor
+ever stopped re-saving an acquiree's inbound-edge neighbors (today
+'neighbor_savenodes_for_nodeMerges' does, via
+'affected_neighbors_of_nodeMerge' over OUTBOUND_RELATIONSHIP_TYPES),
+this class of collision would slip past the save-time check (init/
+rebuild's whole-graph 'validate_override_invariants' would still
+catch it on next boot).  The test reproduces the real wiring (R2 in
+the nonmerge save list) so it pins the behavior as it actually
+ships, not an idealized version.  Logged to TODO/problems.org.
+**** commit 3: the batched matrix target (tests/partner_col_matrix.rs)
+Both functions of the plan's matrix target, plus a 43-file
+multi-source fixture (public owned, private owned-but-inactive,
+foreign read-only) of mutually independent subgraphs.
+
+Function 'relationship_matrix' (one DB, one in-Rust graph, scenarios
+serial, failures ACCUMULATED then reported once):
+- de novo render of all four read-only cols on one owner
+  (subscriberCol, overriderCol, hiderCol, hiddenCol): members
+  indefinitive, sorted-ID order -- closes the plain-mode rendering
+  gaps for hiderCol and hiddenCol;
+- per read-only col: save after reorder (order preserved view-locally,
+  no repair warning), insertion of a non-member (demoted to
+  independent, with warning), deletion of a member (restored, with
+  warning) -- subscriberCol/overriderCol/hiderCol/hiddenCol each;
+- writable subscribeeCol: reorder/delete-one/insert persist to
+  subscribes_to (via buffer_to_validated_saveplan, no disk write);
+- writable overriddenCol: reorder is order-free, delete-one and insert
+  edit overrides_view_of;
+- hiddenCol delete does not unhide on disk;
+- omission under the restricted "public" set: a read-only
+  subscriberCol and a writable subscribeeCol each hold an
+  inactive-source member beside an active one; the inactive member is
+  omitted (no placeholder), and deleting the visible member then
+  saving restricted still preserves the invisible one via the weave.
+Function 'buffer_save_rejects_second_user_owned_overrider' (its own
+DB): adding a second user-owned overrider through an overriddenCol is
+rejected with the monogamy error, and disk is unchanged (the check
+runs before the FS write).
+
+***** TWO deviations from the plan (recorded; reversal cheap)
+1. The plan asserted the target "should not need the global graph
+   handle".  FALSE, and surprising: the PartnerCol scaffolds are
+   created from snapshot_global(), so WITHOUT the installed handle the
+   inbound cols (subscriberCol/overriderCol/hiderCol) and even the
+   outbound hiddenCol and overriddenCol render as NOTHING -- the owner
+   alone, no col.  (Only the subscribeeCol, built from the owner's own
+   outbound subscribes_to, appears without it.)  So the matrix
+   function installs the global handle; the monogamy function does NOT
+   (its override check reads the save's own handle, its buffer is
+   hand-written), so the two never double-install -- verified by
+   running the target under plain 'cargo test' as well as nextest.
+   Logged to TODO/problems.org as a doc/plan mismatch.
+2. The plan envisioned before.org/after.org file pairs per scenario.
+   I used the render-then-edit-then-assert style of
+   partner_col_order / partner_col_warnings instead: each scenario
+   renders de novo, edits the REAL rendered text, saves, and asserts
+   on the saved view, its warnings, or (for writable cols) the
+   would-be disk lists.  This keeps the metadata always correct (no
+   hand-authored sexps to drift); coverage matches the plan's cells.
+   A small accumulating-failure harness (struct Fails) honors the
+   plan's "failures accumulate, report once" requirement.
+***** notes
+- The overriderCol's read-only members are foreign; an unchanged
+  foreign member saves fine (no-op-filtered before foreign
+  validation), so reorder/delete work.  A would-be intruder for that
+  col must be a fresh PUBLIC node, not cloned from a foreign member
+  line (else the save tries to move it public->foreign and refuses) --
+  one fixture bug found and fixed during execution.
+- The restricted save of an UNCHANGED buffer is a no-op (the weave
+  already preserves the inactive member); the omission preservation
+  cell therefore deletes the visible member to force a real change and
+  prove the invisible one survives.
+**** commit 4: source-set / collateral / warning-scoping tests (three)
+- 'restricted_save_preserves_invisible_override_targets'
+  (tests/source_sets.rs, +3 fixture nodes): a node overrides
+  [ovr-visible, ovr-inactive]; under the restricted "public" set the
+  set-difference merge keeps ovr-inactive across a restricted save,
+  and deleting the visible member leaves exactly [ovr-inactive].
+  Closes the pipeline-level half of the second named regression.
+  Built with hand-written buffers (not a render) because the
+  overriddenCol render needs the global handle, which source_sets.rs
+  deliberately does not install.
+- collateral col-membership update + warning scoping, in a NEW target
+  tests/collateral_partner_col.rs (its own target because it installs
+  the global handle for the inbound subscriberCol). One function: a
+  view of N shows subscriberCol=[S]; a save of a second view that
+  drops S's subscription re-renders N collaterally with S gone and the
+  empty col dropped; and the save response carries no col-repair
+  warning (scoping).
+***** deviation: the two collateral cells are ONE test, and the
+  warning-scoping cell is the WEAKER observable form.  The plan wanted
+  a collateral view holding an UNREPAIRED stale member so the
+  collateral rerender performs a real repair that, unscoped, would
+  warn.  That state is not reachable through 'register_view': every
+  registered viewforest comes from a render or a save and is therefore
+  already reconciled (clean).  So the strong form stays enforced by
+  construction (stage 8 passes no warning sink to collateral
+  rerenders).  The test pins the observable consequence instead -- a
+  collateral col change does not add a warning to the saver's response
+  -- which is the property the cell exists to protect.  Reversible if
+  a viewforest-from-edited-text registration helper is ever added.
+**** commit 5: production change (1) -- failed saves carry warnings
+Decided 2026-06-12 (option b): a failed save's response carries its
+warnings alongside its errors.  Today's behavior did NOT comply (the
+parse warnings were collected and then dropped on the abort), so the
+production change landed.
+
+Change: 'SaveError::BufferValidationErrors' became a struct variant
+'{ errors, warnings }'.  'buffer_to_validated_saveplan' attaches the
+parse-time warnings at every validation-error return; the save
+handler's error path passes them to 'empty_response_sexp' (was a
+hardcoded '&[]'); and 'update_from_and_rerender_buffer' back-fills the
+save's parse warnings onto any post-parse validation error (e.g. the
+override-invariant check) via 'backfill_parse_warnings', so the
+"warnings always accompany errors" rule holds for every error path,
+not just the buffer-validation one.
+
+Test 'failed_save_carries_warnings_with_errors'
+(tests/partner_col_warnings.rs): a buffer with leftover text on a
+subscriberCol headline (parse warning) AND an idCol claiming an id
+node n lacks (IDCol_Edited error) -- the returned SaveError carries
+both.
+
+Ripple: the struct-variant change touched ~9 match sites across
+production (2 format fns) and tests (move_source, source_sets,
+override_substitution, multi_source_errors, validate_foreign_nodes,
+override_invariants, partner_col_matrix); all mechanical
+'(errors)' -> '{ errors, .. }'.  178 tests across the affected
+targets pass.
+**** commit 6: init/rebuild refusal wiring (tests/init_refusal.rs)
+A cheap entry point WAS found, so the test was written (not deferred
+to problems.org as the plan's fallback allowed).
+'wipe_then_init_typedb_db' -- the shared TypeDB-population function
+that server start and "rebuild dbs" both reach -- calls
+'error_unless_override_invariants_hold' before touching TypeDB.
+The test feeds it disk data (owned/ N, R1, R2 where R1 and R2 both
+override N, all user-owned) and asserts it refuses with an error
+naming the collision; no database is created (the check precedes
+'overwrite_new_empty_typedb_db').  Runs in ~0.06s -- far cheaper than
+booting a server.
+**** commit 7: expansion of a read-only col member, part 1 (+ ride-along)
+'expanding_subscriberCol_member_is_plain_expansion'
+(tests/expand_partner_col_member.rs, its own target -- it installs the
+global handle for the subscriberCol).  N's subscriberCol shows S
+(indef); requesting S's definitive view expands it IN PLACE: S becomes
+definitive, stays a raw subscriberCol member, its own content (C with
+its body) appears, and NO subscription-hides apply (no
+hiddenIn/OutsideOfSubscribeeCol).  Confirmed the plain-expansion
+semantics (2026-06-12).  Part 2 (production change 2) lands in the
+same target in commit 8.
+Ride-along: renamed 'test_every_kind_of_col' ->
+'test_subscribee_and_filter_cols' in tests/hidden_from_subscriptions.rs
+(the old name overstated its coverage).
+**** commit 8: production change (2) + expansion part 2 + doc
+Generalized the no-substitution-for-immediate-children rule from the
+single plan-11 overridden-as-such case to every raw-drawn position.
+
+Change ('server/update_buffer/reconcile/content.rs'): replaced
+'is_overridden_as_such' with 'is_overridden_drawn_raw'. The new
+predicate fires when 'node' is OVERRIDDEN (ownership-gated,
+visibility-UNGATED: 'resolve_override (config, graph, None, id)') AND
+drawn raw BY ITS POSITION -- a member of any PartnerCol except the
+writable subscribeeCol (whose subscribees-as-such DO substitute), or a
+view root -- and carries no overridesHere marker. Then substitution is
+disabled for its immediate children.
+
+***** the depth-one subtlety (why the plan's one-line predicate is not enough)
+The plan described the predicate as "the parent is overridden and
+carries no overridesHere marker."  Taken literally that CASCADES: a
+child drawn raw under a raw-drawn overridden parent is itself
+overridden-and-markerless, so it would disable substitution for ITS
+children, and so on -- violating the decided DEPTH=one-level.  The
+depth-one behavior comes from a POSITION test, exactly as the original
+structural 'is_overridden_as_such' (parentIs=affected child of an
+overriddenCol) achieved it: a content child is NOT a raw-drawn
+position, so substitution resumes there.  So 'is_overridden_drawn_raw'
+is position-aware (PartnerCol-member-except-subscribee OR view root),
+which both generalizes correctly and preserves depth-one.  Recorded as
+a deviation in HOW (the predicate is richer than the plan's one-liner);
+the decided BEHAVIOR (general scope, depth one, strict edge case) is
+exactly met.
+
+***** a second seam fact found during execution
+The view root is detected during completion as a child of the
+BufferRoot sentinel, NOT by 'parentIs == Absent' -- that stamp is
+applied only later, at render ('to_org/util.rs').  The first cut of
+the predicate used 'parentIs == Absent' and silently did nothing for
+roots (substitution still fired); switching to the BufferRoot-ancestor
+check fixed it.
+
+Test 'raw_drawn_overridden_root_children_are_raw'
+(tests/expand_raw_overridden_children.rs, its own target -- installs
+the global handle).  The docs/forks.md shape: R overrides X, R1
+overrides X1, X contains X1.  Opening X as a raw root draws X1 RAW (no
+'overridesHere', R1 does not stand in for X1).
+
+Doc: api-and-formats.md's bypass note and the override-substitution
+section now state the one-level-raw rule (general scope, strict edge
+case) instead of "recursive content still substitutes".
+
+Full 'cargo nextest run' green after the change (no regression across
+the override suite).
+*** decisions folded (2026-06-12)
+Jeff answered the plan's five decisions; four closed and are
+folded into the plan body:
+- exhaustive per-col coverage, batched: one matrix test function,
+  one database of mutually independent subgraphs, serial
+  before/after org-file scenario pairs with accumulated failure
+  reporting (replaces policy-class sampling and dissolves the two
+  separate targets the plan first proposed into one,
+  tests/partner_col_matrix.rs);
+- init/rebuild refusal tested through the cheapest real entry
+  point in 'server/dbs/init.rs', else recorded as untested in
+  TODO/problems.org rather than booting a server;
+- a failed save's response must carry warnings alongside errors
+  (option b); pin current behavior first, change the pipeline if
+  it does not comply -- a decided exception to the stage's
+  test-only scope;
+- no Emacs-side tests this stage.
+One discussion stays ONGOING: expansion of a read-only col member
+is plain expansion (confirmed, testable now), but Jeff added the
+constraint that substitution should not apply to the immediate
+children of an overridden node drawn raw.  Claude's TODO reply in
+the plan asks four things: scope (every raw-drawn position,
+bypass included, versus col members only), depth (one level, per
+the overridden-as-such precedent), an invisible-overrider edge
+case, and whether that production change rides along in this
+stage.  Execution does not wait on it.
 *** planned
 Wrote 'TODO/full-schema/13_test-rel-matrix.org', covering the
 metaplan_2.org step "test the relationship matrix".  Because stages

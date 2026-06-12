@@ -368,7 +368,7 @@ fn saving_edits_to_inactive_placeholder_content_are_rejected (
         buffer_to_validated_saveplan (
           buffer, config, driver, None ) . await;
       assert! (
-        matches! ( result, Err (SaveError::BufferValidationErrors (_)) ),
+        matches! ( result, Err (SaveError::BufferValidationErrors { .. }) ),
         "editing inactive placeholder title/body should be rejected: {:?}",
         result );
 	      Ok (( )) } )) }
@@ -804,3 +804,61 @@ fn weave_preserves_omitted_inactive_content_members (
           "visible deletion lands; invisible member survives" ); }
       Ok (( )) } )) }
 
+
+#[test]
+fn restricted_save_preserves_invisible_override_targets (
+) -> Result<(), Box<dyn Error>> {
+  // The pipeline-level half of the second named regression
+  // (TODO/full-schema/13_test-rel-matrix.org): a node overrides
+  // [ovr-visible, ovr-inactive] where ovr-inactive's source is
+  // inactive. Rendering restricted shows only ovr-visible; the
+  // set-difference merge must keep ovr-inactive across a restricted
+  // save, even when the visible member is deleted.
+  run_with_source_set_test_db (
+    "skg-test-source-sets-override-preservation",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-override-preservation",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          &config, SourceSetName::from ("public") )?;
+      let override_set = |node : &NodeComplete| -> Vec<ID> {
+        match &node . overrides_view_of {
+          MSV::Specified (ids) => {
+            let mut v : Vec<ID> = ids . clone (); v . sort (); v }
+          MSV::Unspecified => Vec::new (), } };
+      { // Unmodified restricted save: the invisible target is preserved.
+        // (If the merge reproduces disk exactly the owner is a no-op and
+        // emits no SaveNode -- which is itself preservation.)
+        let unmodified = indoc! {"
+          * (skg (node (id ovr-owner) (source public))) ovr-owner
+          ** (skg overriddenCol)
+          *** (skg (node (id ovr-visible) (source public) indef)) ovr-visible
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            unmodified, &config, driver, Some (&active) ) . await?
+          . 1 . define_nodes;
+        if let Some (DefineNode::Save (SaveNode (owner))) =
+          instructions . iter () . find ( |i| matches! (
+            i, DefineNode::Save (SaveNode (n))
+              if n . pid == ID::from ("ovr-owner") )) {
+          assert! (
+            override_set (owner) . contains (&ID::from ("ovr-inactive")),
+            "unmodified restricted save dropped the invisible override \
+             target: {:?}", owner . overrides_view_of ); } }
+      { // Delete the visible member: disk holds exactly [ovr-inactive].
+        let deleted = indoc! {"
+          * (skg (node (id ovr-owner) (source public))) ovr-owner
+          ** (skg overriddenCol)
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            deleted, &config, driver, Some (&active) ) . await?
+          . 1 . define_nodes;
+        assert_eq! (
+          override_set ( saved_node_by_id (&instructions, "ovr-owner") ),
+          vec![ID::from ("ovr-inactive")],
+          "deleting the visible override member must leave exactly the \
+           invisible one" ); }
+      Ok (( )) } )) }

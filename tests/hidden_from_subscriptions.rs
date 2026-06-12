@@ -774,7 +774,7 @@ fn test_extra_view_child_under_owned_subscribee_is_deleted(
 /// Also tests ordering rule: HiddenInSubscribeeCol precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeCol before E21.
 #[test]
-fn test_every_kind_of_col(
+fn test_subscribee_and_filter_cols(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-every-kind-of-col";

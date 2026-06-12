@@ -1,0 +1,5 @@
+pid: dn-owner
+title: dn-owner
+hides_from_its_subscriptions:
+- dn-hid-a
+- dn-hid-b

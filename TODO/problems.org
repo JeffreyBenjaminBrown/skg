@@ -794,3 +794,51 @@
    process per test) all pass.  The target's header documents the
    nextest assumption; a fix would mean per-test fixture-compatible
    globals or a resettable handle.
+** Save-time override-monogamy check depends on neighbor re-saving
+   Found while writing the stage-13 nodeMerge monogamy test
+   ('merge_that_collides_two_overriders_is_rejected' in
+   tests/save/override_invariants.rs).
+   'validate_touched_override_invariants' checks monogamy only from
+   the OVERRIDER (outbound) end of each touched node: for each
+   touched user-owned node T and each X that T overrides, it flags X
+   if X now has >1 user-owned overrider.  It never inspects a touched
+   node's INBOUND overriders directly.  A nodeMerge that fuses two
+   overridden nodes (R1->N1, R2->N2; merge N2 into N1) collides R1
+   and R2 on the merged node, but neither N1 nor N2 is an overrider,
+   so the collision is caught ONLY because the acquiree's inbound
+   neighbor R2 is re-saved as a neighbor savenode
+   ('neighbor_savenodes_for_nodeMerges' ->
+   'affected_neighbors_of_nodeMerge', which scans
+   OUTBOUND_RELATIONSHIP_TYPES and so includes overrides_view_of
+   where the acquiree plays the object).  That re-save puts R2 in
+   'save_instructions', making the colliding edge "touched".
+   If a future change ever narrowed neighbor re-saving (e.g. skipped
+   inbound-override neighbors as "unchanged"), this collision would
+   pass the save-time check silently; the whole-graph
+   'validate_override_invariants' run at init/rebuild would still
+   reject it on the next boot, so disk could hold a monogamy
+   violation until then.  Not a present bug -- the wiring holds
+   today, and the test pins it as it actually ships.  A defensive
+   fix would add an inbound (target-end) monogamy check for touched
+   overridden nodes.
+** De-novo PartnerCol rendering depends on the global graph handle
+   Found while writing the stage-13 matrix target
+   (tests/partner_col_matrix.rs).  The plan
+   (TODO/full-schema/13_test-rel-matrix.org) asserted the target
+   "should not need the global graph handle".  Not so: rendering a
+   node de novo shows its inbound read-only cols (subscriberCol,
+   overriderCol, hiderCol) and even its outbound hiddenCol and
+   overriddenCol ONLY when the process-global in-Rust graph handle
+   ('snapshot_global') is installed.  Without it, those cols render as
+   nothing -- just the owner headline.  (The subscribeeCol is the lone
+   exception: it is built from the owner's own outbound subscribes_to,
+   which the de-novo env graph carries, so it appears regardless.)
+   This is a documentation/plan mismatch rather than a product bug --
+   production always has the handle -- but it is surprising that the
+   PartnerCol creation path reads the global snapshot rather than the
+   env's own in-Rust graph (which 'multi_root_view_inner' builds fresh
+   from disk and would suffice).  Worth either a glossary note ("col
+   scaffolds read snapshot_global") or routing col creation through
+   the env graph so test harnesses without the global handle still see
+   cols.  The matrix target works around it by installing the handle
+   in its render-heavy function only.

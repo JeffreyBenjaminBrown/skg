@@ -14,6 +14,16 @@ tests that fill the real gaps.  Writing tests for already-covered
 cells would only slow the suite; the audit names the covering test
 instead, so a future reader can check the claim.
 
+The stage is test-only with two decided exceptions (2026-06-12),
+each landing as its own commit: a small pipeline change so a failed
+save's response carries its warnings, and a generalization of the
+raw-immediate-children rule for overridden nodes.  Both are
+specified under "production changes" below.
+
+All decisions are settled; "open questions" at the end carries a
+single confirmation request about commit staging, which execution
+does not wait on.
+
 * glossary
 Plain-language definitions of every term of art this plan uses.
 - "relationship matrix" :: the grid of test obligations: one row per
@@ -59,6 +69,10 @@ Plain-language definitions of every term of art this plan uses.
 - "substitution" :: when rendering would create a viewnode for node
   N as ordinary content but N has a visible user-owned overrider R,
   the view draws R instead, marked '(overridesHere N)'.
+- "drawn raw" :: drawn as itself rather than substituted away --
+  the positions where an overridden node still appears under its own
+  title (col members, search results, view roots, ancestry
+  insertions, menu lines, bypass-opened roots, overridden-as-such).
 - "monogamy" :: the validation rule that no node may have more than
   one user-owned overrider.
 - "chain" :: X overrides Y and Y overrides Z with X and Y both
@@ -111,6 +125,12 @@ Plain-language definitions of every term of art this plan uses.
 - "test target" :: one 'tests/NAME.rs' file, possibly pulling in a
   'tests/NAME/' directory of submodules and fixtures.  Cargo
   compiles each target as its own binary.
+- "scenario" :: one unit of the batched matrix test: a before-file
+  (the buffer as the user saves it, real org text) and an
+  after-file (the expected rerendered buffer), plus any in-code
+  assertions org text cannot express (disk contents, warnings).
+  Scenarios run serially inside one test function, against one
+  shared database of mutually independent subgraphs.
 
 * scope
 ** covered
@@ -122,24 +142,30 @@ Plain-language definitions of every term of art this plan uses.
   metaplan 1, audited and filled the same way.
 - The four named regressions from metaplan_2's step text, verified
   present (three already exist) or added.
+- Two production changes (see "production changes"), each its own
+  commit: the failed-save warnings change, and the
+  raw-immediate-children generalization.
 ** not covered
-- No production code changes, except trivial test hooks if a seam
-  needs one (none anticipated).  If a test exposes a bug, fixing it
-  is in scope only if small; otherwise it is recorded in
-  TODO/problems.org and the test pins current behavior with a
-  comment.
-- No new Emacs-side (elisp or integration) tests, unless a decision
-  below says otherwise.  The behaviors in this matrix are
-  server-side; the Emacs wiring they ride (save responses, rerender
-  streams, warning display) already has tests.
-- The documentation step (next metaplan step) stays separate.
+- Production code changes, except the two decided exceptions above.
+  Otherwise: trivial test hooks only.  If a test exposes a further
+  bug, fixing it is in scope only if small; otherwise it is
+  recorded in TODO/problems.org and the test pins current behavior
+  with a comment.
+- No new Emacs-side (elisp or integration) tests (decided
+  2026-06-12).  The behaviors in this matrix are server-side; the
+  Emacs wiring they ride (save responses, rerender streams, warning
+  display) already has tests.
+- The documentation step (next metaplan step) stays separate.  The
+  one doc touch-up this stage makes is the api-and-formats.md bypass
+  note, which the raw-immediate-children change falsifies and so
+  must update in the same commit.
 
 * the audit, by relation and role
 Each subsection lists the seven matrix behaviors with their status.
-"Covered" claims name the test; I verified each named test exists
-and read the load-bearing ones.  Cells marked N/A include the
-reason.  Cells marked GAP are collected into "new tests to write"
-below.
+"Covered" claims name the test; each named test was verified to
+exist and the load-bearing ones were read.  Cells marked N/A include
+the reason.  Cells marked GAP are collected into "new tests to
+write" below.
 
 ** contains (ordinary content)
 - initial rendering: covered.  tests/content_view.rs,
@@ -212,8 +238,9 @@ columns do not apply.
 ** subscribes, inbound: subscriberCol (read-only set)
 - initial rendering: covered.  tests/partner_col_order.rs renders
   it; tests/idempotence.rs includes it in the fixpoint fixture.
-- definitive expansion of a member: GAP, and the behavior itself is
-  not written down anywhere I could find (see problems).
+- definitive expansion of a member: GAP, and the behavior itself was
+  not written down anywhere; the spec is now decided (see
+  "production changes" and the new expansion test).
 - save after reorder: covered.
   tests/partner_col_order.rs ('readonly_col_order_is_preserved',
   including across a second save).
@@ -229,7 +256,7 @@ columns do not apply.
   source_sets.rs omission tests cover content and diff surfaces,
   but no test renders a subscriberCol whose member is inactive and
   asserts the member is omitted (not placeholder-ized).  GAP
-  (cheap, one render).
+  (cheap; folded into the matrix omission scenarios).
 - collateral rerender after save: GAP.  No test opens a view of N,
   then saves a different view that adds or removes a subscription
   to N, and asserts N's subscriberCol updated in the collateral
@@ -266,27 +293,33 @@ columns do not apply.
 - collateral rerender after save: GAP, same shape as subscriberCol;
   the one new collateral test below uses a subscription, and the
   col-update path it exercises ('reconcile_partnerCol_children') is
-  shared by all eight cols, so I do not propose repeating it per
-  relation (see the sampling decision under problems).
+  shared by all eight cols, so it is not repeated per relation
+  (collateral machinery is heavier than a scenario); the per-col
+  BUFFER behaviors land in the batched matrix test instead
+  (decided 2026-06-12).
 
 ** overrides_view_of, inbound: overriderCol (read-only set)
 - initial rendering: covered.  tests/override_menu.rs fixtures and
   tests/git_diff_view/inbound render it (the latter in diff mode).
-- definitive expansion of a member: same GAP/spec question as
-  subscriberCol.
+- definitive expansion of a member: same spec as subscriberCol (now
+  decided; see "production changes" and the new expansion test).
 - save after reorder, insertion, deletion: covered at the shared
   seams: all four read-only sets go through one reconciler and one
   extraction rule ('read_only_col_members_save_themselves_but_not_
   their_owner' covers subscriberCol, overriderCol, hiderCol and
-  hiddenCol in one test).  The end-to-end representative is
-  subscriberCol (partner_col_order, partner_col_warnings).  Whether
-  that sampling satisfies the matrix is a decision (see problems).
+  hiddenCol in one test).  End-to-end, subscriberCol was the only
+  representative (partner_col_order, partner_col_warnings); decided
+  2026-06-12: every col gets these cells end-to-end, batched as
+  serial file-pair scenarios in the new matrix target, so the cost
+  is one database build, not one per cell.
 - source-set restricted rendering: covered for the menu
   ('inactive_overriders_are_omitted_and_can_empty_the_menu'); the
   col rides the same omission code as subscriberCol; the new
-  omission render test below includes an overriderCol line so both
+  omission scenarios include an overriderCol line so both
   directions of omission are pinned.
-- collateral rerender: see the sampling decision.
+- collateral rerender: the shared col-update path is pinned once by
+  the new collateral test; overriderCol's own buffer cells land in
+  the matrix scenarios.
 
 ** hides_from_its_subscriptions, outbound: hiddenCol (read-only set)
 Note the asymmetry: hiddenCol is outbound (the owner hides its
@@ -294,10 +327,10 @@ members) yet read-only; hiding is edited through subscribee trees,
 never through this col.
 - initial rendering: GAP outside diff mode.  Diff-mode rendering is
   covered (tests/git_diff_view.rs, the outbound goal-list work of
-  stage 12), but I found no plain render asserting a hiddenCol with
-  its members.  Cheap; folded into the one new render test.
-- definitive expansion of a member: same spec question as the other
-  read-only cols.
+  stage 12), but no plain render asserts a hiddenCol with its
+  members.  Cheap; folded into the matrix de-novo render scenario.
+- definitive expansion of a member: same spec as the other
+  read-only cols (decided; see "production changes").
 - reorder / insertion / deletion: covered at the shared seams (the
   same one reconciler and the same extraction test).  Plus a
   specific guarantee that deleting from a derived hide surface does
@@ -307,14 +340,16 @@ never through this col.
   hiddenCol case ("deleting from hiddenCol does not unhide") is a
   GAP at the extraction seam, cheap to add.
 - source-set restricted rendering: rides the shared omission code;
-  pinned by the new omission render test.
-- collateral rerender: see the sampling decision.
+  pinned by the new omission scenarios.
+- collateral rerender: the shared col-update path is pinned once by
+  the new collateral test; hiddenCol's own buffer cells land in the
+  matrix scenarios.
 
 ** hides_from_its_subscriptions, inbound: hiderCol (read-only set)
 - initial rendering: diff mode covered (tests/git_diff_view/inbound);
-  plain mode folded into the new render test.
-- everything else: same shared-seam coverage and same sampling
-  decision as overriderCol.
+  plain mode folded into the matrix de-novo render scenario.
+- everything else: same shared-seam coverage as overriderCol, plus
+  its own rows in the matrix scenarios (decided 2026-06-12).
 
 ** the read-only filter cols (hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol)
 - initial rendering and expansion: covered, thoroughly.
@@ -329,7 +364,7 @@ never through this col.
   tests/unit/three_snapshots.rs).
 - source-set restricted rendering: GAP in principle (a hidden
   member from an inactive source), but the omission code is shared;
-  the new omission render test includes one filter-col line.
+  the new omission scenarios include one filter-col line.
 - collateral rerender: covered
   ('test_collateral_view_reflects_newly_hidden_subscribee_content'
   and the unhide twin).
@@ -371,14 +406,13 @@ From metaplan 1, adjusted by metaplan 2.
   multi-collision reporting).  But nothing tests the WIRING: that
   'error_unless_override_invariants_hold' actually stops init /
   rebuild ('server/dbs/init.rs', 'rebuild_dbs.rs') when the disk
-  data is bad.  GAP; see new tests and the decision under problems.
+  data is bad.  GAP; see the init/rebuild refusal test below.
 - two user-owned overriders rejected at save:
   half-covered.  Covered at the simulation seam
   (tests/save/override_invariants.rs).  Not covered through the
   buffer pipeline: no test saves a buffer whose overriddenCol edit
   would create the second overrider and asserts the save response
-  carries the error.  GAP (one test, paired with the accepting
-  case).
+  carries the error.  GAP (the matrix target's second function).
 - foreign overriders displayed but not substituted:
   covered.  'foreign_overriders_are_ignored' (resolution),
   'menu_appears_for_foreign_only_overriders' (menu),
@@ -419,11 +453,13 @@ From metaplan 1, adjusted by metaplan 2.
   ('readonly_col_repairs_warn': restored member, demoted intruder,
   and the discarded col-headline-text warning, all in one save).
 - failed save with both warnings and errors:
-  GAP, and underspecified.  Parse-time warnings (for example col
-  headline text) are produced before validation can fail, but I
-  found no statement or test of whether a failed save's response
-  carries them alongside the errors.  See the decision under
-  problems; the test follows the decision.
+  GAP.  Parse-time warnings (for example col headline text) are
+  produced before validation can fail, but nothing said whether a
+  failed save's response carries them alongside the errors.
+  Decided 2026-06-12 (option (b)): warnings always accompany
+  errors.  The new test asserts it; the production change that makes
+  the pipeline comply (if it does not already) is "production
+  changes (1)" below.
 - single-root content view warning delivery:
   covered.  tests/override_chain_notice.rs (a fresh view's
   compound-chain notice arrives in the content-view response).
@@ -458,6 +494,57 @@ behavior; this stage only had to verify they exist.
 - order preservation of a reordered read-only set across save:
   exists.  tests/partner_col_order.rs.
 
+* production changes (two; each its own commit)
+This stage is otherwise test-only.  Two production changes are in
+scope, each decided 2026-06-12, each committed on its own.
+
+** (1) a failed save's response carries warnings alongside errors
+Decision: option (b) -- warnings always accompany errors.
+Execution: first pin today's behavior with a test that saves a
+buffer producing BOTH a parse-time warning (col-headline text) and
+a validation error, and inspect the error response.  If it already
+carries the warning, the test is the whole commit.  If not, the
+failure path is changed to attach the warnings collected before the
+abort (the save-result format already carries both lists), and the
+test lands in the same commit.
+
+** (2) substitution does not apply to the immediate children of an overridden node drawn raw
+This generalizes a rule that exists today in exactly one position --
+the overridden-as-such, implemented at 'is_overridden_as_such' and
+documented in api-and-formats.md ("the user asked to see the
+original": the immediate children of an Affected child of an
+overriddenCol draw raw, one level deep, substitution resuming
+below).  Overridden nodes are drawn raw in many other positions
+(read-only col members, search results, view roots, ancestry
+insertions, menu lines, bypass-opened roots), and definitively
+expanding any of those today applies substitution to the newly
+created children -- so a raw title can sit over substituted (the
+overrider's) children.  Jeff's principle removes that.  Confirmed
+2026-06-12:
+- SCOPE: general.  The immediate children of ANY overridden node
+  that was drawn raw also draw raw -- every raw-drawn position, not
+  just overridden-as-such.  One predicate at the existing
+  'is_overridden_as_such' seam: the parent is overridden and carries
+  no 'overridesHere' marker.
+- DEPTH: one level.  Grandchildren substitute again, matching the
+  overridden-as-such precedent blessed in stage 11.
+- EDGE CASE: strict.  A node whose only overrider is INVISIBLE under
+  the active source-set is "overridden but drawn raw" too -- not
+  deliberately, but because the resolver could not draw the
+  overrider; its children draw raw as well.  This keeps the rule one
+  predicate.
+- STAGING: its own commit, NOT a test-only ride-along.  (Interpreted
+  as a separate commit within this stage; see "open questions" for
+  the one confirmation this rests on.)
+Test (the second half of the expansion test below): expanding a
+raw-drawn overridden member whose children carry user-owned
+overriders shows those children raw (use the docs/forks.md shape,
+where clone R overrides original X and R's children override X's
+children; open raw X and assert X's immediate children render raw).
+Doc: api-and-formats.md's bypass note ("recursive content beneath it
+still applies override substitution") is now false for the immediate
+children; update it to state the one-level-raw rule, in this commit.
+
 * new tests to write, in order
 Grouped by seam, cheapest first.  Names are suggestions; fixture
 sketches use the title-equals-ID convention the suite already uses.
@@ -485,52 +572,66 @@ sketches use the title-equals-ID convention the suite already uses.
   monogamy violation.  Exercises the 'nodeMerge_definenodes' arm of
   'validate_override_invariants_after_save', currently untested.
 
-** one plain render of the under-rendered cols (one new TypeDB test)
-Target: a new small test target, suggested name
-tests/readonly_col_render.rs, one fixture in which node N is
-subscribed to by S, overridden by O (foreign, so no substitution
-complicates the render), hides H, and is hidden by Z.  One
-single-root view of N asserts all four read-only cols
-(subscriberCol, overriderCol, hiderCol, hiddenCol) appear with the
-right members, indefinitive, in sorted-ID order.  This closes the
-"initial rendering" cells for hiderCol and hiddenCol and
-double-pins the other two outside diff mode.
-
-** omission of inactive col members (extend tests/source_sets.rs, one test)
-Same fixture shape as above but multi-source: one member of each
-of subscriberCol, overriderCol, hiddenCol, and one hidden-in
-filter member, each from a source outside the active set.  Render
-N; assert each inactive member is OMITTED (no placeholder line),
-while a same-col active member still shows.  Closes the
-restricted-rendering cells for the read-only and filter cols in
-one render.
-
-** writable-col membership, end-to-end (one new TypeDB target, suggested name tests/writable_col_membership.rs)
-Four tests through 'update_from_and_rerender_buffer_test', each
-asserting both the rerendered view and the owner's .skg file on
-disk:
-- add a subscription by inserting a member line under
-  subscribeeCol; disk 'subscribes_to' gains it; the rerendered col
-  shows it.
-- remove one subscription the same way; disk loses exactly it.
-- reorder subscriptions; disk order follows the buffer.
-- add an override edge by inserting a member under overriddenCol
-  (no competing overrider in the fixture); disk gains it; then a
-  second save in the same test adds a second user-owned overrider
-  for the same target via another owner's overriddenCol and
-  asserts the save RESPONSE carries the monogamy error and disk is
-  unchanged.  (This is the buffer-level half of the
-  rejected-at-save checklist item.)
-This target does not need the global graph handle unless the
-fixture trips substitution; keeping all overriders foreign-or-
-unique avoids that.
+** the batched matrix target (one new TypeDB target, suggested name tests/partner_col_matrix.rs)
+Decided 2026-06-12: every col gets its end-to-end cells, batched so
+the suite barely grows.  Design:
+- ONE test function builds ONE database (the database build --
+  fixture copy, TypeDB create-and-load, in-Rust graph, Tantivy --
+  is the dominant per-test cost) and then runs scenarios in serial.
+  It must be one function, not one per scenario: nextest gives every
+  test FUNCTION its own process, so splitting the scenarios across
+  functions would rebuild the database per scenario.
+- The fixture holds mutually independent subgraphs, one per
+  scenario, IDs prefixed by scenario name (for example
+  'subRm-owner', 'subRm-a'), so a save in one scenario cannot
+  perturb another and the single database stays sound across the
+  serial run.
+- A scenario is a directory holding 'before.org' (the buffer as the
+  user saves it -- real org text, easy to eyeball and easy to edit
+  if a col's intended behavior ever changes) and 'after.org' (the
+  expected rerendered saved view).  Assertions org text cannot
+  express (disk lists for writable cols, expected warnings) live in
+  a per-scenario code entry beside the runner.
+- Scenario failures ACCUMULATE: the runner collects every mismatch
+  and fails once at the end, reporting all of them, so one broken
+  col does not mask the rest of the matrix.
+Coverage, one scenario per cell where the cell applies:
+- de novo render: a root that owns members in all four read-only
+  relation cols (subscriberCol, overriderCol, hiderCol, hiddenCol),
+  members indefinitive, sorted-ID order.  (This scenario compares a
+  fresh render to an expected file rather than saving.)  Closes the
+  plain-mode "initial rendering" gaps for hiderCol and hiddenCol.
+- save after reorder: each read-only set (order preserved,
+  warning-free); subscribeeCol (new order persisted to disk);
+  overriddenCol (unperturbed, since the relation is order-free).
+- insertion: a non-member into each read-only set (demoted to
+  independent, with warning); a member into each writable col (the
+  subscription / override edge appears on disk).
+- deletion: a member from each read-only set (restored, with
+  warning); ONE member from each writable col (exactly it removed
+  from disk, the others kept); a member from hiddenCol (no unhide
+  -- the extraction twin lives in the extraction seam above).
+- omission under a restricted source-set: cols holding an
+  inactive-source member beside an active one, rendered with a
+  restricted set passed per call; the inactive member is OMITTED
+  (no placeholder line), the active one shows.  Closes the
+  restricted-rendering cells for the read-only and filter cols.
+A second, separate test function in the same target (its own
+database, since it must observe a REJECTED save) covers
+buffer-level monogamy: a save adds a second user-owned overrider
+for an already-overridden target via an overriddenCol; the save
+response carries the monogamy error and disk is unchanged.  This is
+the buffer-level half of the rejected-at-save checklist item.
+The target should not need the global graph handle; keeping
+overriders foreign-or-unique in the fixtures avoids tripping
+substitution.
 
 ** restricted save preserves invisible override targets (extend tests/source_sets.rs, one test)
 Owner with 'overrides_view_of' = [v, i] where i's source is
-inactive.  Render under the restricted set (col shows only v),
-save the buffer unmodified, read disk: the override list still
-contains i.  Then delete v and save: disk holds exactly [i].
-Closes the pipeline-level half of the second named regression.
+inactive.  Render under the restricted set (col shows only v), save
+the buffer unmodified, read disk: the override list still contains
+i.  Then delete v and save: disk holds exactly [i].  Closes the
+pipeline-level half of the second named regression.
 
 ** collateral col update (extend tests/partner_col_warnings.rs's harness style or hidden_from_subscriptions's, one test)
 Open a view of N (its subscriberCol shows S).  In a second view,
@@ -541,39 +642,77 @@ eight cols share.
 
 ** saved-view-only warning scoping (one test beside the previous one)
 Arrange a repair that occurs in the COLLATERAL view (for example
-the collateral view holds a stale intruder under its
-subscriberCol) while the saved buffer is clean.  Assert the save
-response carries no repair warning for the collateral view's col.
-(What the collateral STREAM shows is the repaired view; that is
-already its job.)
+the collateral view holds a stale intruder under its subscriberCol)
+while the saved buffer is clean.  Assert the save response carries
+no repair warning for the collateral view's col.  (What the
+collateral STREAM shows is the repaired view; that is already its
+job.)
 
-** init/rebuild refusal wiring (one new TypeDB test, pending the decision below)
+** failed save carries warnings alongside errors (one test; pairs with production change (1))
+Save a buffer that produces a parse-time warning (col headline text)
+AND a validation error.  Assert the error response carries the
+warning.  Pin today's behavior first; if it already complies the
+test is the whole job, otherwise production change (1) lands with
+it.
+
+** init/rebuild refusal wiring (one new TypeDB test; decided 2026-06-12)
 Fixture directory whose .skg files give one node two user-owned
 overriders; assert the init path 'error_unless_override_invariants_
-hold' is reached through the real entry point used by
-'rebuild dbs' / server start, and that the error text lists the
-collision.  How heavy this is depends on which entry point is
-testable without spawning a server; if only the full server boot
-reaches it, the cost-benefit changes (see decision).
+hold' is reached through the cheapest REAL entry point that
+'rebuild dbs' and server start share ('server/dbs/init.rs'), and
+that the error text lists the collision.  If execution finds no such
+entry point callable from a test without booting a whole server,
+skip the test and record the untested wiring in TODO/problems.org
+instead -- per the agreed lean, the wiring is one line and does not
+justify the suite's most expensive test.
 
-** expansion of read-only col members (one test, pending the spec decision below)
-After the decision: request a definitive view of a subscriberCol
-member; assert whatever the decision says (lean: ordinary
-expansion of the member in place, raw content, no
-subscription-hides applied since those are scoped to
-subscribee-as-such, substitution applying to NEW content beneath
-it as everywhere).
+** expansion of read-only col members (two-part test)
+Part 1 (no dependency): expanding a subscriberCol member behaves
+like expanding any indefinitive node -- the member line stays raw,
+its own content appears, no subscription-hides apply (those are
+scoped to subscribees-as-such).  Use a member that nothing
+overrides, so the test stays valid independent of part 2.  This
+pins the confirmed plain-expansion semantics (2026-06-12).
+Part 2 (the test for production change (2)): expanding a raw-drawn
+overridden member whose children have user-owned overriders shows
+those children raw.  Lands in the same commit as the production
+change.
+
+* order of execution and commits
+Cheapest seams first; the two production changes commit on their
+own per Jeff's instruction.  Suggested commit sequence (easily
+reordered, since most units are independent):
+1. Pure extraction-seam tests (four).
+2. Save-simulation-seam test (the nodeMerge monogamy arm).
+3. The batched matrix target (both functions).
+4. The three source_sets / collateral / warning-scoping tests
+   (restricted-override preservation; collateral col update;
+   saved-view-only warning scoping).
+5. Production change (1) plus its failed-save-warnings test (one
+   commit; the test pins current behavior first, the change rides
+   only if needed).
+6. The init/rebuild refusal test (or the problems.org note if no
+   cheap entry point exists).
+7. The expansion test part 1.
+8. Production change (2) plus expansion test part 2 plus the
+   api-and-formats.md bypass-note update (one commit).
+Ride-along (fold into the nearest test commit that touches the
+file): rename 'test_every_kind_of_col' to
+'test_subscribee_and_filter_cols' (tests/hidden_from_subscriptions.rs),
+retiring a name that overstates its coverage.
 
 * suite-cost accounting
 New pure tests: about seven (extraction, simulation).  New
-TypeDB-backed tests: about eight, of which two reuse existing
-targets' fixtures.  Two new test targets (readonly_col_render,
-writable_col_membership) plus possibly one for init refusal.  No
-new integration (bash/Emacs) tests.  This respects the metaplan's
-instruction to prefer the pure seams; every end-to-end test above
-exists because the behavior it pins lives in wiring (disk writes,
-response contents, the collateral stream) that the pure seams
-cannot see.
+TypeDB-backed test functions: about seven -- but the batched matrix
+function carries roughly twenty file-pair scenarios on a single
+database build, so exhaustive per-col coverage costs about what
+three ordinary TypeDB tests cost.  New test targets: the matrix
+target, plus possibly one for init refusal.  No new integration
+(bash/Emacs) tests (decided 2026-06-12).  This respects the
+metaplan's instruction to prefer the pure seams; every end-to-end
+test above exists because the behavior it pins lives in wiring (disk
+writes, response contents, the collateral stream) that the pure
+seams cannot see.
 
 * test-suite hygiene rules for this stage
 - A test that installs the global graph handle goes in its own
@@ -591,133 +730,58 @@ cannot see.
   are recorded in TODO/problems.org; do not chase them here, and
   run the suite via 'cargo nextest run' as the stages before did.
 
-* problems
-Anything incompletely specified, dangerous, inelegant, awkward, or
-otherwise problematic, found while auditing.  Decisions Jeff must
-make are marked TODO.
-
-** ONGOING decision: is policy-class sampling acceptable, or must every col get every end-to-end cell?
-The four read-only sets share one reconciler, one extraction rule,
-one omission filter and one warning channel; the audit above
-covers each MECHANISM once (usually via subscriberCol) plus cheap
-per-col renders, rather than repeating reorder/insert/delete/
-collateral end-to-end four times.  Risk accepted under sampling: a
-future per-col special case (a match arm that singles out, say,
-hiderCol) would not be caught by the subscriberCol tests.  The
-ColPolicy consolidation from stage 8 makes such drift much harder
-than it used to be, which is why I think sampling is sound.  If
-you want exhaustive instead, the writable_col_membership pattern
-extends mechanically (about twelve more TypeDB tests, noticeably
-slower suite).
-
-*** TODO we can test them all but batch into one test
-The test suite is already unwieldy, so we want to tread lightly.
-But we can run a test like
-'does removal work right in every col?',
-where the saved buffer before and after
-is represented as actual org-text in a before and an after file,
-so easy to eyeball for correctness,
-and easy to modify if the behaivor under some kind of col should change.
-
-That reduces our number of new tests from n x k to k.
-
-But we can go even further and make it one test
-that reads pairs of files in serial.
-I *imagine* the expensive thing about each test
-is that it has to build a new TypeDB db each time;
-this avoids that. There can be one db for the whole test,
-consisting if necessary of independent graphs
-that the test tests in serial.
-** DONE decision: how hard to test the init/rebuild refusal wiring
-The validator is thoroughly tested; what is not tested is that
-init and 'rebuild dbs' CALL it.  An end-to-end test costs a
-bad-data fixture plus whatever the cheapest real entry point is;
-if that turns out to be "boot the whole server", it becomes the
-most expensive test in the suite for one line of wiring.  Options:
-(a) test through the cheapest real entry point if it is callable
-as a function (my lean -- 'server/dbs/init.rs' line 95 region
-looks callable, but I have not proven it from a test context);
-(b) skip the test and record the untested wiring in
-TODO/problems.org; (c) full server boot test.
-*** TODO agreed
-** DONE decision: what should a FAILED save do with warnings?
-Today's shape: parse warnings are produced early; validation
-errors abort the save; I could not find code or test that says
-whether the error response also carries the warnings collected
-before the abort.  The metaplan 1 matrix asked for "failed save
-with both warnings and errors" as a test, which presumes both
-travel together.  Options: (a) pin whatever the code currently
-does, with a test, and move on (my lean: if it already carries
-both, this is free); (b) decide warnings should always accompany
-errors and change the pipeline if needed; (c) decide a failed save
-sends only errors (warnings about a buffer that did not save may
-mislead).  The test will be written to match your choice.
-*** TODO (b)
-** ONGOING decision: what does definitive expansion of a read-only col member mean?
-Expanding a subscribee-as-such applies the subscriber's hides;
-expanding an overridden-as-such shows raw content; but for members
-of subscriberCol, overriderCol, hiderCol and hiddenCol no document
-states the expansion semantics, and no test pins one.  My lean:
-plain expansion, identical to expanding any indefinitive node --
-no hides applied (those are scoped to subscriptions being viewed
-as such), substitution applied to NEW content created beneath the
-member (the member line itself already exists, and col members
-draw raw).  If you confirm, the one test above pins it; if you
-want something else (for example refusing expansion inside
-read-only cols), say so and the test changes.
-*** TODO Yes, but also only apply overriding to children if the parent was itself drawn that way.
-I don't know if that constraint is recorded anywhere but it should apply.
-It would be strange to see an overridden's title over its overrider's children.
-** DONE decision: are Emacs-side tests wanted for any of this?
-Everything in this plan is server-observable (responses, disk,
-streams), and the Emacs handlers for those streams already have
-tests.  My lean is no new elisp or integration tests this stage.
-Veto if you want, for example, a user-visible warning-display
-integration test.
-*** DONE skip it
-** (incompletely specified) the matrix's "collateral rerender" column predates per-col warnings scoping
-Metaplan 1 asked for "rerender-all warning delivery" before stage
-8 decided rerender-all repairs silently.  This plan reinterprets
-the cell as "warnings stay scoped to the saved view" (see the
-warnings audit).  If you meant something else by the original
-cell, the reinterpretation is the thing to correct.
-
-** (awkward) 'test_every_kind_of_col' does not test every kind of col
-It covers subscribeeCol and the two filter cols.  The four
-inbound/outbound read-only relation cols are absent from it.  The
-name predates stage 6's col additions.  Either rename it (my
-lean: 'test_subscribee_and_filter_cols') or extend its fixture;
-renaming is one line and removes a trap for future readers who
-might take the name as evidence of coverage (I nearly did).
-
-** (awkward) coverage of one behavior is scattered across targets named for features, not for matrix cells
-This is the natural result of test-as-you-go staging, and this
-plan deepens it slightly (new cells go into existing
-feature-named targets where the fixtures already fit).  The audit
-section above is the only map from matrix cell to test.  If that
-map should outlive this file, the documentation step (next in the
-metaplan) could carry a maintained version of it; otherwise
-accept that the map decays into the tests themselves.
-
-** (inelegant) the writable cols' end-to-end membership tests arrive this late
-Stage 6 built writable cols, but adding and removing single
-members through a real save apparently never got an end-to-end
-test -- the gap this plan's largest new target fills.  Nothing
-suggests the behavior is broken (the extraction seam is well
-covered and idempotence holds), but if the new tests DO find a
-bug, per the scope rule it lands in TODO/problems.org and the fix
-is its own decision.
-
-** (pre-existing, recorded) two flaky-test families and one process-global race
-The 'ids::save' flake, the one-shot 'test_title_diff_staged...'
-failure, and the plain-'cargo test' race on the global graph
-handle are all recorded in TODO/problems.org already.  This plan
-works around them (nextest, own-target isolation) rather than
-fixing them; a dedicated de-flaking pass would be its own small
-stage if you ever want one.
+* accepted risks and notes
+Non-blocking observations from the audit, recorded so they are not
+rediscovered.
+- (accepted) The "collateral rerender" matrix column predates
+  per-col warning scoping.  Metaplan 1 asked for "rerender-all
+  warning delivery" before stage 8 decided rerender-all repairs
+  silently; this plan reinterprets the cell as "warnings stay
+  scoped to the saved view" (see the warnings audit).
+- (accepted) Coverage of one behavior is scattered across targets
+  named for features, not for matrix cells -- the natural result of
+  test-as-you-go staging, deepened slightly here (new cells go into
+  existing feature-named targets where the fixtures already fit).
+  The audit section above is the only map from matrix cell to test;
+  the documentation step (next in the metaplan) may carry a
+  maintained version of it, otherwise the map decays into the tests
+  themselves.
+- (accepted) The writable cols' end-to-end membership tests arrive
+  this late: stage 6 built writable cols, but adding and removing
+  single members through a real save never got an end-to-end test
+  -- the gap the matrix target fills.  Nothing suggests the
+  behavior is broken (the extraction seam is well covered and
+  idempotence holds); if the new tests DO find a bug, per the scope
+  rule it lands in TODO/problems.org and the fix is its own
+  decision.
+- (pre-existing, recorded) Two flaky-test families and one
+  process-global race (the 'ids::save' flake, the one-shot
+  'test_title_diff_staged...' failure, the plain-'cargo test' race
+  on the global graph handle) are already in TODO/problems.org.
+  This plan works around them (nextest, own-target isolation) rather
+  than fixing them; a dedicated de-flaking pass would be its own
+  small stage if ever wanted.
 
 * open questions
-The TODO decisions above, gathered for answering convenience; each
-is self-contained there.  Nothing else blocks; per
-when-to-stop.org, everything below the decisions is execute-as-
-planned.
+One confirmation, which execution does not wait on (the plan
+proceeds under the stated interpretation; reversing it is cheap).
+
+** DONE commit-staging of the raw-immediate-children generalization
+The four sub-questions about production change (2) are answered:
+scope general, depth one level, edge case strict, and "its own
+commit (No, not a ride-along)".  The staging answer "separate
+commit" was given against two offered options -- ride-along in this
+stage, or "split it into a small stage of its own".  I read it as a
+separate commit WITHIN this stage (stage 13), since you said
+"commit" rather than "stage", and I have written the plan that way
+(production change (2) and its test land here, as commit 8 in
+"order of execution").
+
+If instead you meant a separate STAGE (its own plan file and
+progress entry, e.g. a stage 14 before the documentation step), say
+so and I will lift production change (2), its expansion-test part 2,
+and the api-and-formats.md touch-up out of this plan into their own
+stage -- leaving stage 13 purely test-plus-the-failed-save-warnings
+change.  Either way the rest of stage 13 is unaffected.
+
+*** (Jeff speaking) I believe your interpretation is good.

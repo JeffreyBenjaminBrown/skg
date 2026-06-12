@@ -1,0 +1,4 @@
+pid: roSub-b
+title: roSub-b
+subscribes_to:
+- roSub-owner

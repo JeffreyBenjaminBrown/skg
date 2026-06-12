@@ -452,7 +452,7 @@ fn test_move_and_merge_simultaneously_rejected (
     assert!(result . is_err(),
             "Moving and merging same node should be rejected");
     match result {
-      Err (SaveError::BufferValidationErrors (errors)) => {
+      Err (SaveError::BufferValidationErrors { errors, .. }) => {
         assert!(errors . iter() . any (|e| matches!(
           e, BufferValidationError::CannotMoveAndMergeSimultaneously (_))),
           "Expected CannotMoveAndMergeSimultaneously error, got: {:?}",

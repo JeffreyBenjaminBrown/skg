@@ -23,6 +23,7 @@ use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::types::errors::{SaveError, BufferValidationError};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
@@ -151,3 +152,47 @@ async fn readonly_col_repairs_warn_impl (
     assert! ( result . is_err (),
       "a body on a col scaffold must still abort the save" ); }
   Ok (( )) }
+
+#[test]
+fn failed_save_carries_warnings_with_errors
+  () -> Result<(), Box<dyn Error>> {
+  // Decided 2026-06-12 (option b): a failed save's response carries
+  // its warnings alongside its errors. The buffer below produces BOTH
+  // a parse-time warning (leftover text on a subscriberCol headline)
+  // and a validation error (an idCol claiming an id node n lacks).
+  run_with_test_db (
+    "skg-test-failed-save-warnings",
+    "tests/partner_col_warnings/fixtures",
+    "/tmp/tantivy-test-failed-save-warnings",
+    |config, driver, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let buffer : &str = "\
+* (skg (node (id n) (source main))) n
+** (skg subscriberCol) leftover headline text
+*** (skg (node (id r) (source main) indef)) r
+*** (skg (node (id t) (source main) indef)) t
+** (skg idCol)
+*** (skg id) bogus-id
+";
+      let result : Result<SaveResponse, Box<dyn Error>> =
+        save_buffer (buffer, config, driver, tantivy, &graph) . await;
+      let err : Box<dyn Error> = match result {
+        Ok (_)  => panic! ("save should fail (idCol edited)"),
+        Err (e) => e, };
+      let save_error : &SaveError =
+        err . downcast_ref::<SaveError> ()
+        . unwrap_or_else ( || panic! ("expected a SaveError: {}", err) );
+      match save_error {
+        SaveError::BufferValidationErrors { errors, warnings } => {
+          assert! (
+            errors . iter () . any (
+              |e| matches! (e, BufferValidationError::IDCol_Edited (..)) ),
+            "expected an IDCol_Edited error: {:?}", errors );
+          assert! (
+            warnings . iter () . any (
+              |w| w . contains ("Headline text on a subscriberCol") ),
+            "a failed save must carry its parse warning: {:?}", warnings ); }
+        other => panic! (
+          "expected BufferValidationErrors, got {:?}", other ), }
+      Ok (( )) } )) }

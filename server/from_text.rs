@@ -80,8 +80,11 @@ pub async fn buffer_to_validated_saveplan (
         . await } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
-      return Err ( SaveError::BufferValidationErrors (
-        validation_errors ) ); }}
+      // Warnings always accompany errors (decided 2026-06-12): the
+      // parse-time warnings collected so far ride out with the abort.
+      return Err ( SaveError::BufferValidationErrors {
+        errors   : validation_errors,
+        warnings : parsing_warnings, } ); }}
   let viewforest : ViewForest =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "maybePlaced_to_placed_viewforest" ). entered();
@@ -107,10 +110,12 @@ pub async fn buffer_to_validated_saveplan (
         &nodeMerge_instructions,
         config,
         driver )
-      . await } . map_err (SaveError::BufferValidationErrors) ?;
+      . await } . map_err ( |errors| SaveError::BufferValidationErrors {
+        errors, warnings : parsing_warnings . clone () } ) ?;
   validate_no_simultaneous_move_and_nodeMerge (
     &nonmerge_plan . source_moves, &nodeMerge_instructions )
-    . map_err (SaveError::BufferValidationErrors) ?;
+    . map_err ( |errors| SaveError::BufferValidationErrors {
+      errors, warnings : parsing_warnings . clone () } ) ?;
   let warnings : Vec<String> = {
     let mut warnings : Vec<String> = parsing_warnings;
     warnings . extend ( nonmerge_plan . warnings );

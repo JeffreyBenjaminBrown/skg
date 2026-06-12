@@ -14,7 +14,12 @@ pub enum SaveError {
   ParseError (String),
   DatabaseError(Box<dyn Error>),
   IoError (io::Error),
-  BufferValidationErrors ( Vec<BufferValidationError> ), }
+  // A failed save carries, alongside its errors, the nonfatal
+  // warnings collected before the abort (e.g. discarded col-headline
+  // text). Decided 2026-06-12: warnings always accompany errors.
+  BufferValidationErrors {
+    errors   : Vec<BufferValidationError>,
+    warnings : Vec<String>, }, }
 
 /// If the user attempts to save a buffer
 /// with any of these properties, the server should refuse.

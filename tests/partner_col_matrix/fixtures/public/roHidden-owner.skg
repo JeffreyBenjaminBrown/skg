@@ -1,0 +1,5 @@
+pid: roHidden-owner
+title: roHidden-owner
+hides_from_its_subscriptions:
+- roHidden-a
+- roHidden-b

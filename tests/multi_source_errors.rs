@@ -184,7 +184,7 @@ fn test_foreign_node_modification_errors(
       assert!(result . is_err(), "Expected errors for foreign node modifications");
 
       if let Err (e) = result {
-        if let SaveError::BufferValidationErrors (errors) = e {
+        if let SaveError::BufferValidationErrors { errors, .. } = e {
           println!("\n=== Foreign node modification errors ({} total) ===", errors . len());
           for (i, error) in errors . iter() . enumerate() {
             println!("{}: {:?}", i + 1, error);
@@ -261,7 +261,7 @@ fn test_foreign_node_modification_errors(
               "Expected errors for foreign merge operations");
 
       if let Err (e) = result {
-        if let SaveError::BufferValidationErrors (errors) = e {
+        if let SaveError::BufferValidationErrors { errors, .. } = e {
           println!("\n=== Foreign merge errors ({} total) ===", errors . len());
           for (i, error) in errors . iter() . enumerate() {
             println!("{}: {:?}", i + 1, error);
@@ -388,7 +388,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         println!("Error: {:?}", e);
 
         match e {
-          SaveError::BufferValidationErrors (errors) => {
+          SaveError::BufferValidationErrors { errors, .. } => {
             // Should contain InconsistentSources error
             let source_errors: Vec<&BufferValidationError> = errors . iter()
               . filter(|e| matches!(e, BufferValidationError::InconsistentSources(_, _)))

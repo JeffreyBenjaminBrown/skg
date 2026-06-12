@@ -252,12 +252,16 @@ fn reconcile_content_children (
   // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
   // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
   let substitution_for_children : bool =
-    // The overridden-as-such exception (plan 11): the user asked to
-    // see the ORIGINAL, so its immediate children draw raw; deeper
-    // levels follow the general rule (decided 2026-06-11: no
-    // cascade).
+    // The raw-drawn-override rule (generalized 2026-06-12 from the
+    // plan-11 overridden-as-such case): when this node is itself
+    // overridden but drawn RAW by its position -- a read-only col
+    // member, an overriddenCol member, or a view root -- the user is
+    // looking at the ORIGINAL, so its immediate children draw raw too.
+    // Depth one level: a content child is not a raw position, so
+    // substitution resumes there (matching the overridden-as-such
+    // precedent).
     substitution_enabled
-    && ! is_overridden_as_such (tree, node) ?;
+    && ! is_overridden_drawn_raw (tree, node, config, graph_snap) ?;
   complete_content_children(
     tree, node, &apparent_content_ids, config, graph_snap,
     deleted_since_head_pid_src_map, active_source_set,
@@ -314,25 +318,57 @@ fn mutate_truenode_to_deletednode (
         body, } ) ); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// Whether this node is an overridden-as-such: it claims
-/// parentIs=affected and is a child of an OverriddenCol. Mirrors
-/// 'is_subscribee'; the parallel position with the parallel meaning.
-fn is_overridden_as_such (
-  tree : &Tree<ViewNode>,
-  node : NodeId,
+/// Whether this node is overridden yet drawn RAW by its position, so
+/// that substitution must be disabled for its immediate children (one
+/// level; a content child is a substituting position, so substitution
+/// resumes there). Generalizes the plan-11 overridden-as-such rule (an
+/// overriddenCol member) to every raw-drawn position. Decided
+/// 2026-06-12:
+/// - POSITION: a member of any PartnerCol that draws raw -- every col
+///   EXCEPT the writable subscribeeCol, whose subscribees-as-such DO
+///   substitute (the subscriber's view of them) -- or a view root.
+/// - OVERRIDDEN: ownership-gated, visibility-UNGATED ('active' = None),
+///   so even a node whose only overrider is invisible counts as
+///   "overridden but drawn raw".
+/// - A node carrying an 'overridesHere' marker is a substitute, not a
+///   raw original, so it is excluded (its children substitute as
+///   usual).
+fn is_overridden_drawn_raw (
+  tree       : &Tree<ViewNode>,
+  node       : NodeId,
+  config     : &SkgConfig,
+  graph_snap : &Arc<InRustGraph>,
 ) -> Result<bool, Box<dyn Error>> {
-  let is_member_of_parent : bool =
+  let in_raw_position : bool = {
+    let parent_is_raw_drawing_col : bool =
+      read_at_ancestor_in_tree( tree, node, 1,
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::PartnerCol (pc)
+            => ! matches!( pc, PartnerCol::Subscribee ),
+          _ => false } )
+      . unwrap_or (false);
+    let is_view_root : bool =
+      // During completion a view root is a child of the BufferRoot
+      // sentinel; its 'parentIs == Absent' is stamped only later, at
+      // render.
+      read_at_ancestor_in_tree( tree, node, 1,
+        |vn : &ViewNode| matches!( &vn . kind,
+          ViewNodeKind::BufferRoot ))
+      . unwrap_or (false);
+    parent_is_raw_drawing_col || is_view_root };
+  if ! in_raw_position { return Ok (false); }
+  let (id, has_marker) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
-          => t . parentIs == ParentIs::Affected,
-        _ => false } ) ?;
-  let parent_is_overridden_col : bool =
-    read_at_ancestor_in_tree( tree, node, 1,
-      |vn : &ViewNode| matches!( &vn . kind,
-        ViewNodeKind::PartnerCol (PartnerCol::Overridden)))
-    . unwrap_or (false);
-  Ok( is_member_of_parent && parent_is_overridden_col ) }
+          => ( Some (t . id . clone ()),
+               t . viewStats . overridesHere . is_some () ),
+        _ => ( None, false ) } ) ?;
+  let id : ID = match id { Some (id) => id, None => return Ok (false) };
+  if has_marker { return Ok (false); }
+  let overridden : bool =
+    resolve_override (config, graph_snap, None, &id) . effective != id;
+  Ok (overridden) }
 
 /// Whether this node claims parentIs=affected
 /// and is a child of SubscribeeCol (and not a phantom).

@@ -60,8 +60,10 @@ So far there are these endpoints:
     usual `(switch-to-view ...)` reply); a second menu request
     switches to the open menu; the menu appears in diff mode too.
   - `(override-choice . "bypass")` skips the menu and opens the
-    requested node itself; recursive content beneath it still
-    applies override substitution. Emacs sends bypass from magit
+    requested node itself, drawn raw. Because the bypass-opened root
+    is an overridden node drawn raw, its immediate children also draw
+    raw (one level); substitution resumes at the grandchildren. See
+    "Override substitution" below. Emacs sends bypass from magit
     buffers (readable-ID jumps land on the raw node) and from the
     command `skg-goto-bypassOverride`, the menu's escape hatch.
 
@@ -284,9 +286,15 @@ relationship traversed..."), cycle-guarded, and never in diff mode.
 Existing viewnodes are never rewritten (closing and reopening
 normalizes), and only content substitutes: PartnerCol members,
 view roots, search results, ancestry insertions and phantoms always
-draw the raw node. The immediate children of an overridden-as-such
-(an Affected child of an overriddenCol) also draw raw: the user
-asked to see the original.
+draw the raw node. Moreover, the immediate children of ANY overridden
+node drawn raw -- a PartnerCol member, a view root (bypass-opened or
+otherwise), or the overridden-as-such (an Affected child of an
+overriddenCol) -- also draw raw: the user is looking at the original,
+so its children are the original's, not the overrider's. This is one
+level deep -- substitution resumes at the grandchildren -- and it is
+strict: a node whose only overrider is invisible under the active
+source-set is "overridden but drawn raw" too, so its children draw
+raw as well.
 
 A substituted viewnode carries the keyed viewStats form
 `(overridesHere N)` -- herald red "Oh" -- naming the original it
