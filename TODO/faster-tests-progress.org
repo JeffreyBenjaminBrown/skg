@@ -1,0 +1,115 @@
+* Progress executing TODO/faster-tests.org
+  Started 2026-06-12. The plan file is unchanged (per when-to-stop.org);
+  deviations are recorded here.
+
+* what's done and went well
+  (updated as work lands; see git log, commits prefixed "faster-tests N:")
+
+** faster-tests 1: quick wins
+   - 'bash/all-tests.sh' and 'bash/nextest.sh' now bound the nextest
+     phase's BUILD parallelism ('SKG_NEXTEST_BUILD_JOBS', default
+     half-the-cores capped at 8). This was the likeliest
+     machine-kneeling mechanism (16 parallel links of ~250MB debug
+     binaries on 15GB RAM).
+   - Two stale-doc fixes (development-process.md link, USAGE.md typo).
+
+** faster-tests 2: the shared-db-session machinery
+   - 'run_with_shared_test_db' + 'SharedDbSession' in
+     server/test_utils.rs: one driver connection, one database, one
+     schema per test GROUP; 'reset' wipes data in place (~10ms
+     measured) and repopulates from the next sub-test's fixtures.
+   - Three reset flavors grew out of the conversions:
+     - 'reset (name, fixtures_dir)': copies fixtures to temp; if the
+       copy contains a skgconfig.toml the config is loaded from the
+       copy (multi-source), else a flat single-"main"-source config.
+     - 'reset_from_config (name, toml_path)': in-place TOML, matching
+       'run_with_test_db_from_config'.
+     - 'reset_with_source_path (name, path)': for tests that build
+       their own source dir (git_diff_view's TempDir repos).
+   - 'install_or_swap_global_handle' (server/dbs/in_rust_graph.rs):
+     the OnceLock can't be re-set, but its ArcSwap contents can; each
+     consolidated sub-test points the process-global graph at its own
+     fixtures and adopts the returned global handle.
+   - A process-wide mutex serializes shared-db groups under plain
+     'cargo test' (uncontended under nextest).
+   - tests/shared_db_session.rs pins wipe completeness (zero
+     instances of every schema.tql type after a wipe) and the
+     handle-swap semantics.
+
+** faster-tests 3-7: conversions
+   - Converted to one-group-per-file (every file with >= 2 db tests):
+     definitive_view_cascade_and_budget, content_view,
+     override_substitution, overridden_as_such, view_stats_sharing,
+     partner_col_warnings, hidden_from_subscriptions, typedb (+ 4
+     submodules + util/search/util), merge_nodes,
+     save/none_node_fields_are_noops, save/validate_foreign_nodes,
+     new/ (4 submodules), rebuild (2 submodules), initial_view_bfs,
+     delete_strips_references_from_neighbors,
+     dangling_reference_renders_unknown_node,
+     subscribee_col_empty_persists.
+   - Speedups observed solo (this container): definitive_view 4.3s ->
+     1.0s; content_view 3.2s -> 0.6s; typedb 5.2s -> 0.8s;
+     override_substitution ~2.5s -> 0.4s; hidden_from_subscriptions
+     5.9s -> 2.4s; new 8.7s -> ~1.3s of group time.
+   - The override_substitution plain-cargo-test race documented in
+     problems.org is structurally fixed (sub-tests swap the global
+     handle; the binary is one sequential group).
+   - hidden_from_subscriptions' private setup helpers (one of the six
+     duplicate setup paths) were deleted; its sub-tests use the
+     session.
+
+* Changes to the plan's envisioned order
+  - None of substance. Work proceeded roughly in the plan's order
+    (quick knob first, then machinery, then conversions heaviest-first,
+    binary grouping last).
+  - The plan's conversion sketch passed (config, driver, tantivy) to
+    every sub-test; for git_diff_view the sub-tests instead take the
+    whole '&mut SharedDbSession', because each must build its git repo
+    BEFORE the reset that points the db at it.
+
+* what's imperfect about what's done
+  - Files with exactly ONE db-creating test were left on
+    run_with_test_db (a single-test file gains nothing from sharing):
+    rebuild/sourceward_ancestry, save/birth_and_indefinitive,
+    typedb/paths, typedb/search (its two sub-tests already shared one
+    db), new/buffer_to_viewnodes/validate_tree/contradictory_instructions,
+    file_io, idempotence, indef_should_not_count_as_donotdelete,
+    expand_partner_col_member, expand_raw_overridden_children,
+    collateral_partner_col, collateral_source_move, partner_col_order,
+    override_chain_notice, subscribee_col, init_refusal,
+    inactive_suppression, aliases/view + newhere_cycle/save in
+    git_diff_view. Their residual cost is ~20 x ~0.25s per suite run.
+    Merging them into related groups is possible but couples files;
+    deferred.
+  - graphnodestats_hiding.rs deliberately NOT converted: its
+    TypeDB-path test relies on the process-global handle being
+    UNinstalled, which only process-per-test execution guarantees.
+    The same constraint shapes binary grouping: that file must not
+    share a binary with handle-installing tests, or its TypeDB-path
+    test silently stops testing the TypeDB path under plain
+    'cargo test'. (Under nextest it is always safe.)
+  - Consolidation coarsens failure granularity: a failing sub-test
+    aborts its group's remaining sub-tests. Mitigation in place: each
+    reset prints "-- sub-test: <name>", and libtest replays captured
+    stdout on failure, so the failing sub-test is identifiable. A
+    per-sub-test catch_unwind harness that runs ALL sub-tests and
+    reports every failure would be nicer; not built.
+  - 'wipe_all_data' hardcodes schema.tql's type list
+    (ALL_SCHEMA_INSTANCE_TYPES); adding a type to the schema requires
+    updating it. The self-test pins completeness for the CURRENT
+    schema only.
+  - Orphaned attribute values survive a wipe (invisible to
+    has-queries; documented on wipe_all_data).
+
+* choices determining the future
+  - Sub-test identification is println-based, not structured. If
+    failure reporting proves annoying, the next step is a small
+    harness running each sub-test under catch_unwind.
+  - install_or_swap_global_handle returns the GLOBAL handle and
+    callers adopt it; tests written later should follow that pattern
+    (see tests/partner_col_warnings.rs) so saves through the handle
+    stay globally visible.
+  - The shared-group mutex means plain 'cargo test' runs db groups
+    strictly serially. That trades speed (in an already-slower mode
+    nobody uses for timing) for the end of the
+    shared-process-global-state flake family.

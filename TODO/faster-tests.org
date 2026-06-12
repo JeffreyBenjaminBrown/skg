@@ -1,0 +1,437 @@
+* Making the test suite faster
+  Written 2026-06-12, after investigating where the suite's time goes.
+  No production or test code was changed; the only artifacts are this
+  file, an entry in TODO/problems.org, and the (deleted, reproducible)
+  measurement experiment in the appendix.
+
+  TLDR: Your suspicion is right -- per-test database churn dominates
+  the run -- but the single most expensive operation is creating the
+  TypeDB database itself (~200ms), not loading the schema (~9ms) or
+  the fixtures (~30ms). That suggests a cheaper consolidation than
+  merging fixture graphs: let adjacent tests share one database and
+  one connection, and between tests wipe the DATA in place (~8ms) and
+  repopulate from that test's own fixtures. Assertions, fixture
+  files, and test-body code stay byte-identical, so the diff is
+  quiet. Separately, about 60% of a typical "run the tests after a
+  code change" cycle is spent not running tests at all, but linking
+  52 separate ~250MB test binaries; grouping test files into a few
+  binaries would cut that, and would also relieve the memory/IO
+  pressure that brings the machine to its knees.
+
+* Where the time goes
+** The recorded full run (tests/results/, 2026-06-06)
+   From 'tests/results/ALL.org' and 'tests/results/nextest.log':
+
+   | phase                          | time   | notes                                  |
+   |--------------------------------+--------+----------------------------------------|
+   | build (phase 1, warm)          | 2s     | only bins 'skg', 'cleanup-test-dbs'    |
+   | Emacs unit tests               | 2s     |                                        |
+   | nextest: compile               | ~91s   | "Finished ... in 1m 30s", 52 binaries  |
+   | nextest: run                   | ~61s   | 491 tests, serial (see below)          |
+   | integration tests              | ~45s   | 28 tests, 1-4s each, sequential        |
+   |--------------------------------+--------+----------------------------------------|
+   | total                          | ~200s  |                                        |
+
+   'bash/all-tests.sh' passes '--jobs 1' to nextest, which (verified
+   against 'cargo nextest run --help') is an alias for
+   '--test-threads', so the 61s of test execution is fully serial:
+   the sum of per-test times (60.9s) equals the wall time. Every
+   millisecond of per-test setup is paid in wall-clock.
+
+** Per-test breakdown of the 61s
+   Aggregating the per-test times in 'tests/results/nextest.log':
+
+   - 300 of 491 tests take under 50ms each, summing to ~3.6s.
+   - 179 tests take >= 150ms each, summing to 57.3s -- 94% of the run.
+
+   Those 179 are, almost exactly, the tests that create their own
+   TypeDB database. The suite has ~6 equivalent setup paths that all
+   do the same thing (connect, create db, define schema, populate,
+   tear down):
+
+   - 'run_with_test_db' (110 call sites)
+   - 'run_with_test_db_from_config' (28 call sites)
+   - 'setup_test_dbs' in tests/git_diff_view/common.rs (24 call sites)
+   - 'setup_test' / 'setup_temp_test' in tests/hidden_from_subscriptions.rs (15 tests)
+   - 'setup' in tests/move_source.rs, 'run_with_source_set_test_db'
+     for tests/source_sets.rs, 'setup_test_dbs' in
+     tests/collateral_source_move.rs (the remainder)
+
+   The ten most expensive binaries (sum of their tests' times):
+
+   | binary                             | tests | time  |
+   |------------------------------------+-------+-------|
+   | git_diff_view                      |    29 | 9.4s  |
+   | new                                |   102 | 8.7s  |
+   | hidden_from_subscriptions          |    15 | 5.9s  |
+   | typedb                             |    24 | 5.2s  |
+   | definitive_view_cascade_and_budget |     7 | 4.3s  |
+   | save                               |    18 | 4.0s  |
+   | merge                              |     8 | 3.9s  |
+   | content_view                       |     6 | 3.2s  |
+   | move_source                        |     8 | 2.3s  |
+   | source_sets                        |    15 | 2.2s  |
+
+   Top ten ~= 49s of the 61s.
+
+** What one db setup actually costs (measured 2026-06-12)
+   I ran a temporary experiment (code in the appendix) against a
+   freshly started TypeDB, using 'tests/content_view/fixtures'
+   (8 nodes), on this container (16 cores, 15GB RAM). Steady-state
+   numbers, stable across rounds:
+
+   | phase                               | cost    |
+   |-------------------------------------+---------|
+   | TypeDBDriver::new (connect)         | ~47ms   |
+   | create empty TypeDB db              | ~190-220ms |
+   | define schema                       | ~9ms    |
+   | create sources                      | ~7ms    |
+   | create nodes + relationships (8)    | ~30-40ms |
+   | create empty Tantivy index (on disk)| ~18ms   |
+   | cleanup (delete db + index dir)     | ~60ms   |
+   |-------------------------------------+---------|
+   | total per test                      | ~360ms  |
+
+   And the alternative reset, measured in the same experiment:
+
+   | phase                                      | cost  |
+   |--------------------------------------------+-------|
+   | wipe all data in place (delete entities)   | ~8ms  |
+   | repopulate (sources + nodes + rels, 8 nodes)| ~30ms |
+
+   So 'create db' + 'delete db' + 'connect' + 'schema' is ~300ms per
+   test, replaceable by a ~10ms wipe (the repopulate cost is paid
+   either way). The expensive thing is the database object itself
+   (RocksDB instance churn inside TypeDB), not the schema and not the
+   data.
+
+   Caveat on absolute numbers: on whatever machine produced the
+   2026-06-06 results, the cheapest full db test ('test_pid_from_id')
+   took 203ms TOTAL, so per-test overhead there was nearer ~150-180ms
+   than ~300ms. The proportions, not the absolute milliseconds, are
+   the finding: setup/teardown is roughly 60-90% of every db test,
+   i.e. ~35-50s of the 61s run.
+
+* Why the machine kneels
+  Two separate mechanisms, and the test execution itself is probably
+  the lesser one:
+
+  1. The nextest COMPILE phase builds with unbounded parallelism.
+     'all-tests.sh' applies 'SKG_CARGO_BUILD_JOBS' (default 2) only to
+     the phase-1 'cargo build'; the 'cargo nextest run' invocation gets
+     no '--build-jobs', so it compiles/links with the default = all 16
+     cores. There are 52 test binaries, each a ~250MB debug link
+     (target/debug/deps currently holds 36.8GB). Sixteen concurrent
+     rustc/linker processes chewing through quarter-gigabyte binaries
+     on a 15GB-RAM machine is exactly the memory + IO profile that
+     makes a desktop unresponsive; 'nice 15' helps CPU priority but
+     does nothing for RAM or IO. (Reported in TODO/problems.org.)
+
+  2. TypeDB churn: ~179 database create/delete cycles per run. Each
+     create spins up a RocksDB instance; the file-handle pressure is
+     bad enough that 'start-servers.sh' already raises ulimits and
+     wipes leaked 'skg-test-*' dbs to avoid "Too many open files"
+     panics. Fewer creates means less of this, and fewer leaked dbs
+     after crashed runs.
+
+* Main recommendation: shared db per file, data reset between tests
+** Evaluating the merged-fixture idea first
+   The original idea -- put the independent graphs of adjacent tests
+   into one db simultaneously -- works only where the graphs are
+   disjoint AND no test asserts on global state (whole-db pid sets,
+   Tantivy result counts, whole-buffer renders that would see foreign
+   roots). Surveying the slow files, adjacent tests usually share node
+   IDs on purpose: e.g. 5 of the 8 tests in
+   'tests/definitive_view_cascade_and_budget.rs' use the SAME fixture
+   dir and save buffers naming the same nodes ('1', '11', '12', ...),
+   each relying on a pristine copy. Merging those graphs would mean
+   renumbering fixture IDs and editing every expected-output string --
+   precisely the noisy diff you want to avoid. Letting later tests see
+   earlier tests' mutations instead would mean re-deriving every
+   expectation by hand, which is worse.
+
+** The cheaper equivalent
+   The measurements show you don't need disjoint graphs to get
+   essentially all of the win. Share the expensive objects -- the
+   driver connection, the database, the schema -- and reset only the
+   cheap thing (the data) between tests:
+
+   - one '#[test]' per file (or per group within a file), which opens
+     one connection and creates one db + schema;
+   - each former test body becomes a plain 'async fn' with the same
+     '(config, driver, tantivy)' parameters it already receives from
+     the 'run_with_test_db' closure -- body, assertions, indentation
+     unchanged;
+   - between sub-tests: wipe data in place (~8ms), re-copy the
+     fixture dir to the temp folder, repopulate (the same populate
+     cost the test already paid), fresh empty Tantivy index (~18ms,
+     or 'empty_in_ram_tantivy_index' for ~0 where the test doesn't
+     reopen the directory).
+
+   Every sub-test still starts from a pristine copy of its own
+   fixtures, so no assertion changes, no ID renumbering, and the
+   fixture dirs within a file don't even have to match (the reset
+   repopulates from whichever dir the next sub-test names).
+
+   Per-test overhead drops from ~200-360ms to ~40-60ms. Estimated
+   effect on the recorded run: the 61s test phase drops to roughly
+   25-35s. On this container the saving is larger (~300ms x 179 ~=
+   53s of pure overhead).
+
+** Sketch
+   A new helper beside 'run_with_test_db' in 'server/test_utils.rs':
+
+   #+begin_src rust
+   pub struct SharedDbSession {
+     pub db_name : String,
+     pub config  : SkgConfig,        // re-pointed at each reset's temp fixtures
+     pub driver  : Arc<TypeDBDriver>,
+     pub tantivy : TantivyIndex, }
+
+   impl SharedDbSession {
+     /// Wipe all data, copy `fixtures_folder` to the temp dir,
+     /// repopulate sources/nodes/relationships, fresh Tantivy index.
+     /// Schema and database object survive.
+     pub async fn reset (&mut self, fixtures_folder : &str)
+       -> Result<(), Box<dyn Error>> { ... } }
+
+   pub fn run_with_shared_test_db<F> (
+     db_name : &str,
+     test_fn : F, // receives &mut SharedDbSession
+   ) -> Result<(), Box<dyn Error>> { ... }
+   #+end_src
+
+   And a converted file looks like:
+
+   #+begin_src rust
+   #[test]
+   fn definitive_view_tests () -> Result<(), Box<dyn Error>> {
+     run_with_shared_test_db (
+       "skg-test-definitive-view",
+       |session| Box::pin ( async move {
+         session . reset ("tests/definitive_view_cascade_and_budget/fixtures") . await ?;
+         test_definitive_view_ample_budget (session) . await ?;
+         session . reset ("tests/definitive_view_cascade_and_budget/fixtures") . await ?;
+         test_definitive_view_limit_5_or_6 (session) . await ?;
+         session . reset ("tests/definitive_view_cascade_and_budget/fixtures-cycle") . await ?;
+         test_definitive_view_with_cycle (session) . await ?;
+         // ...
+         Ok (( )) } )) }
+   #+end_src
+
+   The diff per converted test is ~6 lines of header/footer (the
+   '#[test]' + 'run_with_test_db(...)' wrapper becomes an 'async fn'
+   signature; the closing '} ))' becomes '}'); the body keeps its
+   current indentation since Rust doesn't care that it is now one
+   level "too deep".
+
+** Pitfalls the harness must handle
+   These are the things that would bite a naive conversion; all have
+   straightforward answers.
+
+   1. A sub-test panic must not silently skip its siblings.
+      'run_with_test_db' already catches panics for cleanup; the
+      group runner should additionally 'catch_unwind' around EACH
+      sub-test, record the sub-test's name, and re-raise (or collect
+      and report all failures) at the end. Otherwise one failure
+      hides every later sub-test in the group, and nextest's output
+      loses per-test granularity either way -- the harness should
+      print sub-test names as it runs them.
+
+   2. The process-global graph handle ('GLOBAL_HANDLE',
+      server/dbs/in_rust_graph.rs:36). Sixteen test files call
+      'try_init_global_handle'; under nextest each test is its own
+      process so the OnceLock is per-test, but consolidated sub-tests
+      share a process. Since 'InRustGraphHandle' is
+      'Arc<ArcSwap<InRustGraph>>' (line 383), the OnceLock's CONTENTS
+      can be swapped: 'session.reset' should '.store(...)' the new
+      fixture set's graph into the already-installed handle (or
+      install it if absent). Done right, this also fixes the
+      documented 'cargo test --test override_substitution' race in
+      TODO/problems.org, and the precedent constraint that forced
+      'tests/git_diff_view_partner_cols.rs' into its own binary.
+
+   3. The Tantivy background writer is process-global:
+      'session.reset' must call 'wait_for_tantivy_writes_idle' before
+      deleting/recreating the index dir (the existing cleanup already
+      does; see common-gotchas.md).
+
+   4. Wipe completeness. The experiment wiped with
+      'match $x isa node; delete $x;' (likewise 'extra_id',
+      'source'), then repopulated and the round-trip behaved. TypeDB
+      removes relations when their players are deleted; orphaned
+      attribute values may persist invisibly to 'has'-queries. Before
+      trusting it broadly, add a one-off assertion (count instances of
+      every schema type after a wipe) to the helper's test.
+
+   5. Parallel safety is preserved: each GROUP keeps a unique db name,
+      so plain 'cargo test' (threads in one process) and nextest with
+      test-threads > 1 both stay race-free across groups. Within a
+      group, sub-tests are sequential by construction.
+
+   6. Parallelism loss in principle, none in practice: grouping
+      removes nextest's ability to interleave the sub-tests, but the
+      suite is run at '--jobs 1' anyway, and after consolidation the
+      TypeDB load is low enough that raising to 2-3 jobs (across
+      groups, each with its own db) becomes realistic if more speed
+      is wanted later.
+
+** Suggested conversion order
+   Convert the heaviest files first; each is independent:
+   'git_diff_view' (9.4s), 'hidden_from_subscriptions' (5.9s),
+   'typedb' (5.2s), 'definitive_view_cascade_and_budget' (4.3s),
+   'save' (4.0s), 'merge' (3.9s), 'content_view' (3.2s),
+   'move_source' (2.3s), 'source_sets' (2.2s), then the long tail of
+   1-2-test files. 'new' (8.7s) is worth doing too but its 36 db
+   tests are spread across many submodules, so it's more edits for
+   the same per-test saving.
+
+   While at it, the ~6 duplicate setup paths listed above could all
+   collapse into the one shared-session helper -- they differ only in
+   whether config comes from a TOML file and whether fixtures are
+   copied to /tmp.
+
+* Second recommendation: fewer test binaries
+  54 top-level files under tests/ become 52 separate binaries (no
+  '[[test]]' targets in Cargo.toml, so each file auto-discovers).
+  Each links the full skg lib + typedb-driver + tantivy + git2 at
+  ~250MB debug. Measured here: touching ONE test file and relinking
+  costs ~9s wall. After any change to server/ code, ALL 52 relink:
+  that is the ~91s "compile" chunk of the recorded run -- bigger than
+  the 61s of actual testing -- plus the RAM/IO storm of item 1 under
+  "Why the machine kneels".
+
+  Grouping test files into a handful of binaries (e.g. one per area:
+  views, saves, diff, dbs, misc) with '#[path]'-style module includes
+  -- the pattern 'tests/git_diff_view.rs' and
+  'tests/git_diff_view_partner_cols.rs' already use -- would cut the
+  relink count ~10x and save ~10GB of target/. The trade-off: editing
+  one test file recompiles its whole group's binary, slightly slowing
+  test-only iteration; and binaries can no longer be run with
+  'cargo test --test <name>' per old names (filters like
+  'cargo nextest run -E "test(merge)"' replace that).
+
+  This pairs well with the shared-db conversion (consolidating a
+  file's tests into one '#[test]' is unaffected by which binary the
+  file lands in), but neither depends on the other.
+
+* Smaller knobs, in decreasing value
+  - Pass '--build-jobs' (e.g. 4) to the 'cargo nextest run' line in
+    'all-tests.sh', or export 'CARGO_BUILD_JOBS'. One-line change;
+    directly addresses the machine-usability complaint today, before
+    any consolidation lands. (Also in TODO/problems.org.)
+  - Use 'empty_in_ram_tantivy_index' (already exists,
+    server/dbs/init.rs:401) instead of an on-disk index for db tests
+    that never reopen the index directory: saves ~18ms setup + ~60ms
+    teardown-with-retries per test, and removes a class of
+    DirectoryNotEmpty flakes.
+  - The 28 integration tests (~45s) each boot a fresh skg server
+    (full init: db create + schema + fixtures) plus a batch Emacs.
+    Read-only ones (search, view requests, connection checks) could
+    share one server boot. More invasive and order-dependence-prone
+    than the unit-test work; I'd defer until the above lands.
+
+* Appendix: the measurement experiment
+  This lived at 'tests/bench_db_setup.rs' during the investigation
+  and was deleted so it doesn't become a 53rd binary. To re-measure
+  after changes, recreate it and run:
+    cargo test --test bench_db_setup -- --nocapture --test-threads=1
+  (TypeDB must be running.)
+
+  #+begin_src rust
+  use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+  use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
+  use skg::dbs::typedb::nodes::create_all_nodes;
+  use skg::dbs::typedb::relationships::create_all_relationships;
+  use skg::dbs::typedb::sources::create_all_sources;
+  use skg::test_utils::cleanup_test_tantivy_and_typedb_dbs;
+  use skg::types::misc::{SkgConfig, SkgfileSource, SourceName, TantivyIndex};
+  use skg::types::nodes::complete::NodeComplete;
+  use skg::types::nodes::typedb::NodeTypedb;
+
+  use futures::executor::block_on;
+  use std::collections::HashMap;
+  use std::error::Error;
+  use std::path::PathBuf;
+  use std::time::Instant;
+  use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
+
+  #[test]
+  fn bench_db_setup_phases () -> Result<(), Box<dyn Error>> {
+    let fixtures : &str = "tests/content_view/fixtures";
+    let db_name : &str = "skg-test-bench-db-setup";
+    let tantivy_folder : &str = "/tmp/tantivy-test-bench-db-setup";
+    for round in 0 .. 3 {
+      println! ("--- round {} ---", round);
+      block_on ( async {
+        let config : SkgConfig = {
+          let mut sources : HashMap<SourceName, SkgfileSource> =
+            HashMap::new ();
+          sources . insert (
+            SourceName::from ("main"),
+            SkgfileSource {
+              name         : SourceName::from ("main"),
+              abbreviation : None,
+              path         : PathBuf::from (fixtures),
+              user_owns_it : true, });
+          SkgConfig::fromSourcesAndDbName (
+            sources, db_name, tantivy_folder ) };
+        let t : Instant = Instant::now ();
+        let driver : TypeDBDriver = TypeDBDriver::new (
+          Addresses::try_from_address_str ("127.0.0.1:1729") ?,
+          Credentials::new ("admin", "password"),
+          DriverOptions::new (DriverTlsConfig::disabled ())
+        ) . await ?;
+        println! ("driver connect      : {:?}", t . elapsed ());
+        let t : Instant = Instant::now ();
+        let nodes : Vec<NodeComplete> =
+          read_all_skg_files_from_sources (&config) ?;
+        println! ("read fixtures ({:2}) : {:?}", nodes . len (), t . elapsed ());
+        let t : Instant = Instant::now ();
+        overwrite_new_empty_typedb_db (db_name, &driver) . await ?;
+        println! ("create empty db     : {:?}", t . elapsed ());
+        let t : Instant = Instant::now ();
+        read_and_use_schema (db_name, &driver) . await ?;
+        println! ("define schema       : {:?}", t . elapsed ());
+        let t : Instant = Instant::now ();
+        create_all_sources (db_name, &driver, &config) . await ?;
+        println! ("create sources      : {:?}", t . elapsed ());
+        let typedb_nodes : Vec<NodeTypedb> =
+          nodes . iter ()
+          . map (NodeTypedb::from_complete_parsing_textlinks)
+          . collect ();
+        let t : Instant = Instant::now ();
+        create_all_nodes (db_name, &driver, &typedb_nodes) . await ?;
+        println! ("create nodes        : {:?}", t . elapsed ());
+        let t : Instant = Instant::now ();
+        create_all_relationships (db_name, &driver, &typedb_nodes) . await ?;
+        println! ("create relationships: {:?}", t . elapsed ());
+        let t : Instant = Instant::now ();
+        let _tantivy : TantivyIndex =
+          create_empty_tantivy_index ( &PathBuf::from (tantivy_folder) ) ?;
+        println! ("tantivy empty index : {:?}", t . elapsed ());
+        { // Alternative to db delete+create: wipe all data in place,
+          // then repopulate. Measures the "shared db, per-test data
+          // wipe" strategy.
+          use typedb_driver::{Transaction, TransactionType};
+          let t : Instant = Instant::now ();
+          let tx : Transaction = driver . transaction (
+            db_name, TransactionType::Write ) . await ?;
+          tx . query ("match $x isa node; delete $x;") . await ?;
+          tx . query ("match $x isa extra_id; delete $x;") . await ?;
+          tx . query ("match $x isa source; delete $x;") . await ?;
+          tx . commit () . await ?;
+          println! ("wipe data in place  : {:?}", t . elapsed ());
+          let t : Instant = Instant::now ();
+          create_all_sources (db_name, &driver, &config) . await ?;
+          create_all_nodes (db_name, &driver, &typedb_nodes) . await ?;
+          create_all_relationships (db_name, &driver, &typedb_nodes) . await ?;
+          println! ("repopulate          : {:?}", t . elapsed ()); }
+        let t : Instant = Instant::now ();
+        cleanup_test_tantivy_and_typedb_dbs (
+          db_name, &driver,
+          Some ( &PathBuf::from (tantivy_folder) )) . await ?;
+        println! ("cleanup (db+index)  : {:?}", t . elapsed ());
+        Ok::<(), Box<dyn Error>> (( )) } ) ?; }
+    Ok (( )) }
+  #+end_src

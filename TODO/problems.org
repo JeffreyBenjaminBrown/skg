@@ -842,3 +842,45 @@
    the env graph so test harnesses without the global handle still see
    cols.  The matrix target works around it by installing the handle
    in its render-heavy function only.
+* Problems found while investigating test-suite speed (2026-06-12)
+  See TODO/faster-tests.org for the full investigation.
+
+** 'all-tests.sh' bounds build parallelism only for phase 1
+   bash/all-tests.sh. The script's stated purpose is "to keep an
+   interactive machine usable", and 'SKG_CARGO_BUILD_JOBS' (default 2)
+   is applied to the phase-1 'cargo build'. But the phase-2
+   'cargo nextest run' line gets no '--build-jobs', so it compiles and
+   links with the cargo default = every core. With 52 test binaries at
+   ~250MB each (debug), that is 16 concurrent rustc/linker processes
+   on a 15GB-RAM machine -- likely the single biggest contributor to
+   the machine kneeling during a test run, and unaffected by the
+   script's 'nice 15' (which governs CPU priority, not RAM or IO).
+   One-line fix: pass '--build-jobs "$BUILD_JOBS"' (nextest accepts
+   it) or export 'CARGO_BUILD_JOBS' for the phase-2 invocation.
+
+** Six near-duplicate test-db setup paths
+   The same connect / create-db / define-schema / populate / teardown
+   sequence is implemented in: 'run_with_test_db' and
+   'run_with_test_db_from_config' (server/test_utils.rs),
+   'setup_test_dbs' (tests/git_diff_view/common.rs), 'setup_test' and
+   'setup_temp_test' (tests/hidden_from_subscriptions.rs), 'setup'
+   (tests/move_source.rs), 'setup_test_dbs'
+   (tests/collateral_source_move.rs), and
+   'run_with_source_set_test_db' (used by tests/source_sets.rs).
+   They differ only in whether config comes from a TOML file and
+   whether fixtures are copied to /tmp. Quasi-duplication worth
+   collapsing -- and the natural moment is the shared-db-session
+   refactor proposed in TODO/faster-tests.org.
+
+** 'coding-advice/development-process.md' links to a missing file
+   It says the three kinds of tests are "described in
+   [ai-agents.md](../ai-agents.md)", but no 'ai-agents.md' exists at
+   the repo root. The real file is 'coding-advice/ai-agents.org'
+   (same folder), and it does not actually describe how to run the
+   tests; 'tests/USAGE.md' does. Same family as the already-reported
+   stale 'good-refactors.md' reference.
+
+** 'tests/USAGE.md' says "Emacs tests" twice
+   Its second paragraph introduces 'cargo test' with "Similarly, some
+   ways to run the Emacs tests include" -- copy-paste slip for "Rust
+   tests".
