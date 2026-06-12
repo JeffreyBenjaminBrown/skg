@@ -5,77 +5,80 @@
 
 use super::common::*;
 use std::sync::Arc;
+use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
 
 use std::io::BufReader;
 
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-git-diff-collateral-save",
+    |s| Box::pin ( async move {
+      test_collateral_view_preserves_diff_annotations (s) . await ?;
+      test_collateral_view_staged_text_and_unstaged_add (s) . await ?;
+      Ok (( )) } )) }
+
 /// After saving buffer 1 with a new child, collateral buffer 2
 /// should still show textChanged on b and new-here on the new child.
-#[test]
-fn test_collateral_view_preserves_diff_annotations()
-  -> Result<(), Box<dyn Error>>
+async fn test_collateral_view_preserves_diff_annotations (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
-  let db_name : &str = "skg-test-collateral-diff";
-  let tantivy_folder : String =
-    format!("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new()?;
   let repo_path : &Path = temp_dir . path();
   setup_git_repo_with_fixtures (repo_path)?;
+  s . reset_with_source_path (
+    "test_collateral_view_preserves_diff_annotations",
+    repo_path ) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
 
-  let (_config, driver, _tantivy, _save_response, _initial_buffer,
-       uri_2, read_end)
-    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
-       String, ViewUri, TcpStream) =
-    block_on ( async {
-      let (config, driver, mut tantivy)
-        : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex) =
-        setup_test_dbs (
-          db_name, repo_path . to_str() . unwrap(),
-          &tantivy_folder ) . await ?;
+  // 1. Get an initial diff view of "a".
+  let root_ids : Vec<ID> = vec![ID("a" . to_string())];
+  let (initial_buffer, pids, viewforest)
+    : (String, Vec<ID>, Tree<ViewNode>) =
+    multi_root_view (
+      &driver, &config, None, &root_ids, true ) . await ?;
 
-      // 1. Get an initial diff view of "a".
-      let root_ids : Vec<ID> = vec![ID("a" . to_string())];
-      let (initial_buffer, pids, viewforest)
-        : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view (
-          &driver, &config, None, &root_ids, true ) . await ?;
+  // Sanity: initial view should match expected diff output.
+  assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
 
-      // Sanity: initial view should match expected diff output.
-      assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
+  // 2. Build a ViewsState with diff_mode_enabled.
+  // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
+  // the rerender pipeline reads them as needed.)
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::new ());
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : true,
+    open_views            : OpenViews::new (),};
 
-      // 2. Build a ViewsState with diff_mode_enabled.
-      // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
-      // the rerender pipeline reads them as needed.)
-      let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
-      let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+  // 3. Register buffer 1 and buffer 2,
+  //    both viewing the same viewforest rooted at "a".
+  let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
+  let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
+  views_state . open_views . register_view (
+    uri_1 . clone (), viewforest . clone (), &pids );
+  views_state . open_views . register_view (
+    uri_2 . clone (), viewforest . clone (), &pids );
 
-      // 3. Register buffer 1 and buffer 2,
-      //    both viewing the same viewforest rooted at "a".
-      let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
-      let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
-      views_state . open_views . register_view (
-        uri_1 . clone (), viewforest . clone (), &pids );
-      views_state . open_views . register_view (
-        uri_2 . clone (), viewforest . clone (), &pids );
-
-      // 4. Save buffer 1 with a new child "c" of "a".
-      //    This also updates the in-Rust graph and re-renders collateral views.
-      let save_input : String = insert_after (
-        &initial_buffer, "(id a)",
-        "** (skg (node (id c))) c" );
-      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
-      let save_response : SaveResponse =
-        update_from_and_rerender_buffer (
-          &mut stream,
-          &save_input, &driver, &config, &mut tantivy, &graph, true,
-          &Ok ( uri_1 . clone () ),
-          &mut views_state ) . await ?;
-
-      Result::<_, Box<dyn Error>>::Ok ((
-        config, driver, tantivy, save_response,
-        initial_buffer, uri_2, read_end )) } ) ?;
+  // 4. Save buffer 1 with a new child "c" of "a".
+  //    This also updates the in-Rust graph and re-renders collateral views.
+  let save_input : String = insert_after (
+    &initial_buffer, "(id a)",
+    "** (skg (node (id c))) c" );
+  let (mut stream, read_end) = mk_test_tcp_stream_pair ();
+  let _save_response : SaveResponse =
+    update_from_and_rerender_buffer (
+      &mut stream,
+      &save_input, &driver, &config, tantivy, &graph, true,
+      &Ok ( uri_1 . clone () ),
+      &mut views_state ) . await ?;
+  // Close the write end so read_all_lp_messages (which reads to
+  // EOF) terminates. (Before the shared-db conversion the stream
+  // was dropped when the setup block_on's scope ended.)
+  drop (stream);
 
   // 5. Read streamed collateral views from the TCP stream.
   //    There should be exactly one, for buffer 2.
@@ -115,12 +118,6 @@ fn test_collateral_view_preserves_diff_annotations()
   assert!( repo_path . join ("c.skg") . exists (),
     "c.skg should have been created on disk" );
 
-  // Cleanup.
-  block_on ( async {
-    cleanup_test_dbs (
-      db_name, &driver,
-      Some ( Path::new (&tantivy_folder) )) . await
-  } ) ?;
   Ok (( ))
 }
 
@@ -135,64 +132,56 @@ fn test_collateral_view_preserves_diff_annotations()
 ///
 /// Asserts that the collateral re-render correctly attributes each
 /// change to the right stage.
-#[test]
-fn test_collateral_view_staged_text_and_unstaged_add()
-  -> Result<(), Box<dyn Error>>
+async fn test_collateral_view_staged_text_and_unstaged_add (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
 {
-  let db_name : &str = "skg-test-collateral-diff-staged";
-  let tantivy_folder : String =
-    format!("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new()?;
   let repo_path : &Path = temp_dir . path();
   setup_git_repo_with_fixtures_staged (repo_path)?;
+  s . reset_with_source_path (
+    "test_collateral_view_staged_text_and_unstaged_add",
+    repo_path ) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
 
-  let (_config, driver, _tantivy, _save_response, _initial_buffer,
-       uri_2, read_end)
-    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
-       String, ViewUri, TcpStream) =
-    block_on ( async {
-      let (config, driver, mut tantivy)
-        : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex) =
-        setup_test_dbs (
-          db_name, repo_path . to_str() . unwrap(),
-          &tantivy_folder ) . await ?;
+  let root_ids : Vec<ID> = vec![ID("a" . to_string())];
+  let (initial_buffer, pids, viewforest)
+    : (String, Vec<ID>, Tree<ViewNode>) =
+    multi_root_view (
+      &driver, &config, None, &root_ids, true ) . await ?;
 
-      let root_ids : Vec<ID> = vec![ID("a" . to_string())];
-      let (initial_buffer, pids, viewforest)
-        : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view (
-          &driver, &config, None, &root_ids, true ) . await ?;
+  // Sanity: initial view has textChanged attributed to staged.
+  assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);
 
-      // Sanity: initial view has textChanged attributed to staged.
-      assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::new ());
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : true,
+    open_views            : OpenViews::new (),};
 
-      let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
-      let mut views_state : ViewsState = ViewsState {
-        diff_mode_enabled : true,
-        open_views            : OpenViews::new (),};
+  let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
+  let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
+  views_state . open_views . register_view (
+    uri_1 . clone (), viewforest . clone (), &pids );
+  views_state . open_views . register_view (
+    uri_2 . clone (), viewforest . clone (), &pids );
 
-      let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
-      let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
-      views_state . open_views . register_view (
-        uri_1 . clone (), viewforest . clone (), &pids );
-      views_state . open_views . register_view (
-        uri_2 . clone (), viewforest . clone (), &pids );
-
-      let save_input : String = insert_after (
-        &initial_buffer, "(id a)",
-        "** (skg (node (id c))) c" );
-      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
-      let save_response : SaveResponse =
-        update_from_and_rerender_buffer (
-          &mut stream,
-          &save_input, &driver, &config, &mut tantivy, &graph, true,
-          &Ok ( uri_1 . clone () ),
-          &mut views_state ) . await ?;
-
-      Result::<_, Box<dyn Error>>::Ok ((
-        config, driver, tantivy, save_response,
-        initial_buffer, uri_2, read_end )) } ) ?;
+  let save_input : String = insert_after (
+    &initial_buffer, "(id a)",
+    "** (skg (node (id c))) c" );
+  let (mut stream, read_end) = mk_test_tcp_stream_pair ();
+  let _save_response : SaveResponse =
+    update_from_and_rerender_buffer (
+      &mut stream,
+      &save_input, &driver, &config, tantivy, &graph, true,
+      &Ok ( uri_1 . clone () ),
+      &mut views_state ) . await ?;
+  // Close the write end so read_all_lp_messages (which reads to
+  // EOF) terminates. (Before the shared-db conversion the stream
+  // was dropped when the setup block_on's scope ended.)
+  drop (stream);
 
   let mut reader : BufReader<TcpStream> =
     BufReader::new (read_end);
@@ -228,10 +217,5 @@ fn test_collateral_view_staged_text_and_unstaged_add()
   assert!( repo_path . join ("c.skg") . exists (),
     "c.skg should have been created on disk" );
 
-  block_on ( async {
-    cleanup_test_dbs (
-      db_name, &driver,
-      Some ( Path::new (&tantivy_folder) )) . await
-  } ) ?;
   Ok (( ))
 }

@@ -1,4 +1,4 @@
-// cargo nextest run --test view_stats_sharing
+// cargo nextest run --test grouped_overrides -E 'test(view_stats_sharing::)'
 //
 // The position-relative sharing view-stats
 // (TODO/full-schema/10_heralds-and-stats.org):
@@ -16,16 +16,15 @@
 // pins the parse arms).
 //
 // PITFALL: these stats read the process-global in-Rust graph
-// snapshot; the tests install it via try_init_global_handle, which
-// is per-process (nextest's model). Both tests load the same
-// fixture content, so handle reuse under plain 'cargo test' is
-// harmless.
+// snapshot; each sub-test installs its own fixture graph via
+// install_or_swap_global_handle.
 
 use std::error::Error;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::serve::ViewsState;
@@ -34,6 +33,21 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/view_stats_sharing/fixtures";
+  run_with_shared_test_db (
+    "skg-test-view-stats-sharing",
+    |s| Box::pin ( async move {
+      s . reset ("sharing_view_stats_appear_and_roundtrip", fixtures) . await ?;
+      sharing_view_stats_appear_and_roundtrip (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("overridesParent_is_position_relative", fixtures) . await ?;
+      overridesParent_is_position_relative (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 fn lines_containing<'a> (
   buf      : &'a str,
@@ -136,15 +150,12 @@ async fn save_and_rerender (
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-#[test]
-fn sharing_view_stats_appear_and_roundtrip
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-view-stats-sharing",
-    "tests/view_stats_sharing/fixtures",
-    "/tmp/tantivy-test-view-stats-sharing",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn sharing_view_stats_appear_and_roundtrip (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let (de_novo, _pids, _tree)
         : (String, Vec<ID>, _) =
@@ -168,17 +179,14 @@ fn sharing_view_stats_appear_and_roundtrip
           save_and_rerender (&view_of_p, config, driver, tantivy)
           . await ?;
         assert_op_in_view_of_P (&saved_p, "after save, view of P"); }
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn overridesParent_is_position_relative
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-view-stats-op-root",
-    "tests/view_stats_sharing/fixtures",
-    "/tmp/tantivy-test-view-stats-op-root",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn overridesParent_is_position_relative (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let (view_of_c, _pids, _tree)
         : (String, Vec<ID>, _) =
@@ -192,4 +200,4 @@ fn overridesParent_is_position_relative
       assert! ( ! c_root_line . contains ("overridesParent"),
         "C as a view root has no visible parent to override:\n{}",
         view_of_c );
-      Ok (( )) } )) }
+      Ok (( )) }

@@ -1,4 +1,4 @@
-// cargo test --test indef_should_not_count_as_donotdelete -- --nocapture
+// cargo nextest run --test grouped_saves -E 'test(indef_should_not_count_as_donotdelete::)'
 //
 // Reproduces the bug Jeff hit: a buffer that has the same node
 // shown definitive-with-editRequest-delete in one place AND

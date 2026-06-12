@@ -1,4 +1,4 @@
-// cargo test --test file_io
+// cargo nextest run --test grouped_saves -E 'test(file_io::)'
 
 #[allow (unused_imports)]
 use indoc::indoc; // A macro, which acts like an unused import.

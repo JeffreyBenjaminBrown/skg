@@ -1,4 +1,4 @@
-// cargo nextest run --test overridden_as_such
+// cargo nextest run --test grouped_overrides -E 'test(overridden_as_such::)'
 //
 // The overridden-as-such exception
 // (TODO/full-schema/11_override-rendering-and-navigation.org), on
@@ -13,15 +13,16 @@
 // never substitute.
 //
 // PITFALL: marked buffers hit the tamper check, which reads the
-// process-global in-Rust graph; tests install it via
-// try_init_global_handle (per-process under nextest).
+// process-global in-Rust graph; each sub-test installs its own
+// fixture graph via install_or_swap_global_handle.
 
 use std::error::Error;
 use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::serve::ViewsState;
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -29,6 +30,24 @@ use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/overridden_as_such/fixtures";
+  run_with_shared_test_db (
+    "skg-test-overridden-as-such",
+    |s| Box::pin ( async move {
+      s . reset ("subscribee_as_such_expansion_hides_and_substitutes", fixtures) . await ?;
+      subscribee_as_such_expansion_hides_and_substitutes (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("overridden_as_such_expansion_is_raw_and_unhidden", fixtures) . await ?;
+      overridden_as_such_expansion_is_raw_and_unhidden (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("col_members_never_substitute", fixtures) . await ?;
+      col_members_never_substitute (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 /// The lines of 'buf', each tagged with its nearest ENCLOSING col
 /// (by metadata atom; "" outside any col). Depth-aware: a col stops
@@ -110,15 +129,12 @@ async fn expand_e_under (
     "the {} copy of E was found and given a request", col );
   save_and_rerender (&edited, config, driver, tantivy) . await }
 
-#[test]
-fn subscribee_as_such_expansion_hides_and_substitutes
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-oas-subscribee",
-    "tests/overridden_as_such/fixtures",
-    "/tmp/tantivy-test-oas-subscribee",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn subscribee_as_such_expansion_hides_and_substitutes (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let view : String =
         expand_e_under ("subscribeeCol", config, driver, tantivy)
@@ -140,17 +156,14 @@ fn subscribee_as_such_expansion_hides_and_substitutes
                   *c == "hiddenInSubscribeeCol"
                   && l . contains ("(id H)") ),
         "H shows in the hiddenInSubscribeeCol:\n{}", view );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn overridden_as_such_expansion_is_raw_and_unhidden
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-oas-overridden",
-    "tests/overridden_as_such/fixtures",
-    "/tmp/tantivy-test-oas-overridden",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn overridden_as_such_expansion_is_raw_and_unhidden (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let view : String =
         expand_e_under ("overriddenCol", config, driver, tantivy)
@@ -170,17 +183,14 @@ fn overridden_as_such_expansion_is_raw_and_unhidden
          (hides are scoped to subscriptions):\n{}", view );
       assert! ( ! view . contains ("(id X)"),
         "X appears nowhere in this expansion:\n{}", view );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn col_members_never_substitute
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-oas-col-members",
-    "tests/overridden_as_such/fixtures",
-    "/tmp/tantivy-test-oas-col-members",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn col_members_never_substitute (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let (view, _pids, _tree) =
         multi_root_view (
@@ -199,4 +209,4 @@ fn col_members_never_substitute
       assert! ( e_lines . iter () . all (
                   |l| ! l . contains ("overridesHere") ),
         "neither copy is substituted:\n{}", view );
-      Ok (( )) } )) }
+      Ok (( )) }

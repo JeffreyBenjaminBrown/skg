@@ -7,10 +7,11 @@
 use skg::dbs::typedb::ancestry::{
   AncestryTree,
   full_containerward_ancestry};
-use skg::test_utils::run_with_test_db;
-use skg::types::misc::ID;
+use skg::test_utils::run_with_shared_test_db;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 use std::error::Error;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 //
@@ -192,7 +193,49 @@ fn is_leaf_somewhere(
 //
 
 #[test]
-fn test_ancestry_island(
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-typedb-ancestry",
+    |s| Box::pin ( async move {
+      s . reset ("test_ancestry_island",
+                 "tests/typedb/ancestry/fixtures-island") . await ?;
+      test_ancestry_island (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_fork",
+                 "tests/typedb/ancestry/fixtures-fork") . await ?;
+      test_ancestry_fork (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_1cycle",
+                 "tests/typedb/ancestry/fixtures-1cycle") . await ?;
+      test_ancestry_1cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_2cycle",
+                 "tests/typedb/ancestry/fixtures-2cycle") . await ?;
+      test_ancestry_2cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_3cycle",
+                 "tests/typedb/ancestry/fixtures-3cycle") . await ?;
+      test_ancestry_3cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_diamond",
+                 "tests/typedb/ancestry/fixtures-diamond") . await ?;
+      test_ancestry_diamond (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_fork_diamond_cycle",
+                 "tests/typedb/ancestry/fixtures-fork-diamond-cycle") . await ?;
+      test_ancestry_fork_diamond_cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_ancestry_depth_limit",
+                 "tests/typedb/ancestry/fixtures-depth-limit") . await ?;
+      test_ancestry_depth_limit (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_ancestry_island(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -212,16 +255,12 @@ fn test_ancestry_island(
       matches! (result, AncestryTree::Root (_)),
       "Island node should be Root, got {:?}", result );
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-island",
-    "tests/typedb/ancestry/fixtures-island",
-    "/tmp/tantivy-test-ancestry-island",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_fork(
+async fn test_ancestry_fork(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -240,16 +279,12 @@ fn test_ancestry_fork(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-fork",
-    "tests/typedb/ancestry/fixtures-fork",
-    "/tmp/tantivy-test-ancestry-fork",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_1cycle(
+async fn test_ancestry_1cycle(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -266,16 +301,12 @@ fn test_ancestry_1cycle(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-1cycle",
-    "tests/typedb/ancestry/fixtures-1cycle",
-    "/tmp/tantivy-test-ancestry-1cycle",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_2cycle(
+async fn test_ancestry_2cycle(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -293,16 +324,12 @@ fn test_ancestry_2cycle(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-2cycle",
-    "tests/typedb/ancestry/fixtures-2cycle",
-    "/tmp/tantivy-test-ancestry-2cycle",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_3cycle(
+async fn test_ancestry_3cycle(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -321,16 +348,12 @@ fn test_ancestry_3cycle(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-3cycle",
-    "tests/typedb/ancestry/fixtures-3cycle",
-    "/tmp/tantivy-test-ancestry-3cycle",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_diamond(
+async fn test_ancestry_diamond(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -353,16 +376,12 @@ fn test_ancestry_diamond(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-diamond",
-    "tests/typedb/ancestry/fixtures-diamond",
-    "/tmp/tantivy-test-ancestry-diamond",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_fork_diamond_cycle(
+async fn test_ancestry_fork_diamond_cycle(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -384,16 +403,12 @@ fn test_ancestry_fork_diamond_cycle(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-fdc",
-    "tests/typedb/ancestry/fixtures-fork-diamond-cycle",
-    "/tmp/tantivy-test-ancestry-fdc",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }
 
-#[test]
-fn test_ancestry_depth_limit(
+async fn test_ancestry_depth_limit(
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   async fn go(
     db_name : &str,
@@ -412,10 +427,4 @@ fn test_ancestry_depth_limit(
     assert_ancestry_matches_org (& result, expected);
     assert_leaves_are_leaves (& result, expected);
     Ok(()) }
-  run_with_test_db(
-    "skg-test-ancestry-depth",
-    "tests/typedb/ancestry/fixtures-depth-limit",
-    "/tmp/tantivy-test-ancestry-depth",
-    |config, driver, _tantivy| Box::pin(
-      go(& config . db_name, driver)
-    )) }
+  go(& config . db_name, driver) . await }

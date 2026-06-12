@@ -1,4 +1,4 @@
-// cargo nextest run --test collateral_source_move
+// cargo nextest run --test grouped_overrides -E 'test(collateral_source_move::)'
 
 use futures::executor::block_on;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;

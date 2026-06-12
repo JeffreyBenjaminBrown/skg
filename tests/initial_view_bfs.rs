@@ -1,21 +1,43 @@
-// cargo test --test initial_view_bfs -- --nocapture
+// cargo nextest run --test grouped_views -E 'test(initial_view_bfs::)'
 
 use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::render::content_view::multi_root_view;
-use skg::test_utils::run_with_test_db;
-use skg::types::misc::ID;
+use skg::test_utils::run_with_shared_test_db;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 
 #[test]
-fn test_bfs_limit_across_multiple_trees
+fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-bfs-limit-multi-tree",
-    "tests/initial_view_bfs/fixtures",
-    "/tmp/tantivy-test-bfs-limit-multi-tree",
-    |config, driver, _tantivy| Box::pin ( async move {
+  let fixtures : &str = "tests/initial_view_bfs/fixtures";
+  run_with_shared_test_db (
+    "skg-test-initial-view-bfs",
+    |s| Box::pin ( async move {
+      s . reset ("test_bfs_limit_across_multiple_trees", fixtures) . await ?;
+      test_bfs_limit_across_multiple_trees (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_bfs_limit_9_three_branches", fixtures) . await ?;
+      test_bfs_limit_9_three_branches (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_bfs_limit_8_two_branches", fixtures) . await ?;
+      test_bfs_limit_8_two_branches (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_budget_content_beats_subscribers",
+                 "tests/initial_view_bfs/fixtures-content-vs-subscribers") . await ?;
+      test_budget_content_beats_subscribers (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_bfs_limit_across_multiple_trees (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Tree structure across 3 roots:
       // 1
       //   11
@@ -82,16 +104,13 @@ fn test_bfs_limit_across_multiple_trees
       assert_eq!(result, expected,
                  "BFS truncates by the §5.5 budget, leaving whole groups indefinitive");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn test_bfs_limit_9_three_branches
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-bfs-limit-9-three-branches",
-    "tests/initial_view_bfs/fixtures",
-    "/tmp/tantivy-test-bfs-limit-9-three-branches",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_bfs_limit_9_three_branches (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=9 (cost 1 per expansion): expansions are
       // 1,2,3,11,12,13,21,22,23. So roots 1 and 2 fully expand (12 and 22 each
       // draw their whole gen-3 group, indefinitive); root 3 is reached after the
@@ -135,16 +154,13 @@ fn test_bfs_limit_9_three_branches
       assert_eq!(result, expected,
                  "BFS limit=9 fully expands the first two roots; the third stays indefinitive");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn test_bfs_limit_8_two_branches
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-bfs-limit-8-two-branches",
-    "tests/initial_view_bfs/fixtures",
-    "/tmp/tantivy-test-bfs-limit-8-two-branches",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_bfs_limit_8_two_branches (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=8, roots [1,2] (cost 1 per expansion): expansions
       // are 1,2,11,12,13,21,22,23 -- both roots fully expand their gen-2. 12 and
       // 22 each draw their whole gen-3 group (121..123, 221..223), all left
@@ -183,7 +199,7 @@ fn test_bfs_limit_8_two_branches
       assert_eq!(result, expected,
                  "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + indefinitive");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // §5.5: content wins the budget race; a col (here a SubscribeeCol) fills WHOLE
 // and is budget-NEUTRAL. Fixture: root r -> content chain c1 -> c2, and r also
@@ -194,14 +210,11 @@ fn test_bfs_limit_8_two_branches
 // indefinitive -- it is not, which is the guarantee this test pins. Subscribers
 // also sit one level deeper than content (r -> SubscribeeCol -> subscriber vs
 // r -> c1), so BFS-by-depth reaches content first regardless.
-#[test]
-fn test_budget_content_beats_subscribers
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-budget-content-vs-subscribers",
-    "tests/initial_view_bfs/fixtures-content-vs-subscribers",
-    "/tmp/tantivy-test-budget-content-vs-subscribers",
-    |config, driver, _tantivy| Box::pin ( async move {
+async fn test_budget_content_beats_subscribers (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let mut test_config = config . clone();
       test_config . initial_node_limit = 3;
 
@@ -222,4 +235,4 @@ fn test_budget_content_beats_subscribers
       assert_eq!(result, expected,
                  "budget 3 expands the whole content chain; the SubscribeeCol is whole + budget-neutral");
 
-      Ok (( )) } )) }
+      Ok (( )) }

@@ -1,4 +1,4 @@
-// cargo test --test new
+// cargo nextest run --test grouped_saves -E 'test(new::)'
 
 #[path = "new/buffer_to_viewnodes/uninterpreted2.rs"]
 mod uninterpreted2;

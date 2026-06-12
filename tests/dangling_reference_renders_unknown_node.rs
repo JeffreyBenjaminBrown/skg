@@ -1,4 +1,4 @@
-// cargo test --test dangling_reference_renders_unknown_node -- --nocapture
+// cargo nextest run --test grouped_saves -E 'test(dangling_reference_renders_unknown_node::)'
 //
 // Regression: a single dangling reference deep in a viewforest used
 // to abort the whole single_root_view call with
@@ -19,7 +19,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::to_org::render::content_view::single_root_view;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
@@ -28,13 +28,26 @@ use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_dangling_reference_renders_unknown_node
+fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_shared_test_db (
     "skg-test-dangling-reference-renders-unknown-node",
-    "tests/dangling_reference_renders_unknown_node/fixtures",
-    "/tmp/tantivy-test-dangling-reference-renders-unknown-node",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |s| Box::pin ( async move {
+      s . reset ("test_dangling_reference_renders_unknown_node",
+                 "tests/dangling_reference_renders_unknown_node/fixtures") . await ?;
+      test_dangling_reference_renders_unknown_node (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_buffer_with_unknownnode_child_saves_cleanly",
+                 "tests/dangling_reference_renders_unknown_node/fixtures-save-roundtrip") . await ?;
+      test_buffer_with_unknownnode_child_saves_cleanly (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_dangling_reference_renders_unknown_node (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let (rendered, _pids, _) =
         single_root_view (
           driver, config, None,
@@ -54,23 +67,19 @@ fn test_dangling_reference_renders_unknown_node
                   "view should render the dangling child as an \
                    PhantomUnknown rather than aborting");
       Ok (( ))
-    } )) }
+    }
 
 // A view that the server rendered with an PhantomUnknown line in it
 // must round-trip through save without tripping the local-structure
 // validator. Previously, TrueNode parent + PhantomUnknown child
 // triggered LocalStructureViolation.
-#[test]
-fn test_buffer_with_unknownnode_child_saves_cleanly
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-unknownnode-save-roundtrip",
-    "tests/dangling_reference_renders_unknown_node/fixtures-save-roundtrip",
-    "/tmp/tantivy-test-unknownnode-save-roundtrip",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_buffer_with_unknownnode_child_saves_cleanly (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       buffer_with_unknownnode_child_saves_cleanly_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        config, driver, tantivy ) . await }
 
 async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   config  : &SkgConfig,

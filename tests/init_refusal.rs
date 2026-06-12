@@ -1,4 +1,4 @@
-// cargo nextest run --test init_refusal
+// cargo nextest run --test grouped_unit -E 'test(init_refusal::)'
 //
 // The init/rebuild refusal wiring
 // (TODO/full-schema/13_test-rel-matrix.org): override invariants are

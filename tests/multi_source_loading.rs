@@ -1,4 +1,4 @@
-// cargo test --test multi_source_loading
+// cargo nextest run --test grouped_unit -E 'test(multi_source_loading::)'
 
 use std::collections::HashMap;
 use std::fs;

@@ -1,4 +1,4 @@
-// cargo test --test inactive_suppression -- --nocapture
+// cargo nextest run --test grouped_overrides -E 'test(inactive_suppression::)'
 //
 // TODO/full-schema/9-2_source-set-safety.org, inactive-node rewrite
 // suppression: under a restricted source-set, any instruction that

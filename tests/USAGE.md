@@ -5,7 +5,7 @@ emacs -batch -l tests/emacs/test.el
 emacs -batch -l tests/emacs/test.el 2&> tests/results-emacs.txt
 ```
 
-Similarly, some ways to run the Emacs tests include
+Similarly, some ways to run the Rust tests include
 ```
 cargo test
 cargo test 2&> tests/results-rust.txt

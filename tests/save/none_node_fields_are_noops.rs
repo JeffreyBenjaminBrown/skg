@@ -4,11 +4,36 @@ use std::error::Error;
 
 use skg::dbs::filesystem::one_node::optnodecomplete_from_id;
 use skg::from_text::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
-use skg::test_utils::run_with_test_db;
-use skg::types::misc::{ID, MSV, SkgConfig};
+use skg::test_utils::run_with_shared_test_db;
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::SourceMove;
 
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
+
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str =
+    "tests/save/none_node_fields_are_noops/fixtures";
+  run_with_shared_test_db (
+    "skg-test-save-none-node-fields-are-noops",
+    |s| Box::pin ( async move {
+      s . reset ("test_none_aliases_get_replaced_with_disk_aliases", fixtures) . await ?;
+      test_none_aliases_get_replaced_with_disk_aliases (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_none_subscribes_to_get_replaced_with_disk_subscribes_to", fixtures) . await ?;
+      test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides", fixtures) . await ?;
+      test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_none_overrides_view_of_get_replaced_with_disk_overrides", fixtures) . await ?;
+      test_none_overrides_view_of_get_replaced_with_disk_overrides (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 async fn supplement_from_disk_then_extract_nodecomplete (
   config    : &SkgConfig,
@@ -30,17 +55,14 @@ async fn supplement_from_disk_then_extract_nodecomplete (
   Ok (supplement_unspecified_fields_from_disk (
     canonicalized, &disk_node)) }
 
-#[test]
-fn test_none_aliases_get_replaced_with_disk_aliases (
+async fn test_none_aliases_get_replaced_with_disk_aliases (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-  run_with_test_db (
-    "skg-test-none-aliases",
-    "tests/save/none_node_fields_are_noops/fixtures",
-    "/tmp/tantivy-test-none-aliases",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_none_aliases_get_replaced_with_disk_aliases_logic (
         config, driver ) . await
-    } )) }
+    }
 
 async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
   config : &SkgConfig,
@@ -86,17 +108,14 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
 
   Ok (( )) }
 
-#[test]
-fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
+async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-  run_with_test_db (
-    "skg-test-none-subscribes",
-    "tests/save/none_node_fields_are_noops/fixtures",
-    "/tmp/tantivy-test-none-subscribes",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
         config, driver ) . await
-    } )) }
+    }
 
 async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
   config : &SkgConfig,
@@ -142,17 +161,14 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
 
   Ok (( )) }
 
-#[test]
-fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
+async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-  run_with_test_db (
-    "skg-test-none-hides",
-    "tests/save/none_node_fields_are_noops/fixtures",
-    "/tmp/tantivy-test-none-hides",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
         config, driver ) . await
-    } )) }
+    }
 
 async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
   config : &SkgConfig,
@@ -197,17 +213,14 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
 
   Ok (( )) }
 
-#[test]
-fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
+async fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-  run_with_test_db (
-    "skg-test-none-overrides",
-    "tests/save/none_node_fields_are_noops/fixtures",
-    "/tmp/tantivy-test-none-overrides",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
         config, driver ) . await
-    } )) }
+    }
 
 async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
   config : &SkgConfig,

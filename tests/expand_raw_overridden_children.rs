@@ -1,4 +1,4 @@
-// cargo nextest run --test expand_raw_overridden_children
+// cargo nextest run --test grouped_overrides -E 'test(expand_raw_overridden_children::)'
 //
 // Production change (2), the second half of the expansion test
 // (TODO/full-schema/13_test-rel-matrix.org): substitution does not

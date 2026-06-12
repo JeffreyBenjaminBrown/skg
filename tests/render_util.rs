@@ -1,4 +1,4 @@
-// cargo test --test render_util
+// cargo nextest run --test grouped_unit -E 'test(render_util::)'
 
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};

@@ -1,4 +1,4 @@
-// cargo nextest run --test override_chain_notice
+// cargo nextest run --test grouped_overrides -E 'test(override_chain_notice::)'
 //
 // A FRESH view that traverses a legacy compound override chain
 // surfaces the "Compound overrides relationship traversed..."

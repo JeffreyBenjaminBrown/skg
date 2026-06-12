@@ -3,24 +3,73 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{SkgConfig, SkgfileSource, SourceName};
+use skg::types::misc::{SkgConfig, SkgfileSource, SourceName, TantivyIndex};
 use skg::types::tree::forest::MpViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 use skg::types::maybe_placed_viewnode::{MpVognode, MpViewnodeKind};
 
 #[test]
-fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-errors",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-errors",
-    |config, driver, _tantivy| Box::pin(async move {
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str =
+    "tests/merge/merge_nodes/fixtures";
+  run_with_shared_test_db (
+    "skg-test-new-validate-tree",
+    |s| Box::pin ( async move {
+      s . reset ("test_find_buffer_errors_for_saving", fixtures) . await ?;
+      test_find_buffer_errors_for_saving (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_find_buffer_errors_for_saving_valid_input", fixtures) . await ?;
+      test_find_buffer_errors_for_saving_valid_input (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_find_buffer_errors_for_saving_empty_input", fixtures) . await ?;
+      test_find_buffer_errors_for_saving_empty_input (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_multiple_aliascols_in_children", fixtures) . await ?;
+      test_multiple_aliascols_in_children (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_duplicated_content_error", fixtures) . await ?;
+      test_duplicated_content_error (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_no_duplicated_content_error_when_different_ids", fixtures) . await ?;
+      test_no_duplicated_content_error_when_different_ids (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_no_duplicated_content_error_for_phantom_siblings", fixtures) . await ?;
+      test_no_duplicated_content_error_for_phantom_siblings (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_root_without_source_validation", fixtures) . await ?;
+      test_root_without_source_validation (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_nonexistent_source_validation", fixtures) . await ?;
+      test_nonexistent_source_validation (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_empty_title_rejected_for_definitive_node", fixtures) . await ?;
+      test_empty_title_rejected_for_definitive_node (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_empty_title_allowed_for_indefinitive_and_delete", fixtures) . await ?;
+      test_empty_title_allowed_for_indefinitive_and_delete (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_request_with_only_non_content_children_is_allowed", fixtures) . await ?;
+      test_definitive_request_with_only_non_content_children_is_allowed (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_request_with_content_child_is_rejected", fixtures) . await ?;
+      test_definitive_request_with_content_child_is_rejected (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_find_buffer_errors_for_saving (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Test input with various validation errors
       let input_with_errors: &str =
         indoc! {"
@@ -163,15 +212,13 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       assert_eq!(local_errors . len(), 7,
                  "Should find exactly 7 LocalStructureViolation errors");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-valid",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-valid",
-    |config, driver, _tantivy| Box::pin(async move {
+async fn test_find_buffer_errors_for_saving_valid_input (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Test input with no validation errors
       let valid_input: &str =
         indoc! {"
@@ -191,34 +238,26 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
       assert_eq!(parsing_errors . len(), 0, "Should find no parsing errors in valid input");
       assert_eq!(errors . len(), 0, "Should find no validation errors in valid input");
       Ok(())
-    })
-  )
 }
 
-#[test]
-fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-empty",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-empty",
-    |config, driver, _tantivy| Box::pin(async move {
+async fn test_find_buffer_errors_for_saving_empty_input (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Test empty input (viewforest with just BufferRoot, no tree roots)
       let empty_viewforest: MpViewForest = MpViewForest::new();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_viewforest, config, driver) . await?;
 
       assert_eq!(errors . len(), 0, "Should find no errors in empty input");
       Ok(())
-    })
-  )
 }
 
-#[test]
-fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-aliascols",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-aliascols",
-    |config, driver, _tantivy| Box::pin(async move {
+async fn test_multiple_aliascols_in_children (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Test input with multiple AliasCol children
       let input_with_multiple_aliascols: &str =
         indoc! {"
@@ -245,17 +284,13 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
       assert_eq!(multiple_aliascols_errors . len(), 2,
                  "Should find 2 'AliasCol must be unique' errors (one per AliasCol)");
       Ok(())
-    })
-  )
 }
 
-#[test]
-fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-duplicate",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-duplicate",
-    |config, driver, _tantivy| Box::pin(async move {
+async fn test_duplicated_content_error (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Test input with duplicated Content children (same ID)
       let input_with_duplicated_content: &str =
         indoc! {"
@@ -284,17 +319,13 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
                    "Duplicate error should be reported at the parent node (root)");
       }
       Ok(())
-    })
-  )
 }
 
-#[test]
-fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-no-dup",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-no-dup",
-    |config, driver, _tantivy| Box::pin(async move {
+async fn test_no_duplicated_content_error_when_different_ids (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Test input with different Content children IDs (should be valid)
       let input_without_duplicated_content: &str =
         indoc! {"
@@ -315,18 +346,13 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
       assert_eq!(duplicated_content_errors . len(), 0,
                  "Should find no DuplicatedContent errors when IDs are different");
       Ok(())
-    })
-  )
 }
 
-#[test]
-fn test_no_duplicated_content_error_for_phantom_siblings(
+async fn test_no_duplicated_content_error_for_phantom_siblings (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-validate-tree-phantom-dup",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-validate-tree-phantom-dup",
-    |config, driver, _tantivy| Box::pin(async move {
       // A phantom sibling (unstaged removedX removedM) sharing an ID
       // with a real sibling should not trigger a duplicate error.
       let input: &str =
@@ -351,18 +377,13 @@ fn test_no_duplicated_content_error_for_phantom_siblings(
       assert_eq!(duplicated_content_errors . len(), 0,
                  "Phantom siblings should not trigger duplicate ID errors");
       Ok(())
-    })
-  )
 }
 
-#[test]
-fn test_root_without_source_validation(
+async fn test_root_without_source_validation (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-root-without-source",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-root-without-source",
-    |config, driver, _tantivy| Box::pin(async move {
       // root without source should be rejected
       let input: &str =
         indoc! {"
@@ -389,16 +410,13 @@ fn test_root_without_source_validation(
         = source_errors[0]
       { assert_eq!(id . 0, "root2",
                    "Source error should be for root2"); }
-      Ok(( )) } )) }
+      Ok(( )) }
 
-#[test]
-fn test_nonexistent_source_validation(
+async fn test_nonexistent_source_validation (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-nonexistent-source",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-nonexistent-source",
-    |config, driver, _tantivy| Box::pin(async move {
       { // Node with nonexistent source should be rejected
         let input: &str =
           indoc! {"
@@ -438,16 +456,13 @@ fn test_nonexistent_source_validation(
                        if source_re . is_match (msg) && id . 0 == "root2") });
           assert!(found_root_error,
                   "Should find source error for root2"); }}
-      Ok(( )) } )) }
+      Ok(( )) }
 
-#[test]
-fn test_empty_title_rejected_for_definitive_node (
+async fn test_empty_title_rejected_for_definitive_node (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-empty-title",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-empty-title",
-    |config, driver, _tantivy| Box::pin(async move {
       let input: &str =
         indoc! {"
                 * (skg (node (id has-title) (source main))) has a title
@@ -473,16 +488,13 @@ fn test_empty_title_rejected_for_definitive_node (
         = empty_title_errors[0]
       { assert_eq!(id . 0, "no-title",
                    "Empty title error should be for no-title"); }
-      Ok(( )) } )) }
+      Ok(( )) }
 
-#[test]
-fn test_empty_title_allowed_for_indefinitive_and_delete (
+async fn test_empty_title_allowed_for_indefinitive_and_delete (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
-    "skg-test-empty-title-exempt",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-empty-title-exempt",
-    |config, driver, _tantivy| Box::pin(async move {
       let input: &str =
         indoc! {"
                 * (skg (node (id indef) (source main) indef))
@@ -504,21 +516,18 @@ fn test_empty_title_allowed_for_indefinitive_and_delete (
         . collect();
       assert_eq!(empty_title_errors . len(), 0,
                  "Indefinitive and delete-requested nodes should not trigger empty title errors");
-      Ok(( )) } )) }
+      Ok(( )) }
 
-#[test]
-fn test_definitive_request_with_only_non_content_children_is_allowed (
+async fn test_definitive_request_with_only_non_content_children_is_allowed (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // A definitive view request on an indefinitive node whose children
   // are all NON-content (parentIs != Affected) should be permitted: the
   // expansion would fill the node with content, and non-content
   // children (e.g. 'birth containsParent' ancestry stubs) don't conflict
   // with that. Only Container children would be clobbered.
-  run_with_test_db(
-    "skg-test-definitive-non-content-children",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-definitive-non-content-children",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
@@ -537,18 +546,15 @@ fn test_definitive_request_with_only_non_content_children_is_allowed (
         "Non-content children should not trigger \
          DefinitiveRequestOnNodeWithContentChildren. Errors: {:?}",
         errors );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn test_definitive_request_with_content_child_is_rejected (
+async fn test_definitive_request_with_content_child_is_rejected (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Flip side: a Container child (the default when 'parentIs' is absent)
   // DOES conflict with expansion, so the error should fire.
-  run_with_test_db(
-    "skg-test-definitive-content-children",
-    "tests/merge/merge_nodes/fixtures",
-    "/tmp/tantivy-test-definitive-content-children",
-    |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
@@ -569,7 +575,7 @@ fn test_definitive_request_with_content_child_is_rejected (
          DefinitiveRequestOnNodeWithContentChildren for 'parent'. \
          Errors: {:?}",
         errors );
-      Ok (( )) } )) }
+      Ok (( )) }
 
 #[test]
 fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {

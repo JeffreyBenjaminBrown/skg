@@ -16,10 +16,10 @@ use skg::from_text::local_instruction_collection::traverse::collect_instructions
 use skg::from_text::local_instruction_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
-use skg::test_utils::run_with_test_db_from_config;
+use skg::test_utils::run_with_shared_test_db;
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
-use skg::types::misc::{ID, MSV};
+use skg::types::misc::{ID, MSV, SkgConfig};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
@@ -30,6 +30,8 @@ use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
 use skg::types::viewnode::{Vognode, Phantom};
 use std::error::Error;
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
   "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
@@ -823,12 +825,82 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
       if id == &ID::from ("doomed"))); }
 
 #[test]
-fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-new-lic-extraction",
+    |s| Box::pin ( async move {
+      s . reset_from_config (
+        "subscribee_as_such_child_list_removal_does_not_save_subscribee",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      subscribee_as_such_child_list_removal_does_not_save_subscribee (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "subscribee_as_such_child_removal_is_not_foreign_contains_edit",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      subscribee_as_such_child_removal_is_not_foreign_contains_edit (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "subscribee_as_such_child_list_removal_infers_subscriber_hide",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      subscribee_as_such_child_list_removal_infers_subscriber_hide (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "moving_subscribee_as_such_child_to_subscriber_does_not_hide",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      moving_subscribee_as_such_child_to_subscriber_does_not_hide (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "subscribee_as_such_visible_child_removes_subscriber_hide",
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") . await ?;
+      subscribee_as_such_visible_child_removes_subscriber_hide (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "subscribee_as_such_unhide_preserves_unrelated_hides",
+        "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") . await ?;
+      subscribee_as_such_unhide_preserves_unrelated_hides (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "overlapping_subscribee_hiderel_conflict_rejects_save",
+        "tests/hidden_from_subscriptions/fixtures-overlapping-subscribees/skgconfig.toml") . await ?;
+      overlapping_subscribee_hiderel_conflict_rejects_save (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "ordinary_owned_child_list_edit_still_changes_contains",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      ordinary_owned_child_list_edit_still_changes_contains (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "recursive_descendant_under_as_subscribee_keeps_own_contains_edit",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "foreign_subscribee_as_such_title_edit_is_rejected",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      foreign_subscribee_as_such_title_edit_is_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "owned_as_subscribee_title_edit_is_rejected",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      owned_as_subscribee_title_edit_is_rejected (
+        &s . config, &s . driver ) . await ?;
+      s . reset_from_config (
+        "owned_as_subscribee_body_edit_is_rejected",
+        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+      owned_as_subscribee_body_edit_is_rejected (
+        &s . config, &s . driver ) . await ?;
+      Ok (( )) } )) }
+
+async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-as-such-keeps-contains",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -843,15 +915,12 @@ fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
         ! save_ids (&instructions) . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode: {:?}",
         instructions);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
+async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-as-such-removal-not-foreign-edit",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -872,15 +941,12 @@ fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
             if id == &ID::from ("e"))),
         "subscribee-as-such should not be reported as a contains edit: {:?}",
         errors);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
+async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-as-such-infers-hide",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -899,15 +965,12 @@ fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
         ! save_ids (&instructions) . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode: {:?}",
         instructions);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
+async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-as-such-move-to-subscriber-no-hide",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -926,15 +989,12 @@ fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
       assert_eq!(
         saved_node_by_id (&instructions, "r") . contains,
         vec![ID::from ("e1")]);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn subscribee_as_such_visible_child_removes_subscriber_hide (
+async fn subscribee_as_such_visible_child_removes_subscriber_hide (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-as-such-infers-unhide",
-    "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml",
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id R) (source main))) R
@@ -955,15 +1015,12 @@ fn subscribee_as_such_visible_child_removes_subscriber_hide (
         ! save_ids (&instructions) . contains (&ID::from ("E1")),
         "subscribee-as-such should not produce a SaveNode: {:?}",
         instructions);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn subscribee_as_such_unhide_preserves_unrelated_hides (
+async fn subscribee_as_such_unhide_preserves_unrelated_hides (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-as-such-unhide-keeps-unrelated",
-    "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml",
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id R) (source main))) R
@@ -983,15 +1040,12 @@ fn subscribee_as_such_unhide_preserves_unrelated_hides (
         MSV::Specified (
           vec![ID::from ("hidden-in-E2"),
                ID::from ("hidden-for-no-reason")]));
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn overlapping_subscribee_hiderel_conflict_rejects_save (
+async fn overlapping_subscribee_hiderel_conflict_rejects_save (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-overlapping-subscribee-visibility-conflict",
-    "tests/hidden_from_subscriptions/fixtures-overlapping-subscribees/skgconfig.toml",
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id R) (source main))) R
@@ -1015,15 +1069,12 @@ fn overlapping_subscribee_hiderel_conflict_rejects_save (
             if msg . contains ("Conflicting subscribee visibility edits")),
         "expected overlapping visibility conflict, got {:?}",
         buffer_error);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn ordinary_owned_child_list_edit_still_changes_contains (
+async fn ordinary_owned_child_list_edit_still_changes_contains (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-ordinary-owned-keeps-contains-edit",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -1035,15 +1086,12 @@ fn ordinary_owned_child_list_edit_still_changes_contains (
       assert_eq!(
         saved_node_by_id (&instructions, "r") . contains,
         vec![ID::from ("r1")]);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
+async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-same-id-ordinary-keeps-contains-with-as-subscribee",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -1063,7 +1111,7 @@ fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
         saved_node_by_id (&instructions, "r")
           . hides_from_its_subscriptions,
         MSV::Specified (vec![ID::from ("e1")]));
-      Ok (()) })) }
+      Ok (()) }
 
 #[test]
 fn idcol_resident_truenode_saves_itself_but_is_not_content (
@@ -1092,13 +1140,10 @@ fn idcol_resident_truenode_saves_itself_but_is_not_content (
     saved_node_by_id (&instructions, "root") . contains,
     vec![ID::from ("real-child")]); }
 
-#[test]
-fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
+async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-descendant-keeps-contains-edit",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -1116,15 +1161,12 @@ fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
       assert_eq!(
         saved_node_by_id (&instructions, "e2") . contains,
         Vec::<ID>::new());
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn foreign_subscribee_as_such_title_edit_is_rejected (
+async fn foreign_subscribee_as_such_title_edit_is_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-subscribee-title-edit-validation",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
@@ -1149,15 +1191,12 @@ fn foreign_subscribee_as_such_title_edit_is_rejected (
                && msg . contains ("e")),
         "expected foreign subscribee-as-such title edit rejection, got {:?}",
         buffer_error);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn owned_as_subscribee_title_edit_is_rejected (
+async fn owned_as_subscribee_title_edit_is_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-owned-as-subscribee-title-edit-rejected",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id a) (source owned))) a
@@ -1182,15 +1221,12 @@ fn owned_as_subscribee_title_edit_is_rejected (
                && msg . contains ("r")),
         "expected owned subscribee-as-such title edit rejection, got {:?}",
         buffer_error);
-      Ok (()) })) }
+      Ok (()) }
 
-#[test]
-fn owned_as_subscribee_body_edit_is_rejected (
+async fn owned_as_subscribee_body_edit_is_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-owned-as-subscribee-body-edit-rejected",
-    SUBSCRIBEE_EDIT_CONFIG,
-    |config, driver| Box::pin (async move {
       let input : &str =
         indoc! {"
                 * (skg (node (id a) (source owned))) a
@@ -1216,7 +1252,7 @@ fn owned_as_subscribee_body_edit_is_rejected (
                && msg . contains ("r")),
         "expected owned subscribee-as-such body edit rejection, got {:?}",
         buffer_error);
-      Ok (()) })) }
+      Ok (()) }
 
 #[test]
 fn test_extract_nonmergeSavePlan_deep_nesting() {

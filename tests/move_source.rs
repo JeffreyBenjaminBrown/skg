@@ -1,104 +1,25 @@
 // These tests have not been human-verified.
-// cargo nextest run --test move_source
+// cargo nextest run --test grouped_sources -E 'test(move_source::)'
 
-use futures::executor::block_on;
 use indoc::indoc;
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
-use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::dbs::typedb::sources::create_all_sources;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::DefineNode;
 use std::error::Error;
-use std::path::{Path, PathBuf};
-use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
-use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
-
-/// Set up a fresh test environment: copy fixtures to temp,
-/// create TypeDB + Tantivy, return (config, driver, tantivy).
-async fn setup (
-  db_name     : &str,
-  temp_prefix : &str,
-) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex, PathBuf), Box<dyn Error>> {
-  let temp_fixtures : PathBuf =
-    PathBuf::from ( format!("/tmp/{}-fixtures", temp_prefix) );
-  if temp_fixtures . exists() {
-    fs::remove_dir_all (&temp_fixtures)?; }
-  copy_dir_all (
-    &PathBuf::from ("tests/move_source/fixtures"),
-    &temp_fixtures )?;
-  let config : SkgConfig =
-    load_config_with_overrides (
-      temp_fixtures . join ("skgconfig.toml")
-        . to_str() . unwrap(),
-      Some (db_name),
-      &[ ("public",  temp_fixtures . join ("public")),
-         ("private", temp_fixtures . join ("private")),
-         ("foreign", temp_fixtures . join ("foreign")) ] )?;
-  let driver : TypeDBDriver =
-    TypeDBDriver::new (
-      Addresses::try_from_address_str ("127.0.0.1:1729")?,
-      Credentials::new ("admin", "password"),
-      DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
-  let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config)?;
-  let typedb_nodes : Vec<NodeTypedb> =
-    nodes . iter ()
-    . map (NodeTypedb::from_complete_parsing_textlinks)
-    . collect ();
-  overwrite_new_empty_typedb_db (db_name, &driver) . await?;
-  read_and_use_schema (db_name, &driver) . await?;
-  create_all_sources (db_name, &driver, &config) . await?;
-  create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
-  create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
-  let tantivy_index : TantivyIndex =
-    create_empty_tantivy_index (&config . tantivy_folder)?;
-  Ok ((config, driver, tantivy_index, temp_fixtures)) }
-
-async fn teardown (
-  db_name        : &str,
-  driver         : &TypeDBDriver,
-  config         : &SkgConfig,
-  temp_fixtures  : &Path,
-) -> Result<(), Box<dyn Error>> {
-  cleanup_test_tantivy_and_typedb_dbs (
-    db_name, driver,
-    Some (config . tantivy_folder . as_path()) ) . await?;
-  if temp_fixtures . exists() {
-    fs::remove_dir_all (temp_fixtures)?; }
-  Ok (()) }
-
-fn copy_dir_all (
-  src : &PathBuf,
-  dst : &PathBuf,
-) -> std::io::Result<()> {
-  fs::create_dir_all (dst)?;
-  for entry in fs::read_dir (src)? {
-    let entry = entry?;
-    let ty = entry . file_type()?;
-    if ty . is_dir() {
-      copy_dir_all (
-        &entry . path(),
-        &dst . join (entry . file_name()) )?;
-    } else {
-      fs::copy (
-        entry . path(),
-        dst . join (entry . file_name()) )?; }}
-  Ok (()) }
+use typedb_driver::TypeDBDriver;
 
 /// Query Tantivy for a node by title and return its source.
 fn tantivy_source_for_id (
@@ -131,17 +52,47 @@ fn tantivy_source_for_id (
 // Tests
 /////////////////
 
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-move-source",
+    |s| Box::pin ( async move {
+      s . reset ("test_move_node_to_another_owned_source", "tests/move_source/fixtures") . await ?;
+      test_move_node_to_another_owned_source (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_move_node_referenced_by_extra_id", "tests/move_source/fixtures") . await ?;
+      test_move_node_referenced_by_extra_id (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_move_multiple_nodes", "tests/move_source/fixtures") . await ?;
+      test_move_multiple_nodes (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_move_to_foreign_source_rejected", "tests/move_source/fixtures") . await ?;
+      test_move_to_foreign_source_rejected (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_move_from_foreign_source_rejected", "tests/move_source/fixtures") . await ?;
+      test_move_from_foreign_source_rejected (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_source/fixtures") . await ?;
+      test_move_and_merge_simultaneously_rejected (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_no_source_change_produces_no_moves", "tests/move_source/fixtures") . await ?;
+      test_no_source_change_produces_no_moves (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_source_only_change_with_populated_pool", "tests/move_source/fixtures") . await ?;
+      test_source_only_change_with_populated_pool (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
 /// Basic move: change b's source from public to private.
 /// Verify FS (old file gone, new file present),
 /// TypeDB (has_source relation updated), and Tantivy (source field updated).
-#[test]
-fn test_move_node_to_another_owned_source (
+async fn test_move_node_to_another_owned_source (
+  config        : &SkgConfig,
+  driver        : &Arc<TypeDBDriver>,
+  tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-1";
-    let (config, driver, mut tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-1") . await?;
+    let temp_fixtures : &PathBuf = &config . data_root;
 
     // a (public) contains b (public) contains c (public).
     // Edit b's source to private.
@@ -168,7 +119,7 @@ fn test_move_node_to_another_owned_source (
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
-      tantivy_index = new_idx; }
+      *tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file should be gone, new file should exist
@@ -225,20 +176,17 @@ fn test_move_node_to_another_owned_source (
       assert!(node_b . contains . contains (&ID::new ("c")),
               "b should still contain c after move"); }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// Nodes referenced by extra_id in the buffer (not PID).
 /// The save pipeline should resolve extra_ids to PIDs
 /// and the move should still work correctly.
-#[test]
-fn test_move_node_referenced_by_extra_id (
+async fn test_move_node_referenced_by_extra_id (
+  config        : &SkgConfig,
+  driver        : &Arc<TypeDBDriver>,
+  tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-2";
-    let (config, driver, mut tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-2") . await?;
+    let temp_fixtures : &PathBuf = &config . data_root;
 
     // Use extra_ids (a-alias, b-alias, c-alias) instead of PIDs.
     let org_text : &str = indoc! {"
@@ -264,7 +212,7 @@ fn test_move_node_referenced_by_extra_id (
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
-      tantivy_index = new_idx; }
+      *tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
@@ -295,18 +243,15 @@ fn test_move_node_referenced_by_extra_id (
         tantivy_source_for_id (&tantivy_index, "b", "b")?;
       assert_eq!(source . as_deref(), Some ("private")); }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// Move two nodes in the same save.
-#[test]
-fn test_move_multiple_nodes (
+async fn test_move_multiple_nodes (
+  config         : &SkgConfig,
+  driver         : &Arc<TypeDBDriver>,
+  _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-3";
-    let (config, driver, mut _tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-3") . await?;
+    let temp_fixtures : &PathBuf = &config . data_root;
 
     // Move both b and c to private.
     let org_text : &str = indoc! {"
@@ -335,7 +280,7 @@ fn test_move_multiple_nodes (
         config . clone(), &_tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
-      _tantivy_index = new_idx; }
+      *_tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS
@@ -358,18 +303,15 @@ fn test_move_multiple_nodes (
       assert_eq!(source_b . as_str(), "private");
       assert_eq!(source_c . as_str(), "private"); }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// Moving to a foreign source should be rejected.
-#[test]
-fn test_move_to_foreign_source_rejected (
+async fn test_move_to_foreign_source_rejected (
+  config         : &SkgConfig,
+  driver         : &Arc<TypeDBDriver>,
+  _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-4";
-    let (config, driver, _tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-4") . await?;
+    let temp_fixtures : &PathBuf = &config . data_root;
 
     // Try to move b to foreign source.
     let org_text : &str = indoc! {"
@@ -397,18 +339,15 @@ fn test_move_to_foreign_source_rejected (
       assert!( temp_fixtures . join ("public/b.skg") . exists(),
                "b.skg should still be in public/"); }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// Moving from a foreign source should be rejected.
-#[test]
-fn test_move_from_foreign_source_rejected (
+async fn test_move_from_foreign_source_rejected (
+  config         : &SkgConfig,
+  driver         : &Arc<TypeDBDriver>,
+  _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-5";
-    let (config, driver, _tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-5") . await?;
+    let temp_fixtures : &PathBuf = &config . data_root;
 
     // Try to move foreign-node to public.
     let org_text : &str = indoc! {"
@@ -425,19 +364,14 @@ fn test_move_from_foreign_source_rejected (
       assert!( temp_fixtures . join ("foreign/foreign-node.skg") . exists(),
                "foreign-node.skg should still be in foreign/"); }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// Moving and merging the same node simultaneously should be rejected.
-#[test]
-fn test_move_and_merge_simultaneously_rejected (
+async fn test_move_and_merge_simultaneously_rejected (
+  config         : &SkgConfig,
+  driver         : &Arc<TypeDBDriver>,
+  _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-6";
-    let (config, driver, _tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-6") . await?;
-
     // Move b to private AND merge b into stay.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (source public))) a
@@ -462,19 +396,14 @@ fn test_move_and_merge_simultaneously_rejected (
       Ok (_) =>
         panic!("Expected error, got Ok"), }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// No source change: no SourceMove should be produced.
-#[test]
-fn test_no_source_change_produces_no_moves (
+async fn test_no_source_change_produces_no_moves (
+  config         : &SkgConfig,
+  driver         : &Arc<TypeDBDriver>,
+  _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-7";
-    let (config, driver, _tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-7") . await?;
-
     // Save with same sources as on disk.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (source public))) a
@@ -488,20 +417,17 @@ fn test_no_source_change_produces_no_moves (
     assert_eq!(save_plan . source_moves . len(), 0,
                "No source changes => no source moves");
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }
 
 /// Reproduces the bug: changing only the source (nothing else)
 /// with a populated pool caused the instruction to be filtered out
 /// by filter_wouldbe_noop_defineNodes (which didn't compare source).
-#[test]
-fn test_source_only_change_with_populated_pool (
+async fn test_source_only_change_with_populated_pool (
+  config        : &SkgConfig,
+  driver        : &Arc<TypeDBDriver>,
+  tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  block_on ( async {
-    let db_name : &str = "skg-test-move-source-8";
-    let (config, driver, mut tantivy_index, temp_fixtures)
-      : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
-      = setup (db_name, "move-source-8") . await?;
+    let temp_fixtures : &PathBuf = &config . data_root;
 
     // Read all nodes (for test parity with earlier pool-populating variant).
     let _nodes : Vec<NodeComplete> =
@@ -540,7 +466,7 @@ fn test_source_only_change_with_populated_pool (
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
-      tantivy_index = new_idx; }
+      *tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
@@ -561,5 +487,4 @@ fn test_source_only_change_with_populated_pool (
         tantivy_source_for_id (&tantivy_index, "b", "b")?;
       assert_eq!(source . as_deref(), Some ("private")); }
 
-    teardown (db_name, &driver, &config, &temp_fixtures) . await?;
-    Ok (()) } ) }
+    Ok (()) }

@@ -1,4 +1,4 @@
-// cargo test --test body_yaml_format
+// cargo nextest run --test grouped_unit -E 'test(body_yaml_format::)'
 //
 // Tests that NodeFS::to_yaml emits the 'body' field as a YAML block
 // literal (readable in diffs) even when the body contains tabs, and

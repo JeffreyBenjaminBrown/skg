@@ -19,6 +19,7 @@
 
 use super::common::*;
 use skg::test_utils::graph_handle_from_config;
+use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
 
 fn setup_inbound_fixtures (
   repo_path : &Path,
@@ -94,22 +95,30 @@ const EXPECTED_STAGED : &str = "\
 *** (skg (node (id new-h) (source main) (staged newM))) new-h
 ";
 
-fn run_inbound_save_test (
-  db_name  : &str,
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-git-diff-inbound",
+    |s| Box::pin ( async move {
+      inbound_cols_show_phantoms_and_newM_unstaged (s) . await ?;
+      inbound_cols_show_phantoms_and_newM_staged (s) . await ?;
+      Ok (( )) } )) }
+
+async fn run_inbound_save_test (
+  s            : &mut SharedDbSession,
+  subtest_name : &str,
   staged   : bool,
   expected : &str,
 ) -> Result<(), Box<dyn Error>> {
-  let tantivy_folder : String =
-    format! ("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   if staged { setup_inbound_fixtures_staged (repo_path)?; }
   else      { setup_inbound_fixtures        (repo_path)?; }
-  block_on ( async {
-    let (config, driver, tantivy) =
-      setup_test_dbs (
-        db_name, repo_path . to_str () . unwrap (),
-        &tantivy_folder ) . await ?;
+  s . reset_with_source_path (subtest_name, repo_path) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
@@ -139,21 +148,18 @@ fn run_inbound_save_test (
         edge_r . overrides_view_of . or_default () . is_empty (),
         "a removed inbound edge must not return: the relation \
          lives in edge-r's file, which the col cannot edit" ); }
-    cleanup_test_dbs (
-      db_name, &driver, Some (Path::new (&tantivy_folder))
-    ) . await ?;
-    Ok (( )) } ) }
+    Ok (( )) }
 
-#[test]
-fn inbound_cols_show_phantoms_and_newM_unstaged (
+async fn inbound_cols_show_phantoms_and_newM_unstaged (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
   run_inbound_save_test (
-    "skg-test-git-diff-inbound-unstaged", false,
-    EXPECTED_UNSTAGED ) }
+    s, "skg-test-git-diff-inbound-unstaged", false,
+    EXPECTED_UNSTAGED ) . await }
 
-#[test]
-fn inbound_cols_show_phantoms_and_newM_staged (
+async fn inbound_cols_show_phantoms_and_newM_staged (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
   run_inbound_save_test (
-    "skg-test-git-diff-inbound-staged", true,
-    EXPECTED_STAGED ) }
+    s, "skg-test-git-diff-inbound-staged", true,
+    EXPECTED_STAGED ) . await }

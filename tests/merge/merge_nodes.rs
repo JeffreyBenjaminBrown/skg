@@ -3,7 +3,7 @@
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
-use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{run_with_shared_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
@@ -17,8 +17,8 @@ use skg::dbs::typedb::search::{find_related_nodes, find_related_nodes_from_in_ru
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 fn mk_test_viewnode (
@@ -39,39 +39,32 @@ fn mk_test_viewnode (
             kind        : ViewNodeKind::Vognode (Vognode::Active (t)) }}
 
 #[test]
-fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {
-  let fixtures_path = PathBuf::from ("tests/merge/merge_nodes/fixtures");
-  let temp_fixtures_path = PathBuf::from ("/tmp/merge-test-2-into-1-fixtures");
-  let tantivy_path = PathBuf::from ("/tmp/tantivy-test-merge-2-into-1");
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str =
+    "tests/merge/merge_nodes/fixtures";
+  run_with_shared_test_db (
+    "skg-test-merge-nodes",
+    |s| Box::pin ( async move {
+      s . reset ("test_merge_2_into_1", fixtures) . await ?;
+      test_merge_2_into_1 (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_merge_1_into_2", fixtures) . await ?;
+      test_merge_1_into_2 (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_inrustgraph_queries_resolve_aliases_after_merge", fixtures) . await ?;
+      test_inrustgraph_queries_resolve_aliases_after_merge (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
-  // Clean up temp directories if they exist from a previous run
-  if temp_fixtures_path . exists() {
-    fs::remove_dir_all (&temp_fixtures_path)?;
-  }
-  if tantivy_path . exists() {
-    fs::remove_dir_all (&tantivy_path)?;
-  }
-
-  // Copy fixtures to temp directory
-  copy_dir_all(&fixtures_path, &temp_fixtures_path)?;
-
-  let result : Result<(), Box<dyn Error>> =
-    run_with_test_db(
-    "skg-test-merge-2-into-1",
-    "/tmp/merge-test-2-into-1-fixtures",
-    "/tmp/tantivy-test-merge-2-into-1",
-    |config, driver, tantivy| Box::pin(async move {
+async fn test_merge_2_into_1 (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       test_merge_2_into_1_impl(config, driver, tantivy) . await?;
       Ok(( ))
-    } ));
-
-  // Clean up temp directory
-  if temp_fixtures_path . exists() {
-    fs::remove_dir_all (&temp_fixtures_path)?;
-  }
-
-  result
-}
+    }
 
 async fn test_merge_2_into_1_impl(
   config: &SkgConfig,
@@ -299,40 +292,14 @@ fn verify_tantivy_after_merge_2_into_1(
 // Test: Merging 1 into 2
 // ============================================================
 
-#[test]
-fn test_merge_1_into_2() -> Result<(), Box<dyn Error>> {
-  let fixtures_path = PathBuf::from ("tests/merge/merge_nodes/fixtures");
-  let temp_fixtures_path = PathBuf::from ("/tmp/merge-test-1-into-2-fixtures");
-  let tantivy_path = PathBuf::from ("/tmp/tantivy-test-merge-1-into-2");
-
-  // Clean up temp directories if they exist from a previous run
-  if temp_fixtures_path . exists() {
-    fs::remove_dir_all (&temp_fixtures_path)?;
-  }
-  if tantivy_path . exists() {
-    fs::remove_dir_all (&tantivy_path)?;
-  }
-
-  // Copy fixtures to temp directory
-  copy_dir_all(&fixtures_path, &temp_fixtures_path)?;
-
-  let result : Result<(), Box<dyn Error>> =
-    run_with_test_db(
-    "skg-test-merge-1-into-2",
-    "/tmp/merge-test-1-into-2-fixtures",
-    "/tmp/tantivy-test-merge-1-into-2",
-    |config, driver, tantivy| Box::pin(async move {
+async fn test_merge_1_into_2 (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       test_merge_1_into_2_impl(config, driver, tantivy) . await?;
       Ok(( ))
-    } ));
-
-  // Clean up temp directory
-  if temp_fixtures_path . exists() {
-    fs::remove_dir_all (&temp_fixtures_path)?;
-  }
-
-  result
-}
+    }
 
 async fn test_merge_1_into_2_impl(
   config: &SkgConfig,
@@ -659,28 +626,13 @@ fn verify_tantivy_after_merge_1_into_2(
 // queries returned raw IDs; the same public function's TypeDB
 // fallback has always returned canonical pids. This test locks in
 // the in-Rust graph path's canonicalized behavior.
-#[test]
-fn test_inrustgraph_queries_resolve_aliases_after_merge()
-  -> Result<(), Box<dyn Error>>
-{ let fixtures_path = PathBuf::from ("tests/merge/merge_nodes/fixtures");
-  let temp_fixtures_path = PathBuf::from ("/tmp/merge-test-aliases-after-merge-fixtures");
-  let tantivy_path = PathBuf::from ("/tmp/tantivy-test-merge-aliases-after-merge");
-  if temp_fixtures_path . exists() {
-    fs::remove_dir_all (&temp_fixtures_path)?; }
-  if tantivy_path . exists() {
-    fs::remove_dir_all (&tantivy_path)?; }
-  copy_dir_all (&fixtures_path, &temp_fixtures_path)?;
-  let result : Result<(), Box<dyn Error>> =
-    run_with_test_db (
-      "skg-test-merge-aliases-after-merge",
-      "/tmp/merge-test-aliases-after-merge-fixtures",
-      "/tmp/tantivy-test-merge-aliases-after-merge",
-      |config, driver, tantivy| Box::pin ( async move {
+async fn test_inrustgraph_queries_resolve_aliases_after_merge (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
         test_inrustgraph_queries_resolve_aliases_after_merge_impl (
-          config, driver, tantivy ) . await } ));
-  if temp_fixtures_path . exists() {
-    fs::remove_dir_all (&temp_fixtures_path)?; }
-  result }
+          config, driver, tantivy ) . await }
 
 async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   config  : &SkgConfig,
@@ -779,23 +731,3 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
             canonical pid 2" );
 
   Ok (( )) }
-
-/// Recursively copy a directory
-fn copy_dir_all(
-  src: &PathBuf,
-  dst: &PathBuf,
-) -> std::io::Result<()> {
-  fs::create_dir_all (dst)?;
-  for entry in fs::read_dir (src)? {
-    let entry : fs::DirEntry = entry?;
-    let ty : fs::FileType = entry . file_type()?;
-    if ty . is_dir() {
-      copy_dir_all(
-        &entry . path(),
-        &dst . join(entry . file_name()),
-      )?;
-    } else {
-      fs::copy( entry . path(),
-                dst . join(entry . file_name()))?; }}
-  Ok (( ))
-}

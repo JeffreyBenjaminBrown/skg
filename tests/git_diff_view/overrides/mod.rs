@@ -15,7 +15,9 @@
 /// overriderCol is the inbound case); ES subscribed to [EB].
 
 use super::common::*;
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
+use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
 use skg::to_org::render::content_view::multi_root_view_via_env;
 use skg::types::env::SkgEnv;
 
@@ -57,28 +59,38 @@ const EXPECTED_STAGED : &str = "\
 *** (skg (node (id hc) (source main) (staged newM))) hc
 ";
 
-fn run_overrides_view_test (
-  db_name : &str,
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-git-diff-overrides",
+    |s| Box::pin ( async move {
+      outbound_cols_show_phantoms_and_newM_de_novo_unstaged (s) . await ?;
+      emptied_cols_still_render_in_diff_mode_de_novo (s) . await ?;
+      outbound_cols_show_phantoms_and_newM_de_novo_staged (s) . await ?;
+      diff_mode_save_is_noop_and_regenerates_outbound_phantoms (s) . await ?;
+      Ok (( )) } )) }
+
+async fn run_overrides_view_test (
+  s            : &mut SharedDbSession,
+  subtest_name : &str,
   staged  : bool,
   expected : &str,
 ) -> Result<(), Box<dyn Error>> {
-  let tantivy_folder : String =
-    format! ("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   if staged { setup_overrides_fixtures_staged (repo_path)?; }
   else      { setup_overrides_fixtures        (repo_path)?; }
-  block_on ( async {
-    let (config, driver, tantivy) =
-      setup_test_dbs (
-        db_name, repo_path . to_str () . unwrap (),
-        &tantivy_folder ) . await ?;
+  s . reset_with_source_path (subtest_name, repo_path) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     // De novo PartnerCol creation reads the process-global graph
-    // handle (maybe_add_partnerCol_branches). The fixture ids are
-    // unique to this module, so the handle cannot mislead sibling
-    // tests under plain 'cargo test' (nextest isolates processes).
-    skg::dbs::in_rust_graph::try_init_global_handle (
+    // handle (maybe_add_partnerCol_branches). Sub-tests share this
+    // process, so install_or_swap_global_handle re-points the
+    // handle at this sub-test's fixtures each time.
+    install_or_swap_global_handle (
       graph_handle_from_config (&config)? );
     let env : SkgEnv =
       skg_env_from_parts (
@@ -89,17 +101,14 @@ fn run_overrides_view_test (
         &env, &[ ID::from ("R") ], true, None, &mut warnings
       ) . await ?;
     assert_buffer_contains (&actual, expected);
-    cleanup_test_dbs (
-      db_name, &driver, Some (Path::new (&tantivy_folder))
-    ) . await ?;
-    Ok (( )) } ) }
+    Ok (( )) }
 
-#[test]
-fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
+async fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
-    "skg-test-git-diff-overrides-unstaged", false,
-    EXPECTED_UNSTAGED ) }
+    s, "skg-test-git-diff-overrides-unstaged", false,
+    EXPECTED_UNSTAGED ) . await }
 
 /// Col existence: in diff mode, a col whose worktree membership is
 /// EMPTY but whose HEAD side is not still renders, holding only
@@ -107,23 +116,20 @@ fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
 /// (overriddenCol, hiddenCol), an inbound col (overriderCol, via the
 /// inverse scan), and the subscribeeCol.  Outside diff mode the
 /// emptied cols still do not appear.
-#[test]
-fn emptied_cols_still_render_in_diff_mode_de_novo (
+async fn emptied_cols_still_render_in_diff_mode_de_novo (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
-  let db_name : &str =
-    "skg-test-git-diff-col-existence";
-  let tantivy_folder : String =
-    format! ("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (repo_path)?;
-  block_on ( async {
-    let (config, driver, tantivy) =
-      setup_test_dbs (
-        db_name, repo_path . to_str () . unwrap (),
-        &tantivy_folder ) . await ?;
+  s . reset_with_source_path (
+    "emptied_cols_still_render_in_diff_mode_de_novo",
+    repo_path ) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
-    skg::dbs::in_rust_graph::try_init_global_handle (
+    install_or_swap_global_handle (
       graph_handle_from_config (&config)? );
     let env : SkgEnv =
       skg_env_from_parts (
@@ -157,38 +163,32 @@ fn emptied_cols_still_render_in_diff_mode_de_novo (
         assert! ( ! plain_view . contains (col),
           "an empty {} must not render outside diff mode:\n{}",
           col, plain_view ); }}
-    cleanup_test_dbs (
-      db_name, &driver, Some (Path::new (&tantivy_folder))
-    ) . await ?;
-    Ok (( )) } ) }
+    Ok (( )) }
 
-#[test]
-fn outbound_cols_show_phantoms_and_newM_de_novo_staged (
+async fn outbound_cols_show_phantoms_and_newM_de_novo_staged (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
-    "skg-test-git-diff-overrides-staged", true,
-    EXPECTED_STAGED ) }
+    s, "skg-test-git-diff-overrides-staged", true,
+    EXPECTED_STAGED ) . await }
 
 /// A diff-mode save of a buffer holding the worktree members is a
 /// no-op for the relations, regenerates the phantoms (idempotence:
 /// saving the rendered result changes nothing further), and never
 /// collects a phantom as a writable-col member (saving the phantom
 /// line must not re-add W to R's overrides_view_of).
-#[test]
-fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
+async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
+  s : &mut SharedDbSession,
 ) -> Result<(), Box<dyn Error>> {
-  let db_name : &str =
-    "skg-test-git-diff-overrides-save";
-  let tantivy_folder : String =
-    format! ("/tmp/tantivy-{}", db_name);
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (repo_path)?;
-  block_on ( async {
-    let (config, driver, tantivy) =
-      setup_test_dbs (
-        db_name, repo_path . to_str () . unwrap (),
-        &tantivy_folder ) . await ?;
+  s . reset_with_source_path (
+    "diff_mode_save_is_noop_and_regenerates_outbound_phantoms",
+    repo_path ) . await ?;
+  let (config, driver, tantivy)
+    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
+    = (&s . config, &s . driver, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     let input : &str = "\
 * (skg (node (id R) (source main))) R
@@ -230,7 +230,4 @@ fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
         r . hides_from_its_subscriptions . or_default () . to_vec (),
         vec! [ ID::from ("ha"), ID::from ("hc") ],
         "hb must not return to R's hides list" ); }
-    cleanup_test_dbs (
-      db_name, &driver, Some (Path::new (&tantivy_folder))
-    ) . await ?;
-    Ok (( )) } ) }
+    Ok (( )) }

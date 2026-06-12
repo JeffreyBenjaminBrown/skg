@@ -1,4 +1,4 @@
-// cargo nextest run --test expand_partner_col_member
+// cargo nextest run --test grouped_overrides -E 'test(expand_partner_col_member::)'
 //
 // Definitive expansion of a read-only PartnerCol member
 // (TODO/full-schema/13_test-rel-matrix.org). Confirmed 2026-06-12:

@@ -5,6 +5,11 @@ members = ["tools/introspect/code-map", "tools/introspect/call-graph", "tools/in
 name = "skg"
 version = "0.1.0"
 edition = "2024"
+# Every tests/*.rs file used to auto-become its own ~quarter-GB test
+# binary; relinking all of them after any server/ change dominated
+# the test cycle (TODO/faster-tests.org). The explicit [[test]]
+# targets below group them into a few binaries instead.
+autotests = false
 
 [lib]
 path = "server/lib.rs"
@@ -64,6 +69,34 @@ path = "tools/bench-diff-analysis.rs"
 [[bin]]
 name = "function_conversions_for_refactor"
 path = "tools/function_conversions_for_refactor/function_conversions_for_refactor.rs"
+
+[[test]]
+name = "grouped_unit"
+path = "tests/grouped_unit.rs"
+
+[[test]]
+name = "grouped_views"
+path = "tests/grouped_views.rs"
+
+[[test]]
+name = "grouped_overrides"
+path = "tests/grouped_overrides.rs"
+
+[[test]]
+name = "grouped_saves"
+path = "tests/grouped_saves.rs"
+
+[[test]]
+name = "grouped_sources"
+path = "tests/grouped_sources.rs"
+
+[[test]]
+name = "git_diff_view"
+path = "tests/git_diff_view.rs"
+
+[[test]]
+name = "git_diff_view_partner_cols"
+path = "tests/git_diff_view_partner_cols.rs"
 
 [dependencies]
 arc-swap = "1"

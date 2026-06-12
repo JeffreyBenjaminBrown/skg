@@ -1,4 +1,4 @@
-// cargo test --test source_path_validation
+// cargo nextest run --test grouped_unit -E 'test(source_path_validation::)'
 
 use std::collections::HashMap;
 use std::fs;

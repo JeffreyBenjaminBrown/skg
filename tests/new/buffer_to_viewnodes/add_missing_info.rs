@@ -7,10 +7,10 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
-use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
+use skg::test_utils::{run_with_shared_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
-use skg::types::misc::{SkgConfig, ID};
+use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_ids};
@@ -19,19 +19,32 @@ use skg::types::viewnode::ParentIs;
 use ego_tree::Tree;
 
 use std::error::Error;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 #[test]
-fn test_add_missing_info_comprehensive(
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-new-add-missing-info",
+    |s| Box::pin ( async move {
+      s . reset ("test_add_missing_info_comprehensive",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
+      test_add_missing_info_comprehensive (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_source_inheritance_multi_level",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
+      test_source_inheritance_multi_level (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_add_missing_info_comprehensive (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-add-missing-info",
-    "tests/new/buffer_to_viewnodes/add_missing_info/fixtures",
-    "/tmp/tantivy-test-add-missing-info",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_add_missing_info_logic ( config, driver ) . await ?;
-      Ok (( )) } )
-  ) }
+      Ok (( )) }
 
 async fn test_add_missing_info_logic (
   config : &SkgConfig,
@@ -121,17 +134,13 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
     _ => panic! ("expected moved TrueNode") }
 }
 
-#[test]
-fn test_source_inheritance_multi_level(
+async fn test_source_inheritance_multi_level (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-source-inheritance",
-    "tests/new/buffer_to_viewnodes/add_missing_info/fixtures",
-    "/tmp/tantivy-test-source-inheritance",
-    |config, driver, _tantivy| Box::pin ( async move {
       test_source_inheritance_logic ( config, driver ) . await ?;
-      Ok (( )) } )
-  ) }
+      Ok (( )) }
 
 async fn test_source_inheritance_logic (
   config : &SkgConfig,

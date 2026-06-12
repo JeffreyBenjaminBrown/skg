@@ -1,4 +1,4 @@
-// cargo nextest run --test git_ops
+// cargo nextest run --test grouped_unit -E 'test(git_ops::)'
 
 use git2::Repository;
 use std::fs;

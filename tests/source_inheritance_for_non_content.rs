@@ -1,4 +1,4 @@
-// cargo test --test source_inheritance_for_non_content -- --nocapture
+// cargo nextest run --test grouped_unit -E 'test(source_inheritance_for_non_content::)'
 //
 // Verifies that if a node's parent has the same source,
 // then the node's source is not heralded,

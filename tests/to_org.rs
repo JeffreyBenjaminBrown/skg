@@ -1,4 +1,4 @@
-// cargo test --test to_org
+// cargo nextest run --test grouped_unit -E 'test(to_org::)'
 
 #[path = "to_org/util.rs"]
 mod util;

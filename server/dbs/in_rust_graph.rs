@@ -48,6 +48,23 @@ pub fn init_global_handle_for_first_time_or_panic (handle: InRustGraphHandle) {
 pub fn try_init_global_handle (handle: InRustGraphHandle) -> bool {
   GLOBAL_HANDLE . set (handle) . is_ok () }
 
+/// For tests that share a process (consolidated sub-tests, plain
+/// 'cargo test'): make the process-global handle reflect `handle`'s
+/// current graph, whether or not the OnceLock is already set. The
+/// OnceLock itself can never be re-set, but its contents are an
+/// ArcSwap, so a later test can swap in its own graph. RETURNS the
+/// global handle, which callers should use in place of `handle` so
+/// that any subsequent swaps they make stay visible globally.
+pub fn install_or_swap_global_handle (
+  handle : InRustGraphHandle,
+) -> InRustGraphHandle {
+  if GLOBAL_HANDLE . set ( handle . clone () ) . is_err () {
+    let global : &InRustGraphHandle =
+      GLOBAL_HANDLE . get () . unwrap (); // safe: set() just failed, so it is initialized
+    global . store ( handle . load_full () );
+    return global . clone (); }
+  handle }
+
 /// Snap the current in-Rust graph if the global handle has been
 /// initialized; returns None otherwise. In the running server
 /// 'init_global_handle_for_first_time_or_panic' is called during startup before any request

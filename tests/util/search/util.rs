@@ -1,12 +1,14 @@
 // cargo test typedb::search::util
 
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::dbs::typedb::search::pid_and_source_from_id;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::dbs::typedb::util::pids_from_ids::pids_from_ids;
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 
 use std::error::Error;
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_extract_payload_from_typedb_string_rep() {
@@ -21,13 +23,26 @@ fn test_extract_payload_from_typedb_string_rep() {
 }
 
 #[test]
-fn test_pid_from_id (
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  run_with_shared_test_db (
+    "skg-test-util-search-util",
+    |s| Box::pin ( async move {
+      s . reset ("test_pid_from_id",
+                 "tests/typedb/search/util/fixtures") . await ?;
+      test_pid_from_id (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_pids_from_ids",
+                 "tests/typedb/search/util/fixtures") . await ?;
+      test_pids_from_ids (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
+async fn test_pid_from_id (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-search-util",
-    "tests/typedb/search/util/fixtures",
-    "/tmp/tantivy-test-typedb-search-util",
-    |config, driver, _tantivy| Box::pin ( async move {
       let (pid_for_4, source_for_4) = pid_and_source_from_id (
         & config . db_name,
         & driver,
@@ -42,16 +57,13 @@ fn test_pid_from_id (
       assert_eq!(pid_for_44, ID("4" . to_string () ));
       assert_eq!(source_for_4,  SourceName::from ("main") );
       assert_eq!(source_for_44, SourceName::from ("main") );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn test_pids_from_ids (
+async fn test_pids_from_ids (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-pids-from-ids",
-    "tests/typedb/search/util/fixtures",
-    "/tmp/tantivy-test-typedb-pids-from-ids",
-    |config, driver, _tantivy| Box::pin ( async move {
       // Test bulk lookup of multiple IDs using nested subqueries
       let input_ids = vec![
         ID("4" . to_string()),
@@ -77,5 +89,4 @@ fn test_pids_from_ids (
                                           &[] ) . await ?;
       assert!(empty_results . is_empty());
 
-      Ok (( )) } )
-  ) }
+      Ok (( )) }

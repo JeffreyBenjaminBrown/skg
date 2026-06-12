@@ -1,4 +1,4 @@
-// cargo test --test merge
+// cargo nextest run --test grouped_saves -E 'test(merge::)'
 
 #[path = "merge/saveinstructions_from_the_merges_in_an_viewforest.rs"]
 mod saveinstructions_from_the_merges_in_an_viewforest;

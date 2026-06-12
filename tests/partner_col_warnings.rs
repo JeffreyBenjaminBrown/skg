@@ -1,4 +1,4 @@
-// cargo test --test partner_col_warnings -- --nocapture
+// cargo nextest run --test grouped_overrides -E 'test(partner_col_warnings::)'
 //
 // When the completion pass repairs a read-only PartnerCol in the
 // view the user just saved, the save succeeds and
@@ -16,7 +16,8 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::serve::ViewsState;
@@ -29,16 +30,19 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
 
 #[test]
-fn readonly_col_repairs_warn
+fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  let fixtures : &str = "tests/partner_col_warnings/fixtures";
+  run_with_shared_test_db (
     "skg-test-partner-col-warnings",
-    "tests/partner_col_warnings/fixtures",
-    "/tmp/tantivy-test-partner-col-warnings",
-    |config, driver, tantivy| Box::pin ( async move {
+    |s| Box::pin ( async move {
+      s . reset ("readonly_col_repairs_warn", fixtures) . await ?;
       readonly_col_repairs_warn_impl (
-        config, driver, tantivy ) . await
-    } )) }
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("failed_save_carries_warnings_with_errors", fixtures) . await ?;
+      failed_save_carries_warnings_with_errors (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
 
 async fn save_buffer (
   buf     : &str,
@@ -75,9 +79,8 @@ async fn readonly_col_repairs_warn_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-  skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic (
-    graph . clone () );
+    install_or_swap_global_handle (
+      graph_handle_from_config (config) ? );
   let (complete_buffer, _pids, _tree)
     : (String, Vec<ID>, _) =
     multi_root_view (
@@ -153,20 +156,18 @@ async fn readonly_col_repairs_warn_impl (
       "a body on a col scaffold must still abort the save" ); }
   Ok (( )) }
 
-#[test]
-fn failed_save_carries_warnings_with_errors
-  () -> Result<(), Box<dyn Error>> {
+async fn failed_save_carries_warnings_with_errors (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
   // Decided 2026-06-12 (option b): a failed save's response carries
   // its warnings alongside its errors. The buffer below produces BOTH
   // a parse-time warning (leftover text on a subscriberCol headline)
   // and a validation error (an idCol claiming an id node n lacks).
-  run_with_test_db (
-    "skg-test-failed-save-warnings",
-    "tests/partner_col_warnings/fixtures",
-    "/tmp/tantivy-test-failed-save-warnings",
-    |config, driver, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
+        install_or_swap_global_handle (
+          graph_handle_from_config (config) ? );
       let buffer : &str = "\
 * (skg (node (id n) (source main))) n
 ** (skg subscriberCol) leftover headline text
@@ -195,4 +196,4 @@ fn failed_save_carries_warnings_with_errors
             "a failed save must carry its parse warning: {:?}", warnings ); }
         other => panic! (
           "expected BufferValidationErrors, got {:?}", other ), }
-      Ok (( )) } )) }
+      Ok (( )) }

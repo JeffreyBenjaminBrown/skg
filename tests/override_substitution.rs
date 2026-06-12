@@ -1,4 +1,4 @@
-// cargo nextest run --test override_substitution
+// cargo nextest run --test grouped_overrides -E 'test(override_substitution::)'
 //
 // Override substitution (TODO/full-schema/11_override-rendering-and-navigation.org):
 // when completion would CREATE a viewnode for node N as recursive
@@ -17,8 +17,9 @@
 // "other" while P3 and its overrider R3 live in "main".
 //
 // PITFALL: marked buffers hit the tamper check, which reads the
-// process-global in-Rust graph; tests install it via
-// try_init_global_handle (per-process under nextest).
+// process-global in-Rust graph; each sub-test installs its own
+// fixture graph via install_or_swap_global_handle, which keeps the
+// shared process's global consistent with the current fixtures.
 
 use indoc::indoc;
 use std::error::Error;
@@ -28,8 +29,9 @@ use std::sync::Arc;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::serve::ViewsState;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
+use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::test_utils::{
-  run_with_test_db, run_with_test_db_from_config,
+  run_with_shared_test_db,
   graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
@@ -42,6 +44,34 @@ use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
+
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str = "tests/override_substitution/fixtures";
+  run_with_shared_test_db (
+    "skg-test-override-substitution",
+    |s| Box::pin ( async move {
+      s . reset ("de_novo_draws_the_overrider_marked", fixtures) . await ?;
+      de_novo_draws_the_overrider_marked (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("save_roundtrips_to_original_and_is_idempotent", fixtures) . await ?;
+      save_roundtrips_to_original_and_is_idempotent (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("extraction_honors_the_marker", fixtures) . await ?;
+      extraction_honors_the_marker (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("diff_mode_disables_substitution", fixtures) . await ?;
+      diff_mode_disables_substitution (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("marked_view_is_shape_stable_across_diff_toggle", fixtures) . await ?;
+      marked_view_is_shape_stable_across_diff_toggle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset_from_config ("ownership_and_visibility_gate_substitution",
+                             "tests/override_substitution/fixtures-multi/skgconfig.toml") . await ?;
+      ownership_and_visibility_gate_substitution (
+        &s . config, &s . driver ) . await ?;
+      Ok (( )) } )) }
 
 fn marked_lines<'a> (
   buf      : &'a str,
@@ -113,15 +143,12 @@ fn read_fixture_file (
   std::fs::read_to_string (&path)
     . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
 
-#[test]
-fn de_novo_draws_the_overrider_marked
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-override-subst-denovo",
-    "tests/override_substitution/fixtures",
-    "/tmp/tantivy-test-override-subst-denovo",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn de_novo_draws_the_overrider_marked (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let (view, _pids, _tree) =
         multi_root_view (
@@ -139,17 +166,14 @@ fn de_novo_draws_the_overrider_marked
                   |l| l . contains ("(id M)")
                       && ! l . contains ("overridesHere") ),
         "M, not overridden, draws raw:\n{}", view );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn save_roundtrips_to_original_and_is_idempotent
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-override-subst-roundtrip",
-    "tests/override_substitution/fixtures",
-    "/tmp/tantivy-test-override-subst-roundtrip",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn save_roundtrips_to_original_and_is_idempotent (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let (de_novo, _pids, _tree) =
         multi_root_view (
@@ -176,17 +200,14 @@ fn save_roundtrips_to_original_and_is_idempotent
       assert_eq! ( saved, saved_again,
         "a second save is a noop (idempotence through the \
          collected-ID orderkey)" );
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn extraction_honors_the_marker
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-override-subst-extract",
-    "tests/override_substitution/fixtures",
-    "/tmp/tantivy-test-override-subst-extract",
-    |config, driver, _tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn extraction_honors_the_marker (
+  config   : &SkgConfig,
+  driver   : &Arc<TypeDBDriver>,
+  _tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       { // A marked child collects its original: P's collected
         // contains equals disk ([N, M]), so the noop filter drops
@@ -297,17 +318,14 @@ fn extraction_honors_the_marker
             ! s_node . hides_from_its_subscriptions . or_default ()
               . contains ( &ID::from ("N") ),
             "S must not hide N: the drawn R stands for N" ); }}
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn diff_mode_disables_substitution
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-override-subst-diff",
-    "tests/override_substitution/fixtures",
-    "/tmp/tantivy-test-override-subst-diff",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn diff_mode_disables_substitution (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       let (view, _pids, _tree) =
         multi_root_view (
@@ -319,7 +337,7 @@ fn diff_mode_disables_substitution
       assert! ( view . lines () . any (
                   |l| l . contains ("(id N)") ),
         "N draws raw in diff mode:\n{}", view );
-      Ok (( )) } )) }
+      Ok (( )) }
 
 /// A view already containing a drawn substitute (R marked
 /// '(overridesHere N)') is shape-stable across a diff-mode toggle:
@@ -327,15 +345,12 @@ fn diff_mode_disables_substitution
 /// the reconciler matches by collected ID), creates no duplicate raw
 /// N and no phantom for N
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
-#[test]
-fn marked_view_is_shape_stable_across_diff_toggle
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-override-subst-toggle",
-    "tests/override_substitution/fixtures",
-    "/tmp/tantivy-test-override-subst-toggle",
-    |config, driver, tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn marked_view_is_shape_stable_across_diff_toggle (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       { // git-init the temp fixture copy, so the toggle's diff is
         // real (and clean: HEAD == worktree).
@@ -444,16 +459,13 @@ fn marked_view_is_shape_stable_across_diff_toggle
       { let off : String = toggle (&mut views_state);
         assert! ( ! views_state . diff_mode_enabled );
         assert_stable ( & content_of (&off), "diff off" ); }
-      Ok (( )) } )) }
+      Ok (( )) }
 
-#[test]
-fn ownership_and_visibility_gate_substitution
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db_from_config (
-    "skg-test-override-subst-gates",
-    "tests/override_substitution/fixtures-multi/skgconfig.toml",
-    |config, driver| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+async fn ownership_and_visibility_gate_substitution (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
         graph_handle_from_config (config) ? );
       { // A foreign overrider never substitutes.
         let (view, _pids, _tree) =
@@ -493,4 +505,4 @@ fn ownership_and_visibility_gate_substitution
         assert! ( ! view . contains ("(id R3)"),
           "its overrider must not be drawn in its place (the \
            marker would name an inactive node):\n{}", view ); }
-      Ok (( )) } )) }
+      Ok (( )) }
