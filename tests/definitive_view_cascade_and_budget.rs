@@ -1,4 +1,4 @@
-// cargo test --test definitive_view_cascade_and_budget -- --nocapture
+// cargo nextest run --test grouped_views -E 'test(definitive_view_cascade_and_budget::)'
 //
 // Tests for definitive view request expansion.
 // These tests verify that when a node has a "Definitive" view request,

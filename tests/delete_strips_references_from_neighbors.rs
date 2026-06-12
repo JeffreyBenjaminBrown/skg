@@ -1,4 +1,4 @@
-// cargo test --test delete_strips_references_from_neighbors -- --nocapture
+// cargo nextest run --test grouped_saves -E 'test(delete_strips_references_from_neighbors::)'
 //
 // When a node is deleted via a save buffer, every other on-disk
 // node that referenced it in an outbound list field should have

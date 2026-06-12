@@ -1,4 +1,4 @@
-// cargo test --test source_sets
+// cargo nextest run --test grouped_sources -E 'test(source_sets::)'
 //
 // These are feature-first tests for TODO/source-sets/plan.org. They
 // intentionally name the source-set API before the implementation

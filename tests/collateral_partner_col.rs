@@ -1,4 +1,4 @@
-// cargo nextest run --test collateral_partner_col
+// cargo nextest run --test grouped_overrides -E 'test(collateral_partner_col::)'
 //
 // Two cells of the relationship matrix
 // (TODO/full-schema/13_test-rel-matrix.org) that need an open

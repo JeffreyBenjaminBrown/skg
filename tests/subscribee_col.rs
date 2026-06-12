@@ -1,4 +1,4 @@
-// cargo test --test subscribee_col -- --nocapture
+// cargo nextest run --test grouped_unit -E 'test(subscribee_col::)'
 
 use indoc::indoc;
 use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};

@@ -1,4 +1,4 @@
-// cargo test --test partner_col_warnings -- --nocapture
+// cargo nextest run --test grouped_overrides -E 'test(partner_col_warnings::)'
 //
 // When the completion pass repairs a read-only PartnerCol in the
 // view the user just saved, the save succeeds and

@@ -1,4 +1,4 @@
-// cargo nextest run --test overridden_as_such
+// cargo nextest run --test grouped_overrides -E 'test(overridden_as_such::)'
 //
 // The overridden-as-such exception
 // (TODO/full-schema/11_override-rendering-and-navigation.org), on

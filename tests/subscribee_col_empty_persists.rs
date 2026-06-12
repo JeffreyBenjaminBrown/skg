@@ -1,4 +1,4 @@
-// cargo test --test subscribee_col_empty_persists -- --nocapture
+// cargo nextest run --test grouped_views -E 'test(subscribee_col_empty_persists::)'
 //
 // plan_v2 §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
 // self-deleted. It is the editable interface onto the origin's outgoing

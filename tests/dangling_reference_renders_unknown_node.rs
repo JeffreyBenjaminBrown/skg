@@ -1,4 +1,4 @@
-// cargo test --test dangling_reference_renders_unknown_node -- --nocapture
+// cargo nextest run --test grouped_saves -E 'test(dangling_reference_renders_unknown_node::)'
 //
 // Regression: a single dangling reference deep in a viewforest used
 // to abort the whole single_root_view call with

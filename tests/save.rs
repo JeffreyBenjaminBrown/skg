@@ -1,4 +1,4 @@
-// cargo test --test save
+// cargo nextest run --test grouped_saves -E 'test(save::)'
 
 #[path = "save/none_node_fields_are_noops.rs"]
 mod none_node_fields_are_noops;

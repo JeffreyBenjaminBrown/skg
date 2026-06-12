@@ -1,4 +1,4 @@
-// cargo test --test initial_view_bfs -- --nocapture
+// cargo nextest run --test grouped_views -E 'test(initial_view_bfs::)'
 
 use indoc::indoc;
 use std::error::Error;

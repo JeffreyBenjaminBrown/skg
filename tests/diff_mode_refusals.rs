@@ -1,4 +1,4 @@
-// cargo nextest run --test diff_mode_refusals
+// cargo nextest run --test grouped_sources -E 'test(diff_mode_refusals::)'
 //
 // The two refusals of
 // TODO/full-schema/12-2_diff-mode-policy_discussion.org: enabling

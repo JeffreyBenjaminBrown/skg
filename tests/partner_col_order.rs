@@ -1,4 +1,4 @@
-// cargo test --test partner_col_order -- --nocapture
+// cargo nextest run --test grouped_overrides -E 'test(partner_col_order::)'
 //
 // A ColPolicy::ReadOnlySet col (here a SubscriberCol) respects the
 // user's view-local member order across save and rerender

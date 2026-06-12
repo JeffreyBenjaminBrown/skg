@@ -1,4 +1,4 @@
-// cargo test --test hidden_from_subscriptions -- --nocapture
+// cargo nextest run --test grouped_views -E 'test(hidden_from_subscriptions::)'
 //
 // Tests for HiddenOutsideOfSubscribeeCol, HiddenInSubscribeeCol, and HiddenFromSubscribees.
 // These test that:
@@ -6,12 +6,7 @@
 // 2. After saving with definitive view requests, HiddenInSubscribeeCol is shown
 
 use indoc::indoc;
-use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
-use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::dbs::typedb::sources::create_all_sources;
 use skg::test_utils::{
   extract_string_field_from_sexp,
   read_all_lp_messages,
@@ -19,21 +14,17 @@ use skg::test_utils::{
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
-use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 use std::sync::Arc;
-use std::fs;
-use std::path::{Path, PathBuf};
 
 use skg::serve::ViewsState;
 use skg::types::views_state::{OpenViews, ViewUri};
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
-use futures::executor::block_on;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
+use typedb_driver::TypeDBDriver;
 
 fn mk_test_tcp_stream ()
   -> TcpStream

@@ -1,5 +1,5 @@
 // These tests have not been human-verified.
-// cargo nextest run --test move_source
+// cargo nextest run --test grouped_sources -E 'test(move_source::)'
 
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;

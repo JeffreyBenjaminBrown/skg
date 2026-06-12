@@ -1,4 +1,4 @@
-// cargo nextest run --test override_substitution
+// cargo nextest run --test grouped_overrides -E 'test(override_substitution::)'
 //
 // Override substitution (TODO/full-schema/11_override-rendering-and-navigation.org):
 // when completion would CREATE a viewnode for node N as recursive

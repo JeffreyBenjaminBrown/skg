@@ -1,4 +1,4 @@
-// cargo test --test tantivy
+// cargo nextest run --test grouped_unit -E 'test(tantivy::)'
 
 use std::path::Path;
 use std::collections::HashMap;

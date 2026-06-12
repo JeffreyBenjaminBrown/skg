@@ -1,4 +1,4 @@
-// cargo nextest run --test partner_col_matrix
+// cargo nextest run --test grouped_overrides -E 'test(partner_col_matrix::)'
 //
 // The batched relationship-matrix target
 // (TODO/full-schema/13_test-rel-matrix.org). ONE test function builds

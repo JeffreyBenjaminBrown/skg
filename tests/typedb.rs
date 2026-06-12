@@ -1,4 +1,4 @@
-// cargo test --test typedb -- --nocapture
+// cargo nextest run --test grouped_sources -E 'test(typedb::)'
 
 mod typedb {
   pub mod ancestry;

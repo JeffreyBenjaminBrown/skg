@@ -1,4 +1,4 @@
-// cargo nextest run --test override_menu
+// cargo nextest run --test grouped_overrides -E 'test(override_menu::)'
 //
 // The override-choice buffer
 // (TODO/full-schema/11_override-rendering-and-navigation.org): a new

@@ -1,4 +1,4 @@
-// cargo test --test content_view -- --nocapture
+// cargo nextest run --test grouped_views -E 'test(content_view::)'
 
 use indoc::indoc;
 use std::error::Error;

@@ -1,4 +1,4 @@
-// cargo nextest run --test view_stats_sharing
+// cargo nextest run --test grouped_overrides -E 'test(view_stats_sharing::)'
 //
 // The position-relative sharing view-stats
 // (TODO/full-schema/10_heralds-and-stats.org):

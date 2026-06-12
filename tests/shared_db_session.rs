@@ -1,4 +1,4 @@
-// cargo nextest run --test shared_db_session
+// cargo nextest run --test grouped_sources -E 'test(shared_db_session::)'
 //
 // Pins the shared-db-session machinery (server/test_utils.rs) that
 // lets a group of sub-tests reuse one TypeDB database, wiping the

@@ -1,4 +1,4 @@
-// cargo test --test serve_text_search_test
+// cargo nextest run --test grouped_unit -E 'test(serve_text_search_test::)'
 
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
