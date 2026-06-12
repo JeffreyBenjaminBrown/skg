@@ -9,10 +9,14 @@ use std::error::Error;
 use std::net::TcpStream;
 
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_shared_test_db;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
+use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::OpenViews;
+
+use std::sync::Arc;
+use typedb_driver::TypeDBDriver;
 
 
 fn mk_test_tcp_stream ()
@@ -23,20 +27,53 @@ fn mk_test_tcp_stream ()
     listener . local_addr () . unwrap ();
   TcpStream::connect (addr) . unwrap () }
 
+#[test]
+fn all_tests
+  () -> Result<(), Box<dyn Error>> {
+  let fixtures : &str =
+    "tests/definitive_view_cascade_and_budget/fixtures";
+  run_with_shared_test_db (
+    "skg-test-definitive-view-cascade-and-budget",
+    |s| Box::pin ( async move {
+      s . reset ("test_definitive_view_ample_budget", fixtures) . await ?;
+      test_definitive_view_ample_budget (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_view_limit_5_or_6", fixtures) . await ?;
+      test_definitive_view_limit_5_or_6 (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_view_limit_1_to_4", fixtures) . await ?;
+      test_definitive_view_limit_1_to_4 (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_view_conflicting", fixtures) . await ?;
+      test_definitive_view_conflicting (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_view_with_cycle",
+                 "tests/definitive_view_cascade_and_budget/fixtures-cycle") . await ?;
+      test_definitive_view_with_cycle (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_view_with_repeat", fixtures) . await ?;
+      test_definitive_view_with_repeat (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_view_request_cleared", fixtures) . await ?;
+      test_definitive_view_request_cleared (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_budget_aliascol_is_neutral",
+                 "tests/definitive_view_cascade_and_budget/fixtures-aliases") . await ?;
+      test_budget_aliascol_is_neutral (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      Ok (( )) } )) }
+
 // ===================================================
 // Test: Definitive view with an ample budget -> everything expands.
 // §5.5 budget counts vognode EXPANSIONS (cost 1 each); the full subtree here is
 // 12 expansions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
 // 20 is ample and nothing is left indefinitive.
 // ===================================================
-#[test]
-fn test_definitive_view_ample_budget
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-ample-budget",
-    "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-ample-budget",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_ample_budget (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
@@ -90,7 +127,7 @@ fn test_definitive_view_ample_budget
       assert_eq!(result, expected,
         "Definitive view with an ample budget should expand all children");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // ===================================================
 // Test: Definitive view with limit=5 vs limit=6
@@ -100,14 +137,11 @@ fn test_definitive_view_ample_budget
 // after the budget is spent are stripped to indefinitive. (No sibling-group
 // padding: the two limits now differ by one created node.)
 
-#[test]
-fn test_definitive_view_limit_5_or_6
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-limit-5-or-6",
-    "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-limit-5-or-6",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_limit_5_or_6 (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
@@ -195,7 +229,7 @@ fn test_definitive_view_limit_5_or_6
       assert_eq!(result_6, expected_6,
         "limit=6: 121 expands both gen-3 children, rest indefinitive (§5.5)");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // ===================================================
 // Test: Definitive view with limit=1 or limit=4
@@ -205,14 +239,11 @@ fn test_definitive_view_limit_5_or_6
 // so the sibling group is completed, all are indefinitive,
 // and the grandchild generation is not visited at all.
 
-#[test]
-fn test_definitive_view_limit_1_to_4
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-limit-1-to-4",
-    "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-limit-1-to-4",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_limit_1_to_4 (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
@@ -289,7 +320,7 @@ fn test_definitive_view_limit_1_to_4
       assert_eq!(result_4, expected_4,
         "limit=4 creates all four gen-2 children, all indefinitive (§5.5)");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // ===================================================
 // Test: Definitive view on node that conflicts with existing definitive
@@ -298,14 +329,11 @@ fn test_definitive_view_limit_1_to_4
 // definitive view on a second instance of X, the first should become
 // indefinitive.
 
-#[test]
-fn test_definitive_view_conflicting
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-conflict",
-    "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-conflict",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_conflicting (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Node 12 appears twice:
       // - First as a regular child of 1 (will be definitive after completion)
       // - Second with a definitive view request
@@ -351,21 +379,18 @@ fn test_definitive_view_conflicting
       assert_eq!(result, expected,
         "First definitive instance should become indef when second requests definitive");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // ===================================================
 // Test: Definitive view expansion detects cycles
 // ===================================================
 // Create fixtures for a cycle: a contains b contains a
 
-#[test]
-fn test_definitive_view_with_cycle
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-cycle",
-    "tests/definitive_view_cascade_and_budget/fixtures-cycle",
-    "/tmp/tantivy-test-definitive-view-cycle",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_with_cycle (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       // Node a has definitive request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
@@ -401,7 +426,7 @@ fn test_definitive_view_with_cycle
       assert_eq!(result, expected,
         "Definitive view should detect cycles and mark them");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // ===================================================
 // Test: Definitive view expansion detects repeats
@@ -409,14 +434,11 @@ fn test_definitive_view_with_cycle
 // If a node is already visited (definitive elsewhere), it should be
 // marked indef when encountered again during expansion.
 
-#[test]
-fn test_definitive_view_with_repeat
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-repeat",
-    "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-repeat",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_with_repeat (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 121) (source main))) 121
         * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12
@@ -465,20 +487,17 @@ fn test_definitive_view_with_repeat
       assert_eq!(result, expected,
         "Definitive view should mark repeated nodes as indefinitive");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // =====================================================
 // Test: Definitive view request clears after processing
 // =====================================================
 
-#[test]
-fn test_definitive_view_request_cleared
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-definitive-view-cleared",
-    "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-cleared",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_definitive_view_request_cleared (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12
       "};
@@ -505,7 +524,7 @@ fn test_definitive_view_request_cleared
       assert!(!result . contains ("viewRequests"),
         "viewRequests should be cleared after processing");
 
-      Ok (( )) } )) }
+      Ok (( )) }
 
 // ===================================================
 // Test: an AliasCol fills WHOLE and is budget-NEUTRAL (§5.5).
@@ -525,14 +544,11 @@ fn test_definitive_view_request_cleared
 // would then be left indefinitive (verified: at limit=2 c2 *is* indefinitive
 // while the AliasCol stays whole). That c2 is definitive here is the guarantee
 // this test pins.
-#[test]
-fn test_budget_aliascol_is_neutral
-  () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-budget-aliascol-neutral",
-    "tests/definitive_view_cascade_and_budget/fixtures-aliases",
-    "/tmp/tantivy-test-budget-aliascol-neutral",
-    |config, driver, tantivy| Box::pin ( async move {
+async fn test_budget_aliascol_is_neutral (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id r) (source main) (viewRequests aliases))) r
         ** (skg (node (id c1) (source main))) c1
@@ -566,4 +582,4 @@ fn test_budget_aliascol_is_neutral
       assert_eq!(result, expected,
         "budget 3 expands the whole content chain; the AliasCol is whole + budget-neutral");
 
-      Ok (( )) } )) }
+      Ok (( )) }
