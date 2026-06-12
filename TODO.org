@@ -1,128 +1,100 @@
-* ONGOING [[./TODO/full-schema]]
-* TODO batch more tests
-see the section called
-  'we can test them all but batch into one test'
-in
-  TODO/full-schema/13_test-rel-matrix.org
-* DONE , probably :: Phantom = Diff | Deleted | Unknown
-[[./TODO/DONE/phantom-enum/]]
-claude --resume 51f722b5-8564-4c61-9d86-c1b98945f07a
-  in skg2
-* AWAITS TypeDB polls too much, burns 16% of a CPU.
-claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
-  in skg (not skg2, not skg3)
-Simple upstream fix would be to make the poll frequency configurable,
-* Does the new inactive node treatment mean they don't need IDs?
-* Emacs can lose heralds
+* s
+** correctness
+*** I want this todo list in Skg.
+Git review after reshaping it is hell.
+**** merge & export these notes
+***** DONE "TODO" items in this repo
+***** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
+***** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
+***** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
+*** containsParent is a viewstat, not just an isParent value?
+Seems good to use two heralds of the same shape, like "}}",
+but one is the color of isParent and the other the color of viewStats.
+*** bug : graphnodestats are not recalculated in collateral buffers
+*** bugfix : strip last empty line from buffer on save
+Or strip pure-whitespace bodies.
+*** Bug ? Saving doesn't regenerate heralds if there were no changes?
+*** Does the new inactive node treatment mean they don't need IDs?
+*** Emacs can lose heralds
 Editing the rule table in Rust requires regenerating
 tests/elisp/herald-rules.sexp via cargo run --bin emit-herald-rules. A
 Rust test fails with exactly that instruction until you do, so it can't
 drift silently — but it is one generated artifact that exists so batch
 Emacs tests can use the real table without a server. Presentation
 tweaks break no other test, per your atoms-only decision.
-* potential optimization : usually don't check gO, gS, etc.
-Some viewstats are unliekly in most places.
-* git add for both sides of moved source
-* Emacs, not the server, should remember foldedness and point.
-** the idea
+*** suppressed container count rule for subscribees-as-such is wrong
+It suppresses 1, should suppress 0.
+Maybe simplify the rule: always suppress 1 and nothing else.
+*** [[./TODO/incremental-init-might-be-broken.org]]
+*** to be more sure of the git diff analysis
+Have independent code count the number of disappeared files,
+moved files, new roots, and other anomalies,
+and check it against the report.
+(Backgrounded.)
+** performance
+*** TypeDB polls too much, burns 16% of a CPU.
+claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
+  in skg (not skg2, not skg3)
+Simple upstream fix would be to make the poll frequency configurable,
+*** optimization : don't always check all viewstats
+e.g. gO, gS, etc.
+Some viewstats are unliekly in most places,
+and are already caught by the umbrella heralds A, I, O, S, etc.
+** convenience to user
+*** Each parentIs herald should be a different color.
+and always first
+*** the diff report should
+**** explain the maximum badness in each category
+**** include empty top-level categories
+so a reader can remember what those categories are,
+and thus (e.g.) that nothing was orphaned.
+*** git add for both sides of moved source
+*** each new root view sohuld be drawn with a link sources ancestry
+that is, linksource-ancestry as view-descendents
+*** command to reverse the [where I learned it] contains [it] link
+One can then easily place the source under a branch named 'source'.
+**** elaboration
+Suppose you took notes on a book,
+collected under a note with title equal to the book's.
+Then you integrate that knowledge into your graph.
+From each of those integrated bits,
+the source appears in its containerward ancestry.
+I usually don't want that -- I want to see the source as content, not container.
+A command to reverse the direction of a contains relationship
+would make it easy to clean such data -- run from a child,
+it makes the child contain its parent,
+and removes the child from the parent.
+*** text search across containment paths
+*** return point to not just the same line but the same* char
+  * or max within that line if too big)
+** convenience to coder
+*** [[./TODO/better-than-regex-in-emacs-tests.org]]
+*** graphstats should precede even the link source count
+but follow parentIs and indef
+** elegance
+*** Emacs, not the server, should remember foldedness and point.
+**** the idea
 Keep a tree of IDs.
 If the ID that had point is lost,
 destroy its spaces-in-the-text-of-that-node record,
 and hand it to the nearest surviving ancestor.
 
 Continue to apply foldedness leafward from the root as before.
-** It's hard because two viewnodes can share an ID.
+**** It's hard because two viewnodes can share an ID.
 The incoming tree would have to be compared to the outgoing one.
-But (although they usually don't) things can shift around dramatically.
-* The AIs want jq, perl
-* each new root view sohuld be drawn with a link sources ancestry
-that is, linksource-ancestry as view-descendents
-* more diff supplement data
-containers before and after
-heralds (alias action, etc.)
-* must (?) stage them separately, but commit all repos at once
-* command to reverse the [where I learned it] contains [it] link
-One can then easily place the source under a branch named 'source'.
-* the link stack should not be expected to be cleared
+Although they usually don't, things can shift around dramatically.
+** usage mysteries
+*** must (?) stage them separately, but commit all repos at once
+** usage, to document
+*** the link stack should not be expected to be cleared
 Someone can if they find a way to use it.
 They might never use it.
 It's cheap.
-* text search across containment paths
-* Bug ? Saving doesn't regenerate heralds if there were no changes?
-* DONE , probably :: [[./TODO/DONE/local-view-update/plan-critique.org]]
-* u
-** the diff report should
-*** explain the maximum badness in each category
-*** include empty top-level categories
-so a reader can remember what those categories are,
-and thus (e.g.) that nothing was orphaned.
-** bugfix : strip last empty line from buffer on save
-Or strip pure-whitespace bodies.
-** bug : graphnodestats are not recalculated in collateral buffers
-** goto in magit should work on raw IDs too
-* [[./TODO/better-than-regex-in-emacs-tests.org]]
-* suppressed container count rule for subscribees-as-such is wrong
-It suppresses 1, should suppress 0.
-Maybe simplify the rule: always suppress 1 and nothing else.
-* ? replace ViewNode with (Vnode_Viewstate, Vnode)
-where Vnode is the new name of what was ViewNodeKind.
-* ParentIs, Birth and maybe other things are vestigial for Phantoms
-* autoload elisp/skg-view-org-ancestry.el
-* DONE ? [[./TODO/source-sets/]]
-Seems to work.
-* [[./TODO/incremental-init-might-be-broken.org]]
-* return point to not just the same line but the same* char
-  * or max within that line if too big)
-* Need text search across paths.
-* critical
-** I can't demo without privacy mode.
-The backlinks from skg itself contains unsafe references.
-* AWAITS ? to be more sure of the git diff analysis
-Have independent code count the number of disappeared files,
-moved files, new roots, and other anomalies,
-and check it against the report.
-(Backgrounded.)
-* AWAITS links in before contents
-** graphstats should precede even the link source count
-but follow parentIs and indef
-** containsParent is a viewstat, not just an isParent value?
-Seems good to use two heralds of the same shape, like "}}",
-but one is the color of isParent and the other the color of viewStats.
-* AWAITS speed up test suite
-Consolidate redundant tests.
-* ONGOING [[./TODO/birth-to-parent.org]]
-* Each parentIs herald should be a different color.
-and always first
-* understand
-** [[./rerender_view.org][understand rerender_view]]
-** OOPS : meant to review this diff range
-*** command
-git diff 0668ddb6f78b2d678cde26389fa3d04cb6f98614..adf5603bdaf412c418e1e7a40853bb0bdc093941
-*** hash interp
-ending
-  adf5603bdaf412c418e1e7a40853bb0bdc093941
-starting
-  0668ddb6f78b2d678cde26389fa3d04cb6f98614
-*** if it's good
-then the next item can be deleted as done,
-"further subdivide the completion logic"
-** TODO I want this todo list in Skg.
-Git review after reshaping it is hell.
-*** merge & export these notes
-**** DONE "TODO" items in this repo
-**** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
-**** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
-**** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
-** use the .emacs in skg3
-requires rebuilding NixOS
-That was so that M-? would
-not interpret comments as search hits.
 * easy
 ** beep also once the db has rebuilt
 ** remap C-c C-o during Skg
 in skg buffers
-** show the herald it is responsible for next to each field in the metadata
-** ? request containerward paths *excluding* the view-rootward one
+** show what the herald it is responsible for next to each field in the metadata
 ** IDs should not be writeable in the metadata view
 And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?
@@ -136,12 +108,6 @@ I had created a big tree of new nodes.
 Saw it looking at 'address', common to Valentina and Maps.
 ** 'compute_interleaved_diff' can collide for large unique-item lists
 WARNING: That is a verbatim heading title from TODO/problems.org
-* document
-** content is like "what is this idea looking at", and links sources are "what are looking at this idea"
-** strategy for moving source
-Commit all uncommitted changes from both sources.
-Do the move.
-Compare the state of both sources.
 * maybe
 ** a way to present more nodes on one line
 Just triple the relationship character and color it differently.
@@ -208,7 +174,6 @@ if the quotation is represented as leading whitespace.
 *** if needed, convert to haskell
   If it becomes a mess, Haskell is easier to refactor.
   Rust could sit between TypeDB and Haskell.
-* maybe good but not sure why
 * goals, by highest aim
 ** TODO how|what to dogfood
 *** spots to patrol
@@ -319,14 +284,10 @@ To test, compute this two ways: From disk and from dbs.
 If a new or deleted node, it (is still in the graph and) has a parent.
 *** shortcuts
 **** Goto could (also?) be C-C RET.*
-* privacy
-*** TODO Privacy: Permit user to hide certain sources from view.
-**** Figure out the diff logic for insertions when some are hidden.
-I think I see how: Just pin each thing to its last visible sibling.
-** convenience | comfort
-*** importing org-roam should be possible while server is running
+* convenience | comfort
+** importing org-roam should be possible while server is running
 and automatically update the other dbs (not just disk as now)
-*** saving from a narrowed buffer
+** saving from a narrowed buffer
 When the buffer is narrowed, if the user saves, skg should walk backward from the first character until it finds the start of a headline. It's likely the first character *is* the start of a headline, but maybe not -- the user might be lookoing, e.g., at a proper subset of a body.
 
 Similarly, on the other side, skg should search forward until it finds the first character of a new headline (or the end of the buffer), and truncate right before that character (or including it, if it's the end of the buffer). Again it's likely that the very next character is the start of a new headline, but not neecessarily.
@@ -334,15 +295,10 @@ Similarly, on the other side, skg should search forward until it finds the first
 Then skg can just restore the narrowed window so that it starts and ends at those two points. This way, even if things change outside the context, it will know exactly where to start and end.
 
 This isn't perfect, because there might be multiple headlines with the same IDs. If there are, screw it, skg should just report that duplicative IDs are interfering with its ability to save while narrowed, and let the user worry about it.
-*** having to start and stop the server is annoying
-*** some skg-request-* functions save, others don't
-*** ? trying to delete an indef node should warn, not err
+** having to start and stop the server is annoying
+** some skg-request-* functions save, others don't
+** ? trying to delete an indef node should warn, not err
 That is, the save should still succeed.
-* present view of node's root(like) containerward ancestors
-** Hopefully a root, otherwise a cycle; links are ignored.
-** Useful when checking changes
-   "This node changed; show it to me in context."
-   e.g. with git
 * dogfooding
 ** commands to probe better
 *** TODO C-c g m : skg-view-magit
@@ -368,13 +324,6 @@ That is, the save should still succeed.
    I think I did. Searching for 'motivation' used,
    I'm sure, to return a hit with exactly that title.
 * [[./docs/en-espanol.org][En Español]]
-* deciding whether a node is a relationship is up to the user
-* generalize it : a node is a map from one to many
-* figure out how to work in parallel with Claude
-  Need two copies of the repo.
-  Claude advances features while I review older code.
-  When I commit, Claude pulls in those changes,
-  and fixes any merges that break.
 * internalizing
 ** It is legitimate to commit before testing.
    Even AI-generated code.
@@ -414,15 +363,6 @@ That is, the save should still succeed.
 **** Add type signatures.
 **** Update list of user-facing functions in elisp/*.el.
 ** Any place I can separate concerns by re-traversing the tree, do it.
-* later
-** 'timed' and 'timed_async' are noisy
-   Maybe, rather than using them at the function call,
-   use them at the function's definition.
-** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
-** 'content' count is wrong in Subsribees if any are hidden
-** add 'numSubscribees' near 'numLinksIn'
-** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
-* internalize
 ** ask AI to research and present options before implementing
 *** Clear its context before doing that.
 *** Includes even asking for refactoring plan.
@@ -437,6 +377,14 @@ That is, the save should still succeed.
    Less ergonomically, can say:
    "Don't do anything you don't have permission to do.
    I'm going to be away so I can't grant it."
+* later
+** 'timed' and 'timed_async' are noisy
+   Maybe, rather than using them at the function call,
+   use them at the function's definition.
+** Can I download my git repo and read it ony phone with goto definition, find uses, etc?
+** 'content' count is wrong in Subsribees if any are hidden
+** add 'numSubscribees' near 'numLinksIn'
+** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * QA
 ** add tests
 *** collect_generation_ids
@@ -520,6 +468,11 @@ fold-preservation
    Just let the user add all sources from one node at a time.
    Linear paths seem unlikely backward anyway.
 * document
+** content is like "what is this idea looking at", and links sources are "what are looking at this idea"
+** strategy for moving source
+Commit all uncommitted changes from both sources.
+Do the move.
+Compare the state of both sources.
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user
    The original data model was that each node would have only one container. That proved infeasible, because the user can copy data at will. So skg accepts such data. But bear in mind that it is dangerous. The danger is this: If a node has branches, and is copied somewhere earlier in the same document, then that new copy will take precedence. Edits to it will be treated as *the* edits. If all you did was copy the node but not its branches, its branches will be lost when you save.

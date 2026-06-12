@@ -842,3 +842,64 @@
    the env graph so test harnesses without the global handle still see
    cols.  The matrix target works around it by installing the handle
    in its render-heavy function only.
+* Problems found while reviewing inactive-node save treatment (2026-06-12)
+** Retained inactive nodes emit positional save intentions for their container
+   server/from_text/local_instruction_collection/traverse.rs.
+   The metaplan-2 model for source-set safety (this file, "Sharing-col
+   members from inactive sources make a buffer unsavable", and
+   TODO/full-schema/metaplan_2.org) is: omit inactive members from
+   display, and reconstruct their membership at save by MERGING the
+   visible-subset buffer list with disk's invisible members
+   ('preserve_invisible_members' -> weave / set_difference_merge in
+   from_text/weave.rs). Under that model an inactive node contributes
+   NOTHING to any ancestor's saved list; the disk merge is the sole
+   authority for invisible members.
+
+   The order-meaningless list follows the model: 'partnerCol_members'
+   (overriddenCol) collects only Active children (traverse.rs:336-345),
+   and 'set_difference_merge' restores the inactive overrides from disk.
+
+   The two ORDER-MEANINGFUL lists do not. 'content_members'
+   (traverse.rs:373-389) pushes each non-phantom InactiveNode's
+   'collected_id' into the parent's 'SetContains'; 'subscribeeCol_members'
+   (traverse.rs:353-366) does the same into the owner's 'SetSubscribesTo'.
+   So a RETAINED inactive node (one kept in the view because it has
+   visible descendants) becomes a positional member of its
+   container's/owner's saved list, drawn from the buffer. The comments
+   justify this ("subscribee order matters, so a buffer-present
+   InactiveNode counts as a positional member"), and weave.rs's
+   "POSITIONED ... includes retained InactiveNodes" was co-designed with
+   it -- so this is deliberate drift from the metaplan model, not an
+   oversight. But it is both unnecessary and unsafe:
+
+   - Unnecessary: the weave already restores an omitted invisible
+     member to its correct position by anchoring it to its nearest
+     preceding positioned disk member. With disk [A, X, B] (X inactive)
+     and buffer [A, B], the weave yields [A, X, B] whether or not X is
+     in the buffer list. So excluding X loses no position in the common
+     case.
+
+   - Unsafe: because the buffer list is fed to the weave as authority,
+     including X lets a stale or concurrently-edited buffer RESURRECT an
+     invisible member that was authoritatively removed. Concretely: disk
+     P.contains = [A, B] (another save removed X); a stale buffer still
+     shows [A, X, B] with X retained inactive; saving P (no user edit)
+     extracts SetContains [A, X, B]; the weave pushes every buffer
+     member, so X reappears in P.contains on disk. The noop filter does
+     not catch it (buffer != disk), and write-suppression does not catch
+     it (P's source is active, so P's instruction stands). Symmetrically,
+     reordering a read-only inactive placeholder among visible siblings
+     persists as a real write to the container -- editing the position of
+     something the user cannot edit.
+
+   This is the inbound twin of the original "silent deletion" bug: that
+   one dropped invisible members by omission; this one re-adds them by
+   inclusion. The fix is to make 'content_members' and
+   'subscribeeCol_members' collect only Active members (mirroring
+   'partnerCol_members'), and let the weave own invisible members'
+   presence AND position. Tradeoff to confirm with Jeff: a retained
+   inactive node then cannot be repositioned by the user (its post-save
+   position is weave-determined), which is the correct read-only
+   semantics but a visible behavior change. 'inactiveNode_is_phantom'
+   gating and the InactiveNode 'collected_id' accessor become dead on the
+   save path if this lands.

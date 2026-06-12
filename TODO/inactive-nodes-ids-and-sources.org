@@ -1,0 +1,146 @@
+* Do inactive nodes still need IDs or sources?
+  Short answer: IDs yes (but only for VIEW-side work, not for save);
+  sources no (a denormalized cache, with one near-exception). Below is
+  the evidence from the current code, then a recommendation and an open
+  question.
+
+** Correction (2026-06-12), prompted by Jeff
+   My first pass cited "the inactive node's collected_id is contributed
+   to its parent's saved contains" as a load-bearing use of the id.
+   Jeff's model is that an inactive node emits NO save intention for its
+   parent (or, in a col, for whichever ancestor claims the list). He is
+   right, and that citation described a DRIFT, not a justification:
+   'content_members' and 'subscribeeCol_members' (traverse.rs) do push
+   retained inactive ids into the container's SetContains / owner's
+   SetSubscribesTo, but per the metaplan-2 model they should not -- the
+   disk weave is supposed to own invisible members' presence and
+   position. See the new TODO/problems.org entry "Retained inactive
+   nodes emit positional save intentions for their container". So the
+   id's necessity rests on view/collateral/diff/deletion, NOT on
+   feeding any saved list.
+
+** Recap: how we currently treat an inactive node
+   An InactiveNode (server/types/viewnode.rs) is an inert placeholder
+   for a graphnode whose source is outside the active source-set. Under
+   the current (post full-schema 9-x) treatment:
+
+   - It emits NO save instruction for itself
+     (local_instruction_collection/traverse.rs:77 -- "an Inactive
+     vognode emits nothing itself").
+   - Any instruction that *would* touch an inactive source is dropped
+     (validate.rs suppress_writes_to_inactive_nodes) -- but that filter
+     keys on the *instruction's* source (computed from Active nodes in
+     a stale buffer), never on InactiveNode.source.
+   - Its membership in a parent's list is preserved by two mechanisms:
+     1. OMITTED inactive members: restored from disk by the weave
+        (from_text/weave.rs, preserve_invisible_members). The weave's
+        is_visible re-derives each member's source *from the id* via
+        member_is_visible -> snapshot_global / source_from_disk. It
+        never reads an InactiveNode's source field.
+     2. RETAINED inactive members (kept because they have visible
+        descendants): currently positioned in the buffer, and their
+        collected_id IS contributed to the parent's contains
+        (traverse.rs content_members / subscribeeCol_members). This is
+        the drift Jeff caught -- per the metaplan-2 model the weave
+        alone should own their presence and position; see the
+        TODO/problems.org entry. The weave's "POSITIONED ... includes
+        retained InactiveNodes" comment was co-designed with this, so
+        both pieces need to change together if we revert to the model.
+
+** IDs are load-bearing — but for VIEW work, not save
+   The id is the placeholder's only real handle. The legitimate
+   consumers are all view-side (building, tracking, and diffing the
+   display), none of them "writing the inactive node":
+
+   - Collateral re-render: pids_from_viewforest (types/views_state.rs:178)
+     registers an inactive vognode's *id* so a save elsewhere that
+     touches that node re-renders this view.
+   - View completion / col reconciliation: complete_relevant_children
+     keys its goal list on the id (reconcile/content.rs:471,
+     child_data.rs:156, reconcile/mod.rs retained_inactive_children),
+     and ContentReality::Inactive materializes a disk member by id.
+   - Diff membership stamping (render/diff.rs:215) and removed-member
+     phantom anchoring (render/diff.rs:258).
+   - Deletion: convert_inactive_to_deleted_if_deleted
+     (update_buffer/complete.rs:386) matches on the id.
+
+   The SAVE-side reads of the id -- content_members /
+   subscribeeCol_members pushing collected_id into a saved list
+   (traverse.rs:362/385, buffer_to_viewnodes/local.rs:500) -- are the
+   drift flagged above and should go away. After they do, the id is
+   still needed for the view-side uses: strip it and the placeholder is
+   anonymous (unmatchable to disk, untrackable for collateral/diff,
+   undeletable). So the current treatment does NOT make IDs redundant --
+   the id is the one field an inactive node must carry -- but its
+   justification is the view, not the save.
+
+** Sources are NOT authoritative — a denormalized cache
+   The save/visibility machinery never trusts InactiveNode.source:
+
+   - member_is_visible and the weave re-derive a node's source from the
+     in-Rust graph / disk *by id* (find_source_with_optional_tantivy).
+   - write-suppression keys on the instruction's source, from Active
+     nodes (validate.rs).
+
+   The field is read in only three places, and rendered/parsed in two
+   more:
+   - pid_and_source (viewnode.rs:632) — convenience accessor.
+   - content reconciler orderkey/source map (reconcile/content.rs:624).
+   - inactive -> PhantomDeleted conversion (complete.rs:388) — see
+     caveat below.
+   - rendered as (source S) (org_to_text.rs:464) and REQUIRED by the
+     parser (parse_metadata_sexp.rs:606 "inactiveNode requires a
+     source").
+
+   Since id -> source is a function (IDs are globally unique), each of
+   the three reads could re-derive the source from the id. So the
+   source field is closer to vestigial: a cached "which repo this id
+   lives in", round-tripped through the client and shown to the user,
+   but never the authority.
+
+*** Caveat: the one place the cache earns its keep
+    convert_inactive_to_deleted_if_deleted (complete.rs:386) fires when
+    a save *deletes* an inactive node. At that moment its .skg file is
+    gone, so re-deriving the source from disk would fail; the carried
+    InactiveNode.source is what lets the resulting PhantomDeleted keep a
+    real source. It might be re-derivable from a pid->source map the
+    caller already holds (deleted_since_head_pid_src_map), but today the
+    carried field is the clean local source of truth. This is marginal
+    (an inactive node that is *also* deleted by the same save) and the
+    PhantomDeleted is mostly inert, but it's a genuine use.
+
+** Recommendation
+   - Keep the id. It is structurally necessary.
+   - Keep the source too, but treat it honestly as display + a cache,
+     not as authority — which is already how the code behaves. Dropping
+     it would buy a slightly smaller struct/wire format at the cost of
+     2-3 re-derivations (one of them, the deletion path, awkward), plus
+     losing the inline "which repo" cue for the user. Not worth it.
+   - If we ever DO want it gone: remove it from InactiveNode, from
+     org_to_text rendering, and from the parser's required set; have the
+     deletion path pull the source from the pid->source map instead.
+
+** Minor inconsistency worth noting (not a bug)
+   InactiveNode.source is parser-*required* yet non-authoritative; the
+   server would behave identically if the client sent a wrong source
+   (the weave re-derives by id). That's a small trust mismatch: we
+   demand a field we don't rely on. Acceptable, but if you value
+   minimalism on the wire it's a candidate to relax to optional.
+
+** ONGOING Question for Jeff
+The save-intention drift (the real find). Do you want me to revert
+content_members + subscribeeCol_members to collect only Active
+members (so inactive nodes emit nothing for any ancestor, the
+weave owning invisible members' presence and position), update the
+weave.rs "POSITIONED includes retained InactiveNodes" comment, and
+add a regression test for the stale-buffer resurrection? Confirm
+you accept the behavior change: a retained inactive placeholder can
+no longer be repositioned by the user (correct read-only
+semantics, but visible).
+*** TODO Jeff speaking : Yes, and
+also remove every data field from InactiveNode.
+If that turns out to be dumb, push back,
+but I don't see how any of it could be used any more.
+If this merits drawing up a plan first, plesae do;
+otherwise please simply execute, knowing you are free to backtrack
+if you discover it's a bad idea.
