@@ -4,3 +4,4 @@
 pub mod misc;
 pub mod read_repo;
 pub mod diff;
+pub mod find_and_stage_moves;

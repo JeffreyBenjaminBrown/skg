@@ -150,6 +150,36 @@ So far there are these endpoints:
   - Refuses to run unless the active source-set is `all`; restricted
     source-set diff reports are not defined yet.
 
+## Stage moves
+  - Request: ((request . "stage moves"))
+  - Response: LP response-type "stage-moves" with
+    `((content "SHELL_SCRIPT") (errors (...)) (warnings (...)))`.
+  - Behavior: Scans the git status of every configured source and
+    finds each node ID whose `.skg` file "moved" -- vanished from
+    EXACTLY one source (present in that source's git HEAD, gone from
+    its worktree) and appeared in EXACTLY one other source (present in
+    that source's worktree, absent from its HEAD). An ID that vanished
+    from, or appeared in, more than one source has more than one
+    candidate (old, new) pair and is skipped. For each move it emits a
+    block staging the move:
+    ```
+    echo "----"
+    id=<the uuid>
+    cd <old-source-dir>
+    git rm $id.skg
+    cd ../<new-source-dir>
+    git add $id.skg
+    cd ..
+    ```
+    Source directories are named relative to the data root, so the
+    script is meant to be run from there; it assumes each source is a
+    direct subdirectory of the data root. The logic lives in
+    `server/git_ops/find_and_stage_moves.rs`.
+  - Scans all sources regardless of the active source-set (a move can
+    cross source-set boundaries). Sources that are not git repos
+    contribute nothing. When no moves are found, the script body is a
+    single `# No moves detected.` comment.
+
 ## Rebuild databases
   - Request: ((request . "rebuild dbs"))
   - Response: LP response-type "rebuild-dbs" with `((content "..."))`.

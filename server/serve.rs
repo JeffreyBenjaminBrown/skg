@@ -24,6 +24,7 @@ use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rer
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
+use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
@@ -190,6 +191,9 @@ fn handle_emacs (
             handle_diff_analysis_request_with_source_set (
               &mut stream, &request_header, &env . config,
               &active_source_set ),
+          Ok (RequestType::StageMoves) =>
+            handle_stage_moves_request (
+              &mut stream, &env . config ),
           Ok (RequestType::ListSourceSets)
           | Ok (RequestType::ActiveSourceSet)
           | Ok (RequestType::SetActiveSourceSet) =>

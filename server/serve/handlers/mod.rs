@@ -7,5 +7,6 @@ pub mod rerender_all_views;
 pub mod save_buffer;
 pub mod single_root_view;
 pub mod source_sets;
+pub mod stage_moves;
 pub mod text_search;
 pub mod titles_by_ids;

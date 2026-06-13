@@ -157,6 +157,7 @@ and hide INTERNAL from M-x completion."
   (progn;; git add ops (only fire if the .skg file is not yet in HEAD)
     (define-key map (kbd "C-c t A") #'skg-git-add-if-new-recursive)
     (define-key map (kbd "C-c t a") #'skg-git-add-if-new-recursive-preview)
+    (define-key map (kbd "C-c t m") #'skg-stage-moves)
     (define-key map (kbd "C-c t r") #'skg-diff-report)))
 
 (defvar skg-id-stack-mode-map (make-sparse-keymap)

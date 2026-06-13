@@ -224,6 +224,19 @@ across all configured sources.
 The report is based on git/index/worktree state,
 so the command refuses to run while any Skg view buffer
 has unsaved edits.
+*** C-c t m         : skg-stage-moves
+Scans the git status of every configured source and finds each
+node whose .skg file "moved": it vanished from exactly one source
+(committed there in git HEAD, now gone from that source's worktree)
+and appeared in exactly one other source (present in that source's
+worktree, not yet committed). A node that vanished from, or appeared
+in, more than one source is ambiguous and is skipped.
+
+Opens a buffer of shell instructions -- one block per move -- that
+'git rm' the file in the old source and 'git add' it in the new one.
+Review it, then run it from the skg data root. Unlike most commands
+here, this one does not depend on the node at point; it reports moves
+across all sources.
 ** C-c r : showing more information about a node
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes

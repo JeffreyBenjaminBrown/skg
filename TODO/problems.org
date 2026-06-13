@@ -1036,3 +1036,25 @@
    Its second paragraph introduces 'cargo test' with "Similarly, some
    ways to run the Emacs tests include" -- copy-paste slip for "Rust
    tests".
+
+* Problems found while adding skg-stage-moves (2026-06-13)
+** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
+   'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
+   (server/git_ops/read_repo.rs) diff the WHOLE repo with
+   'pathspec("*.skg")', not the source's own subdirectory. So if two
+   configured sources ever live inside one git repo (e.g. as sibling
+   subdirectories of a single repo root), 'compute_diff_for_source'
+   would attribute that repo's entire set of changed .skg files to
+   each such source, double-counting them across sources. This is
+   harmless under the apparent deployment model (one git repo per
+   source) and only bites if a repo spans multiple sources.
+   'find_and_stage_moves.rs' avoids the issue by scoping its HEAD
+   scan to each source's own subtree ('head_skg_ids' /
+   'path_relative_to_repo'); the older diff path does not. If
+   multi-source repos are to be supported, the diff helpers should
+   take a source-relative pathspec too.
+** (fixed) find_and_stage_moves.rs was first named for "commit"
+   Fixed 2026-06-13: renamed 'find_and_commit_moves.rs' ->
+   'find_and_stage_moves.rs'. The module only finds moves and emits a
+   script that STAGES them ('git rm' / 'git add'); committing is left
+   to the user, so the new name describes it exactly.
