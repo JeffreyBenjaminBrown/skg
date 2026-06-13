@@ -458,20 +458,26 @@ but also removes the node from the stack.
 repeated here; described earlier in this doc
 ** exporting to org
 *** skg-export-some-to-org
-Exports Skg data to plain =.org= files under =org-exports/=, so
-the data can be read (and navigated on GitHub) without running
-Skg. No keybinding.
+Exports Skg data to plain =.org= files, so the data can be read
+(and navigated on GitHub) without running Skg. No keybinding.
 
-It asks which source-set to export (tab completion and
-shift-left / shift-right cycling); only nodes from that set are
-included. Choose a public-facing source-set so private notes are
-not exported; exporting =all= warns you about this.
+It asks two things:
+- which source-set to export (tab completion and shift-left /
+  shift-right cycling); only nodes from that set are included.
+  Choose a public-facing source-set so private notes are not
+  exported; exporting =all= warns you about this.
+- which directory to write to (default =org-exports=). This path
+  is interpreted *by the server*, relative to the project root the
+  server runs from. Because the server may run inside a Docker
+  container whose filesystem differs from the host Emacs runs on,
+  this prompt has no tab completion. An absolute path is used
+  as-is.
 
 A node is exported when one of its children's title links to the
 export-instruction node and that child's body gives a
 =target_filepath= (TOML-ish: =target_filepath = docs/setup=,
 quoted if it contains whitespace). That parent is written to
-=org-exports/<target_filepath>.org= as a recursive content view,
+=<output-dir>/<target_filepath>.org= as a recursive content view,
 stripped of skg metadata. The marker child is omitted.
 
 Links are rewritten to relative org links. A link to another
@@ -481,10 +487,10 @@ export root is shown as a link, not inlined. A link whose target
 is not exported under the chosen set points to a "some links
 might be broken" note.
 
-Existing =org-exports/= files are overwritten in place; other
+Existing files in the output dir are overwritten in place; other
 files there are left untouched. (The same export is available
 from the command line for scripting:
-=cargo run --bin skg -- export-org [config] [source-set]=.)
+=cargo run --bin skg -- export-org [config] [source-set] [output-dir]=.)
 ** connection, reload, rebuild dbs
 Unless you're coding or troubleshooting,
 you probably won't need these.

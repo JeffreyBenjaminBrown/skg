@@ -12,21 +12,32 @@
                               ; skg-errors-and-warnings-to-org-string
 (require 'skg-state)
 
-(defun skg-export-some-to-org (source-set)
-  "Export Skg data to .org files under org-exports/.
+(defun skg-export-some-to-org (source-set output-dir)
+  "Export Skg data to .org files under OUTPUT-DIR.
 Prompts for a SOURCE-SET (S-left/S-right cycle, tab completion);
 only nodes from that set are included, so choose a public-facing
-subset to avoid exporting private notes.
+subset to avoid exporting private notes.  Then prompts for
+OUTPUT-DIR.
+
+OUTPUT-DIR is interpreted *by the server*, relative to the project
+root the server runs from -- which may be inside a Docker
+container, so this prompt has no tab completion (the host
+filesystem would not match).  An absolute path is used as-is.  The
+default is `org-exports'.
 
 The Rust server finds every export root -- a node with a child
 whose title links to the export-instruction node and whose body
 gives a `target_filepath' -- and writes each to
-org-exports/<target_filepath>.org as a recursive content view,
+OUTPUT-DIR/<target_filepath>.org as a recursive content view,
 stripped of skg metadata, with links rewritten to relative org
 links.  Broken links point to a \"some links might be broken\"
-note.  Existing org-exports/ files are overwritten in place;
-others are left untouched."
-  (interactive (list (skg--prompt-for-source-set)))
+note.  Existing files are overwritten in place; others are left
+untouched."
+  (interactive
+   (list (skg--prompt-for-source-set)
+         (read-string
+          "Export to dir (relative to the server's project root) [org-exports]: "
+          nil nil "org-exports")))
   (when (string= source-set "all")
     (message
      "Exporting source-set `all'; consider a public-facing source-set so private notes are not exported."))
@@ -41,7 +52,8 @@ others are left untouched."
      (concat
       (prin1-to-string
        `((request . "export to org")
-         (source-set . ,source-set)))
+         (source-set . ,source-set)
+         (output-dir . ,output-dir)))
       "\n"))))
 
 (defun skg--export-to-org-handler (_tcp-proc payload)

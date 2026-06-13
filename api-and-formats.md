@@ -158,7 +158,13 @@ So far there are these endpoints:
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
 ## Export to org
-  - Request: ((request . "export to org") (source-set . "NAME"))
+  - Request: ((request . "export to org") (source-set . "NAME") (output-dir . "PATH"))
+    - `output-dir` is optional; defaults to "org-exports" when absent
+      or blank. It is resolved against the server's working directory
+      (its project root): a relative PATH lands under it, an absolute
+      PATH is used as-is. The client does not tab-complete it, since
+      the server may run in a container whose filesystem differs from
+      the client's.
   - Response: LP response-type "export-to-org" with
     `((content "REPORT") (errors ("..." ...)) (warnings ("..." ...)))`.
     `content` is a human-readable report (files written, broken-link
@@ -168,8 +174,8 @@ So far there are these endpoints:
     headings, broken links, body lines that look like org structure).
   - Behavior: Reads all `.skg` files fresh from disk, finds every
     export root, and writes each to
-    `<cwd>/org-exports/<target_filepath>.org` as a recursive content
-    view limited to `NAME`, stripped of skg metadata, with
+    `<output-dir>/<target_filepath>.org` as a recursive content view
+    limited to `NAME`, stripped of skg metadata, with
     `[[id:..][label]]` links rewritten to relative org links.
     Existing files are overwritten; others are left untouched. Needs
     neither TypeDB nor Tantivy.

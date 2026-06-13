@@ -79,10 +79,15 @@ four real issues; all four are now fixed (tests added for each):
   working skg-diff-report handler and byte-parses cleanly.
 
 ** Choices determining the future
-- Output base is =<cwd>/org-exports/=. The server runs from the
-  repo root (start-servers.sh uses a relative config path), so this
-  lands in the repo. If the server is ever launched from elsewhere,
-  exports would land elsewhere; a config key could pin it later.
+- Output directory is PROMPTED each run (default =org-exports=) and
+  resolved by the SERVER against its working directory (project
+  root): a relative path lands under it, an absolute path is used
+  as-is. No tab completion -- the server may run in a container
+  whose filesystem differs from the host Emacs runs on. This also
+  covers the GitHub front-page case: export with output-dir =.= so
+  a root whose target_filepath is =README= writes a real
+  =./README.org= (GitHub does not render symlinked or #+INCLUDE-d
+  READMEs). The report prints the actual absolute output path.
 - Canonical home = first appearance in target-sorted root order.
   Stable and deterministic, but means moving content between files
   can change where inbound links point.

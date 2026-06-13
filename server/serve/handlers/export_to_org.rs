@@ -13,12 +13,15 @@ use crate::types::nodes::complete::NodeComplete;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-/// Export every export root to `<cwd>/org-exports/`, limited to the
-/// requested source-set. The set name arrives in the request as
-/// `(source-set . "NAME")`; the client picks it (with its circular
-/// selector) before sending. Reads .skg files fresh from disk, so
-/// the export reflects current on-disk state. Needs neither TypeDB
-/// nor Tantivy.
+/// Export every export root, limited to the requested source-set,
+/// into a user-chosen directory. Two request fields:
+/// `(source-set . "NAME")` -- the set the client picked (with its
+/// circular selector) -- and `(output-dir . "PATH")` -- where to
+/// write, resolved against the server's working directory (its
+/// project root); a relative PATH lands under it, an absolute PATH
+/// is used as-is. `output-dir` defaults to "org-exports" when
+/// absent or blank. Reads .skg files fresh from disk, so the export
+/// reflects current on-disk state. Needs neither TypeDB nor Tantivy.
 pub fn handle_export_to_org_request (
   stream  : &mut TcpStream,
   config  : &SkgConfig,
@@ -33,10 +36,14 @@ pub fn handle_export_to_org_request (
     let nodes : Vec<NodeComplete> =
       read_all_skg_files_from_sources (config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
+    let output_dir : String =
+      match value_from_request_sexp ("output-dir", request) {
+        Ok (d) if ! d . trim () . is_empty () => d,
+        _ => "org-exports" . to_string (), };
     let output_base : PathBuf =
       std::env::current_dir ()
       . map_err ( |e| format! ("current_dir: {}", e) ) ?
-      . join ("org-exports");
+      . join (&output_dir); // join with an absolute PATH yields PATH
     let report : ExportReport =
       export_to_org (&active, &nodes, &output_base)
       . map_err ( |e| format! ("Export failed: {}", e) ) ?;

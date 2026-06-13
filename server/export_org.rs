@@ -45,7 +45,8 @@ static TEXTLINK_PATTERN : LazyLock<Regex> =
 //
 
 pub struct ExportReport {
-  pub files_written : Vec<String>, // relative paths, e.g. "docs/setup.org"
+  pub output_base   : String,      // where files were written (display path)
+  pub files_written : Vec<String>, // relative to output_base, e.g. "docs/setup.org"
   pub roots_found   : usize,
   pub broken_links  : usize,
   pub warnings      : Vec<String>,
@@ -64,7 +65,7 @@ impl ExportReport {
       self . files_written . len (),
       self . roots_found ) );
     for f in &self . files_written {
-      s . push_str ( & format! ("  org-exports/{}\n", f) ); }
+      s . push_str ( & format! ("  {}/{}\n", self . output_base, f) ); }
     if self . broken_links > 0 {
       s . push_str ( & format! (
         "{} broken link(s) (pointed at the broken-link note, or \
@@ -161,6 +162,7 @@ pub fn export_to_org (
     build_homes (&roots, &root_events, &by_pid, &mut warnings);
 
   let mut report : ExportReport = ExportReport {
+    output_base   : output_base . display () . to_string (),
     files_written : Vec::new (),
     roots_found   : roots . len (),
     broken_links  : 0,

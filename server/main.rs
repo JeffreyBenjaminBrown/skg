@@ -343,8 +343,10 @@ fn run_import (
 /// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
 /// subcommand runs the same core for scripting and testing.
 ///
-/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set]
-/// (source-set defaults to "all"). Writes <cwd>/org-exports/.
+/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir]
+/// (source-set defaults to "all", output-dir to "org-exports").
+/// output-dir is resolved against the current working directory; an
+/// absolute path is used as-is.
 fn run_export_org (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
@@ -356,12 +358,15 @@ fn run_export_org (
   let set_name : SourceSetName =
     if args . len() > 3 { SourceSetName::from (args[3] . as_str()) }
     else { SourceSetName::from ("all") };
+  let output_dir : String =
+    if args . len() > 4 { args[4] . clone() }
+    else { "org-exports" . to_string() };
   let active : ActiveSourceSet =
     ActiveSourceSet::named (&config, set_name) ?;
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) ?;
   let output_base : PathBuf =
-    std::env::current_dir () ? . join ("org-exports");
+    std::env::current_dir () ? . join (output_dir);
   let report : ExportReport =
     export_to_org (&active, &nodes, &output_base) ?;
   print! ("{}", report . summary ());
