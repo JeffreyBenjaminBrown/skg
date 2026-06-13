@@ -42,7 +42,34 @@
    choice and the user can rotate it), but the two "defaults" are
    inconsistent. Making them match would mean preserving source order
    server-side (an ordered map / Vec<SourceName>) -- out of scope for
-   the fork work.
+   the fork work. (The fork default is now active-aware -- it prefers an
+   owned source ACTIVE under a restricted set -- but still alphabetical
+   among the candidates, so this inconsistency stands.)
+** RESOLVED Restricted-set fork dead-ended on an inactive default source
+   Found by the round-2 adversarial review. Under a restricted
+   source-set, the silent default clone source could be an
+   owned-but-inactive source (alphabetically first), which
+   'validate_fork_specs' rejected with 'ForkSourceInactive' BEFORE the
+   confirmation buffer was shown -- so the documented C-c s s escape
+   hatch was unreachable in exactly that case. Fixed: the default is now
+   active-aware (prefer an owned source active under the set; fall back
+   to any owned). Regression test
+   'fork::fork_default_prefers_active_owned_source'.
+** RESOLVED (elisp) Fork-confirmation walk leaked a stale clone source
+   'skg--fork-sources-from-confirmation-buffer' left 'parent-source'
+   stale when a level-1 headline had no metadata, pairing a later fork's
+   child with a prior clone's source. Fixed: reset on every level-1
+   headline. Regression test added.
+** Minor: confirmation-buffer sourceHerald shows the raw source name
+   'build_fork_confirmation_buffer' emits the clone's '(sourceHerald
+   ⌂:NAME)' with the raw SourceName, not the configured abbreviation
+   ('SkgfileSource::herald_label') that every other rendered view uses.
+   Left raw deliberately: the client's C-c s s rotation also writes
+   '⌂:<raw-name>', so the confirmation flow is self-consistent; fixing
+   only the server side would make the initial display disagree with the
+   post-rotation display. Cosmetic; the load-bearing '(source X)' atom is
+   unaffected. (Noted in case a future change routes BOTH sides through
+   herald_label.)
 
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces
@@ -1206,3 +1233,15 @@
    keeps labels free of =][=, but a title is arbitrary user text.
    Rare; not escaped. Robust fix would require org link-syntax
    escaping of anchors/labels.
+* Problems found while adding data/bash/id-histories.sh + lib.sh (2026-06-20)
+** windows/starter-data/bash/ copies still use the old list-file pattern
+   The Windows starter bundle ships its own copies of these scripts
+   (=windows/starter-data/bash/{push,pull,status,remote}-all.sh=) that
+   still =for i in $(cat list-of-repositories.txt)=. They are now
+   divergent from =data/bash/= (which derives all/owned from
+   skgconfig.toml via lib.sh) and still depend on a list file. Docs that
+   describe the bundle (=to-windows.org=, =windows/run.ps1=,
+   =windows/docs/windows-user.org=) reference the list file too. If the
+   lib.sh approach is the intended one, the Windows bundle and its docs
+   should be regenerated/updated to match. Left untouched this round (out
+   of scope: the request was about data/bash/).

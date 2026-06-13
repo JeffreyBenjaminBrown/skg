@@ -365,11 +365,43 @@ All five plan steps landed in order, one (or two) commits each:
 
 ** TODO open question: default clone source is alphabetical, not config order
 'SkgConfig.sources' is a HashMap, so the TOML's source order is not
-preserved. 'first_owned_source' returns the alphabetically-first owned
-source; the Emacs client's 'skg--default-source' returns the TOML-first
-owned source. They coincide for a single-owned-source user but can
-disagree for someone with several owned sources. Impact is low (the
+preserved. The default clone source is the alphabetically-first owned
+source (now preferring an ACTIVE one under a restricted set -- see the
+review fixes below); the Emacs client's 'skg--default-source' returns the
+TOML-first owned source. They coincide for a single-owned-source user but
+can disagree for someone with several owned sources. Impact is low (the
 confirmation buffer displays the server's choice and the user can rotate
 it), but the two "defaults" are inconsistent. Aligning them would mean
 preserving source order server-side (an ordered map or a
 Vec<SourceName>), which is out of scope here. Flagged for your call.
+
+** Adversarial review (round 2) and its fixes
+Ran a 4-dimension multi-agent review over the whole fork diff (17
+agents; 13 candidate findings, 5 confirmed on independent verification,
+8 dismissed). Acted on the genuine ones:
+- *Confirmed BUG, fixed* -- under a restricted source-set the silent
+  default clone source could be an owned-but-INACTIVE source, so
+  'validate_fork_specs' rejected it with 'ForkSourceInactive' BEFORE the
+  confirmation buffer appeared, making the C-c s s escape hatch
+  unreachable in exactly that case. The default is now active-aware
+  (prefer an owned source active under the set; fall back to any owned).
+  Regression: fork_default_prefers_active_owned_source.
+- *Confirmed BUG, fixed (elisp)* -- 'skg--fork-sources-from-confirmation-
+  buffer' left 'parent-source' stale when a level-1 headline had no
+  metadata, so a later fork's child could be paired with a prior clone's
+  source. Now resets on every level-1 headline. Regression added.
+- *Coverage, added* -- 'ForkSourceNotOwned' (a non-owned chosen source)
+  and the two-level buffer's level markers were untested; both covered.
+- *Confirmed minor, NOT changed (deliberate)* -- the confirmation
+  buffer's clone 'sourceHerald' shows the raw source name, not the
+  configured abbreviation ('herald_label'). Left raw on purpose: the
+  client's own C-c s s rotation also writes '⌂:<raw-name>', so the
+  confirmation flow is self-consistent; routing only the server side
+  through 'herald_label' would make the initial display disagree with the
+  post-rotation display. Cosmetic; the load-bearing '(source X)' is
+  unaffected.
+- *Dismissed* (8): e.g. a claimed parentOverrides round-trip break (no
+  reachable path feeds it back through a save), "malformed fork-sources
+  silently dropped" (the buffer is server-generated and never an ordinary
+  save target), and several "verified, not a defect" confirmations of the
+  keymap guard, the id/source transport shape, and the approve ordering.
