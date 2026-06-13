@@ -69,24 +69,28 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
 /// source is resolved in priority order:
 ///   1. user-set (the source the user carried back from the
 ///      confirmation buffer, keyed by N's pid),
-///   2. inferred (N's nearest owned ancestor in the view),
-///   3. default (the user's first owned source in config).
+///   2. inferred (N's nearest owned ancestor in the view -- always active),
+///   3. default ('default_source', the caller's active-aware first owned
+///      source).
 /// So every fork carries a concrete owned source unless the user owns NO
 /// source at all -- only then does 'ForkSourceUnresolved' fire. (The
 /// chosen source is validated owned + active later, in
-/// 'validate_fork_specs'; resolution here only fills it.)
+/// 'validate_fork_specs'; resolution here only fills it. The default is
+/// active-aware so that, under a restricted source-set with both an
+/// inactive and an active owned source, the fork still reaches the
+/// confirmation buffer rather than dead-ending on 'ForkSourceInactive'.)
 pub fn fork_spec_from_buffer_node (
   buffer_node           : &NodeComplete,
   disk_title            : &str, // N's original title (before the edit), for the confirmation buffer's child line.
   owned_ancestor_source : &HashMap<ID, SourceName>,
   user_set_source       : &HashMap<ID, SourceName>,
-  config                : &SkgConfig,
+  default_source        : Option<&SourceName>, // the caller's active-aware default owned source
 ) -> Result<ForkSpec, BufferValidationError> {
   let clone_source : SourceName =
     user_set_source . get (& buffer_node . pid) . cloned ()
     . or_else ( || owned_ancestor_source . get (& buffer_node . pid)
                    . cloned () )
-    . or_else ( || config . first_owned_source () )
+    . or_else ( || default_source . cloned () )
     . ok_or_else ( || BufferValidationError::ForkSourceUnresolved (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (buffer_node, disk_title, clone_source) ) }

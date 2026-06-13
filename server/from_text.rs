@@ -130,6 +130,23 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   // it here, where the placed viewforest is live, keyed by foreign pid.
   let owned_ancestor_source : HashMap<ID, SourceName> =
     owned_ancestor_sources_for_foreign_vognodes (&viewforest, config);
+  let default_clone_source : Option<SourceName> = {
+    // The active-aware default for a fork whose source can be neither
+    // user-set nor inferred: prefer an owned source that is ACTIVE under
+    // the restricted set, so the fork reaches the confirmation buffer
+    // (where the user can rotate it) instead of dead-ending on
+    // ForkSourceInactive when an inactive owned source happens to sort
+    // first. Falls back to any owned source -- then ForkSourceInactive
+    // fires only when the user owns no ACTIVE source at all (the genuine
+    // "activate one first" case), and ForkSourceUnresolved only when the
+    // user owns no source at all.
+    let active_owned : Option<SourceName> = restricted_source_set . and_then (
+      |active| config . sources . values ()
+        . filter ( |s| s . user_owns_it
+                   && active . contains_source (& s . name) )
+        . map ( |s| s . name . clone () )
+        . min () );
+    active_owned . or_else ( || config . first_owned_source () ) };
   let ( define_nodes, fork_specs )
     : ( Vec<DefineNode>, Vec<ForkSpec> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -139,6 +156,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         &nodeMerge_instructions,
         &owned_ancestor_source,
         fork_sources,
+        default_clone_source . as_ref (),
         config,
         driver )
       . await } . map_err ( |errors| SaveError::BufferValidationErrors {

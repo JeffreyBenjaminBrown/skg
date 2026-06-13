@@ -107,16 +107,22 @@ fn fork_spec_n_edited () -> ForkSpec {
 fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   let buf : String =
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited () ] );
-  // The clone-to-be parent: edited title, owned source, NO id.
-  assert! ( buf . contains ("* (skg (node (source owned2)")
-            && buf . contains ("N-edited"),
-    "clone-to-be parent (edited title, owned source) missing:\n{}", buf );
+  let lines : Vec<&str> = buf . lines () . collect ();
+  // The clone-to-be parent: a LEVEL-1 headline ("* "), edited title,
+  // owned source, NO id. (starts_with pins the level marker so a "* " ->
+  // "** " drift is caught -- the elisp walk keys off the level.)
+  assert! ( lines . iter () . any ( |l|
+      l . starts_with ("* (skg (node (source owned2)")
+      && l . ends_with ("N-edited") ),
+    "clone-to-be parent (level-1, edited title, owned source) missing:\n{}", buf );
   assert! ( ! buf . contains ("(id N) (source owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
-  // The original child: real id, foreign source, indef, independent, pO.
-  assert! ( buf . contains ("** (skg (node (id N) (source foreign)")
-            && buf . contains ("(parentIs independent)")
-            && buf . contains ("indef")
-            && buf . contains ("parentOverrides")
-            && buf . contains ("N-original"),
-    "original child (id/foreign/indef/independent/pO) missing:\n{}", buf ); }
+  // The original child: a LEVEL-2 headline ("** "), real id, foreign
+  // source, indef, independent, pO, original title.
+  assert! ( lines . iter () . any ( |l|
+      l . starts_with ("** (skg (node (id N) (source foreign)")
+      && l . contains ("(parentIs independent)")
+      && l . contains ("indef")
+      && l . contains ("parentOverrides")
+      && l . ends_with ("N-original") ),
+    "original child (level-2, id/foreign/indef/independent/pO) missing:\n{}", buf ); }

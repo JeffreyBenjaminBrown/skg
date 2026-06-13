@@ -19,7 +19,7 @@ use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::test_utils::run_with_shared_test_db;
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
-use skg::types::misc::{ID, MSV, SkgConfig};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
@@ -902,10 +902,15 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       // written, nor forked. (e2, the foreign content shown under it, may
       // fork -- now resolving to the default owned source rather than
       // erroring, which is why this no longer returns Err.)
+      // Supply a default clone source (as the production caller does),
+      // so the foreign grandchild e2 forks cleanly and the call returns
+      // Ok -- this test is about e, not e2.
+      let owned_default : SourceName = SourceName::from ("owned");
       let ( define_nodes, fork_specs ) =
         validate_and_filter_foreign_instructions (
           instructions, &[], &std::collections::HashMap::new(),
           &std::collections::HashMap::new(),
+          Some (& owned_default),
           config, driver) . await
         . expect ("the subscribee-as-such edit must not error");
       assert!(

@@ -368,8 +368,11 @@ child's id N -- the key by which the server applies the chosen source."
         (let ((level (org-current-level))
               (sexp (skg--metadata-sexp-at-point-or-nil)))
           (cond
-           ((and (= level 1) sexp)
-            (setq parent-source (skg--node-source sexp)))
+           ((= level 1)
+            ;; Always rebind on a level-1 headline -- even a
+            ;; metadata-less or garbled one -- so it cannot leak a prior
+            ;; clone-to-be's source to a later fork's child.
+            (setq parent-source (and sexp (skg--node-source sexp))))
            ((and (= level 2) sexp parent-source)
             (let ((id (skg--node-id sexp)))
               (when id

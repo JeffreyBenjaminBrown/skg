@@ -20,6 +20,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle, install_or_swap_global_handle};
 use skg::from_text::buffer_to_validated_saveplan;
+use skg::from_text::buffer_to_validated_saveplan_with_fork_sources;
 use skg::serve::ViewsState;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
@@ -123,7 +124,63 @@ fn all_tests
       s . reset ("fork_user_set_source_overrides", two_owned) . await ?;
       fork_user_set_source_overrides (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("fork_default_prefers_active_owned_source", two_owned) . await ?;
+      fork_default_prefers_active_owned_source (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("fork_user_set_source_not_owned_rejected", two_owned) . await ?;
+      fork_user_set_source_not_owned_rejected (
+        &s . config, &s . driver ) . await ?;
       Ok (( )) } )) }
+
+/// Under a restricted source-set, the clone-source DEFAULT must prefer an
+/// owned source that is ACTIVE. Here "owned" (alphabetically first owned)
+/// is inactive and "owned2" is the only active owned source; a foreign
+/// node with no owned ancestor must default to "owned2" and reach the
+/// confirmation stage, not dead-end on ForkSourceInactive.
+async fn fork_default_prefers_active_owned_source (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let active : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName ("only-owned2" . to_string ()),
+    sources : BTreeSet::from ([ SourceName::from ("owned2"),
+                               SourceName::from ("foreign") ]), };
+  let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
+    FORK_ROOT_BUFFER, config, driver, Some (&active) ) . await ?;
+  assert_eq! ( save_plan . fork_specs . len (), 1,
+    "the fork must resolve, not dead-end on an inactive default source" );
+  assert_eq! ( save_plan . fork_specs[0] . clone . 0 . source,
+               SourceName::from ("owned2"),
+    "with 'owned' inactive, the default must prefer the active owned 'owned2'; got {:?}",
+    save_plan . fork_specs[0] . clone . 0 . source );
+  Ok (( )) }
+
+/// A user-set clone source that the user does NOT own (a configured but
+/// foreign source, which the C-c s s prompt would let one type) is
+/// rejected with ForkSourceNotOwned.
+async fn fork_user_set_source_not_owned_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let fork_sources : HashMap<ID, SourceName> =
+    HashMap::from ([ ( ID::from ("N"), SourceName::from ("foreign") ) ]);
+  let result = buffer_to_validated_saveplan_with_fork_sources (
+    FORK_BUFFER, config, driver, None, &fork_sources ) . await;
+  match result {
+    Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
+      assert! ( errors . iter () . any ( |e| matches! ( e,
+        BufferValidationError::ForkSourceNotOwned (orig, source)
+          if *orig == ID::from ("N")
+             && *source == SourceName::from ("foreign") )),
+        "expected ForkSourceNotOwned(N, foreign), got {:?}", errors ); }
+    other => panic! (
+      "expected ForkSourceNotOwned rejecting a non-owned chosen source, got {:?}",
+      other ), }
+  Ok (( )) }
 
 /// A foreign node with NO owned ancestor still forks: with no user-set
 /// source and nothing to infer, the clone's source defaults to the

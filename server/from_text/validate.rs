@@ -35,6 +35,7 @@ pub async fn validate_and_filter_foreign_instructions(
   nodeMerge_instructions : &[NodeMerge],
   owned_ancestor_source : &HashMap<ID, SourceName>,
   user_set_fork_source : &HashMap<ID, SourceName>,
+  default_clone_source : Option<&SourceName>,
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
@@ -71,7 +72,7 @@ pub async fn validate_and_filter_foreign_instructions(
       = outcome {
       match fork_spec_from_buffer_node (
         buffer_node, disk_title, owned_ancestor_source,
-        user_set_fork_source, config )
+        user_set_fork_source, default_clone_source )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }

@@ -58,6 +58,20 @@ parent's (source X) with each child's (id N)."
     (should (equal (skg--fork-sources-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
 
+(ert-deftest test-fork-sources-walk-does-not-leak-source-across-clones ()
+  "A metadata-less level-1 headline must not leak the previous clone's
+source to a later fork's child (parent-source resets on every level 1)."
+  (with-temp-buffer
+    (insert "* (skg (node (source ownedA))) A-edited\n")
+    (insert "** (skg (node (id N1) (source foreign) indef)) N1-original\n")
+    ;; A stray/garbled level-1 headline with no skg metadata.
+    (insert "* plain heading, no metadata\n")
+    (insert "** (skg (node (id N2) (source foreign) indef)) N2-original\n")
+    (org-mode)
+    ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no source).
+    (should (equal (skg--fork-sources-from-confirmation-buffer)
+                   '(("N1" . "ownedA"))))))
+
 (ert-deftest test-show-fork-confirmation-builds-editable-navigable-buffer ()
   "skg--show-fork-confirmation inserts the content into an EDITABLE
 content-view buffer (so the user can rotate each clone's source), records
