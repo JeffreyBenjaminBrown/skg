@@ -37,7 +37,7 @@ would need the slow SavePlan we don't have yet)."
                   (mapconcat #'buffer-name others ", ")))
           (error "Save aborted: other skg buffers have unsaved edits"))))))
 
-(defun skg-request-save-buffer ()
+(defun skg-request-save-buffer (&optional fork-approved)
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
 The server sends three LP messages around the save:
@@ -46,7 +46,14 @@ The server sends three LP messages around the save:
      the SavePlan is known, plus a collateral-view per rerendered buffer.
   3. save-result: the saved buffer's final content (+ errors/warnings).
 All skg buffers are locked immediately; non-collateral buffers are
-unlocked as save-lock / save-relax-lock / collateral-view arrive."
+unlocked as save-lock / save-relax-lock / collateral-view arrive.
+
+If the save edited any FOREIGN node, the server reads that as a request
+to fork (clone) it and -- unless FORK-APPROVED is non-nil -- replies with
+a `fork-confirmation' message instead of `save-result', committing
+nothing. `skg--fork-confirmation-handler' then shows the confirmation
+buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
+`skg-decline-fork'."
   (interactive)
   (skg--confirm-save-despite-other-unsaved)
   (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
@@ -64,7 +71,8 @@ unlocked as save-lock / save-relax-lock / collateral-view arrive."
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-uri
-                                    save-point-position))
+                                    save-point-position
+                                    fork-approved))
                                   "\n"))
            (content-bytes (encode-coding-string buffer-contents 'utf-8))
            (content-length (length content-bytes))
@@ -121,6 +129,17 @@ unlocked as save-lock / save-relax-lock / collateral-view arrive."
        (lambda (_tcp-proc payload)
          (skg--save-result-handler save-buffer payload))
        t)
+      ;; fork-confirmation: the ALTERNATIVE terminal message to
+      ;; save-result. The server sends exactly one of the two. Registered
+      ;; NON-one-shot (does NOT bump skg-lp--pending-count); whichever
+      ;; terminal handler fires removes the other (and the fork handler
+      ;; decrements the count for the unfired save-result one-shot), so
+      ;; the pending count balances either way.
+      (skg-register-response-handler
+       'fork-confirmation
+       (lambda (_tcp-proc payload)
+         (skg--fork-confirmation-handler save-buffer payload))
+       nil)
 
       (skg-lp-reset)
 
@@ -131,17 +150,23 @@ unlocked as save-lock / save-relax-lock / collateral-view arrive."
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc buffer-contents))))
 
-(defun skg--save-request-sexp (view-uri save-point-position)
-  `((request . "save buffer")
-    (view-uri . ,view-uri)
-    (point-lines-below-focused-headline
-     . ,(number-to-string
-         (plist-get save-point-position
-                    :point-lines-below-focused-headline)))
-    (point-screen-lines-below-window-start
-     . ,(number-to-string
-         (plist-get save-point-position
-                    :point-screen-lines-below-window-start)))))
+(defun skg--save-request-sexp (view-uri save-point-position &optional fork-approved)
+  "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
+include (fork-approved . \"true\") so the server commits any forks it
+finds instead of returning a fork-confirmation."
+  (append
+   `((request . "save buffer")
+     (view-uri . ,view-uri)
+     (point-lines-below-focused-headline
+      . ,(number-to-string
+          (plist-get save-point-position
+                     :point-lines-below-focused-headline)))
+     (point-screen-lines-below-window-start
+      . ,(number-to-string
+          (plist-get save-point-position
+                     :point-screen-lines-below-window-start))))
+   (when fork-approved
+     '((fork-approved . "true")))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -222,6 +247,10 @@ which would trigger overlay modification-hooks if still present."
         (assoc-delete-all 'collateral-view skg-response-handler-map))
   (setq skg-response-handler-map
         (assoc-delete-all 'save-relax-lock skg-response-handler-map))
+  ;; The fork-confirmation alternative did not fire; drop it. It is
+  ;; non-one-shot, so no pending-count adjustment is needed.
+  (setq skg-response-handler-map
+        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
   (skg--end-stream)
   (unwind-protect
       (progn
@@ -229,6 +258,92 @@ which would trigger overlay modification-hooks if still present."
         (with-current-buffer save-buffer
           (skg-handle-save-sexp payload)))
     (skg--unlock-all-save-locked)) )
+
+(defvar-local skg--fork-origin-buffer nil
+  "In a fork-confirmation buffer, the source buffer whose save raised the
+forks. `skg-approve-fork' re-saves it (approved); `skg-decline-fork'
+leaves things untouched.")
+
+(defun skg--fork-confirmation-handler (save-buffer payload)
+  "Handle a `fork-confirmation' LP message: the save edited foreign
+node(s) and was not pre-approved, so NOTHING was committed. Show the
+read-only confirmation buffer (which lists the nodes that would be
+forked) and, interactively, ask whether to approve.
+
+Terminal, like `skg--save-result-handler': remove the streaming handlers
+AND the unfired save-result one-shot (decrementing the pending count for
+it), end the stream, and unlock."
+  (setq skg-response-handler-map
+        (assoc-delete-all 'collateral-view skg-response-handler-map))
+  (setq skg-response-handler-map
+        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
+  (setq skg-response-handler-map
+        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
+  (when (assoc 'save-result skg-response-handler-map)
+    ;; save-result was registered one-shot but will never fire; remove it
+    ;; and decrement the pending count it bumped, or the next save hangs.
+    (setq skg-response-handler-map
+          (assoc-delete-all 'save-result skg-response-handler-map))
+    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
+  (skg--end-stream)
+  (skg--unlock-all-save-locked)
+  (condition-case err
+      (let* ((response (read payload))
+             (content (cadr (assoc 'content response)))
+             (to-minibuffer (cadr (assoc 'to-minibuffer response)))
+             (confirm-buf (skg--show-fork-confirmation content save-buffer)))
+        (when to-minibuffer (message "%s" to-minibuffer))
+        (unless noninteractive
+          ;; In batch (tests) the caller drives skg-approve-fork /
+          ;; skg-decline-fork directly; interactively, ask now.
+          (with-current-buffer confirm-buf
+            (if (yes-or-no-p "Fork the listed node(s)? ")
+                (skg-approve-fork)
+              (skg-decline-fork)))))
+    (error (skg-log 'error 'save "fork-confirmation handler error: %S" err))))
+
+(defun skg--show-fork-confirmation (content save-buffer)
+  "Show CONTENT in the read-only *SKG Fork Confirmation* buffer, recording
+SAVE-BUFFER as its origin, and return the buffer. The buffer is a
+navigable content view (so id-push / search work) but read-only."
+  (let ((buf (get-buffer-create "*SKG Fork Confirmation*")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (or content ""))
+        (skg-content-view-mode)
+        (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
+        (goto-char (point-min)))
+      (setq skg-view-uri (org-id-uuid))
+      (setq skg--fork-origin-buffer save-buffer)
+      (setq buffer-read-only t)
+      ;; Approve / decline from the buffer even after dismissing the
+      ;; prompt. C-c C-c commits the forks; C-c C-k declines.
+      (local-set-key (kbd "C-c C-c") #'skg-approve-fork)
+      (local-set-key (kbd "C-c C-k") #'skg-decline-fork)
+      (set-buffer-modified-p nil))
+    (display-buffer buf)
+    buf))
+
+(defun skg-approve-fork ()
+  "Approve the forks listed in this *SKG Fork Confirmation* buffer:
+re-save the originating buffer, this time approving the forks, then kill
+the confirmation buffer."
+  (interactive)
+  (let ((origin skg--fork-origin-buffer))
+    (unless (buffer-live-p origin)
+      (error "The buffer that requested these forks is no longer open"))
+    (let ((kill-buffer-query-functions nil))
+      (kill-buffer (current-buffer)))
+    (with-current-buffer origin
+      (skg-request-save-buffer t))))
+
+(defun skg-decline-fork ()
+  "Decline the forks; nothing was written. Leave this confirmation buffer
+open (it is navigable -- search it for relevant IDs)."
+  (interactive)
+  (message
+   "Fork declined; nothing was saved. This buffer is left open for reference."))
 
 (defun skg--message-list-nonempty-p (message-list)
   "Return non-nil when MESSAGE-LIST has at least one message."

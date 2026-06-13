@@ -81,10 +81,10 @@ pub fn build_fork_confirmation_buffer (
      # Saving edited foreign nodes forks them: each becomes an editable\n\
      # clone in a source you own, which SUBSCRIBES TO and OVERRIDES the\n\
      # original. The nodes below will be forked.\n\
-     # APPROVE: save this view's source buffer again (your client\n\
-     #   re-sends it as approved).\n\
-     # DECLINE: kill this buffer; nothing is written. It stays open so\n\
-     #   you can still search it for relevant IDs.\n\n" );
+     # APPROVE with your client's fork-approve command (in Emacs: C-c\n\
+     #   C-c here) -- it re-saves the original, committing the forks.\n\
+     # DECLINE with C-c C-k (or just leave this buffer): nothing is\n\
+     #   written, and this buffer stays open so you can search it for IDs.\n\n" );
   for spec in fork_specs {
     out . push_str ( & format! (
       "* (skg (node (id {}) (source {}) indef)) {}\n",
