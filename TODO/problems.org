@@ -14,15 +14,35 @@
    ForkSourceInactive on BufferValidationError) but DEFERRED the broad
    string consolidation -- it is a nice-to-have touching fs/git/diff
    layers, out of proportion to the fork work. Worth doing on its own.
-** Forking a foreign node with no owned ancestor cannot be completed yet
-   The fork-confirmation buffer is read-only; the plan's
-   writeable-for-source affordance (the user rotating a clone's source
-   when it cannot be inferred from an owned ancestor, and that choice
-   riding back on the approve re-save) is NOT built. A foreign node
-   with no owned vognode ancestor in the view therefore fails with
-   ForkSourceUnresolved and cannot be forked through the buffer.
-   Workaround: place it under a node you own first. Details in
-   TODO/forks/progress.org.
+** RESOLVED Forking a foreign node with no owned ancestor
+   (Was: the read-only confirmation buffer could not set a clone's
+   source, so a foreign node with no owned ancestor failed with
+   ForkSourceUnresolved.) Built per TODO/forks/3_plan.org: the
+   confirmation buffer is editable for each clone's source (C-c s s),
+   the choice rides back on the approve re-save as (fork-sources ...),
+   and an un-inferrable source now DEFAULTS to the user's first owned
+   source. ForkSourceUnresolved now fires only when the user owns no
+   source at all. Details in TODO/forks/progress.org.
+** RESOLVED (latent) Fork-confirmation local-set-key mutated the shared mode map
+   skg--show-fork-confirmation bound C-c C-c / C-c C-k via
+   'local-set-key', which mutates '(current-local-map)' -- the SHARED
+   'skg-content-view-mode-map' -- in place, so the binding leaked into
+   every content view. Harmless for C-c C-c (org-mode's own binding),
+   but it would have been a real bug once C-x C-s was rebound there
+   (saving would break everywhere). Fixed by copying the map
+   buffer-local before the overrides; regression test
+   'test-fork-confirmation-does-not-mutate-shared-mode-map'.
+** TODO Default clone source is alphabetical, not config order
+   'SkgConfig.sources' is a HashMap, so the TOML order is lost.
+   'SkgConfig::first_owned_source' returns the alphabetically-first
+   owned source, while the Emacs client's 'skg--default-source'
+   returns the TOML-first owned source. They coincide for a
+   single-owned-source user but can disagree for multi-owned-source
+   users. Low impact (the confirmation buffer shows the server's
+   choice and the user can rotate it), but the two "defaults" are
+   inconsistent. Making them match would mean preserving source order
+   server-side (an ordered map / Vec<SourceName>) -- out of scope for
+   the fork work.
 
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces

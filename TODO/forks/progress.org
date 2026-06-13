@@ -298,3 +298,78 @@ The confirmation buffer approves on C-c C-c, declines on C-c C-k (and
 interactively prompts y/n). The server-built buffer text names those
 keys. If you want different keys or wording, it is a small change
 (elisp/skg-request-save.el + build_fork_confirmation_buffer).
+
+* 3_plan execution: writeable clone source (the last piece)
+This section reports execution of TODO/forks/3_plan.org -- the writeable
+clone source and the source-inference fix. The plan is left as-is.
+
+** What's done and went well
+All five plan steps landed in order, one (or two) commits each:
+- *Step 1* (source-inference fix): 'owned_ancestor_sources_for_foreign_
+  vognodes' now stops at N's NEAREST vognode ancestor, recording its
+  source iff that ancestor is an owned Active vognode -- never walking
+  past a foreign or inactive ancestor. Unit tests in tests/unit/fork.rs
+  (owned->foreign->N infers nothing; owned->N infers; scaffold skipped).
+- *Step 2* (resolution): clone source = user-set > inferred > default,
+  where the default is 'SkgConfig::first_owned_source'. The
+  '(fork-sources ((N . X) ...))' field is parsed in save_buffer.rs and
+  threaded via a new 'buffer_to_validated_saveplan_with_fork_sources'
+  through 'validate_and_filter_foreign_instructions' ->
+  'fork_spec_from_buffer_node'. 'ForkSourceUnresolved' now fires only
+  when the user owns NO source; 'ForkSourceNotOwned' was added for a
+  non-owned chosen source. Tests: a no-owned-ancestor fork completes via
+  default, and a user-set source overrides the inferred one
+  (fixtures-two-owned).
+- *Step 3* (pO herald): 'parentOverrides' field on ViewNodeStats +
+  serialization + herald rule "pO" + coverage atom + regenerated
+  tests/elisp/herald-rules.sexp.
+- *Step 4* (two-level buffer): 'build_fork_confirmation_buffer' emits the
+  clone-to-be parent (edited title, editable source via a sourceHerald,
+  no id) over the original (real id, foreign source, indef,
+  parentIs=independent, pO). To show the original honestly, 'ForkSpec.
+  original_title' is now N's DISK title (threaded through ForkCandidate),
+  not the edited buffer title. Unit test pins the two-level shape + pO.
+- *Step 5* (client): the confirmation buffer is editable for the source
+  only; guarded against ordinary saves (nil 'skg-view-uri' + a
+  buffer-local C-x C-s refusal). 'skg-approve-fork' walks the buffer and
+  sends '(fork-sources ((N . X) ...))' on the approve re-save. elisp
+  tests + integration test tests/integration/fork-source (two owned
+  sources, rotate to owned2 before approving, assert the clone lands in
+  owned2).
+
+** Changes to the plan's envisioned order
+- Steps ran in the plan's order (1..5), then docs, then a small test
+  fixup commit for two suites that had encoded the OLD reject-on-no-
+  source behavior (validate_foreign_nodes, the subscribee-as-such
+  extraction test).
+- 'buffer_to_validated_saveplan' kept its 4-arg signature as a thin
+  wrapper delegating to '..._with_fork_sources', so its ~44 test call
+  sites stayed untouched (the same shim idiom test_utils already uses for
+  the save path). The threading the plan describes still happens; only
+  the entry point is split.
+
+** Unanticipated future potential costs and benefits
+- BENEFIT: 'ForkSpec.original_title' is now honestly the disk title; it
+  was the edited buffer title before (harmless in the old one-level
+  buffer, wrong for two levels).
+- BENEFIT (fixed in passing): the confirmation buffer's 'local-set-key'
+  calls had been mutating the SHARED 'skg-content-view-mode-map'. Now on
+  a buffer-local copy, with a regression test -- otherwise rebinding
+  C-x C-s would have broken saving in every content view. See
+  TODO/problems.org.
+- COST (minor): the confirmation buffer is now fully editable, not just
+  its source field. Stray edits other than the source rotation are
+  ignored (only each clone-to-be's source and each child's id are
+  extracted, and the buffer is never an ordinary save target), so this
+  is safe, but it is laxer than a strictly source-only buffer.
+
+** TODO open question: default clone source is alphabetical, not config order
+'SkgConfig.sources' is a HashMap, so the TOML's source order is not
+preserved. 'first_owned_source' returns the alphabetically-first owned
+source; the Emacs client's 'skg--default-source' returns the TOML-first
+owned source. They coincide for a single-owned-source user but can
+disagree for someone with several owned sources. Impact is low (the
+confirmation buffer displays the server's choice and the user can rotate
+it), but the two "defaults" are inconsistent. Aligning them would mean
+preserving source order server-side (an ordered map or a
+Vec<SourceName>), which is out of scope here. Flagged for your call.
