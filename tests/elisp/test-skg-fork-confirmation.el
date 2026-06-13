@@ -23,25 +23,78 @@
                t)))
     (should (equal (cdr (assoc 'fork-approved sexp)) "true"))))
 
-(ert-deftest test-show-fork-confirmation-builds-readonly-navigable-buffer ()
-  "skg--show-fork-confirmation inserts the content into a read-only
-content-view buffer, records the origin buffer, and binds approve/decline."
+(ert-deftest test-save-request-sexp-omits-fork-sources-by-default ()
+  "Without chosen sources, the save request carries no fork-sources field."
+  (let ((sexp (skg--save-request-sexp
+               "uri-1"
+               '(:point-lines-below-focused-headline 0
+                 :point-screen-lines-below-window-start 0)
+               t)))
+    (should-not (assoc 'fork-sources sexp))))
+
+(ert-deftest test-save-request-sexp-includes-fork-sources-when-set ()
+  "With chosen sources, the request carries (fork-sources ((N . X) ...))."
+  (let* ((sexp (skg--save-request-sexp
+                "uri-1"
+                '(:point-lines-below-focused-headline 0
+                  :point-screen-lines-below-window-start 0)
+                t
+                '(("N" . "owned2") ("M" . "owned"))))
+         (entry (assoc 'fork-sources sexp)))
+    (should entry)
+    ;; The field is (fork-sources ((N . X) (M . Y))) -- a list, not a
+    ;; dotted pair -- so the alist is the cadr.
+    (should (equal (cadr entry)
+                   '(("N" . "owned2") ("M" . "owned"))))))
+
+(ert-deftest test-fork-sources-from-confirmation-buffer-walks-two-levels ()
+  "skg--fork-sources-from-confirmation-buffer pairs each clone-to-be
+parent's (source X) with each child's (id N)."
+  (with-temp-buffer
+    (insert "# FORK CONFIRMATION\n")
+    (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
+    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef (viewStats parentOverrides))) N-original\n")
+    (org-mode)
+    (should (equal (skg--fork-sources-from-confirmation-buffer)
+                   '(("N" . "owned2"))))))
+
+(ert-deftest test-show-fork-confirmation-builds-editable-navigable-buffer ()
+  "skg--show-fork-confirmation inserts the content into an EDITABLE
+content-view buffer (so the user can rotate each clone's source), records
+the origin, leaves skg-view-uri nil, and binds approve/decline plus an
+ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (id N) (source foreign) indef)) N\n"
+                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (parentIs independent) indef (viewStats parentOverrides))) N-original\n"
                     origin)))
           (unwind-protect
               (with-current-buffer buf
-                (should buffer-read-only)
+                (should-not buffer-read-only)
+                (should (null skg-view-uri))
                 (should (eq skg--fork-origin-buffer origin))
                 (should (derived-mode-p 'skg-content-view-mode))
                 (should (string-match-p "(id N)" (buffer-string)))
-                ;; approve / decline are reachable from the buffer
+                ;; approve / decline / save-refusal are reachable
                 (should (eq (key-binding (kbd "C-c C-c")) #'skg-approve-fork))
-                (should (eq (key-binding (kbd "C-c C-k")) #'skg-decline-fork)))
+                (should (eq (key-binding (kbd "C-c C-k")) #'skg-decline-fork))
+                (should (eq (key-binding (kbd "C-x C-s"))
+                            #'skg--fork-confirmation-refuse-save)))
             (kill-buffer buf)))
       (when (buffer-live-p origin) (kill-buffer origin)))))
+
+(ert-deftest test-fork-confirmation-does-not-mutate-shared-mode-map ()
+  "The buffer-local key overrides must not leak into the shared
+skg-content-view-mode-map (which would break C-x C-s in real views)."
+  (let ((origin (generate-new-buffer "*fork-origin-3*")))
+    (let ((buf (skg--show-fork-confirmation
+                "* (skg (node (source owned))) N-edited\n"
+                origin)))
+      (unwind-protect
+          (should (eq (lookup-key skg-content-view-mode-map (kbd "C-x C-s"))
+                      #'skg-request-save-buffer))
+        (kill-buffer buf)
+        (when (buffer-live-p origin) (kill-buffer origin))))))
 
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."

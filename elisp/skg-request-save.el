@@ -37,7 +37,7 @@ would need the slow SavePlan we don't have yet)."
                   (mapconcat #'buffer-name others ", ")))
           (error "Save aborted: other skg buffers have unsaved edits"))))))
 
-(defun skg-request-save-buffer (&optional fork-approved)
+(defun skg-request-save-buffer (&optional fork-approved fork-sources)
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
 The server sends three LP messages around the save:
@@ -72,7 +72,8 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                    (skg--save-request-sexp
                                     skg-view-uri
                                     save-point-position
-                                    fork-approved))
+                                    fork-approved
+                                    fork-sources))
                                   "\n"))
            (content-bytes (encode-coding-string buffer-contents 'utf-8))
            (content-length (length content-bytes))
@@ -150,10 +151,14 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc buffer-contents))))
 
-(defun skg--save-request-sexp (view-uri save-point-position &optional fork-approved)
+(defun skg--save-request-sexp (view-uri save-point-position
+                                        &optional fork-approved fork-sources)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
 include (fork-approved . \"true\") so the server commits any forks it
-finds instead of returning a fork-confirmation."
+finds instead of returning a fork-confirmation. FORK-SOURCES, when
+non-nil, is an alist ((N . SOURCE) ...) pairing each forked node's id
+with the owned source the user chose for its clone; it rides out as the
+field (fork-sources ((N . SOURCE) ...))."
   (append
    `((request . "save buffer")
      (view-uri . ,view-uri)
@@ -166,7 +171,9 @@ finds instead of returning a fork-confirmation."
           (plist-get save-point-position
                      :point-screen-lines-below-window-start))))
    (when fork-approved
-     '((fork-approved . "true")))))
+     '((fork-approved . "true")))
+   (when fork-sources
+     (list (list 'fork-sources fork-sources)))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -303,9 +310,14 @@ it), end the stream, and unlock."
     (error (skg-log 'error 'save "fork-confirmation handler error: %S" err))))
 
 (defun skg--show-fork-confirmation (content save-buffer)
-  "Show CONTENT in the read-only *SKG Fork Confirmation* buffer, recording
+  "Show CONTENT in the *SKG Fork Confirmation* buffer, recording
 SAVE-BUFFER as its origin, and return the buffer. The buffer is a
-navigable content view (so id-push / search work) but read-only."
+navigable content view (so id-push / search work). It is editable so the
+user can rotate each clone's source (C-c s s on the clone-to-be parent),
+but it is NOT an ordinary save target: skg-view-uri is left nil (tripping
+the nil-view-uri save guard) and C-x C-s is rebound to refuse, because a
+stray normal save of its id-less clone-to-be parents would create bare
+nodes. Only C-c C-c (approve) and C-c C-k (decline) act on it."
   (let ((buf (get-buffer-create "*SKG Fork Confirmation*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
@@ -314,29 +326,71 @@ navigable content view (so id-push / search work) but read-only."
         (skg-content-view-mode)
         (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
         (goto-char (point-min)))
-      (setq skg-view-uri (org-id-uuid))
+      ;; nil view-uri: not a registered view, and the ordinary-save guard
+      ;; rejects M-x skg-request-save-buffer on it.
+      (setq skg-view-uri nil)
       (setq skg--fork-origin-buffer save-buffer)
-      (setq buffer-read-only t)
-      ;; Approve / decline from the buffer even after dismissing the
-      ;; prompt. C-c C-c commits the forks; C-c C-k declines.
+      ;; Copy the mode map first so these overrides stay buffer-local --
+      ;; local-set-key mutates (current-local-map) in place, which is the
+      ;; shared skg-content-view-mode-map; rebinding C-x C-s on the shared
+      ;; map would break saving in every content view.
+      (use-local-map (copy-keymap (current-local-map)))
+      ;; C-c C-c commits the forks; C-c C-k declines; C-x C-s refuses
+      ;; (this buffer must not be saved as ordinary content).
       (local-set-key (kbd "C-c C-c") #'skg-approve-fork)
       (local-set-key (kbd "C-c C-k") #'skg-decline-fork)
+      (local-set-key (kbd "C-x C-s") #'skg--fork-confirmation-refuse-save)
       (set-buffer-modified-p nil))
     (display-buffer buf)
     buf))
 
+(defun skg--fork-confirmation-refuse-save ()
+  "Refuse an ordinary save of the fork-confirmation buffer.
+Its clone-to-be parents are id-less owned-source nodes; saving them as
+ordinary content would create bare nodes. Approve with C-c C-c (commits
+the forks) or decline with C-c C-k."
+  (interactive)
+  (user-error
+   "This is the fork-confirmation buffer; use C-c C-c to approve or C-c C-k to decline"))
+
+(defun skg--fork-sources-from-confirmation-buffer ()
+  "Walk the fork-confirmation buffer; return an alist ((N . SOURCE) ...).
+Each level-1 headline is a clone-to-be carrying (source SOURCE) and no
+id; each of its level-2 children is an original carrying (id N). The
+clone's SOURCE (rotated by the user, or the default) is paired with each
+child's id N -- the key by which the server applies the chosen source."
+  (let ((pairs nil)
+        (parent-source nil))
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward org-heading-regexp nil t)
+        (beginning-of-line)
+        (let ((level (org-current-level))
+              (sexp (skg--metadata-sexp-at-point-or-nil)))
+          (cond
+           ((and (= level 1) sexp)
+            (setq parent-source (skg--node-source sexp)))
+           ((and (= level 2) sexp parent-source)
+            (let ((id (skg--node-id sexp)))
+              (when id
+                (push (cons id parent-source) pairs))))))
+        (forward-line 1)))
+    (nreverse pairs)))
+
 (defun skg-approve-fork ()
   "Approve the forks listed in this *SKG Fork Confirmation* buffer:
-re-save the originating buffer, this time approving the forks, then kill
-the confirmation buffer."
+extract each clone's chosen source, re-save the originating buffer with
+the forks approved (carrying those sources), then kill the confirmation
+buffer."
   (interactive)
-  (let ((origin skg--fork-origin-buffer))
+  (let ((origin skg--fork-origin-buffer)
+        (fork-sources (skg--fork-sources-from-confirmation-buffer)))
     (unless (buffer-live-p origin)
       (error "The buffer that requested these forks is no longer open"))
     (let ((kill-buffer-query-functions nil))
       (kill-buffer (current-buffer)))
     (with-current-buffer origin
-      (skg-request-save-buffer t))))
+      (skg-request-save-buffer t fork-sources))))
 
 (defun skg-decline-fork ()
   "Decline the forks; nothing was written. Leave this confirmation buffer
