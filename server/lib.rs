@@ -2,6 +2,7 @@ pub mod consts;
 pub mod context;
 pub mod dbs;
 pub mod diff_analysis;
+pub mod export_org;
 pub mod from_text;
 pub mod git_ops;
 pub mod heralds;

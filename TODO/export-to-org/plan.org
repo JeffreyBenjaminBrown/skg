@@ -1,0 +1,81 @@
+* Plan: export .skg data to .org files
+
+Settled in discussion.org. This plan is the executable breakdown.
+
+** Goal
+From the =data/= store, export recursive content views of every
+"export root" to =org-exports/<target_filepath>.org=, limited to a
+user-chosen source-set, stripped of skg metadata, with links
+rewritten to relative org links. Invoked from Emacs
+(=skg-export-some-to-org=); all logic in Rust.
+
+** Definitions (agreed)
+- MAGIC marker node: 3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f.
+- BROKEN-LINK sink node: 9ff04e25-01e8-4634-8aa5-f5849bc1eb81.
+- Export root R: a node with a child C (in R.contains) whose TITLE
+  links to MAGIC and whose BODY yields a =target_filepath=. C is
+  the "marker child".
+- Marker children are EXCLUDED from rendered output.
+- Nested export roots: rendered as a leaf headline linking to their
+  own file; subtree NOT inlined.
+- Non-root link target: deep link =[[./rel.org::*Heading][label]]=
+  (cross-file) / =[[*Heading][label]]= (same-file).
+- Root link target: =[[./rel.org][label]]= (file top) cross-file,
+  =[[*RootTitle][label]]= same-file.
+- Broken link (target has no exported home): link to the sink's
+  file; if the sink itself isn't exported under the set, emit the
+  label as plain text + warn.
+
+** Rust core: server/export_org.rs
+1. =parse_target_filepath(body)=: tolerant key=value parse.
+   - value may be bare or quoted; bare value with whitespace =>
+     refuse with message (Q3).
+   - reject absolute / =.= / =..= / empty components (path safety).
+2. Discovery: build id->node maps; for each node (sorted pid), scan
+   its contains for a marker child; record ExportRoot{root_pid,
+   target, marker_pid}. Warn+skip: inactive-source root, target
+   collision, marker w/o target, malformed target.
+3. Homes: pre-seed every root's home (kind=Root). Then, for roots
+   sorted by target, DFS the content tree (same traversal as
+   render) and assign each first-seen non-root node a Content home
+   {target, anchor=plaintext title}. Warn on duplicate anchor text
+   within a file.
+4. Render each root: DFS preorder -> headline (stars=depth) +
+   body, links rewritten; exclude markers; omit inactive; nested
+   roots -> link leaf; cycles -> leaf headline (no recurse).
+   Warn on body lines starting with =*= or =#+= (Q7).
+5. Write =output_base/<target>.org=, creating parent dirs (no
+   wipe, Q6). Return ExportReport (files, broken count, warnings).
+   Core signature takes (active, nodes, output_base) so it is
+   TypeDB-free and unit-testable.
+6. Unit tests (DB-free): relpath; target parse incl. whitespace
+   refusal + path-safety; discovery; a small end-to-end render with
+   a nested root, a broken link, and a same-file link.
+
+** Wiring
+- lib.rs: =pub mod export_org;=
+- main.rs: =export-org= subcommand (config[, set]); reads nodes,
+  calls core with =cwd/org-exports=, prints report. (Secondary,
+  TypeDB-free entry -- handy for testing/scripting; the documented
+  path is the Emacs command.)
+- protocol.rs: RequestType::ExportToOrg ("export to org");
+  TcpToClient::ExportToOrg ("export-to-org").
+- serve/handlers/export_to_org.rs: read =source-set= from request,
+  resolve ActiveSourceSet, read nodes, run core into
+  =cwd/org-exports=, reply
+  =((response-type export-to-org)(content ..)(errors ..)(warnings ..))=.
+- serve/handlers/mod.rs + serve.rs: register + dispatch.
+- api-and-formats.md: document the endpoint.
+
+** Emacs
+- elisp/skg-request-export-org.el: =skg-export-some-to-org=,
+  =(interactive (list (skg--prompt-for-source-set)))=, sends the
+  request, messages the report. Hint about a public-facing subset
+  when the chosen set is =all=.
+- skg-client.el: require it. skg-reload.el: add to reload list.
+- docs/COMMANDS.org: document it (no keybinding, per Jeff).
+
+** Reports
+- TODO/problems.org: the target_filepath-not-valid-TOML
+  discrepancy (data + instruction node use bare strings).
+- TODO/export-to-org/progress.org: per when-to-stop.org.

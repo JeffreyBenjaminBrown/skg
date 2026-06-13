@@ -14,6 +14,7 @@
 (require 'skg-request-file-path)
 (require 'skg-request-herald-rules)
 (require 'skg-request-diff-analysis)
+(require 'skg-request-export-org)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-dbs)
 (require 'skg-request-rerender-all-views)
