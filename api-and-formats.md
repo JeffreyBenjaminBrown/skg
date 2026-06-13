@@ -160,20 +160,38 @@ So far there are these endpoints:
     its worktree) and appeared in EXACTLY one other source (present in
     that source's worktree, absent from its HEAD). An ID that vanished
     from, or appeared in, more than one source has more than one
-    candidate (old, new) pair and is skipped. For each move it emits a
-    block staging the move:
+    candidate (old, new) pair and is skipped. The script is a bash
+    move-list plus one loop over it:
     ```
-    echo "----"
-    id=<the uuid>
-    cd <old-source-dir>
-    git rm $id.skg
-    cd ../<new-source-dir>
-    git add $id.skg
-    cd ..
+    moves=(
+      "<uuid> <old-source-dir> <new-source-dir>"
+      ...
+    )
+
+    for move in "${moves[@]}"; do
+      read -r id old new <<< "$move"
+      echo "---- moving $id : $old -> $new"
+      cd "$old" || { echo "  SKIP: cannot enter $old"; continue; }
+      if [ -e "$id.skg" ]; then
+        echo "  SKIP: $id.skg is still present in $old; leaving it alone"
+        cd ..
+        continue
+      fi
+      echo "  removing $id from $old"
+      git rm "$id.skg"
+      echo "  adding $id to $new"
+      cd "../$new"
+      git add "$id.skg"
+      cd ..
+    done
     ```
-    Source directories are named relative to the data root, so the
-    script is meant to be run from there; it assumes each source is a
-    direct subdirectory of the data root. The logic lives in
+    The `[ -e "$id.skg" ]` check guards against a stale entry: `git rm`
+    deletes whatever is present and gives no distinct output, so a file
+    still present in the old source (the move not yet done on disk) is
+    skipped rather than deleted. Source directories are named relative
+    to the data root, so the script is meant to be run from there
+    (bash); it assumes each source is a direct subdirectory of the data
+    root. The logic lives in
     `server/git_ops/find_and_stage_moves.rs`.
   - Scans all sources regardless of the active source-set (a move can
     cross source-set boundaries). Sources that are not git repos

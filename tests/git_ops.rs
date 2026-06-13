@@ -166,13 +166,17 @@ fn test_stage_moves_detects_single_pair_move() {
     config_from_subdirs ( root . path(), &["alpha", "beta"] );
   let script : String =
     stage_moves_script (&config) . unwrap();
-  assert! ( script . contains ("id=node-1"),       "script:\n{}", script );
-  assert! ( script . contains ("cd alpha"),        "script:\n{}", script );
-  assert! ( script . contains ("git rm $id.skg"),  "script:\n{}", script );
-  assert! ( script . contains ("cd ../beta"),      "script:\n{}", script );
-  assert! ( script . contains ("git add $id.skg"), "script:\n{}", script );
-  assert! ( script . contains ("cd .."),           "script:\n{}", script );
-  assert! ( ! script . contains ("id=fresh"),      "script:\n{}", script ); }
+  assert! ( script . contains ("\"node-1 alpha beta\""),
+            "the move should appear as a list entry:\n{}", script );
+  assert! ( script . contains ("for move in"),
+            "the script should be a single loop:\n{}", script );
+  assert! ( script . contains ("[ -e \"$id.skg\" ]"),
+            "the loop should assert the file is gone before removing:\n{}",
+            script );
+  assert! ( script . contains ("git rm \"$id.skg\""),  "script:\n{}", script );
+  assert! ( script . contains ("git add \"$id.skg\""), "script:\n{}", script );
+  assert! ( ! script . contains ("fresh"),
+            "a brand-new node is not a move:\n{}", script ); }
 
 #[test]
 fn test_stage_moves_skips_ambiguous_and_reports_none() {

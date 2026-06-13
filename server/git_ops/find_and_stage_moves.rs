@@ -1,6 +1,8 @@
 /// Detects nodes whose '.skg' file moved from one source's git repo
-/// to another, and renders a shell script that stages each move
-/// ('git rm' in the old repo, 'git add' in the new one).
+/// to another, and renders a bash script -- a move list plus one loop
+/// over it -- that stages each move ('git rm' in the old repo,
+/// 'git add' in the new one), skipping any whose file is still
+/// present in the old source (so a stale entry cannot delete it).
 ///
 /// A node has "moved" iff, across all configured sources, its file
 /// vanished from EXACTLY one source (present in that source's git
@@ -168,46 +170,67 @@ fn skg_id_from_filename (
     . and_then ( |stem| stem . to_str () )
     . map ( |stem| ID ( stem . to_string () )) }
 
-/// Render the whole script: a header comment, then one block per
-/// move. Empty when there are no moves.
+/// Render the whole script: a header comment, the move list, and one
+/// bash loop that stages each move. Empty (just a comment) when there
+/// are no moves. The list and the loop are kept separate so a human
+/// can read the data before running it, and the same text reads
+/// cleanly in the shell afterward.
 fn render_moves_script (
   config : &SkgConfig,
   moves  : &[NodeMove],
 ) -> String {
-  let mut out : String = String::from (
-    "# Run this from the skg data root. Each block moves one node's\n\
-     # .skg file from one source's git repo into another, then stages\n\
-     # the removal and the addition.\n" );
+  let mut out : String =
+    String::from (STAGE_MOVES_HEADER);
   if moves . is_empty () {
     out . push_str ("# No moves detected.\n");
     return out; }
+  out . push_str ("moves=(\n");
   for node_move in moves {
-    out . push_str ( &render_one_move (config, node_move) ); }
+    out . push_str ( &format! (
+      "  \"{id} {from} {to}\"\n",
+      id   = node_move . id . 0,
+      from = source_dir_relative_to_data_root (config, &node_move . from),
+      to   = source_dir_relative_to_data_root (config, &node_move . to) )); }
+  out . push_str (")\n");
+  out . push_str (STAGE_MOVES_LOOP);
   out }
 
-/// One move's block, in the template the user specified: cd into the
-/// old source, 'git rm', cd into the new (a sibling), 'git add', then
-/// cd back. Source folders are named relative to the data root, so
-/// the script is run from there.
-fn render_one_move (
-  config    : &SkgConfig,
-  node_move : &NodeMove,
-) -> String {
-  let from_dir : String =
-    source_dir_relative_to_data_root (config, &node_move . from);
-  let to_dir : String =
-    source_dir_relative_to_data_root (config, &node_move . to);
-  format! (
-    "echo \"----\"\n\
-     id={id}\n\
-     cd {from_dir}\n\
-     git rm $id.skg\n\
-     cd ../{to_dir}\n\
-     git add $id.skg\n\
-     cd ..\n",
-    id       = node_move . id . 0,
-    from_dir = from_dir,
-    to_dir   = to_dir ) }
+/// The header comment, explaining how to run the script and why the
+/// existence check precedes 'git rm'.
+const STAGE_MOVES_HEADER : &str =
+"# Run this from the skg data root (bash). Each entry below names one\n\
+ # node's .skg file, the source it moved out of, and the source it\n\
+ # moved into. The loop stages each move: 'git rm' in the old source,\n\
+ # 'git add' in the new one. 'git rm' deletes whatever is there, with\n\
+ # no distinct output if the file is still present, so before removing\n\
+ # we check that the file is ALREADY gone from the old source's\n\
+ # worktree -- which is how the move was detected. A still-present\n\
+ # file means the move was not actually done on disk, so we skip it\n\
+ # rather than delete it.\n";
+
+/// The constant bash loop. Kept out of 'format!' (and free of '{}')
+/// so its braces and quotes need no escaping. Source dirs are named
+/// relative to the data root, so 'cd ../$new' reaches a sibling and
+/// the trailing 'cd ..' returns to the root for the next iteration.
+const STAGE_MOVES_LOOP : &str =
+r#"
+for move in "${moves[@]}"; do
+  read -r id old new <<< "$move"
+  echo "---- moving $id : $old -> $new"
+  cd "$old" || { echo "  SKIP: cannot enter $old"; continue; }
+  if [ -e "$id.skg" ]; then
+    echo "  SKIP: $id.skg is still present in $old; leaving it alone"
+    cd ..
+    continue
+  fi
+  echo "  removing $id from $old"
+  git rm "$id.skg"
+  echo "  adding $id to $new"
+  cd "../$new"
+  git add "$id.skg"
+  cd ..
+done
+"#;
 
 /// A source's directory, named relative to the data root. Source
 /// paths are made absolute (data_root-joined) at config load, so

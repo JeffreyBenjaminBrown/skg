@@ -232,11 +232,14 @@ and appeared in exactly one other source (present in that source's
 worktree, not yet committed). A node that vanished from, or appeared
 in, more than one source is ambiguous and is skipped.
 
-Opens a buffer of shell instructions -- one block per move -- that
-'git rm' the file in the old source and 'git add' it in the new one.
-Review it, then run it from the skg data root. Unlike most commands
-here, this one does not depend on the node at point; it reports moves
-across all sources.
+Opens a buffer holding a bash script: a list of the moves followed by
+one loop that 'git rm's each file in its old source and 'git add's it
+in the new one. Before removing, the loop checks that the file is
+already gone from the old source's worktree (that is how the move was
+detected); a file still present there is skipped, not deleted, since
+'git rm' would silently remove it. Review the script, then run it from
+the skg data root. Unlike most commands here, this one does not depend
+on the node at point; it reports moves across all sources.
 ** C-c r : showing more information about a node
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes
