@@ -1,0 +1,92 @@
+// Unit tests for fork source-inference. Wired into the lib's test
+// build from server/from_text/fork.rs via #[path].
+//
+// The rule under test ('owned_ancestor_sources_for_foreign_vognodes'):
+// a foreign node's clone inherits the source of its NEAREST vognode
+// ancestor, recorded only if that ancestor is an owned Active vognode.
+// The walk skips scaffolds (cols) but STOPS at the first vognode -- it
+// never passes a foreign or inactive ancestor to reach a distant owned
+// one.
+
+use super::*;
+use crate::types::misc::SkgfileSource;
+use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol,
+                             mk_definitive_viewnode};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+fn config_two_owned_one_foreign () -> SkgConfig {
+  let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new ();
+  for (name, owns) in [ ("owned1", true),
+                        ("owned2", true),
+                        ("foreign", false) ] {
+    sources . insert (
+      SourceName::from (name),
+      SkgfileSource {
+        name         : SourceName::from (name),
+        abbreviation : None,
+        path         : PathBuf::from (name),
+        user_owns_it : owns, } ); }
+  SkgConfig::fromSourcesAndDbName ( sources, "db", "/tmp/none" ) }
+
+fn active (id : &str, source : &str) -> ViewNode {
+  mk_definitive_viewnode (
+    ID::from (id), SourceName::from (source), id . to_string (), None ) }
+
+fn subscribee_col () -> ViewNode {
+  ViewNode { focused : false, folded : false, body_folded : false,
+             kind : ViewNodeKind::PartnerCol (PartnerCol::Subscribee) } }
+
+/// Build a forest exercising the three shapes:
+/// - owned2 P -> foreign F -> foreign N   (must infer NOTHING for N)
+/// - owned2 Q -> foreign M                (must infer owned2 for M)
+/// - owned1 R -> subscribeeCol -> foreign S  (col skipped: owned1 for S)
+fn build_forest () -> ViewForest {
+  let mut f : ViewForest = ViewForest::new ();
+  let p : ego_tree::NodeId = f . append_root ( active ("P", "owned2") );
+  let ff : ego_tree::NodeId =
+    f . get_mut (p) . unwrap () . append ( active ("F", "foreign") ) . id ();
+  let _n : ego_tree::NodeId =
+    f . get_mut (ff) . unwrap () . append ( active ("N", "foreign") ) . id ();
+  let q : ego_tree::NodeId = f . append_root ( active ("Q", "owned2") );
+  let _m : ego_tree::NodeId =
+    f . get_mut (q) . unwrap () . append ( active ("M", "foreign") ) . id ();
+  let r : ego_tree::NodeId = f . append_root ( active ("R", "owned1") );
+  let rc : ego_tree::NodeId =
+    f . get_mut (r) . unwrap () . append ( subscribee_col () ) . id ();
+  let _s : ego_tree::NodeId =
+    f . get_mut (rc) . unwrap () . append ( active ("S", "foreign") ) . id ();
+  f }
+
+#[test]
+fn owned_foreign_N_infers_nothing () {
+  // The bug: walking PAST the foreign ancestor F to the owned P. The
+  // corrected rule stops at F (foreign) and infers nothing for N.
+  let config : SkgConfig = config_two_owned_one_foreign ();
+  let map = owned_ancestor_sources_for_foreign_vognodes (
+    & build_forest (), & config );
+  assert! ( ! map . contains_key (& ID::from ("N")),
+    "owned -> foreign -> N must infer no source; got {:?}",
+    map . get (& ID::from ("N")) ); }
+
+#[test]
+fn owned_N_still_infers_the_owned_source () {
+  // owned2 Q directly contains foreign M: M inherits owned2.
+  let config : SkgConfig = config_two_owned_one_foreign ();
+  let map = owned_ancestor_sources_for_foreign_vognodes (
+    & build_forest (), & config );
+  assert_eq! ( map . get (& ID::from ("M")),
+               Some (& SourceName::from ("owned2")),
+    "owned -> M must infer the owned ancestor's source" ); }
+
+#[test]
+fn scaffold_ancestor_is_skipped () {
+  // owned1 R -> subscribeeCol -> foreign S: the col is a scaffold, so
+  // S's nearest VOGNODE ancestor is the owned R.
+  let config : SkgConfig = config_two_owned_one_foreign ();
+  let map = owned_ancestor_sources_for_foreign_vognodes (
+    & build_forest (), & config );
+  assert_eq! ( map . get (& ID::from ("S")),
+               Some (& SourceName::from ("owned1")),
+    "a scaffold between an owned ancestor and a foreign node is skipped" ); }

@@ -23,14 +23,20 @@ use crate::types::viewnode::{ViewNodeKind, Vognode};
 use std::collections::HashMap;
 
 /// For every FOREIGN vognode in the view, the source of its nearest
-/// OWNED vognode ancestor, if any. A fork's clone C must live in an
-/// owned source; the foreign node N's own source is read-only, so C
-/// inherits from N's nearest owned ancestor in the view (the same
-/// "inherit a source from the parent" idea 'add_missing_info' uses, but
-/// skipping foreign ancestors). A foreign node drawn at several
-/// positions can have different owned ancestors; the first reached in
-/// preorder wins -- monogamy means at most one clone anyway, and the
-/// user can override the choice in the confirmation buffer.
+/// vognode ancestor, recorded IFF that ancestor is an OWNED Active
+/// vognode. A fork's clone C must live in an owned source; the foreign
+/// node N's own source is read-only, so C inherits from N's IMMEDIATE
+/// container context -- the nearest vognode ancestor reached by skipping
+/// only scaffolds (cols, etc.). The walk STOPS at that nearest vognode
+/// ancestor and never passes it: if the ancestor is foreign (or
+/// inactive), nothing is inferred (the source then defaults, or the user
+/// sets it in the confirmation buffer). Inferring a distant owned node
+/// reached by skipping a foreign ancestor would be wrong -- a clone
+/// belongs in the source of the node that actually contains N here.
+/// A foreign node drawn at several positions can have different nearest
+/// ancestors; the first OWNED one reached in preorder wins -- monogamy
+/// means at most one clone anyway, and the user can override the choice
+/// in the confirmation buffer.
 pub fn owned_ancestor_sources_for_foreign_vognodes (
   viewforest : &ViewForest,
   config     : &SkgConfig,
@@ -42,13 +48,21 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
     if config . user_owns_source (& t . source) { continue; } // not foreign
     let mut current = node;
     while let Some (parent) = current . parent () {
-      if let ViewNodeKind::Vognode (Vognode::Active (pt))
-        = & parent . value () . kind
-      { if config . user_owns_source (& pt . source) {
-          map . entry ( t . id . clone () )
-            . or_insert_with ( || pt . source . clone () );
-          break; }}
-      current = parent; }}
+      match & parent . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Active (pt)) => {
+          // N's nearest vognode ancestor: record its source IFF owned,
+          // then stop -- never walk past it.
+          if config . user_owns_source (& pt . source) {
+            map . entry ( t . id . clone () )
+              . or_insert_with ( || pt . source . clone () ); }
+          break; }
+        ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+          // An inactive vognode is a real container boundary too (and
+          // never an owned source): infer nothing.
+          break,
+        _ =>
+          // A scaffold (col, etc.): skip it and keep walking rootward.
+          { current = parent; }} }}
   map }
 
 /// Build the ForkSpec for a fork of the foreign buffer node N: resolve
@@ -170,3 +184,8 @@ pub fn build_fork_clone (
     original_title  : buffer_node . title . clone (),
     original_source : buffer_node . source . clone (),
   }}
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+#[path = "../../tests/unit/fork.rs"]
+mod tests;
