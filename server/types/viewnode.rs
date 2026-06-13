@@ -348,6 +348,11 @@ pub struct ViewNodeStats {
   /// view stat: the same node can sit under different parents in
   /// different positions.
   pub overridesParent       : bool,
+  /// This node's visible org-parent OVERRIDES it -- the inverse of
+  /// 'overridesParent'. Herald red "pO". Marks the original a
+  /// fork-to-be (clone) stands over in the fork-confirmation buffer.
+  /// Computed only where needed (that buffer), not generally.
+  pub parentOverrides       : bool,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald red "Oh".
   /// LOAD-BEARING, unlike the other view stats: save extraction
@@ -836,6 +841,7 @@ impl Default for ViewNodeStats {
       grandparentOverrides  : false,
       grandparentSubscribes : false,
       overridesParent       : false,
+      parentOverrides       : false,
       overridesHere         : None,
     }} }
 

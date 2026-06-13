@@ -261,6 +261,7 @@ pub fn herald_rule_table () -> HeraldRule {
           leaf (Red, "grandparentOverrides",  "gO"),
           leaf (Red, "grandparentSubscribes", "gS"),
           leaf (Red, "overridesParent",       "Op"),
+          leaf (Red, "parentOverrides",       "pO"),
           crule (Red, "overridesHere", vec! [
             // ANY without IT: the marker's ID payload is matched
             // but not echoed; only "Oh" is displayed.
@@ -414,12 +415,13 @@ fn viewstats_atoms () -> Vec<&'static str> {
       grandparentOverrides : _,
       grandparentSubscribes : _,
       overridesParent : _,
+      parentOverrides : _,
       overridesHere : _, // keyed form (a viewStats sub-form)
     } = v; }
   let _ = guard;
   vec! [ "cycle", "containsParent", "sourceHerald",
          "grandparentOverrides", "grandparentSubscribes",
-         "overridesParent", "overridesHere" ] }
+         "overridesParent", "parentOverrides", "overridesHere" ] }
 
 /// ParentIs values the serializer can emit (Affected stays implicit).
 fn parentIs_emitted_atoms () -> Vec<&'static str> {

@@ -269,6 +269,8 @@ fn true_node_metadata_to_string (
         parts . push ( "grandparentSubscribes" . to_string () ); }
       if true_node . viewStats . overridesParent {
         parts . push ( "overridesParent" . to_string () ); }
+      if true_node . viewStats . parentOverrides {
+        parts . push ( "parentOverrides" . to_string () ); }
       if let Some (ref original) =
         true_node . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
