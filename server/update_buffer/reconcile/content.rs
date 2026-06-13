@@ -390,7 +390,14 @@ fn is_subscribee (
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
 /// in order. For a subscribee-as-such (TODO/DONE/local-view-update/plan_v2.org §6.1) it is contains MINUS what the
-/// subscriber hides -- the hidden remainder shows in the HiddenInSubscribeeCol.
+/// subscriber neither HIDES nor CONTAINS: the hidden remainder shows in the
+/// HiddenInSubscribeeCol, and content the subscriber has integrated into its
+/// own graph (any node it contains) has dropped out of "unintegrated subscribed
+/// content" entirely. Hiding is the explicit integration signal; containing is
+/// the implicit one (a node moved into the subscriber is not also hidden --
+/// "hiding your own content is silly", resolve_visibility -- so without the
+/// contains subtraction it would double-show, once as integrated content and
+/// once as unintegrated; forks plan.org Prerequisite / discussion.org Option B).
 /// The git-diff decorations (removed-member phantoms, membership axes) are NOT
 /// computed here: they are applied per node by process_truenode_diff at its BFS
 /// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
@@ -408,14 +415,18 @@ fn content_goal_list (
     let (grandparent_pid, grandparent_source) : (ID, SourceName) =
       pid_and_source_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
+    let grandparent_nodecomplete : NodeComplete =
+      nodecomplete_rustFirst_by_pid_and_source (
+        config, &grandparent_pid, &grandparent_source ) ?;
     let worktree_hidden : Vec<ID> =
-      { let grandparent_nodecomplete : NodeComplete =
-          nodecomplete_rustFirst_by_pid_and_source (
-            config, &grandparent_pid, &grandparent_source ) ?;
-        grandparent_nodecomplete . hides_from_its_subscriptions
-          . or_default() . to_vec() };
+      grandparent_nodecomplete . hides_from_its_subscriptions
+      . or_default() . to_vec();
+    let subscriber_contains : &[ID] =
+      & grandparent_nodecomplete . contains;
     Ok ( setlike_vector_subtraction (
-           content_ids . to_vec(), &worktree_hidden ) )
+           setlike_vector_subtraction (
+             content_ids . to_vec(), &worktree_hidden ),
+           subscriber_contains ) )
   } }
 
 /// Reconcile the node's non-parentIgnored TrueNode children

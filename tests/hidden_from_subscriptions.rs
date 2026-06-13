@@ -527,6 +527,11 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
         "** (skg (node (id e1) (source foreign) indef" ),
       "Expected e1 to remain ordinary content of r:\n{}",
       rerendered );
+    // Regression (forks plan.org Prerequisite): e1, now contained by the
+    // subscriber r, must NOT also re-appear as unintegrated subscribee-as-such
+    // content. Before the contains-subtraction fix it showed twice -- once as
+    // r's integrated content (above) and once under the subscribee-as-such.
+    assert_e1_removed_from_visible_subscribee_branch (&rerendered);
     Ok (( )) }
 
 async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
