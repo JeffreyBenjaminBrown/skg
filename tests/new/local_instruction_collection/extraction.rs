@@ -897,18 +897,23 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
-      let errors : Vec<BufferValidationError> =
+      // Editing within a subscribee-as-such is not a foreign-contains
+      // edit of e: e is neither rejected as a ModifiedForeignNode, nor
+      // written, nor forked. (e2, the foreign content shown under it, may
+      // fork -- now resolving to the default owned source rather than
+      // erroring, which is why this no longer returns Err.)
+      let ( define_nodes, fork_specs ) =
         validate_and_filter_foreign_instructions (
           instructions, &[], &std::collections::HashMap::new(),
           &std::collections::HashMap::new(),
-          config, driver) . await . unwrap_err();
+          config, driver) . await
+        . expect ("the subscribee-as-such edit must not error");
       assert!(
-        ! errors . iter() . any (|error| matches!(
-          error,
-          BufferValidationError::ModifiedForeignNode (id, _)
-            if id == &ID::from ("e"))),
-        "subscribee-as-such should not be reported as a contains edit: {:?}",
-        errors);
+        ! save_ids (&define_nodes) . contains (&ID::from ("e")),
+        "e must not be written as a foreign node: {:?}", define_nodes);
+      assert!(
+        ! fork_specs . iter() . any (|spec| spec . original_id == ID::from ("e")),
+        "e must not be forked: {:?}", fork_specs);
       Ok (()) }
 
 async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
