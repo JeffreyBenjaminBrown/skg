@@ -404,6 +404,10 @@ different parents):
 - `overridesParent` — herald red "Op"; this node overrides the node
   of its visible org-parent. Like `containsParent`, necessarily a
   view stat, since the same node can sit under different parents.
+- `parentOverrides` — herald red "pO"; the inverse of `overridesParent`:
+  this node's visible org-parent overrides it. Computed only where
+  needed (the fork-confirmation buffer, where it marks the original
+  under its clone-to-be), not generally.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 
