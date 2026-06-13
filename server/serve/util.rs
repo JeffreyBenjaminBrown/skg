@@ -144,6 +144,27 @@ pub(crate) fn format_override_menu_response_sexp (
     format_string_list_sexp ("warnings", warnings) ] )
     . to_string () }
 
+/// Format the fork-confirmation response: a read-only buffer listing
+/// the foreign nodes about to be forked, plus the one-line minibuffer
+/// prompt. Like the override-menu response but with NO view-uri -- the
+/// client adopts the buffer under its own generated URI (the
+/// confirmation is transient, not a registered server view).
+/// Format: ((content "...") (to-minibuffer "...") (errors ()) (warnings ()))
+pub(crate) fn format_fork_confirmation_response_sexp (
+  buffer_content : &str,
+  to_minibuffer  : &str,
+) -> String {
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "content" . to_string () )),
+      Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "to-minibuffer" . to_string () )),
+      Sexp::Atom ( Atom::S ( to_minibuffer . to_string () )) ] ),
+    format_string_list_sexp ("errors", &[]),
+    format_string_list_sexp ("warnings", &[]) ] )
+    . to_string () }
+
 /// Format a single view update as an s-expression.
 /// Format: ((view-uri "URI") (content "CONTENT"))
 /// Used for any streamed per-view message (collateral-view,

@@ -523,6 +523,29 @@ pub async fn update_from_and_rerender_buffer_test (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  // Auto-approve forks: a test driving the save directly is exercising
+  // the COMMIT path. The fork-confirmation (commit-nothing) path has its
+  // own shim below.
+  update_from_and_rerender_buffer_with_fork_approval_test (
+    stream, org_buffer_text, driver, config, tantivy_index, graph,
+    diff_mode_enabled, viewuri_from_request_result, views_state,
+    /* fork_approved = */ true ) . await }
+
+/// As 'update_from_and_rerender_buffer_test', but lets the test choose
+/// whether forks are approved -- pass false to exercise the
+/// fork-confirmation (commit-nothing) path.
+pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
+  stream                      : &mut std::net::TcpStream,
+  org_buffer_text             : &str,
+  driver                      : &Arc<TypeDBDriver>,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                 : &mut ViewsState,
+  fork_approved               : bool,
+) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (
       config, Arc::clone (driver),
@@ -534,7 +557,8 @@ pub async fn update_from_and_rerender_buffer_test (
     diff_mode_enabled,
     viewuri_from_request_result,
     views_state,
-    None ) . await }
+    None,
+    fork_approved ) . await }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture

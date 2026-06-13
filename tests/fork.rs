@@ -24,6 +24,7 @@ use skg::serve::ViewsState;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -102,7 +103,51 @@ fn all_tests
       s . reset ("fork_source_inactive", fixtures) . await ?;
       fork_source_inactive (
         &s . config, &s . driver ) . await ?;
+      s . reset ("fork_confirmation_gates_commit", fixtures) . await ?;
+      fork_confirmation_gates_commit (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+/// The confirmation stage: a save that finds forks but is NOT approved
+/// returns a fork-confirmation buffer and commits NOTHING; re-issuing
+/// the save approved then commits.
+async fn fork_confirmation_gates_commit (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+
+  // Unapproved save -> fork-confirmation, nothing committed.
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let response = update_from_and_rerender_buffer_with_fork_approval_test (
+    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state,
+    /* fork_approved = */ false ) . await ?;
+  assert! ( response . fork_confirmation . is_some (),
+    "an unapproved save with forks must return a fork-confirmation" );
+  assert! ( response . saved_view . contains ("FORK CONFIRMATION")
+            && response . saved_view . contains ("(id N)"),
+    "the confirmation buffer must list N:\n{}", response . saved_view );
+  assert! ( clone_on_disk (config) . is_err (),
+    "no clone may be committed before approval" );
+  assert_eq! ( node_from_disk (config, "N") ? . title, "N-original",
+    "N must be untouched before approval" );
+
+  // Approved re-issue -> commits the clone.
+  let mut stream2 : std::net::TcpStream = mk_test_tcp_stream ();
+  let response2 = update_from_and_rerender_buffer_with_fork_approval_test (
+    &mut stream2, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state,
+    /* fork_approved = */ true ) . await ?;
+  assert! ( response2 . fork_confirmation . is_none (),
+    "an approved save commits and returns a normal save-result" );
+  assert! ( clone_on_disk (config) . is_ok (),
+    "the clone must be committed after approval" );
+  Ok (( )) }
 
 /// Monogamy: a node may have at most one user-owned overrider. Forking
 /// N once creates a clone; forking it again is rejected with

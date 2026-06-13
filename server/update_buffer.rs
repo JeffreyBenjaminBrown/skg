@@ -195,7 +195,8 @@ pub async fn update_views_after_save (
     saved_view          : saved_text,
     errors              : context . errors,
     warnings            : context . warnings,
-    save_point_position : None, } ) }
+    save_point_position : None,
+    fork_confirmation   : None, } ) }
 
 async fn rerender_collateral_view (
   uri         : ViewUri,

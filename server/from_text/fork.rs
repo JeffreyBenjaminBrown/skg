@@ -65,6 +65,35 @@ pub fn fork_spec_from_buffer_node (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (buffer_node, clone_source) ) }
 
+/// Build the read-only fork-confirmation buffer: a flat forest with one
+/// indefinitive headline per foreign node about to be forked, preceded
+/// by org-comment explanatory text. The client shows this and asks the
+/// user to approve (re-save) or decline (kill the buffer). The headlines
+/// carry real (skg ...) metadata so the buffer stays navigable -- the
+/// usual ID-stack-push / search commands work on it. Each line also
+/// names the owned source the clone will land in.
+pub fn build_fork_confirmation_buffer (
+  fork_specs : &[ForkSpec],
+) -> String {
+  let mut out : String = String::new ();
+  out . push_str (
+    "# FORK CONFIRMATION (read-only)\n\
+     # Saving edited foreign nodes forks them: each becomes an editable\n\
+     # clone in a source you own, which SUBSCRIBES TO and OVERRIDES the\n\
+     # original. The nodes below will be forked.\n\
+     # APPROVE: save this view's source buffer again (your client\n\
+     #   re-sends it as approved).\n\
+     # DECLINE: kill this buffer; nothing is written. It stays open so\n\
+     #   you can still search it for relevant IDs.\n\n" );
+  for spec in fork_specs {
+    out . push_str ( & format! (
+      "* (skg (node (id {}) (source {}) indef)) {}\n",
+      spec . original_id . 0, spec . original_source, spec . original_title ));
+    out . push_str ( & format! (
+      "# -> clone in your source '{}'\n",
+      spec . clone . 0 . source ) ); }
+  out }
+
 /// Reject any fork that monogamy or the source-set forbids. Run after
 /// the clones are built (their sources resolved) but before the save
 /// commits anything:

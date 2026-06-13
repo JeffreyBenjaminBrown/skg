@@ -9,11 +9,13 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp,
+  format_fork_confirmation_response_sexp,
   format_lock_views_sexp,
   read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp };
+use crate::from_text::fork::build_fork_confirmation_buffer;
 use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
@@ -41,6 +43,12 @@ pub struct SaveResponse {
   pub errors              : Vec<String>,
   pub warnings            : Vec<String>,
   pub save_point_position : Option<SavePointPosition>,
+  /// Some when this save found fork candidates and was NOT pre-approved:
+  /// nothing was committed, 'saved_view' instead holds the read-only
+  /// fork-confirmation buffer, and this holds the one-line minibuffer
+  /// prompt. The handler then sends a 'fork-confirmation' message rather
+  /// than 'save-result'. None for an ordinary save.
+  pub fork_confirmation   : Option<String>,
 }
 
 #[derive(Clone)]
@@ -85,6 +93,12 @@ pub fn handle_save_buffer_request (
     view_uri_from_request (request);
   let save_point_position : Option<SavePointPosition> =
     save_point_position_from_request (request);
+  let fork_approved : bool =
+    // Forking is gated on confirmation: the first save returns a
+    // fork-confirmation buffer, and the client re-issues the save with
+    // this field once the user approves (mirroring the override-menu's
+    // (override-choice . "bypass") field on a re-issued view request).
+    fork_approved_from_request (request);
   { // Send the early broad lock BEFORE reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -111,15 +125,28 @@ pub fn handle_save_buffer_request (
             views_state . diff_mode_enabled,
             &viewuri_from_request_result,
             views_state,
-            Some (active_source_set) ))
+            Some (active_source_set),
+            fork_approved ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
-            send_response_with_length_prefix (
-              stream,
-              & tag_sexp_response (
-                TcpToClient::SaveResult,
-                & save_response . to_sexp_string () )); }
+            match & save_response . fork_confirmation {
+              Some (to_minibuffer) =>
+                // A save that found forks and was not approved: nothing
+                // committed; send the confirmation buffer instead of a
+                // save-result.
+                send_response_with_length_prefix (
+                  stream,
+                  & tag_sexp_response (
+                    TcpToClient::ForkConfirmation,
+                    & format_fork_confirmation_response_sexp (
+                      & save_response . saved_view, to_minibuffer ))),
+              None =>
+                send_response_with_length_prefix (
+                  stream,
+                  & tag_sexp_response (
+                    TcpToClient::SaveResult,
+                    & save_response . to_sexp_string () )), }}
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
               // Warnings always accompany errors (decided 2026-06-12):
@@ -235,6 +262,16 @@ fn nat_from_request (
 ) -> Option<usize> {
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
+/// Whether this save request carries '(fork-approved . "true")', set by
+/// the client when the user approves a fork-confirmation. Absent or any
+/// other value means not approved.
+fn fork_approved_from_request (
+  request : &str,
+) -> bool {
+  value_from_request_sexp ("fork-approved", request)
+    . map ( |v| v == "true" )
+    . unwrap_or (false) }
+
 /// If 'err' is a buffer-validation SaveError that carries no warnings
 /// of its own, attach the save's parse-time warnings so a failed save
 /// still reports them. A no-op for other errors or when there are no
@@ -270,6 +307,7 @@ pub async fn update_from_and_rerender_buffer (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
   active_source_set            : Option<&ActiveSourceSet>,
+  fork_approved                : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
@@ -296,14 +334,26 @@ pub async fn update_from_and_rerender_buffer (
     source_moves,
     fork_specs }
     = save_plan;
-  // Forks detected this save: editing a foreign node N is a request to
-  // clone it. The clone C commits with the rest of the save -- its
-  // 'overrides_view_of = [N]' edge rides in the same DefineNodes, so the
-  // touched-override-invariant check (which reads the simulated post-save
-  // graph) sees C before validating.
-  // TODO (forks plan.org step 6): gate this on the user's confirmation
-  // (a 'fork-confirmation' buffer + a re-issued save carrying approval);
-  // for now an edited foreign node forks unconditionally.
+  if ! fork_specs . is_empty () && ! fork_approved {
+    // A save that found forks but was not pre-approved commits NOTHING.
+    // Return a read-only fork-confirmation buffer; the client shows it,
+    // and on approval re-issues the save with (fork-approved . "true").
+    // (Monogamy and source validation already ran in
+    // buffer_to_validated_saveplan, so every fork here is admissible.)
+    return Ok ( SaveResponse {
+      saved_view          : build_fork_confirmation_buffer (&fork_specs),
+      errors              : Vec::new (),
+      warnings            : parse_warnings,
+      save_point_position : None,
+      fork_confirmation   : Some (
+        format! ( "{} node(s) will be forked. Save again to approve, \
+                   or kill this buffer to decline.",
+                  fork_specs . len () )), } ); }
+  // Forks detected this save (approved, or none): editing a foreign node
+  // N is a request to clone it. The clone C commits with the rest of the
+  // save -- its 'overrides_view_of = [N]' edge rides in the same
+  // DefineNodes, so the touched-override-invariant check (which reads the
+  // simulated post-save graph) sees C before validating.
   let nonmerge_defineNodes : Vec<DefineNode> = {
     let mut nodes : Vec<DefineNode> = nonmerge_defineNodes;
     for spec in &fork_specs {
