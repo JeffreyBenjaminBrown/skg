@@ -230,7 +230,8 @@ fn reconcile_content_children (
   // regenerating contains-minus-hides is correct. The TODO/DONE/local-view-update/plan_v2.org §5.3 cascade draws
   // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
-    content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
+    content_goal_list( tree, node, &content_ids, is_sub, config,
+                       graph_snap ) ?;
   let apparent_content_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: rendering omits every
     // inactive member from the goal (the weave preserves them at save).
@@ -408,6 +409,7 @@ fn content_goal_list (
   content_ids   : &[ID],
   is_subscribee : bool,
   config        : &SkgConfig,
+  graph_snap    : &Arc<InRustGraph>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   if !is_subscribee {
     Ok ( content_ids . to_vec () )
@@ -418,15 +420,26 @@ fn content_goal_list (
     let grandparent_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         config, &grandparent_pid, &grandparent_source ) ?;
+    // Resolve the subtrahends through extra_id -> pid the same way
+    // 'content_ids' (the minuend) was resolved by the caller. Without
+    // this, a child the subscriber has integrated under a now-MERGED id
+    // (its contains holds the pre-merge acquiree alias, while the
+    // subscribee's contains holds the acquirer's primary) would not
+    // cancel, and would double-show as unintegrated subscribed content.
+    let resolve_pids = | ids : Vec<ID> | -> Vec<ID> {
+      ids . into_iter ()
+        . map ( |id| graph_snap . pid_of (&id) . unwrap_or (id) )
+        . collect () };
     let worktree_hidden : Vec<ID> =
-      grandparent_nodecomplete . hides_from_its_subscriptions
-      . or_default() . to_vec();
-    let subscriber_contains : &[ID] =
-      & grandparent_nodecomplete . contains;
+      resolve_pids (
+        grandparent_nodecomplete . hides_from_its_subscriptions
+        . or_default() . to_vec() );
+    let subscriber_contains : Vec<ID> =
+      resolve_pids ( grandparent_nodecomplete . contains . clone () );
     Ok ( setlike_vector_subtraction (
            setlike_vector_subtraction (
              content_ids . to_vec(), &worktree_hidden ),
-           subscriber_contains ) )
+           &subscriber_contains ) )
   } }
 
 /// Reconcile the node's non-parentIgnored TrueNode children
