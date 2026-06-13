@@ -137,14 +137,25 @@ from it to look up relevant IDs.
 - source := chosen as below.
 
 ** Source selection
-C must live in an owned source. Resolve it:
-- infer from N's nearest OWNED vognode ancestor in the view;
-- if there is none (the nearest ancestor is also foreign), the user sets
-  it in the confirmation buffer (the one writeable field);
-- if the resolved source is INACTIVE under the active source-set, FORBID
-  the fork with an explanatory error -- under a restricted set the user
-  is not meant to touch those sources, and an invisible clone is never
-  created silently.
+C must live in an owned source. The current rule (refined with Jeff; the
+mechanics are under "Writeable clone source" near the end of this file):
+- INFER from N's nearest VOGNODE ancestor's source IFF that ancestor is
+  owned -- do NOT walk past a foreign ancestor. (Corrected from the
+  earlier "nearest OWNED ancestor", which wrongly skipped foreign
+  ancestors; Jeff's "I found a problem" below.)
+- This inference runs at SAVE time, from the saved buffer's ancestry,
+  BEFORE the confirmation buffer is built.
+- In the confirmation buffer, each clone-to-be's source is the INFERRED
+  source if inference succeeded, else a DEFAULT of the user's first owned
+  source. Either way it is shown and editable (C-c s s). (This SUPERSEDES
+  the earlier "if there is none, the user sets it in the confirmation
+  buffer" -- a default is pre-filled, so an explicit pick is optional.)
+- Only if the user owns NO source at all does the fork hard-fail
+  (ForkSourceUnresolved -- nothing, inferred or default, can be filled).
+- If the chosen/inferred source is INACTIVE under the active source-set,
+  FORBID the fork with an explanatory error -- under a restricted set the
+  user is not meant to touch those sources, and an invisible clone is
+  never created silently.
 
 'add_missing_info' only inherits a source from a buffer parent
 ('buffer_to_viewnodes/add_missing_info.rs:102-121') and a sourceless node
@@ -158,6 +169,26 @@ if that ancestor is owned." If the nearest ancestor is foreign,
 don't read any further up the view-ancestry;
 instead, the user will have to provide a source
 at the confirmation buffer stage.
+**** ONGOING Claude : you're right -- this is a real bug in what shipped.
+'owned_ancestor_sources_for_foreign_vognodes' (server/from_text/fork.rs)
+walks rootward and keeps going PAST foreign vognode ancestors until it
+hits an owned one. Per your rule it must instead STOP at the nearest
+VOGNODE ancestor (skipping only scaffolds like cols) and use that
+ancestor's source ONLY if it is owned; if that nearest vognode ancestor
+is foreign, infer nothing and leave the source for the user to set.
+
+The shipped fork test did not catch it: there P directly contains N
+(nearest ancestor owned), so the two rules agree. The bug needs the
+shape owned-grandparent -> foreign-parent -> N, where the old code
+wrongly files the clone under the grandparent's source.
+
+Fix (one-line in the loop): at the first Active vognode ancestor, insert
+its source iff owned, then BREAK unconditionally -- never continue past
+it. I'll also add a regression with the owned->foreign->N shape (it must
+yield ForkSourceUnresolved, i.e. fall to the user-set path). Folding
+this into the writeable-source work below (it produces exactly the
+"nearest ancestor is foreign -> user provides the source" case that work
+must handle). Marking DONE once both land.
 
 ** Monogamy
 A node may have at most one user-owned overrider; there is no analogous
@@ -166,8 +197,11 @@ forked would violate monogamy
 ('override_invariants.rs:65-73,127-156'). The confirmation stage detects
 this with a new helper 'existing_user_owned_overrider_of(N)' (over the
 resolver's inverse lookup) and rejects that candidate with an
-explanatory error naming the existing clone; the client offers to open
-it. Never mint a second clone, never auto-delete the first.
+explanatory error naming the existing clone. (DECIDED, Jeff: the error
+message alone is enough -- the client does NOT auto-open or offer to open
+the existing clone, since visiting a view from an id is already easy. So
+no client-side jump is built; this is DONE as shipped.) Never mint a
+second clone, never auto-delete the first.
 
 ** Shallow copy and override resolution
 C stores N's child IDs raw. At render each child runs through
@@ -385,3 +419,169 @@ with an owned source and a 'user_owns_it=false' foreign source).
   overrides_view_of edges;
 - 'TODO/DONE/sharing/vision.org': mark "fork a foreign node by editing
   it" resolved.
+
+* Writeable clone source (build now -- Jeff: "let's do it now")
+The one functional gap. Bundles the source-inference fix above (stop at
+the nearest vognode ancestor; infer only if owned) with making the
+confirmation buffer's clone-source editable so a fork whose source could
+not be inferred can still be completed.
+
+** Source inference correction (do first; it produces the unresolved case)
+Change 'owned_ancestor_sources_for_foreign_vognodes': at the FIRST Active
+vognode ancestor, record its source iff owned, then break unconditionally
+(never walk past a foreign ancestor). Regression: owned -> foreign -> N
+must yield no inferred source (-> ForkSourceUnresolved without the
+user-set path; -> the user-set source with it).
+
+** Default the clone source, so the common case needs no action
+When building each ForkSpec, the clone source is, in priority order:
+  user-set (from the confirmation buffer)  -- highest priority
+  else inferred (the nearest vognode ancestor's source, iff that
+       ancestor is owned -- the corrected rule above)
+  else a DEFAULT: the user's first owned source in config.
+So "no owned ancestor" no longer hard-fails: it defaults to an owned
+source, which the user can rotate. For a user with exactly ONE owned
+source this is automatic (no choice to make). ForkSourceUnresolved then
+only fires if the user has NO owned source at all (cannot fork anywhere).
+*** DECIDED (Jeff: "agreed on both"): default-to-first-owned-source (NOT
+a '<choose>' placeholder). The confirmation buffer SHOWS each clone's
+source so it is visible and rotatable, mitigating the "silently filed in
+the wrong owned source" risk.
+
+** How the user sets it: editable confirmation buffer + C-c s s
+*** DECIDED (Jeff: "agreed on both"): the editable confirmation buffer
+(the plan's design), NOT the simpler minibuffer-prompt alternative.
+The confirmation buffer stops being fully read-only: each fork headline
+carries the clone's proposed source as its '(source ...)' field (the
+default above), and 'skg-set-source' (C-c s s) rotates it among owned
+sources. Every OTHER edit is ignored. On approve, the client walks the
+buffer's headlines, reads each (id . source), and sends them as a new
+'(fork-sources ((N . src) ...))' field on the fork-approved re-save. The
+server reads that map and feeds it as the highest-priority clone-source
+for each N (validated owned + active, reusing validate_fork_specs).
+
+*** NEW QUESTION: the source field on each confirmation headline names
+the CLONE's target, not the original's real source. The buffer is a flat
+list with ONE headline per foreign node to be forked; each such headline
+reads '(skg (node (id N) (source OWNED-TARGET) indef)) <title>' -- i.e.
+it shows the original's id but with the OWNED source the clone will land
+in (the original's real source is foreign). This is deliberate: it lets C-c s s (which rotates
+the '(source ...)' field among owned sources) set the clone target with
+no new command, and the buffer's preamble explains "this source is where
+the clone goes". The only oddity is cosmetic (N drawn with an owned
+source it does not actually live in; the buffer is never saved as N, so
+nothing validates it). Acceptable? Or would you rather keep N's real
+(foreign) source and add a separate clone-target indicator + a dedicated
+rotate command? I recommend the former (reuse '(source ...)' + C-c s s).
+
+**** TODO
+You made me realize it's more complicated.
+The user may have edited the title.
+It will be confusing to see only one headline standing in for both nodes.
+Instead the confirmation buffer should be two levels deep.
+The first layer is each fork-to-be,
+each of which has children equal to everything it would override
+(with appropriate heralds -- the child is independent,
+and the child is marked 'pO' IIRCS ("parent overrides)).
+That way both can display their proper titles and sources,
+and the user can easily see which sources' nodes they are forking.
+***** ONGOING Claude : agreed, the two-level buffer is right. Reiterating
+so we're aligned, then one sub-question (the herald).
+
+SHAPE -- per fork, two levels:
+  * <edited title>   (the FORK-TO-BE = clone C: an OWNED source [editable
+                      via C-c s s], the user's EDITED title, and NO id --
+                      C does not exist yet)
+  ** <original title> (the node C would OVERRIDE = the original N: its
+                       REAL id, its REAL (foreign) source, indefinitive,
+                       parentIs=independent, + a herald for the override)
+The clone-to-be parent carries the one editable thing (its source). The
+child shows the original with its true title + source, so you see exactly
+which source's node you're forking and what the clone will become. A
+clone that overrides several nodes lists several children.
+
+WHY this also fixes the title problem: the edited title lives on the
+parent (the clone), the original title on the child (the original) --
+two headlines, each honest about the node it is.
+
+ON APPROVE: the client pairs, per fork-to-be, the PARENT's (source) with
+the CHILD's (id N) -> '(fork-sources ((N . owned-src) ...))'. The parent
+needs no id; the fork is keyed by the child's id.
+
+SUB-QUESTION (the herald): there is no 'pO'/"parent overrides" herald
+today. The override heralds are 'overriding' (O), 'overridesParent' (Op,
+the INVERSE -- the node overrides its parent), 'grandparentOverrides'
+(gO), 'grandparentSubscribes' (gS), and 'overridesHere' (Oh). So to mark
+the child "your parent overrides you" I see three options:
+  (a) ADD a new herald 'parentOverrides' ("pO") -- matches your two-level
+      intent exactly; cost is a viewStats field + a heralds.rs leaf + the
+      conformance test + emitting it on the child. Small but real.
+  (b) Reuse the existing OVERRIDDEN-AS-SUCH idiom: put the child under an
+      'overriddenCol' of the clone-to-be (C -> overriddenCol -> N). N is
+      then a normal overridden-as-such and AUTO-gets the 'gS' herald
+      (since C also subscribes to N). No new herald, but THREE levels
+      (a col scaffold between), not the two you asked for.
+  (c) No herald: rely on the two-level shape + the buffer's preamble
+      ("each top entry is a clone you'll create; its child is the
+      original it forks"). Simplest; least explicit.
+I lean (a) -- it is what you described and reads cleanest. Which do you
+want? (Then I build: source-inference fix first, then this.)
+****** DONE Jeff : (a)
+Plus: by the time the confirmation buffer is shown, ancestry inference
+has ALREADY run; the default source is only supplied in the buffer when
+inference failed. (Supersedes the earlier "Source selection" wording.)
+******* Claude : decided -- herald (a), and the inference/default
+ordering folded in. Two changes recorded:
+- *Herald*: ADD a 'parentOverrides' ("pO", red) viewStats herald, emitted
+  on each overridden child in the confirmation buffer; plus its
+  heralds.rs leaf and the conformance-test atom. (New build step.)
+- *Source ordering* (your clarification -- it BEATS the older "Source
+  selection" bullet, which I rewrote to match): inference from the saved
+  buffer's ancestry runs FIRST, at save time, before the confirmation
+  buffer exists. Each clone-to-be's source shown in the buffer is the
+  INFERRED source when inference succeeded, and only FALLS BACK to the
+  default (first owned source) when it could not be inferred. So the
+  default is a confirmation-buffer-time fill for the un-inferred case,
+  never a substitute for a successful inference. The user can still
+  rotate either. (Hard-fail ForkSourceUnresolved only if the user owns
+  NO source at all, so nothing -- inferred or default -- can be filled.)
+
+** Build steps
+1. Source-inference correction + its regression (server only; a clean
+   bugfix, safe to land first on its own -- Jeff OK'd this). Stop at the
+   nearest vognode ancestor; infer iff owned.
+2. Server: clone-source resolution = INFERRED (step 1) else DEFAULT (the
+   user's first owned source), applied when the ForkSpec is built so the
+   confirmation buffer always carries a concrete owned source; the
+   user-set source from the re-issued save then overrides it.
+   'fork_sources_from_request' parsing; thread the user-set map through
+   buffer_to_validated_saveplan -> validate_and_filter_foreign_instructions
+   -> fork_spec_from_buffer_node; validate the final source owned+active.
+   ForkSourceUnresolved now only when the user owns no source at all.
+3. The 'parentOverrides' ("pO", red) herald (decided (a)): a new
+   ViewNodeStats field, its leaf in heralds.rs, the
+   herald_rules_cover_the_emittable_vocabulary atom, and emit it on the
+   overridden child.
+4. build_fork_confirmation_buffer: emit the TWO-LEVEL shape (see the
+   reiteration above) -- per fork, a clone-to-be parent (editable owned
+   source via C-c s s, edited title, no id) over its overridden
+   original(s) (real id/title/source, independent, marked "pO"). Update
+   the explanatory text accordingly.
+5. Client: make the confirmation buffer editable (not read-only);
+   skg-approve-fork pairs, per fork-to-be, the PARENT's source with the
+   CHILD's id, and adds the '(fork-sources ((N . src) ...))' field to the
+   re-issued save.
+   PITFALL to guard: the editable confirmation buffer must NOT be a normal
+   save target. Its clone-to-be parents are new (id-less, owned-source)
+   nodes; a stray ordinary save of this buffer would CREATE them as bare
+   nodes (no subscribe/override edges, no confirmation). So the buffer's
+   normal-save path must be refused or redirected to approve (e.g. leave
+   skg-view-uri nil so the existing nil-view-uri save guard rejects it,
+   or rebind the save key to skg-approve-fork). Approve/decline are the
+   only actions on it.
+6. Tests: source-inference regression (owned -> foreign -> N); a fork
+   with no owned ancestor completes via the default (and via a user-set
+   override) source (Rust, driving fork-sources directly); the "pO"
+   herald renders on the child; extend the integration test to rotate a
+   source in the confirmation buffer before approving (needs a fixture
+   with TWO owned sources -- the current one has only one).

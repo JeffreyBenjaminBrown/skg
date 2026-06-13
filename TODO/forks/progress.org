@@ -77,6 +77,19 @@ post-graph-update, so the graph already holds the user's edit).
 
 * Changes to the plan's envisioned order
 (For my own benefit.)
+- Steps 1 and 2 (the two independent prerequisites) landed first, as the
+  plan ordered. Step 2 was then SIMPLIFIED mid-stream (gate removal, not
+  the threaded "collateral rerender" bool the plan described) after Jeff's
+  pushback; the threaded-bool version was written, then reverted.
+- Steps 3-4 (detect + extract) landed together and were COMMITTED WITH
+  AN AUTO-APPROVE stub (forks committed unconditionally) so the core
+  mechanics + round-trip could be proven in isolation. Step 6a then
+  layered the confirmation gating on top (replacing the stub). So the
+  commit order is detect/extract/commit -> monogamy/source -> confirm,
+  not a single fork commit.
+- Step 6 split into 6a (server gating, Rust-tested), 6b (elisp client),
+  6c (integration test) -- the plan treated it as one step.
+- Docs and the adversarial-review fix came after the feature was green.
 
 * What's done and went well
 - *Step 1* (prereq display): content_goal_list subtracts the subscriber's
@@ -141,6 +154,147 @@ own (so an owned ancestor exists) before editing it. The
 read-only-but-source-writeable buffer + the per-node source transport on
 approve is the follow-up to lift this.
 
+- *Step 6c* (integration): tests/integration/fork drives server + Emacs
+  through gesture -> confirm -> approve -> substitution; passes.
+- *Step 7* (one-save ordering + round-trip): covered. The clone's
+  override edge rides the same DefineNodes, so the touched-invariant
+  simulated graph sees it (fork_fixture_files commits cleanly past that
+  check). Round-trip pinned by fork_round_trip + the integration test.
+- *Docs*: forks.md rewritten; sharing-model, glossary, schema, vision
+  updated.
+
+** Source-set "inactive clone does not substitute" -- covered transitively
+The plan listed a test that an inactive clone degrades to drawing the
+original. A fork's override edge is identical to a manual one at the
+resolver, and override_substitution::ownership_and_visibility_gate_substitution
+already pins exactly "an inactive owned overrider does not substitute ->
+original drawn raw". So I did not add a redundant fork-specific render
+test (the discussion itself said this fallback is "already coded; needs
+a test, not new logic" -- that test exists). fork_source_inactive covers
+the other half (you cannot CREATE an inactive clone).
+
+* Adversarial review (multi-agent) and its one confirmed fix
+Ran a 4-dimension adversarial review over the whole fork diff (13
+agents). 9 findings; 8 dismissed on independent verification; ONE
+confirmed and fixed:
+
+** content_goal_list subtracted the subtrahends RAW while the minuend was pid_of-resolved
+The Step-1 fix subtracted subscriber.contains (and the pre-existing
+worktree_hidden) raw, but content_ids (the minuend) is pid_of-resolved
+by the caller (content.rs:221-225, to redirect a now-merged acquiree id
+to its acquirer primary). So a child the subscriber integrated under a
+MERGED id -- its contains holds the pre-merge acquiree alias M while the
+subscribee's contains holds the acquirer primary M' -- would not cancel
+(setlike subtraction is exact-id), and M' would double-show as
+unintegrated. Fix: resolve both subtrahends through graph.pid_of,
+mirroring the minuend. Narrow trigger (needs a merge + subscription).
+A dedicated regression test was DEFERRED as disproportionate: it would
+need a multi-id (post-merge) fixture plus the subscribee-expansion dance;
+the fix is a minimal mirror of the proven content_ids resolution and the
+full subscribee/merge suites confirm no regression.
+
+* Final test status
+- Rust: 455/455 pass (cargo nextest run).
+- Emacs: 234/234 pass (bash/emacs-tests.sh), incl. 4 new fork tests.
+- Integration: tests/integration/fork passes end to end.
+
 * Unanticipated future costs/benefits
+- BENEFIT: the fork reuses the entire sharing substrate; the net new
+  server code is small (from_text/fork.rs + the detection seam + the
+  confirmation gating). No new graph relations, no schema change.
+- COST (minor): editing ANY foreign node now triggers the confirmation
+  stage. A user who makes a foreign node definitive and tweaks it -- even
+  by accident -- gets a confirmation buffer rather than a silent reject.
+  That is the intended gesture, but it is a behavior change for anyone
+  used to foreign edits being rejected outright.
 
 * Open questions
+** ONGOING Writeable-source confirmation buffer -- build it? (the one real gap)
+The only functional shortfall vs the plan. Forking a foreign node with
+no owned ancestor cannot be completed yet (details under "Writeable-
+source path NOT built"). Lifting it needs: (a) the confirmation buffer
+editable for each clone's source via C-c s s; (b) the chosen sources
+riding back on the approve re-save (a new request field or per-node
+metadata the server reads). Do you want this now, or is the
+"put it under a node you own first" workaround acceptable for v1?
+*** ONGOING let's do it now
+**** ONGOING Claude : planned it -- see plan.org "Writeable clone source (build now)".
+
+Good timing: it FOLDS IN the source-inference bug you found in plan.org
+("I found a problem") -- the nearest-ancestor-foreign case is exactly
+what this work must handle, so I corrected the inference rule as step 1
+of it.
+
+Net behavior after this lands: a fork's clone source is user-set (from
+the confirmation buffer) > inferred (nearest ancestor, iff owned) > a
+default of your first owned source. So "no owned ancestor" stops being a
+hard failure -- it defaults to an owned source you can rotate (and for a
+single-owned-source user it is automatic). It only hard-fails if you own
+no source at all.
+
+Two decisions I'd like settled before I build (both in plan.org, both
+reversible -- I recommend the first option of each):
+1. Default the clone source to your FIRST owned source (visible +
+   rotatable in the buffer), vs a '<choose>' placeholder that forces an
+   explicit pick. I lean default-to-first.
+2. The editable confirmation buffer (the plan's design), vs a simpler
+   minibuffer prompt for only the unresolvable forks. I lean to the
+   plan's editable buffer, but flag the smaller option per "push back
+   against complexity".
+
+Say "go" (with any choices) and I'll execute it -- the source-inference
+correction can even land first on its own, since it is a clean bugfix.
+***** DONE Jeff: agreed on both
+****** ONGOING Claude : plan revised; both decisions folded in. Then you
+spotted that one headline can't honestly stand for both the original and
+the (re-titled) clone, and proposed a TWO-LEVEL confirmation buffer
+(clone-to-be parent over the original(s) it overrides). Agreed -- I
+reiterated it in plan.org under your TODO and updated the build steps.
+ONE sub-question remains there (the override herald on the child): no
+'pO'/"parent overrides" herald exists today, so (a) add it, (b) reuse the
+overriddenCol idiom (3 levels, auto 'gS', no new herald), or (c) no
+herald (rely on shape + preamble). I lean (a). Answer that and I build:
+source-inference bugfix first, then the two-level writeable-source.
+** DONE Monogamy reject: error message alone (no client auto-open)
+The plan said the client "offers to open" the existing clone when a
+re-fork is blocked. I implemented the server side (ForkAlreadyExists
+names the existing clone's id in the error), but the Emacs client just
+shows the error text; it does not parse out the id and offer to visit
+it. Minor UX follow-up.
+*** TODO please explain in simpler english with a glossary
+**** Claude : glossary, then plain English
+***** Glossary
+- *fork / clone* :: editing a foreign node N (one you do not own) makes
+  an editable copy of it in your own data. That copy is the *clone*; the
+  act is *forking*.
+- *monogamy* :: you may keep at most ONE clone of any given foreign node.
+  (The shared data can be cloned by many people; but YOU get one clone
+  of any particular node.)
+- *re-fork* :: trying to fork a node you have ALREADY forked.
+***** Plain English
+When you try to RE-fork (fork something you already forked), skg refuses
+-- monogamy says one clone each. The refusal message already names the
+clone you made earlier (it prints that clone's id).
+
+The open question is only about CONVENIENCE on that refusal. Right now
+the Emacs client just shows you the error text (which contains the id).
+It does NOT automatically jump you to that existing clone. So to go edit
+the clone you already have, you'd copy/visit its id by hand.
+
+The plan said the client should "offer to open" that existing clone --
+i.e. on the refusal, either jump straight to it, or ask "open your
+existing clone? (y/n)". I built the server half (it tells you the id);
+I did not build the client half (the jump/offer).
+
+So the question is just: when a re-fork is refused, do you want Emacs to
+auto-open (or offer to open) the clone you already made? It is a small
+elisp addition either way.
+****** DONE Jeff: the error message alone is fine
+Visiting a view from an ID is already easy.
+******* Claude : settled -- no client jump built; plan.org Monogamy
+section marked DONE-as-shipped. Nothing more to do here.
+** Confirmation UX: keys and text
+The confirmation buffer approves on C-c C-c, declines on C-c C-k (and
+interactively prompts y/n). The server-built buffer text names those
+keys. If you want different keys or wording, it is a small change
+(elisp/skg-request-save.el + build_fork_confirmation_buffer).

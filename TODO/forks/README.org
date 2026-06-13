@@ -1,0 +1,4 @@
+These were written in numerical order --
+first a discusion 1_discussion.org
+then a plan 2_plan.org which is mostly executed but thereafter became its own discussion,
+etc.
