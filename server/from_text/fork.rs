@@ -65,16 +65,27 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
           { current = parent; }} }}
   map }
 
-/// Build the ForkSpec for a fork of the foreign buffer node N: resolve
-/// the clone's owned source from the nearest-owned-ancestor map, then
-/// construct C. Errors with 'ForkSourceUnresolved' if N has no owned
-/// ancestor (the confirmation buffer is where the user then sets one).
+/// Build the ForkSpec for a fork of the foreign buffer node N. C's owned
+/// source is resolved in priority order:
+///   1. user-set (the source the user carried back from the
+///      confirmation buffer, keyed by N's pid),
+///   2. inferred (N's nearest owned ancestor in the view),
+///   3. default (the user's first owned source in config).
+/// So every fork carries a concrete owned source unless the user owns NO
+/// source at all -- only then does 'ForkSourceUnresolved' fire. (The
+/// chosen source is validated owned + active later, in
+/// 'validate_fork_specs'; resolution here only fills it.)
 pub fn fork_spec_from_buffer_node (
   buffer_node           : &NodeComplete,
   owned_ancestor_source : &HashMap<ID, SourceName>,
+  user_set_source       : &HashMap<ID, SourceName>,
+  config                : &SkgConfig,
 ) -> Result<ForkSpec, BufferValidationError> {
   let clone_source : SourceName =
-    owned_ancestor_source . get (& buffer_node . pid) . cloned ()
+    user_set_source . get (& buffer_node . pid) . cloned ()
+    . or_else ( || owned_ancestor_source . get (& buffer_node . pid)
+                   . cloned () )
+    . or_else ( || config . first_owned_source () )
     . ok_or_else ( || BufferValidationError::ForkSourceUnresolved (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (buffer_node, clone_source) ) }
@@ -117,6 +128,10 @@ pub fn build_fork_confirmation_buffer (
 ///   'ForkAlreadyExists' (naming it) rather than letting the raw
 ///   MultipleUserOwnedOverriders fire at commit. A monogamy-blocked fork
 ///   is not also reported for its source.
+/// - *owned*: the clone's resolved source must be one the user owns.
+///   Inference and the default only ever yield owned sources, but a
+///   user-set source (typed, or hand-edited) might not be -- reject with
+///   'ForkSourceNotOwned'.
 /// - *source-set*: the clone's owned source must be ACTIVE under the
 ///   active source-set. Under a restricted set the user is not meant to
 ///   touch inactive sources, and an invisible clone is never created
@@ -142,6 +157,12 @@ pub fn validate_fork_specs (
             spec . original_id . clone (), existing ));
         continue; }}
     let clone_source : &SourceName = & spec . clone . 0 . source;
+    if ! config . user_owns_source (clone_source) {
+      errors . push (
+        BufferValidationError::ForkSourceNotOwned (
+          spec . original_id . clone (),
+          clone_source . clone () ));
+      continue; }
     let active : bool =
       restricted_source_set
       . map_or ( true, |a| a . contains_source (clone_source) );

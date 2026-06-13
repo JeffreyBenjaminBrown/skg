@@ -403,6 +403,20 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
+  /// The default owned source for a fork's clone when its source could
+  /// not be inferred from an owned ancestor: the alphabetically-first
+  /// owned source name. (Sources are stored in a HashMap, so the TOML's
+  /// order is not preserved; alphabetical is a deterministic stand-in
+  /// for "the user's first owned source".) None only when the user owns
+  /// no source at all -- the one case 'ForkSourceUnresolved' still fires.
+  pub fn first_owned_source (
+    &self,
+  ) -> Option<SourceName> {
+    self . sources . values ()
+      . filter ( |s| s . user_owns_it )
+      . map ( |s| s . name . clone () )
+      . min () }
+
   pub fn default_source_set_name (
     &self,
   ) -> &SourceSetName {

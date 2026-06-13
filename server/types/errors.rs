@@ -46,6 +46,8 @@ pub enum BufferValidationError {
                                   ID),  // the existing user-owned clone that already overrides N (monogamy: a node may have at most one user-owned overrider)
   ForkSourceInactive             (ID,           // N's pid
                                   SourceName),  // C's resolved owned source, which is INACTIVE under the active source-set
+  ForkSourceNotOwned             (ID,           // N's pid
+                                  SourceName),  // C's chosen source, which the user does NOT own (a typed or hand-edited source the rotation would never offer)
   OverrideInvariantViolation     (String),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (parentIs=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
@@ -117,6 +119,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one user-owned override).", original, existing),
       BufferValidationError::ForkSourceInactive(id, source) =>
         write!(f, "Cannot fork node {:?}: the clone's source '{}' is inactive under the current source-set. Activate it first; an invisible clone is never created silently.", id, source),
+      BufferValidationError::ForkSourceNotOwned(id, source) =>
+        write!(f, "Cannot fork node {:?}: the clone's source '{}' is not one you own. Choose an owned source for the clone (C-c s s in the confirmation buffer).", id, source),
       BufferValidationError::OverrideInvariantViolation(msg) =>
         write!(f, "{}", msg),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) =>

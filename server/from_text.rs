@@ -55,6 +55,24 @@ pub async fn buffer_to_validated_saveplan (
   driver      : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  // No user-set clone sources: every fork's source resolves by
+  // inference-else-default. The fork-confirmation re-save uses the
+  // _with_fork_sources entry below.
+  buffer_to_validated_saveplan_with_fork_sources (
+    buffer_text, config, driver, active_source_set, &HashMap::new () )
+    . await }
+
+/// As 'buffer_to_validated_saveplan', but with the per-fork clone
+/// sources the user chose in the confirmation buffer ('fork_sources',
+/// keyed by each forked node N's pid). These take priority over the
+/// inferred/default source when each clone's source is resolved.
+pub async fn buffer_to_validated_saveplan_with_fork_sources (
+  buffer_text : &str,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
+  fork_sources : &HashMap<ID, SourceName>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let restricted_source_set : Option<&ActiveSourceSet> =
     // The set 'all' restricts nothing; downstream stages treat None
     // as "no restriction", so normalize here, once.
@@ -120,6 +138,7 @@ pub async fn buffer_to_validated_saveplan (
         nonmerge_plan . define_nodes,
         &nodeMerge_instructions,
         &owned_ancestor_source,
+        fork_sources,
         config,
         driver )
       . await } . map_err ( |errors| SaveError::BufferValidationErrors {

@@ -206,6 +206,9 @@ fn format_buffer_validation_error (
     BufferValidationError::ForkSourceInactive(id, source) => {
       format!("Cannot fork into an inactive source:\n- Foreign node: {}\n- Clone's resolved source: {}\n- That source is not in the active source-set. Activate it first; an invisible clone is never created silently.\n",
               id . 0, source) },
+    BufferValidationError::ForkSourceNotOwned(id, source) => {
+      format!("Cannot fork into a source you do not own:\n- Foreign node: {}\n- Clone's chosen source: {}\n- Pick an owned source for the clone (C-c s s in the confirmation buffer).\n",
+              id . 0, source) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
     BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) => {

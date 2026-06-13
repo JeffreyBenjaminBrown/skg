@@ -900,6 +900,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       let errors : Vec<BufferValidationError> =
         validate_and_filter_foreign_instructions (
           instructions, &[], &std::collections::HashMap::new(),
+          &std::collections::HashMap::new(),
           config, driver) . await . unwrap_err();
       assert!(
         ! errors . iter() . any (|error| matches!(

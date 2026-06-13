@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
-use crate::from_text::buffer_to_validated_saveplan;
+use crate::from_text::buffer_to_validated_saveplan_with_fork_sources;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_nodeMerges;
@@ -99,6 +99,10 @@ pub fn handle_save_buffer_request (
     // this field once the user approves (mirroring the override-menu's
     // (override-choice . "bypass") field on a re-issued view request).
     fork_approved_from_request (request);
+  let fork_sources : HashMap<ID, SourceName> =
+    // The per-fork clone sources the user chose in the confirmation
+    // buffer, riding back on the approve re-save. Empty otherwise.
+    fork_sources_from_request (request);
   { // Send the early broad lock BEFORE reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -126,7 +130,8 @@ pub fn handle_save_buffer_request (
             &viewuri_from_request_result,
             views_state,
             Some (active_source_set),
-            fork_approved ))
+            fork_approved,
+            &fork_sources ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
@@ -272,6 +277,38 @@ fn fork_approved_from_request (
     . map ( |v| v == "true" )
     . unwrap_or (false) }
 
+/// Parse the optional '(fork-sources ((N . SOURCE) ...))' field of a
+/// save request into a map from each forked node's id N to the OWNED
+/// source the user chose for its clone (rotated, or left at the default,
+/// in the fork-confirmation buffer). Absent on an ordinary save and on
+/// the first (unapproved) save -- then every clone source resolves by
+/// inference-else-default. The chosen source is validated owned + active
+/// downstream in 'validate_fork_specs'.
+fn fork_sources_from_request (
+  request : &str,
+) -> HashMap<ID, SourceName> {
+  let mut map : HashMap<ID, SourceName> = HashMap::new ();
+  let Ok (sexp) = sexp::parse (request) else { return map; };
+  let Sexp::List (items) = sexp else { return map; };
+  for item in & items {
+    let Sexp::List (pair) = item else { continue; };
+    let Some ( Sexp::Atom ( Atom::S (k) )) = pair . first ()
+      else { continue; };
+    if k != "fork-sources" { continue; }
+    let Some ( Sexp::List (entries) ) = pair . get (1)
+      else { continue; };
+    for entry in entries {
+      // Each entry is a dotted pair (N . SOURCE), which the sexp crate
+      // parses as the 3-element list [N, ".", SOURCE].
+      if let Sexp::List (kv) = entry {
+        if let [ Sexp::Atom ( Atom::S (id) ),
+                 Sexp::Atom ( Atom::S (dot) ),
+                 Sexp::Atom ( Atom::S (source) ) ] = & kv [..]
+        { if dot == "." {
+            map . insert ( ID ( id . clone () ),
+                           SourceName::from ( source . as_str () )); }} }} }
+  map }
+
 /// If 'err' is a buffer-validation SaveError that carries no warnings
 /// of its own, attach the save's parse-time warnings so a failed save
 /// still reports them. A no-op for other errors or when there are no
@@ -308,6 +345,7 @@ pub async fn update_from_and_rerender_buffer (
   views_state                  : &mut ViewsState,
   active_source_set            : Option<&ActiveSourceSet>,
   fork_approved                : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
+  fork_sources                 : &HashMap<ID, SourceName>, // per-fork clone sources the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
@@ -320,9 +358,9 @@ pub async fn update_from_and_rerender_buffer (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
-        buffer_to_validated_saveplan (
+        buffer_to_validated_saveplan_with_fork_sources (
           org_buffer_text, &env . config, &env . driver,
-          active_source_set ) . await
+          active_source_set, fork_sources ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()

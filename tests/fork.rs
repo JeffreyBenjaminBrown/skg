@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use indoc::indoc;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::in_rust_graph::{
@@ -25,6 +25,7 @@ use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
+use skg::test_utils::update_from_and_rerender_buffer_with_fork_sources_test;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -42,6 +43,15 @@ const FORK_BUFFER : &str = indoc! {"
   ** (skg (node (id N) (source foreign))) N-edited
   *** (skg (node (id N1) (source foreign) indef)) N1
   *** (skg (node (id N2) (source foreign) indef)) N2
+  "};
+
+/// A foreign node N opened as a bare ROOT -- no owned ancestor to infer
+/// a clone source from. Editing its title forks it; the clone's source
+/// must then default to the user's first owned source.
+const FORK_ROOT_BUFFER : &str = indoc! {"
+  * (skg (node (id N) (source foreign))) N-edited
+  ** (skg (node (id N1) (source foreign) indef)) N1
+  ** (skg (node (id N2) (source foreign) indef)) N2
   "};
 
 fn mk_test_tcp_stream () -> std::net::TcpStream {
@@ -106,7 +116,66 @@ fn all_tests
       s . reset ("fork_confirmation_gates_commit", fixtures) . await ?;
       fork_confirmation_gates_commit (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      let two_owned : &str = "tests/fork/fixtures-two-owned";
+      s . reset ("fork_no_owned_ancestor_defaults", two_owned) . await ?;
+      fork_no_owned_ancestor_defaults (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("fork_user_set_source_overrides", two_owned) . await ?;
+      fork_user_set_source_overrides (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+/// A foreign node with NO owned ancestor still forks: with no user-set
+/// source and nothing to infer, the clone's source defaults to the
+/// user's first owned source (alphabetically "owned", here). No more
+/// 'ForkSourceUnresolved' hard-fail.
+async fn fork_no_owned_ancestor_defaults (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream, FORK_ROOT_BUFFER, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "a fork with no owned ancestor must complete: {:?}", response . errors );
+  let c : NodeComplete = clone_on_disk (config) ?;
+  assert_eq! ( c . source, SourceName::from ("owned"),
+    "with no owned ancestor and no user-set source, the clone defaults to \
+     the first owned source (alphabetically 'owned'); got {:?}", c . source );
+  Ok (( )) }
+
+/// The user-set clone source (the 'fork-sources' transport) overrides
+/// the inferred one. FORK_BUFFER infers "owned" from the owned ancestor
+/// P; passing N -> "owned2" lands the clone in "owned2" instead.
+async fn fork_user_set_source_overrides (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+  let fork_sources : HashMap<ID, SourceName> =
+    HashMap::from ([ ( ID::from ("N"), SourceName::from ("owned2") ) ]);
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let response = update_from_and_rerender_buffer_with_fork_sources_test (
+    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state,
+    /* fork_approved = */ true, &fork_sources ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "the user-set fork must commit: {:?}", response . errors );
+  let c : NodeComplete = clone_on_disk (config) ?;
+  assert_eq! ( c . source, SourceName::from ("owned2"),
+    "the user-set source 'owned2' must override the inferred 'owned'; \
+     got {:?}", c . source );
+  Ok (( )) }
 
 /// The confirmation stage: a save that finds forks but is NOT approved
 /// returns a fork-confirmation buffer and commits NOTHING; re-issuing

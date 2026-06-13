@@ -546,6 +546,30 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   views_state                 : &mut ViewsState,
   fork_approved               : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  // No user-set clone sources: every fork's source resolves by
+  // inference-else-default.
+  update_from_and_rerender_buffer_with_fork_sources_test (
+    stream, org_buffer_text, driver, config, tantivy_index, graph,
+    diff_mode_enabled, viewuri_from_request_result, views_state,
+    fork_approved, &HashMap::new () ) . await }
+
+/// As 'update_from_and_rerender_buffer_with_fork_approval_test', but also
+/// lets the test supply the per-fork clone sources (keyed by N's pid)
+/// the user would have chosen in the confirmation buffer -- exercising
+/// the 'fork-sources' transport without an Emacs client.
+pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
+  stream                      : &mut std::net::TcpStream,
+  org_buffer_text             : &str,
+  driver                      : &Arc<TypeDBDriver>,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                 : &mut ViewsState,
+  fork_approved               : bool,
+  fork_sources                : &HashMap<ID, SourceName>,
+) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (
       config, Arc::clone (driver),
@@ -558,7 +582,8 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
     viewuri_from_request_result,
     views_state,
     None,
-    fork_approved ) . await }
+    fork_approved,
+    fork_sources ) . await }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture

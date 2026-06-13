@@ -34,6 +34,7 @@ pub async fn validate_and_filter_foreign_instructions(
   instructions       : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
   owned_ancestor_source : &HashMap<ID, SourceName>,
+  user_set_fork_source : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
@@ -67,8 +68,9 @@ pub async fn validate_and_filter_foreign_instructions(
   let mut fork_errors : Vec<BufferValidationError> = Vec::new ();
   for outcome in &outcomes {
     if let ForeignPolicyOutcome::ForkCandidate (buffer_node) = outcome {
-      match fork_spec_from_buffer_node (buffer_node, owned_ancestor_source) {
-        Ok (spec)  => fork_specs . push (spec),
+      match fork_spec_from_buffer_node (
+        buffer_node, owned_ancestor_source, user_set_fork_source, config )
+      { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }
   Ok (( filter_unchanged_foreign_saves ( instructions, &outcomes ),
