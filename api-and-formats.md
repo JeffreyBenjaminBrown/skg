@@ -159,12 +159,14 @@ So far there are these endpoints:
 
 ## Export to org
   - Request: ((request . "export to org") (source-set . "NAME") (output-dir . "PATH"))
-    - `output-dir` is optional; defaults to "org-exports" when absent
-      or blank. It is resolved against the server's working directory
-      (its project root): a relative PATH lands under it, an absolute
-      PATH is used as-is. The client does not tab-complete it, since
-      the server may run in a container whose filesystem differs from
-      the client's.
+    - Both fields are required; a missing or blank `output-dir` is an
+      error (the server applies no default -- the client supplies the
+      user a default but always sends a value). `output-dir` is
+      resolved against the server's working directory (its project
+      root): a relative PATH lands under it, an absolute PATH is used
+      as-is. The client does not tab-complete it, since the server
+      may run in a container whose filesystem differs from the
+      client's.
   - Response: LP response-type "export-to-org" with
     `((content "REPORT") (errors ("..." ...)) (warnings ("..." ...)))`.
     `content` is a human-readable report (files written, broken-link

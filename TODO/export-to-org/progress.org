@@ -79,10 +79,11 @@ four real issues; all four are now fixed (tests added for each):
   working skg-diff-report handler and byte-parses cleanly.
 
 ** Choices determining the future
-- Output directory is PROMPTED each run (default =org-exports=) and
-  resolved by the SERVER against its working directory (project
-  root): a relative path lands under it, an absolute path is used
-  as-is. No tab completion -- the server may run in a container
+- Output directory is PROMPTED each run (the default =org-exports=
+  lives in the CLIENT; the server requires a non-empty value and
+  applies no default of its own) and resolved by the SERVER against
+  its working directory (project root): a relative path lands under
+  it, an absolute path is used as-is. No tab completion -- the server may run in a container
   whose filesystem differs from the host Emacs runs on. This also
   covers the GitHub front-page case: export with output-dir =.= so
   a root whose target_filepath is =README= writes a real
