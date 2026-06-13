@@ -157,6 +157,36 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
+## Export to org
+  - Request: ((request . "export to org") (source-set . "NAME"))
+  - Response: LP response-type "export-to-org" with
+    `((content "REPORT") (errors ("..." ...)) (warnings ("..." ...)))`.
+    `content` is a human-readable report (files written, broken-link
+    count, warning count). `errors` is non-empty only on failure
+    (bad/unknown source-set name, unreadable `.skg` files, filesystem
+    error). `warnings` are non-fatal (skipped roots, ambiguous
+    headings, broken links, body lines that look like org structure).
+  - Behavior: Reads all `.skg` files fresh from disk, finds every
+    export root, and writes each to
+    `<cwd>/org-exports/<target_filepath>.org` as a recursive content
+    view limited to `NAME`, stripped of skg metadata, with
+    `[[id:..][label]]` links rewritten to relative org links.
+    Existing files are overwritten; others are left untouched. Needs
+    neither TypeDB nor Tantivy.
+  - An **export root** is a node one of whose `contains` children has
+    a title linking to the instruction node
+    `3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f` and a body yielding a
+    `target_filepath` (a tolerant `key = value` parse; the value may
+    be bare or quoted, but a bare value with whitespace is refused).
+    The marker child is omitted from output. A nested export root is
+    rendered as a link to its own file, not inlined. Links whose
+    target is not exported under `NAME` point to the export of
+    `9ff04e25-01e8-4634-8aa5-f5849bc1eb81` ("Some links might be
+    broken."); if that note is itself not exported, the link degrades
+    to plain label text.
+  - The same export is available as a CLI subcommand (no TypeDB):
+    `cargo run --bin skg -- export-org [config] [source-set]`.
+
 ## Rerender all views
   - Request: ((request . "rerender all views"))
   - Response: Multiple length-prefixed messages, sent sequentially:

@@ -9,7 +9,10 @@
 use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
+use skg::export_org::{export_to_org, ExportReport};
+use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic;
 use skg::dbs::in_rust_graph::scheduled_audit::schedule_daemon;
@@ -25,7 +28,7 @@ use std::error::Error;
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -43,6 +46,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
       . init ();
     return run_import (&args); }
+
+  if args . len() > 1 && args[1] == "export-org" {
+    tracing_subscriber::fmt()
+      . with_env_filter (
+        tracing_subscriber::EnvFilter::try_from_default_env ()
+        . unwrap_or_else ( |_| tracing_subscriber::EnvFilter::new ("info") ) )
+      . init ();
+    return run_export_org (&args); }
 
   if args . len() > 1 && args[1] == "check-config" {
     // Pre-flight used by bash/start-servers.sh: run the same
@@ -325,6 +336,35 @@ fn run_import (
     "\x1b[1;33mRemember to commit the imported .skg files in {:?} to git, \
      so that git-diff mode can detect changes.\x1b[0m",
     output_dir );
+  Ok (( )) }
+
+/// Secondary, TypeDB-free entry point for the org export. The
+/// primary, documented path is the Emacs command
+/// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
+/// subcommand runs the same core for scripting and testing.
+///
+/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set]
+/// (source-set defaults to "all"). Writes <cwd>/org-exports/.
+fn run_export_org (
+  args : &[String],
+) -> Result<(), Box<dyn Error>> {
+  let config_path : String =
+    if args . len() > 2 { args[2] . clone() }
+    else { "data/skgconfig.toml" . to_string() };
+  let config : SkgConfig =
+    load_config (&config_path) ?;
+  let set_name : SourceSetName =
+    if args . len() > 3 { SourceSetName::from (args[3] . as_str()) }
+    else { SourceSetName::from ("all") };
+  let active : ActiveSourceSet =
+    ActiveSourceSet::named (&config, set_name) ?;
+  let nodes : Vec<NodeComplete> =
+    read_all_skg_files_from_sources (&config) ?;
+  let output_base : PathBuf =
+    std::env::current_dir () ? . join ("org-exports");
+  let report : ExportReport =
+    export_to_org (&active, &nodes, &output_base) ?;
+  print! ("{}", report . summary ());
   Ok (( )) }
 
 /// Set up where log output goes. Three destinations:

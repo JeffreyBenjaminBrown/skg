@@ -49,6 +49,7 @@ connect."
             skg-org-fold
             skg-request-file-path
             skg-request-diff-analysis
+            skg-request-export-org
             skg-request-git-diff-mode
             skg-request-rerender-all-views
             skg-request-save
