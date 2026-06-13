@@ -205,14 +205,17 @@ fn test_foreign_node_modification_errors(
           println!("\nCreatedForeignNode errors: {}",
                    created_foreign_errors . len());
 
-          assert_eq!(modified_foreign_errors . len(), 6, // namely:
-                     // ext-1 (aliases modified)
-                     // ext-2 (title modified)
-                     // ext-3 (body modified)
-                     // ext-4 (content modified)
+          // Editing a foreign node now FORKS it rather than erroring,
+          // so the four content/field edits (ext-1..ext-4) are fork
+          // candidates, not ModifiedForeignNode errors. Only the two
+          // DELETES of foreign nodes still error as ModifiedForeignNode
+          // (deleting a foreign node is not a fork). The delete/create
+          // rejections return before the forks are even built, so the
+          // edits surface no error here at all.
+          assert_eq!(modified_foreign_errors . len(), 2, // namely:
                      // ext-6 (deletion)
                      // ext-7 (deletion)
-                     "Expected exactly 6 ModifiedForeignNode errors");
+                     "Expected exactly 2 ModifiedForeignNode errors (the deletes)");
           assert_eq!(created_foreign_errors . len(), 1,
                      "Expected exactly 1 CreatedForeignNode error");
 
@@ -225,10 +228,6 @@ fn test_foreign_node_modification_errors(
 
           println!("Errors for IDs: {:?}", error_ids);
 
-          assert!(error_ids . contains(&"ext-1" . to_string()), "Expected error for ext-1 (aliases)");
-          assert!(error_ids . contains(&"ext-2" . to_string()), "Expected error for ext-2 (title)");
-          assert!(error_ids . contains(&"ext-3" . to_string()), "Expected error for ext-3 (body)");
-          assert!(error_ids . contains(&"ext-4" . to_string()), "Expected error for ext-4 (content)");
           assert!(error_ids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
           assert!(error_ids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
           assert!(created_foreign_errors . iter() . any (|e| matches!(

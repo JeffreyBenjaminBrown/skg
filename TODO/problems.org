@@ -1,3 +1,29 @@
+* Problems noted during the forks arc (TODO/forks/)
+** Quasi-duplication: "Source '...' not found in config" across ~9 sites
+   The plan asked to consolidate the duplicated "source not found"
+   error into one 'SourceValidationError'. The recon found the
+   duplication is wider than the three sites named (server/util.rs,
+   dbs/filesystem/multiple_nodes.rs x2, plus copies in not_nodes.rs,
+   git_ops/read_repo.rs, diff_analysis/snapshot.rs) -- ~9 literals of
+   the same format string -- across three carrier types (io::Error,
+   Result<_, String>, BufferValidationError). A clean consolidation
+   needs an enum with both an ID-less 'NotInConfig(SourceName)' shape
+   (the fs layer has no node id) and ID-bearing shapes, plus
+   From-impls bridging to io::Error / Box<dyn Error>. I added typed
+   fork-specific errors (ForkSourceUnresolved / ForkAlreadyExists /
+   ForkSourceInactive on BufferValidationError) but DEFERRED the broad
+   string consolidation -- it is a nice-to-have touching fs/git/diff
+   layers, out of proportion to the fork work. Worth doing on its own.
+** Forking a foreign node with no owned ancestor cannot be completed yet
+   The fork-confirmation buffer is read-only; the plan's
+   writeable-for-source affordance (the user rotating a clone's source
+   when it cannot be inferred from an owned ancestor, and that choice
+   riding back on the approve re-save) is NOT built. A foreign node
+   with no owned vognode ancestor in the view therefore fails with
+   ForkSourceUnresolved and cannot be forked through the buffer.
+   Workaround: place it under a node you own first. Details in
+   TODO/forks/progress.org.
+
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces
    The save extraction path uses 'collect_savenode_candidates' to define

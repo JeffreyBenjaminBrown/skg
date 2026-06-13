@@ -1,0 +1,146 @@
+#+title: Forks: execution progress
+#+startup: overview
+
+Companion to 'plan.org'. The plan is left as-is; this file records
+what got done, deviations on *how* (not *what*), and bad news. Per
+'when-to-stop.org', deviations on how-to-achieve are recorded here, not
+escalated. Items needing Jeff's attention are marked TODO.
+
+* Architectural decisions made during execution
+These were under-specified in the plan; I picked the cleanest option
+and proceeded (all easily reversible, or precedented).
+
+** Confirmation transport: a field on a re-issued save, not a new request
+The plan says "a new response-type plus a follow-up request". I
+implement the follow-up as the field '(fork-approved . "true")' on a
+*re-issued save request*, mirroring the override-menu precedent
+('(override-choice . "bypass")' on a re-issued view request), rather
+than a dedicated request type or a server-stashed pending save.
+
+WHY: the plan requires the confirmation buffer to stay usable for
+search / ID-stack-push while it is open. A persistent TCP connection
+processes one request at a time, so a save handler that blocked
+mid-pipeline reading the y/n decision would wedge the connection and
+forbid search. Instead, the first (unapproved) save that finds fork
+candidates returns a 'fork-confirmation' terminal message (after the
+mandatory save-lock), commits nothing, and RETURNS -- freeing the
+connection. Approval re-issues the same buffer with 'fork-approved'.
+Stateless: no token lifecycle, no leak if the user never answers.
+
+** Fork extraction copies the BUFFER node, not a disk-fetched N
+Unlike nodeMerge (which fetches its acquiree from disk because the
+buffer holds only an ID reference), the fork already has N fully in the
+buffer -- the user just edited it. So C copies the *edited* buffer
+node's title/body/contains directly; no async disk fetch of N for
+content is needed. N's pid (for the subscribes_to / overrides_view_of
+edges) is the buffer node's pid. N's .skg is left untouched; the
+foreign SaveNode for N is dropped and replaced by C's SaveNode.
+
+** Source inference walks the viewforest, computed before validation
+C's source = nearest OWNED vognode ancestor of N in the viewforest
+(new walk modeled on 'nearest_truenode_ancestor_source'). The flat
+DefineNodes at foreign-policy validation have lost ancestry, so the
+owned-ancestor source is computed where the viewforest is live
+(buffer_to_validated_saveplan) and threaded in, keyed by foreign pid.
+A foreign node can appear at multiple positions; v1 takes the first
+owned ancestor found in a DFS (monogamy means one clone anyway).
+
+** SourceValidationError: typed fork errors now; broad string dedup deferred
+The plan's "consolidate the duplicated 'source not found' error" is a
+nice-to-have. The recon found the duplication is wider than three sites
+(~9, across fs/git/diff layers) with carrier-type friction (io::Error
+vs String vs BufferValidationError). I add the clean part -- typed
+BufferValidationError variants for the fork's own source rules -- and
+defer the broad string-literal consolidation. Recorded in
+TODO/problems.org as quasi-duplication.
+
+** Collateral-staleness fix: removed the gate, did not thread a flag (Jeff's call)
+The plan said "thread a 'this is a collateral rerender' signal and
+reconcile children regardless of definitiveness in that case." I first
+implemented exactly that (a 'reconcile_definitive_subscribee_cols' bool
+through CompletionContext / rerender_view). Jeff pushed back in plan.org
+("that guard sounds totally wrong") and asked whether other cols share
+the issue.
+
+Investigation: the GENERIC reconcile_partnerCol_children (used by the
+other writable col 'overriddenCol' and every inbound read-only col)
+reconciles UNCONDITIONALLY -- no definitive/diff gate. subscribee_col
+was the ONLY col with the gate. So nothing else needs correcting, and
+the gate was anomalous, not load-bearing. Removing it entirely (always
+reconcile, like every other col) passed the whole view/save/override/
+diff surface (139 tests) plus a new collateral regression
+('tests/collateral_subscribee_staleness.rs', verified to fail under the
+old gate). So I dropped the threaded-bool machinery and just removed the
+gate. Simpler than the plan, and it also fixes the saved-view case the
+plan deliberately left gated (safe: reconciliation runs post-extraction/
+post-graph-update, so the graph already holds the user's edit).
+
+* Changes to the plan's envisioned order
+(For my own benefit.)
+
+* What's done and went well
+- *Step 1* (prereq display): content_goal_list subtracts the subscriber's
+  own contains. ONE function changed (the de-novo and rerender paths
+  share it; the to_org/complete partition's 'visible' output is dead --
+  only its 'hidden' feeds the HiddenIn col, so no second site to touch).
+  Regression extends the move-into-self test; verified to fail without it.
+- *Step 2* (collateral staleness): removed the gate outright (Jeff's
+  call), so subscribeeCol reconciles like every other col. New
+  collateral regression. See the decision note above.
+- *Steps 3-4* (detect + extract + commit): editing a foreign node forks
+  it. The clone copies the EDITED buffer node (no disk fetch -- it is
+  already disk-supplemented, unlike nodeMerge's acquiree). Source
+  inferred from the nearest owned ancestor. Commits via the normal save,
+  so the override-invariant simulated graph sees the clone for free.
+  tests/fork.rs: save-instruction, fixture-file, override round-trip.
+  Quasi-duplication noted: build_fork_clone parallels
+  create_acquiree_text_preserver but is simpler (synchronous, no merge);
+  not worth a shared abstraction.
+
+** TODO Round-trip test: rendered "unintegrated content" check deferred
+The plan's round-trip wanted: clone's subscribeeCol shows N with EMPTY
+unintegrated content, then a new child of N appears as unintegrated. A
+subscribee-as-such only EXPANDS its content when made definitive (a
+viewRequest + save round-trip), so verifying this through the rendered
+buffer needs that dance, and the two N-positions (overridden-as-such
+and subscribee-as-such) can't both be definitive. The underlying rule
+(contains - hides - subscriber.contains) is already pinned by Step 1's
+hidden_from_subscriptions test, and fork_round_trip pins the override
+half (clone drawn in N's place, P.contains preserved). So I deferred the
+rendered unintegrated-content assertion rather than build the fragile
+expansion dance. Not bad news; flagging only so it is a conscious gap.
+
+- *Step 5* (monogamy + source validation): existing_user_owned_overrider_of
+  (live graph) rejects a re-fork with ForkAlreadyExists naming the clone;
+  the source-set check rejects an inactive clone source. Run in
+  buffer_to_validated_saveplan. Tests: fork_monogamy, fork_source_inactive.
+- *Step 6a* (server confirmation): a save with forks, unapproved, returns
+  a 'fork-confirmation' message (new TcpToClient) + commits nothing;
+  approval re-issues the save with (fork-approved . "true"). Gated in
+  update_from_and_rerender_buffer. Test: fork_confirmation_gates_commit.
+- *Step 6b* (Emacs client): skg--fork-confirmation-handler shows the
+  read-only confirmation buffer + skg-approve-fork (C-c C-c) /
+  skg-decline-fork (C-c C-k); the handler balances the pending-count
+  (save-result and fork-confirmation are mutually-exclusive terminals).
+  Byte-compiles clean.
+
+** TODO Writeable-source path NOT built -- a foreign node with no owned ancestor cannot be forked yet
+The plan's confirmation buffer is "read-only EXCEPT the user may set each
+clone's source (C-c s s)", for the case where C's source cannot be
+inferred from an owned ancestor. I built the READ-ONLY confirmation (the
+common case: an owned ancestor exists, so the source is inferred). The
+writeable-source path -- the user rotating C's source in the confirmation
+buffer, and that choice riding back on the approve re-save -- is NOT
+built.
+
+CONSTRAINT THIS IMPOSES (bad news): forking a foreign node that has NO
+owned vognode ancestor in the view (e.g. a foreign node opened as a bare
+root) currently fails with ForkSourceUnresolved and cannot be completed
+through the buffer. Workaround: place the foreign node under a node you
+own (so an owned ancestor exists) before editing it. The
+read-only-but-source-writeable buffer + the per-node source transport on
+approve is the follow-up to lift this.
+
+* Unanticipated future costs/benefits
+
+* Open questions
