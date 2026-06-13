@@ -70,10 +70,13 @@ four real issues; all four are now fixed (tests added for each):
 - A node under two containers in DIFFERENT files is still rendered
   in each file (links resolve to its one canonical home); this
   cross-file case is the irreducible .skg-vs-.org lossiness.
-- The Emacs command path has not been exercised live (needs a
-  running server + Emacs + TypeDB); the Rust core it calls is
-  verified via the CLI and 7 unit tests, and the elisp mirrors the
-  diff-analysis command and byte-parses cleanly.
+- The live "export to org" TCP endpoint is verified against a
+  running server: public / all / unknown-set requests return the
+  correct =((response-type export-to-org)(content ..)(errors ..)
+  (warnings ..))= shape, and the server's write is byte-identical to
+  the CLI's. The only piece not exercised live is the Emacs elisp
+  DISPLAY of that response, which is a near-verbatim clone of the
+  working skg-diff-report handler and byte-parses cleanly.
 
 ** Choices determining the future
 - Output base is =<cwd>/org-exports/=. The server runs from the
