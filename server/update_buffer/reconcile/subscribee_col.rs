@@ -22,7 +22,6 @@ use std::error::Error;
 struct SubscribeeColContext {
   parent_pid             : ID,
   parent_source          : SourceName,
-  parent_indefinitive    : bool,
   worktree_subscribees   : Vec<ID>,
 }
 
@@ -34,7 +33,7 @@ struct SubscribeeColContext {
 /// - Read parent's skg ID and indefinitive flag.
 /// - Look up parent's subscribees.
 /// - If no subscribees: transfer focus if needed, then delete.
-/// - If parent is indefinitive: reconcile subscribee children.
+/// - Reconcile the subscribee children from the graph.
 /// - Ensure HiddenOutsideOfSubscribeeCol exists and is last.
 pub async fn reconcile_subscribee_col_children (
   node                           : NodeId,
@@ -71,8 +70,20 @@ pub async fn reconcile_subscribee_col_children (
   // here means the subscriber lost all its subscriptions, and we keep the
   // headline so the user can re-add.) Its children still reconcile to empty
   // below, and the HiddenOutsideOfSubscribeeCol is still ensured last.
-  if context . parent_indefinitive || source_diffs . is_some() {
-    // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
+  //
+  // The subscribeeCol's children ALWAYS reconcile from the graph -- like every
+  // other PartnerCol (reconcile_partnerCol_children is unconditional). A
+  // generated collection states "these nodes stand in this relationship to the
+  // owner" and must not lie, including in the saved view: reconciliation runs
+  // strictly AFTER extraction and the graph update, so the graph already holds
+  // the user's just-saved subscriptions and reconciling reproduces them rather
+  // than clobbering them. This also refreshes a DEFINITIVE subscriber's
+  // subscribeeCol during a collateral rerender -- the latent staleness
+  // subscribeecol-maybe-todo.org flagged (forks plan.org: "Collateral-rerender
+  // staleness fix"). The old gate (`if parent_indefinitive ||
+  // source_diffs.is_some()`) wrongly skipped a definitive subscriber outside
+  // diff mode; 'parent_indefinitive' is no longer read.
+  { // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
     let axes_for_removed = // the relation this col represents
@@ -113,15 +124,14 @@ fn read_subscribee_col_context (
     required_ancestor (tree, node, 0) ?
     . ok_or ("reconcile_subscribee_col_children: \
               subscriber ancestor absent (generalized orphan)") ?;
-  let (parent_pid, parent_source, parent_indefinitive)
-    : (ID, SourceName, bool)
+  let (parent_pid, parent_source)
+    : (ID, SourceName)
     = read_at_node_in_tree(
       tree, subscriber,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
           => Some(( t . id . clone(),
-                    t . source . clone(),
-                    t . is_indefinitive () )),
+                    t . source . clone() )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not a TrueNode") ?;
@@ -134,7 +144,6 @@ fn read_subscribee_col_context (
   Ok (SubscribeeColContext {
     parent_pid,
     parent_source,
-    parent_indefinitive,
     worktree_subscribees }) }
 
 fn ensure_hiddenoutsideofsubscribeecol_is_last (

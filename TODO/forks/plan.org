@@ -151,6 +151,14 @@ C must live in an owned source. Resolve it:
 hard-fails at lowering ('lower.rs:250-252'), so the inference and the
 buffer-set path both feed a concrete owned source before lowering.
 
+*** TODO I found a problem
+"infer from N's nearest OWNED vognode ancestor in the view;"
+is not right. It has to be "infer from N's nearest vognode ancestor,
+if that ancestor is owned." If the nearest ancestor is foreign,
+don't read any further up the view-ancestry;
+instead, the user will have to provide a source
+at the confirmation buffer stage.
+
 ** Monogamy
 A node may have at most one user-owned overrider; there is no analogous
 constraint on subscriptions. So forking a node the user has already
@@ -199,6 +207,112 @@ creates subscribers, which makes this easy to hit; pre-existing, but in
 scope here. Test: open two views of a definitive subscriber, change its
 subscriptions in one, save, assert the other refreshes.
 
+** ONGOING ah wait I don't understand this
+I need you to explain this to me more simply.
+Please provide a glossary of all terms involved,
+and then restate the idea in plainer English.
+*** Claude : glossary, then plain English
+**** Glossary (the terms in that paragraph)
+- *view* / *buffer* :: one window onto the graph, shown as an org
+  buffer (a tree of headlines). You can have several open at once,
+  and two of them can show the same graph node at the same time.
+- *subscriber* / *subscribee* :: a node that "subscribes" to another.
+  The subscribee's content surfaces under the subscriber as
+  "unintegrated subscribed content". (Forking uses this: a clone
+  subscribes to its original. So once forks exist, subscribers become
+  common.)
+- *subscribeeCol* :: an auto-generated scaffold listed under a
+  subscriber, holding the nodes it subscribes to. skg GENERATES it
+  from the graph; the user does not type its membership. Its
+  "children" are those subscribed nodes.
+- *definitive* vs *indefinitive* :: definitive = shown editable
+  (read-write); indefinitive = shown read-only. The SAME graph node
+  can be definitive in one view and indefinitive in another.
+- *the saved view* vs *a collateral view* :: when you save a buffer,
+  that buffer is "the saved view". Any OTHER open buffer that shares a
+  node with it is "collateral". After a save, skg re-renders the saved
+  view AND every collateral view, so two windows onto the same node
+  agree.
+- *reconcile* against a *goal list* :: to refresh a generated
+  collection, skg computes the "goal list" (the members it SHOULD have
+  per the current graph) and reconciles the on-screen collection
+  against it -- adding missing members, dropping stale ones.
+- *stale* :: showing what the graph USED to say, not what it says now.
+- *the guard* :: the `if parent_indefinitive || source_diffs.is_some()`
+  condition that decides whether to actually apply the fresh goal list.
+- *source_diffs.is_some()* :: shorthand for "we are in git-diff mode".
+**** Plain English
+Picture the same subscriber node S open in two windows, A and B.
+In window A you change S's subscriptions and save. skg updates the
+graph and re-renders A correctly. Window B is collateral -- it should
+also refresh so ITS subscribeeCol shows the new subscription list. But
+it doesn't: B keeps the OLD list on screen. That stale list is the bug.
+
+Why: the function that refreshes a subscribeeCol
+('reconcile_subscribee_col_children') always computes the fresh list
+from the graph, but only APPLIES it when the guard holds -- i.e. when
+the subscriber is read-only (indefinitive) OR we're in git-diff mode.
+If the subscriber is editable (definitive) and we're not in diff mode,
+it skips applying and leaves whatever was already drawn.
+
+That skip is RIGHT for the saved view: in the window you just saved,
+your buffer text is the authority on the subscriptions (you may have
+just typed them), so skg must not overwrite it mid-save with a
+graph-derived list. But the skip is WRONG for a collateral view, which
+you did NOT edit -- it should always defer to the just-saved graph.
+The code can't yet tell those two apart: "definitive + no diff" lumps
+"the view you just saved" (don't refresh) together with "a collateral
+view of the same node" (do refresh).
+
+The fix: thread one extra boolean down the render path meaning "this
+is a COLLATERAL re-render, not the view that was just saved." When it's
+true, refresh the subscribeeCol from the graph regardless of
+definitiveness. The saved view stays byte-stable; collateral views
+catch up. (Forks make this matter because forking mints subscribers,
+so you'll often have a subscriber open in two windows -- exactly when
+this latent bug shows.)
+
+If that lands cleanly, please mark this DONE.
+***** DONE that guard sounds totally wrong
+Is there something similar for the other collections?
+If so we will have to correct them too.
+
+Whether there are source diffs is irrelevant; rerender should always
+correct containers to match what their owning vognode (in this case,
+the subscriber) actually shows on disk. Whether the owning vognode
+is indefinitive is also (for the children of Col scaffolds,
+not for the owning vognode itself) irrelevant -- the collection
+says "these things are in this relationship to the ownig vognode",
+and it should not lie.
+****** Claude : you're right. Removed the gate entirely; details:
+- *Other collections?* No. The GENERIC reconciler
+  'reconcile_partnerCol_children' -- which serves the OTHER writable col
+  ('overriddenCol') and every inbound read-only col (subscriberCol,
+  overriderCol, hiderCol, hiddenCol) -- already reconciles
+  UNCONDITIONALLY: it never looks at definitiveness or diff mode; it
+  only consults 'policy()' to choose member ORDER. So 'subscribeeCol'
+  was the ONLY collection with this gate. Nothing else to correct.
+- *Why subscribeeCol alone had it:* it has its own reconciler
+  ('reconcile_subscribee_col_children', separate because its members are
+  subscribees-as-such with special content + a trailing
+  HiddenOutsideOfSubscribeeCol), and that reconciler carried a stale
+  gate the generic one never had. 'subscribeecol-maybe-todo.org' had
+  already flagged it as "suspicious" and asked for a focused test before
+  changing it.
+- *Saved view too?* Yes -- I dropped the gate completely, not just for
+  collateral views. Safe even there: reconciliation runs strictly AFTER
+  extraction and the graph update, so by the time it runs the graph
+  already holds the subscriptions the user just saved; reconciling
+  reproduces them rather than clobbering them (exactly how overriddenCol
+  already behaves in the saved view). The whole view/save/override/diff
+  test surface (139 tests) passes with the gate gone, including
+  idempotence and the save round-trip.
+- *The focused test the note asked for:*
+  'tests/collateral_subscribee_staleness.rs' -- two views of a
+  DEFINITIVE subscriber S; drop a subscription in one and save; assert
+  the other view's subscribeeCol refreshes. Verified to FAIL under the
+  old gate and pass now.
+Marked DONE since it landed cleanly; reopen if you disagree.
 * Types and helpers to add
 - a 'ForkInstruction' (or 'ForkSpec') type carrying the clone id, the
   original id, and the copied title/body/contains -- so fork extraction
