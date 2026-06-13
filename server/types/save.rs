@@ -57,6 +57,28 @@ pub struct SavePlan {
   pub define_nodes       : Vec<DefineNode>,
   pub nodeMerge_instructions : Vec<NodeMerge>,
   pub source_moves       : Vec<SourceMove>,
+  /// Forks detected this save: editing a foreign node N is read as a
+  /// request to clone it. Held SEPARATE from 'define_nodes' because a
+  /// save carrying forks is gated on the user's confirmation -- the
+  /// clones commit only on approval (see ForkSpec, the save handler's
+  /// fork-confirmation stage). Empty for an ordinary save.
+  pub fork_specs         : Vec<ForkSpec>,
+}
+
+/// One fork: the user made a foreign node N (read-only, in a source
+/// they do not own) definitive and edited it; that edit is read as a
+/// request to clone N. 'clone' is the new OWNED node C, built from the
+/// edited buffer node -- a fresh pid, an owned source, the edited
+/// title/body/contains, 'subscribes_to = [N]' and
+/// 'overrides_view_of = [N]', no hides. N itself is left untouched on
+/// disk (its foreign SaveNode is dropped). The 'original_*' fields name
+/// N, for the monogamy pre-check and the confirmation buffer's display.
+#[derive(Debug, Clone)]
+pub struct ForkSpec {
+  pub clone           : SaveNode,
+  pub original_id     : ID,
+  pub original_title  : String,
+  pub original_source : SourceName,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
@@ -174,6 +196,15 @@ fn format_buffer_validation_error (
               id . 0) },
     BufferValidationError::SourceNotInConfig(id, source) => {
       format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
+              id . 0, source) },
+    BufferValidationError::ForkSourceUnresolved(id) => {
+      format!("Cannot fork a foreign node -- no owned source for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a source from.\n- Set the clone's source in the fork-confirmation buffer (C-c s s), then approve.\n",
+              id . 0) },
+    BufferValidationError::ForkAlreadyExists(original, existing) => {
+      format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one user-owned override. Edit the existing clone instead.\n",
+              original . 0, existing . 0) },
+    BufferValidationError::ForkSourceInactive(id, source) => {
+      format!("Cannot fork into an inactive source:\n- Foreign node: {}\n- Clone's resolved source: {}\n- That source is not in the active source-set. Activate it first; an invisible clone is never created silently.\n",
               id . 0, source) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },

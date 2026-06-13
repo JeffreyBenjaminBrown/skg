@@ -16,6 +16,9 @@ mod collateral_partner_col;
 #[path = "collateral_subscribee_staleness.rs"]
 mod collateral_subscribee_staleness;
 
+#[path = "fork.rs"]
+mod fork;
+
 #[path = "collateral_source_move.rs"]
 mod collateral_source_move;
 

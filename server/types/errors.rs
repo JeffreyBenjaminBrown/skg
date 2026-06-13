@@ -38,6 +38,14 @@ pub enum BufferValidationError {
                                    SourceName), // buffer source
   CannotMoveAndMergeSimultaneously (ID),
   SourceNotInConfig              (ID, SourceName),
+  // Fork errors. Editing a foreign node N is read as a request to
+  // clone it (the clone C lives in an owned source, subscribes to and
+  // overrides N). These are the ways that request can be refused.
+  ForkSourceUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's source from, and the user set none in the confirmation buffer.
+  ForkAlreadyExists              (ID,   // N's pid
+                                  ID),  // the existing user-owned clone that already overrides N (monogamy: a node may have at most one user-owned overrider)
+  ForkSourceInactive             (ID,           // N's pid
+                                  SourceName),  // C's resolved owned source, which is INACTIVE under the active source-set
   OverrideInvariantViolation     (String),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (parentIs=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
@@ -103,6 +111,12 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot move and merge node {:?} in the same save", id),
       BufferValidationError::SourceNotInConfig(id, source) =>
         write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
+      BufferValidationError::ForkSourceUnresolved(id) =>
+        write!(f, "Cannot fork node {:?}: no owned source to put the clone in. It has no owned ancestor in the view to inherit a source from; set the clone's source in the confirmation buffer (C-c s s).", id),
+      BufferValidationError::ForkAlreadyExists(original, existing) =>
+        write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one user-owned override).", original, existing),
+      BufferValidationError::ForkSourceInactive(id, source) =>
+        write!(f, "Cannot fork node {:?}: the clone's source '{}' is inactive under the current source-set. Activate it first; an invisible clone is never created silently.", id, source),
       BufferValidationError::OverrideInvariantViolation(msg) =>
         write!(f, "{}", msg),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) =>

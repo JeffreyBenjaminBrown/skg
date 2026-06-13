@@ -6,6 +6,7 @@
 /// defined here.
 
 pub mod buffer_to_viewnodes;
+pub mod fork;
 pub mod local_instruction_collection;
 pub mod supplement_from_disk;
 pub mod weave;
@@ -24,10 +25,14 @@ use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
+use fork::owned_ancestor_sources_for_foreign_vognodes;
 use local_instruction_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
 
+use std::collections::HashMap;
+use crate::types::misc::SourceName;
+use crate::types::save::ForkSpec;
 use typedb_driver::TypeDBDriver;
 
 /// Save preparation deliberately validates at several
@@ -102,12 +107,19 @@ pub async fn buffer_to_validated_saveplan (
       nodeMerge_instructions_from_pairs (
         &nodeMerge_acquisitions, config, driver )
       . await } . map_err (SaveError::DatabaseError) ?;
-  let define_nodes : Vec<DefineNode> =
+  // C's source is inferred from N's nearest OWNED vognode ancestor in
+  // the view. The flat DefineNodes have lost that ancestry, so resolve
+  // it here, where the placed viewforest is live, keyed by foreign pid.
+  let owned_ancestor_source : HashMap<ID, SourceName> =
+    owned_ancestor_sources_for_foreign_vognodes (&viewforest, config);
+  let ( define_nodes, fork_specs )
+    : ( Vec<DefineNode>, Vec<ForkSpec> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "validate_and_filter_foreign_instructions" ). entered();
       validate_and_filter_foreign_instructions (
         nonmerge_plan . define_nodes,
         &nodeMerge_instructions,
+        &owned_ancestor_source,
         config,
         driver )
       . await } . map_err ( |errors| SaveError::BufferValidationErrors {
@@ -124,5 +136,6 @@ pub async fn buffer_to_validated_saveplan (
         SavePlan {
           define_nodes,
           nodeMerge_instructions,
-          source_moves : nonmerge_plan . source_moves },
+          source_moves : nonmerge_plan . source_moves,
+          fork_specs },
         warnings )) }

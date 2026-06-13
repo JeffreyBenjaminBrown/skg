@@ -1,19 +1,31 @@
+use crate::from_text::fork::fork_spec_from_buffer_node;
 use crate::source_sets::ActiveSourceSet;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use typedb_driver::TypeDBDriver;
 
-/// Validates that foreign (read-only) nodes are not being modified.
-/// Filters out foreign nodes without modifications (no need to write).
+/// Applies the foreign-node write policy, and -- this is where forking
+/// begins -- turns an edit of a foreign node into a fork.
+///
+/// Returns the kept (owned) DefineNodes plus the forks the buffer
+/// requested. Editing a foreign node N is read as a request to clone
+/// it: N's own foreign SaveNode is DROPPED (N stays untouched on disk)
+/// and a ForkSpec for the clone C is collected instead. The clone is
+/// NOT folded into the returned DefineNodes here -- a save carrying
+/// forks is gated on the user's confirmation, so the handler commits
+/// the clones only on approval.
 ///
 /// ERRORS: if an instruction
-/// - Would modify or delete a foreign node
+/// - Would DELETE a foreign node (deleting, unlike editing, is not a fork)
 /// - Would create a node in a foreign source
+/// - Requests a fork whose clone source cannot be resolved
+///
+/// Filters out foreign nodes without modifications (no need to write).
 ///
 /// Requires disk-supplemented DefineNodes: unchanged foreign saves are
 /// harmless only after unspecified fields have been filled from disk,
@@ -21,9 +33,10 @@ use typedb_driver::TypeDBDriver;
 pub async fn validate_and_filter_foreign_instructions(
   instructions       : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
+  owned_ancestor_source : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
-) -> Result<Vec<DefineNode>,
+) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
     Vec::new();
@@ -31,26 +44,47 @@ pub async fn validate_and_filter_foreign_instructions(
     nodeMerge_instructions . iter ()
     . flat_map ( |nodeMerge| nodeMerge . to_vec () )
     . collect ();
-  for instruction in
-    instructions . iter ()
-    . chain (nodeMerge_definenodes . iter ())
-  { outcomes . push (
+  // Only a DIRECT edit of a foreign node forks it. A foreign node
+  // reached through a nodeMerge (merging into it, or deleting it as an
+  // acquiree) is NOT a fork -- it stays a ModifiedForeignNode rejection.
+  for instruction in instructions . iter () {
+    outcomes . push (
       apply_foreign_policy(
-        instruction, config, driver
+        instruction, /* fork_eligible = */ true, config, driver
+      ) . await? ); }
+  for instruction in nodeMerge_definenodes . iter () {
+    outcomes . push (
+      apply_foreign_policy(
+        instruction, /* fork_eligible = */ false, config, driver
       ) . await? ); }
   collect_foreign_policy_outcomes (&outcomes)?;
-  Ok ( filter_unchanged_foreign_saves ( instructions,
-                                        &outcomes )) }
+  // Build the clones from the fork candidates. A fork candidate only
+  // ever arises from a regular `instructions` Save (a nodeMerge's saves
+  // are owned), so zipping with `instructions` (outcomes for the
+  // nodeMerge tail are beyond its length, harmlessly truncated) is
+  // correct.
+  let mut fork_specs : Vec<ForkSpec> = Vec::new ();
+  let mut fork_errors : Vec<BufferValidationError> = Vec::new ();
+  for outcome in &outcomes {
+    if let ForeignPolicyOutcome::ForkCandidate (buffer_node) = outcome {
+      match fork_spec_from_buffer_node (buffer_node, owned_ancestor_source) {
+        Ok (spec)  => fork_specs . push (spec),
+        Err (e)    => fork_errors . push (e), }}}
+  if ! fork_errors . is_empty () { return Err (fork_errors); }
+  Ok (( filter_unchanged_foreign_saves ( instructions, &outcomes ),
+        fork_specs )) }
 
 /// PITFALL: This is applied to every node -- owned as well as foreign.
 enum ForeignPolicyOutcome {
   Keep, // Safe to pass through to persistence.
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
+  ForkCandidate(NodeComplete), // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
 async fn apply_foreign_policy(
   instr: &DefineNode,
+  fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<ForeignPolicyOutcome,
@@ -73,11 +107,19 @@ async fn apply_foreign_policy(
       ) . await {
         Ok(Some (disk_node)) => {
           if buffernode_differs_from_disknode(node, &disk_node) {
-            // can't edit foreign nodes
-            Ok (ForeignPolicyOutcome::Reject(
-              BufferValidationError::ModifiedForeignNode(
-                node . pid . clone(),
-                node . source . clone() )))
+            // A direct edit of a foreign node forks it (no longer a
+            // ModifiedForeignNode error -- that rejection was the
+            // absence of forking). The buffer node carries the edited
+            // content the clone will copy. A nodeMerge-derived change to
+            // a foreign node is NOT a fork and still rejects.
+            if fork_eligible {
+              Ok (ForeignPolicyOutcome::ForkCandidate( node . clone() ))
+            } else {
+              Ok (ForeignPolicyOutcome::Reject(
+                BufferValidationError::ModifiedForeignNode(
+                  node . pid . clone(),
+                  node . source . clone() )))
+            }
           } else {
             // drop a non-edit to a foreign node
             Ok (ForeignPolicyOutcome::DropUnchangedForeignSave)
@@ -106,8 +148,10 @@ fn collect_foreign_policy_outcomes(
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// Drop any DefineNode that
-/// defines a foreign node to be unchanged.
+/// Drop any DefineNode that defines a foreign node to be unchanged, and
+/// any that is a fork candidate (N's own save is never written -- N
+/// stays untouched on disk; the clone C is committed separately, gated
+/// on confirmation).
 fn filter_unchanged_foreign_saves(
   instructions: Vec<DefineNode>,
   outcomes: &[ForeignPolicyOutcome],
@@ -116,7 +160,8 @@ fn filter_unchanged_foreign_saves(
     . zip (outcomes)
     . filter_map (|(instruction, outcome)| {
       match outcome {
-        ForeignPolicyOutcome::DropUnchangedForeignSave =>
+        ForeignPolicyOutcome::DropUnchangedForeignSave
+          | ForeignPolicyOutcome::ForkCandidate (_) =>
           None,
         _ => Some (instruction) }})
     . collect()

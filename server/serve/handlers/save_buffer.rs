@@ -293,8 +293,22 @@ pub async fn update_from_and_rerender_buffer (
   let SavePlan {
     define_nodes       : nonmerge_defineNodes,
     nodeMerge_instructions : nodeMerges,
-    source_moves }
+    source_moves,
+    fork_specs }
     = save_plan;
+  // Forks detected this save: editing a foreign node N is a request to
+  // clone it. The clone C commits with the rest of the save -- its
+  // 'overrides_view_of = [N]' edge rides in the same DefineNodes, so the
+  // touched-override-invariant check (which reads the simulated post-save
+  // graph) sees C before validating.
+  // TODO (forks plan.org step 6): gate this on the user's confirmation
+  // (a 'fork-confirmation' buffer + a re-issued save carrying approval);
+  // for now an edited foreign node forks unconditionally.
+  let nonmerge_defineNodes : Vec<DefineNode> = {
+    let mut nodes : Vec<DefineNode> = nonmerge_defineNodes;
+    for spec in &fork_specs {
+      nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
+    nodes };
 
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
