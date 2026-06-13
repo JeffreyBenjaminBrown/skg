@@ -1058,3 +1058,69 @@
    'find_and_stage_moves.rs'. The module only finds moves and emits a
    script that STAGES them ('git rm' / 'git add'); committing is left
    to the user, so the new name describes it exactly.
+
+* Problems found while planning forks (2026-06-13)
+  Found while reading the sharing code to write 'TODO/forks/plan.org'.
+  The first is a real, fork-independent bug; it is also the prerequisite
+  the fork/clone feature depends on, and is discussed at length in that
+  plan.
+
+** The subscribee-as-such display subtracts only hides, not the subscriber's own contains
+   'content_goal_list' (server/update_buffer/reconcile/content.rs:398-419)
+   computes the content shown under a subscribee-as-such as
+   'subscribee.contains MINUS subscriber.hides_from_its_subscriptions'.
+   It does NOT subtract the subscriber's own 'contains'.
+
+   Consequence (the move-into-graph integration path, vision.org
+   example 2): 'resolve_visibility' (server/from_text/local_instruction_collection/resolve_visibility.rs:61-66)
+   deliberately does NOT create a hide when the user moves subscribee
+   content into the subscriber's own graph ("hiding one's own content
+   would be silly"). So that content is in 'R.contains' but not in
+   'R.hides', and the formula above still shows it under the
+   subscribee-as-such. It therefore appears twice: once as R's
+   integrated content, once as "unintegrated" subscribed content. This
+   contradicts vision.org example 2 (which expects it to drop out of the
+   subscribee view) and 'docs/sharing-model.md' para 2 ("an implicit
+   hides_from_its_subscriptions relationship from the clone to all of
+   its normal content ... any branch that shows up as ordinary
+   integrated content does not need to also show up in the
+   subscriptions").
+
+   Test gap that hid it:
+   'tests/hidden_from_subscriptions.rs::test_moving_foreign_subscribee_content_to_subscriber_does_not_hide'
+   moves 'e1' into the subscriber and asserts only that (a) no hide is
+   created and (b) 'e1' appears as content of 'r'. It never asserts 'e1'
+   is removed from the subscribee-as-such branch, and its
+   'contains("** (skg (node (id e1) ...")' check would even match a
+   deeper '**** ' occurrence, so a duplicate passes unnoticed.
+
+   This is also a hard blocker for forks: a fresh clone C has
+   'C.contains = N.contains' and 'C.hides = {}', so the subscribee-as-
+   such view of N under C would re-show every child C just integrated.
+
+   Proposed fix (see 'TODO/forks/plan.org', "Prerequisite"): make
+   'content_goal_list' for a subscribee-as-such subtract the
+   subscriber's own 'contains' too --
+   'subscribee.contains - subscriber.hides - subscriber.contains' --
+   implementing 'sharing-model.md's "implicit hides to all normal
+   content" without writing redundant data. Mirror the change anywhere
+   else the subscribee-as-such membership is derived, and audit the
+   HiddenIn/HiddenOutside goal lists ('goal_list.rs') so a node that is
+   both integrated and explicitly hidden does not double-count.
+   (If a filter I missed already excludes the subscriber's content
+   downstream, this is moot -- but I could not find one.)
+
+** 'overrides_view_of' has never been written by a save; its round-trip is untested
+   Per 'TODO/DONE/sharing/status-before-plan.org', overrides were
+   "dead weight": no buffer path populated 'overrides_view_of'. Since
+   then the 'overriddenCol' became a writable surface (the 'SetOverrides'
+   intent, server/from_text/local_instruction_collection/traverse.rs:307-323),
+   but no production save actually exercises it yet -- the fork/clone
+   feature would be its first real writer. The 'overridesHere'
+   round-trip marker is validated VISIBILITY-UNGATED
+   (server/from_text/buffer_to_viewnodes/validate_tree.rs) but RENDERED
+   visibility-GATED (server/dbs/in_rust_graph/override_resolution.rs),
+   so a freshly-created overrider whose source is inactive under the
+   active source-set can silently drop its substitution. Needs dedicated
+   create-an-override round-trip and source-set tests before the fork
+   relies on it. (Cross-referenced in 'TODO/forks/plan.org' P6.)

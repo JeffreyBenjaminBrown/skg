@@ -1,0 +1,754 @@
+#+title: Forks: implementation discussion
+#+startup: overview
+
+* what this is and how to read it
+This plan is for the feature described in 'docs/forks.md' (the doc is
+named '.md', not '.org'; the prompt said 'docs/forks.org', which does
+not exist). It was written after reading the orientation material,
+'docs/sharing-model.md', 'docs/data-model.org', the schema, the
+'TODO/DONE/sharing/' history, and the relevant server code (cited
+inline). A fan-out recon plus an adversarial design critique informed
+it; where I assert a code fact I have a file:line behind it.
+
+Discussion protocol (per Jeff's usual): reply to a heading as an
+alternating-depth child; settled decisions get folded into the body
+and the heading marked DONE with a note; questions/curveballs get a
+TODO->ONGOING flip and a child reply. The plan ends with a single
+'Problems' section (my pushback plus the open questions/decisions I need
+from you); the discussion state lives there, visible in the markers.
+
+* TL;DR
+The forks vision is *almost entirely already built*. The relations
+('subscribes', 'hides_from_its_subscriptions', 'overrides_view_of'),
+all eight PartnerCols, override substitution, the override-choice
+menu, and the save-time hide/unhide interpretation of subscribee-as-
+such edits all exist and are tested (the whole 'TODO/DONE/sharing/'
+arc). The single missing piece -- the lone unresolved item in
+'TODO/DONE/sharing/vision.org' ("fork a foreign node by editing it")
+-- is the *fork/clone operation itself*: turning a foreign node N into
+an owned clone C that copies N's text and child-list, subscribes to N,
+and overrides N.
+
+There is also one *prerequisite bug* that the fork depends on and that
+your "nonobvious point" is exactly about: the subscribee-as-such
+content display subtracts only the subscriber's hides, not the
+subscriber's own integrated content. Until that is fixed, a fresh fork
+would redundantly re-show everything it just integrated as
+"unintegrated". See [[*Prerequisite: the subscribee-as-such display must subtract the subscriber's own contains][the prerequisite section]].
+
+* What already exists (so this plan does NOT build it)
+Grounded in code and the 'TODO/DONE/sharing/' arc:
+
+- The three relations are in 'schema.tql' and fully persisted across
+  FS/Rust/TypeDB (NodeFS/NodeRust/NodeComplete fields; YAML
+  'subscribes_to:', 'hides_from_its_subscriptions:',
+  'overrides_view_of:').
+- All eight PartnerCols render (glossary "PartnerCol"): the writable
+  'subscribeeCol' and 'overriddenCol', the read-only inbound
+  'subscriberCol'/'overriderCol'/'hiderCol'/'hiddenCol', and the
+  read-only filter 'hiddenInSubscribeeCol'/'hiddenOutsideOfSubscribeeCol'.
+- 'overrides_view_of' is now *writable* from a buffer via the
+  'overriddenCol' (the 'SetOverrides' intent,
+  'server/from_text/local_instruction_collection/traverse.rs:307-323').
+  ('TODO/DONE/sharing/status-before-plan.org' says it is "dead weight"
+  with no write path -- that doc predates the override work and is
+  stale on this point.)
+- 'subscribes_to' is writable from a buffer via the 'subscribeeCol'
+  ('subscribeeCol_members', 'traverse.rs:350-359').
+- Override substitution draws an owned overrider in place of the
+  overridden node wherever it would appear as recursive content,
+  with the load-bearing 'overridesHere' round-trip marker
+  ('server/update_buffer/reconcile/content.rs', the marker set when
+  'drawn_id' is present; validated at
+  'server/from_text/buffer_to_viewnodes/validate_tree.rs').
+- Override invariants -- monogamy (<=1 user-owned overrider per
+  overridden node) and acyclicity -- are validated at save and rebuild
+  ('server/dbs/in_rust_graph/override_invariants.rs').
+- The override-choice menu exists ('api-and-formats.md', "the
+  override-choice menu").
+- Save-time interpretation of subscribee-as-such child edits into
+  hides/unhides exists and is tested
+  ('server/from_text/local_instruction_collection/resolve_visibility.rs';
+  'tests/hidden_from_subscriptions.rs').
+
+The EditRequest enum ('server/types/viewnode.rs:423') has exactly two
+variants, 'NodeMerge' and 'Delete'. There is no fork/clone command in
+'elisp/' or 'server/'. That is the gap.
+
+* The gap: the fork/clone operation
+Per 'docs/forks.md' and 'docs/sharing-model.md', to "edit" a foreign
+node N you instead create a *clone* C in a source you own, where:
+
+- C.title and C.body copy N's (then become editable);
+- C.contains copies N's 'contains' list -- *the child IDs only,
+  shallow*, not N's descendants (this is what makes forking cheap:
+  'docs/sharing-model.md' para 5);
+- C 'subscribes' to N (so N's later additions surface to C);
+- C 'overrides_view_of' N (so override substitution draws C wherever N
+  would appear as content).
+
+Today, editing a foreign node instead *rejects the whole save*:
+'apply_foreign_policy' returns 'ModifiedForeignNode' (changed
+title/body/contains) or 'CreatedForeignNode' (new node in a foreign
+source), collected into a fatal error vector
+('server/from_text/validate.rs:21-95'). The fork is the affirmative
+alternative to that rejection.
+
+* Reconciling docs/forks.md with the implemented model
+'docs/forks.md' depicts the unintegrated subscribed content as a
+single auto-generated branch titled
+'<skg< unintegrated subscribed content from ... >>' hung under the
+clone. *That branch should not be built.* As you noted: the existing
+'subscribeeCol' under C already serves this exact role -- it shows N
+as a subscribee-as-such, and the content under it is precisely what C
+has not yet integrated (assuming the prerequisite fix below). So this
+plan treats forks.md's '<skg<...>>' branch as obsolete narrative;
+['docs/forks.md' must be rewritten] to describe the subscribeeCol
+mechanism instead. (forks.md itself flags its examples as provisional:
+"TODO: These examples are goofy.")
+
+* tentative plan
+** Prerequisite: the subscribee-as-such display must subtract the subscriber's own contains
+This is the heart of your "nonobvious point", and it is a blocker for
+forking, so it comes first.
+*** DONE DECIDED (Jeff): Option B. A subscribee-as-such shows only what
+the subscriber neither HIDES nor CONTAINS. So 'content_goal_list' must
+subtract the subscriber's own 'contains' as well as its hides
+(generalizing the formula below). The fork then needs NO explicit hides:
+C's copied contains are excluded from its own subscribee-as-such view by
+this rule, leaving only N's later additions. (This reverses an earlier
+"Option A" detour where the fork would have materialized hides; Jeff:
+"Container R should not both hide and contain content T.") The code
+analysis below -- the formula, the test gap -- is still accurate; only
+the prescribed fix is settled: change the display, not the fork.
+
+*** What the code does today
+The content shown under a subscribee-as-such is computed by
+'content_goal_list' ('server/update_buffer/reconcile/content.rs:398-419'):
+
+#+begin_src text
+  subscribee.contains  MINUS  subscriber.hides_from_its_subscriptions
+#+end_src
+
+It subtracts only the subscriber's *hides*. It does not subtract the
+subscriber's own 'contains'.
+
+*** Why that is wrong for integration-by-moving
+'resolve_visibility.rs:61-66' deliberately does NOT create a hide when
+the user moves subscribee content into the subscriber's own graph
+("hiding one's own content would be silly"). So after such a move the
+content is in 'R.contains' but not in 'R.hides'. The display formula
+above therefore still shows it under the subscribee-as-such -- so it
+appears *twice*: once as R's integrated content and once as
+"unintegrated" subscribed content. This contradicts
+'docs/data-model.org'/'vision.org' example 2 (which expects it to drop
+out of the subscribee view) and contradicts your statement that "the
+subscribeeCol displays precisely its unintegrated content".
+
+Evidence it is genuinely unhandled:
+'tests/hidden_from_subscriptions.rs::test_moving_foreign_subscribee_content_to_subscriber_does_not_hide'
+moves 'e1' into the subscriber and asserts only (a) no hide is created
+and (b) 'e1' appears as content of 'r'. It never asserts 'e1'
+disappears from the subscribee-as-such branch. Its existing-content
+assertion 'contains("** (skg (node (id e1) ...")' would even match a
+'**** ' (deeper) occurrence, so a duplicate would pass unnoticed.
+
+*** Why it is a hard blocker for forks
+A fresh fork has 'C.contains = N.contains' and 'C.hides = {}'. The
+subscribee-as-such view of N under C would be
+'N.contains - {} = N.contains' -- i.e. every child C just integrated
+shown again as unintegrated. The fork would be unusable on day one.
+'docs/sharing-model.md' para 2 already names the intended rule: there
+is "an implicit 'hides_from_its_subscriptions' relationship from the
+clone to all of its normal content ... any branch that shows up as
+ordinary integrated content does not need to also show up in the
+subscriptions." The display simply does not implement that implicit
+rule yet.
+
+*** The fix (two candidate shapes; recommend B)
+- (A) Materialize the implicit hides: at fork time write
+  'C.hides_from_its_subscriptions = C.contains'. Cheap to add, but
+  bloats the file with redundant data and must be kept in sync with
+  'contains' on every later edit -- fragile.
+- (B) *Change the display to subtract the subscriber's own contains.*
+  Make 'content_goal_list' for a subscribee-as-such return
+  'subscribee.contains - subscriber.hides - subscriber.contains'. This
+  implements 'sharing-model.md's "implicit hides to all normal
+  content" without writing redundant data, keeps 'hides' meaning only
+  "explicitly hidden", fixes the pre-existing move-into-graph bug
+  (example 2) at the same time, and makes a fresh fork show empty
+  unintegrated content automatically.
+
+Recommend B. It is a localized change (one function reads the
+grandparent/subscriber's 'contains' alongside its 'hides' and subtracts
+both). It must be mirrored anywhere else the subscribee-as-such content
+membership is derived; audit the initial-render path
+('server/to_org/complete/partner_col/') for a sibling of
+'content_goal_list', and the HiddenIn/HiddenOutside goal lists
+('goal_list.rs') so the hidden buckets stay consistent (a node that is
+both integrated and explicitly hidden should not double-count).
+
+*** Order
+Land B with its own regression *before* the fork work, so the fork's
+"unintegrated content is empty initially" test has correct ground
+truth. The regression: open a subscriber whose own 'contains' includes
+a node M that a subscribee also contains; assert M does not appear
+under the subscribee-as-such. (This is independent of forking and is
+worth fixing regardless.)
+
+** Design of the fork operation
+
+*** Trigger and transport
+**** DONE SUPERSEDED by the gesture veto (see Problems -> "The trigger
+deviates from the long-term vision"). This section recommends the
+EditRequest::Fork command, which Jeff vetoed in favor of the implicit
+gesture (editing a foreign node forks it, with a save-time y/n
+confirmation buffer). Rewrite this section to the gesture model once the
+gesture sub-questions in that discussion are answered. Kept below only
+for the reasoning it records.
+The original N is shown as read-only/indefinitive content (under a
+subscribeeCol, via override substitution, or as a foreign view root).
+'EditRequestOnIndefinitive' ('parse_metadata_sexp.rs:188-200') forbids
+attaching an edit request to an indefinitive node, and structurally an
+'IndefOrDef::Indefinitive' has nowhere to store one. So the request
+cannot ride on N. Two viable shapes:
+
+- *Recommended -- EditRequest::Fork(target) on a NEW owned headline.*
+  Mirrors merge exactly: merge marks the *acquirer* (an owned node)
+  with '(editRequest (merge ACQUIREE))'; fork marks the *clone-to-be*
+  (a new owned node, ID minted in 'add_missing_info') with
+  '(editRequest (fork ORIGINAL))'. The new node is Definitive, so the
+  indefinitive guard never fires. On save, a fork-extraction phase --
+  modeled on 'nodeMerge_instructions_from_pairs'
+  ('server/nodeMerge/nodeMergeInstructionTriple.rs:101-140'), which
+  already does an async disk fetch of the referenced node -- fetches N
+  and fills C's save intent (title, body, contains copied;
+  subscribes_to=[N]; overrides_view_of=[N]). Stays entirely within the
+  save pipeline (the sole graph-mutation path), reuses the writable-col
+  persistence for the two relations, and matches a known precedent.
+
+- *Alternative -- a dedicated "fork node" request that returns a
+  pre-populated buffer.* Like single-root-view/override-menu: the
+  server (no mutation) builds a buffer for a new C with title/body/
+  contains copied and a subscribeeCol+overriddenCol already holding N;
+  the user reviews/edits and saves through the normal pipeline. More
+  "preview", but it needs speculative col construction for an unsaved
+  node, which is new and fiddly.
+
+Both keep the copy server-side (the client must never reconstruct N's
+data). Recommend the EditRequest shape; see [[*Open questions][Open questions]] Q1.
+
+*** What the clone C gets
+- title := the title the fork gesture produced -- the user's edited
+  title if they changed it while editing N, else N.title verbatim
+  (decided with Jeff);
+- body := N.body;
+- contains := N.contains (shallow; the child IDs stored RAW -- decided
+  with Jeff -- with override substitution applied only at render time,
+  not at copy time);
+- subscribes_to := [N];
+- overrides_view_of := [N];
+- source := a user-owned source (see next);
+- hides_from_its_subscriptions := none. Per Jeff's Option-B decision
+  (Problems -> "unintegrated content"), the subscribee-as-such display
+  excludes what the subscriber both hides AND contains, so C's copied
+  contains are already filtered out -- the fork records no hides, and the
+  subscribee-as-such under C shows only N's later additions. (The
+  prerequisite display fix carries this.)
+
+*** Source selection for C
+C must live in a source the user owns; N's is foreign/read-only, and
+'add_missing_info' only inherits a source from a buffer *parent*
+('add_missing_info.rs:102-121'), with a sourceless node hard-failing at
+lowering ('lower.rs:250-252'). Resolution (decided with Jeff, under the
+gesture model where the user edits N in place):
+- infer C's source from N's nearest OWNED vognode ancestor in the view;
+- if there is none (the nearest ancestor is also foreign), do NOT die:
+  the fork-confirmation buffer (see the gesture discussion) is WRITEABLE
+  for this -- the user sets C's source there with the metadata
+  source-rotation command (on 'C-c s s' / 'C-c v m'), and the buffer
+  explains that edits to anything else in it are ignored;
+- if the resolved owned source is INACTIVE under the active source-set,
+  FORBID the fork (Jeff: in a restricted set you are not meant to touch
+  those sources) -- abort with an explanatory error, never create an
+  invisible clone.
+
+*** Monogamy: forking a node you have already forked
+If N already has a user-owned overrider C1, minting C2 over N fails
+'MultipleUserOwnedOverriders'
+('override_invariants.rs:65-73,127-156'). The fork must *pre-check*:
+look up user-owned overriders of N (the resolver already provides this,
+'override_resolution.rs') and, if one exists, *redirect* the user to
+edit the existing clone C1 -- never mint a second, and never
+auto-delete C1 (that would silently discard C1's accumulated edits).
+MVP minimum: reject with a message naming C1 ("you already forked this;
+your clone is <C1>") and let the client offer to open it. (Decided with
+Jeff: this reject-with-error is also how the save-time fork-confirmation
+handles a monogamy-blocked node. There is NO analogous constraint on
+subscriptions -- only on user-owned overrides, and a node may have at
+most one user-owned overrider.)
+
+*** One save, with correct ordering
+Create + subscribe + override in a single save. Unlike move+merge
+(genuinely conflicting; 'CannotMoveAndMergeSimultaneously',
+'validate.rs:182-207'), these are additive on a fresh node, so no split
+is needed. The constraint is ordering inside the save: the touched-
+override invariant check reads the *post-save simulated graph*
+('override_invariants.rs' header comment), so C and its
+'overrides_view_of' edge must be in 'touched' and in the simulated
+graph before validation -- exactly as nodeMerge simulates its three
+nodes.
+
+** Server implementation steps (suggested order)
+*** DONE STALE pending the gesture decisions: step 1 is now Option A (the
+fork records hides for the content it copies; the display is left as-is),
+and step 2's EditRequest::Fork is superseded by the implicit gesture +
+a save-time confirmation stage. Rewrite this list once the gesture
+sub-questions (under "The trigger deviates ...") are settled; the
+fork-extraction phase, monogamy pre-check, and round-trip test below
+still survive.
+1. *Prerequisite fix B* + its standalone regression (subscribee-as-such
+   display subtracts subscriber.contains). Independent; land first.
+2. *EditRequest::Fork(ID)*: add the variant
+   ('server/types/viewnode.rs:423'); 'Display'/'FromStr' (~768-792,
+   grammar '(fork ID)' to match '(merge ID)'); 'parse_editrequest_sexp'
+   ('server/serve/parse_metadata_sexp.rs:701-729'); the herald
+   conformance atom table ('server/heralds.rs', covered by the
+   'herald_rules_cover_the_emittable_vocabulary' test). Audit every
+   'EditRequest::' match site (recon counted ~11; e.g.
+   'contradictory_instructions.rs', 'predicates.rs',
+   'validate_nodeMerge.rs', 'org_to_text.rs') and either handle Fork or
+   explicitly reject it, so a Fork cannot silently fall through.
+3. *Intent plumbing*: 'NodeIntent_Local::Fork' + an 'IntentsForOneId'
+   fork slot + a 'lower' handler, paralleling NodeMerge across
+   'local_instruction_collection/{types.rs,traverse.rs,lower.rs}'.
+4. *Fork extraction phase*: a 'fork_instructions_from_pairs'-style async
+   function that fetches N from disk and builds C's SaveNode (title/
+   body/contains copied; subscribes_to/overrides_view_of set). Look for
+   genuine reuse with 'nodeMerge_instructions_from_pairs' -- both pair
+   an owned node with a fetched referenced node; if a shared abstraction
+   is clean, extract it, else note the quasi-duplication.
+5. *Monogamy pre-check / redirect* (see design). New helper
+   'existing_user_owned_overrider_of(N)' over the resolver's inverse
+   lookup.
+6. *Validation*: C's source must be user-owned; reject fork of a node
+   that resolves to inactive under the active source-set if the clone
+   could not then substitute (decide -- see Open questions Q4);
+   the existing foreign-policy validation must let C (owned) through
+   while N stays untouched.
+7. *Round-trip*: confirm post-save rerender draws C in N's place
+   (override substitution + 'overridesHere'), and that C's subscribeeCol
+   shows empty unintegrated content given fix B. This exercises the
+   override *write* path for the first time ever (it has only ever been
+   read before -- see Problems P6), so test it hard.
+
+** Emacs client
+- New command 'skg-fork-node' (parallel to 'skg-set-merge-request',
+  'elisp/skg-metadata.el'): read the original's PID at point (reuse the
+  id/link reader used by merge), create/mark a new owned headline with
+  '(editRequest (fork PID))', resolve C's source (inherit owned parent
+  or prompt), and message "Fork of <PID> staged; save to apply." Do not
+  save automatically (the established delete/merge pattern stages a
+  metadata edit and waits for the user to save).
+- Keybinding under the existing 'C-c s' family near 'C-c s m'
+  (set-merge), e.g. 'C-c s f'.
+- If 'skg--set-relation-request'-style duplication with
+  'skg-set-merge-request' is clean, factor it; else note it.
+- The monogamy-redirect response (server says "already forked, here is
+  C1") should open C1.
+
+** Tests
+Follow the established sharing-test patterns
+('tests/hidden_from_subscriptions.rs', 'tests/override_substitution.rs',
+'tests/collateral_partner_col.rs'; the shared-db harness
+'run_with_shared_test_db'; multi-source 'skgconfig.toml' fixtures with
+an owned source and a 'user_owns_it=false' foreign source).
+
+- Prerequisite-B regression (above), independent of fork.
+- Save-instruction assertion: a fork request yields a SaveNode for C
+  with title/body copied, contains = N's child IDs *shallow* (assert
+  descendants are NOT pulled in), subscribes_to=[N],
+  overrides_view_of=[N].
+- Fixture-file assertion after save: 'main/C.skg' has the four fields;
+  'foreign/N.skg' is byte-unchanged.
+- Round-trip: save C, close, reopen a view that contained N; assert C
+  is drawn in N's place with '(overridesHere N)'; assert C's
+  subscribeeCol shows N with *empty* unintegrated content; then add a
+  child to N on disk + rebuild and assert it now appears as
+  unintegrated.
+- Monogamy: forking an already-forked N is rejected/redirected, not a
+  raw 'MultipleUserOwnedOverriders' crash.
+- Source: fork with no owned parent and no source errors clearly; fork
+  under an owned parent inherits its source.
+- Source-set: a clone whose source is inactive under the active set
+  does not substitute (decide Q4) and degrades gracefully.
+- Integration (elisp), mirroring 'tests/integration/override-menu/':
+  drive 'skg-fork-node' end to end.
+
+** Docs to update
+- 'docs/forks.md': rewrite to the subscribeeCol mechanism; drop the
+  '<skg<...>>' branch; de-goofy the examples.
+- 'docs/sharing-model.md': add the fork command and that integrated
+  content is excluded from the subscribee-as-such view (the implicit-
+  hides rule, now actually implemented by fix B).
+- 'glossary.md': add "clone"/"fork operation" if useful; note EditRequest
+  gained Fork.
+- 'schema.tql' comment on 'subscribes'/'overrides_view_of': mention the
+  fork command creates both edges.
+- 'docs/undoing-import.org' already notes these relations are lost on
+  export; no change needed, but verify it still reads true.
+- 'TODO/DONE/sharing/vision.org' "fork a foreign node by editing it"
+  can be marked resolved when this lands.
+
+* Problems (pushback)
+** GLOSSARY for this section
+*** "fork" = turn a foreign node (one in a source you do
+NOT own, hence read-only) into an editable clone in a source you DO
+own.
+*** N = the foreign node being forked; C = the clone the fork creates.
+C copies N's title, body, and child-list, *subscribes* to N (so N's
+later additions surface to C as unintegrated content) and *overrides* N
+(so skg draws C wherever N would otherwise appear -- "override
+substitution").
+*** "source-set" = the subset of configured sources active
+in a given view.
+** DONE (Jeff speaking) We only need one Problems section.
+I can see from the TODO / ONGOING / DONE markers where my attention is needed.
+*** Claude : done -- the separate "Open questions" section is gone; its
+three questions now live as items below (inactive-source clones, title,
+placement). One section from here on; new questions/problems go as
+top-level children of Problems.
+** DONE (Jeff speaking) : Are the items marked ONGOING below no long ongoing?
+That is, should they be marked DONE? If so, please mark them DONE;
+if not, please extend them with whatever question remains open from them.
+*** Claude : reviewed both. "overrides_view_of write path" -> DONE (your
+round-trip question is answered; the only residue is a recorded test
+requirement). "Subscribee-collateral staleness" -> still ONGOING: I
+investigated and it is NOT fixed; the one open item is your scope call
+(fix it here, or split it into its own task).
+** DONE *docs/forks.org does not exist.*
+The prompt names 'docs/forks.org';
+the file is 'docs/forks.md'. I proceeded with the '.md'. Confirm that
+is the intended source.
+*** DONE right
+** DONE *forks.md is partly obsolete
+and its examples are self-described as
+"goofy".* The '<skg<...>>' generated branch it describes duplicates the
+subscribeeCol that already exists. Following forks.md literally would
+build a redundant scaffold. This plan instead reuses the subscribeeCol
+(your nonobvious point). forks.md needs rewriting either way.
+*** DONE agreed, please do
+**** Claude : queued as an execution-time task (it is in "Docs to
+update"). I'll rewrite forks.md once the gesture + Option-A design is
+locked, so it describes the mechanism that actually ships rather than
+being rewritten twice.
+** DONE *The "unintegrated content is what the subscribeeCol shows" claim
+is not actually true in code yet for the move-into-graph path.* The
+display subtracts only 'subscriber.hides', not 'subscriber.contains'
+('content_goal_list', 'content.rs:398-419'); 'resolve_visibility'
+intentionally does not hide content you move into your own graph. So
+today, moved-in content shows in two places, and a fresh fork would
+re-show everything as unintegrated. I am fairly confident of this
+reading and a test gap supports it
+('test_moving_foreign_subscribee_content_to_subscriber_does_not_hide'
+never checks for the duplicate). *If I have missed a filter, please
+point me at it.* Either way the fork depends on prerequisite-fix B.
+*** DONE We're both kind of right.
+You're right that it does not subtract what the subscriber contains.
+But that's not the only way content can be integrated.
+The user might have given it any other parent.
+We can't actually know what the user considers 'integration complete' --
+maybe they gave it many parents but still haven't removed it
+from the subscribee-as-such because they intend to integrate it elsewhere,
+too. So we just have to take them at their word.
+If there's a hidden relationship -- either because they moved it,
+or because they deleted it -- we call it integrated;
+if there isn't, we call it unintegrated.
+*** Claude : folded as "Option A" -- the fork records C as hiding every
+child it copies, and the display keeps subtracting only hides
+('content_goal_list'), so it is correct as-is. Reframed the
+"Prerequisite" section to match.
+*** DONE Claude : one residual, hinges on your "either because they moved
+it" -- it is only PARTLY true in code today. Moving subscribee content
+to some OTHER owned node DOES infer a hide; but moving it into the
+SUBSCRIBER ITSELF does NOT ('resolve_visibility' skips it -- "hiding
+your own content is silly"). In that one case the item is integrated by
+being contained, not by a hide, so under pure Option A it would still
+double-show under the subscribee-as-such. Two ways to honor your
+principle: (a) make move-into-self also infer a hide; or (b) for that
+one case, also subtract the subscriber's own contains in the display (a
+touch of the old Option B). Which? (Affects ongoing use after a fork,
+not the initial fork itself, where Option A already covers it.)
+**** DONE oh good point
+Container R should not both hide and contain content T,
+so let's have a subscribee-as-such only show things the corresponding subscriber
+neither hides nor contains.
+***** Claude : decided -- Option B. Folded: the display rule becomes
+contains - hides - subscriber's-own-contains, and the fork records no
+hides. Reverted the earlier Option-A notes in the plan body (the
+"Prerequisite" section and "What the clone C gets").
+** DONE *Monogamy makes "re-fork" a guaranteed save failure, and the naive
+fixes lose data.* Auto-deleting the prior overrider to mint a new one
+discards the existing clone's edits. The safe design is detect-and-
+redirect to the existing clone. This must be decided before coding the
+extraction.
+*** DONE good point
+Note that there is no monogamy constraint (right?) for subscriptions,
+just for overrides. If a user tries to edit something they already
+override (whether or not that overrider is also a subscriber),
+the save should be rejected with an explanatory error message.
+Note that *they* is important -- the data can override a node
+many times, but the user-owned data can override it only once.
+*** Claude : folded into the "Monogamy" design section (reject a re-fork
+with an explanatory error naming the existing clone; no analogous
+constraint on subscriptions, only on user-owned overrides). This also
+answers gesture sub-question 3 above: a monogamy-blocked node makes the
+save-time confirmation reject with that naming error, rather than
+silently proceeding.
+** DONE *Shallow contains-copy interacts with override resolution.*
+A fork copies N's child IDs into C verbatim -- a *shallow* copy, so N's
+descendants are not cloned. At render, every content child is passed
+through override resolution, which can draw a different node in its
+place. Two hazards:
+- If one of N's children is itself a node the user has already forked
+  (overridden), C will silently show that child's clone instead of N's
+  child (maybe desirable, maybe surprising);
+  - Jeff : desirable. Visible to user via heralds (already coded).
+- If N contains itself (or a cycle reachable through the copied IDs),
+  the resolver's cycle guard returns the node unsubstituted and *masks*
+  the anomaly silently rather than flagging it.
+  - TODO : Jeff : Please elaborate; I don't get it. If C overrides N,
+    then shouldn't we see C in place of N both as the parent
+    and in place of N as the (indefinitive, because it's a repeat) child?
+  - Claude : You're right -- it's normal cycle display, not a hazard;
+    I withdraw it. If N self-contains, C (overriding N) is the root, and
+    the child slot (C.contains still lists N) resolves N -> C, drawn as an
+    indefinitive repeat with the 'cycle' viewstat -- exactly "C as parent
+    and C again as the repeat child". Storing raw IDs makes this
+    automatic; nothing special is needed.
+- Decide whether the shallow copy stores the raw IDs (the current
+  assumption) or resolves overrides first and stores the results, and
+  whether a self/cycle copy should warn.
+  - TODO : Jeff : I think the raw IDs. If you turn up yet more problems
+    that this creates, tell me, but if the above are the only ones,
+    let's go with the raw IDs
+    (subject at render time to override substitution).
+  - Claude : Agreed, raw IDs (substitution applied at render). No further
+    problems turned up. Folded into "What the clone C gets" in the plan
+    body.
+** DONE *The trigger deviates from the long-term vision.*
+'docs/data-model.org' (para "Forks ... require three more
+relationships") specifies an *implicit* model: ANY edit to a foreign
+node forks it automatically. This plan instead recommends an *explicit*
+command ('skg-fork-node') for the first version, because the implicit
+path is blocked at two layers today -- a foreign-node edit is rejected
+outright at save, and foreign content shown read-only ('indefinitive')
+never even becomes an editable instruction an interceptor could catch
+-- and because silently minting a new node in the user's data on a
+stray keystroke is hard to undo. A conscious deviation from the stated
+vision; flagging it so you can veto.
+*** DONE Jeff : Vetoing -- I want the gesture.
+The gesture requires removing the foreign-edit check.
+We should, however, insert a stage into saving wherein the server
+asks the user to verify that they want to fork the things
+they have (maybe unwittingly) asked to fork, after verifying
+that no prior forks block any of them.
+This can take the form of a buffer that lists every node they asked to fork,
+as a flat (single layer of headlines + invisible bufferroot)
+read-only tree of org headlines with explanatory text before the first,
+asking for a simple y/n response.
+**** DONE Claude : gesture accepted -- folding it in. It supersedes the
+EditRequest::Fork approach: the plan body's "Trigger and transport"
+section and the EditRequest::Fork implementation step are now stale; I
+marked "Trigger and transport" TODO to rewrite to this gesture model
+once the sub-questions below are settled. New sub-questions the gesture
+raises (answer here):
+- Which edits trigger a fork? Any real change to a foreign node (title,
+  body, add/remove/reorder children), at any depth in the view? Or a
+  narrower set (e.g. ignore pure reordering)?
+- The confirmation stage is a new mid-save interaction: server pauses the
+  save and returns the read-only "confirm these forks" buffer, the client
+  answers y/n, the save resumes. Is that the shape -- a new response-type
+  plus a follow-up request (server -> client -> server)? And does "n"
+  abort the WHOLE save, or only the forking, keeping any non-fork edits?
+- When a prior user-owned override already blocks one of the nodes to be
+  forked (the monogamy check you mention): abort the whole confirmation,
+  or list the blocked ones and proceed with the rest (redirecting the
+  blocked ones to their existing clones)?
+***** Claude : two of these are now answered elsewhere -- the third
+(monogamy-blocked) is "reject with an explanatory error naming the
+existing clone" (from the Monogamy discussion above); and the
+confirmation buffer is now WRITEABLE, at least for C's source (from the
+Inactive-source discussion below), updating the "read-only" assumption.
+Still genuinely open for you:
+- *Which edits trigger a fork?* Any real change to a foreign node (title,
+  body, add/remove/reorder children), at any depth? Or a narrower set
+  (e.g. ignore pure reordering)?
+- *On "n" at the confirmation*, abort the WHOLE save, or only the
+  forking (keeping any non-fork edits)?
+****** DONE any change, and abort the whole save
+but do not close that error buffer -- the user will need it,
+in order to search for the relevant IDs.
+(They should be able to run the usual ID stack push function from it.)
+******* Claude : folded into plan.org -- any change to a foreign node
+triggers a fork; "n" aborts the whole save; the confirmation buffer
+stays open and supports the ID-stack-push/search command.
+** DONE *The 'overrides_view_of' write path is brand new and untested.*
+The override edge from C to N can now be written from a saved buffer
+(via the generated 'overriddenCol' scaffold), but no save has ever
+actually created one -- per 'status-before-plan.org' it has only ever
+been read, so a fork would be its first real writer. The marker that
+lets a drawn substitute round-trip on save ('overridesHere') is
+*validated* ignoring which sources are active but *rendered* respecting
+them ('override_resolution.rs' vs 'validate_tree.rs'), so a clone whose
+source falls outside the active source-set can silently stop
+substituting. Needs dedicated round-trip and source-set tests before
+the fork relies on it.
+*** DONE please elaborate
+When you say round-trip what do you mean?
+(Server-client-server? Disk-skg-disk?)
+**** Claude : the buffer cycle server -> client -> server, not
+disk-skg-disk. Concretely: the server renders C in N's place carrying
+the '(overridesHere N)' marker; the user edits and saves; on save,
+extraction must read that marker and record N (not C) in the container's
+stored 'contains'; the re-render then draws C again. "Round-trip" = that
+marker surviving render -> save -> re-render, so a container's child-list
+is never silently rewritten from N to C. (The container's .skg keeping N
+is the consequence, not a separate disk loop.)
+**** Claude : marking DONE -- your round-trip question is answered. The
+residue (the fork is the first real writer of 'overrides_view_of'; it
+needs dedicated round-trip + source-set tests) is an implementation/test
+requirement, recorded in TODO/problems.org.
+***** DONE how did we close this?
+I don't remember ever answering.
+But now that I think I understand the question:
+Suppose a fork F is being substituted for S somewhere.
+Then F's source goes inactive.
+F should be (this is already coded) removed if indefinitive,
+left in place but marked inactive (and hence redacted)
+if it has children that need to be persisted in the view.
+Either way, it will no longer look like a child that affects its parent,
+so the parent will try to regenerate S, and since F's source is inactive,
+will draw the original S instead of replacing it with F.
+****** Claude : exactly right, and that fallback is already coded -- the
+visibility-gated resolver won't substitute an inactive overrider, so the
+original S is drawn raw ('override_resolution.rs'); an inactive F with
+children is retained, redacted, and emits no membership. So this is
+correct behavior, not a bug. The only residue is a test that exercises
+it for a freshly-created fork (the first real 'overrides_view_of'
+writer).
+** DONE *Missing types/abstractions that would make this safer:*
+*** a 'ForkInstruction' (or 'ForkSpec') type carrying (clone_id,
+  original_id, copied title/body/contains) so the fork extraction is
+  typed end-to-end, not a bag of loose fields -- parallel to the
+  existing 'NodeMerge' type;
+**** DONE yes
+*** 'EditRequest::Fork' (the new buffer instruction marking "fork node
+  X") must round-trip through ~11 code sites plus Display/FromStr and
+  the herald atom table; making each 'match' on 'EditRequest'
+  exhaustive (no wildcard arm) would make the compiler flag every place
+  Fork must be handled;
+**** DONE vetoed per above
+*** a single 'existing_user_owned_overrider_of(id)' helper to centralize
+  the "has the user already forked this node?" check (skg allows at
+  most one user-owned override per node -- the monogamy rule);
+**** DONE yes
+*** 'SourceValidationError' consolidation (recon found "source not
+  found" duplicated across 'supplement_from_disk.rs', 'save.rs',
+  'multiple_nodes.rs') -- nice-to-have.
+**** DONE yes
+*** Claude : folded -- adopting 'ForkInstruction', the
+'existing_user_owned_overrider_of' helper, and 'SourceValidationError';
+dropping 'EditRequest::Fork' (the gesture veto removes the need for it).
+The implementation-steps list is marked stale to match.
+** DONE *Subscribee-collateral-rerender staleness (pre-existing).*
+'subscribeecol-maybe-todo.org' flags a latent bug: when a node that
+subscribes to others is open in two views at once and one view is
+saved, the OTHER view's generated list of subscribed nodes (its
+'subscribeeCol') can keep stale entries instead of refreshing from the
+saved graph. Forking creates subscribers, so this becomes easier to
+hit. Worth resolving (with its own test) alongside the fork work, or at
+least noting.
+*** DONE please investigate, running experiments
+The save instruction collection and rerender pathways were both
+recently overhauled, and I think both of those were after the flag
+you mention; it might be solved now. If it's not,
+please write up (here) how it isn't.
+**** DONE Claude : investigated -- NOT solved; the same guard survived
+the overhaul. The function the old note named ('complete_subscribee_col_preorder')
+is gone, but its replacement, 'reconcile_subscribee_col_children'
+('server/update_buffer/reconcile/subscribee_col.rs'), computes the fresh
+goal-list from the graph (line ~52) and then only *applies* it inside
+'if context.parent_indefinitive || source_diffs.is_some()' (line ~74).
+So a DEFINITIVE subscriber in a NON-diff collateral rerender never
+reconciles its subscribeeCol children against the fresh list -- stale
+entries persist. Repro: open two views of a definitive subscriber S;
+change S's subscriptions in one and save; the other view's subscribeeCol
+is not refreshed. The guard is right for the SAVED view (a definitive
+subscriber there IS the source of truth for that save) but wrong for a
+COLLATERAL rerender (which should refresh from the graph). Fix: pass a
+"this is a collateral rerender" signal and reconcile children regardless
+of definitiveness in that case; the original note in
+'subscribeecol-maybe-todo.org' still applies. In scope here, or split
+out? (This is independent of forks but forking makes it easier to hit.)
+***** DONE in scope here
+****** Claude : folded into plan.org as an in-scope step (fix the
+collateral rerender so a definitive subscriber's subscribeeCol
+reconciles from the graph).
+** DONE *Inactive-source clones.*
+If C's source is not in the active
+source-set -- so C cannot be drawn, and therefore cannot substitute for
+N -- should the fork refuse, or create C anyway and accept that it has
+no visible effect until the user activates C's source?
+*** DONE what do you mean "should the fork refuse"?
+Refuse to be drawn? Refuse to create a fork?
+**** DONE Claude : refuse to CREATE the fork. Scenario: you fork N, but
+the owned source C would live in is not in the active source-set, so C
+cannot be drawn and its override of N cannot substitute (you'd still see
+N raw). Two options: (a) refuse -- abort the fork with "activate source
+X first"; or (b) create C anyway -- the fork succeeds but is invisible /
+non-substituting until you activate its source. (Once we settle where
+C's source comes from under the gesture -- "Source selection for C" --
+this may rarely arise, since you'd usually fork into an active source.)
+Which?
+***** DONE I'm not seeing how it would arise, but let's forbid it.
+When the user is in a restricted source set,
+the idea is that they are not touching those sources.
+***** DONE this raises a quetsion I hadn't considered
+When a user edits a foreign node, they might not change its source.
+The source can be inferred from its nearest vognode ancestor
+if that ancestor is owned, but that can't be its source if it's also foreign.
+Rather than die, the 'are you sure you want to fork?' verification buffer
+should be writeable, and let the user edit (via the commands linked to
+C-c s s or C-c v m whose names I've forgotten)
+their source. It should explain that edits to anything else
+from that verification buffer will be ignored.
+***** Claude : both folded into "Source selection for C" -- (1) a fork
+whose resolved owned source is inactive is FORBIDDEN; (2) when the source
+can't be inferred from an owned ancestor, the fork-confirmation buffer is
+WRITEABLE so the user sets C's source there (the source-rotation command;
+other edits in that buffer are ignored). (2) also partially answers
+gesture sub-question 2: the confirmation buffer is editable, at least for
+source.
+** DONE *What title should the clone get by default?* Copy N's title
+verbatim (recommended for a first version), or build the joined
+"container / node" title forks.md shows (e.g. "eggs / mystical")? The
+join needs the title of N's container, which is not part of N and is
+ambiguous when N has more than one container (in skg a node can be
+contained by any number of others). I recommend punting the join; the
+user can rename C.
+*** DONE yeah, the title can simply be the original
+or whatever the user edited it to, if a title edit was
+part of the edit gesture that created the fork
+**** Claude : folded into "What the clone C gets" -- title := the user's
+edited title if the fork gesture changed it, else N.title verbatim.
+** DONE *Where does the clone live?* When you fork an N that appeared as
+content of some container, override substitution already draws C
+wherever N showed, without rewriting that container's stored child-list
+-- so no placement is needed there. But to add a fork as NEW content
+somewhere N was not (forks.md's "put eggs / mystical under mysticism"),
+the user must file C themselves. Is that manual placement fine for a
+first version, or do you want a "fork into this container" gesture?
+*** DONE manual placement is fine
+**** Claude : noted -- MVP creates C standalone; manual placement; no
+"fork into this container" gesture for v1.
