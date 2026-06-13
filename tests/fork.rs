@@ -14,14 +14,18 @@ use std::sync::Arc;
 
 use indoc::indoc;
 
+use std::collections::BTreeSet;
+
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle, install_or_swap_global_handle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::serve::ViewsState;
+use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
+use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::ForkSpec;
@@ -92,7 +96,77 @@ fn all_tests
       s . reset ("fork_round_trip", fixtures) . await ?;
       fork_round_trip (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("fork_monogamy", fixtures) . await ?;
+      fork_monogamy (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("fork_source_inactive", fixtures) . await ?;
+      fork_source_inactive (
+        &s . config, &s . driver ) . await ?;
       Ok (( )) } )) }
+
+/// Monogamy: a node may have at most one user-owned overrider. Forking
+/// N once creates a clone; forking it again is rejected with
+/// 'ForkAlreadyExists' naming the existing clone -- not the raw
+/// MultipleUserOwnedOverriders crash.
+async fn fork_monogamy (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  update_from_and_rerender_buffer (
+    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
+  let c1 : ID = clone_on_disk (config) ? . pid;
+
+  // Refresh the global graph so the monogamy pre-check sees the new
+  // clone, then try to fork the same N again.
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let result = buffer_to_validated_saveplan (
+    FORK_BUFFER, config, driver, None ) . await;
+  match result {
+    Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
+      assert! ( errors . iter () . any ( |e| matches! ( e,
+        BufferValidationError::ForkAlreadyExists (orig, existing)
+          if *orig == ID::from ("N") && *existing == c1 )),
+        "expected ForkAlreadyExists(N, {}), got {:?}", c1 . 0, errors ); }
+    other => panic! (
+      "expected ForkAlreadyExists rejecting the re-fork, got {:?}", other ), }
+  Ok (( )) }
+
+/// Source-set: a fork whose resolved owned source is inactive under the
+/// active source-set is forbidden ('ForkSourceInactive'), so an
+/// invisible clone is never created silently. Here the active set is
+/// {foreign} only, so the clone's inferred source "owned" is inactive.
+async fn fork_source_inactive (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  // Refresh the process-global graph from the freshly-reset fixtures so
+  // the monogamy pre-check does not see a prior sub-test's clone (reset
+  // wipes disk/DB but not the global handle).
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let active : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName ("only-foreign" . to_string ()),
+    sources : BTreeSet::from ([ SourceName::from ("foreign") ]), };
+  let result = buffer_to_validated_saveplan (
+    FORK_BUFFER, config, driver, Some (&active) ) . await;
+  match result {
+    Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
+      assert! ( errors . iter () . any ( |e| matches! ( e,
+        BufferValidationError::ForkSourceInactive (orig, source)
+          if *orig == ID::from ("N")
+             && *source == SourceName::from ("owned") )),
+        "expected ForkSourceInactive(N, owned), got {:?}", errors ); }
+    other => panic! (
+      "expected ForkSourceInactive, got {:?}", other ), }
+  Ok (( )) }
 
 /// The SavePlan a foreign edit produces carries one ForkSpec whose
 /// clone copies N's title/body/contains (SHALLOW -- the child IDs only,

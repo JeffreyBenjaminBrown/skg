@@ -183,6 +183,24 @@ pub fn validate_touched_override_invariants (
             final_targets, } ); } } }
   dedup_violations (violations) }
 
+/// The single user-owned node (by pid) that already overrides
+/// 'overridden', if any -- the monogamy pre-check a fork runs before
+/// minting a new clone. Returns the first such overrider (monogamy
+/// guarantees at most one in a valid graph). 'overridden' may be a
+/// primary or extra id; it is resolved to a pid first, matching how the
+/// graph and override edges resolve. Read against the LIVE graph before
+/// the save, so a fork of an already-forked node is rejected with a
+/// helpful "you already forked this; your clone is X" rather than the
+/// raw MultipleUserOwnedOverriders crash at commit.
+pub fn existing_user_owned_overrider_of (
+  config     : &SkgConfig,
+  graph      : &InRustGraph,
+  overridden : &ID,
+) -> Option<ID> {
+  let pid : ID =
+    graph . pid_of (overridden) . unwrap_or_else ( || overridden . clone () );
+  user_owned_overriders_of (config, graph, &pid) . into_iter () . next () }
+
 /// The user-owned nodes (by pid) that override 'overridden' (a pid), via
 /// the in-Rust graph's 'overriders_of' inverse index. Overriders whose
 /// source is unknown are treated as not-user-owned here: a touched

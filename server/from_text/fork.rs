@@ -10,6 +10,9 @@
 //! and builds C's SaveNode. The confirmation-gating and the commit live
 //! in the save handler.
 
+use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
+use crate::dbs::in_rust_graph::snapshot_global;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -61,6 +64,50 @@ pub fn fork_spec_from_buffer_node (
     . ok_or_else ( || BufferValidationError::ForkSourceUnresolved (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (buffer_node, clone_source) ) }
+
+/// Reject any fork that monogamy or the source-set forbids. Run after
+/// the clones are built (their sources resolved) but before the save
+/// commits anything:
+/// - *monogamy*: a node may have at most one user-owned overrider, so
+///   forking an N the user has already forked would violate it. Detect
+///   the existing clone against the LIVE graph and reject with
+///   'ForkAlreadyExists' (naming it) rather than letting the raw
+///   MultipleUserOwnedOverriders fire at commit. A monogamy-blocked fork
+///   is not also reported for its source.
+/// - *source-set*: the clone's owned source must be ACTIVE under the
+///   active source-set. Under a restricted set the user is not meant to
+///   touch inactive sources, and an invisible clone is never created
+///   silently; reject with 'ForkSourceInactive'.
+///
+/// 'restricted_source_set' is None when nothing is restricted (the set
+/// 'all'); the monogamy graph is the process-global snapshot, absent
+/// only in tests that bypass it (then monogamy is left to the commit-time
+/// invariant check).
+pub fn validate_fork_specs (
+  fork_specs            : &[ForkSpec],
+  config                : &SkgConfig,
+  restricted_source_set : Option<&ActiveSourceSet>,
+) -> Vec<BufferValidationError> {
+  let mut errors : Vec<BufferValidationError> = Vec::new ();
+  let graph_snap = snapshot_global ();
+  for spec in fork_specs {
+    if let Some (graph) = graph_snap . as_deref () {
+      if let Some (existing) = existing_user_owned_overrider_of (
+        config, graph, & spec . original_id )
+      { errors . push (
+          BufferValidationError::ForkAlreadyExists (
+            spec . original_id . clone (), existing ));
+        continue; }}
+    let clone_source : &SourceName = & spec . clone . 0 . source;
+    let active : bool =
+      restricted_source_set
+      . map_or ( true, |a| a . contains_source (clone_source) );
+    if ! active {
+      errors . push (
+        BufferValidationError::ForkSourceInactive (
+          spec . original_id . clone (),
+          clone_source . clone () )); }}
+  errors }
 
 /// Construct the clone C from the edited foreign buffer node N and a
 /// resolved owned source. C copies N's title/body/contains (the

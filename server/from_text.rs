@@ -25,7 +25,7 @@ use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use fork::owned_ancestor_sources_for_foreign_vognodes;
+use fork::{owned_ancestor_sources_for_foreign_vognodes, validate_fork_specs};
 use local_instruction_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
@@ -128,6 +128,15 @@ pub async fn buffer_to_validated_saveplan (
     &nonmerge_plan . source_moves, &nodeMerge_instructions )
     . map_err ( |errors| SaveError::BufferValidationErrors {
       errors, warnings : parsing_warnings . clone () } ) ?;
+  { // Reject forks monogamy or the source-set forbids (before any
+    // commit). Monogamy reads the live graph; the source-set check uses
+    // the active set.
+    let fork_errors : Vec<BufferValidationError> =
+      validate_fork_specs (&fork_specs, config, restricted_source_set);
+    if ! fork_errors . is_empty () {
+      return Err ( SaveError::BufferValidationErrors {
+        errors   : fork_errors,
+        warnings : parsing_warnings . clone () } ); }}
   let warnings : Vec<String> = {
     let mut warnings : Vec<String> = parsing_warnings;
     warnings . extend ( nonmerge_plan . warnings );
