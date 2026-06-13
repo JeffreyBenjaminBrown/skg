@@ -67,9 +67,11 @@ pub async fn validate_and_filter_foreign_instructions(
   let mut fork_specs : Vec<ForkSpec> = Vec::new ();
   let mut fork_errors : Vec<BufferValidationError> = Vec::new ();
   for outcome in &outcomes {
-    if let ForeignPolicyOutcome::ForkCandidate (buffer_node) = outcome {
+    if let ForeignPolicyOutcome::ForkCandidate (buffer_node, disk_title)
+      = outcome {
       match fork_spec_from_buffer_node (
-        buffer_node, owned_ancestor_source, user_set_fork_source, config )
+        buffer_node, disk_title, owned_ancestor_source,
+        user_set_fork_source, config )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }
@@ -80,7 +82,8 @@ pub async fn validate_and_filter_foreign_instructions(
 enum ForeignPolicyOutcome {
   Keep, // Safe to pass through to persistence.
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
-  ForkCandidate(NodeComplete), // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
+  ForkCandidate(NodeComplete, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
+               String), // N's DISK title -- the original, before the user's edit -- for the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title).
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
@@ -115,7 +118,8 @@ async fn apply_foreign_policy(
             // content the clone will copy. A nodeMerge-derived change to
             // a foreign node is NOT a fork and still rejects.
             if fork_eligible {
-              Ok (ForeignPolicyOutcome::ForkCandidate( node . clone() ))
+              Ok (ForeignPolicyOutcome::ForkCandidate(
+                node . clone(), disk_node . title . clone() ))
             } else {
               Ok (ForeignPolicyOutcome::Reject(
                 BufferValidationError::ModifiedForeignNode(
@@ -163,7 +167,7 @@ fn filter_unchanged_foreign_saves(
     . filter_map (|(instruction, outcome)| {
       match outcome {
         ForeignPolicyOutcome::DropUnchangedForeignSave
-          | ForeignPolicyOutcome::ForkCandidate (_) =>
+          | ForeignPolicyOutcome::ForkCandidate (..) =>
           None,
         _ => Some (instruction) }})
     . collect()

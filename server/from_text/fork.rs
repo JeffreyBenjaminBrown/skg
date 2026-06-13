@@ -77,6 +77,7 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
 /// 'validate_fork_specs'; resolution here only fills it.)
 pub fn fork_spec_from_buffer_node (
   buffer_node           : &NodeComplete,
+  disk_title            : &str, // N's original title (before the edit), for the confirmation buffer's child line.
   owned_ancestor_source : &HashMap<ID, SourceName>,
   user_set_source       : &HashMap<ID, SourceName>,
   config                : &SkgConfig,
@@ -88,35 +89,50 @@ pub fn fork_spec_from_buffer_node (
     . or_else ( || config . first_owned_source () )
     . ok_or_else ( || BufferValidationError::ForkSourceUnresolved (
         buffer_node . pid . clone () )) ?;
-  Ok ( build_fork_clone (buffer_node, clone_source) ) }
+  Ok ( build_fork_clone (buffer_node, disk_title, clone_source) ) }
 
-/// Build the read-only fork-confirmation buffer: a flat forest with one
-/// indefinitive headline per foreign node about to be forked, preceded
-/// by org-comment explanatory text. The client shows this and asks the
-/// user to approve (re-save) or decline (kill the buffer). The headlines
-/// carry real (skg ...) metadata so the buffer stays navigable -- the
-/// usual ID-stack-push / search commands work on it. Each line also
-/// names the owned source the clone will land in.
+/// Build the fork-confirmation buffer: read-only EXCEPT each clone's
+/// source. Two levels per fork, because one headline cannot honestly
+/// stand for both the original N and the (possibly re-titled) clone C:
+///
+///   * <edited title>     -- the CLONE-TO-BE C: its owned source (the one
+///                           editable field, rotated with C-c s s), the
+///                           user's edited title, NO id (none yet).
+///   ** <original title>  -- the ORIGINAL N that C overrides: its real id,
+///                           real (foreign) source, indefinitive,
+///                           parentIs=independent, marked "pO".
+///
+/// The client shows this and asks the user to approve (re-save the origin
+/// with the chosen sources) or decline (kill the buffer). Every headline
+/// carries real (skg ...) metadata so the buffer stays navigable -- the
+/// usual ID-stack-push / search commands work on it.
 pub fn build_fork_confirmation_buffer (
   fork_specs : &[ForkSpec],
 ) -> String {
   let mut out : String = String::new ();
   out . push_str (
-    "# FORK CONFIRMATION (read-only)\n\
+    "# FORK CONFIRMATION (read-only except each clone's source)\n\
      # Saving edited foreign nodes forks them: each becomes an editable\n\
      # clone in a source you own, which SUBSCRIBES TO and OVERRIDES the\n\
-     # original. The nodes below will be forked.\n\
+     # original. Below, each TOP headline is the clone-to-be (your edited\n\
+     # title); its SOURCE is the one editable field -- rotate it with C-c\n\
+     # s s. Its CHILD is the original it forks (real id, foreign source,\n\
+     # marked \"pO\": its visible parent overrides it).\n\
      # APPROVE with your client's fork-approve command (in Emacs: C-c\n\
-     #   C-c here) -- it re-saves the original, committing the forks.\n\
+     #   C-c here) -- it re-saves the origin, committing the forks into\n\
+     #   the sources shown.\n\
      # DECLINE with C-c C-k (or just leave this buffer): nothing is\n\
      #   written, and this buffer stays open so you can search it for IDs.\n\n" );
   for spec in fork_specs {
+    let clone_source : &SourceName = & spec . clone . 0 . source;
     out . push_str ( & format! (
-      "* (skg (node (id {}) (source {}) indef)) {}\n",
-      spec . original_id . 0, spec . original_source, spec . original_title ));
+      "* (skg (node (source {}) (viewStats (sourceHerald ⌂:{})))) {}\n",
+      clone_source, clone_source, spec . clone . 0 . title ));
     out . push_str ( & format! (
-      "# -> clone in your source '{}'\n",
-      spec . clone . 0 . source ) ); }
+      "** (skg (node (id {}) (source {}) (parentIs independent) indef \
+       (viewStats parentOverrides))) {}\n",
+      spec . original_id . 0, spec . original_source,
+      spec . original_title )); }
   out }
 
 /// Reject any fork that monogamy or the source-set forbids. Run after
@@ -184,6 +200,7 @@ pub fn validate_fork_specs (
 /// override substitution applies at render time.
 pub fn build_fork_clone (
   buffer_node  : &NodeComplete,
+  disk_title   : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
   clone_source : SourceName,
 ) -> ForkSpec {
   let clone : NodeComplete = NodeComplete {
@@ -202,7 +219,9 @@ pub fn build_fork_clone (
   ForkSpec {
     clone           : SaveNode (clone),
     original_id     : buffer_node . pid . clone (),
-    original_title  : buffer_node . title . clone (),
+    // The ORIGINAL title (N's disk title), distinct from the clone's
+    // edited title above -- the two-level confirmation buffer shows both.
+    original_title  : disk_title . to_string (),
     original_source : buffer_node . source . clone (),
   }}
 

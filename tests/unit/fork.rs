@@ -10,6 +10,7 @@
 
 use super::*;
 use crate::types::misc::SkgfileSource;
+use crate::types::nodes::complete::empty_node_complete;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol,
                              mk_definitive_viewnode};
@@ -90,3 +91,32 @@ fn scaffold_ancestor_is_skipped () {
   assert_eq! ( map . get (& ID::from ("S")),
                Some (& SourceName::from ("owned1")),
     "a scaffold between an owned ancestor and a foreign node is skipped" ); }
+
+/// A fork-to-be (clone) with an edited title over the original N it
+/// overrides, in N's foreign source. (original_title is N's disk title.)
+fn fork_spec_n_edited () -> ForkSpec {
+  let buffer_node : NodeComplete = NodeComplete {
+    title  : "N-edited" . to_string (),
+    source : SourceName::from ("foreign"),
+    pid    : ID::from ("N"),
+    .. empty_node_complete () };
+  build_fork_clone (
+    & buffer_node, "N-original", SourceName::from ("owned2") ) }
+
+#[test]
+fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
+  let buf : String =
+    build_fork_confirmation_buffer ( & [ fork_spec_n_edited () ] );
+  // The clone-to-be parent: edited title, owned source, NO id.
+  assert! ( buf . contains ("* (skg (node (source owned2)")
+            && buf . contains ("N-edited"),
+    "clone-to-be parent (edited title, owned source) missing:\n{}", buf );
+  assert! ( ! buf . contains ("(id N) (source owned2)"),
+    "the clone-to-be must carry no id:\n{}", buf );
+  // The original child: real id, foreign source, indef, independent, pO.
+  assert! ( buf . contains ("** (skg (node (id N) (source foreign)")
+            && buf . contains ("(parentIs independent)")
+            && buf . contains ("indef")
+            && buf . contains ("parentOverrides")
+            && buf . contains ("N-original"),
+    "original child (id/foreign/indef/independent/pO) missing:\n{}", buf ); }
