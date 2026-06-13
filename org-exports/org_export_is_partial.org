@@ -1,0 +1,19 @@
+* Some links might be broken.
+This data is represented as .skg files.
+Skg is a new program, based on org, an ancient and powerful notes program.
+Some of this .skg data is exported to .org format,
+for instance to present the documentation for skg
+without requiring someone to already be using skg.
+
+All of this .skg data is public and freely available at
+https://github.com/JeffreyBenjaminBrown/public-notes-in-skg-format
+but not all of it has been exported to org.
+When some data that was exported to org
+includes a link to data that was not so exported,
+you are brought to (the org-export of) this note
+(which is also represented as .skg data).
+
+(The skg-org correspondence is not 1-to-1;
+one .org file would correspond to many .skg files,
+and certain data (e.g. content with two containers)
+can be represented in .skg and cannot be reprsented in .org.)

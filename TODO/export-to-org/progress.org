@@ -1,0 +1,101 @@
+* Progress: export .skg data to .org
+
+Status as of 2026-06-13. Plan in plan.org; decisions in
+discussion.org. Branch: export-to-org.
+
+** What's done and went well
+- Core module =server/export_org.rs= (TypeDB/Tantivy-free):
+  discovery of export roots, the node->home map, one shared DFS
+  used for both home-building and rendering, link rewriting, the
+  =relpath= computation, tolerant =parse_target_filepath=, and
+  file writing. Entry: =export_to_org(active, nodes, output_base)=.
+- Wired as a TCP endpoint "export to org"
+  (=server/serve/handlers/export_to_org.rs=, protocol.rs, serve.rs)
+  AND a TypeDB-free CLI subcommand
+  =cargo run --bin skg -- export-org [config] [source-set]=.
+- Emacs command =skg-export-some-to-org=
+  (=elisp/skg-request-export-org.el=), reusing the existing
+  circular-cycle source-set picker; wired into skg-client.el and
+  skg-reload.el. Documented in docs/COMMANDS.org.
+- Endpoint documented in api-and-formats.md.
+- TOML discrepancy recorded in TODO/problems.org (Q3).
+- Tests: 4 DB-free unit tests pass (=cargo test --lib export_org=),
+  covering relpath, target parsing incl. whitespace refusal +
+  path-safety, a full multi-file render exercising a nested root, a
+  broken link, a same-file root link, a deep cross-file link, and
+  marker-child exclusion.
+- End-to-end against the real =data/=: exports the one current root
+  (9ff04e25) to =org-exports/org_export_is_partial.org= in ~1.6s,
+  marker child correctly omitted, body preserved. Unknown-set name
+  errors cleanly.
+
+** Changes to the plan's envisioned order
+- None material. The plan anticipated a CLI subcommand as the
+  invocation; discussion.org Q1 then chose the Emacs/TCP path, so I
+  built BOTH: the TCP endpoint (primary, what Jeff asked for) and
+  the CLI subcommand (kept as a TypeDB-free entry, used to verify
+  end-to-end against real data without a running server/Emacs).
+
+** Adversarial review and the fixes it drove
+A multi-agent review (27 agents, 4 lenses, each finding
+independently verified) confirmed 19 findings, which clustered into
+four real issues; all four are now fixed (tests added for each):
+1. DAG/cycle handling. The old recursive DFS used a path-local
+   cycle guard, so a node reached via two sibling branches was
+   re-expanded in full (subtree duplicated), a wide DAG could blow
+   up O(2^depth), and a deep chain could overflow the stack.
+   collect_events is now ITERATIVE with a monotonic per-file
+   visited set: each node renders once per file; a later
+   occurrence (diamond or cycle) becomes a link-leaf to its home.
+   (Test: diamond_node_rendered_once_then_linked.)
+2. Heading/anchor divergence. Headings are now the title's
+   plain-label form (links -> labels), identical to the anchor used
+   to link to them; links live only in bodies. (Test:
+   heading_text_matches_deep_link_anchor.)
+3. Marker over-exclusion. A "marker" is now precisely title-links-
+   to-instruction AND has a valid target_filepath; a node that only
+   mentions the instruction node in its title is content, not a
+   dropped marker. Alias ids are resolved in marker detection too.
+   (Test: title_link_to_instruction_without_target_is_content.)
+4. Robustness. One bad target / I/O error is now a per-root warning,
+   not a whole-run abort (Q6 non-destructive); discovery is
+   per-parent, so an inactive root warns once; the broken-link
+   summary wording no longer over-claims "redirected".
+
+** What's imperfect about what's done
+- Heading-anchor deep links still rely on title uniqueness within a
+  file: two DISTINCT nodes with the same title collide (warned);
+  org has no per-node anchor without property drawers. A literal
+  bracket in a title can also break a link. Both in problems.org.
+- A node under two containers in DIFFERENT files is still rendered
+  in each file (links resolve to its one canonical home); this
+  cross-file case is the irreducible .skg-vs-.org lossiness.
+- The live "export to org" TCP endpoint is verified against a
+  running server: public / all / unknown-set requests return the
+  correct =((response-type export-to-org)(content ..)(errors ..)
+  (warnings ..))= shape, and the server's write is byte-identical to
+  the CLI's. The only piece not exercised live is the Emacs elisp
+  DISPLAY of that response, which is a near-verbatim clone of the
+  working skg-diff-report handler and byte-parses cleanly.
+
+** Choices determining the future
+- Output directory is PROMPTED each run (the default =org-exports=
+  lives in the CLIENT; the server requires a non-empty value and
+  applies no default of its own) and resolved by the SERVER against
+  its working directory (project root): a relative path lands under
+  it, an absolute path is used as-is. No tab completion -- the server may run in a container
+  whose filesystem differs from the host Emacs runs on. This also
+  covers the GitHub front-page case: export with output-dir =.= so
+  a root whose target_filepath is =README= writes a real
+  =./README.org= (GitHub does not render symlinked or #+INCLUDE-d
+  READMEs). The report prints the actual absolute output path.
+- Canonical home = first appearance in target-sorted root order.
+  Stable and deterministic, but means moving content between files
+  can change where inbound links point.
+- =parse_target_filepath= is deliberately tolerant (bare or quoted
+  value), not strict TOML, to match existing data. Strictening it
+  later would require quoting values in the data.
+- Marker detection keys on a child's TITLE linking to
+  3d9aa9be-...; the instruction node itself (same id) is never a
+  marker (its title doesn't link to itself), so it renders as
+  ordinary documentation content where contained.

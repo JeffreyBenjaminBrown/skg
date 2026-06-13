@@ -23,6 +23,7 @@ pub enum RequestType {
   ListSourceSets,
   ActiveSourceSet,
   SetActiveSourceSet,
+  ExportToOrg,
 }
 
 impl RequestType {
@@ -48,6 +49,7 @@ impl RequestType {
       "list source sets"         => Ok (RequestType::ListSourceSets),
       "active source set"        => Ok (RequestType::ActiveSourceSet),
       "set active source set"    => Ok (RequestType::SetActiveSourceSet),
+      "export to org"            => Ok (RequestType::ExportToOrg),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -81,6 +83,7 @@ pub enum TcpToClient {
   StageMoves,
   SourceSets,
   ActiveSourceSet,
+  ExportToOrg,
   Error,
 }
 
@@ -112,4 +115,5 @@ impl TcpToClient {
       TcpToClient::StageMoves       => "stage-moves",
       TcpToClient::SourceSets       => "source-sets",
       TcpToClient::ActiveSourceSet  => "active-source-set",
+      TcpToClient::ExportToOrg      => "export-to-org",
       TcpToClient::Error            => "error", }} }

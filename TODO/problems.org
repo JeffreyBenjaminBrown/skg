@@ -1058,3 +1058,40 @@
    'find_and_stage_moves.rs'. The module only finds moves and emits a
    script that STAGES them ('git rm' / 'git add'); committing is left
    to the user, so the new name describes it exactly.
+* Problems found during the org-export feature (2026-06-13)
+** export marker bodies are not valid TOML
+   The instruction node 3d9aa9be-... says a marker child's body "is
+   interpreted as .toml", and both it and the one real marker
+   (512ea9da, body =target_filepath = org_export_is_partial=) write
+   the value UNQUOTED. That is not valid TOML: unlike YAML, TOML
+   requires string values to be quoted, so =toml::from_str= would
+   reject these bodies.
+
+   Resolution (agreed with Jeff, TODO/export-to-org/discussion.org
+   Q3): the exporter (server/export_org.rs 'parse_target_filepath')
+   does a tolerant =key = value= parse instead of strict TOML -- the
+   value may be bare or quoted, and is forward-compatible with quoted
+   TOML. A bare value containing whitespace is refused with an
+   explanatory message; absolute paths and '.'/'..' components are
+   refused so a target cannot escape org-exports/. The instruction
+   node's wording ("interpreted as .toml") is now slightly
+   inaccurate; if it ever matters, either quote the values in the
+   data or soften the wording to "a tolerant key = value line".
+** heading-anchor links rely on heading-text uniqueness
+   Deep links use org's =[[./file.org::*Heading][label]]= search,
+   which matches the FIRST headline with that text. When two
+   DISTINCT nodes in one exported file have the same title, links to
+   the second resolve to the first. The exporter emits one warning
+   per such collision, but org has no per-node anchor available
+   without property drawers (which we omit, since exported files
+   must not require org-roam). Headings are rendered as the title's
+   plain-label form (links collapsed to labels), so a heading's text
+   always equals the anchor used to link to it -- the earlier
+   heading-vs-anchor divergence is gone.
+** a literal bracket in a title can break a deep link
+   Anchors and labels are interpolated verbatim into
+   =[[*anchor][label]]=. A title containing a literal =]= (e.g.
+   "Notes [draft]") yields a malformed org link. The textlink regex
+   keeps labels free of =][=, but a title is arbitrary user text.
+   Rare; not escaped. Robust fix would require org link-syntax
+   escaping of anchors/labels.

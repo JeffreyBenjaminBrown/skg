@@ -1,0 +1,128 @@
+* Org-export feature: plan + questions for Jeff
+Please answer inline. Each open question has a *Recommendation*
+(what I'll do unless you say otherwise) and a blank "Jeff:" line.
+If every recommendation is fine, just write "all recs fine" at the
+top and I'll proceed.
+
+** Confirmed by you
+- *Nested export roots: link, don't inline.* A node that has its
+  own target file, when it appears as content inside another export
+  root, is rendered as a leaf headline whose title links to its own
+  .org file; its subtree is not duplicated.
+
+** How export roots are found (so we agree on the mechanism)
+A node R is an *export root* iff one of the children in its
+=contains= list is a *marker child* C, where
+- C's *title* contains a link to 3d9aa9be-... (the instruction
+  node), and
+- C's *body* yields a =target_filepath=.
+R is then written to =org-exports/<target_filepath>.org=.
+Right now exactly one real root exists: 9ff04e25 ("Some links might
+be broken.") -> =org-exports/org_export_is_partial.org=.
+(a19c5804 contains the instruction node *directly* as
+documentation, so it is correctly NOT a root.)
+=> Flag me if this mechanism is wrong; everything below assumes it.
+
+*** TODO perfect
+
+** Open questions
+
+*** Q1. Where should the exporter live / how is it invoked?
+Recommendation: a *=skg export-org=* subcommand of the main binary,
+parallel to =import-org-roam= (reuses config loading, source-set
+resolution, .skg reading; no TypeDB/server needed). Invocation:
+: cargo run --bin skg -- export-org [config-path] [source-set]
+With no source-set arg it lists the sets and prompts on stdin.
+Alternative: a standalone binary under =tools/= (e.g.
+=cargo run --bin export-org=).
+
+Jeff: let's be able to run it from Emacs, even though all the logic is in Rust. Call it skg-export-some-to-org. No keyboard shortcut, but document it in docs/COMMANDS.org
+
+*** Q2. How to rewrite links to a NON-root node
+(A non-root node = one that appears as content somewhere, but is
+not itself an export root with its own file.)
+Recommendation: *deep heading-anchor links*, using org's heading
+search --
+  cross-file: =[[./rel.org::*Heading][label]]=
+  same-file:  =[[*Heading][label]]=
+This lands the reader on the exact section (you wanted this if org
+permits it; it does). Caveat: org matches heading TEXT, so if two
+headlines in the target file share text it resolves to the first;
+I'll warn when that happens.
+Alternative: link only to the target file's top
+(=[[./rel.org][label]]=) -- fully robust, but the reader lands at
+the top and must scroll.
+
+Jeff: Agreed: deep.
+
+*** Q3. =target_filepath= is not valid TOML in your data
+The instruction node says the marker body "is interpreted as
+.toml", and both it and the real marker (512ea9da) write:
+: target_filepath = org_export_is_partial
+But that is *not* valid TOML -- a bare unquoted string like
+=org_export_is_partial= is rejected by a strict TOML parser (TOML,
+unlike YAML, requires string values to be quoted).
+Recommendation: a *tolerant* line parser accepting the value bare
+OR quoted (=foo= and ="foo"= both work), so current data exports
+now and quoted-TOML still works later. I'll note this in
+TODO/problems.org.
+Alternative: enforce strict TOML -- means quoting the value in the
+data and in the instruction node's example.
+
+Jeff: Yes, tolerant is good. But if the path might have whitespace and isn't wrapped in quotes we should refuse with an explanatory message.
+
+*** Q4. Source-set safety (avoid leaking private notes)
+Your =data/skgconfig.toml= defines no =[[source_sets]]=, so the
+prompt can only offer the predefined =all=. Exporting under =all=
+pulls in *any* source (incl. personal-*) wherever reachable as
+content under a root. Moot for the current single public root, but
+a general leak risk.
+Recommendation: I will NOT edit your config; the prompt offers
+whatever sets exist (today: just =all=). I'll recommend you add:
+: [[source_sets]]
+: name = "public"
+: sources = ["public"]
+and export that set.
+Alternative: tell me to add that =public= set (or another) for you.
+
+Jeff: Fixed it already, thanks. But in the event that a user doesn't have any other sources set up, it should permit them, but only offer the one source set (we already have code somewhere in elisp/ for scrolling circularly through a list) and explain that they might want to define a public-facing subset.
+*** Q5. The marker child itself
+The marker child (title links to 3d9aa9be, body holds
+=target_filepath=) is an export *instruction*, not content.
+Recommendation: *exclude* it from the exported file. Everything
+else under the root is included.
+
+Jeff: Good idea!
+
+*** Q6. Overwrite / cleanup policy for org-exports/
+Recommendation: create =org-exports/= and parent dirs, write/
+overwrite exactly the target files, and *leave any other files
+alone* (no wiping). =org-exports/= is not gitignored, so exports
+get committed to this repo.
+Alternative: wipe =org-exports/= clean each run (removes stale
+files but destroys anything not regenerated this run).
+
+Jeff: agreed, no wipe
+
+*** Q7. Body lines that look like org structure
+A =.skg= body line starting with =*= or =#+= becomes a spurious
+headline/keyword once it sits under a deeper heading in the output.
+Recommendation: emit body text verbatim and *warn* per offending
+node (I won't silently mangle prose). Risk is low.
+Alternative: escape such lines (e.g. add a leading space), at the
+cost of altering literal text.
+
+Jeff: Warning seems fine. During normal use (i.e. without editing the raw files) this seems at least hard, maybe impossible, for a user to achieve.
+** Minor defaults (FYI, not blocking -- flag if you dislike)
+- Root node => level-1 headline =* <title>=; nesting adds one =*=
+  per content level. No =#+title:= (matches your README/
+  this-is-awesome/setup style).
+- A non-root node reachable under two different export files (your
+  "content with two containers" case) gets ONE canonical home for
+  link targets: export roots sort by target_filepath, and the
+  node's home is its first appearance in that order.
+- Broken links (target not exported under the chosen set) point to
+  the export of 9ff04e25 (=org_export_is_partial.org=), per your
+  instruction node. If that sink isn't exported under the chosen
+  set, the link degrades to plain label text + a warning.
+- Relative links use your =[[./path.org][label]]= house style.
