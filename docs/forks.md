@@ -1,74 +1,137 @@
 # Forks
 
-## "Forks": Subscription and overriding in detail
+A **fork** turns a *foreign* node — one in a source you do **not** own,
+hence read-only — into an editable **clone** in a source you *do* own.
+The clone keeps a live link to the original, so the original's later
+additions still reach you, but your edits never touch the original.
 
-TODO: These examples are goofy. I intend to use more plausible ones.
+See also [the sharing model](sharing-model.md) for the underlying
+relations (`subscribes`, `overrides_view_of`,
+`hides_from_its_subscriptions`) and `glossary.md` ("fork", "clone",
+"subscribee as such", "override substitution").
+
+## The gesture
+
+You do not run a special command. You just **edit the foreign node**:
+
+1. Make the foreign node *definitive* (editable) with the definitive-view
+   request, `C-c s d`. (A foreign node is read-only until you do this.)
+2. Edit it however you like — its title, its body, add / remove / reorder
+   its children, at any depth.
+3. Save.
+
+Any real change to a foreign node is read as a request to fork it. (An
+unchanged definitive foreign node forks nothing; saving it is a no-op.)
+
+The save does not commit blindly. The server first returns a read-only
+**fork-confirmation buffer** listing every node about to be forked, and
+asks you to approve:
+
+- **Approve** (`C-c C-c` in that buffer) commits the forks and completes
+  the save.
+- **Decline** (`C-c C-k`, or just leave the buffer) aborts the *whole*
+  save — nothing is written. The confirmation buffer stays open, so you
+  can still search it for the IDs involved.
+
+## What the clone is
+
+When you fork a foreign node `N`, the clone `C` is a new node in a source
+you own. `C`:
+
+- copies `N`'s title, body, and **child list** — the child IDs only, a
+  *shallow* copy, not `N`'s whole subtree (this is what makes forking
+  cheap);
+- **subscribes to** `N`, so `N`'s later additions surface to you as
+  unintegrated content (below);
+- **overrides** `N`, so *override substitution* draws `C` wherever `N`
+  would otherwise appear as content — you see and edit `C` in `N`'s
+  place from then on, without `N`'s containers being rewritten to point
+  at `C`.
+
+`C`'s source is inferred from the nearest node you own above `N` in the
+view. (If there is none, the fork cannot pick a source yet; put `N`
+under a node you own first.)
+
+`N` itself is left completely untouched on disk.
+
+## Unintegrated content: the subscribeeCol
+
+Because `C` subscribes to `N`, a generated **subscribeeCol** appears
+under `C` listing `N` as a *subscribee-as-such*. Its content is exactly
+what you have **not** yet integrated: a subscribee-as-such shows only the
+children the subscriber (`C`) neither hides nor already contains. A fresh
+clone has `C.contains == N.contains`, so this starts **empty** — every
+child you copied is excluded as already-contained. As the original gains
+new children you have not pulled in, they appear here.
 
 ### An example
-Suppose this document, `mysticism`, is yours:
+
+Suppose this document, `mysticism`, is yours, and `eggs` belongs to your
+friend Egg Man (a source you do not own):
+
 ```
-  * mysticism
-  ** imagination
-  ** God
-  ** common objects with mystical associations
-  *** black cats
-  *** the moon
+* eggs                              (Egg Man's, read-only to you)
+** health
+** recipes
+** mystical
+*** Which came first, the chicken or the egg?
 ```
 
-And suppose this document, `eggs`, belongs to your friend Egg Man:
+You make `mystical` definitive, edit it (say you rename it to
+`eggy mysticism`), and save. The confirmation buffer lists `mystical`;
+you approve. Now your graph has a clone of `mystical` that you can file
+under `mysticism`. Wherever `mystical` would be drawn, you see your clone
+instead, marked as standing in for the original:
+
 ```
-  * eggs
-  ** health
-  *** protein
-  *** cholesterol
-  ** recipes
-  ** mystical
-  *** Which came first, the chicken or the egg?
+* mysticism                         (yours)
+** common objects with mystical associations
+*** eggy mysticism      «Oh» (drawn in place of Egg Man's "mystical")
+**** Which came first, the chicken or the egg?
+*** subscribeeCol
+**** mystical           (the subscribee-as-such; empty so far)
 ```
 
-You might choose to move the `mystical` branch from `eggs` into your `mysticism` document, under `common objects with mystical associations`. I will not call the new node a "copy", but rather a `clone` of `mystical` from `eggs`. Your document after integrating the clone would look like this:
-```
-  * mysticism
-  ** imagination
-  ** God
-  ** common objects with mystical associations
-  *** black cats
-  *** the moon
-  *** eggs / mystical -- CLONED from Egg Man's "eggs"
-  **** Which came first, the chicken or the egg?
-```
-(Notice that the title of the root of the new branch, `eggs / mystical`, joins two separate titles found in `eggs`. That might be the default, but you can also choose some other title instead. The point is that `eggs / mystical` in your `mysticsm` comes from `mystical` in Egg Man's `eggs`.)
+When Egg Man later extends `mystical`:
 
-Suppose Egg Man then extends the original `eggs` note, so it looks like this:
 ```
-  * eggs
-  ** health
-  ** recipes
-  ** mystical
-  *** Which came first, the chicken or the egg?
-  *** Egg limpia (curanderismo) -- NEW
-  *** The philosophical egg     -- NEW
+* eggs
+** mystical
+*** Which came first, the chicken or the egg?
+*** Egg limpia (curanderismo)       -- NEW
+*** The philosophical egg           -- NEW
 ```
 
-Your clone in "mysticsm" of the original "eggs / mystical" is by default `subscribed` to the original. While it is subscribed (which you can change), after Egg Man adds the new nodes, when you look at your "mysticism" you might see the following:
+his two new children — which you have not integrated — show up under the
+subscribee-as-such:
+
 ```
-  * mysticism
-  ** imagination
-  ** God
-  ** common objects with mystical associations
-  *** black cats
-  *** the moon
-  *** eggs / mystical -- CLONED from Egg Man's "eggs"
-  **** Which came first, the chicken or the egg?
-  **** <skg< unintegrated subscribed content from Egg Man's document "eggs" >>
-  ***** Egg limpia (curanderismo)
-  ***** The philosophical egg
+*** eggy mysticism      «Oh»
+**** Which came first, the chicken or the egg?
+*** subscribeeCol
+**** mystical
+***** Egg limpia (curanderismo)     (unintegrated)
+***** The philosophical egg         (unintegrated)
 ```
-The node `<skg< unintegrated subscribed content from Egg Man's document "eggs" >>` was automatically generated, based on the subscription from your node titled `eggs / mystical` to the node titled `mystical` in Egg Man's document `eggs`.
 
-Since [branches can be folded](tree-folding-is-powerful.md), even if Egg Man has added hundreds of new nodes, the automatically-generated branch titled `<skg< unintegrated subscribed content from Egg Man's document "eggs" >>` does not have to clutter your view of `mysticism`.
+Since [branches can be folded](tree-folding-is-powerful.md), even
+hundreds of new originals' children need not clutter your view. To
+integrate one, move it into your clone's own content; it then drops out
+of the subscribee-as-such (it is now contained). You can also hide
+individual children, or unsubscribe entirely.
 
-You can of course unsubscribe from Egg Man's changes to that branch if you want, or even unsubscribe from Egg Man's writings entirely.
+## Once forked: monogamy
 
-## Conlcusion
-You and Egg Man can thus focus on exactly what you care about. Your "changes" to Egg Man's data don't have to affect Egg Man's experience at all. However, if you make public the fact that you integrated Egg Man's note into yours, and Egg Man has chosen to see such information, then an indicator in Egg Man's view of `eggs` will show that his `mystical` branch is part of a document owned by you. If Egg Man is curious, he can follow that indicator to discover your `mysticism` document.
+A node may have at most one clone *you* own. If you try to fork something
+you have already forked, the save is rejected with a message naming your
+existing clone — edit that clone instead. (The underlying data may
+override a node many times; only your own override is limited to one.)
+
+## Conclusion
+
+You and Egg Man focus on exactly what each of you cares about. Your
+"changes" to Egg Man's data never affect Egg Man's experience. If you
+make public that you integrated his note, and he has chosen to see such
+information, an indicator in his view of `eggs` shows that his `mystical`
+branch lives on in a document you own, which he can follow to discover
+your `mysticism`.

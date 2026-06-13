@@ -42,7 +42,10 @@ define
 
   # A subscriber forks a subscribee: it clones the subscribee's
   # content and stays subscribed, so the subscribee's later additions
-  # appear in the subscriber's view as unintegrated content.
+  # appear in the subscriber's view as unintegrated content. The fork
+  # gesture (editing a foreign node; see `docs/forks.md`) creates the
+  # clone with BOTH a `subscribes` edge and an `overrides_view_of` edge
+  # to the original, in one save.
   relation subscribes,
     relates subscriber,
     relates subscribee;
@@ -55,7 +58,8 @@ define
     relates hidden;
   # An overrider stands in for the overridden node wherever the
   # overridden node would be drawn as recursive content (override
-  # substitution; see `docs/sharing-model.md` and `glossary.md`).
+  # substitution; see `docs/sharing-model.md` and `glossary.md`). The
+  # fork gesture creates this edge alongside a `subscribes` edge (above).
   # Invariants on USER-OWNED edges, validated at save and at
   # init/rebuild: monogamy (at most one user-owned overrider per
   # overridden node) and acyclicity (no user-owned override chains).

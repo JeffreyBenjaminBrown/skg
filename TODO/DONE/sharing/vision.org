@@ -152,7 +152,13 @@ so the recursive view of 'subscriber' ends up the same as before:
 ```
 * still unresolved
 ** Users need to be able to unhide nodes.
-** fork a foreign node by "editing" it
+** DONE fork a foreign node by "editing" it
+The fork gesture is implemented (TODO/forks/): editing a definitive
+foreign node is read as a request to clone it, with a save-time
+confirmation. See docs/forks.md. (One follow-up remains: the
+confirmation buffer is not yet writeable for a clone's source, so a
+foreign node with no owned ancestor cannot be forked yet -- see
+TODO/forks/progress.org.)
 ** *cols for all rels in either direction
 ** make overriding obvious; permit visiting the replaced
 ** How to show a subscribee's subscribees?

@@ -80,6 +80,19 @@ and can be recovered by a later session.
 Some people intpret a fork as a binary choice.
 In Skg a fork can split into any number.
 
+## clone, and the fork operation
+
+To **fork** a *foreign* node N (one in a source you do not own, hence
+read-only) is to turn it into an editable **clone** C in a source you do
+own. The gesture is implicit: make N definitive (`C-c s d`), edit it, and
+save; any real change to N is read as a fork request, and the save asks
+you to confirm. C copies N's title, body, and child-list (the child IDs
+only — shallow), `subscribes_to` N (so N's later additions surface to C
+as unintegrated subscribed content) and `overrides_view_of` N (so
+override substitution draws C wherever N would appear). N itself is left
+untouched. A node may have at most one clone you own (override monogamy).
+See `docs/forks.md` and `docs/sharing-model.md`.
+
 ## hiderel = "hides" relationship
 
 See schema.tql for what a "hides" relationship is.
