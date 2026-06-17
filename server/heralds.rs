@@ -212,7 +212,7 @@ pub fn herald_rule_table () -> HeraldRule {
         s ("DELETED"),
         vac ("id"),
         vac ("source") ]),
-      crule (Orange, "unknownNode", vec! [
+      crule (Orange, "unknown", vec! [
         s ("Parent references unknown node."),
         vac ("id") ]),
       // An inactive placeholder is anonymous and dataless: the bare
@@ -276,6 +276,41 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("containerwardView", vec! [ s ("req:containers") ]),
           rule ("sourcewardView",    vec! [ s ("req:sources") ]),
           rule ("definitiveView",    vec! [ s ("req:definitive") ]) ]),
+        interc (Some (Green), "", Some ("staged"), vec! [
+          s ("staged:"),
+          leaf (Green, "newX",     "X"),
+          leaf (Red,   "removedX", "-X"),
+          leaf (Green, "newM",     "M"),
+          leaf (Red,   "removedM", "-M") ]),
+        interc (Some (Green), "", Some ("unstaged"), vec! [
+          s ("unstaged:"),
+          leaf (Green, "newX",     "X"),
+          leaf (Red,   "removedX", "-X"),
+          leaf (Green, "newM",     "M"),
+          leaf (Red,   "removedM", "-M") ]),
+        leaf (Red, "notInGit", "diff:not-in-git") ]),
+      // A PhantomDiff (a moved/removed node in git-diff mode) emits its
+      // own root atom 'diffPhantom', not 'node'. Its grammar is the
+      // strict subset of node's that phantomDiff_metadata_to_string can
+      // produce: id, source, indef, graphStats, the staged/unstaged diff
+      // axes, and notInGit -- never parentIs/birth/viewStats/editRequest/
+      // viewRequests.
+      rule ("diffPhantom", vec! [
+        vac ("id"),
+        vac ("source"),
+        leaf_abut (Green, "indef", "☮"),
+        rule ("graphStats", vec! [
+          interc (Some (Yellow), "→", None, vec! [
+            rule ("linksInFromContainers", vec! [ any (vec! [RuleChild::It]) ]),
+            rule ("linksInFromLeaves",     vec! [ any (vec! [RuleChild::It]) ]) ]),
+          interc (Some (Blue), "{", None, vec! [
+            crule (Yellow, "containers", vec! [ any (vec! [RuleChild::It]) ]),
+            crule (Blue,   "contents",   vec! [ any (vec! [RuleChild::It]) ]) ]),
+          leaf (Blue, "aliasing",    "A"),
+          leaf (Blue, "extraIDs",    "I"),
+          leaf (Blue, "overriding",  "O"),
+          leaf (Blue, "subscribing", "S"),
+          leaf (Blue, "hiding",      "H") ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
           leaf (Green, "newX",     "X"),
@@ -365,8 +400,9 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // Bare buffer-position atoms, from org_to_text.rs:
     "focused", "folded", "bodyFolded",
     // Form heads, from org_to_text.rs:
-    "node", "deleted", "unknownNode", "inactiveNode", "deletedScaffold",
-    // Keys inside node / deleted / unknownNode forms:
+    "node", "diffPhantom", "deleted", "unknown", "inactiveNode",
+    "deletedScaffold",
+    // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "source",
     "parentIs", "birth", "indef", "notInGit",
     "graphStats", "viewStats", "editRequest", "viewRequests",

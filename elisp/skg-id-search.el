@@ -367,36 +367,43 @@ title comes from the stack entry."
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
   "Return t if SEXP contains an id under the ActiveNode shape
-(skg (node (id ...))) or the Deleted-phantom shape
+(skg (node (id ...))), the diff-phantom shape
+(skg (diffPhantom (id ...))), or the Deleted-phantom shape
 (skg (deleted (id ...)))."
-  (or (skg-sexp-subtree-p sexp '(skg (node    (id))))
-      (skg-sexp-subtree-p sexp '(skg (deleted (id))))))
+  (or (skg-sexp-subtree-p sexp '(skg (node        (id))))
+      (skg-sexp-subtree-p sexp '(skg (diffPhantom (id))))
+      (skg-sexp-subtree-p sexp '(skg (deleted     (id))))))
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
-  "Extract the id value from SEXP. Accepts either the ActiveNode shape
-(skg (node (id X) ...)) or the Deleted-phantom shape
+  "Extract the id value from SEXP. Accepts the ActiveNode shape
+(skg (node (id X) ...)), the diff-phantom shape
+(skg (diffPhantom (id X) ...)), or the Deleted-phantom shape
 (skg (deleted (id X) ...)). Returns the id as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    id)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted id))))))
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     id))))))
     (when val (format "%s" val))))
 
 (defun skg--extract-source-from-metadata-sexp (sexp)
-  "Extract the source value from SEXP. Accepts either the ActiveNode shape
-(skg (node (source X) ...)) or the Deleted-phantom shape
+  "Extract the source value from SEXP. Accepts the ActiveNode shape
+(skg (node (source X) ...)), the diff-phantom shape
+(skg (diffPhantom (source X) ...)), or the Deleted-phantom shape
 (skg (deleted (source X) ...)). Returns the source as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    source)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted source))))))
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        source)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom source)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     source))))))
     (when val (format "%s" val))))
 
 (defun skg--metadata-is-removed-here-phantom-p (sexp)
   "Return t if SEXP describes a 'removed-here' phantom: a node whose
 membership was removed in some stage but whose file existence is
-unchanged. SEXP is shaped like (skg (node ... (staged ATOMS) (unstaged ATOMS))).
+unchanged. Such a node is emitted as a diffPhantom, shaped like
+(skg (diffPhantom ... (staged ATOMS) (unstaged ATOMS))).
 A removed-here phantom has at least one removedM atom under a stage
 form, and no removedX/newX atoms."
-  (let ((staged-atoms   (skg-sexp-cdr-at-path sexp '(skg node staged)))
-        (unstaged-atoms (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
+  (let ((staged-atoms   (skg-sexp-cdr-at-path sexp '(skg diffPhantom staged)))
+        (unstaged-atoms (skg-sexp-cdr-at-path sexp '(skg diffPhantom unstaged))))
     (let ((all-atoms (append staged-atoms unstaged-atoms)))
       (and (memq 'removedM all-atoms)
            (not (memq 'newX     all-atoms))

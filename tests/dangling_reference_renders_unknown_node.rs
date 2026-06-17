@@ -10,7 +10,7 @@
 // arise in real use).
 //
 // Expected: rendering the view of `parent` succeeds, with `ghost`
-// represented as an PhantomUnknown (skg metadata `(unknownNode (id ghost))`)
+// represented as an PhantomUnknown (skg metadata `(unknown (id ghost))`)
 // rather than killing the view.
 
 use indoc::indoc;
@@ -61,7 +61,7 @@ async fn test_dangling_reference_renders_unknown_node (
       // The unknown line has no headline title -- the id already
       // appears in the metadata, no need to duplicate it.
       let expected = indoc! {"* (skg (node (id parent) (source main) (parentIs absent))) parent
-                              ** (skg (unknownNode (id ghost)))
+                              ** (skg (unknown (id ghost)))
                               "};
       assert_eq! (rendered, expected,
                   "view should render the dangling child as an \
@@ -88,7 +88,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
     * (skg (node (id parent) (source main))) parent
-    ** (skg (unknownNode (id ghost)))
+    ** (skg (unknown (id ghost)))
   "};
   let graph : InRustGraphHandle =
     new_handle (InRustGraph::new ());

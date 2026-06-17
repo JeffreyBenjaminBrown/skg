@@ -364,15 +364,15 @@ fn activeNode_metadata_to_string (
   parts . push ( node_sexp (activeNode, config));
   parts . join (" ") }
 
-/// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). A phantom is always
-/// indefinitive (so always emits `indef` and never a body, editRequest, or
-/// viewRequests) and its parentIs is implicit Affected and birth Unremarkable
-/// (so neither atom appears, and graphStats is rendered as if Affected /
-/// Unremarkable). It carries no viewStats. What remains: id, source, indef,
-/// graphStats, the staged/unstaged diff axes, and notInGit. This is
-/// byte-identical to what the old shared ActiveNode renderer produced for a
-/// phantom (verified: no phantom ever carried parentIs/birth/viewStats/
-/// viewRequests in any oracle).
+/// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
+/// `diffPhantom`, distinct from the `node` atom an ActiveNode emits, so the
+/// client can tell a moved/removed phantom apart from a live node without
+/// inferring it from the diff axes. A phantom is always indefinitive (so always
+/// emits `indef` and never a body, editRequest, or viewRequests) and its
+/// parentIs is implicit Affected and birth Unremarkable (so neither atom
+/// appears, and graphStats is rendered as if Affected / Unremarkable). It
+/// carries no viewStats. What remains: id, source, indef, graphStats, the
+/// staged/unstaged diff axes, and notInGit.
 fn phantomDiff_metadata_to_string (
   focused     : bool,
   folded      : bool,
@@ -385,7 +385,7 @@ fn phantomDiff_metadata_to_string (
     config  : & SkgConfig,
   ) -> String {
     let mut parts : Vec < String > =
-      vec! [ "node" . to_string () ];
+      vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
     parts . push ( format! ( "(source {})", phantom . source ));
     // parentIs is implicit Affected and birth Unremarkable on a phantom, so
@@ -433,7 +433,7 @@ fn phantomDeleted_metadata_to_string (
   parts . join (" ") }
 
 /// Render metadata for an PhantomUnknown:
-///   (skg [focused] [folded] (unknownNode (id X)))
+///   (skg [focused] [folded] (unknown (id X)))
 /// Triggered when a referenced ID resolved to nothing in any db.
 fn phantomUnknown_metadata_to_string (
   focused      : bool,
@@ -445,7 +445,7 @@ fn phantomUnknown_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! ( "(unknownNode (id {}))",
+  parts . push ( format! ( "(unknown (id {}))",
                             unknown_node . id . 0 ));
   parts . join (" ") }
 

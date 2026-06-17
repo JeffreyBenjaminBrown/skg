@@ -72,6 +72,11 @@ pub struct ViewnodeMetadata {
   // When true, this is an inactive-source placeholder: an anonymous,
   // dataless marker (see InactiveNode). It carries no id/source/etc.
   pub is_inactive_node : bool,
+  // When true, this is a PhantomDiff. It carries the same fields as a
+  // node (id/source/indef/graphStats/diff axes), parsed via
+  // parse_node_sexp, but emits and is recognized by its own root atom
+  // 'diffPhantom' rather than being inferred from the diff axes.
+  pub is_diff_phantom : bool,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -98,7 +103,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     is_deleted_node: false,
     is_dead_scaffold: false,
     unknown_node_id: None,
-    is_inactive_node: false, }}
+    is_inactive_node: false,
+    is_diff_phantom: false, }}
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
@@ -212,8 +218,10 @@ pub fn viewnode_from_metadata (
             not_in_git       : metadata . activeNode_not_in_git,
             indef_or_def, };
         let node_kind : MpViewnodeKind =
-          if t . should_be_diffPhantom ()
+          if metadata . is_diff_phantom
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
+            // root atom 'diffPhantom' (not the diff axes) decides this, so a
+            // live node carrying e.g. removedM stays a Vognode. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping
             // indef_or_def/parentIs/etc. here loses nothing.
@@ -288,11 +296,18 @@ pub fn parse_metadata_to_viewnodemd (
         match first . as_str () {
           "node" => {
             parse_node_sexp ( &items[1..], &mut result ) ?; },
+          "diffPhantom" => {
+            // (diffPhantom ...) -- a moved/removed phantom in git-diff
+            // mode. Same field grammar as (node ...) (id/source/indef/
+            // graphStats/diff axes), but its own root atom so the client
+            // and round-trip never infer phantom-ness from the diff axes.
+            parse_node_sexp ( &items[1..], &mut result ) ?;
+            result . is_diff_phantom = true; },
           "deleted" => {
             result . is_deleted_node = true;
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
-          "unknownNode" => {
-            // (unknownNode (id X)) -- placeholder for a referenced
+          "unknown" => {
+            // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No source/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
           "inactiveNode" => {
@@ -517,7 +532,7 @@ fn apply_axis_atoms_to_membership_scaffold (
     *slot = Some (sign); }
   Ok (( )) }
 
-/// Parse the (unknownNode (id X)) s-expression contents.
+/// Parse the (unknown (id X)) s-expression contents.
 /// Sets metadata.unknown_node_id when an id is found.
 fn parse_unknownnode_sexp (
   items    : &[Sexp],
@@ -535,8 +550,8 @@ fn parse_unknownnode_sexp (
             metadata . unknown_node_id =
               Some ( ID::from (value)); },
           _ => { return Err ( format! (
-            "Unknown unknownNode key: {}", key )); }} },
-      _ => { return Err ( "Unexpected element in unknownNode sexp"
+            "Unknown 'unknown' key: {}", key )); }} },
+      _ => { return Err ( "Unexpected element in unknown sexp"
                            . to_string () ); }} }
   Ok (( )) }
 

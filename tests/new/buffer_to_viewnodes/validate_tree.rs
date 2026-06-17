@@ -353,13 +353,16 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
   driver   : &Arc<TypeDBDriver>,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // A phantom sibling (unstaged removedX removedM) sharing an ID
-      // with a real sibling should not trigger a duplicate error.
+      // A phantom sibling (a diffPhantom carrying unstaged removedX
+      // removedM) sharing an ID with a real sibling should not trigger a
+      // duplicate error. The 'diffPhantom' root atom -- not the diff axes
+      // -- is what marks it a phantom, matching what the diff renderer
+      // emits and what the user saves back.
       let input: &str =
         indoc! {"
                 * (skg (node (id root) (source main))) parent
                 ** (skg (node (id 1) (source main))) real child
-                ** (skg (node (id 1) (source main) (unstaged removedX removedM))) phantom child
+                ** (skg (diffPhantom (id 1) (source main) (unstaged removedX removedM))) phantom child
             "};
 
       let viewforest: MpViewForest =
@@ -579,15 +582,16 @@ async fn test_definitive_request_with_content_child_is_rejected (
 
 #[test]
 fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
-  // A phantom (indef) node marked for deletion cannot be
-  // saved: IndefOrDef::Indefinitive has no slot for an edit_request,
-  // so the parser would silently drop the user's instruction. Instead
-  // we emit EditRequestOnIndefinitive so the save is rejected with a
-  // clear message.
+  // A phantom (a diffPhantom, always indefinitive) marked for deletion
+  // cannot be saved: IndefOrDef::Indefinitive has no slot for an
+  // edit_request, so the parser would silently drop the user's
+  // instruction. Instead we emit EditRequestOnIndefinitive so the save
+  // is rejected with a clear message. (The error is raised before the
+  // phantom-vs-vognode dispatch, so it fires on the diffPhantom path too.)
   let input_delete: &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (node (id phantom) (source main) indef (unstaged removedM) (editRequest delete))) phantom child
+      ** (skg (diffPhantom (id phantom) (source main) indef (unstaged removedM) (editRequest delete))) phantom child
     "};
   let (_viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
