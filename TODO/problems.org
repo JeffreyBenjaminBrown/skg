@@ -1233,3 +1233,93 @@
    keeps labels free of =][=, but a title is arbitrary user text.
    Rare; not escaped. Robust fix would require org link-syntax
    escaping of anchors/labels.
+
+* Problems found while diagnosing a diff-mode render crash (2026-06-17)
+  Trigger: in git diff mode, visiting a deciduous node aborted document
+  generation with "Error generating document: find_source: no source for
+  8c24623a-736f-4f07-ba5a-624c3328f5ee". Investigation in this session.
+
+** (fixed) Diff-phantom render aborts the whole view on an unresolvable removed member
+   'insert_phantoms_for_missing_contains'
+   (server/to_org/render/diff.rs) resolved each removed-since-HEAD
+   contains member's source with
+   'find_source_with_optional_tantivy(...).ok_or_else(...)?' -- so a
+   single member whose source could not be determined hard-errored the
+   ENTIRE document render. This is exactly the failure the PartnerCol
+   removed-member path already guards against: 'build_child_data'
+   (server/to_org/complete/partner_col/child_data.rs:86-92) falls back
+   to 'SourceName::not_found()' for the same case
+   (TODO/DONE/local-view-update/plan_v2.org §7.6, and the doc on
+   'SourceName::not_found' in server/types/misc.rs:133-142 -- "so that
+   one unresolvable reference does not abort an entire render"). The
+   contains-phantom path in diff.rs was simply missed when §7.6 made the
+   col path graceful.
+
+   When does a removed member have no resolvable source? 'find_source'
+   (server/types/env.rs) layers in-Rust graph -> deleted-since-HEAD map
+   -> Tantivy -> disk. The deleted-since-HEAD map
+   ('deleted_since_head_pid_src_map', built by 'deleted_ids_to_source'
+   over all sources in server/serve/handlers/save_buffer.rs:499-514) only
+   holds files whose git status is *Deleted between HEAD<->index or
+   index<->worktree*. A node whose .skg file was deleted by a COMMIT
+   (gone at HEAD too) is unchanged between HEAD and worktree, so it is in
+   neither stage's diff and never enters the map; if it also exists in no
+   source's worktree (truly deleted, not moved), find_source returns None
+   and the old code aborted. Whether that commit was to the node's own
+   source or to a different source is irrelevant -- find_source is
+   git-topology-agnostic; it is the *committing* of the deletion that
+   removes the safety net, not cross-repo-ness.
+
+   Fixed 2026-06-17: diff.rs now uses
+   '.unwrap_or_else(SourceName::not_found)', mirroring child_data.rs. The
+   phantom still renders (NOT_FOUND source, placeholder title, Minus
+   membership axis intact), so the user still sees the member was removed
+   since HEAD instead of losing the whole buffer. TODO: a git_diff_view
+   integration test for "HEAD contains a pointer to a committed-deleted
+   node, worktree drops it" (no such fixture exists -- the systemic scan
+   below shows the state is reachable in real data but untested).
+
+** (open) No audit catches a container whose contains points at a missing .skg file
+   The ordinary save path does NOT create such dangling references:
+   'apply_delete_propagation_cleanup' (server/save.rs:370-428) runs
+   before the FS write and, via the in-Rust inverse indexes
+   (contained_by / subscribers_of / hiders_of / overriders_of, built
+   from all .skg files at init), synthesizes a verbatim Save for every
+   referencer -- even ones not open in any buffer -- then strips the
+   deleted id from all their lists. So a correct save rewrites the
+   container on disk atomically with the deletion. BUT nothing detects a
+   dangling reference once it exists: the daily audit
+   (server/dbs/in_rust_graph/audit.rs) compares the in-Rust graph to
+   TypeDB only and DELIBERATELY does not report dangling outbound
+   references; it never compares against the filesystem.
+
+   A scan of all sources (this session) found the state IS reachable in
+   real data: at HEAD, 3 ids are referenced but exist in no source
+   (01545418..., 8c24623a..., f0a77ca4...); in the worktree, 1 still is
+   (01545418...). 8c24623a / f0a77ca4 are HEAD-only (already scrubbed in
+   the worktree, like the case here) -- they are partial-commit
+   artifacts that vanish once the scrubbed container is committed. But a
+   *worktree-level* dangling ref (01545418...) means some path other than
+   a clean save produced it: the cleanup is blind when the in-Rust graph
+   is stale relative to disk (a referencer added by direct file editing
+   without a rebuild is invisible to the inverse indexes -- save.rs:396),
+   and direct edits / imports bypass it entirely. Worth: (a) a
+   filesystem-aware consistency check (init/rebuild or the audit) that
+   reports a contains/subscribes/overrides/hides member with no .skg file
+   in any source, and (b) deciding whether such a check should auto-repair
+   (drop the pointer) or only warn. Note textlinks_to body references are
+   intentionally never scrubbed (save.rs:363-369) and degrade to
+   PhantomUnknown when followed; a contains pointer had no such fallback
+   until the fix above.
+
+** Root cause of THIS instance: a partial commit, not a save bug
+   Recorded for completeness (not a code defect). The node 8c24623a
+   ("earplugs") was a leaf whose only referrer was d40db175 ("backpack").
+   HEAD commit 200b688 deleted 8c24623a.skg but did not touch d40db175,
+   whose committed contains still lists 8c24623a; the worktree edit that
+   drops it (part of a wholesale "DONE backpack" rewrite) is uncommitted.
+   So HEAD is internally inconsistent while the worktree is consistent --
+   precisely the input that made diff mode (HEAD<->worktree) build a
+   removed-member phantom for a node that exists nowhere. Data repair:
+   commit the pending d40db175.skg (the worktree is already correct), or
+   any commit that makes HEAD's d40db175 stop referencing 8c24623a.

@@ -27,6 +27,9 @@ mod inbound;
 #[path = "git_diff_view/filter_cols/mod.rs"]
 mod filter_cols;
 
+#[path = "git_diff_view/roundtrip/mod.rs"]
+mod roundtrip;
+
 // The outbound-col diff tests (git_diff_view/overrides/) live in
 // their own target, tests/git_diff_view_partner_cols.rs: their de
 // novo renders install the process-global graph handle, which must

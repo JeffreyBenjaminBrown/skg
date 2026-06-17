@@ -40,7 +40,7 @@ pub fn validate_local_structure (
     { MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         validate_truenode(tree, node_id, t, config),
       MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
-        validate_phantom(tree, node_id, p, config),
+        validate_phantom(tree, node_id, p),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
       MpViewnodeKind::Qual (Qual::Alias { .. }) =>
@@ -372,23 +372,24 @@ fn validate_inactive_node (
   errors }
 
 /// The identity + child-structure checks shared by a TrueNode and a phantom
-/// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, source in config, no wrong-structure child, and
-/// distinct content-child ids. `label` ("TrueNode" / "Phantom") is woven into the
-/// messages so each kind reports itself. (validate_truenode appends the
+/// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, no
+/// wrong-structure child, and distinct content-child ids. `label` ("TrueNode"
+/// / "Phantom") is woven into the messages so each kind reports itself.
+/// Source validity is NOT checked here: source is load-bearing only for a
+/// TrueNode (it is the node's .skg file path), so validate_truenode adds that
+/// check; a phantom writes nothing and is ignored at save, so its source --
+/// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
+/// inert and goes unchecked. (validate_truenode also appends the
 /// definitive-title check; a phantom is title-exempt, being indefinitive.)
 fn validate_gnode_identity_and_structure (
-  tree         : &Tree<MpViewnode>,
-  node_id      : NodeId,
-  id_present   : bool,
-  source_valid : bool,
-  label        : &str,
+  tree       : &Tree<MpViewnode>,
+  node_id    : NodeId,
+  id_present : bool,
+  label      : &str,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !id_present {
     errors . push( format!("{} must have an ID.", label) ); }
-  if !source_valid {
-    errors . push( format!(
-      "{} must have a source that exists in the config.", label) ); }
   let is_subscribee_as_such : bool =
     // A subscribee-as-such (gnode child of a SubscribeeCol) is the
     // one gnode position that legitimately carries a
@@ -415,27 +416,28 @@ fn validate_truenode (
 ) -> Vec<String> {
   let mut errors : Vec<String> =
     validate_gnode_identity_and_structure (
-      tree, node_id, has_id (t), has_valid_source (t, config), "TrueNode" );
+      tree, node_id, has_id (t), "TrueNode" );
+  if !has_valid_source (t, config) {
+    errors . push("TrueNode must have a source that exists in the config."
+                  . to_string()); }
   if has_empty_title (t) {
     errors . push("Definitive node has an empty title." . to_string()); }
   errors }
 
-/// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): same identity and child-structure checks as a
-/// TrueNode, but the "definitive node must have a non-empty title" rule does
-/// not apply -- a phantom is always indefinitive, hence exempt (as
-/// has_empty_title would conclude for it).
+/// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
+/// identity and child-structure checks as a TrueNode, minus the two
+/// TrueNode-only rules. The definitive-title rule does not apply (a phantom is
+/// always indefinitive, hence exempt). The source-in-config rule does not
+/// apply either: a phantom writes nothing and is ignored at save, so its
+/// source -- possibly the NOT_FOUND sentinel for a reference that resolves to
+/// no source -- is inert.
 fn validate_phantom (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
   p       : &MpPhantomDiff,
-  config  : &SkgConfig,
 ) -> Vec<String> {
   validate_gnode_identity_and_structure (
-    tree, node_id,
-    p . id . is_some (),
-    p . source . as_ref () . is_some_and (
-      |s| config . sources . contains_key (s) ),
-    "Phantom" ) }
+    tree, node_id, p . id . is_some (), "Phantom" ) }
 
 fn cannot_be_child_of_gnode (
   node : &MpViewnode,
