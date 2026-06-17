@@ -44,7 +44,7 @@ you might not want to review the command manually.)"
 
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
-The current heading and its org-descendants are scanned for TrueNode
+The current heading and its org-descendants are scanned for ActiveNode
 metadata containing `(unstaged newX)'. The generated form rechecks
 the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."
@@ -163,7 +163,7 @@ Order is the natural outline order."
       (nreverse pairs))))
 
 (defun skg--metadata-has-unstaged-new-file-p (sexp)
-  "Return t if SEXP is a TrueNode marked as a new worktree file."
+  "Return t if SEXP is an ActiveNode marked as a new worktree file."
   (memq 'newX (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
 
 (provide 'skg-git-add)

@@ -102,7 +102,7 @@ async fn test_find_buffer_errors_for_saving (
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
         . collect();
 
-      // AliasCol children must be Aliases (bad_child is a TrueNode child of AliasCol)
+      // AliasCol children must be Aliases (bad_child is an ActiveNode child of AliasCol)
       { let aliascol_children_re =
           Regex::new(r"(?i)aliascol.*children.*must.*alias") . unwrap();
         let aliascol_children_errors: Vec<&BufferValidationError> =
@@ -184,28 +184,28 @@ async fn test_find_buffer_errors_for_saving (
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_Scaffold error for alias"); }
 
-      // View roots must be TrueNodes or deleted nodes.
-      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*truenode.*deleted") . unwrap();
+      // View roots must be ActiveNodes or deleted nodes.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*activeNode.*deleted") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(|e| matches!(e, BufferValidationError::Other (msg)
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be TrueNodes or deleted nodes' error"); }
+                   "Should find 1 'View roots must be ActiveNodes or deleted nodes' error"); }
 
-      // TrueNode child belongs elsewhere (root has Alias children directly, not via AliasCol)
-      { let truenode_children_re =
-          Regex::new(r"(?i)truenode.*child.*belongs.*elsewhere") . unwrap();
-        let truenode_children_errors: Vec<&BufferValidationError> =
+      // ActiveNode child belongs elsewhere (root has Alias children directly, not via AliasCol)
+      { let activeNode_children_re =
+          Regex::new(r"(?i)activeNode.*child.*belongs.*elsewhere") . unwrap();
+        let activeNode_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
         . filter( |e| matches!( e,
                                 BufferValidationError::LocalStructureViolation(
                                   msg, _)
-                               if truenode_children_re . is_match (msg)))
+                               if activeNode_children_re . is_match (msg)))
           . collect();
-        assert_eq!(truenode_children_errors . len(), 1,
-                   "Should find 1 misplaced TrueNode child error"); }
+        assert_eq!(activeNode_children_errors . len(), 1,
+                   "Should find 1 misplaced ActiveNode child error"); }
 
       // "Alias with body problem" fails two checks (no children + AliasCol parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
@@ -709,7 +709,7 @@ fn test_inactive_placeholder_active_children_allowed_locally () {
 }
 
 #[test]
-fn test_inactive_placeholder_under_truenode_allowed_locally () {
+fn test_inactive_placeholder_under_activeNode_allowed_locally () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
@@ -728,7 +728,7 @@ fn test_inactive_placeholder_under_truenode_allowed_locally () {
     . expect ("root child should exist")
     . id ();
   validate_local_structure (&viewforest, root_id, &config)
-    . expect ("TrueNode should accept an inactive placeholder child");
+    . expect ("ActiveNode should accept an inactive placeholder child");
 }
 
 #[test]
@@ -811,7 +811,7 @@ fn duplicate_members_of_readonly_cols_are_still_rejected () {
       . expect_err (
         "duplicate members of a read-only col should fail validation");
     assert!(
-      error . message . contains ("must not have duplicate TrueNode children"),
+      error . message . contains ("must not have duplicate ActiveNode children"),
       "Unexpected read-only-col validation error: {:?}",
       error ); }}
 

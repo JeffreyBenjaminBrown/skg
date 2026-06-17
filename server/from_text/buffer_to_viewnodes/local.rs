@@ -2,7 +2,7 @@
 /// These check structural properties of individual nodes
 /// without requiring global context.
 
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, PartnerCol, Qual, QualCol};
 use crate::types::misc::{ID, SkgConfig};
@@ -17,7 +17,7 @@ use ego_tree::{Tree, NodeId};
 use std::collections::HashSet;
 
 /// Error from local structure validation.
-/// Contains the error message and the ID of the nearest TrueNode ancestor.
+/// Contains the error message and the ID of the nearest ActiveNode ancestor.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalStructureError {
   pub message : String,
@@ -38,7 +38,7 @@ pub fn validate_local_structure (
   let errors : Vec<String> =
     match &node_ref . value() . kind
     { MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
-        validate_truenode(tree, node_id, t, config),
+        validate_activeNode(tree, node_id, t, config),
       MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
         validate_phantom(tree, node_id, p),
       MpViewnodeKind::BufferRoot =>
@@ -115,7 +115,7 @@ fn validate_aliascol (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Active (_) )))
-    { errors . push("AliasCol must have a TrueNode parent." . to_string()); }
+    { errors . push("AliasCol must have an ActiveNode parent." . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
@@ -134,13 +134,13 @@ fn validate_hidden_in_subscribee_col (
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
     { errors . push(
-        "HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)"
+        "HiddenInSubscribeeCol must have an ActiveNode parent (the subscribee)"
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ())
     { errors . push(
-        "HiddenInSubscribeeCol's children can only be TrueNodes (to hide)."
+        "HiddenInSubscribeeCol's children can only be ActiveNodes (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -151,7 +151,7 @@ fn validate_hidden_in_subscribee_col (
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenInSubscribeeCol TrueNode children must have parentIs=affected."
+        "HiddenInSubscribeeCol ActiveNode children must have parentIs=affected."
       . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -162,7 +162,7 @@ fn validate_hidden_in_subscribee_col (
                     . to_string()); }
   if !partnerCol_children_have_distinct_ids(tree, node_id)
     { errors . push(
-      "HiddenInSubscribeeCol must not have duplicate TrueNode children."
+      "HiddenInSubscribeeCol must not have duplicate ActiveNode children."
         . to_string() ); }
   errors }
 
@@ -182,7 +182,7 @@ fn validate_hidden_outside_of_subscribee_col (
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("HiddenOutsideOfSubscribeeCol's children must include only TrueNodes." . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeCol's children must include only ActiveNodes." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -192,7 +192,7 @@ fn validate_hidden_outside_of_subscribee_col (
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol TrueNode children must be parentIs=affected."
+        "HiddenOutsideOfSubscribeeCol ActiveNode children must be parentIs=affected."
         . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -204,7 +204,7 @@ fn validate_hidden_outside_of_subscribee_col (
         . to_string()); }
   if !partnerCol_children_have_distinct_ids(tree, node_id)
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol must not have duplicate TrueNode children."
+        "HiddenOutsideOfSubscribeeCol must not have duplicate ActiveNode children."
         . to_string() ); }
   errors }
 
@@ -216,7 +216,7 @@ fn validate_subscribeecol (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("SubscribeeCol must have a TrueNode parent." . to_string()); }
+    { errors . push("SubscribeeCol must have an ActiveNode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
@@ -224,7 +224,7 @@ fn validate_subscribeecol (
                     MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_source-set-safety.org)
                       | MpViewnodeKind::PartnerCol (
                           PartnerCol::HiddenOutsideOfSubscribee) ))
-    { errors . push( "SubscribeeCol's children must include only TrueNodes, inactive placeholders or HiddenOutsideOfSubscribeeCol." . to_string()); }
+    { errors . push( "SubscribeeCol's children must include only ActiveNodes, inactive placeholders or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -238,7 +238,7 @@ fn validate_subscribeecol (
         PartnerCol::HiddenOutsideOfSubscribee)
         => true,
       _ => false, } )
-    { errors . push("SubscribeeCol TrueNode children must have parentIs=affected."
+    { errors . push("SubscribeeCol ActiveNode children must have parentIs=affected."
                     . to_string() ); }
   // There is no duplicate-member check here: SubscribeeCol is a
   // defining col, and duplicate members of defining cols are
@@ -258,13 +258,13 @@ fn validate_relation_col (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push(format!("{} must have a TrueNode parent.", label)); }
+    { errors . push(format!("{} must have an ActiveNode parent.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_source-set-safety.org)
-    { errors . push(format!("{}'s children must include only TrueNodes or inactive placeholders.", label)); }
+    { errors . push(format!("{}'s children must include only ActiveNodes or inactive placeholders.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -276,7 +276,7 @@ fn validate_relation_col (
         => true,
       _ => false, } )
     { errors . push(format!(
-        "{} TrueNode children must have parentIs=affected.", label)); }
+        "{} ActiveNode children must have parentIs=affected.", label)); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
@@ -289,7 +289,7 @@ fn validate_relation_col (
     // read-only roles keep the check.
     && !partnerCol_children_have_distinct_ids(tree, node_id) {
     errors . push(format!(
-      "{} must not have duplicate TrueNode children.", label)); }
+      "{} must not have duplicate ActiveNode children.", label)); }
   errors }
 
 fn validate_text_changed (
@@ -300,7 +300,7 @@ fn validate_text_changed (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("TextChanged must have a TrueNode parent." . to_string()); }
+    { errors . push("TextChanged must have an ActiveNode parent." . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("TextChanged must have no (non-ignored) children." . to_string()); }
   if !siblings_cannot_include(
@@ -318,7 +318,7 @@ fn validate_idcol (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("IDCol must have a TrueNode parent." . to_string()); }
+    { errors . push("IDCol must have an ActiveNode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
@@ -367,19 +367,19 @@ fn validate_inactive_node (
                          | MpViewnodeKind::PartnerCol (_)
                          | MpViewnodeKind::DeadScaffold
                          | MpViewnodeKind::BufferRoot )) // an InactiveNode can be a view root: a root that went inactive but was retained for its active children
-    { errors . push("Inactive placeholder must have a TrueNode, col or DeadScaffold parent, or be a view root."
+    { errors . push("Inactive placeholder must have an ActiveNode, col or DeadScaffold parent, or be a view root."
                     . to_string()); }
   errors }
 
-/// The identity + child-structure checks shared by a TrueNode and a phantom
+/// The identity + child-structure checks shared by an ActiveNode and a phantom
 /// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, no
-/// wrong-structure child, and distinct content-child ids. `label` ("TrueNode"
+/// wrong-structure child, and distinct content-child ids. `label` ("ActiveNode"
 /// / "Phantom") is woven into the messages so each kind reports itself.
 /// Source validity is NOT checked here: source is load-bearing only for a
-/// TrueNode (it is the node's .skg file path), so validate_truenode adds that
+/// ActiveNode (it is the node's .skg file path), so validate_activeNode adds that
 /// check; a phantom writes nothing and is ignored at save, so its source --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
-/// inert and goes unchecked. (validate_truenode also appends the
+/// inert and goes unchecked. (validate_activeNode also appends the
 /// definitive-title check; a phantom is title-exempt, being indefinitive.)
 fn validate_gnode_identity_and_structure (
   tree       : &Tree<MpViewnode>,
@@ -408,25 +408,25 @@ fn validate_gnode_identity_and_structure (
     errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
   errors }
 
-fn validate_truenode (
+fn validate_activeNode (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
-  t       : &MpTruenode,
+  t       : &MpActiveNode,
   config  : &SkgConfig,
 ) -> Vec<String> {
   let mut errors : Vec<String> =
     validate_gnode_identity_and_structure (
-      tree, node_id, has_id (t), "TrueNode" );
+      tree, node_id, has_id (t), "ActiveNode" );
   if !has_valid_source (t, config) {
-    errors . push("TrueNode must have a source that exists in the config."
+    errors . push("ActiveNode must have a source that exists in the config."
                   . to_string()); }
   if has_empty_title (t) {
     errors . push("Definitive node has an empty title." . to_string()); }
   errors }
 
 /// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
-/// identity and child-structure checks as a TrueNode, minus the two
-/// TrueNode-only rules. The definitive-title rule does not apply (a phantom is
+/// identity and child-structure checks as an ActiveNode, minus the two
+/// ActiveNode-only rules. The definitive-title rule does not apply (a phantom is
 /// always indefinitive, hence exempt). The source-in-config rule does not
 /// apply either: a phantom writes nothing and is ignored at save, so its
 /// source -- possibly the NOT_FOUND sentinel for a reference that resolves to
@@ -453,13 +453,13 @@ fn cannot_be_child_of_gnode (
        && matches!(&node . kind,
             MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)) ) }
 
-/// Check if an MpTruenode has an ID.
-pub fn has_id ( t : &MpTruenode ) -> bool {
+/// Check if an MpActiveNode has an ID.
+pub fn has_id ( t : &MpActiveNode ) -> bool {
   t . id . is_some() }
 
-/// Check if an MpTruenode has a source and it exists in the config.
+/// Check if an MpActiveNode has a source and it exists in the config.
 pub fn has_valid_source (
-  t      : &MpTruenode,
+  t      : &MpActiveNode,
   config : &SkgConfig,
 ) -> bool {
   t . source . as_ref()
@@ -467,7 +467,7 @@ pub fn has_valid_source (
 
 /// A definitive node (not marked for deletion) must have a non-empty title.
 /// Nodes that are indefinitive or carry a delete request are exempt.
-fn has_empty_title ( t : &MpTruenode ) -> bool {
+fn has_empty_title ( t : &MpActiveNode ) -> bool {
   let is_definitive : bool =
     matches! ( &t . indef_or_def, IndefOrDef::Definitive { .. } );
   let is_delete : bool =

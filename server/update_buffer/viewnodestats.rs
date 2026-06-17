@@ -128,7 +128,7 @@ fn set_relation_relative_stats (
     : (bool, bool, bool) = {
     let node_is_affected : bool =
       tree . get (treeid) . unwrap () . value ()
-      . is_truenode_and_parentIs_affected ();
+      . is_activeNode_and_parentIs_affected ();
     match parent {
       VisibleParent::Gnode (parent_pid) =>
         ( graph . relation_membership_is_real (
@@ -173,7 +173,7 @@ fn set_source_at_boundary (
     else { return; };
     t . source . clone () };
   let ancestor_source : Option<SourceName> =
-    nearest_truenode_ancestor_source (tree, treeid);
+    nearest_activeNode_ancestor_source (tree, treeid);
   let at_boundary : bool =
     match ancestor_source {
       None => true,
@@ -184,7 +184,7 @@ fn set_source_at_boundary (
 
 /// Walk rootward from treeid (exclusive) to find
 /// the nearest active vognode ancestor's source.
-fn nearest_truenode_ancestor_source (
+fn nearest_activeNode_ancestor_source (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Option<SourceName> {
@@ -227,7 +227,7 @@ fn set_parent_containment_stats_in_viewnode (
           . get (node_pid)
           . map_or ( false, |contents|
                      contents . contains (parent_pid)) )
-    } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not a truenode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply. But in that case, using these values for parent_is_container and parent_is_content has the desired effect on the node's metadata: It won't make any noise about either relationship.
+    } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not an activeNode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply. But in that case, using these values for parent_is_container and parent_is_content has the desired effect on the node's metadata: It won't make any noise about either relationship.
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . parentIsContainer = parent_is_container;

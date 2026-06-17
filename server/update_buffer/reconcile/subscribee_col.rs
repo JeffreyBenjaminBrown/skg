@@ -134,7 +134,7 @@ fn read_subscribee_col_context (
                     t . source . clone() )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("reconcile_subscribee_col_children: parent is not a TrueNode") ?;
+    . ok_or ("reconcile_subscribee_col_children: parent is not an ActiveNode") ?;
   let worktree_subscribees : Vec<ID> =
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &parent_pid, &parent_source )

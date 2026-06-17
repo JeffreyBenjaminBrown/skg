@@ -1,13 +1,13 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request_with_source_set, build_and_integrate_sourceward_view_then_drop_request_with_source_set};
-use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive };
+use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, activeNode_in_tree_is_indefinitive };
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::tree::viewnode_nodecomplete::{write_at_truenode_in_tree, pid_and_source_from_treenode};
+use crate::types::tree::viewnode_nodecomplete::{write_at_activeNode_in_tree, pid_and_source_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::error::Error;
@@ -84,7 +84,7 @@ pub fn apply_definitive_draw_rule (
       // cascade DVR landing on a freshly-created definitive child whose id
       // is already Final elsewhere; for a user DVR on an already-indefinitive
       // node it is a no-op. The expand step then clobbers/refreshes it.)
-      write_at_truenode_in_tree (
+      write_at_activeNode_in_tree (
         viewforest, node_id,
         |t| { t . view_requests . remove (& ViewRequest::Definitive);
               t . indef_or_def = IndefOrDef::Indefinitive; } )
@@ -95,7 +95,7 @@ pub fn apply_definitive_draw_rule (
                                      prior . node_id (),
                                      visited, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
-    write_at_truenode_in_tree (
+    write_at_activeNode_in_tree (
       viewforest, node_id, |t| {
         t . view_requests . remove (& ViewRequest::Definitive);
         t . indef_or_def = IndefOrDef::Definitive {
@@ -111,7 +111,7 @@ pub fn apply_definitive_draw_rule (
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as indefinitive.
 /// - Remove them from `visited`.
-/// Only recurses into non-ignored TrueNode children;
+/// Only recurses into non-ignored ActiveNode children;
 ///   ignored and scaffold children persist unchanged.
 /// TODO : This will need complication to properly handle
 ///   sharing-related nodes among the input node's descendents.
@@ -136,7 +136,7 @@ fn indefinitize_content_subtree (
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
-  if ! truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
+  if ! activeNode_in_tree_is_indefinitive ( tree, node_id ) ? {
     visited . remove (&node_pid);
     makeIndefinitiveAndClobber ( tree, node_id, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
@@ -161,7 +161,7 @@ fn from_disk_replace_title_body_and_nodecomplete (
   if title . is_empty () {
     return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }
   let body : Option < String > = nodecomplete . body . clone ();
-  write_at_truenode_in_tree
+  write_at_activeNode_in_tree
     ( tree, node_id,
       |t| { t . title = title;
             if let IndefOrDef::Definitive { body: ref mut b, .. }

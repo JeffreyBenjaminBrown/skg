@@ -66,7 +66,7 @@ pub enum ViewNodeKind {
 /// The two graph-backed kinds: each corresponds to a real, current node.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
-  Active   (TrueNode),
+  Active   (ActiveNode),
   Inactive (InactiveNode), // From a source that is inactive (see "source sets").
 }
 
@@ -76,7 +76,7 @@ pub enum Vognode {
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of ActiveNode's parentIs/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // No longer exists in the graph.
   Unknown (PhantomUnknown), // If it *ever* existed in the graph, Skg didn't find it.
 }
@@ -91,7 +91,7 @@ pub enum Phantom {
 /// ARISES: during post-save / collateral re-render (NOT in git diff mode), when
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Active content child flips here via
-/// `mutate_truenode_to_deletednode`. (An Inactive node is NOT flipped: it is an
+/// `mutate_activeNode_to_deletednode`. (An Inactive node is NOT flipped: it is an
 /// anonymous placeholder, and turning it into a DELETED marker would leak that a
 /// hidden node vanished, so it just lingers until the next full rerender drops
 /// it.) So it marks a node that genuinely no longer exists in the graph, killed
@@ -167,13 +167,13 @@ pub struct PhantomUnknown {
 #[derive( Debug, Clone, PartialEq )]
 pub struct InactiveNode;
 
-pub type TrueNode            = TrueNode_Generic < ID, SourceName >;
-pub type MpTruenode = TrueNode_Generic < Option < ID >,
-                                         Option < SourceName >>;
+pub type ActiveNode   = ActiveNode_Generic < ID, SourceName >;
+pub type MpActiveNode = ActiveNode_Generic < Option < ID >,
+                                             Option < SourceName >>;
 
 /// A ViewNode that corresponds to a NodeComplete.
 #[derive( Debug, Clone, PartialEq )]
-pub struct TrueNode_Generic < Id, Src > {
+pub struct ActiveNode_Generic < Id, Src > {
   pub title         : String,
   pub id            : Id,
   pub source        : Src,
@@ -198,7 +198,7 @@ pub struct TrueNode_Generic < Id, Src > {
 
 pub type PhantomDiff   = PhantomDiff_Generic < ID, SourceName >;
 pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
-                                                       Option < SourceName >>;
+                                               Option < SourceName >>;
 
 /// The slim payload of a `Phantom::Diff` -- one of the three placeholder
 /// ("phantom") kinds, alongside PhantomDeleted and PhantomUnknown (see
@@ -224,7 +224,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// it exists solely to show a change between git snapshots. It keeps a `title`
 /// and `source` (resolved via `title_for_phantom`; the source may be the
 /// SourceName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
-/// phantoms. It needs NONE of TrueNode's parentIs / birth / viewStats /
+/// phantoms. It needs NONE of ActiveNode's parentIs / birth / viewStats /
 /// view_requests / indef_or_def (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
 /// reads a phantom's parentIs, and every phantom is indefinitive.
 #[derive( Debug, Clone, PartialEq )]
@@ -243,11 +243,11 @@ pub struct PhantomDiff_Generic < Id, Src > {
 }
 
 impl < Id, Src > PhantomDiff_Generic < Id, Src > {
-  /// Build a phantom payload from a TrueNode, keeping only the phantom-relevant
+  /// Build a phantom payload from an ActiveNode, keeping only the phantom-relevant
   /// fields and discarding parentIs / birth / viewStats / view_requests /
   /// indef_or_def. Used when flipping an Active node to a phantom and by the
   /// placed<->maybe-placed conversions.
-  pub fn from_truenode ( t : TrueNode_Generic < Id, Src > ) -> Self {
+  pub fn from_activeNode ( t : ActiveNode_Generic < Id, Src > ) -> Self {
     PhantomDiff_Generic {
       title      : t . title,
       id         : t . id,
@@ -273,7 +273,7 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
     && self . existence . unstaged != Some (Sign::Minus) }
 }
 
-/// Each TrueNode has one of these.
+/// Each ActiveNode has one of these.
 /// - A Definitive represents an editable view.
 ///   The user's changes to title, body and children
 ///   will be written to disk and the dbs when they save.
@@ -334,7 +334,7 @@ pub struct ViewNodeStats {
   pub cycle             : bool,
   pub parentIsContainer : bool,
   pub parentIsContent   : bool,
-  pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest truenode ancestor.
+  pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest activeNode ancestor.
   /// For a subscribee-as-such (Affected child of a SubscribeeCol):
   /// the col's owner also overrides this node. Herald red "gO".
   /// Not computed under an OverriddenCol, where the col already says it.
@@ -449,7 +449,7 @@ pub enum ViewRequest {
 /// - any membership axis being '-' (removed in some stage), or
 /// - the worktree existence axis being '-' (file deleted), or
 /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
-/// Shared by TrueNode_Generic and PhantomDiff_Generic, which both carry
+/// Shared by ActiveNode_Generic and PhantomDiff_Generic, which both carry
 /// these axes.
 pub fn diff_axes_require_phantom (
   existence  : &ExistenceAxes,
@@ -459,7 +459,7 @@ pub fn diff_axes_require_phantom (
   || membership . unstaged == Some (Sign::Minus)
   || existence  . unstaged == Some (Sign::Minus) }
 
-impl < Id, Src > TrueNode_Generic < Id, Src > {
+impl < Id, Src > ActiveNode_Generic < Id, Src > {
   pub fn should_be_diffPhantom (
     &self,
   ) -> bool {
@@ -492,7 +492,7 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
       IndefOrDef::Indefinitive => None, }}
 }
 
-impl TrueNode {
+impl ActiveNode {
   /// The COLLECTED ID: what this viewnode contributes to its
   /// parent's collected lists -- the 'overridesHere' original when
   /// the node was drawn in place of one, else its own ID. Save
@@ -505,8 +505,8 @@ impl TrueNode {
     . unwrap_or_else ( || self . id . clone () ) }
 }
 
-impl MpTruenode {
-  /// As 'TrueNode::collected_id', for the maybe-placed stage (the
+impl MpActiveNode {
+  /// As 'ActiveNode::collected_id', for the maybe-placed stage (the
   /// node might not have an ID yet; a marker, if present, wins).
   pub fn collected_id (&self) -> Option<ID> {
     self . viewStats . overridesHere . clone ()
@@ -709,7 +709,7 @@ impl ViewNode {
           // builds from an Indefinitive base, so now every phantom is
           // indefinitive by construction.
           let phantom : PhantomDiff =
-            PhantomDiff::from_truenode ( t . clone () );
+            PhantomDiff::from_activeNode ( t . clone () );
           self . kind = ViewNodeKind::Phantom (
             Phantom::Diff (phantom)); }}}
 
@@ -730,7 +730,7 @@ impl ViewNode {
         "",
     }}
 
-  /// Reasonable for both TrueNodes and Scaffolds.
+  /// Reasonable for both ActiveNodes and Scaffolds.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) => t . body (),
@@ -745,7 +745,7 @@ impl ViewNode {
         | ViewNodeKind::DeadScaffold => None,
     }}
 
-  pub fn is_truenode_and_parentIs_affected (&self) -> bool {
+  pub fn is_activeNode_and_parentIs_affected (&self) -> bool {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
         t . parentIs == ParentIs::Affected,
@@ -758,7 +758,7 @@ impl ViewNode {
       _ => None,
     }}
 
-  /// The id of an Active vognode or a Diff phantom -- the two TrueNode-ish kinds,
+  /// The id of an Active vognode or a Diff phantom -- the two ActiveNode-ish kinds,
   /// which before the Vognode/Phantom split both lived in Vognode and were
   /// reached by `Vognode::normal_or_phantom_id`. None for everything else
   /// (Inactive, Deleted/Unknown phantoms, cols, scaffolds, BufferRoot).
@@ -849,14 +849,14 @@ impl Default for ViewNodeStats {
 // Constructor functions
 //
 
-/// Create a TrueNode with default values for all fields except id, source, and title.
+/// Create an ActiveNode with default values for all fields except id, source, and title.
 /// Useful when you need to customize other fields after construction.
-pub fn default_truenode (
+pub fn default_activeNode (
   id     : ID,
   source : SourceName,
   title  : String,
-) -> TrueNode {
-  TrueNode {
+) -> ActiveNode {
+  ActiveNode {
     title,
     id,
     source,
@@ -889,7 +889,7 @@ pub fn mk_phantom_viewnode (
     { t . existence  = existence;
       t . membership = membership;
       viewnode . kind = ViewNodeKind::Phantom (
-        Phantom::Diff ( PhantomDiff::from_truenode (t) )); }
+        Phantom::Diff ( PhantomDiff::from_activeNode (t) )); }
   else
     // mk_indefinitive_viewnode always yields an Active vognode; if that ever
     // changes, fail loudly rather than silently return a non-phantom.
@@ -964,7 +964,7 @@ pub fn mk_indefinitive_viewnode_with_birth (
 
 /// Convert a definitive ViewNode to indefinitive.
 /// Discards body and edit_request.
-/// Errors if the input is not a TrueNode.
+/// Errors if the input is not an ActiveNode.
 pub fn mk_indefinitive_from_viewnode (
   viewnode : ViewNode,
   parentIs    : ParentIs,
@@ -977,7 +977,7 @@ pub fn mk_indefinitive_from_viewnode (
       ViewNodeKind::Phantom (Phantom::Diff (p)) =>
         ( p . id, p . source, p . title ),
       _ => return Err (
-        "mk_indefinitive_from_viewnode: expected TrueNode"
+        "mk_indefinitive_from_viewnode: expected ActiveNode"
           . to_string () ) };
   Ok ( mk_indefinitive_viewnode_with_birth (
     id, source, title, parentIs, birth )) }
@@ -1000,11 +1000,11 @@ pub fn mk_viewnode (
              body_folded : false,
              kind        : ViewNodeKind::Vognode (
                Vognode::Active (
-                 TrueNode { parentIs,
+                 ActiveNode { parentIs,
                             birth,
                             view_requests,
                             indef_or_def,
-                            .. default_truenode (
+                            .. default_activeNode (
                               id, source, title ) } ) ) }}
 
 /// Helper to create a BufferRoot ViewNode.

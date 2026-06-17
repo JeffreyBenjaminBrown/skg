@@ -6,7 +6,7 @@
 (defun skg-view-new-empty ()
   "Open a new skg content view for a new node.
 Prompts to choose an owned source, then opens a buffer
-with an indefinitive TrueNode (no ID yet) and a placeholder title."
+with an indefinitive ActiveNode (no ID yet) and a placeholder title."
   (interactive)
   (let* ((source (skg--prompt-for-owned-source))
          (org-text

@@ -689,7 +689,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
       assert! (
         ! rendered . contains ("private-container"),
         "inactive container should not render as a placeholder or \
-         TrueNode: {}",
+         ActiveNode: {}",
         rendered );
       assert! (
         ! rendered . contains ("active-root-after-private"),

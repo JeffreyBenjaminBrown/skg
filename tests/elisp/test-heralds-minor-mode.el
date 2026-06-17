@@ -137,14 +137,14 @@
 (ert-deftest test-heralds-diff-display ()
   "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
   (with-temp-buffer
-    ;; TrueNode with unstaged membership removal (the v.1 'removed-here').
+    ;; ActiveNode with unstaged membership removal (the v.1 'removed-here').
     (erase-buffer)
     (insert "(skg (node (id 1) (source s) (unstaged removedM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
       (should (string-match "M" result)))
 
-    ;; TrueNode with unstaged file creation + membership add (the v.1 'new').
+    ;; ActiveNode with unstaged file creation + membership add (the v.1 'new').
     (erase-buffer)
     (insert "(skg (node (id 2) (source s) (unstaged newX newM)))")
     (let ((result (heralds-from-metadata (buffer-string))))

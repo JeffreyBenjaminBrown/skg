@@ -28,11 +28,11 @@ struct HiddenInContext {
 /// HiddenInSubscribeeCol completion (called at this col's own BFS visit).
 ///
 /// Tree structure:
-///   Subscriber (TrueNode)            <- ancestor 3
+///   Subscriber (ActiveNode)            <- ancestor 3
 ///     └─ SubscribeeCol (Scaffold)    <- ancestor 2
-///          └─ Subscribee (TrueNode)  <- ancestor 1
+///          └─ Subscribee (ActiveNode)  <- ancestor 1
 ///               └─ HiddenInSubscribeeCol (Scaffold) <- self
-///                    └─ [hidden TrueNode children]
+///                    └─ [hidden ActiveNode children]
 ///
 /// The HiddenInSubscribeeCol collects nodes that the subscriber
 /// hides from its subscriptions AND that are top-level content

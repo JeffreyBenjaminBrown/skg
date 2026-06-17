@@ -86,7 +86,7 @@ fn test_text_search_org_format (
         result . lines () . collect ();
 
       // Parse each line with headline_to_triple.
-      // Collect level-1 TrueNode headlines and alias groups.
+      // Collect level-1 ActiveNode headlines and alias groups.
       let mut level1_headlines : Vec < (String, String) > =
         Vec::new ();
       let mut aliases_under_current : Vec < String > =

@@ -119,7 +119,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         &viewforest, config, driver, restricted_source_set )
       . await . map_err (SaveError::DatabaseError) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
-    // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_truenode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.
+    // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_activeNode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodeMerge_instructions_from_pairs" ). entered();
       nodeMerge_instructions_from_pairs (

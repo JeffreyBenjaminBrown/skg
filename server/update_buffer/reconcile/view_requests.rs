@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-pub async fn execute_truenode_view_requests (
+pub async fn execute_activeNode_view_requests (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   config             : &SkgConfig,
@@ -24,7 +24,7 @@ pub async fn execute_truenode_view_requests (
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Active (_)) ),
-    "execute_truenode_view_requests: expected TrueNode" )
+    "execute_activeNode_view_requests: expected ActiveNode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
     extract_view_requests( tree, node ) ?;

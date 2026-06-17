@@ -117,7 +117,7 @@ There are three ways to test the code:
   - textlinks_to: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral scaffolding rebuilt every save:
-  - TrueNode: corresponds to an NodeComplete, can be Definitive (editable) or Indefinitive (read-only)
+  - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Indefinitive (read-only)
   - Scaffold: display-only nodes; the relation collections are
     PartnerCols (subscribeeCol, subscriberCol, overriddenCol, ...),
     plus AliasCol, IDCol, etc. (see glossary.md, "PartnerCol")

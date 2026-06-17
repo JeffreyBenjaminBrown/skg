@@ -64,7 +64,7 @@ connect."
             skg-sexpr-edit
             skg-sexpr-org-bijection
             skg-sexpr-search
-            skg-truenode-defaults
+            skg-activeNode-defaults
             skg-state
             skg-test-utils
             skg-readable-ids

@@ -2,7 +2,7 @@
 ;;;
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a).
 ;;; From buffer B, edits a's title and adds a new child "c" of a (no
-;;; metadata — the server reads it as a TrueNode with a random UUID).
+;;; metadata — the server reads it as a ActiveNode with a random UUID).
 ;;; Verifies that buffer B's save response reflects the changes (title,
 ;;; new node with UUID). Then checks collateral buffer A.
 ;;;

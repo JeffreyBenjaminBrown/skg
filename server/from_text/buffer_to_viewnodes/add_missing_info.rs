@@ -71,7 +71,7 @@ pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
       { t . parentIs = ParentIs::Affected; }}}
 
 /// Make it a Qual::Alias if both:
-/// - it is a TrueNode
+/// - it is an ActiveNode
 /// - its parent is an AliasCol
 fn make_alias_if_appropriate(
   node: &mut NodeMut<MpViewnode>
@@ -97,8 +97,8 @@ fn make_alias_if_appropriate(
   Ok (( )) }
 
 /// Inherit parent's source if both:
-/// - this is a sourceless TrueNode
-/// - its parent is a TrueNode with a source
+/// - this is a sourceless ActiveNode
+/// - its parent is an ActiveNode with a source
 fn inherit_parent_source_if_possible(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {
@@ -120,7 +120,7 @@ fn inherit_parent_source_if_possible(
       { t . source = Some (source); }}}
   Ok (( )) }
 
-/// Assign a new UUID to a TrueNode if it doesn't have an ID.
+/// Assign a new UUID to an ActiveNode if it doesn't have an ID.
 fn assign_new_id_if_absent(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {

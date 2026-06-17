@@ -238,7 +238,7 @@ Returns nil if parsing fails. Normalisation currently means: if
 the sexp is an (skg (node ...)) form whose node has no explicit
 (parentIs ...) sub-form, insert (parentIs container) -- the server
 leaves 'affected' membership implicit
-(see `true_node_metadata_to_string' in org_to_text.rs),
+(see `activeNode_metadata_to_string' in org_to_text.rs),
 but the herald rules use this internal marker to preserve the ordinary
 content herald."
   (let ((parsed (condition-case nil

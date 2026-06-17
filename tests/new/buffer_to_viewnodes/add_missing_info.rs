@@ -126,12 +126,12 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) =>
       assert_eq! (t . parentIs, ParentIs::Absent),
-    _ => panic! ("expected root TrueNode") }
+    _ => panic! ("expected root ActiveNode") }
   match &moved_node . value() . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) =>
       assert_eq! (t . parentIs, ParentIs::Affected),
-    _ => panic! ("expected moved TrueNode") }
+    _ => panic! ("expected moved ActiveNode") }
 }
 
 async fn test_source_inheritance_multi_level (

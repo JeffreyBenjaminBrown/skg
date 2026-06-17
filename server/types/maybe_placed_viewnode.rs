@@ -4,13 +4,13 @@
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
-pub use super::viewnode::{MpTruenode, MpPhantomDiff};
+pub use super::viewnode::{MpActiveNode, MpPhantomDiff};
 use super::viewnode::PhantomDiff;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, Phantom, QualCol, Qual, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualCol, Qual, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -30,7 +30,7 @@ pub struct MpViewnode {
   pub kind        : MpViewnodeKind,
 }
 
-// MpTruenode is defined in viewnode.rs.
+// MpActiveNode is defined in viewnode.rs.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpViewnodeKind {
@@ -45,7 +45,7 @@ pub enum MpViewnodeKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
-  Active   (MpTruenode),
+  Active   (MpActiveNode),
   Inactive (InactiveNode),
 }
 
@@ -60,15 +60,15 @@ pub enum MpPhantom {
 // Conversion implementations
 //
 
-impl TryFrom<MpTruenode> for TrueNode {
+impl TryFrom<MpActiveNode> for ActiveNode {
   type Error = String;
 
-  fn try_from(u: MpTruenode) -> Result<Self, Self::Error> {
+  fn try_from(u: MpActiveNode) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
     let source = u . source . ok_or_else(
       || format!("Node '{}' has no source", u . title))?;
-    Ok(TrueNode {
+    Ok(ActiveNode {
       title          : u . title,
       id,
       source,
@@ -126,7 +126,7 @@ impl TryFrom<MpViewnodeKind> for ViewNodeKind {
     match u {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         Ok (ViewNodeKind::Vognode (
-          Vognode::Active (TrueNode::try_from (t)?))),
+          Vognode::Active (ActiveNode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
         Ok (ViewNodeKind::Vognode (Vognode::Inactive (i))),
       MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
@@ -163,9 +163,9 @@ impl TryFrom<MpViewnode> for ViewNode {
 
 // Infallible conversions from placed to maybePlaced types.
 
-impl From<TrueNode> for MpTruenode {
-  fn from(t: TrueNode) -> Self {
-    MpTruenode {
+impl From<ActiveNode> for MpActiveNode {
+  fn from(t: ActiveNode) -> Self {
+    MpActiveNode {
       title          : t . title,
       id             : Some(t . id),
       source         : Some(t . source),
@@ -187,7 +187,7 @@ impl From<ViewNodeKind> for MpViewnodeKind {
     match k {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
         MpViewnodeKind::Vognode (
-          MpVognode::Active (MpTruenode::from (t))),
+          MpVognode::Active (MpActiveNode::from (t))),
       ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
         MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
       ViewNodeKind::Phantom (Phantom::Diff (p)) =>
@@ -333,9 +333,9 @@ pub fn placed_to_maybePlaced_tree(
 // Defaults
 //
 
-impl Default for MpTruenode {
+impl Default for MpActiveNode {
   fn default() -> Self {
-    MpTruenode {
+    MpActiveNode {
       title          : String::new(),
       id             : None,
       source         : None,
@@ -361,7 +361,7 @@ impl Default for MpViewnode {
       folded      : false,
       body_folded : false,
       kind        : MpViewnodeKind::Vognode (
-        MpVognode::Active (MpTruenode::default())),
+        MpVognode::Active (MpActiveNode::default())),
     }
   }
 }
@@ -454,7 +454,7 @@ impl MpViewnode {
         | MpViewnodeKind::DeadScaffold =>
         None, }}
 
-  /// True for the two TrueNode-ish kinds: an Active vognode or a Diff phantom.
+  /// True for the two ActiveNode-ish kinds: an Active vognode or a Diff phantom.
   pub fn is_active_or_diff_phantom (&self) -> bool {
     matches! ( &self . kind,
       MpViewnodeKind::Vognode (MpVognode::Active (_))

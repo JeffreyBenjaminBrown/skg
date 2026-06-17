@@ -164,7 +164,7 @@ fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
 ///
 ///   * Two scaffold-level staged/unstaged INTERC rules and two
 ///     node-level ones -- the scaffold-level pair omits the X / -X
-///     axes because existence-change markers only apply to TrueNodes,
+///     axes because existence-change markers only apply to ActiveNodes,
 ///     not to scaffolds.
 ///
 ///   * The 'parentIs' sub-rule 'container' names an atom the server
@@ -402,7 +402,7 @@ fn graphstats_atoms () -> Vec<&'static str> {
          "containers", "contents",
          "linksInFromContainers", "linksInFromLeaves" ] }
 
-/// ViewNodeStats atoms, from true_node_metadata_to_string's
+/// ViewNodeStats atoms, from activeNode_metadata_to_string's
 /// view_stats (org_to_text.rs). Guard as in graphstats_atoms.
 fn viewstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ViewNodeStats;

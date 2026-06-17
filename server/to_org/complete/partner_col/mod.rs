@@ -84,8 +84,8 @@ async fn build_initial_render_child_data (
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
-/// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
-/// (Checking that its grandparent (the subscriber) is a TrueNode
+/// A Subscribee is an ActiveNode whose parent is a SubscribeeCol scaffold.
+/// (Checking that its grandparent (the subscriber) is an ActiveNode
 /// happens from the SubscribeeCol, so needn't be repeated here.)
 pub fn type_and_parent_type_consistent_with_subscribee (
   tree    : &Tree<ViewNode>,
@@ -94,15 +94,15 @@ pub fn type_and_parent_type_consistent_with_subscribee (
   let node_ref : NodeRef < ViewNode > =
     tree . get (node_id)
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
-  let is_truenode_and_parentIs_affected : bool =
-    node_ref . value () . is_truenode_and_parentIs_affected ();
+  let is_activeNode_and_parentIs_affected : bool =
+    node_ref . value () . is_activeNode_and_parentIs_affected ();
   let parent_is_subscribee_col : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
               ViewNodeKind::PartnerCol (PartnerCol::Subscribee)))
     . unwrap_or (false);
-  Ok ( is_truenode_and_parentIs_affected
+  Ok ( is_activeNode_and_parentIs_affected
        && parent_is_subscribee_col ) }
 
 /// If appropriate, prepend a SubscribeeCol child containing:
@@ -121,7 +121,7 @@ pub async fn maybe_add_subscribeeCol_branch (
     tree, node_id,
     |vn| matches!( &vn . kind,
                     ViewNodeKind::Vognode (Vognode::Active (_))),
-    "maybe_add_subscribeeCol_branch: expected TrueNode" ) ?;
+    "maybe_add_subscribeeCol_branch: expected ActiveNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
@@ -145,7 +145,7 @@ pub async fn maybe_add_subscribeeCol_branch (
           => Some ( t . source . clone () ),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("maybe_add_subscribeeCol_branch: expected TrueNode") ?;
+    . ok_or ("maybe_add_subscribeeCol_branch: expected ActiveNode") ?;
   let subscribee_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: inactive
     // subscribees are omitted at de novo creation (no retained
@@ -246,7 +246,7 @@ pub async fn maybe_add_partnerCol_branches (
     tree, node_id,
     |vn| matches!( &vn . kind,
                     ViewNodeKind::Vognode (Vognode::Active (_) )),
-    "maybe_add_partnerCol_branches: expected TrueNode" ) ?;
+    "maybe_add_partnerCol_branches: expected ActiveNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
@@ -295,7 +295,7 @@ async fn maybe_add_one_partnerCol (
       |vn| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
           => Ok (( t . id . clone (), t . source . clone () )),
-        _ => Err ("expected TrueNode" . to_string ()), } )
+        _ => Err ("expected ActiveNode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
     // The two Hidden*SubscribeeCol scaffolds lack this, hence end here.

@@ -269,7 +269,7 @@ Prompts for the link label, defaulting to the title."
     "*"))
 
 (defun skg--insert-node-from-entry (entry)
-  "Insert an indefinitive TrueNode headline from ENTRY, an (id title) pair.
+  "Insert an indefinitive ActiveNode headline from ENTRY, an (id title) pair.
 If point is already after headline stars at the start of a line,
 insert only the metadata and title.  Otherwise insert a full same-level
 headline."
@@ -306,7 +306,7 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-paste-node ()
-  "Insert an indefinitive TrueNode headline from the top of `skg-id-stack'.
+  "Insert an indefinitive ActiveNode headline from the top of `skg-id-stack'.
 Does not modify the stack.  The inserted metadata contains the node ID
 and `indef`; the headline title comes from the stack entry."
   (interactive)
@@ -332,7 +332,7 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-pop-node ()
-  "Pop the top of `skg-id-stack' and insert an indefinitive TrueNode headline.
+  "Pop the top of `skg-id-stack' and insert an indefinitive ActiveNode headline.
 The inserted metadata contains the node ID and `indef`; the headline
 title comes from the stack entry."
   (interactive)
@@ -366,7 +366,7 @@ title comes from the stack entry."
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
-  "Return t if SEXP contains an id under the TrueNode shape
+  "Return t if SEXP contains an id under the ActiveNode shape
 (skg (node (id ...))) or the Deleted-phantom shape
 (skg (deleted (id ...)))."
   (or (skg-sexp-subtree-p sexp '(skg (node    (id))))
@@ -374,7 +374,7 @@ title comes from the stack entry."
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
-  "Extract the id value from SEXP. Accepts either the TrueNode shape
+  "Extract the id value from SEXP. Accepts either the ActiveNode shape
 (skg (node (id X) ...)) or the Deleted-phantom shape
 (skg (deleted (id X) ...)). Returns the id as a string, or nil."
   (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    id)))
@@ -382,7 +382,7 @@ title comes from the stack entry."
     (when val (format "%s" val))))
 
 (defun skg--extract-source-from-metadata-sexp (sexp)
-  "Extract the source value from SEXP. Accepts either the TrueNode shape
+  "Extract the source value from SEXP. Accepts either the ActiveNode shape
 (skg (node (source X) ...)) or the Deleted-phantom shape
 (skg (deleted (source X) ...)). Returns the source as a string, or nil."
   (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    source)))

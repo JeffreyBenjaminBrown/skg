@@ -1,25 +1,25 @@
-;;; test-skg-truenode-defaults.el --- Tests for skg-truenode-defaults
+;;; test-skg-activeNode-defaults.el --- Tests for skg-activeNode-defaults
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
 (require 'ert)
-(require 'skg-truenode-defaults)
+(require 'skg-activeNode-defaults)
 
 ;;
-;; skg-truenode-sexp-p
+;; skg-activeNode-sexp-p
 ;;
 
-(ert-deftest test-truenode-sexp-p-positive ()
-  "Recognizes a TrueNode sexp."
-  (should (skg-truenode-sexp-p '(skg (node (id abc) (source jeff))))))
+(ert-deftest test-activeNode-sexp-p-positive ()
+  "Recognizes an ActiveNode sexp."
+  (should (skg-activeNode-sexp-p '(skg (node (id abc) (source jeff))))))
 
-(ert-deftest test-truenode-sexp-p-negative-not-skg ()
+(ert-deftest test-activeNode-sexp-p-negative-not-skg ()
   "Rejects non-skg sexp."
-  (should-not (skg-truenode-sexp-p '(foo (node (id abc))))))
+  (should-not (skg-activeNode-sexp-p '(foo (node (id abc))))))
 
-(ert-deftest test-truenode-sexp-p-negative-not-node ()
+(ert-deftest test-activeNode-sexp-p-negative-not-node ()
   "Rejects skg sexp without node."
-  (should-not (skg-truenode-sexp-p '(skg (alias (id abc))))))
+  (should-not (skg-activeNode-sexp-p '(skg (alias (id abc))))))
 
 ;;
 ;; skg-headlines-to-org
@@ -36,10 +36,10 @@
 ;;
 
 (ert-deftest test-expand-minimal-sexp ()
-  "Expanding a minimal TrueNode inserts all default fields."
+  "Expanding a minimal ActiveNode inserts all default fields."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, source : jeff,
@@ -65,7 +65,7 @@
   "Expanding a sexp with bare indefinitive shows 'true' child."
   (let* ((sexp '(skg (node (id abc) (source jeff) indef)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (indef-idx (cl-position "indef" headlines
@@ -82,7 +82,7 @@
   "Expanding a sexp without parentIs inserts 'affected (default)'."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (parentIs-idx (cl-position "parentIs" headlines
@@ -99,8 +99,8 @@
   "Stripping an unmodified expanded org returns the original sexp."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -126,7 +126,7 @@
                            "**** none (default)\n"
                            "*** viewRequests\n"
                            "**** none (default)"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (source jeff) indef))))))
 
@@ -152,7 +152,7 @@
                            "**** none\n"
                            "*** viewRequests\n"
                            "**** none"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (source jeff)))))))
 
@@ -164,8 +164,8 @@
   "Round-trip: expand then strip on minimal sexp is identity."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -173,8 +173,8 @@
   "Round-trip: expand then strip preserves bare indefinitive."
   (let* ((sexp '(skg (node (id abc) (source jeff) indef)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -182,8 +182,8 @@
   "Round-trip: expand then strip preserves (editRequest delete)."
   (let* ((sexp '(skg (node (id abc) (source jeff) (editRequest delete))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -191,8 +191,8 @@
   "Round-trip: expand then strip preserves (editRequest (merge XYZ))."
   (let* ((sexp '(skg (node (id abc) (source jeff) (editRequest (merge XYZ)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -204,7 +204,7 @@
   "Fields appear in canonical order after expansion."
   (let* ((sexp '(skg (node (source jeff) (graphStats 42) (id abc) indef)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (level-3 (mapcar #'cdr
@@ -231,7 +231,7 @@
                            "**** jeff\n"
                            "*** editRequest\n"
                            "**** merge [[id:XYZ][some label]]"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (source jeff)
@@ -251,7 +251,7 @@
                            "**** jeff\n"
                            "*** parentIs\n"
                            "**** independent"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (source jeff) (parentIs independent)))))))
@@ -271,7 +271,7 @@
                            "*** viewRequests\n"
                            "**** aliases\n"
                            "**** containerwardView"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (source jeff)
@@ -285,7 +285,7 @@
   "Expanding with default-source marks matching source value."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text "jeff"))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "jeff (default)" headlines
@@ -295,7 +295,7 @@
   "Expanding with default-source leaves non-matching source value bare."
   (let* ((sexp '(skg (node (id abc) (source bob))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text "jeff"))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "bob" headlines :key #'cdr :test #'string=))
@@ -306,7 +306,7 @@
   "Expanding a node with no source inserts default source."
   (let* ((sexp '(skg (node (id abc))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text "jeff"))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "source" headlines :key #'cdr :test #'string=))
@@ -321,7 +321,7 @@
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff (default)"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (source jeff)))))))
 
@@ -333,7 +333,7 @@
                            "**** abc\n"
                            "*** source\n"
                            "**** bob"))
-         (stripped (skg-truenode-strip-defaults-from-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (id abc) (source bob)))))))
 
@@ -341,16 +341,16 @@
   "Round-trip with default-source: expand then strip is identity."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text "jeff"))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
 (ert-deftest test-round-trip-new-node-no-source ()
   "Round-trip for new node: expand with default, strip keeps source."
   (let* ((org-text "* skg\n** node")
-         (expanded (skg-truenode-expand-defaults-in-org org-text "jeff"))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text "jeff"))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (source jeff)))))))
 
@@ -365,7 +365,7 @@
   (let* ((sexp '(skg (node (id abc) (source public)
                            (graphStats (containers 0) (contents 5) (containsHerald 0{5)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Source field must be present
@@ -384,8 +384,8 @@ for the editable fields (graphStats is readonly and preserved too)."
   (let* ((sexp '(skg (node (id abc) (source public)
                            (graphStats (containers 0) (contents 5) (containsHerald 0{5)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -400,7 +400,7 @@ preserves source and all fields."
                                        (linksInFromContainers 4)
                                        (linksHerald 4→)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Source must be present
@@ -423,8 +423,8 @@ preserves source and all fields."
                                        (linksInFromLeaves 1)
                                        (linksHerald 3→1)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-truenode-expand-defaults-in-org org-text))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (expanded (skg-activeNode-expand-defaults-in-org org-text))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -437,7 +437,7 @@ preserves source and all fields."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
          (expanded
-          (skg-truenode-expand-defaults-in-org
+          (skg-activeNode-expand-defaults-in-org
            org-text nil "actual title"))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
@@ -452,7 +452,7 @@ preserves source and all fields."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
          (expanded
-          (skg-truenode-expand-defaults-in-org org-text nil ""))
+          (skg-activeNode-expand-defaults-in-org org-text nil ""))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (equal (car headlines) '(1 . "skg")))))
@@ -462,10 +462,10 @@ preserves source and all fields."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
          (expanded
-          (skg-truenode-expand-defaults-in-org
+          (skg-activeNode-expand-defaults-in-org
            org-text nil "actual title"))
-         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (stripped (skg-activeNode-strip-defaults-from-org expanded))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
-(provide 'test-skg-truenode-defaults)
+(provide 'test-skg-activeNode-defaults)

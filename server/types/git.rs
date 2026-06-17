@@ -202,14 +202,14 @@ impl GitDiffStatus {
 // Functions
 //
 
-/// Returns the (staged, unstaged) pair of NodeChanges for a TrueNode.
+/// Returns the (staged, unstaged) pair of NodeChanges for an ActiveNode.
 /// Either element may be None (that stage has no diff entry for this
 /// file, or the entry has 'node_changes: None').
 ///
 /// Consumers that need a flat HEAD→worktree view can compose both
 /// stages via 'net_diff_from_per_stage'. Consumers that need
 /// per-stage signs use 'axes_from_per_stage_diffs'.
-pub fn per_stage_node_changes_for_truenode<'a> (
+pub fn per_stage_node_changes_for_activeNode<'a> (
   source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
   source       : &SourceName,
@@ -335,7 +335,7 @@ pub fn added_membership_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
 /// Deleted → Minus, Modified / absent → None).
 ///
 /// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
-/// TrueNode's own existence axes and for phantoms of a removed parent's
+/// ActiveNode's own existence axes and for phantoms of a removed parent's
 /// children).
 pub fn file_existence_axes_from_source_diff (
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,

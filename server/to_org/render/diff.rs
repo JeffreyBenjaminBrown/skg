@@ -1,10 +1,10 @@
 /// Per-node git-diff decoration for the git diff view.
-/// process_truenode_diff decorates one Active vognode and generates its
+/// process_activeNode_diff decorates one Active vognode and generates its
 /// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
 ///
-/// Each TrueNode and Scaffold is decorated with per-stage diff axes:
+/// Each ActiveNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed
 ///     between HEAD↔index (staged) or index↔worktree (unstaged).
 ///   M (membership) describes whether the node's appearance at this
@@ -30,7 +30,7 @@ use std::path::PathBuf;
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its cols then self-deaden via their own
 /// generalized-orphan check at their later visits.
-pub(crate) fn process_truenode_diff (
+pub(crate) fn process_activeNode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -41,7 +41,7 @@ pub(crate) fn process_truenode_diff (
     node_mut . id();
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
-      node_mut . tree(), tree_node_id, "process_truenode_diff"
+      node_mut . tree(), tree_node_id, "process_activeNode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
   let source_diff : &SourceDiff =
     match source_diffs . get (&source) {

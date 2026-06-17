@@ -19,7 +19,7 @@ use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 /// "should be this value" (even if empty).
 ///
 /// ELABORATION:
-/// When a user saves a TrueNode, its non-ignored TrueNode children
+/// When a user saves an ActiveNode, its non-ignored ActiveNode children
 /// always define its contents, so MSV does not apply there.
 /// But other fields -- e.g. aliases --
 /// the user is likely not to mention (in particular,

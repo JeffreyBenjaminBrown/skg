@@ -9,7 +9,7 @@
 //!
 //! How it used to plug in (so a future reviver knows the wiring that was
 //! removed): the draw rule (apply_definitive_draw_rule in definitive.rs) would
-//! detect a removed node with `truenode_file_absent_from_worktree`, load its
+//! detect a removed node with `activeNode_file_absent_from_worktree`, load its
 //! title/body from git with `from_git_replace_title_body`, compute the
 //! subscriber hide-set with `get_hidden_ids_if_subscribee`, and report
 //! `is_removed_node = true`; view completion (complete_nodes_in_level_order in
@@ -35,7 +35,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, IndefOrDef, mk_phantom_viewnode };
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::tree::viewnode_nodecomplete::{write_at_truenode_in_tree, pid_and_source_from_treenode};
+use crate::types::tree::viewnode_nodecomplete::{write_at_activeNode_in_tree, pid_and_source_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet, HashSet, HashMap};
@@ -78,7 +78,7 @@ fn get_hidden_ids_if_subscribee (
         . iter () . cloned () . collect ();
     Ok (hidden_ids) }}
 
-fn truenode_file_absent_from_worktree (
+fn activeNode_file_absent_from_worktree (
   existence : &ExistenceAxes,
 ) -> bool {
   match existence . unstaged {
@@ -101,7 +101,7 @@ fn from_git_replace_title_body (
       "from_git_replace_title_body" ) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_from_index_or_head ( &pid, &src, config ) ?;
-  write_at_truenode_in_tree (
+  write_at_activeNode_in_tree (
     tree, node_id, |t| {
       t . title = nodecomplete . title;
       if let IndefOrDef::Definitive { body: ref mut b, .. }

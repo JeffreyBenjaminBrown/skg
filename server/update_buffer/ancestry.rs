@@ -29,7 +29,7 @@
 
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
+use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::{ ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 
@@ -234,7 +234,7 @@ fn dispose_orphaned_col_child (
     : (bool, bool, bool, bool) = {
     let c : NodeRef<ViewNode> = tree . get (child)
       . ok_or ("dispose_orphaned_col_child: child not found") ?;
-    ( c . value () . is_truenode_and_parentIs_affected (),
+    ( c . value () . is_activeNode_and_parentIs_affected (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
                  ViewNodeKind::Vognode (_) | ViewNodeKind::Phantom (_) ),
@@ -243,7 +243,7 @@ fn dispose_orphaned_col_child (
     if is_leaf {
       detach_scaffold_transferring_focus (tree, child) ?;
     } else {
-      write_at_truenode_in_tree ( tree, child,
+      write_at_activeNode_in_tree ( tree, child,
         |t| { t . parentIs = ParentIs::Independent; } )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   } else if is_col {

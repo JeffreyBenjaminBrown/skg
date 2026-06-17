@@ -1,4 +1,4 @@
-use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
+use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -12,18 +12,18 @@ use std::collections::HashMap;
 use std::error::Error;
 
 /// Reconciles an AliasCol's children against
-///   the aliases on disk (via the map) for its parent TrueNode.
+///   the aliases on disk (via the map) for its parent ActiveNode.
 ///
 /// Per the spec in buffer-update.org:
 /// - Verify this node is an AliasCol
-/// - Verify its parent is a TrueNode
+/// - Verify its parent is an ActiveNode
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasCol's children into:
-///   - TrueNodes with parentIs != Affected
+///   - ActiveNodes with parentIs != Affected
 ///   - Alias scaffold nodes
 ///   (Error if any child does not fit these categories.)
-/// - Reorder children: ignored TrueNodes first, then Alias nodes
+/// - Reorder children: ignored ActiveNodes first, then Alias nodes
 /// - Among the Alias children, discard any not in 'aliases'
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
@@ -52,7 +52,7 @@ pub fn reconcile_alias_col_children (
     . map_err ( |_| "reconcile_alias_col_children: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
+    per_stage_node_changes_for_activeNode (
       source_diffs, &parent_pid, &parent_source );
   let (goal_list, axes_map)
     : (Vec<String>, HashMap<String, MembershipAxes>) =

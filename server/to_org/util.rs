@@ -9,9 +9,9 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
+use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, ActiveNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -114,7 +114,7 @@ pub(super) fn makeIndefinitiveAndClobber (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_truenode_in_tree (
+  write_at_activeNode_in_tree (
     tree, node_id,
     |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -139,7 +139,7 @@ pub async fn complete_branch_minus_content (
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  if truenode_in_tree_is_indefinitive ( tree, node_id )?
+  if activeNode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveViewnode (
       tree, node_id, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -168,7 +168,7 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   let pid : ID = // Will error if node is a Scaffold.
     get_id_from_treenode ( tree, node_id ) ?;
   let is_indefinitive : bool =
-    write_at_truenode_in_tree (
+    write_at_activeNode_in_tree (
       tree, node_id,
       |t| { if defMap . contains_key (&pid)
                { // It's a repeat, so make it indefinitive.
@@ -189,7 +189,7 @@ pub fn detect_and_mark_cycle_v1 (
   let is_cycle : bool = {
     let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_truenode_in_tree
+  write_at_activeNode_in_tree
     ( tree, node_id,
       |t| { t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -221,7 +221,7 @@ pub async fn stub_viewforest_from_root_ids (
     ) . await ?; }
   Ok (viewforest) }
 
-/// Mark forest-root TrueNodes as having no parent in the view.
+/// Mark forest-root ActiveNodes as having no parent in the view.
 pub fn mark_view_roots_parent_absent (
   viewforest : &mut Tree<ViewNode>,
 ) {
@@ -235,20 +235,20 @@ pub fn mark_view_roots_parent_absent (
       = vn . kind
       { t . parentIs = ParentIs::Absent; }}}
 
-/// Walk the view and correct any TrueNode whose metadata claims a
+/// Walk the view and correct any ActiveNode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
 /// Silently clears stale birth claims or flips stale membership claims
 /// to Independent;
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::ContainsParent' on child C with TrueNode parent P:
+/// - 'Birth::ContainsParent' on child C with ActiveNode parent P:
 ///   claim is "C contains P". Verified against C's 'contains'
 ///   list in the in-Rust graph.
-/// - 'Birth::LinksToParent' on child C with TrueNode parent P:
+/// - 'Birth::LinksToParent' on child C with ActiveNode parent P:
 ///   claim is "C's body/title links to P". Verified against C's
 ///   'textlinks_to' in the in-Rust graph.
-/// - 'ParentIs::Affected' on child C with INDEFINITIVE TrueNode
+/// - 'ParentIs::Affected' on child C with INDEFINITIVE ActiveNode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -258,7 +258,7 @@ pub fn mark_view_roots_parent_absent (
 /// so extra_id aliasing (typically a nodeMerge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Forest roots have no TrueNode parent and therefore
+/// Forest roots have no ActiveNode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
 /// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
@@ -277,16 +277,16 @@ pub fn validate_parentIs_relationships (
     // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
-      let child_tn : &TrueNode =
+      let child_tn : &ActiveNode =
         match & child_ref . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t)) => t,
           _ => continue };
       let parent_ref : NodeRef<ViewNode> = match child_ref . parent () {
         Some (p) => p, None => continue };
-      let parent_tn : &TrueNode =
+      let parent_tn : &ActiveNode =
         match & parent_ref . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t)) => t,
-          // A non-TrueNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
+          // A non-ActiveNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . parentIs == ParentIs::Absent {
         // The child was a root, and the user gave it a parent, so let the parent contain it.
@@ -603,9 +603,9 @@ pub async fn build_node_branch_minus_content (
 // Reading from NodeCompletes and ViewNodes, esp. in trees
 // ==============================================
 
-/// Check if a TrueNode is indefinitive.
+/// Check if an ActiveNode is indefinitive.
 /// Errs if given a Scaffold.
-pub fn truenode_in_tree_is_indefinitive (
+pub fn activeNode_in_tree_is_indefinitive (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {

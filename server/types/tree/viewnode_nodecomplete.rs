@@ -4,7 +4,7 @@ use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, TrueNode, ParentIs };
+    ViewNode, ViewNodeKind, ActiveNode, ParentIs };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, PartnerCol};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
@@ -17,23 +17,23 @@ use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-/// Apply a mutating function to the TrueNode at the given tree position.
-/// Errors if the node is not found or is not a TrueNode.
-pub fn write_at_truenode_in_tree<F, R> (
+/// Apply a mutating function to the ActiveNode at the given tree position.
+/// Errors if the node is not found or is not an ActiveNode.
+pub fn write_at_activeNode_in_tree<F, R> (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
   f      : F,
 ) -> Result<R, String>
-where F: FnOnce (&mut TrueNode) -> R {
+where F: FnOnce (&mut ActiveNode) -> R {
   write_at_node_in_tree (
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
-      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not a TrueNode (it carries a slim PhantomDiff), so
+      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveNode (it carries a slim PhantomDiff), so
       // this Normal-only mutator cannot apply to one (a phantom has no
       // view_requests/indef_or_def/etc).
       ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( f (t) ),
-      _ => Err ( "write_at_truenode_in_tree: expected TrueNode"
+      _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"
                    . to_string () ) }} ) ? }
 
 /// Extract (ID, source) from a vognode that carries both.
@@ -57,7 +57,7 @@ pub fn pid_and_source_from_treenode (
       caller_name ) . into() ),
   }}
 
-/// Get the ID from this node if it's an MpTruenode with an ID,
+/// Get the ID from this node if it's an MpActiveNode with an ID,
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn id_from_self_or_nearest_ancestor (
@@ -228,7 +228,7 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -244,7 +244,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -262,7 +262,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -277,7 +277,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude TrueNodes with parentIs != Affected.
+///   then we exclude ActiveNodes with parentIs != Affected.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   node_id            : NodeId,

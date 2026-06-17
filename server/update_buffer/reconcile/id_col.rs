@@ -2,7 +2,7 @@ use crate::types::git::{MembershipAxes, NodeChanges};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
+use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
@@ -13,10 +13,10 @@ use std::collections::HashMap;
 use std::error::Error;
 
 /// Reconciles an IDCol's children against
-///   the IDs on disk (via the map) for its parent TrueNode.
+///   the IDs on disk (via the map) for its parent ActiveNode.
 ///
 /// - Verify this node is an IDCol
-/// - Verify its parent is a TrueNode
+/// - Verify its parent is an ActiveNode
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its IDs into a goal list
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
@@ -44,7 +44,7 @@ pub fn reconcile_id_col_children (
     . map_err ( |_| "reconcile_id_col_children: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
+    per_stage_node_changes_for_activeNode (
       source_diffs, &parent_pid, &parent_source );
   let (goal_list, axes_map)
     : (Vec<ID>, HashMap<ID, MembershipAxes>) =

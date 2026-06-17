@@ -77,7 +77,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
 
     { // Source validation errors: one for dub-1 (nonexistent source "dub")
       // and one for pub-1 (no source at all).
-      let source_re = Regex::new(r"(?i)truenod.*must.*source") . unwrap();
+      let source_re = Regex::new(r"(?i)activenod.*must.*source") . unwrap();
       let source_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(

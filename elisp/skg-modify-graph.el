@@ -109,8 +109,8 @@ outline heuristic, not a precise graph-content query."
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
-existing TrueNode with an ID.  Its org-parent must be a definitive
-TrueNode whose source is owned by the user.  The whole org subtree
+existing ActiveNode with an ID.  Its org-parent must be a definitive
+ActiveNode whose source is owned by the user.  The whole org subtree
 at point is replaced by a same-level headline whose title is an
 org id link to the former root, then the buffer is saved."
   (interactive)
@@ -130,9 +130,9 @@ org id link to the former root, then the buffer is saved."
   "Replace the leaf at point with content linked from that leaf.
 Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
-org-descendents, and a definitive TrueNode org-parent whose source
+org-descendents, and a definitive ActiveNode org-parent whose source
 is owned by the user.  The link must be an id link.  The leaf is
-replaced by an indefinitive same-level TrueNode for the link
+replaced by an indefinitive same-level ActiveNode for the link
 target, then the buffer is saved."
   (interactive)
   (org-back-to-heading t)
@@ -148,12 +148,12 @@ target, then the buffer is saved."
     (skg-request-save-buffer)))
 
 (defun skg--content-link-replacement-node-data ()
-  "Return plist data for the TrueNode headline at point."
+  "Return plist data for the ActiveNode headline at point."
   (let* ((headline-text (skg-get-current-headline-text))
          (split (skg-split-as-stars-metadata-title headline-text))
          (metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-    (unless (skg--truenode-sexp-p metadata-sexp)
-      (user-error "Cannot replace this branch with a link: it is not a truenode"))
+    (unless (skg--activeNode-sexp-p metadata-sexp)
+      (user-error "Cannot replace this branch with a link: it is not an activeNode"))
     (let ((id (skg--node-id metadata-sexp)))
       (unless id
         (user-error "Cannot replace this branch with a link: node has no ID"))
@@ -166,8 +166,8 @@ target, then the buffer is saved."
     (unless (org-up-heading-safe)
       (user-error "Cannot replace this branch with a link: node has no container"))
     (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-      (unless (skg--truenode-sexp-p metadata-sexp)
-        (user-error "Cannot replace this branch with a link: container is not a truenode"))
+      (unless (skg--activeNode-sexp-p metadata-sexp)
+        (user-error "Cannot replace this branch with a link: container is not an activeNode"))
       metadata-sexp)))
 
 (defun skg--check-content-link-replacement-container (metadata-sexp)
@@ -248,7 +248,7 @@ one link is not an id link."
     (nreverse links)))
 
 (defun skg--replace-current-leaf-with-linked-content (link)
-  "Replace the current leaf with an indefinitive TrueNode for LINK."
+  "Replace the current leaf with an indefinitive ActiveNode for LINK."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
          (id (plist-get link :id))

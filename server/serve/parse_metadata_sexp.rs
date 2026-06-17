@@ -2,7 +2,7 @@
 ///
 /// Format:
 ///   Scaffolds: (skg [focused] [folded] scaffoldKind)
-///   TrueNodes: (skg [focused] [folded]
+///   ActiveNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
 ///                         [(parentIs affected|independent|absent)]
@@ -26,7 +26,7 @@ use crate::types::viewnode::{
   Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
 };
 use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff,
+    MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff,
     MpVognode, MpPhantom,
 };
 
@@ -46,7 +46,7 @@ pub struct ViewnodeMetadata {
   pub body_folded: bool,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
-  // TrueNode fields (ignored if scaffold is Some)
+  // ActiveNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
   pub source: Option<SourceName>,
   pub parentIs: ParentIs,
@@ -56,9 +56,9 @@ pub struct ViewnodeMetadata {
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<EditRequest>,
   pub view_requests: HashSet<ViewRequest>,
-  pub truenode_existence  : ExistenceAxes,
-  pub truenode_membership : MembershipAxes,
-  pub truenode_not_in_git : bool,
+  pub activeNode_existence  : ExistenceAxes,
+  pub activeNode_membership : MembershipAxes,
+  pub activeNode_not_in_git : bool,
   pub scaffold_membership : MembershipAxes,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
@@ -89,9 +89,9 @@ pub fn default_metadata() -> ViewnodeMetadata {
     viewStats: ViewNodeStats::default(),
     edit_request: None,
     view_requests: HashSet::new(),
-    truenode_existence  : ExistenceAxes::default(),
-    truenode_membership : MembershipAxes::default(),
-    truenode_not_in_git : false,
+    activeNode_existence  : ExistenceAxes::default(),
+    activeNode_membership : MembershipAxes::default(),
+    activeNode_not_in_git : false,
     scaffold_membership : MembershipAxes::default(),
     textchanged_staged   : false,
     textchanged_unstaged : false,
@@ -177,7 +177,7 @@ pub fn viewnode_from_metadata (
           other => other . clone () };
         ( non_vognode_with_title, error, col_title_warning )
       } else {
-      // MpTruenode
+      // MpActiveNode
       { let indef_or_def : IndefOrDef =
           if metadata . indefinitive
           { IndefOrDef::Indefinitive }
@@ -198,7 +198,7 @@ pub fn viewnode_from_metadata (
           { metadata . id . clone ()
             . map ( BufferValidationError::EditRequestOnIndefinitive ) }
           else { None };
-        let t : MpTruenode = MpTruenode {
+        let t : MpActiveNode = MpActiveNode {
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
@@ -207,9 +207,9 @@ pub fn viewnode_from_metadata (
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             view_requests    : metadata . view_requests . clone (),
-            existence        : metadata . truenode_existence,
-            membership       : metadata . truenode_membership,
-            not_in_git       : metadata . truenode_not_in_git,
+            existence        : metadata . activeNode_existence,
+            membership       : metadata . activeNode_membership,
+            not_in_git       : metadata . activeNode_not_in_git,
             indef_or_def, };
         let node_kind : MpViewnodeKind =
           if t . should_be_diffPhantom ()
@@ -219,7 +219,7 @@ pub fn viewnode_from_metadata (
             // indef_or_def/parentIs/etc. here loses nothing.
             MpViewnodeKind::Phantom (
               MpPhantom::Diff (
-                MpPhantomDiff::from_truenode (t) )) }
+                MpPhantomDiff::from_activeNode (t) )) }
           else
           { MpViewnodeKind::Vognode ( MpVognode::Active (t) ) };
         ( node_kind,
@@ -332,7 +332,7 @@ pub fn parse_metadata_to_viewnodemd (
           "id" | "source" | "view" | "code" => {
             return Err ( format! (
               "Legacy metadata format detected (found '{}' at top level). \
-               The new format uses (skg [focused] [folded] (node ...)) for TrueNodes \
+               The new format uses (skg [focused] [folded] (node ...)) for ActiveNodes \
                and (skg [focused] [folded] scaffoldKind) for Scaffolds.",
               first )); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
@@ -442,17 +442,17 @@ fn parse_node_sexp (
               _ => return Err ( format! (
                 "Invalid birth value: {}", value )), }; },
           "staged" => {
-            apply_axis_atoms_to_truenode (
+            apply_axis_atoms_to_activeNode (
               &subitems[1..],
               true,  // staged
-              &mut metadata . truenode_existence,
-              &mut metadata . truenode_membership ) ?; },
+              &mut metadata . activeNode_existence,
+              &mut metadata . activeNode_membership ) ?; },
           "unstaged" => {
-            apply_axis_atoms_to_truenode (
+            apply_axis_atoms_to_activeNode (
               &subitems[1..],
               false, // unstaged
-              &mut metadata . truenode_existence,
-              &mut metadata . truenode_membership ) ?; },
+              &mut metadata . activeNode_existence,
+              &mut metadata . activeNode_membership ) ?; },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
@@ -464,7 +464,7 @@ fn parse_node_sexp (
           "indef" =>
             metadata . indefinitive = true,
           "notInGit" =>
-            metadata . truenode_not_in_git = true,
+            metadata . activeNode_not_in_git = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
@@ -473,8 +473,8 @@ fn parse_node_sexp (
   Ok (( )) }
 
 /// Apply a sequence of axis atoms (newX, removedX, newM, removedM) to
-/// a TrueNode's existence and membership axes for the given stage.
-fn apply_axis_atoms_to_truenode (
+/// an ActiveNode's existence and membership axes for the given stage.
+fn apply_axis_atoms_to_activeNode (
   atoms      : &[Sexp],
   is_staged  : bool,
   existence  : &mut ExistenceAxes,
