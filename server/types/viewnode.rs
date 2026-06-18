@@ -528,15 +528,6 @@ fn herald_from_pair (
   else
     { Some ( format! ("{}{}{}", left, separator, right )) }}
 
-impl NodeContainRels {
-  pub fn herald_for_content (&self) -> Option<String> {
-    herald_from_pair ( self . containers, 1,
-                       self . contents,   0,
-                       "{" ) }
-  pub fn herald_for_non_content (&self) -> String {
-    self . herald_for_content ()
-      . unwrap_or_else ( || format! ("{}{{", self . containers) ) } }
-
 impl NodeLinksourceRels {
   pub fn herald (&self) -> Option<String> {
     herald_from_pair ( self . sources_with_content,    0,
@@ -584,16 +575,6 @@ impl PartnerCol {
       _                              => None,
     } }
 
-  pub fn origin_depth (self) -> usize {
-    match self {
-      PartnerCol::Subscribee
-        | PartnerCol::Subscriber
-        | PartnerCol::Overridden
-        | PartnerCol::Overrider
-        | PartnerCol::Hider
-        | PartnerCol::Hidden => 1,
-      PartnerCol::HiddenInSubscribee => 3,
-      PartnerCol::HiddenOutsideOfSubscribee => 2, } }
 }
 
 impl QualCol {
@@ -603,8 +584,6 @@ impl QualCol {
       QualCol::ID    => "idCol",
     } }
 
-  pub fn origin_depth (self) -> usize {
-    1 }
 }
 
 impl Qual {

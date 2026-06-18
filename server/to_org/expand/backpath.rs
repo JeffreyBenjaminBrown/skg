@@ -26,17 +26,6 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-pub async fn build_and_integrate_containerward_view_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
-
-  node_id       : NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_containerward_view_then_drop_request_with_source_set (
-    tree, node_id, config, typedb_driver, errors, None ) . await
-}
 
 pub async fn build_and_integrate_containerward_view_then_drop_request_with_source_set (
   tree          : &mut Tree<ViewNode>,
@@ -83,16 +72,6 @@ pub async fn build_and_integrate_containerward_path_with_source_set (
   ) . await ?;
   Ok (( )) }
 
-pub async fn build_and_integrate_sourceward_view_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
-  node_id       : NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_sourceward_view_then_drop_request_with_source_set (
-    tree, node_id, config, typedb_driver, errors, None ) . await
-}
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request_with_source_set (
   tree          : &mut Tree<ViewNode>,

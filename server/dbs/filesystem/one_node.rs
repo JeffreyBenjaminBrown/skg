@@ -24,18 +24,6 @@ pub async fn nodecomplete_from_id (
   Ok ( nodecomplete_from_pid_and_source (
     config, pid, &source )? ) }
 
-/// Fetch multiple NodeCompletes from disk given a list of IDs.
-pub async fn nodecompletes_from_ids (
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-  ids    : &[ID],
-) -> Result<Vec<NodeComplete>, Box<dyn Error>> {
-  let mut nodes : Vec<NodeComplete> = Vec::new();
-  for id in ids {
-    let node : NodeComplete =
-      nodecomplete_from_id ( config, driver, id ) . await ?;
-    nodes . push (node); }
-  Ok (nodes) }
 
 /// Reads a NodeComplete from disk given its PID and source.
 pub fn nodecomplete_from_pid_and_source (

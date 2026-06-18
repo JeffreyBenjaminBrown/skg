@@ -38,18 +38,6 @@ where L : Clone + Eq + Hash,
       . or_default ()
       . insert (l); }
 
-  pub fn remove_pair (
-    &mut self,
-    l : &L,
-    r : &R,
-  ) { if let Some (rs) = self . left_to_right . get_mut (l)
-      { rs . remove (r);
-        if rs . is_empty ()
-          { self . left_to_right . remove (l); }}
-    if let Some (ls) = self . right_to_left . get_mut (r)
-      { ls . remove (l);
-        if ls . is_empty ()
-          { self . right_to_left . remove (r); }}}
 
   /// Remove a right value and all its associated left values.
   pub fn remove_right (
@@ -70,10 +58,4 @@ where L : Clone + Eq + Hash,
   ) -> Option<&HashSet<R>> {
     self . left_to_right . get (l) }
 
-  /// Look up all left values for a given right value.
-  pub fn get_left (
-    &self,
-    r : &R,
-  ) -> Option<&HashSet<L>> {
-    self . right_to_left . get (r) }
 }

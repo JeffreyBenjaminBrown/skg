@@ -135,13 +135,6 @@ changes."
   (skg--subtree-id-and-source-pairs-if
    #'skg--metadata-has-unstaged-new-file-p))
 
-(defun skg--subtree-id-and-source-pairs ()
-  "Return a list of (id . source) for the current heading and every
-org-descendant whose headline metadata carries both an id and a
-source. Order is the natural outline order."
-  (skg--subtree-id-and-source-pairs-if
-   (lambda (_sexp) t)))
-
 (defun skg--subtree-id-and-source-pairs-if (predicate)
   "Return subtree (id . source) pairs whose metadata satisfies PREDICATE.
 Order is the natural outline order."

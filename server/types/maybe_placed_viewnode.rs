@@ -272,62 +272,6 @@ pub fn maybePlaced_to_placed_viewforest (
       Ok (( )) } )?;
   Ok (ViewForest::from_internal_tree (checked)) }
 
-/// Convert a placed ViewNode tree to an MpViewnode tree.
-/// Infallible since checked types always satisfy maybePlaced requirements.
-pub fn placed_to_maybePlaced_tree(
-  checked: &Tree<ViewNode>
-) -> Tree<MpViewnode> {
-  fn convert_children(
-    checked_tree   : &Tree<ViewNode>,
-    unchecked_tree : &mut Tree<MpViewnode>,
-    checked_id     : NodeId,
-    unchecked_id   : NodeId,
-  ) {
-    let child_ids : Vec<NodeId> =
-      checked_tree
-      . get (checked_id)
-      . unwrap()
-      . children()
-      . map(|c| c . id())
-      . collect();
-
-    for checked_child_id in child_ids {
-      let checked_child : &ViewNode =
-        checked_tree
-        . get (checked_child_id)
-        . unwrap()
-        . value();
-      let unchecked_child : MpViewnode =
-        MpViewnode::from(checked_child . clone());
-
-      let unchecked_child_id : NodeId =
-        { let mut parent_mut : NodeMut<MpViewnode> =
-           unchecked_tree . get_mut (unchecked_id) . unwrap();
-         parent_mut . append (unchecked_child) . id() };
-
-      convert_children(
-        checked_tree,
-        unchecked_tree,
-        checked_child_id,
-        unchecked_child_id );
-    }
-  }
-
-  let root_checked : &ViewNode =
-    checked . root() . value();
-  let root_unchecked : MpViewnode =
-    MpViewnode::from(root_checked . clone());
-  let mut unchecked : Tree<MpViewnode> =
-    Tree::new (root_unchecked);
-
-  let checked_root_id : NodeId =
-    checked . root() . id();
-  let unchecked_root_id : NodeId =
-    unchecked . root() . id();
-  convert_children(&checked, &mut unchecked, checked_root_id, unchecked_root_id);
-
-  unchecked
-}
 
 //
 // Defaults

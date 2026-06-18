@@ -4,14 +4,13 @@ use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, ActiveNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -473,66 +472,7 @@ pub fn get_id_from_treenode (
     _ => Err ( "get_id_from_treenode: caller must pass a vognode" . into() ),
   }}
 
-/// Build a node from disk and
-/// append it at 'parent_treeid' as a child.
-/// Returns the new node's ego_tree::NodeId.
-///
-/// Does *not* take its ancestors into account,
-/// and does *not* build any of its descendents.
-/// Those can be done later via 'complete_branch_minus_content',
-/// or they can all be done at once via
-/// 'build_node_branch_minus_content.
-pub async fn make_and_append_child_pair (
-  tree          : &mut Tree<ViewNode>,
-  parent_treeid : NodeId, // will parent the new node
-  child_skgid   : &ID, // how to find the new node
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-) -> Result < NodeId, // the new node
-              Box<dyn Error> > {
-  let child_viewnode : ViewNode = match
-    nodecomplete_and_viewnode_from_id (
-      config, driver, child_skgid ) . await ?
-    { Some ((_nc, v)) => v,
-      None => mk_unknown_viewnode (child_skgid . clone ()) };
-  let child_treeid : NodeId =
-    with_node_mut ( // append child
-      tree, parent_treeid,
-      ( |mut parent_mut|
-        parent_mut . append (child_viewnode) . id() ))
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (child_treeid) }
 
-pub async fn make_and_append_child_pair_with_source_set (
-  tree          : &mut Tree<ViewNode>,
-  parent_treeid : NodeId,
-  child_skgid   : &ID,
-  config        : &SkgConfig,
-  driver        : &TypeDBDriver,
-  active        : Option<&ActiveSourceSet>,
-) -> Result < (NodeId, bool), Box<dyn Error> > {
-  if let Some (active) = active {
-    if ! active . is_all () {
-      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-        HashMap::new ();
-      if let Some (source) =
-        find_source_with_optional_tantivy (
-          child_skgid, &deleted_since_head_pid_src_map, None, config )
-      {
-        if ! active . contains_source (&source) {
-          let inactive : ViewNode =
-            mk_inactive_viewnode ();
-          let child_treeid : NodeId =
-            with_node_mut (
-              tree, parent_treeid,
-              ( |mut parent_mut|
-                parent_mut . append (inactive) . id () ))
-            . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-          return Ok ((child_treeid, false)); }}}}
-  let child_treeid : NodeId =
-    make_and_append_child_pair (
-      tree, parent_treeid, child_skgid, config, driver ) . await ?;
-  Ok ((child_treeid, true)) }
 
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,

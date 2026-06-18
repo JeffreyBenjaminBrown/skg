@@ -395,20 +395,6 @@ title comes from the stack entry."
                  (car (skg-sexp-cdr-at-path sexp '(skg deleted     source))))))
     (when val (format "%s" val))))
 
-(defun skg--metadata-is-removed-here-phantom-p (sexp)
-  "Return t if SEXP describes a 'removed-here' phantom: a node whose
-membership was removed in some stage but whose file existence is
-unchanged. Such a node is emitted as a diffPhantom, shaped like
-(skg (diffPhantom ... (staged ATOMS) (unstaged ATOMS))).
-A removed-here phantom has at least one removedM atom under a stage
-form, and no removedX/newX atoms."
-  (let ((staged-atoms   (skg-sexp-cdr-at-path sexp '(skg diffPhantom staged)))
-        (unstaged-atoms (skg-sexp-cdr-at-path sexp '(skg diffPhantom unstaged))))
-    (let ((all-atoms (append staged-atoms unstaged-atoms)))
-      (and (memq 'removedM all-atoms)
-           (not (memq 'newX     all-atoms))
-           (not (memq 'removedX all-atoms))))))
-
 (defun skg--point-in-link-p ()
   "If point is within a link, return (id . label). Otherwise nil."
   (let ( ( pos (point) )
@@ -467,13 +453,6 @@ e.g. \"557a869b-02ba-4c59-a5d3-5fb469a12353.skg\" or \"a.skg\"."
           (setq result (cons (match-string-no-properties 1)
                              (match-string-no-properties 0) )) )) )
     result ))
-
-(defun skg--truncate-id
-    (id)
-  "Return first 6 characters of ID followed by ellipsis."
-  (if (> (length id) 6)
-      (concat (substring id 0 6) "...")
-    id ))
 
 (defun skg-replace-id-stack-from-buffer ()
   "Replace `skg-id-stack' with contents parsed from current buffer.

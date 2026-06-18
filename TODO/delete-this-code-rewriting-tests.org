@@ -1,0 +1,164 @@
+* Dead-code cleanup — handoff for the test-rewriting phase
+  Status as of <2026-06-17>. Work so far is UNCOMMITTED (review git diff).
+  Author: Claude. Picks-up-from notes are written for a human or AI.
+
+  The easy, no-test-rewriting deletions are DONE and verified. What
+  remains needs tests deleted or rewritten, which is why it stopped
+  here for a decision. Each remaining candidate below has its file, the
+  tests that reference it, and a concrete rewrite recipe.
+
+* TL;DR
+  - DONE (verified, green): removed 23 Rust fns + 7 elisp fns that had
+    NO reference anywhere outside their own definition.
+    Verification: =cargo check --all-targets= clean, =cargo nextest run=
+    460/460, elisp ERT 239/239, =check-parens= on all touched elisp.
+  - REMAINING: 4 buckets (A,B Rust; C,D elisp) of code reachable only
+    from tests (or unbound M-x). Deleting them means rewriting/removing
+    tests. Recommendations are per bucket; nothing here is done yet.
+
+* How this was found / how to verify (reproduce before trusting)
+  1. Reachability, Rust:
+       cargo run -q -p call-graph        # regenerates tools/introspect/call-graph/db/{functions,calls}.csv
+     then BFS from =main= over calls.csv; anything not reached is a
+     candidate. NOTE the call-graph is NAME-BASED and cannot see:
+       - trait-impl methods (Display/Deref/Drop/serde derive ...),
+       - serde-attribute string refs (=#[serde(deserialize_with="...")]=),
+       - deref-coercion, fn-pointers, macro-generated calls.
+     So "unreachable" OVER-reports. Always confirm with the compiler.
+  2. The ORACLE for Rust is the compiler:
+       cargo check --all-targets         # lib + every bin + every wired test
+     If a deletion still compiles, nothing references it anywhere that
+     compiles (serde/trait/tests/tools included). This is ground truth.
+  3. Private items: =cargo check --lib= reports ZERO dead_code warnings,
+     so every PRIVATE Rust item is production-live. Only fully-=pub=
+     items can be dead-but-unwarned. Don't bother hunting private dead
+     code; there is none.
+  4. Elisp has no static unused-detection. Signal = textual symbol refs
+     across all production =elisp/*.el= + ALL of =tests/= (this MUST
+     include =tests/integration/*/test-emacs.el=, the end-to-end driver
+     scripts — a fn used there is a real feature, NOT dead). Verify with
+     =check-parens= per file + =bash bash/emacs-tests.sh= (239 tests) +,
+     for anything integration-referenced, =bash bash/integration-tests.sh=.
+  5. Transitive/aggressive: after each deletion, regenerate the
+     call-graph and recompute — deleting a leaf exposes new leaves.
+     Iterate to a fixpoint. (Both DONE batches were taken to fixpoint.)
+
+  Helper scripts written for this (delete them too if unwanted):
+    - tools/remove_fn.py           char-precise Rust fn remover
+                                   (preserves cuddled enclosing braces!)
+    - tools/remove_elisp_defun.py  paren-matched elisp defun remover
+
+* Protected — do NOT delete (your "location-based" rule + carve-outs)
+  - server/abandoned/, elisp/abandoned/, elisp/experim/, _burying/
+  - server/to_org/expand/unused_but_nice.rs  (#![allow(dead_code)]; kept on purpose)
+  - Test infrastructure: server/test_utils*, elisp/skg-test-utils.el,
+    and the KEEP list below.
+
+* DONE — already deleted (do not redo)
+** Rust (23) — zero refs anywhere
+   nodecompletes_from_ids; NodeRelation::from_typeql_name;
+   RelationRole::{from_typeql_role_name,typeql_role_name};
+   subset_with_hadid; path_sourceward_to_first_nonlinearity;
+   nodecomplete_from_git_head; handle_get_file_path_request; send_response;
+   render_viewforest_with_source_set;
+   build_and_integrate_{containerward,sourceward}_view_then_drop_request;
+   make_and_append_child_pair_with_source_set; make_and_append_child_pair;
+   ManyToMany::{get_left,remove_pair}; placed_to_maybePlaced_tree;
+   Forest::as_internal_tree; NodeContainRels::{herald_for_non_content,herald_for_content};
+   {PartnerCol,QualCol}::origin_depth; ViewUri::is_search.
+   Plus the emptied =impl NodeContainRels= block and 5 orphaned imports.
+** Elisp (7) — no production reference
+   skg--default-source; skg--metadata-is-removed-here-phantom-p;
+   skg--subtree-id-and-source-pairs; skg--truncate-id;
+   skg-sexp-edit--cycle-and-replace;
+   skg-show-save-errors; skg-show-save-warnings
+   (the last two superseded by skg-show-save-errors-and-warnings).
+   Confirmed: none referenced in tests/integration either.
+
+* REMAINING WORK
+
+** BUCKET A — Rust dead production wrappers — RECOMMEND DELETE
+   Each is a thin wrapper a refactor left behind; production now calls
+   the delegate directly (these are unreachable from main). Recipe:
+   change each test call to the delegate, then re-run the oracle.
+   The "all" source set is:
+     let active = ActiveSourceSet::named (
+        config, SourceSetName::from ("all"))
+       . expect ("reserved source-set all should always resolve");
+
+   - handle_diff_analysis_request   [serve/handlers/diff_analysis.rs]
+       tests: tests/diff_analysis.rs:163
+       -> handle_diff_analysis_request_with_source_set(stream, request, config, &active)
+   - handle_titles_by_ids_request   [serve/handlers/titles_by_ids.rs]
+       tests: tests/titles_by_ids.rs:54,167,227
+       -> handle_titles_by_ids_request_with_source_set(stream, request, tantivy_index, config, diff_mode_enabled, &active)
+   - path_containerward_to_first_nonlinearity   [dbs/typedb/paths.rs]
+       tests: tests/typedb/paths.rs, tests/typedb/search.rs, tests/content_view.rs
+       -> path_to_first_nonlinearity(db_name, driver, node, "contains", "contained", "container")
+   - nodeMerge_instructions_from_viewforest   [nodeMerge/nodeMergeInstructionTriple.rs]
+       tests: tests/merge/merge_nodes.rs, tests/merge/saveinstructions_from_the_merges_in_an_viewforest.rs
+       -> { let collected = collect_instructions_locally(viewforest)?;
+            nodeMerge_instructions_from_pairs(&nodeMerge_pairs(&collected), config, driver).await }
+   - multi_root_view_with_source_set   [to_org/render/content_view.rs]
+       tests: tests/source_sets.rs, tests/partner_col_matrix.rs, tests/override_substitution.rs
+       -> multi_root_view_inner(driver, config, tantivy_index, root_ids, diff_mode_enabled, Some(active_source_set)).await
+   - build_and_integrate_containerward_path   [to_org/expand/backpath.rs]
+       tests: tests/rebuild/integrate_backpath.rs, tests/typedb/paths.rs
+       -> build_and_integrate_containerward_path_with_source_set(tree, node_id, config, driver, None).await
+   - build_and_integrate_sourceward_path   [to_org/expand/backpath.rs]
+       tests: tests/rebuild/sourceward_ancestry.rs
+       -> build_and_integrate_sourceward_path_with_source_set(tree, node_id, config, driver, None).await
+   - integrate_path_that_might_fork_or_cycle   [to_org/expand/backpath.rs]
+       tests: tests/rebuild/integrate_backpath.rs
+       -> integrate_path_that_might_fork_or_cycle_with_source_set(tree, node_id, path, branches, cycle_nodes, config, driver, birth, None).await
+
+   CAVEAT: confirm the test still asserts what it should after pointing
+   at the delegate (the wrappers only added the default source set / a
+   fixed direction; behavior is identical for the "all" set, so most
+   asserts should hold verbatim).
+
+** BUCKET B — Rust production-capable fns only tests use — YOUR CALL
+   Coherent library functions (DB queries, tree traversal, accessors).
+   Unused by production today, but possibly intended API. Decide per item.
+   - write_nodecomplete_to_source   [dbs/filesystem/one_node.rs]      tests: multi_source_loading.rs, file_io.rs
+   - AuditRecord::is_clean          [dbs/in_rust_graph/audit_store.rs] tests: tests/dbs/in_rust_graph/audit_store.rs
+   - node_source_relation_count     [dbs/typedb/sources.rs]           tests: tests/typedb.rs
+   - source_name_for_node_ids       [dbs/typedb/sources.rs]           tests: tests/typedb.rs
+   - source_ownership_for_node_ids  [dbs/typedb/sources.rs]           tests: tests/typedb.rs
+   - add_v_to_map_if_absent         [types/maps.rs]                   tests: tests/to_org/complete/contents.rs
+   - NodeMerge::targets_from_nodeMerge [types/save.rs]                tests: tests/merge/*
+   - Forest::first_root             [types/tree/forest.rs]            tests: tests/new/buffer_to_viewnodes/validate_tree.rs, tests/merge/merge_acquiree_as_independent_root.rs
+   - first_in_generation            [types/tree/generations.rs]       tests: tests/types/tree.rs
+   - next_in_generation             [types/tree/generations.rs]       tests: tests/types/tree.rs
+
+** BUCKET C — Elisp unit-test-only fns — RECOMMEND DELETE
+   Referenced only in tests/elisp (NOT in tests/integration), no
+   production caller. Delete the defun, then remove/rewrite the unit
+   test (named below) so the suite stays green. Re-run bash/emacs-tests.sh.
+   - skg-delete-kv-pair-from-metadata-by-key  [skg-metadata.el]   test: tests/elisp/test-skg-metadata-editing.el
+   - skg-delete-value-from-metadata           [skg-metadata.el]   test: tests/elisp/test-skg-metadata-editing.el
+   - skg-parse-headline-metadata              [skg-metadata.el]   test: tests/elisp/test-skg-metadata.el
+   - skg-replace-id-stack-from-buffer         [skg-id-search.el]  test: tests/elisp/test-skg-id-search.el
+   - skg-sexp-at-or-after-point               [skg-sexpr/skg-sexpr-search.el] test: tests/elisp/test-skg-sexpr-search.el
+
+** BUCKET D — Elisp unbound interactive M-x commands — RECOMMEND KEEP
+   Bound to no key, referenced nowhere (incl. integration), but you may
+   run them via M-x, so they aren't obviously dead. Confirm before any go.
+   - skg-active-source-set     [skg-request-source-sets.el]
+   - skg-connection-end        [skg-client.el]
+   - skg-goto-bypassOverride   [skg-id-search.el]
+   - skg-list-source-sets      [skg-request-source-sets.el]
+   - skg-rebuild-dbs           [skg-request-rebuild-dbs.el]
+
+* KEEP — test infrastructure & integration-tested features (do NOT flag again)
+  Rust test infra: install_or_swap_global_handle, try_init_global_handle,
+  run_with_source_set_test_db, empty_node_complete, tree_from_org_text,
+  enriched_search_buffer_for_source_set_for_test,
+  titles_by_ids_for_source_set_for_test,
+  filter_branches_to_active_sources_for_test,
+  filter_path_to_active_sources_for_test,
+  atoms_in_rule_table, emittable_metadata_atoms (herald-invariant test).
+  Elisp features verified END-TO-END by integration tests (so NOT dead,
+  despite no elisp-unit/production ref):
+  - skg-open-empty-content-view  (tests/integration/empty-content-save)
+  - skg-visit-link               (tests/integration/visit-link)

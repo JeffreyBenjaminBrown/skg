@@ -31,20 +31,6 @@ impl NodeRelation {
         "overrides_view_of",
     } }
 
-  pub fn from_typeql_name (name : &str) -> Option<NodeRelation> {
-    match name {
-      "contains" =>
-        Some (Self::Contains),
-      "textlinks_to" =>
-        Some (Self::TextlinksTo),
-      "subscribes" =>
-        Some (Self::Subscribes),
-      "hides_from_its_subscriptions" =>
-        Some (Self::HidesFromItsSubscriptions),
-      "overrides_view_of" =>
-        Some (Self::OverridesViewOf),
-      _ => None,
-    } }
 
   /// The per-stage diff of this relation's outbound list within a
   /// NodeChanges, or None for a relation NodeChanges does not diff
@@ -96,28 +82,7 @@ impl RelationRole {
   ) -> RelationRole {
     RelationRole { relation, position } }
 
-  pub fn from_typeql_role_name (
-    relation : NodeRelation,
-    role     : &'static str,
-  ) -> Result<RelationRole, String> {
-    let (first_role, second_role) : (&'static str, &'static str) =
-      relation . roles ();
-    if role == first_role {
-      Ok (RelationRole::new (relation, BinaryRolePosition::First))
-    } else if role == second_role {
-      Ok (RelationRole::new (relation, BinaryRolePosition::Second))
-    } else {
-      Err (format!(
-        "role '{}' is not part of relation '{}'",
-        role, relation . typeql_name ())) } }
 
-  pub fn typeql_role_name (self) -> &'static str {
-    let (first_role, second_role) : (&'static str, &'static str) =
-      self . relation . roles ();
-    match self . position {
-      BinaryRolePosition::First  => first_role,
-      BinaryRolePosition::Second => second_role,
-    } }
 
   pub fn opposite_position (self) -> BinaryRolePosition {
     match self . position {

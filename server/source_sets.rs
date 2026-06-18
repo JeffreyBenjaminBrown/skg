@@ -7,7 +7,6 @@ use crate::dbs::init::{
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::sources::create_all_sources;
-use crate::org_to_text::viewforest_to_string;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 pub use crate::types::misc::SourceSetName;
@@ -157,13 +156,6 @@ pub fn apply_source_set_to_viewforest (
           viewforest . get_mut (id) . unwrap ();
         node_mut . detach (); }, }}}
 
-pub fn render_viewforest_with_source_set (
-  viewforest : &mut Tree<ViewNode>,
-  config     : &SkgConfig,
-  active     : &ActiveSourceSet,
-) -> Result<String, Box<dyn Error>> {
-  apply_source_set_to_viewforest (viewforest, active);
-  viewforest_to_string (viewforest, config) }
 
 pub fn titles_for_source_set_for_test (
   config : &SkgConfig,

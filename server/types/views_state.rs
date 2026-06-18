@@ -61,8 +61,7 @@ impl ViewUri {
       ViewUri::OverrideMenu ( pid . to_string () )
     } else {
       ViewUri::ContentView (s) } }
-  pub fn is_search ( &self ) -> bool {
-    matches! ( self, ViewUri::SearchView (_) ) } }
+}
 
 impl OpenViews {
   pub fn new () -> Self {

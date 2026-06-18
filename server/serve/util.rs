@@ -38,14 +38,6 @@ pub fn tag_text_response (
       Sexp::Atom ( Atom::S ( text            . to_string () )), ] ),
   ] ) . to_string () }
 
-pub fn send_response (
-  stream   : &mut TcpStream,
-  response : &str,
-) { if let Err (e) = writeln! (stream, "{}", response) {
-      tracing::error!("Failed to send response: {}", e);
-      return; }
-    if let Err (e) = stream . flush () {
-      tracing::error!("Failed to flush response: {}", e); } }
 
 pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
