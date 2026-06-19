@@ -51,7 +51,14 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
+*** Why is search slow?
+Try a search that was big -- backup my data.
+The view update or the ranking might swamp the other's cost.
 *** show content roots of all modified nodes
+*** a function to relabel link labels
+The label could be a special string like ":skg default label:".
+That is, the target got a better title, and you would like
+everything that uses the default title to switch to the new one.
 *** recursive git rm for removed nodes
 *** Each parentIs herald should be a different color.
 and always first
