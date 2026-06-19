@@ -1323,3 +1323,69 @@
    removed-member phantom for a node that exists nowhere. Data repair:
    commit the pending d40db175.skg (the worktree is already correct), or
    any commit that makes HEAD's d40db175 stop referencing 8c24623a.
+
+* DONE C-c t a (git-add preview) freezes on a large content view (2026-06-19)
+  Fixed 2026-06-19: replaced the `org-map-entries' scan in
+  `skg--subtree-id-and-source-pairs-if' with a manual
+  `outline-next-heading' walk (see "Fix applied" below). The 5
+  `test-skg-git-add' ERT tests pass and the walk returns results
+  identical to the old code on the real buffer.
+
+  Reported by Jeff: from a single-root recursive content view of
+  9c5619e5 ("shareable knowledge gardens", the project root, ~195
+  view nodes), `C-c t a' (`skg-git-add-if-new-recursive-preview')
+  freezes Emacs -- the cursor stops responding, no preview appears,
+  and `C-g' aborts cleanly with no damage. It works from smaller
+  content views.
+
+** The only whole-buffer operation in that command is `org-map-entries'
+   The command path is
+   `skg-git-add-if-new-recursive-preview'
+   -> `skg--git-add-new-files-recursive-plan'
+   -> `skg--subtree-unstaged-new-file-id-and-source-pairs'
+   -> `skg--subtree-id-and-source-pairs-if' (elisp/skg-git-add.el:138),
+   whose only non-trivial step is `org-map-entries (... nil 'tree)'.
+   This is the SOLE use of `org-map-entries' anywhere in elisp/. Every
+   other subtree walker in the client (the save path
+   skg-request-save.el, skg-metadata.el, skg-modify-graph.el,
+   skg-org-fold.el, ...) uses a lightweight `org-back-to-heading' +
+   bounded `outline-next-heading' loop. The save path scans this same
+   195-node buffer with no trouble.
+
+   In org 9.7, `org-map-entries' with a nil match routes through
+   `org-scan-tags' -> `org-element-cache-map', which forces a full
+   org-element AST parse/sync of the buffer (and an
+   `org-entry-get-with-inheritance "CATEGORY"' ancestry walk per node).
+   That is far heavier than an outline-regexp scan and -- unlike the
+   manual walk -- its cost depends on the live org-element cache state,
+   which interactive folding/navigation/edits churn. skg content views
+   are exactly the kind of buffer that can confuse the element cache:
+   heading text carries `(skg ...)' metadata that isn't normal org,
+   heralds-minor-mode masks it with `display' overlays, and node bodies
+   can contain heading-like lines.
+
+** Caveat: NOT reproduced headless
+   With the current data I could not reproduce the freeze. The full
+   command -- bootstrapped through the real client (skg-init.el),
+   connected to the live server, git diff mode on, real
+   skg-content-view-mode + heralds-minor-mode buffer -- completes in
+   ~0.038 s and finds 1 unstaged-new file. In batch, `org-map-entries'
+   over the real 195-node buffer is ~0.04 s (folded or not), scales
+   only linearly (≈7 s at 50k nodes), and returns results identical to
+   a manual scan; `pp-to-string' of the preview form and the
+   `skg-readable-ids-mode' annotation are both cheap/async. So the
+   freeze needs the interactive element-cache state that batch can't
+   reproduce. The size correlation ("works from smaller buffers") fits
+   an element-cache stall whose cost grows with the buffer.
+
+** Fix applied (verified equivalent): dropped org-map-entries
+   `skg--subtree-id-and-source-pairs-if' now walks the subtree with
+   `org-back-to-heading' + `org-end-of-subtree' + bounded
+   `outline-next-heading', matching the rest of the client and never
+   invoking `org-element-cache-map'. A batch comparison confirmed the
+   manual walk returns byte-identical pairs on the real buffer and on
+   synthetic buffers up to 30k nodes, while being ~2-3x faster even in
+   batch. This removes the only fragile dependency in the command, and
+   it also drops the latent `org-agenda-prepare-buffers' branch that
+   `org-map-entries' would take should an skg buffer ever gain a
+   `buffer-file-name'.

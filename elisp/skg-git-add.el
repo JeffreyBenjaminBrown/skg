@@ -137,22 +137,27 @@ changes."
 
 (defun skg--subtree-id-and-source-pairs-if (predicate)
   "Return subtree (id . source) pairs whose metadata satisfies PREDICATE.
-Order is the natural outline order."
+Order is the natural outline order.
+Walks the subtree with `outline-next-heading' rather than
+`org-map-entries', so it never drives org's tags scanner / element
+cache (`org-element-cache-map'), which can stall on a large,
+interactively-folded content view."
   (save-excursion
     (let ((pairs '()))
       (org-back-to-heading t)
-      (org-map-entries
-       (lambda ()
-         (save-excursion
-           (beginning-of-line)
-           (let ((sexp (skg-first-sexpr-on-line)))
-             (when sexp
-               (let ((id     (skg--extract-id-from-metadata-sexp sexp))
-                     (source (skg--extract-source-from-metadata-sexp sexp)))
-                 (when (and id source
-                            (funcall predicate sexp))
-                   (push (cons id source) pairs)))))))
-       nil 'tree)
+      (let ((end (save-excursion (org-end-of-subtree t t))))
+        (beginning-of-line)
+        (cl-block done
+          (while (< (point) end)
+            (let ((sexp (skg-first-sexpr-on-line)))
+              (when sexp
+                (let ((id     (skg--extract-id-from-metadata-sexp sexp))
+                      (source (skg--extract-source-from-metadata-sexp sexp)))
+                  (when (and id source
+                             (funcall predicate sexp))
+                    (push (cons id source) pairs)))))
+            (unless (outline-next-heading)
+              (cl-return-from done)))))
       (nreverse pairs))))
 
 (defun skg--metadata-has-unstaged-new-file-p (sexp)
