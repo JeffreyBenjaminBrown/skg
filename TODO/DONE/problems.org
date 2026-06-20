@@ -4,6 +4,17 @@
   to the top of this file (just under this note). The bulk below was
   migrated 2026-06-19 in the original problems.org order (oldest
   section first).
+* DONE (split-and-extend-paths-and-cols, step 6): parentOverrides ("pO") emit-only/unparseable
+  Fixed. 'parentOverrides' is now computed in the general viewStats pass
+  ('set_relation_relative_stats', 'server/update_buffer/viewnodestats.rs')
+  alongside 'overridesParent', and the viewStats parser
+  ('parse_metadata_sexp.rs') gained match arms for it and the four new
+  parent stats (subscribesParent / parentSubscribes / hidesParent /
+  parentHides). The Op/pO pair is symmetric again, and a
+  'paths-through-overridden' (path overridden) view round-trips pO. The
+  herald table emits red "pO"/"Sp"/"pS"/"Hp"/"pH". Covered by
+  'partner_col_matrix::relationship_matrix' (path scenarios assert the
+  stat on each grafted partner, plus a buffer-parse round-trip).
 * RESOLVED docs/COMMANDS.org misdescribed skg-reveal-sourceward (2026-06-20)
   'docs/COMMANDS.org' said skg-reveal-sourceward shows "the nodes that
   the node at point links to (its textlink targets)". The code surfaces

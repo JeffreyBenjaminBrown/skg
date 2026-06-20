@@ -681,8 +681,9 @@ fn parse_graphstats_sexp (
       { lr . sources_without_content = c; }}
   Ok (( )) }
 
-/// Parse the (viewStats ...) s-expression contents.
-/// Only handles bare atoms (cycle, containsParent).
+/// Parse the (viewStats ...) s-expression contents: the bare-atom
+/// stats (cycle, containsParent, the parent-relationship heralds) and
+/// the keyed 'overridesHere'/'sourceHerald' sub-forms.
 fn parse_viewstats_sexp (
   items : &[Sexp],
   stats : &mut ViewNodeStats
@@ -698,6 +699,11 @@ fn parse_viewstats_sexp (
           "grandparentOverrides"  => stats . grandparentOverrides  = true,
           "grandparentSubscribes" => stats . grandparentSubscribes = true,
           "overridesParent"       => stats . overridesParent       = true,
+          "parentOverrides"       => stats . parentOverrides       = true,
+          "subscribesParent"      => stats . subscribesParent      = true,
+          "parentSubscribes"      => stats . parentSubscribes      = true,
+          "hidesParent"           => stats . hidesParent           = true,
+          "parentHides"           => stats . parentHides           = true,
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },

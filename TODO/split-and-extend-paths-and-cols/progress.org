@@ -99,6 +99,25 @@
    - All 462 Rust tests pass; the containerward/sourceward + on-phantom
      integration tests still pass (refactor is behavior-preserving).
 
+** Step 6 — viewStats parent-herald matrix: Sp/pS/Hp/pH; fix pO (commit pending)
+   - 'ViewNodeStats' gained subscribesParent/parentSubscribes/
+     hidesParent/parentHides (Default false). 'set_relation_relative_stats'
+     now computes the full SIX-stat parent-relative matrix in its Gnode
+     arm (over/under for overrides, subscribes, hides) via
+     'relation_membership_is_real', keyed by the RelationRole consts --
+     including parentOverrides, previously produced only by the
+     fork buffer. Serializer + parser learned all of them; the parser's
+     missing 'parentOverrides' arm (the LATENT BUG) is fixed, so Op/pO is
+     symmetric again. Herald table emits red Sp/pS/Hp/pH; regenerated the
+     elisp fixture.
+   - Tests: the matrix 'path_request_scenarios' assert the matching
+     parent-relative stat on each grafted partner (pO via path overridden,
+     Op via overrider, pS via subscribee, Sp via subscriber, pH via
+     hidden, Hp via hider) AND a buffer-parse round-trip of all the new
+     atoms. All 462 Rust tests pass.
+   - Moved the pO latent-bug entry from 'TODO/problems.org' to
+     'TODO/DONE/problems.org'.
+
 * Changes to the plan's envisioned order
   - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
     regenerated WITHIN each herald-touching commit (step 2 here, later

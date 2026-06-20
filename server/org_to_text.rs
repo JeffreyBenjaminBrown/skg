@@ -271,6 +271,14 @@ fn activeNode_metadata_to_string (
         parts . push ( "overridesParent" . to_string () ); }
       if activeNode . viewStats . parentOverrides {
         parts . push ( "parentOverrides" . to_string () ); }
+      if activeNode . viewStats . subscribesParent {
+        parts . push ( "subscribesParent" . to_string () ); }
+      if activeNode . viewStats . parentSubscribes {
+        parts . push ( "parentSubscribes" . to_string () ); }
+      if activeNode . viewStats . hidesParent {
+        parts . push ( "hidesParent" . to_string () ); }
+      if activeNode . viewStats . parentHides {
+        parts . push ( "parentHides" . to_string () ); }
       if let Some (ref original) =
         activeNode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",

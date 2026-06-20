@@ -356,10 +356,26 @@ pub struct ViewNodeStats {
   /// different positions.
   pub overridesParent       : bool,
   /// This node's visible org-parent OVERRIDES it -- the inverse of
-  /// 'overridesParent'. Herald red "pO". Marks the original a
-  /// fork-to-be (clone) stands over in the fork-confirmation buffer.
-  /// Computed only where needed (that buffer), not generally.
+  /// 'overridesParent'. Herald red "pO". Computed generally now (in
+  /// 'set_relation_relative_stats'), like 'overridesParent'; also still
+  /// marks the original a fork-to-be (clone) stands over in the
+  /// fork-confirmation buffer.
   pub parentOverrides       : bool,
+  /// This node SUBSCRIBES TO its visible org-parent's node. Herald red
+  /// "Sp". A view stat like 'overridesParent': the same node under a
+  /// different parent has a different value.
+  pub subscribesParent      : bool,
+  /// This node's visible org-parent SUBSCRIBES TO it -- the inverse of
+  /// 'subscribesParent'. Herald red "pS".
+  pub parentSubscribes      : bool,
+  /// This node HIDES its visible org-parent (an outbound
+  /// 'hides_from_its_subscriptions' edge to it). Herald red "Hp". A
+  /// plain binary edge herald (Q9): the full "hidden from which
+  /// subscription" context lives in the hide cols, not here.
+  pub hidesParent           : bool,
+  /// This node's visible org-parent HIDES it -- the inverse of
+  /// 'hidesParent'. Herald red "pH".
+  pub parentHides           : bool,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald red "Oh".
   /// LOAD-BEARING, unlike the other view stats: save extraction
@@ -846,6 +862,10 @@ impl Default for ViewNodeStats {
       grandparentSubscribes : false,
       overridesParent       : false,
       parentOverrides       : false,
+      subscribesParent      : false,
+      parentSubscribes      : false,
+      hidesParent           : false,
+      parentHides           : false,
       overridesHere         : None,
     }} }
 

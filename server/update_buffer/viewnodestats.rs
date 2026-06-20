@@ -1,6 +1,5 @@
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
-use crate::dbs::in_rust_graph::relation_accessors::{
-  BinaryRolePosition, NodeRelation, RelationRole};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{PartnerCol, ViewNode, ViewNodeKind};
 use crate::types::viewnode::Vognode;
@@ -105,18 +104,23 @@ fn set_viewnodestats_recursive (
     { ancestor_ids . remove (pid); } } }
 
 /// Sets the stats that relate the node to its visible parent through
-/// the sharing relations:
-/// - 'overridesParent' ("Op"): the parent is a gnode this node
-///   overrides. Computed at every such position; the org-relative
-///   analogue of 'containsParent'.
-/// - 'grandparentOverrides' ("gO"): this node is a subscribee-as-such
-///   (Affected child of a SubscribeeCol) whose col owner also
-///   overrides it.
-/// - 'grandparentSubscribes' ("gS"): this node is an Affected child
-///   of an OverriddenCol whose col owner also subscribes to it.
+/// the sharing relations.
+/// PARENT-RELATIVE matrix (all computed when the visible parent is a
+/// gnode -- "the node R's the parent" and the inverse "the parent R's
+/// the node", for each sharing relation R):
+/// - 'overridesParent' ("Op") / 'parentOverrides' ("pO");
+/// - 'subscribesParent' ("Sp") / 'parentSubscribes' ("pS");
+/// - 'hidesParent' ("Hp") / 'parentHides' ("pH") -- plain binary edge
+///   heralds (Q9); the hide cols carry the subscription context.
+/// (The containment pair "}" / "{" is set elsewhere, in
+/// 'set_parent_containment_stats_in_viewnode'.)
+/// GRANDPARENT cases (subscribee/overridden-as-such):
+/// - 'grandparentOverrides' ("gO"): a subscribee-as-such (Affected
+///   child of a SubscribeeCol) whose col owner also overrides it.
+/// - 'grandparentSubscribes' ("gS"): an Affected child of an
+///   OverriddenCol whose col owner also subscribes to it.
 /// The redundant cases are deliberately not computed (no gS under a
-/// subscribeeCol, no gO under an overriddenCol): the col itself
-/// already says it.
+/// subscribeeCol, no gO under an overriddenCol): the col already says it.
 fn set_relation_relative_stats (
   tree     : &mut Tree<ViewNode>,
   treeid   : NodeId,
@@ -124,39 +128,52 @@ fn set_relation_relative_stats (
   parent   : &VisibleParent,
   graph    : &InRustGraph,
 ) {
-  let (overrides_parent, grandparent_overrides, grandparent_subscribes)
-    : (bool, bool, bool) = {
-    let node_is_affected : bool =
-      tree . get (treeid) . unwrap () . value ()
-      . is_activeNode_and_parentIs_affected ();
+  let node_is_affected : bool =
+    tree . get (treeid) . unwrap () . value ()
+    . is_activeNode_and_parentIs_affected ();
+  // The six parent-relative stats. The RelationRole names the role the
+  // NODE plays toward the parent: e.g. 'node overrides parent' is the
+  // node-as-OVERRIDER; 'parent overrides node' is the node-as-OVERRIDDEN.
+  let parent_stats
+    : (bool, bool, bool, bool, bool, bool) =
     match parent {
-      VisibleParent::Gnode (parent_pid) =>
-        ( graph . relation_membership_is_real (
-            parent_pid, node_pid, // the node overrides; the parent is overridden
-            RelationRole::new ( NodeRelation::OverridesViewOf,
-                                BinaryRolePosition::First )),
-          false, false ),
+      VisibleParent::Gnode (parent_pid) => {
+        let node_plays = | role : RelationRole | -> bool {
+          graph . relation_membership_is_real (
+            parent_pid, node_pid, role ) };
+        ( node_plays (RelationRole::OVERRIDER),   // overridesParent
+          node_plays (RelationRole::OVERRIDDEN),  // parentOverrides
+          node_plays (RelationRole::SUBSCRIBER),  // subscribesParent
+          node_plays (RelationRole::SUBSCRIBEE),  // parentSubscribes
+          node_plays (RelationRole::HIDER),       // hidesParent
+          node_plays (RelationRole::HIDDEN) ) },  // parentHides
+      _ => (false, false, false, false, false, false) };
+  let (grandparent_overrides, grandparent_subscribes) : (bool, bool) =
+    match parent {
       VisibleParent::Col { col : PartnerCol::Subscribee,
                            owner : Some (owner_pid) }
         if node_is_affected =>
-        ( false,
-          graph . relation_membership_is_real (
+        ( graph . relation_membership_is_real (
             owner_pid, node_pid, // the owner overrides; the node is overridden
-            RelationRole::new ( NodeRelation::OverridesViewOf,
-                                BinaryRolePosition::Second )),
+            RelationRole::OVERRIDDEN ),
           false ),
       VisibleParent::Col { col : PartnerCol::Overridden,
                            owner : Some (owner_pid) }
         if node_is_affected =>
-        ( false, false,
+        ( false,
           graph . relation_membership_is_real (
             owner_pid, node_pid, // the owner subscribes; the node is the subscribee
-            RelationRole::new ( NodeRelation::Subscribes,
-                                BinaryRolePosition::Second )) ),
-      _ => (false, false, false) } };
+            RelationRole::SUBSCRIBEE ) ),
+      _ => (false, false) };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . overridesParent       = overrides_parent;
+  { let (op, p_o, sp, p_s, hp, p_h) = parent_stats;
+    t . viewStats . overridesParent       = op;
+    t . viewStats . parentOverrides       = p_o;
+    t . viewStats . subscribesParent      = sp;
+    t . viewStats . parentSubscribes      = p_s;
+    t . viewStats . hidesParent           = hp;
+    t . viewStats . parentHides           = p_h;
     t . viewStats . grandparentOverrides  = grandparent_overrides;
     t . viewStats . grandparentSubscribes = grandparent_subscribes; }}
 
