@@ -97,6 +97,7 @@ and removes the child from the parent.
 *** graphstats should precede even the link source count
 but follow parentIs and indef
 ** elegance
+*** reveal aliases is different from reveal sourceward/containerward
 *** Emacs, not the server, should remember foldedness and point.
 **** the idea
 Keep a tree of IDs.
@@ -108,6 +109,18 @@ Continue to apply foldedness leafward from the root as before.
 **** It's hard because two viewnodes can share an ID.
 The incoming tree would have to be compared to the outgoing one.
 Although they usually don't, things can shift around dramatically.
+*** missing abstraction : "relationship to visible org-parent"
+Provenance/relationship to the org-parent is currently expressed three ways:
+(a) a 'birth' marker (containment, links)
+(b) a viewStats parent-herald (overrides: Op/pO)
+(c) for containment, BOTH at once ("}" appears as birth and as viewStats).
+
+Extending to subscribes/
+hides invites picking one. A single concept — "this node's relation
+to its visible org-parent, with role/direction" — computed in one
+place ('set_relation_relative_stats') and rendered by one herald
+family, would cover all 5 relations x 2 directions uniformly and
+retire the birth/viewStats split. Recommended by Q7(B) + Q8.
 ** usage mysteries
 *** must (?) stage them separately, but commit all repos at once
 ** usage, to document

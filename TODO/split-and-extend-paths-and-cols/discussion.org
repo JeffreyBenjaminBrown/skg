@@ -1,0 +1,391 @@
+* Hey Jeff — separating & extending the collection / path command families
+  You asked me to think the scheme through, find what you haven't
+  decided (or have spelled out inconsistently), and write up questions.
+  Here they are. Please answer inline under each "ANSWER:" line.
+  Anything you leave blank, I'll do per the "Recommend:" note.
+
+  The headline finding: your two families map *cleanly* onto two
+  mechanisms that already exist in the code (scaffold-cols vs.
+  backpath-ancestries), so the bones are good. But three things in the
+  spec are under- or mis-specified, and one is outright dangerous. The
+  blockers are Q2, Q3, and Q8; everything else has a safe default.
+
+* Ground truth — what exists today (so we agree before deciding)
+  I traced the whole path, client to server. The relevant facts:
+
+  - The three 'C-c r' commands are thin aliases
+    ('elisp/skg-keymaps-and-aliases.el:24-29, 123-126') over
+    'skg-request-*-view' ('elisp/skg-request-views.el'). Each inserts a
+    '(viewRequests TOKEN)' atom into the node's metadata; the server
+    fulfills the request during view completion.
+    - 'skg-reveal-aliases' inserts '(viewRequests aliases)' and does
+      NOT save. The server builds an 'AliasCol' scaffold, populated.
+    - 'skg-reveal-containerward' / 'skg-reveal-sourceward' insert
+      'containerwardView' / 'sourcewardView' AND auto-save.
+  - 'ViewRequest' ('server/types/viewnode.rs:433-441') has exactly four
+    variants: Aliases, Containerward, Sourceward, Definitive. There is
+    NO request for any PartnerCol.
+  - "Collections" in your sense = scaffold cols: the 8 PartnerCols plus
+    AliasCol. "Paths" = the backpath engine
+    ('server/to_org/expand/backpath.rs'), which climbs a relation
+    transitively (until a fork/cycle/root) and grafts the partners as
+    inverted, indefinitive, 'parentIs=independent' content children with
+    a 'birth' provenance marker.
+  - The backpath engine is ALREADY relation-generic: the relation is a
+    3-string parameter '(relation, input_role, output_role)' and the
+    in-Rust lookup ('server/dbs/typedb/search.rs:103-164') already
+    dispatches all five relations in BOTH directions. So the path
+    algorithm needs no new logic — only new call sites + plumbing
+    (birth markers, request variants, commands).
+  - 'C-c c' and 'C-c p' are both completely free prefixes today. Good.
+
+  Two things in the spec are factually off (details in Problems):
+  - Your 'C-c c o' is assigned to overrides AND hides AND subscribes.
+  - "containment and link heralds are already defined in both
+    directions" — links are NOT; only the node->parent direction
+    ('←') exists.
+
+* Blocking decisions
+
+** Q1. Keybinding collision (easy, but I need the letters)
+   You gave 'C-c c o' to overrides, hides, AND subscribes. Here is the
+   full proposed map; eyeball it. Collections each create BOTH
+   direction-cols, so they need no case distinction. Paths reuse your
+   UPPER=inbound/active, lower=outbound/passive convention.
+
+   Collections ('C-c c'):
+   | key     | command                        | cols created                  |
+   | C-c c a | skg-show-collection-aliases    | aliasCol                      |
+   | C-c c o | skg-show-collection-overrides  | overriddenCol + overriderCol  |
+   | C-c c h | skg-show-collection-hides      | hiderCol + hiddenCol          |
+   | C-c c s | skg-show-collection-subscribes | subscribeeCol + subscriberCol |
+
+   Paths ('C-c p'):
+   | key     | command                             | partners shown         | status |
+   | C-c p C | skg-show-paths-through-containers   | containers of N        | EXISTS |
+   | C-c p L | skg-show-paths-through-link-sources | nodes linking to N     | EXISTS |
+   | C-c p l | skg-show-paths-through-link-targets | nodes N links to       | new    |
+   | C-c p O | skg-show-paths-through-overriders   | nodes overriding N     | new    |
+   | C-c p o | skg-show-paths-through-overridden   | nodes N overrides      | new    |
+   | C-c p H | skg-show-paths-through-hiders       | nodes hiding N         | new    |
+   | C-c p h | skg-show-paths-through-hidden       | nodes N hides          | new    |
+   | C-c p S | skg-show-paths-through-subscribers  | nodes subscribing to N | new    |
+   | C-c p s | skg-show-paths-through-subscribees  | nodes N subscribes to  | new    |
+
+   Recommend: the table above (a/o/h/s for collections; your letters
+   for paths).
+   ANSWER: yes that's perfect
+
+** Q2. DANGEROUS: how a collection gets "put there" — request atom, NOT literal scaffold
+   You wrote: "If it's missing, put it there -- even if it will be
+   empty ... the view update subroutine of the save will complete it."
+   Taken literally — insert an empty col headline, then save — this is
+   unsafe for the two WRITABLE cols (overriddenCol, subscribeeCol):
+
+   - Save EXTRACTION reads the buffer before completion runs. A present
+     but empty 'overriddenCol' emits 'SetOverrides(vec![])'
+     ('from_text/local_instruction_collection/traverse.rs:307-323'),
+     which lowers to 'MSV::Specified(vec![])' ('.../lower.rs:268-273')
+     — i.e. "set this node's overrides to the empty set". If the node
+     HAD overrides on disk, saving the empty col WIPES them. The
+     reconcile that would have repopulated the col runs in the rerender
+     step, which is too late.
+   - (Same hazard for subscribeeCol -> 'subscribes_to', and even
+     aliasCol -> aliases.)
+
+   The existing 'skg-reveal-aliases' is safe precisely because it does
+   NOT insert a literal empty col — it inserts a '(viewRequests
+   aliases)' atom, and the server builds the col already POPULATED from
+   the graph. An empty result is then a true "this node has none",
+   never a destructive overwrite.
+
+   So I want to implement all collection commands the same way: insert a
+   request atom; the server builds each col populated from the graph.
+   That requires a new request mechanism for cols (none exists today).
+
+   Recommend: implement collections as requests, mirroring aliases —
+   never as hand-inserted empty scaffolds. (Mechanism in Q2a.)
+   ANSWER: That's perfect.
+
+*** Q2a. One parameterized request type, or many variants?
+    Collections need ~4 new request kinds (or 6 col-targets), and Paths
+    need ~9. Enumerating each as its own 'ViewRequest' variant means
+    ~13 new variants, each with a 'REPRS_IN_CLIENT' entry and a herald
+    'req:' rule. Since the backpath engine and the col reconcilers are
+    already relation-generic, I'd rather add TWO parameterized requests,
+    e.g. (sketch)
+    : ViewRequest::Col  ( PartnerCol-or-QualCol )
+    : ViewRequest::Path ( relation , direction )
+    serialized like '(viewRequests (col overriddenCol))' /
+    '(viewRequests (path overrides overrider))'. The elisp side still
+    gets 13 nicely-named commands for discoverability/keybindings; only
+    the wire atom is parameterized. This keeps 'ViewRequest', the herald
+    table, and the parser from sprouting 13 near-identical entries.
+
+    Recommend: two parameterized requests (Col, Path), with named elisp
+    commands on top.
+    ANSWER: That seems good. But rather than direction, let's use role name.
+    And in the herald for the request, let's keep it as brief as is intelligible:
+    (viewrequest col relname), (viewrequest path rolename).
+    (The distinction relname v. rolename is intentional.)
+
+** Q3. BLOCKER: "even if empty" cannot hold for the read-only (inbound) cols
+   Of the cols your commands create, only THREE survive a completion
+   pass while empty: 'overriddenCol', 'subscribeeCol', and 'aliasCol'.
+   The other five — 'overriderCol', 'subscriberCol', 'hiderCol',
+   'hiddenCol', and the two filter cols — are pruned when empty by
+   'is_self_deletable_when_empty' ('server/update_buffer/complete.rs:325-337').
+
+   Concretely, of your two-col commands:
+   - overrides: overriddenCol persists empty; overriderCol VANISHES empty.
+   - subscribes: subscribeeCol persists empty; subscriberCol VANISHES empty.
+   - hides: BOTH hiderCol and hiddenCol VANISH empty (hides has no
+     writable side at all).
+
+   So "put it there even if empty" is currently impossible for the
+   read-only halves. There's also a real question of whether you'd even
+   want it: a read-only col is informational and not user-extendable
+   (inserting a node into it just relabels it 'independent'), so an
+   empty 'overriderCol' only ever says "nobody overrides this" — which
+   is arguably better conveyed by its absence.
+
+   Options:
+   - (A) Accept the asymmetry: empty read-only cols simply don't appear;
+     the command shows them only when populated. Empty WRITABLE cols
+     (overriddenCol/subscribeeCol) and aliasCol do persist, giving you
+     the editable "add here" surface. Zero code change to the prune rule.
+   - (B) Make a *requested* col sticky: carry a flag so a col the user
+     explicitly asked for survives empty even when read-only. Costs a
+     new bit on the col + a prune-rule exception, and an empty read-only
+     col that does nothing.
+
+   Recommend: (A). It's safe, needs no prune change, and matches what
+   the cols mean.
+   ANSWER: Sure, (A).
+
+** Q4. Two cols with opposite editability under one command — confirm intent
+   Your collection commands bundle both directions. Note the halves
+   behave oppositely: the WRITABLE col is where you *create* the
+   relation (type a node in, save), while the read-only col only
+   *reports* the inverse and respawns/relabels on edit. And 'hides' is
+   special — neither direction is writable, because you hide by deleting
+   a subscribee-as-such's child, never by editing a 'hiderCol'
+   ('docs/sharing-model.md'). So 'skg-show-collection-hides' is
+   purely informational on both sides.
+
+   Recommend: keep the two-col bundling as you specified, but I'll
+   document per command which side (if any) is editable, so the bundling
+   doesn't imply you can add a hider/overrider from N's side.
+   ANSWER (flag if you'd rather, say, drop the read-only half, or split
+   each into two commands):
+
+*** TODO
+I think it's not a problem -- there will be the peace symbol herald
+on each read-only collection, so the user will understand.
+I don't think you'll even need to document it, because somewhere,
+the set of writeable and readonly cols is already documented
+(but please fact-check me).
+
+* The paths family
+
+** Q5. Transitive chains vs. a single step
+   Today's containerward/sourceward paths climb transitively — N's
+   container, its container, and so on until a fork/cycle/root
+   ('server/dbs/typedb/paths.rs:203-247'). Pointed at the sharing
+   relations, the same engine yields transitive chains. For some of
+   these that's degenerate or odd:
+   - overrides: user-owned overrides are monogamous + acyclic, so an
+     owned override chain is one step anyway (foreign chains can be
+     longer).
+   - hides: chaining "hiders of hiders of N" is semantically thin —
+     hiding is really about subscriptions, not a chainable ancestry.
+
+   Recommend: keep transitive (it's free — same engine — and harmless,
+   since one-step relations just produce one-step paths). I'll only
+   special-case if you disagree.
+   ANSWER: Let's keep it uniform, just to reduce the user's cognitive load.
+   (Maybe noteworthy: I will soon implement user-owned overrides chains.)
+
+** Q6. Direction-naming sanity check
+   Confirm my reading of your letters (it drives which graph role each
+   command queries):
+   - link-sources (L) = nodes that link TO N  = today's 'sourceward'.
+   - link-targets (l) = nodes N links to      = new (forward textlinks).
+   - containers   (C) = nodes that contain N  = today's 'containerward'.
+   - For overrides/hides/subscribes, UPPER = the partner that acts on N
+     (overrider/hider/subscriber), lower = the partner N acts on
+     (overridden/hidden/subscribee).
+   (Heads up: 'docs/COMMANDS.org' currently *misdescribes* sourceward as
+   "nodes the node links to" — that's backwards vs. the code. Logged in
+   Problems / 'TODO/problems.org'.)
+
+   Recommend: as above.
+   ANSWER: Please fix that error in docs/COMMANDS.org.
+   Yes, I think you've got all the casing right.
+   In each case it's the first member that's capitalized.
+
+** Q7. Provenance markers for the seven new path directions
+   Each grafted path node currently carries a 'birth' marker recording
+   how it was born ('Birth::ContainsParent' -> "}",
+   'Birth::LinksToParent' -> "←"). 'Birth' has only those two
+   relation-bearing variants ('server/types/viewnode.rs:36-40'), and the
+   save-side 'validate_parentIs_relationships' checks birth-vs-relation
+   consistency. So each new path direction needs *some* provenance, and
+   there's a design fork:
+   - (A) Add a 'Birth' variant + herald per new direction (~7 of them):
+     verbose but uniform with how containers/links work today.
+   - (B) Add one generic 'Birth::Backpath' (provenance = "grafted
+     ancestry") and let the per-direction *relationship* be carried by
+     the parent-relationship heralds from Q8 (Op/pO/Sp/pS/Hp/pH +
+     reverse-link). Less herald sprawl; needs the validation to accept a
+     generic backpath birth.
+
+   Recommend: (B) — one generic backpath provenance, with direction read
+   off the Q8 heralds. It also nudges us toward unifying the three
+   different ways "relationship to org-parent" is encoded today (see
+   Problems: missing abstraction).
+
+*** TODO
+I don't think we can lean on the heralds that way. Aren't they rather volatile?
+Heralds are a kind of secondary, generated information.
+
+I'm inclined to say (A), but maybe there's some third way,
+How is Birth even used?
+* Heralds
+
+** Q8. BLOCKER-ish: the parent-relationship herald matrix is incomplete
+   You want Op/pO, Sp/pS, Hp/pH, and you suspected not all exist.
+   Correct — here's the true state across all 5 relations x 2
+   directions (node->org-parent vs org-parent->node):
+
+   | relation   | node -> parent          | parent -> node                      |
+   | contains   | "}" containsParent  OK  | "{" parentIsContainer  OK           |
+   | textlinks  | "←" linksToParent   OK  | MISSING (no "parent links to node") |
+   | overrides  | "Op" overridesParent OK | "pO" parentOverrides — see caveat   |
+   | subscribes | "Sp" MISSING            | "pS" MISSING                        |
+   | hides      | "Hp" MISSING            | "pH" MISSING                        |
+
+   Caveat on pO: the atom + herald rule exist, but it is produced ONLY
+   by the fork-confirmation buffer ('server/from_text/fork.rs:135-137'),
+   is NOT computed in the general viewStats pass, and is NOT even
+   parseable ('parse_metadata_sexp.rs' has no arm for it — it'd hit the
+   error branch on round-trip). So for the 'paths-through-overridden'
+   view it effectively does not work yet.
+
+   Each grafted path node lands the matching herald: e.g.
+   'paths-through-overriders' children get "Op", 'paths-through-overridden'
+   children get "pO", subscribers->"Sp", subscribees->"pS",
+   hiders->"Hp", hidden->"pH", and 'paths-through-link-targets' children
+   need the MISSING reverse-link herald.
+
+   So to make the new path family readable I need to add five new
+   heralds (Sp, pS, Hp, pH, reverse-link) and properly wire pO
+   (general computation + parser arm). The graph layer already supports
+   every direction ('relation_membership_is_real' +
+   'NodeRelation::{Subscribes,HidesFromItsSubscriptions}'), so each is a
+   mechanical 6-7 site change (field, computation, serializer, herald
+   rule, atom list, conformance fixture, and — unlike today's pO —
+   a parser arm).
+
+   Recommend: add Sp, pS, Hp, pH, and reverse-link as red, parent-
+   relative viewStats heralds (same shape as Op); fix pO to be computed
+   generally AND parseable. Glyph for reverse-link: "→" (mirror of "←").
+   ANSWER (confirm the set, and the "→" glyph): Yes.
+
+** Q9. Hp/pH semantics — hiding is ternary
+   'hides_from_its_subscriptions' is really "subscriber X hides node Y
+   *from X's subscriptions*". A bare parent-relative "this node hides its
+   org-parent" (Hp) drops the "from which subscription" context. The
+   edge IS stored binary, so the herald is computable, but it asserts
+   less than the col view ('hiderCol'/'hiddenCol') does.
+
+   Recommend: emit Hp/pH as plain binary heralds (node has an outbound/
+   inbound hide edge to/from its org-parent), matching how the other
+   parent-heralds work, and rely on the existing hide cols for the full
+   subscription context. Flag if you want hide heralds suppressed
+   outside subscription contexts instead.
+   ANSWER: Yes.
+
+* Smaller decisions
+
+** Q10. Auto-save consistency
+   Today aliases does NOT auto-save, but containerward/sourceward DO
+   (the only behavioral difference among the three). With the request-
+   atom design (Q2), auto-saving is safe for everything (the server
+   builds cols populated).
+   Recommend: every collection and path command inserts its request and
+   auto-saves, and I bring aliases in line (auto-save too).
+   ANSWER: Yes.
+
+** Q11. Fate of the old 'C-c r' names
+   The underlying 'skg-request-*-view' functions and their integration
+   tests can stay unchanged; only the user-facing aliases + 'C-c r'
+   bindings move to 'C-c c' / 'C-c p'. There's also a bonus alias
+   'skg-reveal-link-sourceward'.
+   Recommend: drop the 'C-c r' bindings and the 'skg-reveal-*' aliases
+   (replaced by the new names); keep the underlying functions. 'C-c r'
+   becomes free.
+   ANSWER: Agreed.
+
+* Problems
+  Flaws in the scheme as written (code-level bugs I also logged to
+  'TODO/problems.org').
+
+** TODO
+aside from the 'relationship to visible org-parent' item
+(which I've transcribed in TODO.org),
+these are all resolved in this document already outside of this
+'problems' section, right?
+
+** DANGEROUS — "put an empty col there, save completes it" can wipe data
+   The literal reading of the collections spec wipes 'overrides_view_of'
+   / 'subscribes_to' / aliases when an empty writable col is saved
+   before completion repopulates it (full mechanism in Q2). The
+   request-atom design avoids it. This is the one thing in the spec I'd
+   refuse to implement as literally written.
+
+** INCORRECT — three statements in the spec don't hold
+   - 'C-c c o' is triple-booked (overrides/hides/subscribes) (Q1).
+   - "containment and link heralds are already defined in both
+     directions" — the reverse-LINK direction is missing; only "←"
+     exists (Q8). (Containment really is both-directional.)
+   - Not your spec, but adjacent: 'docs/COMMANDS.org:254-256' describes
+     'sourceward' backwards (says "nodes the node links to"; the code
+     surfaces nodes that link to it).
+
+** AWKWARD — "aliases" is a collection but not a PartnerCol
+   AliasCol is a 'QualCol', not one of the 8 PartnerCols, and aliases
+   alone behaves differently (no auto-save; QualCol vs PartnerCol prune
+   rules). Bundling it under 'skg-show-collection-*' is fine for the
+   user, but the implementation can't treat all "collections"
+   uniformly — the Col request (Q2a) must span QualCol + PartnerCol.
+
+** AWKWARD — one command, two cols of opposite editability
+   See Q4. Bundling a writable col with a read-only one under a single
+   verb ("show collection") risks implying symmetry that isn't there,
+   especially for 'hides' (no writable side).
+
+** MISSING ABSTRACTION — "relationship to visible org-parent" is encoded three ways
+   Provenance/relationship to the org-parent is currently expressed as:
+   (a) a 'birth' marker (containment, links), (b) a viewStats parent-
+   herald (overrides: Op/pO), and (c) for containment, BOTH at once
+   ("}" appears as birth and as viewStats). Extending to subscribes/
+   hides invites picking one. A single concept — "this node's relation
+   to its visible org-parent, with role/direction" — computed in one
+   place ('set_relation_relative_stats') and rendered by one herald
+   family, would cover all 5 relations x 2 directions uniformly and
+   retire the birth/viewStats split. Recommended by Q7(B) + Q8.
+
+** MISSING ABSTRACTION — no parameterized Col/Path request
+   Without Q2a's parameterized requests, this feature adds ~13 ViewRequest
+   variants, 13 'REPRS_IN_CLIENT' rows, 13 herald 'req:' rules, and 13
+   parser arms — all near-identical, when the engines beneath are already
+   relation-generic. Two typed requests carrying '(relation, direction)'
+   and '(col)' collapse that to ~2.
+
+** LATENT BUG — pO is emit-only and not parseable
+   'parentOverrides' is emitted ('fork.rs') but has no parser arm
+   ('parse_metadata_sexp.rs:690-698') — it survives only because it lives
+   in a read-only buffer. Any path/col feature that puts pO (or a new
+   pS/pH) into a saveable buffer will hit the parser's error branch on
+   round-trip. Must be fixed as part of Q8. (Logged in 'TODO/problems.org'.)

@@ -3,6 +3,29 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems found while scoping the collection/path command split (hey-jeff.org)
+** parentOverrides ("pO") is emit-only and not parseable
+   'parentOverrides' is emitted only by the fork-confirmation buffer
+   ('server/from_text/fork.rs:135-137') and serialized
+   ('server/org_to_text.rs:272-273'), but 'parse_metadata_sexp.rs'
+   (the viewStats arm, ~690-698) has NO match arm for it, so a buffer
+   containing '(viewStats parentOverrides)' would hit the parser's
+   '_ =>' error branch on round-trip. It is safe today only because pO
+   appears solely in a read-only buffer that is never re-saved. This
+   blocks reusing pO for a 'paths-through-overridden' view, and means
+   the Op/pO pair is asymmetric (Op IS parsed). Fix: add the parser arm
+   and compute pO in the general viewStats pass
+   ('server/update_buffer/viewnodestats.rs:set_relation_relative_stats'),
+   alongside Op.
+** docs/COMMANDS.org misdescribes skg-reveal-sourceward
+   'docs/COMMANDS.org:254-256' says it shows "the nodes that the node at
+   point links to (its textlink targets)". The code surfaces the
+   INVERSE: textlink SOURCES, i.e. nodes that link TO the node
+   ('server/to_org/expand/backpath.rs:105-117' passes
+   '("textlinks_to","dest","source")'; in-Rust dispatch reads
+   'textlinks_in' at 'server/dbs/typedb/search.rs:156-158'). The term
+   "sourceward" agrees with the code; only the prose is wrong. Fix the
+   doc (and, if the new path family lands, supersede the entry).
 * Problems noted during the forks arc (TODO/forks/)
 ** Quasi-duplication: "Source '...' not found in config" across ~9 sites
    The plan asked to consolidate the duplicated "source not found"
