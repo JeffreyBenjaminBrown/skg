@@ -110,6 +110,24 @@ If there is no active region, do nothing."
       (user-error "Node has no source"))
     (format "%s" (car source-values))))
 
+(defun skg--headline-metadata-empty-p ()
+  "Return non-nil if the headline at point has no skg metadata."
+  (let* (( headline (skg-get-current-headline-text) )
+         ( split (skg-split-as-stars-metadata-title headline) ))
+    (or (null split)
+        (string-empty-p (cadr split)))))
+
+(defun skg--populate-minimal-node-metadata ()
+  "Write minimal ActiveNode metadata onto the metadata-less headline at point.
+Prompts for an owned source (no prompt when only one source is owned)
+and inserts (skg (node (source SOURCE))).  Returns the chosen source.
+Reuses `skg-edit-metadata-at-point', which formats and spaces the sexp
+correctly relative to the existing title."
+  (let (( source (skg--prompt-for-owned-source) ))
+    (skg-edit-metadata-at-point
+     `(skg (node (source ,(intern source)))))
+    source))
+
 (defun skg-set-source (&optional recursive)
   "Prompt for and change the source of the node at point.
 Starts with the current source as minibuffer text.  S-left/S-right cycle
@@ -118,25 +136,29 @@ their paths, and typed source names are accepted directly.
 With a prefix argument RECURSIVE, changes every affected content
 descendent whose source matches the source at point.
 Only descendents for which parentIs=affected are traversed.
+On a headline that has no metadata yet, instead populates it minimally
+via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
-  (let* ((current-source (skg--current-node-source))
-         (new-source (string-trim
-                      (skg--prompt-for-source-change current-source))))
-    (unless (string-empty-p new-source)
-      (skg--validate-source-name new-source)
-      (if (string= current-source new-source)
-          (message "Source unchanged: %s" current-source)
-        (let ((changed-count
-               (if recursive
-                   (skg--change-source-recursive current-source
-                                                new-source)
-                 (skg--change-source-at-point new-source))))
-          (message "Source changed from %s to %s on %d node%s. Save to apply."
-                   current-source
-                   new-source
-                   changed-count
-                   (if (= changed-count 1) "" "s")))))))
+  (if (skg--headline-metadata-empty-p)
+      (skg--populate-minimal-node-metadata)
+    (let* ((current-source (skg--current-node-source))
+           (new-source (string-trim
+                        (skg--prompt-for-source-change current-source))))
+      (unless (string-empty-p new-source)
+        (skg--validate-source-name new-source)
+        (if (string= current-source new-source)
+            (message "Source unchanged: %s" current-source)
+          (let ((changed-count
+                 (if recursive
+                     (skg--change-source-recursive current-source
+                                                  new-source)
+                   (skg--change-source-at-point new-source))))
+            (message "Source changed from %s to %s on %d node%s. Save to apply."
+                     current-source
+                     new-source
+                     changed-count
+                     (if (= changed-count 1) "" "s"))))))))
 
 (defun skg-set-source-recursive ()
   "Prompt for and recursively change the source of the node at point.

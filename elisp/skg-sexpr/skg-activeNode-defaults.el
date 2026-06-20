@@ -331,6 +331,7 @@ CHILD-LEVEL is the level of the field headline."
        (t group)))
      ((string= field-name "viewRequests")
       (cond
+       ((null value-text) nil) ;; childless: drop the field, key and all
        ((and value-text
              (skg-activeNode--default-none-p value-text)
              (= (length group) 2))

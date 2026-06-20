@@ -278,6 +278,39 @@
                                (viewRequests aliases containerwardView)))))))
 
 ;;
+;; Strip: the empty-node view skeleton (childless editable fields)
+;; drops every unpopulated field, keeping only the pre-filled source.
+;;
+
+(ert-deftest test-strip-empty-node-skeleton ()
+  "Stripping the all-childless skeleton keeps only the source field.
+Every editable field -- including viewRequests -- is childless, so each
+is dropped key-and-all, leaving (skg (node (source only)))."
+  (let* ((org-text (concat "* skg\n"
+                           "** node\n"
+                           "*** source\n"
+                           "**** only\n"
+                           "*** indef\n"
+                           "*** parentIs\n"
+                           "*** birth\n"
+                           "*** editRequest\n"
+                           "*** viewRequests"))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (result (org-to-sexp stripped)))
+    (should (equal result '(skg (node (source only)))))))
+
+(ert-deftest test-strip-viewrequests-childless-dropped ()
+  "A childless viewRequests field is dropped, not kept as a bare atom."
+  (let* ((org-text (concat "* skg\n"
+                           "** node\n"
+                           "*** source\n"
+                           "**** only\n"
+                           "*** viewRequests"))
+         (stripped (skg-activeNode-strip-defaults-from-org org-text))
+         (result (org-to-sexp stripped)))
+    (should (equal result '(skg (node (source only)))))))
+
+;;
 ;; Source defaults
 ;;
 

@@ -124,27 +124,66 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
          (concat "^\\*+ " (regexp-quote field-name) "$") nil t)
     (outline-next-heading)))
 
-(defun skg-edit-metadata--insert-new-node-metadata ()
-  "Prompt for source and insert new-node metadata at the headline at point.
-Uses minibuffer with S-left/S-right cycling through owned sources."
-  (let* ((source (skg--prompt-for-owned-source))
-         (sexp-text (format "(skg (node (source %s))) "
-                            source)))
-    (beginning-of-line)
-    (search-forward " " nil t) ;; past the stars + space
-    (insert sexp-text)))
+(defun skg-edit-metadata--open-empty-node-view (title)
+  "Populate minimal metadata on the metadata-less headline at point,
+then open its metadata view.  TITLE is the headline's existing title.
+The view pre-fills the chosen source (Q2: saving needs a source, so the
+user confronts that choice immediately) and leaves every other editable
+field childless, so an untouched save yields just (skg (node (source X)))."
+  (skg--populate-minimal-node-metadata)
+  (let* (( source-buffer (current-buffer) )
+         ( headline (skg-get-current-headline-text) )
+         ( split (skg-split-as-stars-metadata-title headline) )
+         ( metadata-str (cadr split) )
+         ( source (skg--node-source (read metadata-str)) )
+         ( sexp-start (+ (line-beginning-position)
+                         (length (car split))) )
+         ( sexp-end (+ sexp-start (length metadata-str)) )
+         ( org-text (skg-edit-metadata--empty-node-org-text
+                     source title) ))
+    (skg-sexp-edit--open-edit-buffer
+     org-text source-buffer sexp-start sexp-end t)
+    (skg-sexp-edit--goto-field-value "source")))
+
+(defun skg-edit-metadata--empty-node-org-text (source title)
+  "Build org text for the empty-node metadata view.
+SOURCE is pre-filled under the `source' field.  TITLE, if non-blank,
+appears under a display-only `title' group; otherwise `title' is shown
+childless.  Every editable field other than source appears childless,
+so the strip step (`skg-activeNode-strip-defaults-from-org') drops the
+ones the user never populates -- key and all."
+  (let* (( title-group
+           (if (string-empty-p (string-trim (or title "")))
+               (list (cons 1 "title"))
+             (list (cons 1 "title")
+                   (cons 2 title)) ))
+         ( node-skeleton
+           (append (list (cons 1 "skg")
+                         (cons 2 "node")
+                         (cons 3 "source")
+                         (cons 4 source))
+                   (mapcar (lambda (field)
+                             (cons 3 field))
+                           (mapcar #'car
+                                   skg-activeNode--editable-defaults))) ))
+    (skg-headlines-to-org
+     (append title-group node-skeleton))))
 
 ;;
 ;; Advice: after org-insert-heading-respect-content in skg buffers
 ;;
 
 (defun skg-sexp-edit--after-insert-heading (&rest _)
-  "After `org-insert-heading-respect-content', open metadata editor for new roots.
-Only acts in skg-content-view-mode buffers when a level-1 heading was created."
+  "After `org-insert-heading-respect-content', give new roots a source.
+Only acts in skg-content-view-mode buffers when a level-1 heading was
+created.  Routes through `skg-set-source', which on a metadata-less
+headline prompts for an owned source and writes minimal node metadata
+-- the quick path, no edit buffer.  (The full metadata view is reserved
+for an explicit `skg-edit-metadata'/C-c v m.)"
   (when (and (derived-mode-p 'skg-content-view-mode)
              (org-at-heading-p)
              (= (org-outline-level) 1))
-    (skg-edit-metadata)))
+    (skg-set-source)))
 
 (advice-add 'org-insert-heading-respect-content :after
             #'skg-sexp-edit--after-insert-heading)
@@ -156,7 +195,9 @@ Only acts in skg-content-view-mode buffers when a level-1 heading was created."
 (defun skg-edit-metadata ()
   "Edit the metadata sexp on the current headline in an org buffer.
 Opens a temporary org buffer with the sexp converted to org headlines.
-If the headline has no metadata, prompts for source and inserts new metadata.
+If the headline has no metadata, populates a minimal (skg (node (source X)))
+in place and opens the empty-node view over it -- source pre-filled, the
+other editable fields childless (see `skg-edit-metadata--open-empty-node-view').
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   (interactive)
@@ -169,7 +210,7 @@ Kill the buffer to cancel without saving."
     (let* (( metadata-str (cadr split) )
            ( no-metadata (string-empty-p metadata-str) ))
       (if no-metadata
-          (skg-edit-metadata--insert-new-node-metadata)
+          (skg-edit-metadata--open-empty-node-view (caddr split))
         (let* (( source-buffer (current-buffer) )
                (sexp (read metadata-str) )
                (is-activeNode (skg-activeNode-sexp-p sexp) )

@@ -306,4 +306,130 @@ open the sexp-edit buffer (not prompt in minibuffer)."
      (should (equal (mapcar #'car (skg--source-paths))
                     '("public" "private"))))))
 
+;; --- Empty-node metadata view (C-c v m on a metadata-less headline) ---
+
+(defvar test--config-one-source
+  (concat "[[sources]]\n"
+          "name = \"only\"\n"
+          "path = \"/tmp\"\n"
+          "user_owns_it = true\n")
+  "Config text with a single owned source, so no source prompt fires.")
+
+(defun test--skg-edit-buffer ()
+  "Return the open sexp-edit buffer, if any."
+  (cl-find-if
+   (lambda (b)
+     (buffer-local-value 'skg-sexp-edit--source-buffer b))
+   (buffer-list)))
+
+;; Builder: source pre-filled, other editable fields childless, title group.
+
+(ert-deftest test-empty-node-org-text-with-title ()
+  "The skeleton pre-fills source, leaves other fields childless,
+and shows the title under a `title' group."
+  (let* ((org-text (skg-edit-metadata--empty-node-org-text
+                    "only" "my title"))
+         (headlines (org-to-sexp--extract-headlines
+                     (split-string org-text "\n"))))
+    (should (equal headlines
+                   '((1 . "title")
+                     (2 . "my title")
+                     (1 . "skg")
+                     (2 . "node")
+                     (3 . "source")
+                     (4 . "only")
+                     (3 . "indef")
+                     (3 . "parentIs")
+                     (3 . "birth")
+                     (3 . "editRequest")
+                     (3 . "viewRequests"))))))
+
+(ert-deftest test-empty-node-org-text-blank-title ()
+  "With a blank title, `title' is shown childless (nothing under it)."
+  (let* ((org-text (skg-edit-metadata--empty-node-org-text "only" ""))
+         (headlines (org-to-sexp--extract-headlines
+                     (split-string org-text "\n"))))
+    (should (equal (car headlines) '(1 . "title")))
+    (should (equal (cadr headlines) '(1 . "skg")))))
+
+;; Opening: C-c v m on a metadata-less headline drops minimal metadata
+;; in place and opens the view with source pre-filled.
+
+(ert-deftest test-edit-metadata-empty-opens-view ()
+  "C-c v m on a metadata-less headline populates (skg (node (source only)))
+in place and opens the empty-node view: source pre-filled, others childless."
+  (test--with-skg-content-view
+   "* a new node\n"
+   test--config-one-source
+   (lambda ()
+     (let ((source-buffer (current-buffer)))
+       (skg-edit-metadata)
+       ;; The source headline now carries minimal metadata.
+       (with-current-buffer source-buffer
+         (should (string-match-p
+                  "^\\* (skg (node (source only))) a new node$"
+                  (buffer-substring-no-properties
+                   (point-min) (point-max)))))
+       ;; The edit buffer shows the skeleton.
+       (let ((edit-buf (test--skg-edit-buffer)))
+         (should edit-buf)
+         (unwind-protect
+             (with-current-buffer edit-buf
+               (let ((content (buffer-substring-no-properties
+                               (point-min) (point-max))))
+                 (should (string-match-p "^\\*\\*\\* source\n\\*\\*\\*\\* only$"
+                                         content))
+                 (should (string-match-p "^\\*\\*\\* indef$" content))
+                 (should (string-match-p "^\\*\\*\\* viewRequests$" content))
+                 ;; childless: no value lines under the editable fields.
+                 (should-not (string-match-p "^\\*\\*\\*\\* false" content))
+                 (should-not (string-match-p "^\\*\\*\\*\\* none" content))
+                 ;; title group present and read-only.
+                 (should (string-match-p "^\\* title$" content))
+                 (should (string-match-p "^\\*\\* a new node$" content))))
+           (kill-buffer edit-buf)))))))
+
+;; Round-trip: committing the untouched view yields just the source.
+
+(ert-deftest test-edit-metadata-empty-commit-untouched ()
+  "Committing the untouched empty-node view yields (skg (node (source only)))."
+  (test--with-skg-content-view
+   "* a new node\n"
+   test--config-one-source
+   (lambda ()
+     (let ((source-buffer (current-buffer)))
+       (skg-edit-metadata)
+       (with-current-buffer (test--skg-edit-buffer)
+         (skg-sexp-edit--commit))
+       (with-current-buffer source-buffer
+         (should (string-match-p
+                  "^\\* (skg (node (source only))) a new node$"
+                  (buffer-substring-no-properties
+                   (point-min) (point-max)))))))))
+
+;; Round-trip: a field the user populates survives; the rest stay absent.
+
+(ert-deftest test-edit-metadata-empty-commit-with-indef ()
+  "Populating indef=true in the view yields (skg (node (source only) indef)),
+while the untouched fields contribute no keys."
+  (test--with-skg-content-view
+   "* a new node\n"
+   test--config-one-source
+   (lambda ()
+     (let ((source-buffer (current-buffer)))
+       (skg-edit-metadata)
+       (with-current-buffer (test--skg-edit-buffer)
+         ;; Simulate the user adding a level-4 child under indef and
+         ;; cycling it to true.
+         (goto-char (point-min))
+         (re-search-forward "^\\*\\*\\* indef$" nil t)
+         (end-of-line)
+         (insert "\n**** true")
+         (skg-sexp-edit--commit))
+       (with-current-buffer source-buffer
+         (should (string-match-p
+                  "^\\* (skg (node (source only) indef)) a new node$"
+                  (buffer-substring-no-properties
+                   (point-min) (point-max)))))))))
+
 (provide 'test-skg-insert-heading-source-prompt)
