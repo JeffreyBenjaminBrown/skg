@@ -67,8 +67,7 @@ LINE-NUMBER is zero-based."
       (forward-line line-number)
       (setq integration-test-phase
             (format "requesting-aliases-view-line-%d" line-number))
-      (skg-request-aliases-view)
-      (skg-request-save-buffer) ;; save to send request to server
+      (skg-show-collection-aliases) ;; auto-saves to send the request
       (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 

@@ -21,12 +21,6 @@ and hide INTERNAL from M-x completion."
 ;;
 
 (skg-alias skg-save                   skg-request-save-buffer)
-(skg-alias skg-reveal-aliases         skg-request-aliases-view)
-(skg-alias skg-reveal-containerward   skg-request-containerward-view)
-(skg-alias skg-reveal-sourceward      skg-request-sourceward-view)
-(skg-alias skg-reveal-link-sourceward
-           ;; For if someone forgets "source" but remembers "link".
-                                      skg-request-sourceward-view)
 (skg-alias skg-set-definitive         skg-request-definitive-view)
 (skg-alias skg-limit-source-set       skg-set-active-source-set)
 (skg-alias skg-view-heralds-mode      heralds-minor-mode)
@@ -120,10 +114,22 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
     (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
-  (progn;; show (requests that server render a local change to the view)
-    (define-key map (kbd "C-c r a") #'skg-reveal-aliases)
-    (define-key map (kbd "C-c r c") #'skg-reveal-containerward)
-    (define-key map (kbd "C-c r s") #'skg-reveal-sourceward))
+  (progn;; show COLLECTIONS (C-c c) and PATHS (C-c p): request a local
+    ;; view change the server fulfills on save. Each command auto-saves.
+    (define-key map (kbd "C-c c a") #'skg-show-collection-aliases)
+    (define-key map (kbd "C-c c o") #'skg-show-collection-overrides)
+    (define-key map (kbd "C-c c h") #'skg-show-collection-hides)
+    (define-key map (kbd "C-c c s") #'skg-show-collection-subscribes)
+    ;; UPPER = the partner's active (first) role; lower = passive (second).
+    (define-key map (kbd "C-c p C") #'skg-show-paths-through-containers)
+    (define-key map (kbd "C-c p L") #'skg-show-paths-through-link-sources)
+    (define-key map (kbd "C-c p l") #'skg-show-paths-through-link-dests)
+    (define-key map (kbd "C-c p O") #'skg-show-paths-through-overriders)
+    (define-key map (kbd "C-c p o") #'skg-show-paths-through-overridden)
+    (define-key map (kbd "C-c p H") #'skg-show-paths-through-hiders)
+    (define-key map (kbd "C-c p h") #'skg-show-paths-through-hidden)
+    (define-key map (kbd "C-c p S") #'skg-show-paths-through-subscribers)
+    (define-key map (kbd "C-c p s") #'skg-show-paths-through-subscribees))
   (progn;; properties
     (define-key map (kbd "C-c s d") #'skg-set-definitive)
     (define-key map (kbd "C-c s i") #'skg-set-indefinitive)

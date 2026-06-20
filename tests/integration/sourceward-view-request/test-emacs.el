@@ -43,7 +43,7 @@ LINE-NUMBER is zero-based."
       (forward-line line-number)
       (setq integration-test-phase
             (format "requesting-sourceward-view-line-%d" line-number))
-      (skg-request-sourceward-view) ;; this also saves the buffer
+      (skg-show-paths-through-link-sources) ;; this also saves the buffer
       (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 

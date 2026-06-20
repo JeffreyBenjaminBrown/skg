@@ -129,6 +129,24 @@
    label). Regenerated the elisp fixture. All 462 Rust + 249 elisp tests
    pass.
 
+** Step 8 — client commands, keybindings, auto-save; drop C-c r (commit pending)
+   - 'skg-request-views.el' rewritten: a 'skg--define-view-request-commands'
+     macro generates the thirteen commands ('skg-show-collection-{aliases,
+     overrides,hides,subscribes}' and 'skg-show-paths-through-*') from
+     (name request-form docstring) rows; each inserts its '(viewRequests
+     (col ...))' / '(... (path ...))' atom and AUTO-SAVES (aliases too,
+     Q10). 'skg-request-definitive-view' kept (no auto-save).
+   - 'skg-keymaps-and-aliases.el': bound 'C-c c {a,o,h,s}' and 'C-c p
+     {C,L,l,O,o,H,h,S,s}'; removed the three 'C-c r' bindings and the
+     four 'skg-reveal-*' aliases ('C-c r' is now free).
+   - Updated the three migrated integration tests to call the new
+     command names (aliases now auto-saves, so its explicit save line was
+     dropped). Added a 'test-skg-collection-and-path-keybindings'
+     lookup-key assertion over a sample (incl. the C-c p O / C-c p o
+     UPPER/lower pair).
+   - 250 elisp tests pass; the aliases/containerward/sourceward
+     integration tests pass with the renamed commands.
+
 * Changes to the plan's envisioned order
   - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
     regenerated WITHIN each herald-touching commit (step 2 here, later

@@ -85,12 +85,12 @@
         (setq integration-test-phase "new-buffer-created")))))
 
 (defun test-request-containerward-view ()
-  "Call skg-request-containerward-view on node 12."
+  "Call skg-show-paths-through-containers on node 12."
   (message "=== PHASE 3: Requesting containerward view for node 12 ===")
 
   (with-current-buffer "*skg-content-view*"
-    (message "Calling skg-request-containerward-view...")
-    (skg-request-containerward-view) ;; this also saves the buffer
+    (message "Calling skg-show-paths-through-containers...")
+    (skg-show-paths-through-containers) ;; this also saves the buffer
 
     ;; Wait for response
     (skg-test-wait-for-response)
