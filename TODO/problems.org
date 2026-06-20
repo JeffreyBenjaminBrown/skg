@@ -17,15 +17,6 @@
    and compute pO in the general viewStats pass
    ('server/update_buffer/viewnodestats.rs:set_relation_relative_stats'),
    alongside Op.
-** docs/COMMANDS.org misdescribes skg-reveal-sourceward
-   'docs/COMMANDS.org:254-256' says it shows "the nodes that the node at
-   point links to (its textlink targets)". The code surfaces the
-   INVERSE: textlink SOURCES, i.e. nodes that link TO the node
-   ('server/to_org/expand/backpath.rs:105-117' passes
-   '("textlinks_to","dest","source")'; in-Rust dispatch reads
-   'textlinks_in' at 'server/dbs/typedb/search.rs:156-158'). The term
-   "sourceward" agrees with the code; only the prose is wrong. Fix the
-   doc (and, if the new path family lands, supersede the entry).
 * Problems noted during the forks arc (TODO/forks/)
 ** Quasi-duplication: "Source '...' not found in config" across ~9 sites
    The plan asked to consolidate the duplicated "source not found"

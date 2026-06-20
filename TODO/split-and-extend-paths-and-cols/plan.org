@@ -1,0 +1,296 @@
+* Plan — separate & extend the collection / path command families
+  Splits today's three 'C-c r' reveal commands into two families --
+  COLLECTIONS ('C-c c', scaffold cols) and PATHS ('C-c p', backpath
+  ancestries) -- and extends both across all five graph relations in
+  both directions.
+
+  Rationale, alternatives, and every settled decision live in
+  'discussion.org' (this folder); this file is the build plan and does
+  not re-argue them. Where a decision needs a one-line reminder it is in
+  "Settled design" below.
+
+  Formatting: per 'coding-advice/', code refs use single apostrophes;
+  no "phase N" labels -- the commits below are simply done in order.
+
+* Settled design (what this plan implements)
+
+** Two command families + keybindings
+   Collections ('C-c c') -- each builds BOTH cols of its relation:
+   | C-c c a | skg-show-collection-aliases    | aliasCol                      |
+   | C-c c o | skg-show-collection-overrides  | overriddenCol + overriderCol  |
+   | C-c c h | skg-show-collection-hides      | hiderCol + hiddenCol          |
+   | C-c c s | skg-show-collection-subscribes | subscribeeCol + subscriberCol |
+
+   Paths ('C-c p') -- UPPER = the partner's "first" (active) role,
+   lower = its "second" (passive) role:
+   | C-c p C | skg-show-paths-through-containers   | containers of N        | exists |
+   | C-c p L | skg-show-paths-through-link-sources | nodes linking to N     | exists |
+   | C-c p l | skg-show-paths-through-link-dests   | nodes N links to       | new    |
+   | C-c p O | skg-show-paths-through-overriders   | nodes overriding N     | new    |
+   | C-c p o | skg-show-paths-through-overridden   | nodes N overrides      | new    |
+   | C-c p H | skg-show-paths-through-hiders       | nodes hiding N         | new    |
+   | C-c p h | skg-show-paths-through-hidden       | nodes N hides          | new    |
+   | C-c p S | skg-show-paths-through-subscribers  | nodes subscribing to N | new    |
+   | C-c p s | skg-show-paths-through-subscribees  | nodes N subscribes to  | new    |
+
+   ('C-c r' and the 'skg-reveal-*' aliases, incl. 'skg-reveal-link-sourceward',
+   are removed. No legacy syntax is kept -- single user, single dev.)
+
+** Wire grammar
+   Requests, inside the existing '(viewRequests ...)' container:
+   : (viewRequests (col RELNAME))    ;; builds BOTH cols of the relation
+   : (viewRequests (path ROLENAME))  ;; builds the backpath for that one role
+   : (viewRequests definitiveView)   ;; unchanged (neither col nor path)
+   Birth (provenance on a grafted path node):
+   : (birth backpath ROLENAME)
+
+   RELNAME in: 'aliases', 'overrides', 'hides', 'subscribes'.
+   ROLENAME in the nine below. A col is named by its RELATION (it spans
+   both roles); a path and a birth are named by the single ROLE the
+   partner plays (= the role the grafted node plays toward its
+   org-parent). One ROLENAME determines its relation, so a single token
+   suffices for both '(path ...)' and '(birth backpath ...)' -- a
+   deliberate tightening of the discussion's '(birth backpath RELATION
+   ROLE)' sketch (the relation is implied by the role; one vocabulary
+   serves requests and births alike). Flag on review if you want the
+   relation spelled out too.
+
+** Types (server/types/viewnode.rs unless noted)
+Reuse the existing 'RelationRole { relation: NodeRelation, position:
+BinaryRolePosition }' ('server/dbs/in_rust_graph/relation_accessors.rs') --
+it already enumerates all five relations and both role positions, and
+the in-Rust lookup already dispatches all ten role-pairs
+('server/dbs/typedb/search.rs:103-164').
+
+Replace the flat four-variant 'ViewRequest' with:
+: pub enum ViewRequest { Col (ColRelation), Path (RelationRole), Definitive }
+: pub enum ColRelation { Aliases, Overrides, Hides, Subscribes }
+For a Path/Birth, the 'RelationRole' names the PARTNER's (output)
+role. Replace the flat 'Birth' with:
+: pub enum Birth { Unremarkable, Backpath (RelationRole) }
+
+One ROLENAME <-> RelationRole <-> backpath-triple <-> glyph table is
+the single source of truth (put it next to 'RelationRole' or in a new
+small module; both the request layer and the backpath engine read it):
+| ROLENAME   | RelationRole                      | (relation, input_role, output_role)         | glyph |
+| container  | Contains, First                   | contains, contained, container              | }     |
+| linkSource | TextlinksTo, First                | textlinks_to, dest, source                  | ←     |
+| linkDest   | TextlinksTo, Second               | textlinks_to, source, dest                  | →     |
+| overrider  | OverridesViewOf, First            | overrides_view_of, overridden, overrider    | Op    |
+| overridden | OverridesViewOf, Second           | overrides_view_of, overrider, overridden    | pO    |
+| hider      | HidesFromItsSubscriptions, First  | hides_from_its_subscriptions, hidden, hider | Hp    |
+| hidden     | HidesFromItsSubscriptions, Second | hides_from_its_subscriptions, hider, hidden | pH    |
+| subscriber | Subscribes, First                 | subscribes, subscribee, subscriber          | Sp    |
+| subscribee | Subscribes, Second                | subscribes, subscriber, subscribee          | pS    |
+('contained' / "content" is intentionally absent -- the recursive
+content view already serves it.)
+** Heralds to add or fix (server/heralds.rs, single source of truth)
+   - Birth: the parameterized '(birth backpath ROLENAME)' renders the
+     glyph above, in birth's orange. (For the sharing roles this glyph
+     equals the Q8 viewStat's, so a path node shows the orange birth
+     glyph AND the red viewStat -- exactly as containerward shows
+     '(birth containsParent)' "}" plus '(viewStats containsParent)' "}"
+     today. De-duplicating the two encodings is the parked
+     "relationship-to-org-parent" abstraction in TODO.org, out of scope
+     here.)
+   - viewStats parent matrix (the GENERAL case -- any node vs its
+     visible org-parent, not just path nodes): add red 'Sp'
+     (subscribesParent), 'pS' (parentSubscribes), 'Hp' (hidesParent),
+     'pH' (parentHides). 'Op' (overridesParent) already works. FIX 'pO'
+     (parentOverrides): today it is emit-only (fork buffer) and
+     unparseable -- compute it in the general pass and add a parser arm
+     (see the LATENT BUG in 'TODO/problems.org').
+   - Read-only-col marker: render ☮ on the SIX read-only col scaffolds
+     ('subscriberCol', 'overriderCol', 'hiderCol', 'hiddenCol',
+     'hiddenInSubscribeeCol', 'hiddenOutsideOfSubscribeeCol') straight
+     from their herald rules ('heralds.rs:187-202'). Meaning: "this
+     collection cannot be changed from here", the same sense ☮ ('indef')
+     carries on member nodes. No new wire atom or parser change -- the
+     atom already says which cols are read-only. (A lock 🔒 is a one-line
+     swap; the conformance test pins atoms, not glyphs.)
+   - Request heralds: '(col RELNAME)' / '(path ROLENAME)' render briefly,
+     e.g. "req:col:overrides" / "req:path:overrider" (keep terse).
+
+** Safety invariants (do not regress)
+   - Collections are REQUESTS, never hand-inserted empty scaffolds: the
+     server builds each col POPULATED from the graph. An empty literal
+     writable col ('overriddenCol'/'subscribeeCol') saved before
+     completion lowers to 'MSV::Specified(vec![])' and WIPES the
+     relation ('traverse.rs:307-323' -> 'lower.rs:268-273'); the request
+     path avoids this because the col is populated before any save reads
+     it.
+   - Empty-col policy (decision A): an empty READ-ONLY col simply does
+     not appear (existing prune, 'complete.rs:325-337'); an empty
+     WRITABLE col DOES appear (the editable "add here" surface). So
+     'skg-show-collection-overrides' on a node with no overrides shows
+     an empty 'overriddenCol' and no 'overriderCol'; '...-hides' on a
+     node with no hides shows nothing (both sides read-only).
+   - All collection and path commands AUTO-SAVE (incl. aliases, which
+     currently does not).
+
+* Work, in order
+  Each step is one commit, leaving the suite green. Run 'cargo nextest
+  run' + the relevant integration test after each (see
+  'coding-advice/development-process.md', 'tests/USAGE.md').
+
+** 1. Rename 'target' -> 'dest' in the textlink context (its own commit)
+   Per your directive. SCOPE STRICTLY to the hyperlink/textlink
+   destination meaning; do NOT touch unrelated 'target's
+   ('target_filepath' in export, build targets, override "stands
+   over"/"stands in" prose, etc.). 'schema.tql' already says 'dest'.
+   - Discover: 'grep -rin target server/ elisp/ tests/ docs/
+     api-and-formats.md glossary.md' and classify each hit.
+   - Rename textlink-context identifiers, comments, and doc prose
+     ('link target' -> 'link dest', 'textlink targets' -> 'textlink
+     dests', any 'target'/'targets' variable in the textlinks code).
+   - This commit is purely mechanical and behavior-preserving; the
+     suite must stay green on its own.
+
+** 2. Parameterize Birth -> Backpath(RelationRole)
+   Refactor only; no new directions yet -- containerward/sourceward keep
+   working with the new wire form.
+   - 'server/types/viewnode.rs': 'Birth' becomes '{ Unremarkable,
+     Backpath(RelationRole) }'; add the ROLENAME<->RelationRole<->triple<->glyph
+     table.
+   - Serialize '(birth backpath ROLENAME)' ('org_to_text.rs:334-339');
+     parse it ('parse_metadata_sexp.rs:449-458'); other reads
+     ('backpath.rs:343' the linkSource-ancestry attach now matches
+     'Backpath(TextlinksTo, First)'; 'org_to_text.rs:505').
+   - 'validate_parentIs_relationships' ('to_org/util.rs:265-327'):
+     collapse the per-variant birth check to one
+     'relation_membership_is_real' call keyed by the 'RelationRole'.
+   - Backpath call sites ('backpath.rs:60-73, 105-119') pass
+     'Birth::Backpath(container-role)' / '(linkSource-role)'.
+   - Herald table ('heralds.rs:240-242') + 'birth_emitted_atoms'
+     ('heralds.rs:473-480'): the parameterized birth glyphs.
+   - UPDATE the containerward/sourceward integration golden fixtures
+     ('tests/integration/{containerward,sourceward}-view-request/') to
+     the new '(birth backpath ...)' text in this same commit.
+
+** 3. Parameterize ViewRequest (Col + Path); fold in the existing three
+   - 'server/types/viewnode.rs': 'ViewRequest' becomes '{ Col(ColRelation),
+     Path(RelationRole), Definitive }'; update 'REPRS_IN_CLIENT'-style
+     parse/serialize for the '(col RELNAME)' / '(path ROLENAME)' /
+     'definitiveView' forms.
+   - Parser ('parse_metadata_sexp.rs:435-437, 747-765') accepts the
+     nested '(col ...)' / '(path ...)' forms and the bare 'definitiveView'.
+   - Herald req rules ('heralds.rs:274-278') for '(col ...)' / '(path ...)'.
+   - Dispatch ('to_org/expand/definitive.rs:16-49' +
+     'update_buffer/reconcile/view_requests.rs:64-89'): route
+     'Path(role)' to the backpath engine with the role's triple +
+     'Birth::Backpath(role)'; route 'Col(rel)' to step 4's builder;
+     keep the view-root containerward special-case
+     ('view_requests.rs:75-88') for the container role only (its linear
+     engine is cycle-guarded, so the other roles need no special-case --
+     verify with a self-referential fixture).
+   - Fold the old tokens: 'aliases'->'(col aliases)',
+     'containerwardView'->'(path container)',
+     'sourcewardView'->'(path linkSource)'. Remove the old atoms.
+   - UPDATE the three existing integration fixtures
+     ('tests/integration/{aliases,containerward,sourceward}-view-request/')
+     to the new request text in this commit.
+
+** 4. Fulfill the Col request (both cols, populated)
+   'Col(rel)' builds BOTH of the relation's cols, each POPULATED from the
+   graph -- reuse the de-novo generators
+   ('to_org/complete/partner_col/mod.rs') and the aliases builder
+   ('to_org/expand/aliases.rs').
+   - aliases -> aliasCol; overrides -> overriddenCol + overriderCol;
+     hides -> hiderCol + hiddenCol; subscribes -> subscribeeCol +
+     subscriberCol.
+   - For the WRITABLE col of the relation (overriddenCol, subscribeeCol,
+     aliasCol), CREATE it even when empty (the generators skip empties
+     today, 'mod.rs:160-171, 315-332') so the user gets the editable
+     surface; an empty writable col is spared by the prune
+     ('complete.rs:325-337'). READ-ONLY cols are built only when
+     populated (decision A) -- an empty one is pruned, which is fine.
+   - Confirm no wipe: a populated/empty writable col round-trips its
+     real members; saving never silently empties an existing relation
+     (extraction 'traverse.rs:307-323' sees the populated col).
+
+** 5. Fulfill the Path request for the new roles
+   The backpath engine is already relation-generic
+   ('build_and_integrate_backpaths', 'backpath.rs:130-153'); only new
+   call data is needed.
+   - For each of the seven new roles, call the engine with the role's
+     '(relation, input_role, output_role)' triple and
+     'Birth::Backpath(role)'. No traversal changes.
+   - linkDest mirrors linkSource; decide whether linkDest also attaches
+     each partner's containerward ancestry (linkSource does,
+     'backpath.rs:329-347') -- default: yes, for symmetry.
+   - Integration tests: one golden per new role (model on
+     'tests/integration/containerward-view-request/').
+
+** 6. viewStats parent-herald matrix: add Sp/pS/Hp/pH; fix pO
+   The GENERAL parent-relationship heralds (independent of paths).
+   - 'ViewNodeStats' ('viewnode.rs:332-367') + 'Default'
+     ('viewnode.rs:813-825'): add 'subscribesParent', 'parentSubscribes',
+     'hidesParent', 'parentHides'.
+   - Compute in 'set_relation_relative_stats' ('viewnodestats.rs:120-161'),
+     'Gnode' arm, via 'relation_membership_is_real' (both role positions
+     already supported); also compute 'parentOverrides' there (it is
+     currently produced only by 'fork.rs:135-137').
+   - Serialize ('org_to_text.rs:257-285'); PARSE all of them incl. the
+     previously-missing 'parentOverrides' ('parse_metadata_sexp.rs:690-698').
+   - Herald rules ('heralds.rs:258-269') + 'viewstats_atoms' guard
+     ('heralds.rs:443-460'): red 'Sp','pS','Hp','pH' ('Op','pO' exist).
+   - Hp/pH are plain binary edge heralds (decision Q9); the hide cols
+     carry the full subscription context.
+   - When done, move the pO LATENT BUG entry from 'TODO/problems.org' to
+     'TODO/DONE/problems.org'.
+
+** 7. Read-only col scaffold ☮ herald
+   Render ☮ on the six read-only col scaffold rules
+   ('heralds.rs:187-202'). Pure herald-table change: no wire atom, no
+   parser, no server logic. Regenerate the elisp fixture (step 9).
+
+** 8. Client: commands, keybindings, auto-save; drop 'C-c r'
+   - 'elisp/skg-request-views.el': a table-driven macro generating the
+     thirteen commands from '(command-name . request-form)' rows, each
+     inserting its '(viewRequests (col ...))' / '(... (path ...))' atom
+     via 'skg-edit-metadata-at-point' ('skg-metadata.el:352-385') and
+     then auto-saving. aliases now auto-saves too (Q10).
+   - 'elisp/skg-keymaps-and-aliases.el': bind 'C-c c {a,o,h,s}' and
+     'C-c p {C,L,l,O,o,H,h,S,s}' (Q1 table); remove the three 'C-c r'
+     bindings ('124-126') and the 'skg-reveal-*' aliases ('24-29').
+   - Keep the renamed underlying request functions; rename them to the
+     new scheme ('skg-show-collection-*', 'skg-show-paths-through-*').
+   - Add keymap 'lookup-key' assertions ('tests/elisp/test-skg-metadata.el'
+     pattern) for a sample of the new bindings.
+
+** 9. Docs, fixtures, conformance
+   - 'docs/COMMANDS.org': replace the 'C-c r' section with the 'C-c c'
+     and 'C-c p' families (the tables above), describing per command
+     which col side (if any) is editable.
+   - 'glossary.md' / 'api-and-formats.md': document the new
+     '(viewRequests (col ...)/(path ...))' and '(birth backpath ...)'
+     grammar, and the read-only-col ☮.
+   - Regenerate the herald elisp fixture:
+     'cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp'
+     (the dynamic conformance test 'tests/unit/heralds.rs' then passes;
+     it fails first if any atom/rule is half-wired -- the intended guard).
+   - Full suite: 'cargo nextest run', 'bash/emacs-tests.sh',
+     'bash/integration-tests.sh'.
+
+* Out of scope (deferred)
+  - Unifying the THREE encodings of "node's relationship to its visible
+    org-parent" (birth marker vs viewStats parent-herald vs both for
+    containment). Parked by you in TODO.org; the parameterized Birth +
+    full viewStats matrix here are a down-payment, but collapsing them
+    into one computed-once concept is its own effort.
+  - User-owned override chains (you mentioned implementing these soon);
+    the transitive path engine already handles chains, so no path work
+    is blocked on it.
+
+* Testing strategy
+  - Unit (Rust): role<->triple<->glyph table round-trips; Birth and
+    ViewRequest parse/serialize round-trips; pO now round-trips;
+    'relation_membership_is_real' drives each new viewStat.
+  - Integration: one golden per new path role and per new collection
+    command; re-green the three migrated fixtures; a self-referential
+    fixture to confirm non-container roots need no special-case.
+  - Conformance: 'herald_rules_cover_the_emittable_vocabulary' guards
+    the new atoms; regenerate the pinned elisp fixture.
+  - Manual (optional, /run): exercise 'C-c c o' on a node with and
+    without overrides (empty writable col appears, empty read-only col
+    does not); 'C-c p O' / 'C-c p o' show the Op / pO heralds.

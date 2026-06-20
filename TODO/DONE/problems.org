@@ -4,6 +4,18 @@
   to the top of this file (just under this note). The bulk below was
   migrated 2026-06-19 in the original problems.org order (oldest
   section first).
+* RESOLVED docs/COMMANDS.org misdescribed skg-reveal-sourceward (2026-06-20)
+  'docs/COMMANDS.org' said skg-reveal-sourceward shows "the nodes that
+  the node at point links to (its textlink targets)". The code surfaces
+  the INVERSE: textlink SOURCES, i.e. nodes that link TO the node
+  ('server/to_org/expand/backpath.rs:105-117' passes
+  '("textlinks_to","dest","source")'; in-Rust dispatch reads
+  'textlinks_in' at 'server/dbs/typedb/search.rs:156-158'). The term
+  "sourceward" agreed with the code; only the prose was wrong. Fixed the
+  description (and the adjacent containerward "one step out" claim, which
+  was also wrong -- it climbs the containment ancestry until a
+  fork/cycle/root). Found while scoping the collection/path command
+  split (TODO/split-and-extend-paths-and-cols/).
 * RESOLVED Heralds: the rule table was volatile session state with no self-heal (2026-06-19)
   The herald rule table ('heralds--transform-rules') is fetched once
   per connect by 'skg-request-herald-rules' (called from

@@ -249,11 +249,11 @@ See what other text you could search for to find this node.
 You can always search for its title.
 Most nodes have a title and no aliases.
 *** C-c r c : skg-reveal-containerward
-Show the nodes that contain the node at point (its parents
-in the containment graph, one step out).
+Show the nodes that contain the node at point -- its ancestry
+in the containment graph, climbing until a fork, cycle, or root.
 *** C-c r s : skg-reveal-sourceward
-Show the nodes that the node at point links to (its textlink
-targets).
+Show the nodes that link to the node at point (its textlink
+sources).
 ** C-c s : setting node properties
 *** first some vocab: 'definitive' and 'indefinitive'
 A view of a node can be definitive or indefinitive.

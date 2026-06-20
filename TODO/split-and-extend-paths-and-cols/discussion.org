@@ -10,6 +10,47 @@
   spec are under- or mis-specified, and one is outright dangerous. The
   blockers are Q2, Q3, and Q8; everything else has a safe default.
 
+* Round 2 — status after your inline answers (Claude)
+  SETTLED (your answer took the recommendation or gave a clear
+  directive): Q1, Q2, Q3, Q5, Q6, Q8, Q9, Q10, Q11, and the Q2a core
+  (two parameterized requests). Every 'Problems' item is resolved
+  except the "relationship to visible org-parent" abstraction, which
+  you moved to TODO.org.
+  Done already this round: fixed the 'docs/COMMANDS.org' sourceward
+  error you flagged (Q6) — also corrected the adjacent, equally-wrong
+  "one step out" claim — and moved that problem to
+  TODO/DONE/problems.org.
+  STILL OPEN — need you:
+  - Q7 (Birth provenance): I answer "how is Birth used?" and propose a
+    third way, in a child under your note.
+  - Q2a follow-ups (link role-name vocabulary; whether to fold the two
+    existing requests into the new '(path ...)' form): new TODO children.
+  - Q4 follow-up (do you want a read-only-col marker?): new TODO child,
+    after a fact-check correction.
+  I did NOT write 'plan.org' yet — Q7 is a real type-design fork only
+  you should settle. Once it closes I'll write the plan.
+  Convention below: my additions are children tagged "Claude:"; a
+  subtree flips to DONE when nothing on it needs you.
+
+* Round 3 — status (Claude)
+  Now settled by your latest answers: Q2a link names ('linkSource' /
+  'linkDest', plus a 'target' -> 'dest' rename as its own commit), Q2a
+  fold-in (migrate, no legacy atoms), Q7 (parameterize 'Birth').
+  ONE item left -- Q4: your "peace symbol" note rests on a misreading.
+  "☮" is the per-node 'indef' marker, NOT a read-only-collection mark,
+  and it is load-bearing on some WRITABLE-col members (a
+  subscribee-as-such MUST be indefinitive), so it can't be removed from
+  them. I corrected this under Q4 and proposed a distinct read-only-col
+  marker. Close that one (pick a glyph) and I write 'plan.org'.
+
+* Round 4 — all settled; plan written (Claude)
+  Q4 closed: I fact-checked that 'indef'/☮ is emitted only on node-like
+  vognodes/phantoms ('server/org_to_text.rs:344, 393'), never on a
+  scaffold, so your unified "cannot be changed from here" reading holds.
+  Decision: ☮ on the six read-only col scaffolds (a lock 🔒 stays a
+  one-line swap). NOTHING left open. Plan written:
+  'TODO/split-and-extend-paths-and-cols/plan.org'.
+
 * Ground truth — what exists today (so we agree before deciding)
   I traced the whole path, client to server. The relevant facts:
 
@@ -129,6 +170,58 @@
     (viewrequest col relname), (viewrequest path rolename).
     (The distinction relname v. rolename is intentional.)
 
+**** Claude: incorporating your answer (settled wire shapes)
+    : (viewRequests (col RELNAME))    ;; builds BOTH cols for the relation
+    : (viewRequests (path ROLENAME))  ;; builds the path for that one role
+    A col spans BOTH roles of a relation, so it's named by the relation
+    (relname); a path is single-direction, so it's named by the one role
+    it follows (rolename) -- your distinction, captured.
+    - col RELNAME in: aliases, overrides, hides, subscribes. (aliases is
+      the odd one -- a QualCol, not a graph relation -- but reads fine as
+      a relname; the Col request must span QualCol + PartnerCol, per the
+      AWKWARD-aliases problem.)
+    - path ROLENAME = the role the grafted PARTNERS play (the output
+      role): container, source, dest, overrider, overridden, hider,
+      hidden, subscriber, subscribee. (No 'contained' -- that's content,
+      already served by the recursive view.)
+
+**** DONE Claude: link role-name vocabulary
+    The schema's textlink roles are 'source' and 'dest' ('schema.tql'),
+    so 'paths-through-link-sources' -> '(path source)' and
+    'paths-through-link-targets' -> '(path dest)'. But "source" already
+    names a data-source in the metadata ('(source main)'), so a bare
+    '(path source)' could read ambiguously.
+    Recommend: keep the schema role names ('source'/'dest') -- the
+    leading 'path' disambiguates. Alternative: 'linkSource'/'linkTarget'.
+***** DONE Jeff
+Let's use linkSource/linkDest, and change every use of 'target'
+in that context to be 'dest' instead,
+because I think dest it's clearer than target.
+(The rename should be its own commit, and part of the plan.)
+***** Claude: settled
+      Wire rolenames 'linkSource' / 'linkDest'; the matching commands
+      become 'skg-show-paths-through-link-sources' /
+      'skg-show-paths-through-link-dests'. A standalone pre-step in the
+      plan renames 'target' -> 'dest' across the textlink context
+      (code, tests, docs) as its own commit; 'schema.tql' already says
+      'dest'.
+
+**** DONE Claude: fold the two existing requests into '(path ...)' / '(col ...)'?
+    With the parameterized form, the existing tokens become:
+    'aliases' -> '(col aliases)', 'containerwardView' -> '(path
+    container)', 'sourcewardView' -> '(path source)'. ('definitiveView'
+    is neither col nor path -- it stays as-is.) Folding them in gives ONE
+    col mechanism and ONE path mechanism (cleaner, matches your generic
+    instinct), but it changes the three existing commands' wire tokens
+    and their integration golden fixtures
+    ('tests/integration/aliases-view-request/',
+    'containerward-view-request/', 'sourceward-view-request/'). Keeping
+    the legacy bare atoms avoids that churn but leaves two mechanisms.
+    Recommend: fold them in (migrate), updating the fixtures.
+***** DONE ANSWER: Yes, fold them in.
+Remember that there's never any need to hold onto legacy syntax;
+I'm the only user and the only (human) dev.
+
 ** Q3. BLOCKER: "even if empty" cannot hold for the read-only (inbound) cols
    Of the cols your commands create, only THREE survive a completion
    pass while empty: 'overriddenCol', 'subscribeeCol', and 'aliasCol'.
@@ -179,12 +272,77 @@
    ANSWER (flag if you'd rather, say, drop the read-only half, or split
    each into two commands):
 
-*** TODO
+*** DONE
 I think it's not a problem -- there will be the peace symbol herald
 on each read-only collection, so the user will understand.
 I don't think you'll even need to document it, because somewhere,
 the set of writeable and readonly cols is already documented
 (but please fact-check me).
+
+**** Claude (fact-check): the peace symbol does NOT mark read-only
+     I checked. "☮" is the herald for the 'indef' (indefinitive) atom,
+     and it sits on col MEMBERS -- but on WRITABLE cols' members too
+     (subscribeeCol/overriddenCol members are made indefinitive exactly
+     like subscriberCol members; 'to_org/complete/partner_col/child_data.rs').
+     So "☮" does not distinguish read-only from writable. In fact NO
+     herald marks a col read-only: all 8 col scaffolds render as plain
+     green labels ('server/heralds.rs:187-202'). What differs is the
+     label TEXT ("it overrides the view of these" vs "these override the
+     view of it") -- direction, not editability.
+     Your other half is right: the writable/read-only split IS
+     documented -- 'glossary.md:21-54' ("PartnerCol, and the col-policy
+     vocabulary") and in code via 'PartnerCol::policy'
+     ('server/types/viewnode.rs:537-551'). So no new doc is needed, and
+     the two-col bundling stands.
+
+***** DONE oh geez that needs to change
+The only point of having the peace symbol on collections
+was to identify the readonly ones.
+It should not be on the writeable ones.
+
+****** DONE Claude: ☮ can't be that marker — here's why, and the fix
+The catch: "☮" IS the 'indef' (indefinitive) marker, and indef is
+load-bearing on some WRITABLE-col members, so it cannot be removed
+from them without breaking save semantics. A subscribeeCol
+(writable) member is a subscribee-as-such, which MUST be
+indefinitive -- title/body edits to it are rejected and its
+definition lives elsewhere ('docs/sharing-model.md'). So a
+writable col will ALWAYS carry ☮ on its members; ☮ therefore
+cannot mean "this collection is read-only."
+Also: ☮ marks the MEMBERS, never the col headline -- but the thing
+that is read-only is the COLLECTION (its membership), not the
+individual member nodes.
+Fix (recommended): give the SIX read-only col scaffolds
+(subscriberCol, overriderCol, hiderCol, hiddenCol,
+hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol) their own
+read-only herald on the col HEADLINE -- a distinct glyph, NOT ☮
+(which already means indef on members). That marks exactly the
+read-only collections, leaves indef semantics untouched, and is
+one new herald + rule rather than a per-member change.
+Pick a glyph: I suggest a lock (🔒) or a plain "ro". Reusing ☮ on
+the read-only SCAFFOLDS would clash with ☮-on-members and read as
+ambiguous, so I'd avoid it.
+
+******* DONE I don't think the collision is a problem.
+Although I do like the lock icon :)
+If indef is currently only used for vognodes,
+and never on collection nodes, then its meaning on a collection node
+will be clear. Its meaning in both cases is the same:
+"This (collection, vognode) cannot be chnaged from here."
+******** Claude: confirmed — your condition holds
+         Fact-checked: 'indef' is emitted in exactly two places, both
+         node-like -- the 'node' form (vognodes) and the 'diffPhantom'
+         form ('server/org_to_text.rs:344, 393'); NO collection/scaffold
+         emits it, and the herald rule is nested under 'node'
+         ('server/heralds.rs:245'). So your unified reading holds and ☮
+         on a read-only col scaffold is unambiguous.
+         SETTLED: ☮ marks the six read-only col scaffolds, meaning
+         "cannot be changed from here." Cleanest implementation: render ☮
+         straight from each read-only col's herald rule
+         ('server/heralds.rs:187-202') -- no new wire atom, no
+         parser/server change, since which cols are read-only is already
+         known from the atom. (Lock 🔒 stays a one-line swap; the
+         conformance test pins atoms, not glyphs.)
 
 * The paths family
 
@@ -245,12 +403,62 @@ the set of writeable and readonly cols is already documented
    different ways "relationship to org-parent" is encoded today (see
    Problems: missing abstraction).
 
-*** TODO
+*** DONE
 I don't think we can lean on the heralds that way. Aren't they rather volatile?
 Heralds are a kind of secondary, generated information.
 
 I'm inclined to say (A), but maybe there's some third way,
 How is Birth even used?
+
+**** DONE Claude: how Birth is used, and a third way
+How it is used (traced): Birth is a provenance marker set in just one
+functional place -- when the backpath engine grafts ancestry nodes
+('backpath.rs:70' ContainsParent, ':116' LinksToParent) -- plus
+Unremarkable defaults and one CLEARING site. It round-trips through
+the buffer ('(birth containsParent)' / '(birth linksToParent)';
+serialized 'org_to_text.rs:334-339', parsed
+'parse_metadata_sexp.rs:449-458').
+
+It is read for: (1) heralds
+("}" / "←"); (2) 'validate_parentIs_relationships'
+('to_org/util.rs:265-327', from 'update_buffer.rs:444'), which checks
+the birth CLAIM against the real graph (does the child actually
+contain / link-to the parent?) and, if stale, DEMOTES it to
+Unremarkable; (3) two minor display decisions ('backpath.rs:343',
+'org_to_text.rs:505'). Crucially Birth does NOT drive save
+correctness -- what gets written is governed by 'ParentIs' and the
+graph's own relations. So Birth = provenance + display + a
+self-correcting validation cross-check.
+You're right about (B): leaning on the Op/pO/... heralds for
+direction is fragile -- those are regenerated display. (Birth is
+regenerated too, but it's a structural field that round-trips and is
+validated; that's the part worth keeping.)
+
+Third way (recommended): don't add ~7 flat Birth variants and don't
+lean on heralds -- PARAMETERIZE Birth:
+: enum Birth { Unremarkable, Backpath { relation, role } }
+reusing the existing 'RelationRole' / 'NodeRelation' /
+'BinaryRolePosition' ('dbs/in_rust_graph/relation_accessors.rs').
+Wire form '(birth backpath RELATION ROLE)' -- the grammar already
+carries argument-bearing atoms ('(overridesHere ID)', '(merge ID)',
+'(containers N)'), so it's mechanical.  One structured variant
+replaces seven; 'validate_parentIs_relationships' collapses to a
+single check via the existing 'relation_membership_is_real' primitive
+(already covers all 5 relations x both roles); and direction stays
+STRUCTURAL in Birth, the herald merely DERIVED from it -- exactly
+your concern. It's "(A), with one parameterized variant instead of
+seven," and a first step toward the 'relationship to org-parent'
+unification you parked in TODO.org.
+
+(The Q8 viewStats heralds Op/pO/Sp/pS/Hp/pH still exist for the
+GENERAL case -- a node related to its parent in any view, not just
+grafted paths; a path node would carry both its Birth marker and the
+matching viewStat, exactly as containerward nodes carry both
+'(birth containsParent)' and '(viewStats containsParent)' today.)
+Need your nod on this vs. flat-(A); then I can write the plan.
+
+***** DONE agreed
+
 * Heralds
 
 ** Q8. BLOCKER-ish: the parent-relationship herald matrix is incomplete
@@ -331,11 +539,26 @@ How is Birth even used?
   Flaws in the scheme as written (code-level bugs I also logged to
   'TODO/problems.org').
 
-** TODO
+** DONE  Claude confirmed: yes — all resolved except the org-parent abstraction
 aside from the 'relationship to visible org-parent' item
 (which I've transcribed in TODO.org),
 these are all resolved in this document already outside of this
 'problems' section, right?
+*** Claude: mapping (where each is resolved)
+    - DANGEROUS (empty-col wipe) -> Q2 (request atoms, never literal
+      empty scaffolds).
+    - INCORRECT (3) -> Q1 ('C-c c o' collision), Q8 (reverse-link
+      herald), Q6 ('docs/COMMANDS.org' -- now FIXED + moved to
+      TODO/DONE/problems.org).
+    - AWKWARD (aliases is a QualCol, not a PartnerCol) -> Q2a (Col
+      request spans QualCol + PartnerCol).
+    - AWKWARD (two cols, opposite editability) -> Q4.
+    - MISSING ABSTRACTION (no parameterized request) -> Q2a.
+    - LATENT BUG (pO emit-only / unparseable) -> Q8 (and tracked in
+      TODO/problems.org until coded).
+    Only the OTHER missing-abstraction item ("relationship to visible
+    org-parent", encoded three ways) is deferred -> your TODO.org. The
+    Q7 parameterized-Birth proposal is a first step toward it.
 
 ** DANGEROUS — "put an empty col there, save completes it" can wipe data
    The literal reading of the collections spec wipes 'overrides_view_of'
