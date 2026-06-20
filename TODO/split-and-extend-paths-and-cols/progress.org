@@ -1,0 +1,51 @@
+* Progress — separate & extend the collection / path command families
+  Running log kept per 'when-to-stop.org'. The plan ('plan.org') is
+  left as-is; this file records what's done, deviations in HOW (not
+  WHAT), and choices that shape the future. Newest notes appended.
+
+* What's done and went well
+
+** Step 1 — 'target' -> 'dest' in the textlink context (commit pending)
+   Discovery grep classified every 'target' hit. Key finding: the
+   textlink-RELATION code already uses 'dest' everywhere -- the schema
+   ('schema.tql' roles source/dest), 'OUTBOUND_RELATIONSHIP_TYPES'
+   ('relationships.rs'), the role-pair dispatch ('search.rs:140-164'),
+   and 'relation_accessors.rs' all say 'dest'. So there were NO
+   textlink-ROLE identifiers left to rename; step 1 reduced to doc
+   prose. Renamed the textlink-destination prose in: 'docs/vocabulary.md',
+   'docs/data-model.org' (x2), 'docs/hyperlinks.md', 'docs/COMMANDS.org'
+   (link-dest view prose + the export "link whose dest" line), and
+   'api-and-formats.md' (export "links whose dest" line).
+
+* Changes to the plan's envisioned order
+  (none yet)
+
+* What's imperfect about what's done
+  (none yet)
+
+* Choices determining the future
+
+** SCOPE DECISION (step 1): left the search-ranking subsystem on "target"
+   The only remaining code uses of "target" in a link sense are in the
+   search-NOTABILITY ranking subsystem, NOT the textlink role:
+   - 'ContextOriginType::Target' (one of {Root, CycleMember, Target,
+     HadID, MultiContained}) -- "this node is a link destination, hence
+     notable", with a label "Target" persisted in Tantivy and recomputed
+     at every startup ('compute_and_store_context_types', 'main.rs:307').
+   - 'link_targets' / 'link_targets_from_nodes' -- the in-memory set of
+     textlink-destination IDs FED to that ranking, threaded through the
+     critical init path ('InitContextHandoff', 'dbs/init.rs', 'main.rs').
+   - 'MULTIPLIER_TARGET' ('consts.rs') paired with the enum.
+   I deliberately did NOT rename these, because: (a) it's a distinct
+   notability vocabulary, not the textlink ROLE the rename targets (the
+   role code is already 'dest'); (b) "Target" reads idiomatically among
+   {Root, CycleMember, HadID, MultiContained}, whereas "Dest" reads
+   oddly there; (c) it threads the most critical (startup/init) code
+   path and a persisted label, so a rename is higher-risk and tangential
+   to this feature; (d) 'coding-advice/for-ai.md' says "no gratuitous
+   renaming" and the plan says "SCOPE STRICTLY".
+   REVERSIBLE: if you want the ranking subsystem's "Target" -> "Dest"
+   too (var, enum, label, multiplier, and the matching test/doc
+   updates), say so and it's a quick mechanical follow-up. The plan's
+   literal "'link target' -> 'link dest'" example is what I'm reading as
+   "doc prose", not the 'link_targets' ranking variable.

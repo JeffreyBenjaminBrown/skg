@@ -27,7 +27,7 @@ How you share your data is up to you. Skg includes no network protocol between p
 
 If you want to hide your private knowledge from your view (say, while reading it in public) you can do that.
 ** hyperlinks
-Any text at any node (so both title and body) can contain any number of hyperlinks to other nodes. A hyperlink is defined by the ID of its target and an arbitrary label invented by the author. A hyperlink points from its "source" node to its "target" node. (I try to say "hyperlink" and not "link" because any relationship can be thought of as a link.)
+Any text at any node (so both title and body) can contain any number of hyperlinks to other nodes. A hyperlink is defined by the ID of its dest and an arbitrary label invented by the author. A hyperlink points from its "source" node to its "dest" node. (I try to say "hyperlink" and not "link" because any relationship can be thought of as a link.)
 ** A tree can show more than the contains relationship.
 Usually, probably, most nodes in the view will correspond to nodes in the graph, but not always. It thus helps to distinguish view-nodes from graph-nodes.
 
@@ -53,7 +53,7 @@ Each parent-child relationship in an initial view like the one above is the 'con
 
 The third and fourth view-nodes represent graph-nodes that link to the first. The second view-node *does not represent a graph-node* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
 
-It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relationship from container to content, the hyperlink relationship from source to target, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.
+It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relationship from container to content, the hyperlink relationship from source to dest, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.
 ** Forks of foreign data require three more relationships.
 The three relationships are called 'subscribes', 'hides-from-its-subscriptions' and 'overrides'.
 

@@ -236,7 +236,7 @@ So far there are these endpoints:
     be bare or quoted, but a bare value with whitespace is refused).
     The marker child is omitted from output. A nested export root is
     rendered as a link to its own file, not inlined. Links whose
-    target is not exported under `NAME` point to the export of
+    dest is not exported under `NAME` point to the export of
     `9ff04e25-01e8-4634-8aa5-f5849bc1eb81` ("Some links might be
     broken."); if that note is itself not exported, the link degrades
     to plain label text.

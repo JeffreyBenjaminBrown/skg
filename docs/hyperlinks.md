@@ -1,7 +1,7 @@
 # TextLinks can point to any part of a document.
 TextLinks point to nodes (or, equivalently, to branches).
 
-The target of every textlink is a node. If the target is a document root, we can say the link targets the entire document. But it might target some other node deeper in the document.
+The dest of every textlink is a node. If the dest is a document root, we can say the link points to the entire document. But it might point to some other node deeper in the document.
 
 For example, consider a document called `eggs` like this:
 ```

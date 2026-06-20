@@ -330,8 +330,8 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive activeNode for the link target. The parent is
-definitive, so saving records the target as content of the
+indefinitive activeNode for the link dest. The parent is
+definitive, so saving records the dest as content of the
 parent; the replacement child is indefinitive, so its own text is
 not rewritten from the link label.
 *** C-c m l : skg-replace-content-with-link
@@ -499,7 +499,7 @@ stripped of skg metadata. The marker child is omitted.
 Links are rewritten to relative org links. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, via =[[./file.org::*Heading][label]]=. A nested
-export root is shown as a link, not inlined. A link whose target
+export root is shown as a link, not inlined. A link whose dest
 is not exported under the chosen set points to a "some links
 might be broken" note.
 
