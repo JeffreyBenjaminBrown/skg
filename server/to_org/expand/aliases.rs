@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, ColRelation};
 use crate::types::viewnode::{QualCol, Qual};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child, unique_scaffold_child_of_viewnode};
@@ -23,7 +23,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
       tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
-    ViewRequest::Aliases,
+    ViewRequest::Col (ColRelation::Aliases),
     "Failed to integrate aliases view",
     errors, result ) }
 

@@ -3,7 +3,8 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request_with_source_set, build_and_integrate_sourceward_view_then_drop_request_with_source_set};
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, activeNode_in_tree_is_indefinitive };
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs };
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ColRelation, IndefOrDef, ParentIs };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -23,20 +24,32 @@ pub async fn execute_view_requests (
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
-      ViewRequest::Aliases => {
+      ViewRequest::Col (ColRelation::Aliases) => {
         build_and_integrate_aliases_view_then_drop_request (
           viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
-      ViewRequest::Containerward => {
+      ViewRequest::Col (rel) =>
+        // Populated overrides/hides/subscribes PartnerCols are built in
+        // step 4; no client requests them yet.
+        return Err ( format! (
+          "execute_view_requests: Col({}) not yet implemented",
+          rel . relname () ) . into () ),
+      ViewRequest::Path (role) if role == RelationRole::CONTAINER => {
         build_and_integrate_containerward_view_then_drop_request_with_source_set (
           viewforest, node_id, config, typedb_driver, errors,
           active_source_set )
           . await ?; },
-      ViewRequest::Sourceward => {
+      ViewRequest::Path (role) if role == RelationRole::LINK_SOURCE => {
         build_and_integrate_sourceward_view_then_drop_request_with_source_set (
           viewforest, node_id, config, typedb_driver, errors,
           active_source_set )
           . await ?; },
+      ViewRequest::Path (role) =>
+        // The other seven partner roles are built in step 5; no client
+        // requests them yet.
+        return Err ( format! (
+          "execute_view_requests: Path({}) not yet implemented",
+          role . rolename () ) . into () ),
       ViewRequest::Definitive =>
         // View completion (dispatch_node_update) settles every Definitive
         // request at the node's own visit (apply_definitive_draw_rule, the TODO/DONE/local-view-update/plan_v2.org §5.2

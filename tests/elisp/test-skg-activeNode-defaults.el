@@ -269,13 +269,15 @@
                            "*** source\n"
                            "**** jeff\n"
                            "*** viewRequests\n"
-                           "**** aliases\n"
-                           "**** containerwardView"))
+                           "**** col\n"
+                           "***** aliases\n"
+                           "**** path\n"
+                           "***** container"))
          (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (source jeff)
-                               (viewRequests aliases containerwardView)))))))
+                               (viewRequests (col aliases) (path container))))))))
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)

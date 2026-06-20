@@ -281,10 +281,9 @@ pub fn herald_rule_table () -> HeraldRule {
           crule (Red, "merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]) ]),
         crule (Green, "viewRequests", vec! [
-          rule ("aliases",           vec! [ s ("req:aliases") ]),
-          rule ("containerwardView", vec! [ s ("req:containers") ]),
-          rule ("sourcewardView",    vec! [ s ("req:sources") ]),
-          rule ("definitiveView",    vec! [ s ("req:definitive") ]) ]),
+          rule ("col",  vec! [ any (vec! [ s ("req:col:"),  RuleChild::It ]) ]),
+          rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
+          rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
           leaf (Green, "newX",     "X"),
@@ -425,8 +424,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( birth_emitted_atoms () );
   atoms . extend ( axis_atoms () );
   atoms . extend ( qual_and_col_atoms () );
-  atoms . extend ( ViewRequest::REPRS_IN_CLIENT . iter ()
-                   . map ( |(s, _)| *s ) );
+  atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
 /// GraphNodeStats atoms, from graphnodestats_to_sexp (org_to_text.rs).

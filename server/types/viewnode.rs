@@ -437,13 +437,51 @@ pub enum EditRequest {
   Delete, // request to delete this node
 }
 
+/// Which relation's collection a 'Col' view-request builds. A Col
+/// builds BOTH cols of its relation, so it is named by the RELATION
+/// (relname), unlike a Path, which is named by a single partner ROLE.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ColRelation {
+  Aliases,
+  Overrides,
+  Hides,
+  Subscribes,
+}
+
+impl ColRelation {
+  pub const ALL : [ColRelation; 4] = [
+    ColRelation::Aliases, ColRelation::Overrides,
+    ColRelation::Hides,   ColRelation::Subscribes ];
+
+  pub fn relname (
+    self,
+  ) -> &'static str {
+    match self {
+      ColRelation::Aliases    => "aliases",
+      ColRelation::Overrides  => "overrides",
+      ColRelation::Hides      => "hides",
+      ColRelation::Subscribes => "subscribes", } }
+
+  pub fn from_relname (
+    s : &str,
+  ) -> Option<ColRelation> {
+    match s {
+      "aliases"    => Some (ColRelation::Aliases),
+      "overrides"  => Some (ColRelation::Overrides),
+      "hides"      => Some (ColRelation::Hides),
+      "subscribes" => Some (ColRelation::Subscribes),
+      _            => None, } }
+}
+
 /// Requests for additional views related to a node.
 /// Multiple view requests can be active simultaneously.
+/// - 'Col(rel)' builds BOTH cols of the relation, populated from the graph.
+/// - 'Path(role)' builds the backpath for that one partner role.
+/// - 'Definitive' makes the (indefinitive) node editable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
-  Aliases,
-  Containerward,
-  Sourceward,
+  Col  (ColRelation),
+  Path (RelationRole),
   Definitive,
 }
 
@@ -646,28 +684,14 @@ impl Phantom {
 }
 
 impl ViewRequest {
-  /// Single source of truth for ViewRequest <-> client string bijection.
-  /// Public so the herald conformance test (server/heralds.rs) can
-  /// enumerate the emittable atoms from it.
-  pub const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
-    ("aliases",            ViewRequest::Aliases),
-    ("containerwardView",  ViewRequest::Containerward),
-    ("sourcewardView",     ViewRequest::Sourceward),
-    ("definitiveView",     ViewRequest::Definitive),
-  ];
-
-  /// String representation as used in client metadata.
-  pub fn repr_in_client (&self) -> &'static str {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(_, vr)| vr == self )
-      . map ( |(s, _)| *s )
-      . expect ("REPRS_IN_CLIENT should cover all ViewRequest variants") }
-
-  /// Parse a client string to a ViewRequest.
-  pub fn from_client_string ( s: &str ) -> Option<ViewRequest> {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(cs, _)| *cs == s )
-      . map ( |(_, vr)| *vr ) }
+  /// The MATCH-position atoms the server can emit inside
+  /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
+  /// '(col ...)' / '(path ...)' forms are VALUE-position (echoed by the
+  /// herald's ANY/IT), so they are deliberately absent -- like IDs and
+  /// counts elsewhere. Enumerated for the herald conformance test
+  /// (server/heralds.rs).
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 3] =
+    [ "col", "path", "definitiveView" ];
 }
 
 impl AsRef<ViewNode> for ViewNode {
@@ -787,16 +811,10 @@ impl fmt::Display for ViewRequest {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    write!(f, "{}", self . repr_in_client()) } }
-
-impl FromStr for ViewRequest {
-  type Err = String;
-
-  fn from_str (
-    s : &str
-  ) -> Result<Self, Self::Err> {
-    Self::from_client_string (s)
-      . ok_or_else ( || format! ( "Unknown ViewRequest value: {}", s ) ) } }
+    match self {
+      ViewRequest::Col  (rel)  => write! (f, "(col {})",  rel  . relname  ()),
+      ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
+      ViewRequest::Definitive  => write! (f, "definitiveView"), } } }
 
 //
 // Defaults

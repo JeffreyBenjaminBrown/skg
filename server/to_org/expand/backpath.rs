@@ -41,7 +41,7 @@ pub async fn build_and_integrate_containerward_view_then_drop_request_with_sourc
       tree, node_id, config, typedb_driver, active ) . await;
   remove_completed_view_request (
     tree, node_id,
-    ViewRequest::Containerward,
+    ViewRequest::Path (RelationRole::CONTAINER),
     "Failed to integrate containerward path",
     errors, result ) }
 
@@ -87,7 +87,7 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request_with_source_s
       tree, node_id, config, typedb_driver, active ) . await;
   remove_completed_view_request (
     tree, node_id,
-    ViewRequest::Sourceward,
+    ViewRequest::Path (RelationRole::LINK_SOURCE),
     "Failed to integrate sourceward path",
     errors, result ) }
 

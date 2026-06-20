@@ -38,6 +38,30 @@
      integration tests (containerward/sourceward/content-view-from-non-root/
      search-enrichment).
 
+** Step 3 — parameterize ViewRequest (Col + Path); fold in the three (commit pending)
+   - 'ViewRequest' is now '{ Col(ColRelation), Path(RelationRole),
+     Definitive }', with 'ColRelation { Aliases, Overrides, Hides,
+     Subscribes }' (relname/from_relname). Dropped the flat
+     'REPRS_IN_CLIENT'/'from_client_string'/'FromStr'; Display now emits
+     '(col RELNAME)' / '(path ROLENAME)' / 'definitiveView'.
+   - Parser rewritten ('parse_viewrequests_sexp') to accept the nested
+     '(col ...)' / '(path ...)' forms and the bare 'definitiveView'.
+   - viewRequests herald rule now matches 'col'/'path'/'definitiveView'
+     (the RELNAME/ROLENAME are value-position, echoed by ANY/IT ->
+     "req:col:NAME" / "req:path:NAME"). 'EMITTABLE_MATCH_ATOMS'
+     = ["col","path","definitiveView"] feeds the conformance test.
+   - Dispatch ('execute_view_requests'): Col(Aliases) -> existing aliases
+     builder; Path(CONTAINER)/Path(LINK_SOURCE) -> existing containerward/
+     sourceward engines; the other Col/Path arms return a clear "not yet
+     implemented" error (steps 4/5; no client requests them yet). The
+     view-root containerward special-case now keys on Path(CONTAINER).
+   - Folded the three old tokens (aliases/containerwardView/sourcewardView)
+     into the new forms across server, the elisp request commands, and
+     the affected fixtures. Old atoms fully removed.
+   - All suites green: 460 Rust, 249 elisp, and the
+     aliases/containerward/sourceward/save_collateral_delete integration
+     tests.
+
 * Changes to the plan's envisioned order
   - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
     regenerated WITHIN each herald-touching commit (step 2 here, later
@@ -54,6 +78,19 @@
     'add_to_inverse_indexes' (newly 'pub(crate)'). This is a test-only
     correctness fix, not a production change; flagging it because it
     widened the visibility of an internal helper.
+  - Step 3 needed a SMALL client change earlier than step 8: the three
+    existing request commands ('skg-request-{aliases,containerward,
+    sourceward}-view') had to emit the new '(col aliases)'/'(path
+    container)'/'(path linkSource)' atoms, else the integration tests
+    (which invoke those commands) would send atoms the new server
+    rejects. The full client rework (rename to 'skg-show-*', the ten new
+    commands, keybindings, auto-save) is still step 8.
+  - Step 3 also trimmed the sexpr-editor's viewRequests field-cycling
+    list ('skg-sexpr-cycling.el') to just 'definitiveView' (the only
+    bare-atom request). The col/path requests are structured forms made
+    via commands, not flat-cycleable values. Untested helper; left a
+    comment. A fuller cycling UX for the structured requests, if wanted,
+    belongs with the step-8 client work.
 
 * Choices determining the future
 

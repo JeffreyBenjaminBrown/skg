@@ -79,31 +79,31 @@
 (ert-deftest test-heralds-viewrequests-display ()
   "Test that viewRequests are displayed as req:* heralds."
   (with-temp-buffer
-    ;; Test aliases viewRequest
+    ;; Test (col aliases) viewRequest
     (erase-buffer)
-    (insert "(skg (node (id 1) (viewRequests aliases)))")
+    (insert "(skg (node (id 1) (viewRequests (col aliases))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:aliases" result)))
+      (should (string-match "req:col:.*aliases" result)))
 
-    ;; Test containerwardView viewRequest
+    ;; Test (path container) viewRequest
     (erase-buffer)
-    (insert "(skg (node (id 2) (viewRequests containerwardView)))")
+    (insert "(skg (node (id 2) (viewRequests (path container))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:containers" result)))
+      (should (string-match "req:path:.*container" result)))
 
-    ;; Test sourcewardView viewRequest
+    ;; Test (path linkSource) viewRequest
     (erase-buffer)
-    (insert "(skg (node (id 3) (viewRequests sourcewardView)))")
+    (insert "(skg (node (id 3) (viewRequests (path linkSource))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:sources" result)))
+      (should (string-match "req:path:.*linkSource" result)))
 
     ;; Test multiple viewRequests
     (erase-buffer)
-    (insert "(skg (node (id 4) (viewRequests aliases containerwardView sourcewardView)))")
+    (insert "(skg (node (id 4) (viewRequests (col aliases) (path container) (path linkSource))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:aliases" result))
-      (should (string-match "req:containers" result))
-      (should (string-match "req:sources" result)))))
+      (should (string-match "req:col:.*aliases" result))
+      (should (string-match "req:path:.*container" result))
+      (should (string-match "req:path:.*linkSource" result)))))
 
 (ert-deftest test-heralds-scaffold-display ()
   "Test that scaffold kinds are displayed correctly."

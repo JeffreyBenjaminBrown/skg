@@ -12,17 +12,17 @@
 (defun skg-request-aliases-view ()
   "Edit metadata to request an aliases view for the headline at point."
   (interactive)
-  (skg--request-view 'aliases))
+  (skg--request-view '(col aliases)))
 
 (defun skg-request-containerward-view ()
   "Request containerward view and (to apply it) save."
   (interactive)
-  (skg--request-view-and-save 'containerwardView))
+  (skg--request-view-and-save '(path container)))
 
 (defun skg-request-sourceward-view ()
   "Request sourceward view and (to apply it) save."
   (interactive)
-  (skg--request-view-and-save 'sourcewardView))
+  (skg--request-view-and-save '(path linkSource)))
 
 (defun skg-request-definitive-view ()
   "Edit metadata to request a definitive view for the headline at point.
@@ -36,7 +36,7 @@ The node must be indefinitive and childless."
   (skg-request-save-buffer))
 
 (defun skg--request-view
-    (view-token) ;; 'aliases, 'containerwardView, or 'sourcewardView
+    (view-token) ;; '(col RELNAME), '(path ROLENAME), or 'definitiveView
   "Common helper to request VIEW-TOKEN for the headline at point.
 Edits the metadata but does NOT save,
 until the user calls `skg-request-save-buffer'."
