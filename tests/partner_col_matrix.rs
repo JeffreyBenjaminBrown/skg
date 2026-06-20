@@ -354,8 +354,72 @@ fn relationship_matrix
       omission_scenarios (&mut fails, config, driver) . await ?;
       col_request_scenarios (
         &mut fails, config, driver, tantivy, &graph) . await ?;
+      path_request_scenarios (
+        &mut fails, config, driver, tantivy, &graph) . await ?;
 
       fails . finish () } )) }
+
+//////////////////////////////////////////////////////////////
+// The Path view-request, '(viewRequests (path ROLENAME))': graft the
+// partners playing ROLENAME toward the node as inverted indefinitive
+// children with a '(birth backpath ROLENAME)' marker. One generic
+// backpath engine serves all nine roles; these cover the seven new
+// ones (the container/linkSource roles keep their own golden tests).
+// An absent relation field stays MSV::Unspecified on save, so these
+// saves never disturb the graph the path then reads.
+//////////////////////////////////////////////////////////////
+
+async fn path_request_scenarios (
+  fails : &mut Fails,
+  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
+) -> Result<(), Box<dyn Error>> {
+  let req = | owner : &str, role : &str, title : &str | -> String {
+    format! (
+      "* (skg (node (id {}) (source public) (viewRequests (path {})))) {}\n",
+      owner, role, title ) };
+  // Each row: (scenario, owner, title, role, partner-id-expected).
+  let sharing : [(&str, &str, &str, &str); 6] = [
+    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a"),
+    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner"),
+    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a"),
+    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner"),
+    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a"),
+    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner"),
+  ];
+  for (s, owner, role, partner) in sharing {
+    let resp : SaveResponse = save (
+      &req (owner, role, owner), // title == owner (matches its disk title)
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_contains (s, &resp . saved_view,
+                           &format! ("(id {})", partner) );
+    fails . want_contains (s, &resp . saved_view,
+                           &format! ("backpath {}", role) ); }
+  { // (path linkDest) on a node whose TITLE carries [[id:pathLink-dst]]:
+    // the dest node is grafted. (linkSource is the existing sourceward
+    // golden; this is its mirror.)
+    let s : &str = "path/linkDest";
+    let resp : SaveResponse = save (
+      &req ("pathLink-src", "linkDest", "[[id:pathLink-dst][to dst]]"),
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
+    fails . want_contains (s, &resp . saved_view, "backpath linkDest"); }
+  { // Self-referential fixture: a node that links to ITSELF. A
+    // non-container path role is cycle-guarded and needs NO view-root
+    // special-case (unlike containerward) -- the build must not panic,
+    // and the node reappears as its own grafted dest.
+    let s : &str = "path/self-referential-no-special-case";
+    let resp : SaveResponse = save (
+      &req ("pathSelf", "linkDest", "[[id:pathSelf][to self]]"),
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_contains (s, &resp . saved_view, "(id pathSelf)"); }
+  Ok (( )) }
 
 //////////////////////////////////////////////////////////////
 // The Col view-request, '(viewRequests (col RELNAME))': build BOTH

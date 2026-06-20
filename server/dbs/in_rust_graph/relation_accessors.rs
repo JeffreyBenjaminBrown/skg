@@ -301,3 +301,48 @@ fn inbound_pid_set (
       . unwrap_or_default (),
   };
   ids . into_iter () . collect () }
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+mod tests {
+  use super::*;
+
+  /// Every PARTNER_ROLE_VOCAB row round-trips ROLENAME <-> RelationRole,
+  /// resolves a glyph, and yields the expected backpath triple.
+  #[test]
+  fn partner_role_vocab_round_trips_and_derives_triples () {
+    // (rolename, RelationRole, glyph, (relation, input_role, output_role))
+    let expected : [(&str, RelationRole, &str,
+                     (&str, &str, &str)); 9] = [
+      ("container",  RelationRole::CONTAINER,   "}",
+       ("contains", "contained", "container")),
+      ("linkSource", RelationRole::LINK_SOURCE, "←",
+       ("textlinks_to", "dest", "source")),
+      ("linkDest",   RelationRole::LINK_DEST,   "→",
+       ("textlinks_to", "source", "dest")),
+      ("overrider",  RelationRole::OVERRIDER,   "Op",
+       ("overrides_view_of", "overridden", "overrider")),
+      ("overridden", RelationRole::OVERRIDDEN,  "pO",
+       ("overrides_view_of", "overrider", "overridden")),
+      ("hider",      RelationRole::HIDER,       "Hp",
+       ("hides_from_its_subscriptions", "hidden", "hider")),
+      ("hidden",     RelationRole::HIDDEN,      "pH",
+       ("hides_from_its_subscriptions", "hider", "hidden")),
+      ("subscriber", RelationRole::SUBSCRIBER,  "Sp",
+       ("subscribes", "subscribee", "subscriber")),
+      ("subscribee", RelationRole::SUBSCRIBEE,  "pS",
+       ("subscribes", "subscriber", "subscribee")),
+    ];
+    for (name, role, glyph, triple) in expected {
+      assert_eq! ( role . rolename (), name );
+      assert_eq! ( RelationRole::from_rolename (name), Some (role) );
+      assert_eq! ( role . glyph (), glyph );
+      assert_eq! ( role . backpath_triple (), triple,
+        "wrong backpath triple for {}", name ); } }
+
+  #[test]
+  fn from_rolename_rejects_unknown_and_the_absent_content_role () {
+    assert_eq! ( RelationRole::from_rolename (""), None );
+    assert_eq! ( RelationRole::from_rolename ("contained"), None );
+    assert_eq! ( RelationRole::from_rolename ("bogus"), None ); }
+}

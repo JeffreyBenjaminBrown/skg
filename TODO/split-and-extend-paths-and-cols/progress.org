@@ -84,6 +84,21 @@
      overrides-populated, subscribes-populated, and hides-empty (nothing).
    - All 460 Rust tests pass.
 
+** Step 5 — fulfill the Path request for the new roles (commit pending)
+   - Made the path dispatch fully relation-generic: new
+     'build_and_integrate_path_view_then_drop_request(role)' /
+     'build_and_integrate_path_with_source_set(role)' in 'backpath.rs'
+     take the '(relation, input_role, output_role)' triple straight from
+     'RelationRole::backpath_triple', so ONE call site serves all nine
+     roles. The dispatch's Path(role) arm now routes every role through
+     it; the two old containerward/sourceward '*_view_then_drop_request*'
+     wrappers are gone, and the 'containerward_path'/'sourceward_path'
+     helpers (test-used) became thin wrappers over the generic engine
+     (a deduplication). Generalized the ancestry-attach helper to
+     'attach_containerward_ancestries_for_birth_role(role)'.
+   - All 462 Rust tests pass; the containerward/sourceward + on-phantom
+     integration tests still pass (refactor is behavior-preserving).
+
 * Changes to the plan's envisioned order
   - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
     regenerated WITHIN each herald-touching commit (step 2 here, later
@@ -113,6 +128,31 @@
     via commands, not flat-cycleable values. Untested helper; left a
     comment. A fuller cycling UX for the structured requests, if wanted,
     belongs with the step-8 client work.
+
+* Choices determining the future (more)
+
+** Step 5: containerward ancestry attached for EVERY non-container role
+   The plan only explicitly decided linkDest should attach each
+   partner's containerward ancestry (mirroring linkSource, "default:
+   yes"). For the six sharing roles it was silent. I attach the
+   containerward ancestry uniformly for ALL non-container path roles --
+   so every grafted partner is shown in its own container context, the
+   same affordance linkSource has always had. The container role itself
+   IS that ancestry, so it does not re-attach. Reversible: gate the
+   attach on a role set if you want it only for the link roles.
+
+** Step 5: tested with Rust matrix scenarios, not 7 integration goldens
+   The plan envisioned "one integration golden per new path role". I
+   instead (a) unit-test 'backpath_triple'/'rolename'/'glyph' for all
+   nine roles, and (b) added 'path_request_scenarios' to
+   'partner_col_matrix.rs' covering all seven new roles end-to-end
+   (overridden/overrider/subscribee/subscriber/hidden/hider via existing
+   public fixtures, linkDest via three new textlink fixtures), plus a
+   self-referential (self-linking) node proving a non-container role
+   needs no view-root special-case. This is faster and in-process; the
+   client commands that the bash goldens would drive don't exist until
+   step 8. New fixtures: 'pathLink-src/dst.skg', 'pathSelf.skg' under
+   the matrix's public source.
 
 * Choices determining the future
 

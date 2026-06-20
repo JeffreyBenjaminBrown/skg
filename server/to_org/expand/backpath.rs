@@ -28,35 +28,67 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 
-pub async fn build_and_integrate_containerward_view_then_drop_request_with_source_set (
+/// Fulfill a '(viewRequests (path ROLENAME))' request: build the
+/// backpath for 'role' and drop the request. Relation-generic -- the
+/// '(relation, input_role, output_role)' triple comes from the role
+/// ('RelationRole::backpath_triple'), so one call site serves all nine
+/// partner roles.
+pub async fn build_and_integrate_path_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
   node_id       : NodeId,
+  role          : RelationRole,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
   active        : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_containerward_path_with_source_set (
-      tree, node_id, config, typedb_driver, active ) . await;
+    build_and_integrate_path_with_source_set (
+      tree, node_id, role, config, typedb_driver, active ) . await;
   remove_completed_view_request (
     tree, node_id,
-    ViewRequest::Path (RelationRole::CONTAINER),
-    "Failed to integrate containerward path",
+    ViewRequest::Path (role),
+    "Failed to integrate path view",
     errors, result ) }
 
-/// Integrate a containerward path into an ViewNode tree.
-/// This is called on a specific node in the tree,
-/// and integrates the containerward path from that node.
+/// Build the backpath for one partner 'role', and -- for every role
+/// EXCEPT the container role -- attach each grafted partner's
+/// containerward ancestry beneath it, so the partner is shown in its
+/// own container context (as sourceward has always done for link
+/// sources). The container role itself IS that ancestry, so it does not
+/// re-attach.
+pub async fn build_and_integrate_path_with_source_set (
+  tree      : &mut Tree<ViewNode>,
+  node_id   : NodeId,
+  role      : RelationRole,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+  active    : Option<&ActiveSourceSet>,
+) -> Result < (), Box<dyn Error> > {
+  let (relation, input_role, output_role)
+    : (&'static str, &'static str, &'static str) =
+    role . backpath_triple ();
+  let _ : Vec<ID> = build_and_integrate_backpaths (
+    tree, node_id, config, driver,
+    relation, input_role, output_role,
+    Birth::Backpath (role),
+    active ) . await ?;
+  if role != RelationRole::CONTAINER {
+    attach_containerward_ancestries_for_birth_role (
+      tree, node_id, role, config, driver, active ) . await ?; }
+  Ok (( )) }
+
+/// Integrate a containerward path into a ViewNode tree (no ancestry
+/// re-attach). Thin wrapper kept for callers/tests; the engine is the
+/// generic 'build_and_integrate_path_with_source_set'.
 pub async fn build_and_integrate_containerward_path (
   tree      : &mut Tree<ViewNode>,
   node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_containerward_path_with_source_set (
-    tree, node_id, config, driver, None ) . await
-}
+  build_and_integrate_path_with_source_set (
+    tree, node_id, RelationRole::CONTAINER, config, driver, None ) . await }
 
 pub async fn build_and_integrate_containerward_path_with_source_set (
   tree      : &mut Tree<ViewNode>,
@@ -65,59 +97,20 @@ pub async fn build_and_integrate_containerward_path_with_source_set (
   driver    : &TypeDBDriver,
   active    : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
-  let _ : Vec<ID> = build_and_integrate_backpaths (
-    tree, node_id, config, driver,
-    "contains", "contained", "container",
-    Birth::Backpath (RelationRole::CONTAINER),
-    active
-  ) . await ?;
-  Ok (( )) }
+  build_and_integrate_path_with_source_set (
+    tree, node_id, RelationRole::CONTAINER, config, driver, active ) . await }
 
-
-pub async fn build_and_integrate_sourceward_view_then_drop_request_with_source_set (
-  tree          : &mut Tree<ViewNode>,
-  node_id       : NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-  active        : Option<&ActiveSourceSet>,
-) -> Result < (), Box<dyn Error> > {
-  let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_sourceward_path_with_source_set (
-      tree, node_id, config, typedb_driver, active ) . await;
-  remove_completed_view_request (
-    tree, node_id,
-    ViewRequest::Path (RelationRole::LINK_SOURCE),
-    "Failed to integrate sourceward path",
-    errors, result ) }
-
-/// Integrate sourceward paths into a ViewNode tree,
-/// then attach containerward ancestry beneath each source node.
+/// Integrate sourceward paths (link sources of the node), attaching
+/// each source's containerward ancestry. Thin wrapper over the generic
+/// engine with the linkSource role.
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut Tree<ViewNode>,
   node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_sourceward_path_with_source_set (
-    tree, node_id, config, driver, None ) . await
-}
-
-pub async fn build_and_integrate_sourceward_path_with_source_set (
-  tree      : &mut Tree<ViewNode>,
-  node_id   : NodeId,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
-  active    : Option<&ActiveSourceSet>,
-) -> Result < (), Box<dyn Error> > {
-  let _source_pids : Vec<ID> =
-    build_and_integrate_backpaths (
-      tree, node_id, config, driver,
-      "textlinks_to", "dest", "source",
-      Birth::Backpath (RelationRole::LINK_SOURCE),
-      active ) . await ?;
-  attach_containerward_ancestries_to_link_sources (
-    tree, node_id, config, driver, active ) . await }
+  build_and_integrate_path_with_source_set (
+    tree, node_id, RelationRole::LINK_SOURCE, config, driver, None ) . await }
 
 /// Plural 'backpaths' because if the origin
 /// immediately forks in the backward direction,
@@ -324,28 +317,30 @@ fn extract_pids_from_paths (
         result . push ( id . clone () ); } } }
   result }
 
-/// Walk the subtree under node_id to find every Birth::Backpath(LINK_SOURCE) node.
-/// For each, insert its containerward ancestry as subheadlines
-/// with Birth::Backpath(CONTAINER).
-async fn attach_containerward_ancestries_to_link_sources (
+/// Walk the subtree under node_id to find every Birth::Backpath(role)
+/// node grafted by this path build. For each, insert its containerward
+/// ancestry as subheadlines with Birth::Backpath(CONTAINER), so the
+/// partner is shown in its own container context.
+async fn attach_containerward_ancestries_for_birth_role (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
+  role    : RelationRole,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   active  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
-  // Collect LinksToParent nodes before mutating the tree.
-  let links_to_nodeids : Vec<NodeId> = {
+  // Collect the role's grafted partner nodes before mutating the tree.
+  let role_nodeids : Vec<NodeId> = {
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in tree . get (node_id) . unwrap () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::Vognode (Vognode::Active (t))
           = &node_ref . value () . kind
-        { if t . birth == Birth::Backpath (RelationRole::LINK_SOURCE) {
+        { if t . birth == Birth::Backpath (role) {
             result . push ( node_ref . id () ); }} }}
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
-    tree, &links_to_nodeids, config, driver, active ) . await }
+    tree, &role_nodeids, config, driver, active ) . await }
 
 /// For each NodeId, look up its ActiveNode pid in the tree, fetch
 /// every such pid's containerward ancestry from the graph (in
