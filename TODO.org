@@ -52,6 +52,26 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
+*** in cols the peace symbol should precede the title
+and there should be a space between them
+*** rewrite docs/COMMANDS.org
+Some new Claude-written passages assume too much of the reade
+*** uniform rel stats
+pX = parent Xs it
+Xp = it Xs parent
+3pX = 3 X it, among them its parent
+X4p = it Xs 4, including its parent
+
+In the special case of X=L for links,
+a(b,c)L (where a,b,c are numbers) =
+  a nodes link to it,
+  b of those a differ from it, are bodyless and content-less, but their title text is something other than the link label
+  c of the a have their own content
+  (the remainer are links whose title nodes are just a link with one of the node's normal aliases)
+
+g (grandparent) and G (great-grandparent)
+can be used like p.
+*** O,S,A etc. should precede numerical content stats, in another color
 *** fork request
 To provide a way to fork your own data
 (because the 'edit a foreign one' gesture cannot be applied).

@@ -3,6 +3,29 @@
   left as-is; this file records what's done, deviations in HOW (not
   WHAT), and choices that shape the future. Newest notes appended.
 
+* FEATURE COMPLETE — all nine steps done (2026-06-20)
+  Every step of 'plan.org' is implemented, each as its own commit
+  (fde34bc2..efa32e4c), suite green at each. Final state:
+  - 'cargo nextest run' : 462 passed.
+  - 'bash/emacs-tests.sh' : 250 passed.
+  - 'bash/integration-tests.sh' : all passed.
+  Two command families now exist: COLLECTIONS ('C-c c', both cols of a
+  relation, writable col forced even when empty) and PATHS ('C-c p', the
+  relation-generic backpath for any of nine partner roles), with Birth
+  and ViewRequest parameterized, the full parent-relative viewStats
+  matrix (Sp/pS/Hp/pH + the pO fix), and the read-only-col ☮.
+
+  THINGS YOU MIGHT WANT TO LOOK AT (all reversible, detailed below):
+  - Step 1 scope: I left the search-ranking 'ContextOriginType::Target'
+    / 'link_targets' subsystem on "target" (renamed only the textlink
+    ROLE prose). Say the word to rename it too.
+  - Step 5 choice: I attach containerward ancestry under EVERY
+    non-container path partner (the plan only fixed linkDest=yes). Easy
+    to restrict to the link roles.
+  - Step 2 follow-on caught in step 9: three save_collateral/git-diff
+    integration fixtures still read the old birth atom via a shared
+    helper; fixed. (See "What's imperfect".)
+
 * What's done and went well
 
 ** Step 1 — 'target' -> 'dest' in the textlink context (commit pending)

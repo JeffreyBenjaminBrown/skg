@@ -240,7 +240,7 @@ detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
 on the node at point; it reports moves across all sources.
-** C-c c : show a COLLECTION (both cols of a relation)
+** C-c c : show a collection (both cols of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's collections (cols) into the view, POPULATED from
@@ -262,7 +262,7 @@ hides nor is hidden, nothing appears.
 The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberCol (the nodes that subscribe to
 this one -- read-only, ☮).
-** C-c p : show a PATH (the backpath through one relation role)
+** C-c p : show a path (the backpath through one relation role)
 Like the collections, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
 children, climbing transitively until a fork, cycle, or root. UPPER =
