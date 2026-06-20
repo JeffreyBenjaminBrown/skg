@@ -352,8 +352,72 @@ fn relationship_matrix
       hiddenCol_delete_does_not_unhide (
         &mut fails, config, driver) . await ?;
       omission_scenarios (&mut fails, config, driver) . await ?;
+      col_request_scenarios (
+        &mut fails, config, driver, tantivy, &graph) . await ?;
 
       fails . finish () } )) }
+
+//////////////////////////////////////////////////////////////
+// The Col view-request, '(viewRequests (col RELNAME))': build BOTH
+// cols of the relation, the writable one even when empty (decision A).
+// Save a minimal definitive buffer carrying just the request and assert
+// on the rerendered view. An absent writable col means "no opinion"
+// (MSV::Unspecified, filled from disk), so these saves never wipe the
+// relation -- the cols come back populated/empty in the rerender.
+//////////////////////////////////////////////////////////////
+
+async fn col_request_scenarios (
+  fails : &mut Fails,
+  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
+) -> Result<(), Box<dyn Error>> {
+  let request_buf = | owner : &str, rel : &str | -> String {
+    format! (
+      "* (skg (node (id {}) (source public) (viewRequests (col {})))) {}\n",
+      owner, rel, owner ) };
+  { // (col overrides) on wSub-owner, which overrides nothing and is
+    // overridden by nothing: the WRITABLE overriddenCol appears EMPTY
+    // (the "add an override here" surface); the read-only overriderCol
+    // does not appear (empty read-only cols are pruned).
+    let s : &str = "col-request/overrides-empty";
+    let resp : SaveResponse = save (
+      &request_buf ("wSub-owner", "overrides"),
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_contains (s, &resp . saved_view, "(skg overriddenCol)");
+    fails . want_absent  (s, &resp . saved_view, "overriderCol"); }
+  { // (col overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
+    // the overriddenCol appears POPULATED with both.
+    let s : &str = "col-request/overrides-populated";
+    let resp : SaveResponse = save (
+      &request_buf ("wOvr-owner", "overrides"),
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_contains (s, &resp . saved_view, "(skg overriddenCol)");
+    fails . want_contains (s, &resp . saved_view, "(id wOvr-a)");
+    fails . want_contains (s, &resp . saved_view, "(id wOvr-b)"); }
+  { // (col subscribes) on wSub-owner: subscribeeCol POPULATED (a,b,c).
+    let s : &str = "col-request/subscribes-populated";
+    let resp : SaveResponse = save (
+      &request_buf ("wSub-owner", "subscribes"),
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_contains (s, &resp . saved_view, "(skg subscribeeCol)");
+    fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
+  { // (col hides) on wSub-owner, which neither hides nor is hidden:
+    // both sides read-only and empty, so NOTHING appears.
+    let s : &str = "col-request/hides-empty";
+    let resp : SaveResponse = save (
+      &request_buf ("wSub-owner", "hides"),
+      config, driver, tantivy, graph) . await ?;
+    if ! resp . errors . is_empty () {
+      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
+    fails . want_absent (s, &resp . saved_view, "hiderCol");
+    fails . want_absent (s, &resp . saved_view, "hiddenCol"); }
+  Ok (( )) }
 
 //////////////////////////////////////////////////////////////
 // Writable cols (subscribeeCol, overriddenCol): the membership

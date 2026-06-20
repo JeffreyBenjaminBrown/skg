@@ -116,6 +116,9 @@ pub async fn maybe_add_subscribeeCol_branch (
   driver  : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  force_create_when_empty : bool, // a Col view-request materializes the
+    // writable subscribeeCol as an empty "add here" surface even with
+    // no subscribees.
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
@@ -168,7 +171,8 @@ pub async fn maybe_add_subscribeeCol_branch (
              &subscriber_pid, &subscriber_source,
              NodeRelation::Subscribes,
              source_diffs, &subscribee_ids ) . 0 . is_empty ();
-    if ! head_side_occupied { return Ok (( )); }}
+    if ! head_side_occupied && ! force_create_when_empty {
+      return Ok (( )); }}
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content
@@ -257,7 +261,7 @@ pub async fn maybe_add_partnerCol_branches (
     if is_indefinitive { return Ok(( )); } }
   maybe_add_subscribeeCol_branch (
     tree, node_id, config, driver, active_source_set,
-    source_diffs ) . await ?;
+    source_diffs, false ) . await ?;
   let Some (graph) = snapshot_global () else {
     return Ok (( )); };
   for kind in [
@@ -268,13 +272,18 @@ pub async fn maybe_add_partnerCol_branches (
     PartnerCol::Hidden,
   ] { maybe_add_one_partnerCol (
         tree, node_id, kind, config, driver, &graph,
-        active_source_set, source_diffs ) . await ?; }
+        active_source_set, source_diffs, false ) . await ?; }
   Ok (( )) }
 
 /// Add a generated PartnerCol for `node_id` if it would
 /// have visible members.
 /// Conditions determining the 'maybe' are commented.
-async fn maybe_add_one_partnerCol (
+/// 'force_create_when_empty' overrides the empty-skip: a Col view-request
+/// uses it to materialize the WRITABLE col (Overridden) as an empty
+/// "add here" surface even when the relation has no members. (Only ever
+/// passed 'true' for a writable col; an empty read-only col would just
+/// be pruned again.)
+pub async fn maybe_add_one_partnerCol (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   kind    : PartnerCol,
@@ -283,6 +292,7 @@ async fn maybe_add_one_partnerCol (
   graph   : &Arc<InRustGraph>,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  force_create_when_empty : bool,
 ) -> Result < (), Box<dyn Error> > {
   if unique_scaffold_child_of_viewnode (
       tree, node_id, &ViewNodeKind::PartnerCol (kind)
@@ -329,7 +339,8 @@ async fn maybe_add_one_partnerCol (
              &owner_pid, member_role . relation, source_diffs )
            . values ()
            . any ( |axes| ! axes . net_is_present () ) };
-    if ! head_side_occupied { return Ok (( )); }}
+    if ! head_side_occupied && ! force_create_when_empty {
+      return Ok (( )); }}
   let col_nid : NodeId =
     insert_scaffold_as_child (
       tree, node_id, ViewNodeKind::PartnerCol (kind), true) ?;
