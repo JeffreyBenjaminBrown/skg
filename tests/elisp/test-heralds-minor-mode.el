@@ -2,6 +2,7 @@
                              (file-name-directory load-file-name)))
 (require 'ert)
 (require 'heralds-minor-mode)
+(require 'skg-request-herald-rules) ;; self-heal: skg-herald-rules-ensure
 (skg-test-install-herald-rules)
 
 (ert-deftest test-heralds-minor-mode-toggle ()
@@ -137,14 +138,14 @@
 (ert-deftest test-heralds-diff-display ()
   "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
   (with-temp-buffer
-    ;; TrueNode with unstaged membership removal (the v.1 'removed-here').
+    ;; ActiveNode with unstaged membership removal (the v.1 'removed-here').
     (erase-buffer)
     (insert "(skg (node (id 1) (source s) (unstaged removedM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
       (should (string-match "M" result)))
 
-    ;; TrueNode with unstaged file creation + membership add (the v.1 'new').
+    ;; ActiveNode with unstaged file creation + membership add (the v.1 'new').
     (erase-buffer)
     (insert "(skg (node (id 2) (source s) (unstaged newX newM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
@@ -209,5 +210,42 @@ should still remove them."
     (heralds-minor-mode -1)
     (should-not (cl-some (lambda (ov) (overlay-get ov 'heralds))
                          (overlays-in (point-min) (point-max))))))
+
+(ert-deftest test-heralds-self-heals-missing-rule-table ()
+  "Enabling heralds with a missing table re-fetches, then displays.
+The herald table is volatile session state; if it goes missing, turning
+heralds on should recover it rather than give up. Here the stubbed
+fetcher stands in for the server answering the re-request by installing
+the fixture table."
+  (let ((heralds--transform-rules nil)) ;; pretend the table was lost
+    (cl-letf (((symbol-function 'skg-request-herald-rules)
+               (lambda () (skg-test-install-herald-rules))))
+      (with-temp-buffer
+        (insert "(skg (node (id 1) (source s) (graphStats (contents 2) (containsHerald (contents 2)))))\n")
+        (heralds-minor-mode 1)
+        (should heralds-minor-mode)       ;; stayed on
+        (should heralds--transform-rules) ;; table recovered
+        (should (cl-some (lambda (ov) (overlay-get ov 'display))
+                         (overlays-in (point-min) (point-max))))))))
+
+(ert-deftest test-heralds-gives-up-after-bounded-fetch-attempts ()
+  "When the server never sends a table, heralds retries a bounded number
+of times and then disables itself instead of spinning forever."
+  (let ((heralds--transform-rules nil)
+        (skg-rust-tcp-proc nil)             ;; no live connection to wait on
+        (skg-herald-rules-attempt-timeout 0.05) ;; keep the test quick
+        (calls 0))
+    (cl-letf (((symbol-function 'skg-request-herald-rules)
+               ;; Simulate a server that never answers: count the
+               ;; requests but never install a table.
+               (lambda () (setq calls (1+ calls)))))
+      (with-temp-buffer
+        (insert "(skg (node (id 1)))\n")
+        (heralds-minor-mode 1)
+        (should-not heralds-minor-mode)     ;; turned itself off
+        (should-not heralds--transform-rules)
+        (should (= calls skg-herald-rules-max-attempts)) ;; tried exactly N times
+        (should-not (cl-some (lambda (ov) (overlay-get ov 'display))
+                             (overlays-in (point-min) (point-max))))))))
 
 (provide 'test-heralds-minor-mode)

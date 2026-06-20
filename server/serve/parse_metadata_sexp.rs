@@ -2,7 +2,7 @@
 ///
 /// Format:
 ///   Scaffolds: (skg [focused] [folded] scaffoldKind)
-///   TrueNodes: (skg [focused] [folded]
+///   ActiveNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
 ///                         [(parentIs affected|independent|absent)]
@@ -26,7 +26,7 @@ use crate::types::viewnode::{
   Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
 };
 use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff,
+    MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff,
     MpVognode, MpPhantom,
 };
 
@@ -46,7 +46,7 @@ pub struct ViewnodeMetadata {
   pub body_folded: bool,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
-  // TrueNode fields (ignored if scaffold is Some)
+  // ActiveNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
   pub source: Option<SourceName>,
   pub parentIs: ParentIs,
@@ -56,9 +56,9 @@ pub struct ViewnodeMetadata {
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<EditRequest>,
   pub view_requests: HashSet<ViewRequest>,
-  pub truenode_existence  : ExistenceAxes,
-  pub truenode_membership : MembershipAxes,
-  pub truenode_not_in_git : bool,
+  pub activeNode_existence  : ExistenceAxes,
+  pub activeNode_membership : MembershipAxes,
+  pub activeNode_not_in_git : bool,
   pub scaffold_membership : MembershipAxes,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
@@ -72,6 +72,11 @@ pub struct ViewnodeMetadata {
   // When true, this is an inactive-source placeholder: an anonymous,
   // dataless marker (see InactiveNode). It carries no id/source/etc.
   pub is_inactive_node : bool,
+  // When true, this is a PhantomDiff. It carries the same fields as a
+  // node (id/source/indef/graphStats/diff axes), parsed via
+  // parse_node_sexp, but emits and is recognized by its own root atom
+  // 'diffPhantom' rather than being inferred from the diff axes.
+  pub is_diff_phantom : bool,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -89,16 +94,17 @@ pub fn default_metadata() -> ViewnodeMetadata {
     viewStats: ViewNodeStats::default(),
     edit_request: None,
     view_requests: HashSet::new(),
-    truenode_existence  : ExistenceAxes::default(),
-    truenode_membership : MembershipAxes::default(),
-    truenode_not_in_git : false,
+    activeNode_existence  : ExistenceAxes::default(),
+    activeNode_membership : MembershipAxes::default(),
+    activeNode_not_in_git : false,
     scaffold_membership : MembershipAxes::default(),
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
     is_dead_scaffold: false,
     unknown_node_id: None,
-    is_inactive_node: false, }}
+    is_inactive_node: false,
+    is_diff_phantom: false, }}
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
@@ -177,7 +183,7 @@ pub fn viewnode_from_metadata (
           other => other . clone () };
         ( non_vognode_with_title, error, col_title_warning )
       } else {
-      // MpTruenode
+      // MpActiveNode
       { let indef_or_def : IndefOrDef =
           if metadata . indefinitive
           { IndefOrDef::Indefinitive }
@@ -198,7 +204,7 @@ pub fn viewnode_from_metadata (
           { metadata . id . clone ()
             . map ( BufferValidationError::EditRequestOnIndefinitive ) }
           else { None };
-        let t : MpTruenode = MpTruenode {
+        let t : MpActiveNode = MpActiveNode {
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
@@ -207,19 +213,21 @@ pub fn viewnode_from_metadata (
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             view_requests    : metadata . view_requests . clone (),
-            existence        : metadata . truenode_existence,
-            membership       : metadata . truenode_membership,
-            not_in_git       : metadata . truenode_not_in_git,
+            existence        : metadata . activeNode_existence,
+            membership       : metadata . activeNode_membership,
+            not_in_git       : metadata . activeNode_not_in_git,
             indef_or_def, };
         let node_kind : MpViewnodeKind =
-          if t . should_be_diffPhantom ()
+          if metadata . is_diff_phantom
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
+            // root atom 'diffPhantom' (not the diff axes) decides this, so a
+            // live node carrying e.g. removedM stays a Vognode. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping
             // indef_or_def/parentIs/etc. here loses nothing.
             MpViewnodeKind::Phantom (
               MpPhantom::Diff (
-                MpPhantomDiff::from_truenode (t) )) }
+                MpPhantomDiff::from_activeNode (t) )) }
           else
           { MpViewnodeKind::Vognode ( MpVognode::Active (t) ) };
         ( node_kind,
@@ -288,11 +296,18 @@ pub fn parse_metadata_to_viewnodemd (
         match first . as_str () {
           "node" => {
             parse_node_sexp ( &items[1..], &mut result ) ?; },
+          "diffPhantom" => {
+            // (diffPhantom ...) -- a moved/removed phantom in git-diff
+            // mode. Same field grammar as (node ...) (id/source/indef/
+            // graphStats/diff axes), but its own root atom so the client
+            // and round-trip never infer phantom-ness from the diff axes.
+            parse_node_sexp ( &items[1..], &mut result ) ?;
+            result . is_diff_phantom = true; },
           "deleted" => {
             result . is_deleted_node = true;
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
-          "unknownNode" => {
-            // (unknownNode (id X)) -- placeholder for a referenced
+          "unknown" => {
+            // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No source/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
           "inactiveNode" => {
@@ -332,7 +347,7 @@ pub fn parse_metadata_to_viewnodemd (
           "id" | "source" | "view" | "code" => {
             return Err ( format! (
               "Legacy metadata format detected (found '{}' at top level). \
-               The new format uses (skg [focused] [folded] (node ...)) for TrueNodes \
+               The new format uses (skg [focused] [folded] (node ...)) for ActiveNodes \
                and (skg [focused] [folded] scaffoldKind) for Scaffolds.",
               first )); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
@@ -442,17 +457,17 @@ fn parse_node_sexp (
               _ => return Err ( format! (
                 "Invalid birth value: {}", value )), }; },
           "staged" => {
-            apply_axis_atoms_to_truenode (
+            apply_axis_atoms_to_activeNode (
               &subitems[1..],
               true,  // staged
-              &mut metadata . truenode_existence,
-              &mut metadata . truenode_membership ) ?; },
+              &mut metadata . activeNode_existence,
+              &mut metadata . activeNode_membership ) ?; },
           "unstaged" => {
-            apply_axis_atoms_to_truenode (
+            apply_axis_atoms_to_activeNode (
               &subitems[1..],
               false, // unstaged
-              &mut metadata . truenode_existence,
-              &mut metadata . truenode_membership ) ?; },
+              &mut metadata . activeNode_existence,
+              &mut metadata . activeNode_membership ) ?; },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
@@ -464,7 +479,7 @@ fn parse_node_sexp (
           "indef" =>
             metadata . indefinitive = true,
           "notInGit" =>
-            metadata . truenode_not_in_git = true,
+            metadata . activeNode_not_in_git = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
@@ -473,8 +488,8 @@ fn parse_node_sexp (
   Ok (( )) }
 
 /// Apply a sequence of axis atoms (newX, removedX, newM, removedM) to
-/// a TrueNode's existence and membership axes for the given stage.
-fn apply_axis_atoms_to_truenode (
+/// an ActiveNode's existence and membership axes for the given stage.
+fn apply_axis_atoms_to_activeNode (
   atoms      : &[Sexp],
   is_staged  : bool,
   existence  : &mut ExistenceAxes,
@@ -517,7 +532,7 @@ fn apply_axis_atoms_to_membership_scaffold (
     *slot = Some (sign); }
   Ok (( )) }
 
-/// Parse the (unknownNode (id X)) s-expression contents.
+/// Parse the (unknown (id X)) s-expression contents.
 /// Sets metadata.unknown_node_id when an id is found.
 fn parse_unknownnode_sexp (
   items    : &[Sexp],
@@ -535,8 +550,8 @@ fn parse_unknownnode_sexp (
             metadata . unknown_node_id =
               Some ( ID::from (value)); },
           _ => { return Err ( format! (
-            "Unknown unknownNode key: {}", key )); }} },
-      _ => { return Err ( "Unexpected element in unknownNode sexp"
+            "Unknown 'unknown' key: {}", key )); }} },
+      _ => { return Err ( "Unexpected element in unknown sexp"
                            . to_string () ); }} }
   Ok (( )) }
 

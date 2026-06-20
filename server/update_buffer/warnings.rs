@@ -28,7 +28,7 @@ pub enum RepairKind {
 pub enum CompletionWarning {
   ColRepair {
     col      : PartnerCol,
-    owner    : ID, // the node the col belongs to (its TrueNode parent)
+    owner    : ID, // the node the col belongs to (its ActiveNode parent)
     repair   : RepairKind,
     children : Vec<ID>,
   },

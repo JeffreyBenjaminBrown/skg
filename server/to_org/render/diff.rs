@@ -1,10 +1,10 @@
 /// Per-node git-diff decoration for the git diff view.
-/// process_truenode_diff decorates one Active vognode and generates its
+/// process_activeNode_diff decorates one Active vognode and generates its
 /// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
 ///
-/// Each TrueNode and Scaffold is decorated with per-stage diff axes:
+/// Each ActiveNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed
 ///     between HEAD↔index (staged) or index↔worktree (unstaged).
 ///   M (membership) describes whether the node's appearance at this
@@ -13,7 +13,7 @@
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_membership_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage, removed_membership_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
@@ -30,7 +30,7 @@ use std::path::PathBuf;
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its cols then self-deaden via their own
 /// generalized-orphan check at their later visits.
-pub(crate) fn process_truenode_diff (
+pub(crate) fn process_activeNode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -41,7 +41,7 @@ pub(crate) fn process_truenode_diff (
     node_mut . id();
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
-      node_mut . tree(), tree_node_id, "process_truenode_diff"
+      node_mut . tree(), tree_node_id, "process_activeNode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
   let source_diff : &SourceDiff =
     match source_diffs . get (&source) {
@@ -120,14 +120,21 @@ pub(crate) fn process_truenode_diff (
          staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
          unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) ) {
       prepend_empty_diff_col ( &mut node_mut, QualCol::Alias ); } }
-  // Compute per-stage contains diff for the parent so we can decorate
-  // worktree children with M axes and insert phantoms.
-  let merged_contains : Vec<(ID, MembershipAxes)> =
-    axes_from_per_stage_diffs (
+  // Per-stage contains diff for the parent, split into position-specific
+  // membership axes. A REORDERED id appears in one stage as both Removed (its
+  // old slot) and New (its new slot); a single MembershipAxes keyed by id
+  // (axes_from_per_stage_diffs) collapses that pair to whichever it applies
+  // last, so the moved member's two slots cannot both be labelled. Keeping the
+  // added (Plus on New) and removed (Minus on Removed) maps apart lets the live
+  // worktree child render 'newM' at its new slot and the phantom 'removedM' at
+  // its old slot -- a git-style move that round-trips (the old slot, carrying a
+  // Minus, re-parses as a phantom, not a duplicate live vognode).
+  let added_membership_by_id : HashMap<ID, MembershipAxes> =
+    added_membership_from_per_stage_diffs (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
-    &mut node_mut, tree_node_id, &merged_contains );
+    &mut node_mut, tree_node_id, &added_membership_by_id );
   // Net HEAD->worktree contains order (an LCS of the reconstructed HEAD and
   // worktree contains lists), so each removed-member phantom lands at its
   // correct HEAD position among surviving siblings -- even when contains changed
@@ -136,10 +143,12 @@ pub(crate) fn process_truenode_diff (
     net_diff_from_per_stage (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
-  let membership_by_id : HashMap<ID, MembershipAxes> =
-    merged_contains . iter () . cloned () . collect ();
+  let removed_membership_by_id : HashMap<ID, MembershipAxes> =
+    removed_membership_from_per_stage_diffs (
+      staged_changes   . map ( |c| c . contains_diff . as_slice () ),
+      unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   insert_phantoms_for_missing_contains (
-    &mut node_mut, tree_node_id, &net_contains, &membership_by_id,
+    &mut node_mut, tree_node_id, &net_contains, &removed_membership_by_id,
     source_diff, source_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
@@ -193,14 +202,13 @@ fn prepend_empty_diff_col (
       kind        : ViewNodeKind::QualCol (kind) } ); }
 
 /// For each existing child in the worktree's contains list, copy any
-/// per-stage M-axis values from the merged contains diff.
+/// per-stage ADDITION (Plus) axes from the added-membership map, so a member
+/// added (or moved to a new slot) since HEAD renders 'newM'.
 fn mark_membership_on_existing_children (
-  node_mut       : &mut NodeMut<ViewNode>,
-  tree_node_id   : NodeId,
-  merged_contains: &[(ID, MembershipAxes)],
+  node_mut     : &mut NodeMut<ViewNode>,
+  tree_node_id : NodeId,
+  by_id        : &HashMap<ID, MembershipAxes>,
 ) {
-  let by_id : HashMap<&ID, &MembershipAxes> =
-    merged_contains . iter () . map ( |(id, m)| (id, m) ) . collect ();
   let child_ids : Vec<NodeId> = {
     let node_ref : NodeRef<ViewNode> =
       node_mut . tree() . get (tree_node_id) . unwrap();
@@ -264,12 +272,17 @@ fn insert_phantoms_for_missing_contains (
   for (id, anchor) in plan {
     let membership : MembershipAxes =
       membership_by_id . get (&id) . copied () . unwrap_or_default ();
+    // A removed-member diff-phantom is a *non-Active* viewnode. If its
+    // source can't be determined -- e.g. a contains pointer at HEAD to a
+    // node whose .skg file was deleted by an earlier commit and so exists
+    // in no source -- fall back to the NOT_FOUND sentinel rather than
+    // aborting the whole render (matching the PartnerCol removed-member
+    // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
     let child_source : SourceName =
       find_source_with_optional_tantivy (
         &id, deleted_since_head_pid_src_map,
         tantivy_index, config )
-        . ok_or_else ( || format! (
-          "find_source: no source for {}", id . 0 )) ?;
+        . unwrap_or_else ( SourceName::not_found );
     let child_existence : ExistenceAxes =
       existence_axes_for_phantom (&id, &child_source, source_diff, source_diffs);
     let child_title : String =

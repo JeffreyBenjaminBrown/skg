@@ -7,7 +7,7 @@
 
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
+use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
@@ -42,7 +42,7 @@ pub fn goal_list_for_outbound_col (
     return (worktree_list . to_vec (), HashSet::new ()); }
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
+    per_stage_node_changes_for_activeNode (
       source_diffs, owner_pid, owner_source );
   if staged_nc . is_none () && unstaged_nc . is_none () {
     return (worktree_list . to_vec (), HashSet::new ()); }
@@ -65,7 +65,7 @@ pub fn outbound_member_axes (
 ) -> HashMap<ID, MembershipAxes> {
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
+    per_stage_node_changes_for_activeNode (
       source_diffs, owner_pid, owner_source );
   axes_from_per_stage_diffs (
     staged_nc   . and_then ( |c| relation . diff_in_nodechanges (c) ),

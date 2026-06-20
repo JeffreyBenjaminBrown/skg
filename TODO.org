@@ -1,5 +1,12 @@
+* Play two roles, communicate through git.
 * s
 ** correctness
+*** Bug: skg-close-all-buffers
+is closing too much, e.g. the first (starred) buffer here:
+
+ *   skg.skg.org            43283 Org              ~/hodal/skg/skg.skg.org
+ *%  *Completions*            223 Completion List
+  %  magit: skg              7768 Magit            ~/hodal/skg/
 *** I want this todo list in Skg.
 Git review after reshaping it is hell.
 **** merge & export these notes
@@ -32,6 +39,10 @@ moved files, new roots, and other anomalies,
 and check it against the report.
 (Backgrounded.)
 ** performance
+*** faster search : first use AND between all tokens
+and return those results; then, backgrounded, update those results.
+If the user kills the search buffer before the update,
+abort the more exhaustive search.
 *** TypeDB polls too much, burns 16% of a CPU.
 claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
   in skg (not skg2, not skg3)
@@ -41,8 +52,21 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
+*** fork request
+To provide a way to fork your own data
+(because the 'edit a foreign one' gesture cannot be applied).
+*** Why is search slow?
+Try a search that was big -- backup my data.
+The view update or the ranking might swamp the other's cost.
+*** show content roots of all modified nodes
+*** a function to relabel link labels
+The label could be a special string like ":skg default label:".
+That is, the target got a better title, and you would like
+everything that uses the default title to switch to the new one.
+*** recursive git rm for removed nodes
 *** Each parentIs herald should be a different color.
 and always first
+*** C-a should alternate between title start and line start
 *** the diff report should
 **** explain the maximum badness in each category
 **** include empty top-level categories
@@ -68,6 +92,7 @@ and removes the child from the parent.
 *** return point to not just the same line but the same* char
   * or max within that line if too big)
 ** convenience to coder
+*** I want my config data to be in git.
 *** [[./TODO/better-than-regex-in-emacs-tests.org]]
 *** graphstats should precede even the link source count
 but follow parentIs and indef

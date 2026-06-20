@@ -144,14 +144,14 @@ stats form emptied by the removal is dropped, other data is kept."
            '(skg (node (id x))))))
 
 (ert-deftest test-strip-heralds-does-not-fabricate-node ()
-  "A non-TrueNode sexp (no (node ...)) is returned unchanged, so it
+  "A non-ActiveNode sexp (no (node ...)) is returned unchanged, so it
 never gains a fabricated (node ...) and never matches (skg (node))."
   (let ((stripped (skg-strip-heralds-from-sexp '(skg (id x)))))
     (should (equal stripped '(skg (id x))))
     (should-not (skg-sexp-subtree-p stripped '(skg (node))))))
 
-(ert-deftest test-strip-heralds-truenode-without-stats-unchanged ()
-  "A TrueNode lacking stats keeps exactly its fields -- no fabricated
+(ert-deftest test-strip-heralds-activeNode-without-stats-unchanged ()
+  "A ActiveNode lacking stats keeps exactly its fields -- no fabricated
 graphStats/viewStats."
   (should (equal
            (skg-strip-heralds-from-sexp '(skg (node (id x) (source y))))

@@ -1,0 +1,270 @@
+* Diff-mode render/validate round-trip bugs (research, 2026-06-17)
+Written at Jeff's request: research + proposed solutions, no fix yet
+(beyond the already-applied crash fix in render/diff.rs, discussed
+under "Status of the earlier fix" below).
+
+** Symptom
+Visiting a single-root content view at 141fe535 ("Nocaima ... pack
+list for"), enabling git diff mode, running C-c t A
+(skg-git-add-if-new-recursive), then saving to refresh, fails with:
+
+- Error 1: node 47d54e87 ("last minute") --
+"TrueNode's non-ignored content children must be unique (no two
+sharing the same ID)."
+- Error 2: node 8c24623a --
+"Phantom must have a source that exists in the config."
+
+NOTHING WAS SAVED.
+
+** One theme: the diff renderer emits a buffer its own save rejects
+A diff-mode buffer is meant to round-trip -- you save it to refresh
+the view. Both errors are the SAME class of defect: the render path
+(server -> buffer text) produces a structure that the save path
+(buffer text -> parse -> validate) then rejects. Render and validate
+have diverged. Each error is a different divergence; neither is
+caused by C-c t A (see "C-c t A is incidental").
+
+** Error 2 -- NOT_FOUND phantom rejected on save
+*** Mechanism (confirmed)
+The earlier crash fix made the diff renderer draw a dangling-at-HEAD
+contains member (8c24623a, deleted by a commit, present in no
+source) as a removed-member phantom carrying the reserved source
+sentinel SourceName::not_found() = "NOT_FOUND"
+(server/types/misc.rs:133-142). The phantom renders fine:
+
+  *** (skg (node (id 8c24623a-...) (source NOT_FOUND) indef
+            (graphStats (containers 0)) (unstaged removedM)))
+      TITLE NOT FOUND for ID 8c24623a-...
+
+On save it carries a Minus axis (unstaged removedM), so the parser
+reclassifies it as a phantom (should_be_diffPhantom; see Error 1).
+But validate_phantom (server/from_text/buffer_to_viewnodes/local.rs:427-438)
+checks the phantom's source against the config:
+p.source ... is_some_and(|s| config.sources.contains_key(s))
+"NOT_FOUND" is not a configured source, so source_valid = false and
+validate_gnode_identity_and_structure (local.rs:389-391) pushes
+"Phantom must have a source that exists in the config."
+
+*** Why this is a render/validate divergence
+SourceName::not_found exists PRECISELY so an unresolvable reference
+renders instead of aborting (its doc: "so that one unresolvable
+reference does not abort an entire render"). The render side honors
+that; validate_phantom was never taught about the sentinel. The same
+latent gap exists for the PartnerCol removed-member path
+(server/to_org/complete/partner_col/child_data.rs:90-92), which also
+emits NOT_FOUND phantoms -- saving a col buffer holding one would
+fail validate_phantom identically. So this is not unique to the
+contains path.
+
+*** Why does validate_phantom check the source at all? (investigated)
+Answer: it is INCIDENTAL, copied from the TrueNode validator, not a
+purpose-built phantom rule.
+- Provenance: the source-in-config check on phantoms predates the
+  dedup commit a2c2973c ("dedup the phantom/truenode validators"),
+  whose own message says "validate_phantom was a near-copy of
+  validate_truenode" and lists "source-in-config" as one of the four
+  checks copied across. For a TrueNode the check is load-bearing --
+  source determines the .skg file PATH, so a TrueNode with no valid
+  source cannot be written. A phantom writes nothing, so the same
+  check has no corresponding purpose; it rode along in the copy.
+- Nothing consumes a phantom's source at save (confirmed):
+  - instruction extraction excludes phantoms outright --
+    member_counts_for_partnerCol / active_child_counts_as_content
+    (server/from_text/local_instruction_collection/predicates.rs:18-36)
+    require !should_be_diffPhantom(), so a phantom emits no
+    save-instruction and its source is never used to compute a path.
+  - the inconsistency checks skip phantoms --
+    collect_instructions_rec
+    (server/from_text/buffer_to_viewnodes/validate_tree/contradictory_instructions.rs)
+    matches only MpVognode::Active, so a phantom's source never enters
+    the InconsistentSources / Multiple_Defining maps. (Bonus: this is
+    also why a phantom + a vognode sharing an ID -- the Error 1 move
+    case -- raises neither of those.)
+  - the re-rendered buffer a save returns is generated fresh from the
+    graph, not from the buffer's phantoms, so the phantom's source is
+    not read there either.
+Conclusion: dropping (or relaxing) the source check FOR PHANTOMS is
+safe; nothing downstream depends on it. As Jeff noted, if that were
+wrong the suite would show it -- and the round-trip test below would
+be the thing that shows it.
+
+*** Proposed solutions
+- (2a, recommended) Teach validate_phantom to accept the NOT_FOUND
+sentinel. A phantom "defines nothing" and is ignored at save
+(api-and-formats.md: "Phantoms define nothing: saving a buffer
+ignores them"), so its source is non-load-bearing; an unresolvable
+source is harmless. Change the phantom source check to
+"in config OR == SourceName::not_found()", or simply skip the
+source-validity check for phantoms (keep it for TrueNodes, where a
+bad source IS an error caught pre-save). This fixes the contains
+AND the col case uniformly, in one place.
+- (2b) Make the renderer skip the phantom for a dangling-at-HEAD
+member instead of drawing NOT_FOUND. Loses the "member removed
+since HEAD" signal, diverges from the col path, and leaves the col
+path's latent bug. Not recommended.
+
+** Error 1 -- a reordered contains member is drawn twice
+*** Mechanism (confirmed end to end)
+47d54e87's contains was REORDERED between HEAD and worktree. 486e988b
+("scarf") sits at index 3 in HEAD/index but index 9 in the worktree
+(it moved past 63ec2017/5de0b78a/aaa7e634/d0f6000c). It is present in
+BOTH lists -- not removed.
+
+The chain:
+1. The contains diff is an LCS (compute_interleaved_diff,
+ server/types/list.rs). An LCS cannot keep a moved item in place,
+ so it represents the move as Removed(486 @ old) + New(486 @ new)
+ in the unstaged contains diff.
+2. insert_phantoms_for_missing_contains (render/diff.rs:234-290) +
+ phantom_insertion_plan (diff.rs:153-165) emit a removed-member
+ phantom for the Removed(486) at its old position. That is a
+ SECOND copy of 486 under 47d54e87 (the first being the real
+ worktree child, created by the content reconciler from
+ content_goal_list, reconcile/content.rs:406-443).
+3. The phantom's membership axes come from membership_by_id, built
+ by axes_from_per_stage_diffs (server/types/git.rs). For 486 that
+ function sees both Removed (-> Minus) and New (-> Plus) in one
+ stage and applies them in slice order, so the New OVERWRITES the
+ Minus: 486's merged unstaged membership ends up Plus (newM), not
+ Minus.
+4. So the old-position phantom renders with (unstaged newM):
+
+   *** (skg (node (id 486e988b-...) (source decid) indef
+             (unstaged newM))) scarf            <- old slot
+   ...
+   *** (skg (node (id 486e988b-...) (source decid)
+             (unstaged newM))) scarf            <- worktree slot
+
+5. On save re-parse, a node is reclassified as a phantom only if it
+ carries a Minus axis: should_be_diffPhantom ->
+ diff_axes_require_phantom (server/types/viewnode.rs:455-466)
+ requires membership.staged/unstaged == Minus or
+ existence.unstaged == Minus. The old-position copy has only Plus
+ (newM), so it parses as an ACTIVE indefinitive vognode, NOT a
+ phantom.
+6. nonignored_children_have_distinct_ids
+ (server/from_text/buffer_to_viewnodes/local.rs:482+) counts every
+ Active child with parentIs == Affected. Now 47d54e87 has TWO such
+ children with id 486e988b -> the uniqueness check fails.
+
+The single real defect (Jeff's call, 2026-06-17): showing a moved
+member at BOTH its old slot (removed) and its new slot (added) is
+DESIRED -- a git-diff-literate user reads remove+add as a move, and
+it is otherwise hard to convey that something moved. So drawing 486
+twice is correct; the bug is only that BOTH copies came out as live
+Vognodes (one Active can't legitimately share an id with another --
+a node has one content position), instead of old=phantom + new=live.
+The cause is the axis mislabel:
+- axes_from_per_stage_diffs (server/types/git.rs) returns ONE
+  MembershipAxes per id, but a reordered id needs TWO (Minus at the
+  old slot, Plus at the new slot). It applies the slice in order, so
+  New (Plus) OVERWRITES Removed (Minus); the phantom then inherits
+  Plus (newM) and, lacking any Minus axis, re-parses as a second
+  Active member (should_be_diffPhantom needs a Minus).
+
+*** Proposed solution (matches Jeff's intent: show both)
+- Make the old-slot copy a PROPER removedM phantom. The removed-member
+  phantom must carry the REMOVAL axes (Minus in whichever stage(s) the
+  id appears as Removed), independent of any New occurrence of the same
+  id at its new slot. Concretely, do not read the conflated
+  membership_by_id for phantoms in insert_phantoms_for_missing_contains
+  (render/diff.rs); derive each phantom's axes from the per-stage
+  Removed entries (a separate removed-axes map), and keep the existing
+  Plus-only marking (mark_membership_on_existing_children) for the live
+  worktree child. Net effect: 486 shows once as removedM at its old
+  slot and once as newM at its new slot -- git-style move display --
+  and the uniqueness validator is satisfied because the old slot is now
+  a phantom (it counts only Active + Affected children; phantoms are
+  already excluded -- local.rs:482+). The genuine-removal case
+  (8c24623a: Removed only, no New) is unaffected: removal axes = Minus,
+  one phantom, no live child, exactly as today.
+- NOT chosen: suppressing the old-slot phantom for a still-present id
+  (an earlier idea). Rejected because it hides the move; Jeff wants the
+  remove+add pair visible.
+- The deeper structural note: membership axes keyed by id cannot
+  represent a reordered id (needs Minus@old AND Plus@new). The fix
+  above sidesteps this by computing phantom axes separately rather than
+  from the by-id map. A larger refactor (axes keyed by position, or a
+  distinct "moved" axis) is possible later but unneeded for the fix.
+
+*** Note: this is independent of 8c24623a and of C-c t A
+The 486e988b reorder lives in 47d54e87's unstaged diff regardless of
+whether 8c24623a exists or whether ae1f7903 was staged. ANY diff-mode
+view of a node whose contains was reordered would hit Error 1 on
+save. It was simply unreachable for THIS view before, because the
+render crashed on 8c24623a first.
+
+** C-c t A is incidental
+skg-git-add-if-new-recursive staged the new file ae1f7903.skg (it is
+now "A " in git). That splits ae1f7903 across stages (staged-new file,
+unstaged-new member of 47d54e87) but changes neither bug: Error 2 is
+about 8c24623a's source, Error 1 about 486e988b's reorder. Saving the
+diff buffer would fail with both errors with or without C-c t A. C-c
+t A was just the user's "refresh" gesture; the trigger is saving the
+diff buffer at all.
+
+** Status of the earlier fix (render/diff.rs)
+The one-line change already applied -- find_source ... ok_or_else(?)
+-> unwrap_or_else(SourceName::not_found) -- correctly stops the hard
+CRASH and lets the view render. It is still wanted. But it is only
+half the dangling-member story: drawing the NOT_FOUND phantom exposes
+Error 2 at save time. The matching half is (2a): teach the save-side
+validator about the NOT_FOUND sentinel. Together they make a
+dangling-at-HEAD member both render and round-trip. (Error 1 is
+orthogonal and needs the removed-axes phantom fix regardless.)
+
+** Suggested test (covers the whole class)
+A round-trip invariant: any buffer the server RENDERS in diff mode
+must PASS save-validation (render -> parse -> find_buffer_errors_for_saving
+yields no errors), since the user can always save to refresh. Two
+fixtures would have caught these: (i) a node whose contains lost a
+member that was deleted by a prior commit (Error 2); (ii) a node whose
+contains was reordered (Error 1). Per TODO/problems.org, existing
+git-diff-view tests lean on unstaged-only edits and never round-trip a
+rendered diff buffer back through save -- which is why both slipped
+through.
+
+** Data-repair reminder (unchanged from the earlier write-up)
+The HEAD-level dangling pointer (d40db175 -> 8c24623a) self-heals once
+the pending d40db175.skg worktree edit is committed; the worktree is
+already consistent. The reorder (Error 1) is ordinary, valid data --
+nothing to repair there; it just must not crash or block saving.
+
+* Implemented 2026-06-17
+Both fixes landed and the round-trip test was added. Full suite green
+under nextest (460 passed); the plain 'cargo test' failures in
+grouped_overrides / grouped_sources / grouped_unit are the documented
+shared-state races (each passes in isolation), not regressions.
+
+** Error 2: phantoms are no longer source-validated
+'validate_gnode_identity_and_structure'
+(server/from_text/buffer_to_viewnodes/local.rs) dropped the
+source-in-config check; 'validate_truenode' now adds it (source is
+load-bearing only for a TrueNode -- its .skg path), and
+'validate_phantom' no longer takes 'config'. A NOT_FOUND-sourced phantom
+round-trips.
+
+** Error 1: the fix is SYMMETRIC (refinement to the research above)
+The research framed Error 1 as only the OLD-slot (phantom) copy being
+mislabeled 'newM'. Implementing revealed the dual: which member git's
+LCS calls "moved" is not contractual, and the by-id axis collapse
+('axes_from_per_stage_diffs') can land on EITHER sign depending on
+whether the New or the Removed entry comes last in the stage's diff
+slice -- so the LIVE new-slot copy could equally come out unlabelled.
+Both slots now get position-specific axes (server/types/git.rs):
+- 'removed_membership_from_per_stage_diffs' (Minus on Removed) -> the
+  old-slot phantom renders 'removedM' (re-parses as a phantom, excluded
+  from the content-child uniqueness check);
+- 'added_membership_from_per_stage_diffs' (Plus on New) -> the live
+  new-slot child renders 'newM'.
+'process_truenode_diff' (server/to_org/render/diff.rs) feeds the added
+map to 'mark_membership_on_existing_children' and the removed map to
+'insert_phantoms_for_missing_contains'. A move thus shows 'removedM'
+(old) + 'newM' (new) regardless of LCS direction.
+
+** Test
+tests/git_diff_view/roundtrip/ (wired into tests/git_diff_view.rs): a
+within-parent reorder and a dangling-at-HEAD member. Each renders the
+diff, checks the move/removal is shown, then SAVES the rendered buffer
+and asserts no validation errors -- the round-trip invariant. Each
+subtest fails without its corresponding fix.

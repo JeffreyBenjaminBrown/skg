@@ -6,7 +6,7 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
+use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, viewforest_root_viewnode, default_activeNode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
@@ -26,11 +26,11 @@ fn mk_test_viewnode (
   id           : &str,
   edit_request : Option<EditRequest>,
 ) -> ViewNode {
-  let t : TrueNode = TrueNode {
+  let t : ActiveNode = ActiveNode {
     indef_or_def : IndefOrDef::Definitive {
       body         : None,
       edit_request },
-    .. default_truenode ( ID::from (id),
+    .. default_activeNode ( ID::from (id),
                           SourceName::from ("main"),
                           title . to_string() ) };
   ViewNode { focused     : false,

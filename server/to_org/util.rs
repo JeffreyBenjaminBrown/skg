@@ -4,14 +4,13 @@ use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
+use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -114,7 +113,7 @@ pub(super) fn makeIndefinitiveAndClobber (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_truenode_in_tree (
+  write_at_activeNode_in_tree (
     tree, node_id,
     |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -139,7 +138,7 @@ pub async fn complete_branch_minus_content (
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_indef_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  if truenode_in_tree_is_indefinitive ( tree, node_id )?
+  if activeNode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveViewnode (
       tree, node_id, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -168,7 +167,7 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   let pid : ID = // Will error if node is a Scaffold.
     get_id_from_treenode ( tree, node_id ) ?;
   let is_indefinitive : bool =
-    write_at_truenode_in_tree (
+    write_at_activeNode_in_tree (
       tree, node_id,
       |t| { if defMap . contains_key (&pid)
                { // It's a repeat, so make it indefinitive.
@@ -189,7 +188,7 @@ pub fn detect_and_mark_cycle_v1 (
   let is_cycle : bool = {
     let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_truenode_in_tree
+  write_at_activeNode_in_tree
     ( tree, node_id,
       |t| { t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -221,7 +220,7 @@ pub async fn stub_viewforest_from_root_ids (
     ) . await ?; }
   Ok (viewforest) }
 
-/// Mark forest-root TrueNodes as having no parent in the view.
+/// Mark forest-root ActiveNodes as having no parent in the view.
 pub fn mark_view_roots_parent_absent (
   viewforest : &mut Tree<ViewNode>,
 ) {
@@ -235,20 +234,20 @@ pub fn mark_view_roots_parent_absent (
       = vn . kind
       { t . parentIs = ParentIs::Absent; }}}
 
-/// Walk the view and correct any TrueNode whose metadata claims a
+/// Walk the view and correct any ActiveNode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
 /// Silently clears stale birth claims or flips stale membership claims
 /// to Independent;
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::ContainsParent' on child C with TrueNode parent P:
+/// - 'Birth::ContainsParent' on child C with ActiveNode parent P:
 ///   claim is "C contains P". Verified against C's 'contains'
 ///   list in the in-Rust graph.
-/// - 'Birth::LinksToParent' on child C with TrueNode parent P:
+/// - 'Birth::LinksToParent' on child C with ActiveNode parent P:
 ///   claim is "C's body/title links to P". Verified against C's
 ///   'textlinks_to' in the in-Rust graph.
-/// - 'ParentIs::Affected' on child C with INDEFINITIVE TrueNode
+/// - 'ParentIs::Affected' on child C with INDEFINITIVE ActiveNode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -258,7 +257,7 @@ pub fn mark_view_roots_parent_absent (
 /// so extra_id aliasing (typically a nodeMerge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Forest roots have no TrueNode parent and therefore
+/// Forest roots have no ActiveNode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
 /// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
@@ -277,16 +276,16 @@ pub fn validate_parentIs_relationships (
     // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
-      let child_tn : &TrueNode =
+      let child_tn : &ActiveNode =
         match & child_ref . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t)) => t,
           _ => continue };
       let parent_ref : NodeRef<ViewNode> = match child_ref . parent () {
         Some (p) => p, None => continue };
-      let parent_tn : &TrueNode =
+      let parent_tn : &ActiveNode =
         match & parent_ref . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t)) => t,
-          // A non-TrueNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
+          // A non-ActiveNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . parentIs == ParentIs::Absent {
         // The child was a root, and the user gave it a parent, so let the parent contain it.
@@ -473,66 +472,7 @@ pub fn get_id_from_treenode (
     _ => Err ( "get_id_from_treenode: caller must pass a vognode" . into() ),
   }}
 
-/// Build a node from disk and
-/// append it at 'parent_treeid' as a child.
-/// Returns the new node's ego_tree::NodeId.
-///
-/// Does *not* take its ancestors into account,
-/// and does *not* build any of its descendents.
-/// Those can be done later via 'complete_branch_minus_content',
-/// or they can all be done at once via
-/// 'build_node_branch_minus_content.
-pub async fn make_and_append_child_pair (
-  tree          : &mut Tree<ViewNode>,
-  parent_treeid : NodeId, // will parent the new node
-  child_skgid   : &ID, // how to find the new node
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-) -> Result < NodeId, // the new node
-              Box<dyn Error> > {
-  let child_viewnode : ViewNode = match
-    nodecomplete_and_viewnode_from_id (
-      config, driver, child_skgid ) . await ?
-    { Some ((_nc, v)) => v,
-      None => mk_unknown_viewnode (child_skgid . clone ()) };
-  let child_treeid : NodeId =
-    with_node_mut ( // append child
-      tree, parent_treeid,
-      ( |mut parent_mut|
-        parent_mut . append (child_viewnode) . id() ))
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (child_treeid) }
 
-pub async fn make_and_append_child_pair_with_source_set (
-  tree          : &mut Tree<ViewNode>,
-  parent_treeid : NodeId,
-  child_skgid   : &ID,
-  config        : &SkgConfig,
-  driver        : &TypeDBDriver,
-  active        : Option<&ActiveSourceSet>,
-) -> Result < (NodeId, bool), Box<dyn Error> > {
-  if let Some (active) = active {
-    if ! active . is_all () {
-      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-        HashMap::new ();
-      if let Some (source) =
-        find_source_with_optional_tantivy (
-          child_skgid, &deleted_since_head_pid_src_map, None, config )
-      {
-        if ! active . contains_source (&source) {
-          let inactive : ViewNode =
-            mk_inactive_viewnode ();
-          let child_treeid : NodeId =
-            with_node_mut (
-              tree, parent_treeid,
-              ( |mut parent_mut|
-                parent_mut . append (inactive) . id () ))
-            . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-          return Ok ((child_treeid, false)); }}}}
-  let child_treeid : NodeId =
-    make_and_append_child_pair (
-      tree, parent_treeid, child_skgid, config, driver ) . await ?;
-  Ok ((child_treeid, true)) }
 
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
@@ -603,9 +543,9 @@ pub async fn build_node_branch_minus_content (
 // Reading from NodeCompletes and ViewNodes, esp. in trees
 // ==============================================
 
-/// Check if a TrueNode is indefinitive.
+/// Check if an ActiveNode is indefinitive.
 /// Errs if given a Scaffold.
-pub fn truenode_in_tree_is_indefinitive (
+pub fn activeNode_in_tree_is_indefinitive (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {

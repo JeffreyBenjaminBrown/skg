@@ -9,7 +9,7 @@ use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
 /// Insert full containerward ancestry trees into the search viewforest,
-/// under each level-1 result TrueNode.
+/// under each level-1 result ActiveNode.
 /// Ancestry children are prepended (inserted first among siblings).
 pub(crate) fn insert_containerward_ancestries_into_search_view (
   viewforest     : &mut Tree<ViewNode>,
@@ -43,7 +43,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
             viewforest, tantivy_index, config, active ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
-/// as indefinitive non-content TrueNode children
+/// as indefinitive non-content ActiveNode children
 /// under the given parent. Ancestry nodes are prepended.
 fn insert_containerward_ancestry_tree(
   node          : &AncestryTree,
@@ -66,7 +66,7 @@ fn insert_containerward_ancestry_tree(
         viewforest, tantivy_index, config, active ); } } }
 
 /// Looks up a node's title and source from Tantivy,
-/// prepends an indefinitive independent TrueNode child
+/// prepends an indefinitive independent ActiveNode child
 /// under the given parent.
 /// Returns the new child's NodeId.
 fn prepend_containing_child_from_tantivy (

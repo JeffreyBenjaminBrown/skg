@@ -130,10 +130,6 @@ name directly."
     (when config-file
       (skg-owned-sources-from-toml config-file))))
 
-(defun skg--default-source ()
-  "Return the first owned source name from config, or nil."
-  (car (skg--owned-sources)))
-
 (defun skg-port-from-toml (file)
   "Return the integer value of `port = ...` from FILE (a TOML config)."
   (with-temp-buffer

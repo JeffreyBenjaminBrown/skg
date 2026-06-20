@@ -266,7 +266,7 @@ fn find_collateral_view_uris (
 /// creates each fresh node's PartnerCols (create_partnerCols_for_fresh_nodes
 /// = true), expands content, reconciles cols, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
-/// at its BFS visit, via process_truenode_diff) -- the same path post-save uses.
+/// at its BFS visit, via process_activeNode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
 /// stats.
 /// Returns the completed viewforest plus any warning strings the
@@ -305,7 +305,7 @@ pub async fn render_initial_view (
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via source_diffs
-  // (which drives the inline process_truenode_diff and the diff-aware QualCol /
+  // (which drives the inline process_activeNode_diff and the diff-aware QualCol /
   // PartnerCol reconcilers).
   let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
     if diff_mode { Some ( compute_diff_for_every_source (&env . config) ) }
@@ -358,7 +358,7 @@ pub async fn rerender_view (
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
-      // The real per-source diffs drive ALL diff inline: process_truenode_diff
+      // The real per-source diffs drive ALL diff inline: process_activeNode_diff
       // (content axes + phantom flip + TextChanged/IDCol/AliasCol) and the
       // diff-aware QualCol / PartnerCol reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
@@ -385,7 +385,7 @@ pub async fn rerender_view (
       complete_viewforest (
         viewforest, &mut completion_context ) . await ? }; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/scaffold diff was applied INLINE during the
-  // BFS above (process_truenode_diff at each Active node's visit, driven by
+  // BFS above (process_activeNode_diff at each Active node's visit, driven by
   // source_diffs = the real diffs).
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -401,7 +401,7 @@ pub async fn rerender_view (
 
 /// The shared post-completion tail for BOTH render paths (TODO/DONE/local-view-update/plan_v2.org §20.3): the de-novo
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
-/// post-save re-render (rerender_view, above). Given a viewforest whose TrueNode
+/// post-save re-render (rerender_view, above). Given a viewforest whose ActiveNode
 /// content + git diff have already been completed, it:
 ///   - fulfills a ViewRequest::Containerward carried by a view-ROOT (only de-novo
 ///     sets it; see render_initial_view), building that root's
@@ -472,7 +472,7 @@ pub async fn finish_viewforest (
 /// to include the rest of the subscriber's content.
 ///
 /// PITFALL: The function does not actually remember the nodeMerge history.
-/// It merely identifies each TrueNode in 'viewforest'
+/// It merely identifies each ActiveNode in 'viewforest'
 /// whose pid is an extra_id of some distinct node in the snapshot.
 fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
   viewforest : &mut Tree<ViewNode>,
@@ -584,7 +584,7 @@ fn remove_branches_that_git_marked_removed (
 
 /// Remove scaffolds that exist only to display diff information:
 /// TextChanged and IDCol.
-/// These are regenerated from scratch by 'process_truenode_diff' (the inline
+/// These are regenerated from scratch by 'process_activeNode_diff' (the inline
 /// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
 /// AliasCol is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
@@ -610,7 +610,7 @@ fn remove_diff_only_scaffolds (
       } else { Ok (true) } } ) ?;
   Ok (( )) }
 
-/// Clear diff metadata from all TrueNodes in the viewforest.
+/// Clear diff metadata from all ActiveNodes in the viewforest.
 /// Diff-only scaffolds (TextChanged, IDCol) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
 fn clear_diff_metadata (

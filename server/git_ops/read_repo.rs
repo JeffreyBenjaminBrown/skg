@@ -10,36 +10,6 @@ use std::str::from_utf8;
 
 use super::misc::{diff_delta_to_entry, path_relative_to_repo};
 
-/// Load a NodeComplete from git HEAD given its ID and source.
-pub fn nodecomplete_from_git_head (
-  pid    : &ID,
-  src    : &SourceName,
-  config : &SkgConfig,
-) -> Result<NodeComplete, Box<dyn StdError>> {
-  let source_config : &SkgfileSource =
-    config . sources . get (src)
-    . ok_or_else ( || format! ( "Source '{}' not found in config",
-                                src )) ?;
-  let source_path : &Path =
-    Path::new ( &source_config . path );
-  let repo : git2::Repository =
-    open_repo (source_path) . ok_or_else ( || format! (
-      "Could not open git repo at {:?}", source_path )) ?;
-  let file_path : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ));
-  let rel_path : PathBuf =
-    path_relative_to_repo ( &repo, &source_path . join (&file_path) )
-    . unwrap_or (file_path);
-  let content : Option<String> =
-    get_file_content_at_head ( &repo, &rel_path ) ?;
-  let content_str : String =
-    content . ok_or_else ( || format! ( "File {:?} not found at HEAD",
-                                        rel_path )) ?;
-  let node_fs : NodeFS =
-    serde_yaml::from_str (&content_str) . map_err (
-      |e| format! ( "Failed to parse NodeComplete for {}: {}",
-                    pid . 0, e )) ?;
-  Ok ( node_fs . into_complete ( src . clone ())) }
 
 /// Load a NodeComplete for a node whose worktree file is gone, preferring
 /// the index version over HEAD when both exist (since the index is

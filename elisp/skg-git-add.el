@@ -44,7 +44,7 @@ you might not want to review the command manually.)"
 
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
-The current heading and its org-descendants are scanned for TrueNode
+The current heading and its org-descendants are scanned for ActiveNode
 metadata containing `(unstaged newX)'. The generated form rechecks
 the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."
@@ -135,35 +135,33 @@ changes."
   (skg--subtree-id-and-source-pairs-if
    #'skg--metadata-has-unstaged-new-file-p))
 
-(defun skg--subtree-id-and-source-pairs ()
-  "Return a list of (id . source) for the current heading and every
-org-descendant whose headline metadata carries both an id and a
-source. Order is the natural outline order."
-  (skg--subtree-id-and-source-pairs-if
-   (lambda (_sexp) t)))
-
 (defun skg--subtree-id-and-source-pairs-if (predicate)
   "Return subtree (id . source) pairs whose metadata satisfies PREDICATE.
-Order is the natural outline order."
+Order is the natural outline order.
+Walks the subtree with `outline-next-heading' rather than
+`org-map-entries', so it never drives org's tags scanner / element
+cache (`org-element-cache-map'), which can stall on a large,
+interactively-folded content view."
   (save-excursion
     (let ((pairs '()))
       (org-back-to-heading t)
-      (org-map-entries
-       (lambda ()
-         (save-excursion
-           (beginning-of-line)
-           (let ((sexp (skg-first-sexpr-on-line)))
-             (when sexp
-               (let ((id     (skg--extract-id-from-metadata-sexp sexp))
-                     (source (skg--extract-source-from-metadata-sexp sexp)))
-                 (when (and id source
-                            (funcall predicate sexp))
-                   (push (cons id source) pairs)))))))
-       nil 'tree)
+      (let ((end (save-excursion (org-end-of-subtree t t))))
+        (beginning-of-line)
+        (cl-block done
+          (while (< (point) end)
+            (let ((sexp (skg-first-sexpr-on-line)))
+              (when sexp
+                (let ((id     (skg--extract-id-from-metadata-sexp sexp))
+                      (source (skg--extract-source-from-metadata-sexp sexp)))
+                  (when (and id source
+                             (funcall predicate sexp))
+                    (push (cons id source) pairs)))))
+            (unless (outline-next-heading)
+              (cl-return-from done)))))
       (nreverse pairs))))
 
 (defun skg--metadata-has-unstaged-new-file-p (sexp)
-  "Return t if SEXP is a TrueNode marked as a new worktree file."
+  "Return t if SEXP is an ActiveNode marked as a new worktree file."
   (memq 'newX (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
 
 (provide 'skg-git-add)

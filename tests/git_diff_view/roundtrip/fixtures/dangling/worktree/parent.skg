@@ -1,0 +1,5 @@
+pid: parent
+title: parent
+contains:
+  - a
+  - b

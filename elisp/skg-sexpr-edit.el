@@ -9,7 +9,7 @@
 (require 'skg-config)
 (require 'skg-metadata)
 (require 'skg-sexpr-org-bijection)
-(require 'skg-truenode-defaults)
+(require 'skg-activeNode-defaults)
 (require 'skg-sexpr-cycling)
 (require 'skg-state)
 
@@ -27,8 +27,8 @@
 (defvar-local skg-sexp-edit--end nil
   "End position of the sexp in the source buffer.")
 
-(defvar-local skg-sexp-edit--is-truenode nil
-  "Non-nil if the sexp being edited is a TrueNode.")
+(defvar-local skg-sexp-edit--is-activeNode nil
+  "Non-nil if the sexp being edited is an ActiveNode.")
 
 ;;
 ;; Minor mode for the edit buffer
@@ -54,8 +54,8 @@ Kill the buffer to cancel without saving."
   (let* ((org-text (buffer-substring-no-properties
                     (point-min) (point-max)))
          (final-org ;; last version of the org text in the sexp-edit buffer
-          (if skg-sexp-edit--is-truenode
-              (skg-truenode-strip-defaults-from-org org-text)
+          (if skg-sexp-edit--is-activeNode
+              (skg-activeNode-strip-defaults-from-org org-text)
             org-text))
          (new-sexp (org-to-sexp final-org))
          (new-text (prin1-to-string new-sexp))
@@ -74,7 +74,7 @@ Kill the buffer to cancel without saving."
 
 
 (defun skg-sexp-edit--open-edit-buffer (org-text source-buffer
-                                       sexp-start sexp-end is-truenode)
+                                       sexp-start sexp-end is-activeNode)
   "Open a sexp-edit buffer with ORG-TEXT from SOURCE-BUFFER.
 SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
   (let (( edit-buffer (generate-new-buffer "*skg-metadata-edit*") ))
@@ -83,7 +83,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (insert org-text)
     (skg--org-mode-with-options)
     (org-fold-show-all)
-    (when is-truenode
+    (when is-activeNode
       (skg-sexp-edit--make-title-headlines-read-only))
     (goto-char (point-min))
     (progn ;; move point
@@ -96,7 +96,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
-    (setq-local skg-sexp-edit--is-truenode is-truenode)))
+    (setq-local skg-sexp-edit--is-activeNode is-activeNode)))
 
 (defun skg-sexp-edit--make-title-headlines-read-only ()
   "Make the display-only title group read-only, if it is present."
@@ -172,18 +172,18 @@ Kill the buffer to cancel without saving."
           (skg-edit-metadata--insert-new-node-metadata)
         (let* (( source-buffer (current-buffer) )
                (sexp (read metadata-str) )
-               (is-truenode (skg-truenode-sexp-p sexp) )
+               (is-activeNode (skg-activeNode-sexp-p sexp) )
                (sexp-start (+ (line-beginning-position)
                               (length (car split))) )
                (sexp-end (+ sexp-start (length metadata-str)) )
                (title (caddr split))
                (org-text (let ((sexp-as-org (sexp-to-org sexp)))
-                           (if is-truenode
-                               (skg-truenode-expand-defaults-in-org
+                           (if is-activeNode
+                               (skg-activeNode-expand-defaults-in-org
                                 sexp-as-org nil title)
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer
-           org-text source-buffer sexp-start sexp-end is-truenode)
+           org-text source-buffer sexp-start sexp-end is-activeNode)
           (skg-sexp-edit--goto-field-value "source"))))))
 
 (provide 'skg-sexpr-edit)

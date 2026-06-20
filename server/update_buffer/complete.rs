@@ -16,15 +16,15 @@ use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::to_org::render::diff::process_truenode_diff;
-use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
+use crate::to_org::render::diff::process_activeNode_diff;
+use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol, ViewRequest, IndefOrDef};
 use crate::types::viewnode::{Vognode, Phantom, QualCol};
 use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
 use super::reconcile::partner_col::reconcile_partnerCol_children;
 use super::reconcile::subscribee_col::reconcile_subscribee_col_children;
-use super::reconcile::content::expand_true_content_at_truenode;
+use super::reconcile::content::expand_true_content_at_activeNode;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -34,10 +34,10 @@ use std::sync::Arc;
 pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
   /// The per-source git diffs (Some in diff mode, None otherwise). This is the
-  /// single diff handle: it drives the per-node process_truenode_diff (content
+  /// single diff handle: it drives the per-node process_activeNode_diff (content
   /// axes, the phantom flip, TextChanged/IDCol/AliasCol), the diff-aware QualCol
   /// reconcilers, and the PartnerCols' removed-member phantoms. The content
-  /// reconcile itself produces only the pure worktree view; process_truenode_diff
+  /// reconcile itself produces only the pure worktree view; process_activeNode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
@@ -177,7 +177,7 @@ async fn dispatch_node_update (
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
-    // process_truenode_diff at the owner's BFS visit, so their reconcilers must
+    // process_activeNode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (source_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
@@ -216,7 +216,7 @@ async fn visit_normal_node (
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand DVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
-  // expand_true_content_at_truenode); once it hits 0 every later vognode is left
+  // expand_true_content_at_activeNode); once it hits 0 every later vognode is left
   // indefinitive -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already drawn keep all their members); we only stop
   // STARTING new expansions. EXCEPTION: a view root (child of the BufferRoot) is
@@ -229,7 +229,7 @@ async fn visit_normal_node (
     // Budget spent and this is not a view root: draw it indefinitive and expand
     // nothing under it; strip any DVR so it is not treated as Final. The content
     // engine (settled) then clobbers+returns.
-    write_at_truenode_in_tree (
+    write_at_activeNode_in_tree (
       tree, treeid,
       |t| { t . view_requests . remove (& ViewRequest::Definitive);
             t . indef_or_def = IndefOrDef::Indefinitive; } )
@@ -244,7 +244,7 @@ async fn visit_normal_node (
         settled = true; }
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
-  expand_true_content_at_truenode (
+  expand_true_content_at_activeNode (
     treeid, tree, context . defmap,
     &context . env . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
@@ -256,7 +256,7 @@ async fn visit_normal_node (
   // The steps below apply only while the node is still an Active vognode:
   // content reconcile may have converted it to Deleted (a node this save
   // deleted). The flip to a Diff phantom happens at the END of this visit
-  // (process_truenode_diff, below), after content + cols + view requests.
+  // (process_activeNode_diff, below), after content + cols + view requests.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &ViewNode| matches! ( &vn . kind,
@@ -282,7 +282,7 @@ async fn visit_normal_node (
         context . source_diffs ) . await ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
-  super::reconcile::view_requests::execute_truenode_view_requests (
+  super::reconcile::view_requests::execute_activeNode_view_requests (
     treeid, tree, &context . env . config, &context . env . driver,
     context . errors, context . active_source_set ) . await ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
@@ -292,7 +292,7 @@ async fn visit_normal_node (
     context . source_diffs ) . await ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
-  // worktree Active node (content, cols, view requests), so process_truenode_diff
+  // worktree Active node (content, cols, view requests), so process_activeNode_diff
   // sees its final children. The flip to a phantom happens here; the node's cols
   // (visited later, level-order) self-deaden via their own generalized-orphan
   // check. Gated on diff mode (source_diffs = Some); both de-novo and post-save
@@ -300,7 +300,7 @@ async fn visit_normal_node (
   if let Some (real_diffs) = context . source_diffs {
     let node_mut : NodeMut<ViewNode> =
       tree . get_mut (treeid) . unwrap ();
-    process_truenode_diff (
+    process_activeNode_diff (
       node_mut, real_diffs,
       context . deleted_since_head_pid_src_map,
       context . diff_tantivy_index,

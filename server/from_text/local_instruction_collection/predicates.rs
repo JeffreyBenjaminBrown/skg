@@ -9,14 +9,14 @@
 /// error ('nonignored_children_have_distinct_ids'), and duplicate
 /// defining-col members are silently deduplicated at emission.
 
-use crate::types::viewnode::{EditRequest, ParentIs, TrueNode};
+use crate::types::viewnode::{EditRequest, ParentIs, ActiveNode};
 
 /// This returns true iff the given Active vognode counts as a
 /// member of the writeable PartnerCol (a SubscribeeCol or
 /// OverriddenCol) that is its parent. To count, it must be Affected,
 /// not a would-be diff phantom, and not marked for deletion.
 pub fn member_counts_for_partnerCol (
-  t : &TrueNode,
+  t : &ActiveNode,
 ) -> bool {
   t . parentIs == ParentIs::Affected
     && !t . should_be_diffPhantom ()
@@ -31,7 +31,7 @@ pub fn member_counts_for_partnerCol (
 /// (The caller must also know the child is in content position;
 /// that is context, not a fact about the node.)
 pub fn active_child_counts_as_content (
-  t : &TrueNode,
+  t : &ActiveNode,
 ) -> bool {
   member_counts_for_partnerCol (t) }
 
@@ -43,7 +43,7 @@ pub fn active_child_counts_as_content (
 /// has no diff-phantom condition: an Active node whose diff axes
 /// have gone negative still counts as visible here.
 pub fn active_child_counts_as_visible_content (
-  t : &TrueNode,
+  t : &ActiveNode,
 ) -> bool {
   t . parentIs == ParentIs::Affected
     && !matches!( t . edit_request (),

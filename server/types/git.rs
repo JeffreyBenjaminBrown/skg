@@ -202,14 +202,14 @@ impl GitDiffStatus {
 // Functions
 //
 
-/// Returns the (staged, unstaged) pair of NodeChanges for a TrueNode.
+/// Returns the (staged, unstaged) pair of NodeChanges for an ActiveNode.
 /// Either element may be None (that stage has no diff entry for this
 /// file, or the entry has 'node_changes: None').
 ///
 /// Consumers that need a flat HEAD→worktree view can compose both
 /// stages via 'net_diff_from_per_stage'. Consumers that need
 /// per-stage signs use 'axes_from_per_stage_diffs'.
-pub fn per_stage_node_changes_for_truenode<'a> (
+pub fn per_stage_node_changes_for_activeNode<'a> (
   source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
   source       : &SourceName,
@@ -274,13 +274,68 @@ pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
          |m, s| m . unstaged = s);
   result }
 
+/// Per-stage REMOVAL axes, keyed by id: for each id a stage's list diff marks
+/// Removed, that stage's sign is Minus. Unlike 'axes_from_per_stage_diffs',
+/// this records removals ONLY -- so a REORDERED id (Removed at its old slot and
+/// New at its new slot within one stage) still gets a Minus here, rather than
+/// having the New (Plus) overwrite it. A removed-member diff phantom takes its
+/// membership from this map, so its old slot renders 'removedM' and round-trips
+/// as a phantom; the live new-slot child takes its Plus from the mirror,
+/// 'added_membership_from_per_stage_diffs'.
+pub fn removed_membership_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
+  staged_diff   : Option<&[Diff_Item<T>]>,
+  unstaged_diff : Option<&[Diff_Item<T>]>,
+) -> HashMap<T, MembershipAxes> {
+  let mut result : HashMap<T, MembershipAxes> = HashMap::new ();
+  let apply = | result   : &mut HashMap<T, MembershipAxes>,
+                diff     : Option<&[Diff_Item<T>]>,
+                set_axis : fn(&mut MembershipAxes, Option<Sign>) | {
+    if let Some (slice) = diff {
+      for item in slice {
+        if let Diff_Item::Removed (v) = item {
+          set_axis (
+            result . entry (v . clone ())
+              . or_insert_with (MembershipAxes::default),
+            Some (Sign::Minus) ); } } } };
+  apply (&mut result, staged_diff,   |m, s| m . staged   = s);
+  apply (&mut result, unstaged_diff, |m, s| m . unstaged = s);
+  result }
+
+/// Per-stage ADDITION axes, keyed by id: for each id a stage's list diff marks
+/// New, that stage's sign is Plus. The mirror of
+/// 'removed_membership_from_per_stage_diffs', recording additions ONLY -- so a
+/// REORDERED id (New at its new slot, Removed at its old slot within one stage)
+/// still gets a Plus here, rather than having the Removed (Minus) overwrite it.
+/// Used to mark the live worktree child's membership, so a moved member's new
+/// slot renders 'newM' while its old-slot phantom takes Minus from the removed
+/// map. (Unlike 'axes_from_per_stage_diffs', which keys one MembershipAxes per
+/// id and so collapses a reorder's New+Removed to whichever it applies last.)
+pub fn added_membership_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
+  staged_diff   : Option<&[Diff_Item<T>]>,
+  unstaged_diff : Option<&[Diff_Item<T>]>,
+) -> HashMap<T, MembershipAxes> {
+  let mut result : HashMap<T, MembershipAxes> = HashMap::new ();
+  let apply = | result   : &mut HashMap<T, MembershipAxes>,
+                diff     : Option<&[Diff_Item<T>]>,
+                set_axis : fn(&mut MembershipAxes, Option<Sign>) | {
+    if let Some (slice) = diff {
+      for item in slice {
+        if let Diff_Item::New (v) = item {
+          set_axis (
+            result . entry (v . clone ())
+              . or_insert_with (MembershipAxes::default),
+            Some (Sign::Plus) ); } } } };
+  apply (&mut result, staged_diff,   |m, s| m . staged   = s);
+  apply (&mut result, unstaged_diff, |m, s| m . unstaged = s);
+  result }
+
 /// Per-stage file-level ExistenceAxes for a node, derived from
 /// 'SourceDiff's staged / unstaged maps. Each stage's sign comes
 /// from the file's git status in that stage (Added → Plus,
 /// Deleted → Minus, Modified / absent → None).
 ///
 /// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
-/// TrueNode's own existence axes and for phantoms of a removed parent's
+/// ActiveNode's own existence axes and for phantoms of a removed parent's
 /// children).
 pub fn file_existence_axes_from_source_diff (
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,

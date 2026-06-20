@@ -16,6 +16,12 @@
 (require 'cl-lib)
 (require 'skg-sexpr-search)
 
+;; Defined in skg-request-herald-rules.el, which requires THIS file, so
+;; we cannot require it back (circular). `heralds--ensure-rules' reaches
+;; it through `fboundp' instead; this declaration is just for the
+;; byte-compiler.
+(declare-function skg-herald-rules-ensure "skg-request-herald-rules" ())
+
 (defvar heralds--transform-rules nil
   "Rules for lensing `(skg ...)` metadata into a line of herald tokens.
 
@@ -32,9 +38,11 @@ under the session.) Tests inject a table directly via
 batch-mode tests need no server.
 
 While this is nil (fetch failed, or not yet connected), enabling
-`heralds-minor-mode' disables itself with a one-line message; there
-is deliberately no vendored fallback table, which would re-create
-the two-homes problem the Rust move ended.
+`heralds-minor-mode' first tries to self-heal -- re-fetching the
+table via `skg-herald-rules-ensure' (bounded retries, then give up)
+-- and only disables itself, with an informative message, if that
+fails. There is deliberately no vendored fallback table, which
+would re-create the two-homes problem the Rust move ended.
 
 The table is interpreted by the generic engine in skg-lens.el
 \(`skg-transform-sexp-flat'), whose full semantics for colour
@@ -120,6 +128,36 @@ tokens and per-segment-colored INTERC tokens."
     ((eq color-keyword 'ORANGE) 'heralds-orange-face)
     (t nil)))
 
+(defun heralds--ensure-rules ()
+  "Return non-nil when the herald rule table is available for display.
+The table is session state fetched from the skg server (it lives only
+in Rust; see `heralds--transform-rules'). When it is missing -- the
+connect-time fetch was dropped, or a botched reload wiped it -- try to
+self-heal by re-fetching via `skg-herald-rules-ensure', which retries a
+bounded number of times and then gives up rather than spin.
+
+On failure show an informative message and return nil, so the caller
+disables heralds cleanly. Never signals."
+  (cond
+   (heralds--transform-rules t)
+   ((not (fboundp 'skg-herald-rules-ensure))
+    ;; The fetcher lives in skg-request-herald-rules, loaded with the
+    ;; rest of the client; without it we have no way to recover.
+    (message "Heralds disabled: not connected to the skg server, \
+so no herald rule table is available.")
+    nil)
+   (t
+    (condition-case err
+        (or (skg-herald-rules-ensure)
+            (progn
+              (message "Heralds disabled: the skg server sent no herald \
+rule table after repeated attempts.")
+              nil))
+      (error
+       (message "Heralds disabled: could not fetch the herald rule table: %s"
+                (error-message-string err))
+       nil)))))
+
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
   "Display skg metadata as a short list of \"herald\" markers.
@@ -129,11 +167,11 @@ coloured tokens that summarise view and code information. Every
 piece of display logic lives in `heralds--transform-rules'."
   :lighter " ⟪Y⟫"
   (if heralds-minor-mode
-      (if (null heralds--transform-rules)
-          (progn ;; No rule table (server fetch failed or never ran):
-                 ;; heralds cannot display, so stay off.
-            (message "Heralds disabled: no herald rule table from the server.")
-            (setq heralds-minor-mode nil))
+      (if (not (heralds--ensure-rules))
+          ;; No rule table, and self-heal could not get one: heralds
+          ;; cannot display, so stay off. `heralds--ensure-rules' has
+          ;; already shown an informative message explaining why.
+          (setq heralds-minor-mode nil)
         (heralds-apply-to-buffer)
         (add-hook ;; When a user edits some lines, redisplay heralds only for those lines.
          'after-change-functions
@@ -238,7 +276,7 @@ Returns nil if parsing fails. Normalisation currently means: if
 the sexp is an (skg (node ...)) form whose node has no explicit
 (parentIs ...) sub-form, insert (parentIs container) -- the server
 leaves 'affected' membership implicit
-(see `true_node_metadata_to_string' in org_to_text.rs),
+(see `activeNode_metadata_to_string' in org_to_text.rs),
 but the herald rules use this internal marker to preserve the ordinary
 content herald."
   (let ((parsed (condition-case nil

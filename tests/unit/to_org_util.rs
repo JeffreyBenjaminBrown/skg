@@ -46,7 +46,7 @@ fn parentIs_if_normal (
 ) -> ParentIs {
   match & viewforest . get (nid) . unwrap () . value () . kind {
     ViewNodeKind::Vognode (Vognode::Active (t)) => t . parentIs,
-    _ => panic! ("expected TrueNode") } }
+    _ => panic! ("expected ActiveNode") } }
 
 fn birth_if_normal (
   viewforest : &Tree<ViewNode>,
@@ -54,7 +54,7 @@ fn birth_if_normal (
 ) -> Birth {
   match & viewforest . get (nid) . unwrap () . value () . kind {
     ViewNodeKind::Vognode (Vognode::Active (t)) => t . birth,
-    _ => panic! ("expected TrueNode") } }
+    _ => panic! ("expected ActiveNode") } }
 
 #[test]
 fn linksto_false_claim_flipped_to_independent () {

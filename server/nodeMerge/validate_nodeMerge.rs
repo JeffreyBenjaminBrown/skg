@@ -1,5 +1,5 @@
 /// Validation rules:
-///   - Both merge partners must be TrueNodes with IDs.
+///   - Both merge partners must be ActiveNodes with IDs.
 ///     - Those two IDs must represent distinct nodes.
 ///     - Those two IDs must already be in the DB.
 ///   - Neither merge partner can be marked for deletion.
@@ -8,7 +8,7 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::viewnode::EditRequest;
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
@@ -35,7 +35,7 @@ pub async fn validate_nodeMerge_requests(
   let nodeMerge_validation_data : NodeMergeValidationData =
     collect_nodeMerge_validation_data (viewforest);
   for node in nodeMerge_validation_data . acquirer_viewnodes {
-    let t : &MpTruenode = match &node . kind {
+    let t : &MpActiveNode = match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) => t,
       _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
                                      node . kind));

@@ -9,7 +9,7 @@
 
 (defun skg-delete (&optional recursive)
   "Mark the headline at point for deletion.
-With a prefix argument RECURSIVE, also mark every truenode
+With a prefix argument RECURSIVE, also mark every activeNode
 org-descendent (equivalent to `skg-delete-recursive').
 Edits the metadata to include `delete` in the `editRequest` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
@@ -21,8 +21,8 @@ Does NOT save; call `skg-request-save-buffer' afterward."
     (message "This change will only be applied when you save the buffer.")))
 
 (defun skg-delete-recursive ()
-  "Mark the headline at point, and every truenode org-descendent of it,
-for deletion. Descendent headlines that are not truenodes (phantoms,
+  "Mark the headline at point, and every activeNode org-descendent of it,
+for deletion. Descendent headlines that are not activeNodes (phantoms,
 aliascol, id-col, etc.) are skipped. Does NOT save;
 call `skg-request-save-buffer' afterward."
   (interactive)
@@ -103,7 +103,7 @@ If there is no active region, do nothing."
     (read metadata-str)))
 
 (defun skg--current-node-source ()
-  "Return the source string for the TrueNode headline at point."
+  "Return the source string for the ActiveNode headline at point."
   (let* ((sexp (skg--current-headline-metadata-sexp))
          (source-values (skg-sexp-cdr-at-path sexp '(skg node source))))
     (unless source-values
@@ -203,7 +203,7 @@ only descendents for which parentIs=affected are traversed."
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
         (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-          (if (not (and (skg--truenode-sexp-p metadata-sexp)
+          (if (not (and (skg--activeNode-sexp-p metadata-sexp)
                         (skg--node-parentIs-content-of-p metadata-sexp)))
               (skg--goto-next-heading-after-subtree)
             (when (equal (skg--node-source metadata-sexp) old-source)
@@ -231,8 +231,8 @@ only descendents for which parentIs=affected are traversed."
                  (not (string-empty-p metadata-str)))
         (read metadata-str)))))
 
-(defun skg--truenode-sexp-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP describes a TrueNode."
+(defun skg--activeNode-sexp-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP describes an ActiveNode."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
 
@@ -258,7 +258,7 @@ only descendents for which parentIs=affected are traversed."
       (format "%s" (car id-values)))))
 
 (defun skg--node-indefinitive-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has the bare TrueNode indef marker."
+  "Return non-nil if METADATA-SEXP has the bare ActiveNode indef marker."
   (skg-sexp-subtree-p metadata-sexp '(skg (node indef))))
 
 (defun skg--change-source-at-point (new-source)

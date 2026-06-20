@@ -10,21 +10,21 @@ use skg::from_text::local_instruction_collection::predicates::{
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::viewnode::{
-  default_truenode, EditRequest, IndefOrDef, ParentIs,
-  TrueNode };
+  default_activeNode, EditRequest, IndefOrDef, ParentIs,
+  ActiveNode };
 
-fn base_truenode (
-) -> TrueNode {
-  default_truenode (
+fn base_activeNode (
+) -> ActiveNode {
+  default_activeNode (
     ID::from ("n"),
     SourceName::from ("main"),
     "n" . to_string() ) }
 
 fn with_edit_request (
   edit_request : EditRequest,
-) -> TrueNode {
-  let mut t : TrueNode =
-    base_truenode ();
+) -> ActiveNode {
+  let mut t : ActiveNode =
+    base_activeNode ();
   t . indef_or_def = IndefOrDef::Definitive {
     body         : None,
     edit_request : Some (edit_request) };
@@ -33,25 +33,25 @@ fn with_edit_request (
 #[test]
 fn relation_collection_membership_conditions () {
   assert!( member_counts_for_partnerCol (
-    &base_truenode () ));
+    &base_activeNode () ));
   { // parentIs != Affected excludes.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . parentIs = ParentIs::Independent;
     assert!( ! member_counts_for_partnerCol (&t) ); }
   { // A negative staged membership axis (would-be diff phantom) excludes.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . membership . staged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerCol (&t) ); }
   { // A negative unstaged membership axis excludes.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . membership . unstaged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerCol (&t) ); }
   { // A negative unstaged existence axis (file deleted) excludes.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . existence . unstaged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerCol (&t) ); }
   { // A positive axis does not exclude.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . membership . unstaged = Some (Sign::Plus);
     assert!( member_counts_for_partnerCol (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
@@ -64,18 +64,18 @@ fn relation_collection_membership_conditions () {
 fn content_membership_coincides_with_relation_collection_membership () {
   // The two predicates encode one condition today; if they ever
   // diverge, this test should be split per condition.
-  let cases : Vec<TrueNode> = {
-    let mut cases : Vec<TrueNode> =
-      vec![ base_truenode (),
+  let cases : Vec<ActiveNode> = {
+    let mut cases : Vec<ActiveNode> =
+      vec![ base_activeNode (),
             with_edit_request (EditRequest::Delete),
             with_edit_request (EditRequest::NodeMerge (ID::from ("other"))) ];
-    { let mut t : TrueNode = base_truenode ();
+    { let mut t : ActiveNode = base_activeNode ();
       t . parentIs = ParentIs::Independent;
       cases . push (t); }
-    { let mut t : TrueNode = base_truenode ();
+    { let mut t : ActiveNode = base_activeNode ();
       t . membership . unstaged = Some (Sign::Minus);
       cases . push (t); }
-    { let mut t : TrueNode = base_truenode ();
+    { let mut t : ActiveNode = base_activeNode ();
       t . existence . unstaged = Some (Sign::Minus);
       cases . push (t); }
     cases };
@@ -86,9 +86,9 @@ fn content_membership_coincides_with_relation_collection_membership () {
 #[test]
 fn visible_content_membership_conditions () {
   assert!( active_child_counts_as_visible_content (
-    &base_truenode () ));
+    &base_activeNode () ));
   { // parentIs != Affected excludes.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . parentIs = ParentIs::Independent;
     assert!( ! active_child_counts_as_visible_content (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
@@ -99,7 +99,7 @@ fn visible_content_membership_conditions () {
   { // This pins an asymmetry: negative diff axes do NOT exclude
     // here, unlike in the contains and PartnerCol
     // predicates.
-    let mut t : TrueNode = base_truenode ();
+    let mut t : ActiveNode = base_activeNode ();
     t . membership . staged   = Some (Sign::Minus);
     t . membership . unstaged = Some (Sign::Minus);
     t . existence  . unstaged = Some (Sign::Minus);

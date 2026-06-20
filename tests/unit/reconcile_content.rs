@@ -1,4 +1,4 @@
-use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff, SourceDiff, per_stage_node_changes_for_truenode};
+use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff, SourceDiff, per_stage_node_changes_for_activeNode};
 
 use super::*;
 use std::path::PathBuf;
@@ -42,7 +42,7 @@ fn text_changed_both (
   pid   : &ID,
   src   : &SourceName,
 ) -> (bool, bool) {
-  let (s, u) = per_stage_node_changes_for_truenode (diffs, pid, src);
+  let (s, u) = per_stage_node_changes_for_activeNode (diffs, pid, src);
   ( s . map ( |n| n . text_changed ) . unwrap_or (false),
     u . map ( |n| n . text_changed ) . unwrap_or (false) )
 }

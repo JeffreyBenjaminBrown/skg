@@ -26,17 +26,6 @@ use std::pin::Pin;
 use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
-pub async fn build_and_integrate_containerward_view_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
-
-  node_id       : NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_containerward_view_then_drop_request_with_source_set (
-    tree, node_id, config, typedb_driver, errors, None ) . await
-}
 
 pub async fn build_and_integrate_containerward_view_then_drop_request_with_source_set (
   tree          : &mut Tree<ViewNode>,
@@ -83,16 +72,6 @@ pub async fn build_and_integrate_containerward_path_with_source_set (
   ) . await ?;
   Ok (( )) }
 
-pub async fn build_and_integrate_sourceward_view_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
-  node_id       : NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  errors        : &mut Vec < String >,
-) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_sourceward_view_then_drop_request_with_source_set (
-    tree, node_id, config, typedb_driver, errors, None ) . await
-}
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request_with_source_set (
   tree          : &mut Tree<ViewNode>,
@@ -367,11 +346,11 @@ async fn attach_containerward_ancestries_to_link_sources (
   attach_containerward_ancestries_at_nodeids_with_source_set (
     tree, &links_to_nodeids, config, driver, active ) . await }
 
-/// For each NodeId, look up its TrueNode pid in the tree, fetch
+/// For each NodeId, look up its ActiveNode pid in the tree, fetch
 /// every such pid's containerward ancestry from the graph (in
 /// parallel via `ancestry_by_id_from_ids_async`), and prepend any
 /// `Inner`-shaped ancestry under that NodeId as indefinitive
-/// `Birth::ContainsParent` children. NodeIds that aren't TrueNodes,
+/// `Birth::ContainsParent` children. NodeIds that aren't ActiveNodes,
 /// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
 pub async fn attach_containerward_ancestries_at_nodeids (

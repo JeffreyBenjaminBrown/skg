@@ -98,7 +98,7 @@ pub async fn find_buffer_errors_for_saving (
 /// Edits to an idCol's membership abort the save (decision from
 /// vision.org, via metaplan_2.org and
 /// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
-/// idCol whose parent is a TrueNode with an ID, the multiset of ID
+/// idCol whose parent is an ActiveNode with an ID, the multiset of ID
 /// scaffolds beneath it must equal the owner's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
 /// anyway); adding, deleting or text-editing an ID scaffold fails,
@@ -107,7 +107,7 @@ pub async fn find_buffer_errors_for_saving (
 /// it net-removed is git history, not a membership claim, and is
 /// excluded before comparing. An absent idCol means no opinion, as
 /// for other cols. Shapes that other validations reject (an idCol
-/// without a TrueNode parent, a parent without an ID) are skipped
+/// without an ActiveNode parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
 async fn idCol_membership_errors (
@@ -211,13 +211,13 @@ fn validate_view_roots (
         | MpViewnodeKind::Phantom (MpPhantom::Deleted (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be TrueNodes, inactive placeholders or deleted nodes."
+          "View roots must be ActiveNodes, inactive placeholders or deleted nodes."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
 /// - The node is indefinitive.
-/// - It has no content children (TrueNode children with parentIs ==
+/// - It has no content children (ActiveNode children with parentIs ==
 ///   Container). Non-content children — containerward ancestry stubs,
 ///   link sources, scaffolds, etc. — don't block expansion:
 ///   they won't be clobbered by it.

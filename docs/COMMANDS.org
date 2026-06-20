@@ -16,8 +16,8 @@ Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
-Same as skg-delete, but also marks every truenode org-descendent
-of the node at point. Descendent headlines that are not truenodes
+Same as skg-delete, but also marks every activeNode org-descendent
+of the node at point. Descendent headlines that are not activeNodes
 (phantoms, aliascol, id-col, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
@@ -326,11 +326,11 @@ ID, the command warns that the old node might become an orphan.
 
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
-org-descendents. Its org-parent must be a definitive truenode
+org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive truenode for the link target. The parent is
+indefinitive activeNode for the link target. The parent is
 definitive, so saving records the target as content of the
 parent; the replacement child is indefinitive, so its own text is
 not rewritten from the link label.
@@ -341,8 +341,8 @@ be there, then save the buffer.
 Point can be on the headline or in the node body.
 The command uses the headline either way.
 
-The node being replaced must be an existing truenode with an ID,
-and an org-child of a definitive truenode whose source is
+The node being replaced must be an existing activeNode with an ID,
+and an org-child of a definitive activeNode whose source is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its org-descendents,

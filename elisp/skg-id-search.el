@@ -269,7 +269,7 @@ Prompts for the link label, defaulting to the title."
     "*"))
 
 (defun skg--insert-node-from-entry (entry)
-  "Insert an indefinitive TrueNode headline from ENTRY, an (id title) pair.
+  "Insert an indefinitive ActiveNode headline from ENTRY, an (id title) pair.
 If point is already after headline stars at the start of a line,
 insert only the metadata and title.  Otherwise insert a full same-level
 headline."
@@ -306,7 +306,7 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-paste-node ()
-  "Insert an indefinitive TrueNode headline from the top of `skg-id-stack'.
+  "Insert an indefinitive ActiveNode headline from the top of `skg-id-stack'.
 Does not modify the stack.  The inserted metadata contains the node ID
 and `indef`; the headline title comes from the stack entry."
   (interactive)
@@ -332,7 +332,7 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-pop-node ()
-  "Pop the top of `skg-id-stack' and insert an indefinitive TrueNode headline.
+  "Pop the top of `skg-id-stack' and insert an indefinitive ActiveNode headline.
 The inserted metadata contains the node ID and `indef`; the headline
 title comes from the stack entry."
   (interactive)
@@ -366,41 +366,34 @@ title comes from the stack entry."
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
-  "Return t if SEXP contains an id under the TrueNode shape
-(skg (node (id ...))) or the Deleted-phantom shape
+  "Return t if SEXP contains an id under the ActiveNode shape
+(skg (node (id ...))), the diff-phantom shape
+(skg (diffPhantom (id ...))), or the Deleted-phantom shape
 (skg (deleted (id ...)))."
-  (or (skg-sexp-subtree-p sexp '(skg (node    (id))))
-      (skg-sexp-subtree-p sexp '(skg (deleted (id))))))
+  (or (skg-sexp-subtree-p sexp '(skg (node        (id))))
+      (skg-sexp-subtree-p sexp '(skg (diffPhantom (id))))
+      (skg-sexp-subtree-p sexp '(skg (deleted     (id))))))
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
-  "Extract the id value from SEXP. Accepts either the TrueNode shape
-(skg (node (id X) ...)) or the Deleted-phantom shape
+  "Extract the id value from SEXP. Accepts the ActiveNode shape
+(skg (node (id X) ...)), the diff-phantom shape
+(skg (diffPhantom (id X) ...)), or the Deleted-phantom shape
 (skg (deleted (id X) ...)). Returns the id as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    id)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted id))))))
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     id))))))
     (when val (format "%s" val))))
 
 (defun skg--extract-source-from-metadata-sexp (sexp)
-  "Extract the source value from SEXP. Accepts either the TrueNode shape
-(skg (node (source X) ...)) or the Deleted-phantom shape
+  "Extract the source value from SEXP. Accepts the ActiveNode shape
+(skg (node (source X) ...)), the diff-phantom shape
+(skg (diffPhantom (source X) ...)), or the Deleted-phantom shape
 (skg (deleted (source X) ...)). Returns the source as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    source)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted source))))))
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        source)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg diffPhantom source)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     source))))))
     (when val (format "%s" val))))
-
-(defun skg--metadata-is-removed-here-phantom-p (sexp)
-  "Return t if SEXP describes a 'removed-here' phantom: a node whose
-membership was removed in some stage but whose file existence is
-unchanged. SEXP is shaped like (skg (node ... (staged ATOMS) (unstaged ATOMS))).
-A removed-here phantom has at least one removedM atom under a stage
-form, and no removedX/newX atoms."
-  (let ((staged-atoms   (skg-sexp-cdr-at-path sexp '(skg node staged)))
-        (unstaged-atoms (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
-    (let ((all-atoms (append staged-atoms unstaged-atoms)))
-      (and (memq 'removedM all-atoms)
-           (not (memq 'newX     all-atoms))
-           (not (memq 'removedX all-atoms))))))
 
 (defun skg--point-in-link-p ()
   "If point is within a link, return (id . label). Otherwise nil."
@@ -460,13 +453,6 @@ e.g. \"557a869b-02ba-4c59-a5d3-5fb469a12353.skg\" or \"a.skg\"."
           (setq result (cons (match-string-no-properties 1)
                              (match-string-no-properties 0) )) )) )
     result ))
-
-(defun skg--truncate-id
-    (id)
-  "Return first 6 characters of ID followed by ellipsis."
-  (if (> (length id) 6)
-      (concat (substring id 0 6) "...")
-    id ))
 
 (defun skg-replace-id-stack-from-buffer ()
   "Replace `skg-id-stack' with contents parsed from current buffer.

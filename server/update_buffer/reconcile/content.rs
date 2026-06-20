@@ -19,7 +19,7 @@ use crate::types::viewnode::{Vognode, Phantom, PartnerCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
-    write_at_truenode_in_tree};
+    write_at_activeNode_in_tree};
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
@@ -50,7 +50,7 @@ struct ChildData {
   drawn_id : Option<ID>,
 }
 
-/// TrueNode content reconcile + content-child creation, for one node, in the
+/// ActiveNode content reconcile + content-child creation, for one node, in the
 /// TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS visit. View completion (dispatch_node_update)
 /// settles the node's
 /// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
@@ -64,7 +64,7 @@ struct ChildData {
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new ViewNodes; content-child
 ///   creation is capped against it.
-pub fn expand_true_content_at_truenode (
+pub fn expand_true_content_at_activeNode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   defmap             : &mut DefinitiveMap,
@@ -85,7 +85,7 @@ pub fn expand_true_content_at_truenode (
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Active (_))),
-    "expand_true_content_at_truenode: expected Active vognode" ) ?;
+    "expand_true_content_at_activeNode: expected Active vognode" ) ?;
   if ! settled {
     // A DVR node was already resolved by apply_definitive_draw_rule; running
     // the dedup here would indefinitize it against its own (just-inserted)
@@ -94,9 +94,9 @@ pub fn expand_true_content_at_truenode (
       tree, node, defmap ) ?; }
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
-                                  "expand_true_content_at_truenode" ) ?;
+                                  "expand_true_content_at_activeNode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
-  // (axes, phantom flip, diff scaffolds) is applied by process_truenode_diff at
+  // (axes, phantom flip, diff scaffolds) is applied by process_activeNode_diff at
   // the end of the node's BFS visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3).
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
@@ -108,7 +108,7 @@ pub fn expand_true_content_at_truenode (
       clobberIndefinitiveViewnode( tree, node, config ) ?;
       return Ok (( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
-    mutate_truenode_to_deletednode (
+    mutate_activeNode_to_deletednode (
       tree, node, &pid, &initial_source ) ?;
     return Ok (( )); }
   // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is definitive and about to expand -- draw its whole
@@ -125,7 +125,7 @@ pub fn expand_true_content_at_truenode (
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
-  sync_truenode_from_disk (tree, node, &nodecomplete) ?;
+  sync_activeNode_from_disk (tree, node, &nodecomplete) ?;
   reconcile_content_children (
     tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
@@ -157,7 +157,7 @@ fn attach_cascade_dvrs_to_affected_content (
     . map ( |c| c . id () )
     . collect ();
   for cid in child_ids {
-    write_at_truenode_in_tree (
+    write_at_activeNode_in_tree (
       tree, cid,
       |t| { t . view_requests . insert ( ViewRequest::Definitive ); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
@@ -168,7 +168,7 @@ fn clear_edit_request (
   tree : &mut Tree<ViewNode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  write_at_truenode_in_tree (
+  write_at_activeNode_in_tree (
     tree, node,
     |t| { if let IndefOrDef::Definitive { edit_request, .. }
           = &mut t . indef_or_def
@@ -179,7 +179,7 @@ fn clear_edit_request (
 /// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every definitive node re-syncs, saved and collateral
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
-fn sync_truenode_from_disk (
+fn sync_activeNode_from_disk (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
   nodecomplete : &NodeComplete,
@@ -187,7 +187,7 @@ fn sync_truenode_from_disk (
   let disk_title : String = nodecomplete . title . clone ();
   let disk_body  : Option<String> = nodecomplete . body . clone ();
   let disk_source : SourceName = nodecomplete . source . clone ();
-  write_at_truenode_in_tree (
+  write_at_activeNode_in_tree (
     tree, node,
     |t| { t . title = disk_title;
           t . source = disk_source;
@@ -243,7 +243,7 @@ fn reconcile_content_children (
                  . map ( |(_pid, src)| src )
                  . or_else ( || source_from_disk (id, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
-  // budget is spent once per expanding vognode (in expand_true_content_at_truenode),
+  // budget is spent once per expanding vognode (in expand_true_content_at_activeNode),
   // not per child, so a node either fully expands or is left indefinitive; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
@@ -295,7 +295,7 @@ fn convert_nonmember_unknown_children_to_dead (
     |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
-fn mutate_truenode_to_deletednode (
+fn mutate_activeNode_to_deletednode (
   tree   : &mut Tree<ViewNode>,
   node   : NodeId,
   pid    : &ID,
@@ -400,7 +400,7 @@ fn is_subscribee (
 /// contains subtraction it would double-show, once as integrated content and
 /// once as unintegrated; forks plan.org Prerequisite / discussion.org Option B).
 /// The git-diff decorations (removed-member phantoms, membership axes) are NOT
-/// computed here: they are applied per node by process_truenode_diff at its BFS
+/// computed here: they are applied per node by process_activeNode_diff at its BFS
 /// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
 /// worktree view.
 fn content_goal_list (
@@ -442,7 +442,7 @@ fn content_goal_list (
            &subscriber_contains ) )
   } }
 
-/// Reconcile the node's non-parentIgnored TrueNode children
+/// Reconcile the node's non-parentIgnored ActiveNode children
 /// against the goal list (content IDs, possibly interleaved with
 /// phantom IDs in diff view). Missing children are created as
 /// indefinitive ViewNodes or phantom ViewNodes as appropriate.
@@ -563,8 +563,8 @@ fn mark_erroneous_content_children_as_indep (
 
 /// Reorder children into three groups:
 /// - scaffolds first
-/// - parentIgnored TrueNodes
-/// - non-ignored TrueNodes last
+/// - parentIgnored ActiveNodes
+/// - non-ignored ActiveNodes last
 /// Preserves relative order within each group.
 fn order_children_as_scaffolds_then_ignored_then_content (
   tree    : &mut Tree<ViewNode>,

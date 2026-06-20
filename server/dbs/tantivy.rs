@@ -24,7 +24,7 @@ use tantivy::schema::document::Value;
 use tantivy::query::Query;
 use tantivy::collector::TopDocs;
 use tantivy::schema;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
@@ -192,28 +192,6 @@ pub fn titles_by_ids (
     { result . insert ( id . clone (), t ); } }
   result }
 
-/// Return the subset of the input for which 'had_id' is true.
-pub fn subset_with_hadid (
-  tantivy_index : &TantivyIndex,
-  ids           : &HashSet<ID>,
-) -> HashSet<ID> {
-  let searcher : Searcher = tantivy_index . reader . searcher ();
-  let mut result : HashSet<ID> = HashSet::new ();
-  for id in ids {
-    let doc_addresses : Vec<tantivy::DocAddress> =
-      match doc_addresses_for_id (
-        tantivy_index, &searcher, id, 1 )
-      { Some (a) => a,
-        None     => continue };
-    let Some (addr) = doc_addresses . first ()
-      else { continue };
-    let doc : TantivyDocument =
-      match load_doc_or_warn ( &searcher, *addr, id ) {
-        Some (d) => d,
-        None     => continue };
-    if bool_field_eq_true ( &doc, tantivy_index . had_id_field ) {
-      result . insert ( id . clone () ); } }
-  result }
 
 /// Run an exact-match TermQuery against the id_field, returning
 /// the matching doc addresses (scores discarded). None on any

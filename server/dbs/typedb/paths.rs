@@ -148,21 +148,6 @@ pub async fn path_containerward_to_first_nonlinearity (
     "container"
   ) . await }
 
-/// See path_to_first_nonlinearity.
-/// This is the case that searches containerward.
-pub async fn path_sourceward_to_first_nonlinearity (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  node    : &ID
-) -> Result < PathToFirstNonlinearity, Box<dyn Error> > {
-  path_to_first_nonlinearity (
-    db_name,
-    driver,
-    node,
-    "textlinks_to",
-    "dest",
-    "source"
-  ) . await }
 
 pub async fn paths_to_first_nonlinearities (
   db_name     : &str,

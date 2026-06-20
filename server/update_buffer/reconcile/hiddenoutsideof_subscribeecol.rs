@@ -26,12 +26,12 @@ struct HiddenOutsideContext {
 /// HiddenOutsideOfSubscribeeCol completion (called at this col's own BFS visit).
 ///
 /// Tree structure:
-///   Subscriber (TrueNode)                       <- ancestor 2
+///   Subscriber (ActiveNode)                       <- ancestor 2
 ///     └─ SubscribeeCol (Scaffold)               <- ancestor 1 = parent
-///          ├─ Subscribee_A (TrueNode)           <- sibling
-///          ├─ Subscribee_B (TrueNode)           <- sibling
+///          ├─ Subscribee_A (ActiveNode)           <- sibling
+///          ├─ Subscribee_B (ActiveNode)           <- sibling
 ///          └─ HiddenOutsideOfSubscribeeCol      <- self
-///               └─ [hidden TrueNode children]
+///               └─ [hidden ActiveNode children]
 ///
 /// Collects nodes that the subscriber hides from its subscriptions
 /// but that are NOT top-level content of any subscribee.

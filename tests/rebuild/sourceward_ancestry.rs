@@ -39,7 +39,7 @@ use ego_tree::{NodeId, Tree};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Collect (pid, parentIs) pairs for all TrueNode children of a node.
+/// Collect (pid, parentIs) pairs for all ActiveNode children of a node.
 fn children_info (
   tree : &Tree<ViewNode>,
   node_id : NodeId,
@@ -53,7 +53,7 @@ fn children_info (
       } else { None } } )
     . collect () }
 
-/// Find a child TrueNode by pid, returning its NodeId.
+/// Find a child ActiveNode by pid, returning its NodeId.
 fn find_child (
   tree : &Tree<ViewNode>,
   parent : NodeId,

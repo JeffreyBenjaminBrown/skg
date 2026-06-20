@@ -502,7 +502,7 @@ async fn test_recursive_document (
   assert! ( matches! ( &root_node . kind,
                         ViewNodeKind::Vognode ( Vognode::Active (_) )
                           | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
-    "should be TrueNode" );
+    "should be ActiveNode" );
   let ViewNodeKind::Vognode ( Vognode::Active (root_t) ) =
     &root_node . kind
     else { unreachable!() };
@@ -520,7 +520,7 @@ async fn test_recursive_document (
   assert! ( matches! ( &b_node . kind,
                         ViewNodeKind::Vognode ( Vognode::Active (_) )
                           | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
-    "should be TrueNode" );
+    "should be ActiveNode" );
   let ViewNodeKind::Vognode ( Vognode::Active (b_t) )
     = &b_node . kind
     else { unreachable!() };
@@ -542,7 +542,7 @@ async fn test_recursive_document (
   assert! ( matches! ( &c_node . kind,
                         ViewNodeKind::Vognode ( Vognode::Active (_) )
                           | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
-    "should be TrueNode" );
+    "should be ActiveNode" );
   let ViewNodeKind::Vognode ( Vognode::Active (c_t) )
     = &c_node . kind
     else { unreachable!() };
@@ -560,7 +560,7 @@ async fn test_recursive_document (
   assert! ( matches! ( &b_repeat . kind,
                         ViewNodeKind::Vognode ( Vognode::Active (_) )
                           | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
-    "should be TrueNode" );
+    "should be ActiveNode" );
   let ViewNodeKind::Vognode ( Vognode::Active (b_repeat_t) )
     = &b_repeat . kind
     else { unreachable!() };

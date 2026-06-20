@@ -8,11 +8,11 @@
 /// - A `goal_list` is the ordered list of node IDs that a col
 ///   should present after completion.  The list is computed from the
 ///   graph and, in diff views, from git-diff state.
-/// - A goal child is a child ViewNode whose TrueNode ID appears in
+/// - A goal child is a child ViewNode whose ActiveNode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for PartnerCols, a TrueNode marked parentIs=affected.
+///   manage: for PartnerCols, an ActiveNode marked parentIs=affected.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/source/phantom metadata

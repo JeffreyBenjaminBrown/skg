@@ -2,7 +2,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, TrueNode, PhantomDiff,
+  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats,
   Birth, ParentIs,
 };
@@ -155,10 +155,10 @@ pub fn viewnode_to_string (
       Ok ( deleted_scaff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewNodeKind::Vognode (Vognode::Active (true_node)) =>
-      Ok ( true_node_metadata_to_string (
+    ViewNodeKind::Vognode (Vognode::Active (activeNode)) =>
+      Ok ( activeNode_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, true_node, config )),
+        viewnode . body_folded, activeNode, config )),
     ViewNodeKind::Phantom (Phantom::Diff (phantom)) =>
       Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
@@ -237,142 +237,142 @@ fn append_membership_stage_forms (
   if let Some (atom) = membership . unstaged_atom ()
     { parts . push ( format! ( "(unstaged {})", atom ) ); } }
 
-/// Render metadata for a TrueNode:
+/// Render metadata for an ActiveNode:
 ///   (skg [focused] [folded] (node ...))
-fn true_node_metadata_to_string (
+fn activeNode_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  true_node   : & TrueNode,
+  activeNode   : & ActiveNode,
   config      : & SkgConfig,
 ) -> String {
   fn node_sexp (
-    true_node : & TrueNode,
+    activeNode : & ActiveNode,
     config    : & SkgConfig,
   ) -> String {
-    fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
-      graphnodestats_to_sexp ( & true_node . graphStats,
-                                 true_node . parentIs,
-                                 true_node . birth ) }
+    fn graph_stats ( activeNode : & ActiveNode ) -> Option < String > {
+      graphnodestats_to_sexp ( & activeNode . graphStats,
+                                 activeNode . parentIs,
+                                 activeNode . birth ) }
     fn view_stats (
-      true_node : & TrueNode,
+      activeNode : & ActiveNode,
       config    : & SkgConfig,
     ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
-      if true_node . viewStats . cycle {
+      if activeNode . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
-      if true_node . viewStats . parentIsContent {
+      if activeNode . viewStats . parentIsContent {
         parts . push ( "containsParent" . to_string () ); }
-      if true_node . viewStats . grandparentOverrides {
+      if activeNode . viewStats . grandparentOverrides {
         parts . push ( "grandparentOverrides" . to_string () ); }
-      if true_node . viewStats . grandparentSubscribes {
+      if activeNode . viewStats . grandparentSubscribes {
         parts . push ( "grandparentSubscribes" . to_string () ); }
-      if true_node . viewStats . overridesParent {
+      if activeNode . viewStats . overridesParent {
         parts . push ( "overridesParent" . to_string () ); }
-      if true_node . viewStats . parentOverrides {
+      if activeNode . viewStats . parentOverrides {
         parts . push ( "parentOverrides" . to_string () ); }
       if let Some (ref original) =
-        true_node . viewStats . overridesHere {
+        activeNode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
-      if true_node . viewStats . sourceAtBoundary {
+      if activeNode . viewStats . sourceAtBoundary {
         if let Some (src_config)
-        = config . sources . get ( &true_node . source )
+        = config . sources . get ( &activeNode . source )
         { parts . push ( format! ("(sourceHerald ⌂:{})",
                                   src_config . herald_label () )); }}
       if parts . is_empty () { None }
       else { Some ( format! (
                "(viewStats {})", parts . join (" ") )) }}
-    fn edit_request ( true_node : & TrueNode
+    fn edit_request ( activeNode : & ActiveNode
                     ) -> Option < String > {
-      true_node . edit_request () . map ( | edit_req | {
+      activeNode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           EditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
           EditRequest::Delete => "delete" . to_string () };
         format! ( "(editRequest {})", edit_str ) } ) }
-    fn view_requests ( true_node : & TrueNode
+    fn view_requests ( activeNode : & ActiveNode
                      ) -> Option < String > {
-      if true_node . view_requests . is_empty () { return None; }
+      if activeNode . view_requests . is_empty () { return None; }
       let mut request_strings : Vec < String > =
-        true_node . view_requests . iter ()
+        activeNode . view_requests . iter ()
           . map ( | req | req . to_string () )
           . collect ();
       request_strings . sort ();
       Some ( format! ( "(viewRequests {})",
                        request_strings . join (" ") )) }
-    fn staged_axes ( true_node : & TrueNode ) -> Option < String > {
+    fn staged_axes ( activeNode : & ActiveNode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = true_node . existence  . staged_atom ()
+      if let Some (a) = activeNode . existence  . staged_atom ()
         { atoms . push (a); }
-      if let Some (a) = true_node . membership . staged_atom ()
+      if let Some (a) = activeNode . membership . staged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(staged {})", atoms . join (" "))) } }
-    fn unstaged_axes ( true_node : & TrueNode ) -> Option < String > {
+    fn unstaged_axes ( activeNode : & ActiveNode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = true_node . existence  . unstaged_atom ()
+      if let Some (a) = activeNode . existence  . unstaged_atom ()
         { atoms . push (a); }
-      if let Some (a) = true_node . membership . unstaged_atom ()
+      if let Some (a) = activeNode . membership . unstaged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(unstaged {})", atoms . join (" "))) } }
-    fn not_in_git_atom ( true_node : & TrueNode ) -> Option < String > {
-      if true_node . not_in_git { Some ("notInGit" . to_string ()) }
+    fn not_in_git_atom ( activeNode : & ActiveNode ) -> Option < String > {
+      if activeNode . not_in_git { Some ("notInGit" . to_string ()) }
       else                      { None } }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    parts . push ( format! ( "(id {})", true_node . id . 0 ));
-    parts . push ( format! ( "(source {})", true_node . source ));
+    parts . push ( format! ( "(id {})", activeNode . id . 0 ));
+    parts . push ( format! ( "(source {})", activeNode . source ));
     // ParentIs::Affected is left implicit because it is the default
     // membership relation.
-    match true_node . parentIs {
+    match activeNode . parentIs {
       ParentIs::Affected => {},
       ParentIs::Absent =>
         parts . push ( "(parentIs absent)" . to_string () ),
       ParentIs::Independent =>
         parts . push ( "(parentIs independent)" . to_string () ) }
-    match true_node . birth {
+    match activeNode . birth {
       Birth::Unremarkable => {},
       Birth::ContainsParent =>
         parts . push ( "(birth containsParent)" . to_string () ),
       Birth::LinksToParent =>
         parts . push ( "(birth linksToParent)" . to_string () ) }
-    if true_node . is_indefinitive () {
+    if activeNode . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "indef" . to_string () ); }
-    if let Some (s) = graph_stats (true_node)
+    if let Some (s) = graph_stats (activeNode)
     { parts . push (s); }
-    if let Some (s) = view_stats (true_node, config)
+    if let Some (s) = view_stats (activeNode, config)
     { parts . push (s); }
-    if let Some (s) = edit_request (true_node)
+    if let Some (s) = edit_request (activeNode)
     { parts . push (s); }
-    if let Some (s) = view_requests (true_node)
+    if let Some (s) = view_requests (activeNode)
     { parts . push (s); }
-    if let Some (s) = staged_axes (true_node)
+    if let Some (s) = staged_axes (activeNode)
     { parts . push (s); }
-    if let Some (s) = unstaged_axes (true_node)
+    if let Some (s) = unstaged_axes (activeNode)
     { parts . push (s); }
-    if let Some (s) = not_in_git_atom (true_node)
+    if let Some (s) = not_in_git_atom (activeNode)
     { parts . push (s); }
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( node_sexp (true_node, config));
+  parts . push ( node_sexp (activeNode, config));
   parts . join (" ") }
 
-/// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). A phantom is always
-/// indefinitive (so always emits `indef` and never a body, editRequest, or
-/// viewRequests) and its parentIs is implicit Affected and birth Unremarkable
-/// (so neither atom appears, and graphStats is rendered as if Affected /
-/// Unremarkable). It carries no viewStats. What remains: id, source, indef,
-/// graphStats, the staged/unstaged diff axes, and notInGit. This is
-/// byte-identical to what the old shared TrueNode renderer produced for a
-/// phantom (verified: no phantom ever carried parentIs/birth/viewStats/
-/// viewRequests in any oracle).
+/// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
+/// `diffPhantom`, distinct from the `node` atom an ActiveNode emits, so the
+/// client can tell a moved/removed phantom apart from a live node without
+/// inferring it from the diff axes. A phantom is always indefinitive (so always
+/// emits `indef` and never a body, editRequest, or viewRequests) and its
+/// parentIs is implicit Affected and birth Unremarkable (so neither atom
+/// appears, and graphStats is rendered as if Affected / Unremarkable). It
+/// carries no viewStats. What remains: id, source, indef, graphStats, the
+/// staged/unstaged diff axes, and notInGit.
 fn phantomDiff_metadata_to_string (
   focused     : bool,
   folded      : bool,
@@ -385,7 +385,7 @@ fn phantomDiff_metadata_to_string (
     config  : & SkgConfig,
   ) -> String {
     let mut parts : Vec < String > =
-      vec! [ "node" . to_string () ];
+      vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
     parts . push ( format! ( "(source {})", phantom . source ));
     // parentIs is implicit Affected and birth Unremarkable on a phantom, so
@@ -406,7 +406,7 @@ fn phantomDiff_metadata_to_string (
       { parts . push ( format! ( "(unstaged {})", atoms . join (" "))); } }
     if phantom . not_in_git
     { parts . push ( "notInGit" . to_string () ); }
-    let _ = config; // reserved for parity with true_node_metadata_to_string
+    let _ = config; // reserved for parity with activeNode_metadata_to_string
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -433,7 +433,7 @@ fn phantomDeleted_metadata_to_string (
   parts . join (" ") }
 
 /// Render metadata for an PhantomUnknown:
-///   (skg [focused] [folded] (unknownNode (id X)))
+///   (skg [focused] [folded] (unknown (id X)))
 /// Triggered when a referenced ID resolved to nothing in any db.
 fn phantomUnknown_metadata_to_string (
   focused      : bool,
@@ -445,7 +445,7 @@ fn phantomUnknown_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! ( "(unknownNode (id {}))",
+  parts . push ( format! ( "(unknown (id {}))",
                             unknown_node . id . 0 ));
   parts . join (" ") }
 

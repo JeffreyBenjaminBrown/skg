@@ -32,7 +32,7 @@ fn two_source_config () -> SkgConfig {
       user_owns_it : true } );
   SkgConfig::dummyFromSources (sources) }
 
-/// When a node N has the same source as its nearest truenode ancestor,
+/// When a node N has the same source as its nearest activeNode ancestor,
 /// even if N is marked parentIs=Independent,
 /// sourceAtBoundary should be false.
 #[test]
@@ -67,13 +67,13 @@ fn source_inheritance_across_non_content_same_source () {
     . first_child () . unwrap ();
   let ViewNodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
-    else { panic! ("expected TrueNode") };
+    else { panic! ("expected ActiveNode") };
   assert! ( ! t . viewStats . sourceAtBoundary,
             "Same source across non-content boundary \
              should NOT be at boundary" ); }
 
 /// When a non-content child (parentIs != Affected) has a different source
-/// from its nearest truenode ancestor,
+/// from its nearest activeNode ancestor,
 /// sourceAtBoundary should be true.
 #[test]
 fn source_inheritance_across_non_content_different_source () {
@@ -105,7 +105,7 @@ fn source_inheritance_across_non_content_different_source () {
     . first_child () . unwrap ();
   let ViewNodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
-    else { panic! ("expected TrueNode") };
+    else { panic! ("expected ActiveNode") };
   assert! ( t . viewStats . sourceAtBoundary,
             "Different source across non-content boundary \
              should be at boundary" ); }

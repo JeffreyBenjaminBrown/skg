@@ -29,11 +29,11 @@ use std::sync::Arc;
 /// Reconciles one PartnerCol (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a col = a collecting scaffold)
 /// from a node in the view tree with the current in-Rust graph snapshot's data
 /// about that node.
-/// Makes the col's TrueNode children marked parentIs=affected match a goal list,
+/// Makes the col's ActiveNode children marked parentIs=affected match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked parentIs=affected to 'parentIs=independent'.
 pub fn reconcile_partnerCol_children (
-  node         : NodeId, // The PartnerCol. Its parent is a TrueNode.
+  node         : NodeId, // The PartnerCol. Its parent is an ActiveNode.
   tree         : &mut Tree<ViewNode>,
   kind         : PartnerCol,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,

@@ -3,7 +3,7 @@ use crate::serve::util::{
   value_from_request_sexp,
   send_response_with_length_prefix,
   tag_text_response};
-use crate::source_sets::{ActiveSourceSet, SourceSetName};
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::util::path_from_pid_and_source;
 
@@ -11,20 +11,6 @@ use std::fs;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-/// Resolves the on-disk file path for a node given its id and source.
-/// Returns the path relative to the skgconfig.toml directory.
-pub fn handle_get_file_path_request (
-  stream  : &mut TcpStream,
-  request : &str,
-  config  : &SkgConfig,
-) {
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
-      config,
-      SourceSetName::from ("all"))
-    . expect ("reserved source-set all should always resolve");
-  handle_get_file_path_request_with_source_set (
-    stream, request, config, &active ) }
 
 pub fn handle_get_file_path_request_with_source_set (
   stream  : &mut TcpStream,

@@ -1092,7 +1092,7 @@ async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee
       Ok (()) }
 
 #[test]
-fn idcol_resident_truenode_saves_itself_but_is_not_content (
+fn idcol_resident_activeNode_saves_itself_but_is_not_content (
 ) {
   let input : &str =
     indoc! {"

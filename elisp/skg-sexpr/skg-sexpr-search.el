@@ -72,7 +72,7 @@ sourceHerald inside viewStats -- carry characters like { and ⌂: that
 confuse Emacs sexp navigation; Rust discards them on parse anyway.
 They live only inside a (node ...) form, so a SEXP that has none -- a
 phantom, scaffold, or search viewnode -- is returned unchanged. In
-particular nothing is ever added, so a non-TrueNode never gains a
+particular nothing is ever added, so a non-ActiveNode never gains a
 (node ...) and so never falsely matches the pattern (skg (node))."
   (if (not (and (consp sexp) (eq (car sexp) 'skg)))
       sexp

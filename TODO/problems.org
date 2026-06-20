@@ -1,3 +1,8 @@
+* HOW TO USE THIS FILE
+  Open problems only. As soon as a problem here is *done* -- fixed,
+  resolved, or obsolete -- MOVE its entry out of this file and PREPEND
+  it to the top of TODO/DONE/problems.org. Do not let finished entries
+  accumulate here.
 * Problems noted during the forks arc (TODO/forks/)
 ** Quasi-duplication: "Source '...' not found in config" across ~9 sites
    The plan asked to consolidate the duplicated "source not found"
@@ -14,24 +19,6 @@
    ForkSourceInactive on BufferValidationError) but DEFERRED the broad
    string consolidation -- it is a nice-to-have touching fs/git/diff
    layers, out of proportion to the fork work. Worth doing on its own.
-** RESOLVED Forking a foreign node with no owned ancestor
-   (Was: the read-only confirmation buffer could not set a clone's
-   source, so a foreign node with no owned ancestor failed with
-   ForkSourceUnresolved.) Built per TODO/forks/3_plan.org: the
-   confirmation buffer is editable for each clone's source (C-c s s),
-   the choice rides back on the approve re-save as (fork-sources ...),
-   and an un-inferrable source now DEFAULTS to the user's first owned
-   source. ForkSourceUnresolved now fires only when the user owns no
-   source at all. Details in TODO/forks/progress.org.
-** RESOLVED (latent) Fork-confirmation local-set-key mutated the shared mode map
-   skg--show-fork-confirmation bound C-c C-c / C-c C-k via
-   'local-set-key', which mutates '(current-local-map)' -- the SHARED
-   'skg-content-view-mode-map' -- in place, so the binding leaked into
-   every content view. Harmless for C-c C-c (org-mode's own binding),
-   but it would have been a real bug once C-x C-s was rebound there
-   (saving would break everywhere). Fixed by copying the map
-   buffer-local before the overrides; regression test
-   'test-fork-confirmation-does-not-mutate-shared-mode-map'.
 ** TODO Default clone source is alphabetical, not config order
    'SkgConfig.sources' is a HashMap, so the TOML order is lost.
    'SkgConfig::first_owned_source' returns the alphabetically-first
@@ -45,21 +32,6 @@
    the fork work. (The fork default is now active-aware -- it prefers an
    owned source ACTIVE under a restricted set -- but still alphabetical
    among the candidates, so this inconsistency stands.)
-** RESOLVED Restricted-set fork dead-ended on an inactive default source
-   Found by the round-2 adversarial review. Under a restricted
-   source-set, the silent default clone source could be an
-   owned-but-inactive source (alphabetically first), which
-   'validate_fork_specs' rejected with 'ForkSourceInactive' BEFORE the
-   confirmation buffer was shown -- so the documented C-c s s escape
-   hatch was unreachable in exactly that case. Fixed: the default is now
-   active-aware (prefer an owned source active under the set; fall back
-   to any owned). Regression test
-   'fork::fork_default_prefers_active_owned_source'.
-** RESOLVED (elisp) Fork-confirmation walk leaked a stale clone source
-   'skg--fork-sources-from-confirmation-buffer' left 'parent-source'
-   stale when a level-1 headline had no metadata, pairing a later fork's
-   child with a prior clone's source. Fixed: reset on every level-1
-   headline. Regression test added.
 ** Minor: confirmation-buffer sourceHerald shows the raw source name
    'build_fork_confirmation_buffer' emits the clone's '(sourceHerald
    ⌂:NAME)' with the raw SourceName, not the configured abbreviation
@@ -70,7 +42,6 @@
    post-rotation display. Cosmetic; the load-bearing '(source X)' atom is
    unaffected. (Noted in case a future change routes BOTH sides through
    herald_label.)
-
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces
    The save extraction path uses 'collect_savenode_candidates' to define
@@ -92,7 +63,6 @@
    deliberately ignored rather than rejected: a Delete or nodeMerge
    request on a subscribee-as-such is silently dropped, which validation
    could instead flag.
-
 ** Save rerender may not insert missing HiddenInSubscribeeCol
    While experimenting with the "delete as-a-subscribee content
    implies hide" feature, I saw a case where the subscriber's
@@ -106,7 +76,6 @@
    The eventual feature implementation probably needs to ensure that
    a HiddenInSubscribeeCol is inserted when the updated hide list
    intersects a subscribee's content.
-
 ** 'mk_indefinitive_from_viewnode' silently drops fields
    server/types/viewnode.rs line 538.
    It rebuilds a fresh viewnode via 'mk_indefinitive_viewnode',
@@ -119,50 +88,7 @@
    Consider refactoring to mutate in place:
    clear body, set indef_or_def to Indefinitive,
    update parentIs — but keep everything else.
-
-** DONE 'path_from_pid_and_source' uses .expect() and can panic
-   Verified fixed 2026-06-12: server/util.rs:6 already returns
-   'Result<String, String>' via '.ok_or_else()'; no '.expect()'.
-   server/util.rs. Already noted in MEMORY.md.
-   If an invalid source reaches this function (e.g. from a search view),
-   the server crashes. Should return Result.
-
 * Problems found during the staged/unstaged diff axis refactor
-
-** DONE 'node_changes_for_truenode' merges the two stages
-   Verified fully fixed 2026-06-12: the bare 'node_changes_for_truenode'
-   no longer exists in server/ (only 'per_stage_node_changes_for_truenode'
-   remains). Every former caller (aliascol.rs, id_col.rs, goal_list.rs)
-   now reads both stages; 'content_goal_list' (reconcile/content.rs) was
-   refactored off it. The migration-then-delete plan below is complete.
-   server/types/git.rs.
-   Picks the unstaged stage when both have changes, losing the
-   per-stage distinction. Worse, when a save rewrites a file with
-   only byte-level (not semantic) changes, the unstaged entry has
-   all-Unchanged diffs; this function returned that one, hiding the
-   staged side's real changes so IDCol/AliasCol/TextChanged
-   scaffolds weren't emitted and per-stage tags were wrong.
-
-   Fixed 2026-04-23: added 'per_stage_node_changes_for_truenode'
-   returning '(Option<&NodeChanges>, Option<&NodeChanges>)', and
-   moved 'axes_from_per_stage_diffs' to types/git.rs. Rewrote
-   completeIDCol, completeAliasCol, and
-   maybe_prepend_diff_view_scaffolds to consult both stages.
-
-   Still-open callers of 'node_changes_for_truenode':
-   - 'content_goal_list' in complete_parent_first/truenode.rs, which
-     uses 'contains_diff' for phantom placement. If a contains-list
-     change is staged only (e.g. after a save rewrites the file
-     byte-differently), removed children will be dropped from the
-     goal list and phantoms won't appear.
-   - 'complete_subscribee_col_preorder' and the two
-     'complete_hidden*_col' functions, which use node_changes
-     similarly. Same class of bug for subscribees / hidden children.
-
-   Plan: migrate these callers to 'per_stage_node_changes_for_truenode'
-   and use 'axes_from_per_stage_diffs' for list-field membership.
-   Then delete 'node_changes_for_truenode'.
-
 ** Test coverage: every git-diff-view test exercises only unstaged
    tests/git_diff_view/common.rs.
    'setup_git_repo_with_fixtures' copies fixtures, commits, then
@@ -180,21 +106,6 @@
    scenarios (text, content, newhere_cycle, collateral) plus tests
    that mix staged + unstaged on the same file. Without these, the
    remaining node_changes_for_truenode callers could easily regress.
-
-** (obsolete) 'head_node' field on NodeCompleteDiff is a misnomer
-   Noted obsolete 2026-06-11 (diff-mode-policy replanning): the field
-   was renamed 'before_node', with a comment explaining it holds the
-   stage's baseline (HEAD for staged, INDEX for unstaged).
-   server/types/git.rs, populated in server/git_ops/diff.rs.
-   The struct comment says "only for deleted files", but the field
-   is populated with the 'before' state of the stage: HEAD for the
-   staged stage, INDEX for the unstaged stage. So for an
-   unstaged-only-deleted file, 'head_node' actually holds the INDEX
-   contents. Currently only read by 'collect_deleted_nodes_for_both'
-   for phantom title lookup, where the value still makes sense.
-   Worth renaming to 'before_node' or similar; would save future
-   debugging.
-
 ** (dormant) 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes
    Dormant as of 2026-06-12: 'mk_removed_child_viewnode' now lives in
    server/to_org/expand/unused_but_nice.rs ("Held for someday, not
@@ -215,46 +126,18 @@
    axis (if parent removed staged, children are 'removed from
    contains' staged too), which is a bit more nuanced than the pure
    contains_diff lookup used in phantom_axes.
-
 ** Three NodeComplete parses per changed file in 'compute_diff_for_source'
    server/git_ops/diff.rs.
    For each changed file we now load HEAD, index, and worktree YAML
    blobs and parse them into NodeCompletes. A small repo with N changed
    files does 3N parses. At current sizes this is fine but worth
    measuring on a larger garden.
-
-** DONE 'compute_nodecomplete_diff' silently swallows YAML parse errors
-   Verified fixed 2026-06-12: 'nodefs_as_nodecomplete_with_default_source'
-   (server/git_ops/diff.rs:108-121) now logs 'tracing::warn!' with path
-   and origin on parse failure before returning None -- the "surface to
-   logs" the entry asked for. (Callers still can't distinguish
-   corrupt-from-absent, but that was not requested.)
-   server/git_ops/diff.rs.
-   load_from_head / load_from_index / load_from_disk return None on
-   parse failure (via '.ok()'), indistinguishable from "file absent".
-   A corrupt NodeComplete therefore degrades to "no node_changes" silently.
-   Worth surfacing the error to logs.
-
 ** 'NotInGit' is per-source but stamped per-truenode
    server/to_org/render/diff.rs / process_truenode_diff.
    Every truenode in a non-git source gets 'not_in_git = true'. The
    wire-level emission is a per-truenode 'notInGit' atom too. A
    per-source banner / source-herald prefix would scale better.
-
-** (obsolete) Stringly-typed cell-merge in herald post-pass
-   elisp/heralds-minor-mode.el / 'heralds--merge-stage-tokens'.
-   The post-pass identifies stage groups by parsing token strings
-   (matching the literal "staged:" / "unstaged:" prefix). If the
-   herald rule strings are ever changed, the regex must be updated in
-   lockstep. Manageable but a new fragility introduced by this design.
-
-   Noted obsolete 2026-06-11 (heralds stage audit): the post-pass no
-   longer exists; 'heralds--merge-stage-tokens' appears nowhere in the
-   repo. Stage grouping is handled by the INTERC rules in the rule
-   table (now defined in server/heralds.rs).
-
 * Performance
-
 ** 'fetch_all_graphnodestats' scales linearly in pids, ~60ms each
    server/dbs/typedb/search/all_graphnodestats.rs.
 
@@ -323,7 +206,6 @@
    (i.e. any real working set above initial_node_limit/2) will have
    multi-second first-render latency.
 * Other problems
-
 ** Windows packaging request names scripts as top-level =bash/= scripts, but they live in =data/bash/=
    The requested files =pull-all.sh=, =push-all.sh=, =remote-all.sh=,
    and =status-all.sh= are not present under top-level =bash/= in this
@@ -334,16 +216,6 @@
    probably live in a tracked template/starter-data location, or the
    Windows packaging plan should explicitly copy them from the private
    =data/bash/= source.
-
-** DONE (obsolete) =docs/setup.org= refers to =example-data/=, but no =example-data/= is present
-   Obsolete 2026-06-12: an 'example-data/' directory now exists and is
-   git-tracked (skgconfig.toml, README.md, public/ and private/
-   .gitkeep placeholders). The setup.org reference -- and the two in
-   api-and-formats.md -- now resolve. Nothing to do.
-   The setup doc says "See example-data/ for how" when describing the
-   data folder. This checkout does not contain an =example-data/=
-   directory. New install packaging will need a tracked starter data
-   template or the docs will send users to a missing path.
 
 ** 'bash/start-servers.sh' process management is not safe for multiple Skg servers in one container
    Found while writing docker-unification-strategies.org.
@@ -360,67 +232,6 @@
    Fix direction: manage Skg processes per config/data-root, probably with
    PID files under the data root's logs/run directory, and split TypeDB
    lifecycle management from Skg server lifecycle management.
-
-** DONE 'skg-first-sexpr-on-line' fabricates a (node ...) child
-   Fixed 2026-06-12: rewrote 'skg-strip-heralds-from-sexp'
-   (elisp/skg-sexpr/skg-sexpr-search.el) as a self-contained recursive
-   stripper that removes the herald subfields where present and adds
-   NOTHING. A sexp without a '(node ...)' is returned unchanged, so a
-   non-truenode never gains a fabricated node and never matches
-   '(skg (node))'. It also no longer injects '(graphStats (DELETE ...))'
-   junk into a truenode that lacked stats (a second fabrication the
-   original DSL-merge approach produced). The shared edit DSL is left
-   untouched. Five regression tests added to
-   tests/elisp/test-skg-sexpr-search.el; full elisp suite green (230).
-   elisp/skg-sexpr/skg-sexpr-search.el / skg-strip-heralds-from-sexp.
-   The stripper calls 'skg-edit-nested-sexp' with instructions
-   '(skg (node (graphStats (DELETE ...)) (viewStats (DELETE ...))))'.
-   The DSL's merge semantics append '(node ...)' to any sexp that
-   lacks one, so every non-truenode sexp that round-trips through the
-   stripper comes out with a fabricated '(node (graphStats ...)
-   (viewStats ...))' child. This makes 'skg-sexp-subtree-p' against
-   the simple pattern '(skg (node))' spuriously match phantoms,
-   search viewnodes, etc. Existing callers (skg-request-file-path)
-   accidentally dodge the bug by matching the more specific
-   '(skg (node (id)))'. Fix candidates: stripper should use
-   DELETE-only instructions, or short-circuit when the target lacks
-   '(node ...)' to begin with.
-
-** DONE 'coding-advice/ai-agents.org' refers to a missing file
-   Fixed 2026-06-12: the reference now reads
-   'coding-advice/some-good-refactors.md', the actual filename.
-   It says to see 'coding-advice/good-refactors.md', but that file
-   does not exist in the repository. Either the file was renamed or
-   the reference is stale.
-
-** DONE 'compute_interleaved_diff' can collide for large unique-item lists
-   WARNING: TODO.org refers to the headline title verbatim.
-   (Kept verbatim: TODO.org's copy is also prefixed "DONE ".)
-
-   Fixed 2026-06-12: rewrote 'compute_interleaved_diff'
-   (server/types/list.rs) to diff the items directly via
-   'similar::capture_diff_slices' instead of mapping each item to a
-   Unicode scalar. There is no scalar encoding left to collide, so
-   distinct items can never be conflated regardless of list length.
-   Added 'Ord' to the bound (and to 'net_diff_from_per_stage', the one
-   generic caller). Regression test:
-   'git_ops::test_interleaved_diff_many_distinct_items_do_not_collide'
-   swaps two items deep in the old collision band and asserts the swap
-   is seen.
-
-   server/types/list.rs maps each unique item to a Unicode scalar and
-   feeds the resulting strings to 'similar::TextDiff::from_chars'.
-
-   The mapping starts at 0x100 and uses
-   'char::from_u32(char_counter).unwrap_or('?')'. Once the counter
-   reaches surrogate code points, or eventually passes Unicode's max
-   scalar value, multiple distinct items map to '?'. That can make the
-   diff incorrect.
-
-   It probably does not matter for small relationship lists, but a
-   generic list diff helper should either avoid scalar encoding or
-   return an error instead of silently colliding.
-
 ** Long-running SKG server can hide code/protocol fixes
    On 2026-05-04, the server process listening on port 1730 was still
    an older / already-running binary. It accepted 'titles by ids'
@@ -429,7 +240,6 @@
    makes client bugs look nondeterministic after code changes. A small
    version/build-id endpoint, or logging the executable build hash at
    startup, would make stale-server cases obvious.
-
 ** Emacs client can hold stale TCP state after server/data replacement
    Observed 2026-05-06 after stopping the server, replacing data/,
    and restarting. The Rust server was listening on 1730 and a fresh
@@ -445,7 +255,6 @@
    '(setq skg-port ...)', so reinitializing with a replaced config will
    not update an already-bound port variable. That is harmless when the
    port stays 1730, but surprising when switching configs.
-
 ** Initialization warning files can be easy to miss
    On 2026-05-06, startup completed and logged "Server ready", but
    data/ also contained:
@@ -457,7 +266,6 @@
 
    These did not block connection verification, but they are important
    enough that the client should probably surface them after init.
-
 ** Replacing data/skgconfig.toml can leave server and client on different ports
    Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
    but the already-running server process was still listening on 1730.
@@ -472,7 +280,6 @@
    Possible fixes: watch the config file too, log the active port and
    config path in a user-visible way, or add a client diagnostic that
    explicitly says "config wants port X but no server is listening".
-
 ** One TypeDB process has a fixed idle CPU tax
    Investigated on 2026-05-14;
    see 'TODO/typedb-performance-research.org'.
@@ -486,7 +293,6 @@
    fixed idle taxes. The likely mitigation is one shared TypeDB server
    with distinct database names per Skg instance, plus separate Skg
    ports/configs.
-
 ** Diff analysis still does whole-source work for tiny diffs
    Investigated on 2026-05-22;
    see 'faster-diff-analysis.org'.
@@ -495,7 +301,6 @@
    diffs are fast and repeated one-change reports are much faster. The
    next win is cached inverse indexes or reusable 'GraphFacts' keyed by
    the same endpoint identities.
-
 ** GraphStats rendering still lacks parent-kind context
    Observed on 2026-05-31 while splitting 'ParentIs' from 'Birth'.
 
@@ -510,52 +315,9 @@
    implementation would pass parent tree context into metadata
    rendering, so a scaffold child and a normal Vognode child can use
    different graphStats suppression rules.
-
 * Problems found while taking over the local-view-update dialog (2026-06-02)
   Found while answering the open questions in
   TODO/local-view-update/problems.org. Each is cross-referenced there.
-
-** DONE Merge silently discards the acquiree's aliases
-   Verified fixed 2026-06-12: 'three_nodeMerged_nodecompletes'
-   (server/nodeMerge/nodeMergeInstructionTriple.rs:178-185) now unions
-   the acquiree's aliases into the acquirer, parallel to extra_ids, with
-   a comment. The "decide what merge preserves" question is decided:
-   union (stay findable by the acquiree's old aliases).
-   server/merge/mergeInstructionTriple.rs.
-   'three_merged_nodecompletes' (line 162) clones the acquirer and unions
-   extra_ids, contains, subscribes_to, hides_from_its_subscriptions, and
-   overrides_view_of from the acquiree -- but never aliases. The acquiree's
-   title is preserved (mangled to "MERGED: ...") in an
-   acquiree_text_preserver, whose own aliases are set to
-   MSV::Unspecified (create_acquiree_text_preserver, line 229). So after
-   merging X into Y, the result is no longer findable by any of X's
-   aliases.
-
-   This is asymmetric with extra_ids, which ARE unioned so the node stays
-   findable by X's id. Either aliases should be unioned into the acquirer
-   the same way, or the behavior should be a documented decision. Decide
-   what "merge" should preserve.
-
-** DONE (obsolete) Inactive nodes are never converted to Vognode::Deleted
-   Obsolete 2026-06-12: the strip-inactive-node-fields work
-   deliberately REMOVED the inactive->Deleted conversion
-   ('convert_inactive_to_deleted_if_deleted' is deleted; complete.rs:190
-   documents the no-op), because flipping an inactive node to a DELETED
-   marker leaks that a hidden node vanished. An inactive placeholder is
-   now anonymous and lingers until the next full rerender. The entry's
-   premise (that the conversion should happen) is reversed by decision.
-   server/update_buffer/complete_preorder/truenode.rs.
-   When a save in one buffer deletes a node, collateral views convert a
-   matching Normal vognode to Vognode::Deleted via
-   'mutate_truenode_to_deletednode' (line 137-140). But that check lives
-   inside 'expand_true_content_at_truenode', which only runs on
-   Vognode::Normal (line 115-118). A node shown as Vognode::Inactive (from
-   an inactive source) whose pid is in 'deleted_by_this_save_pids' is never
-   converted, so it lingers as an Inactive placeholder for a node that no
-   longer exists. Rare (the user must delete an inactive-source node), but
-   real. Fix: have the parent's reconcile convert any child -- Normal or
-   Inactive -- whose pid is in 'deleted_by_this_save_pids'.
-
 ** Diff scaffolds are not added to nodes made definitive by a view request
    server/update_buffer/complete.rs, server/to_org/expand/definitive.rs.
    'ensure_diff_scaffolds' (complete.rs:50) runs once, before
@@ -574,7 +336,6 @@
    or changed content). The planned "separate diff pass over Vognode::Normal"
    (TODO/local-view-update) would fix it by visiting every Normal vognode
    regardless of when it became definitive.
-
 ** Collateral graphStats can go stale when only a node's relationships change
    server/update_buffer.rs / find_collateral_view_uris.
    Collateral views are selected by the PIDs in the SavePlan's DefineNodes.
@@ -584,7 +345,6 @@
    until B's view is next rerendered. Pre-existing and arguably acceptable;
    fixing it would require selecting collateral by the neighbors of changed
    nodes, not just the changed nodes.
-
 ** (not a bug, but a simplification) Lock over-approximates the rerender set
    server/serve/handlers/save_buffer.rs, elisp/skg-request-save.el.
    The early lock message ('uris_of_views_to_lock') locks every open view
@@ -600,12 +360,10 @@
    the changed-PID set would make lock and rerender coincide, removing the
    transient lock on buffers that won't change. See the collateral
    resolution in TODO/local-view-update/problems.org.
-
 * Performance: the save-buffer pathway (see profiling-save.org)
   Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
   found four inefficiencies, in impact order. Full evidence, numbers,
   and recommendations are in the top-level 'profiling-save.org'.
-
 ** Override validation re-scans the whole graph on every save (~24%)
    'validate_override_invariants_after_save' (server/save.rs), called
    unconditionally from 'update_graph_including_merges', runs
@@ -615,7 +373,6 @@
    every save slows as the user's data grows. Disabling it cut the save
    from 343 ms to 256 ms. Fix: validate only the saved nodes and their
    'overrides_view_of' neighborhood.
-
 ** Tantivy is written and committed twice per save (~38%)
    'update_tantivy_from_saveinstructions' (server/save.rs) indexes each
    saved node with 'context_origin_type = ""'; then
@@ -626,7 +383,6 @@
    header comment names the fix ("compute origin types before
    indexing"): compute the type first, index once, commit once, and
    reuse one long-lived IndexWriter.
-
 ** TypeDB relationship update is delete-all-then-recreate-all (~15%, O(children))
    'update_typedb_from_saveinstructions' (server/save.rs) deletes and
    recreates ALL outbound edges of each saved node every save, so
@@ -634,94 +390,20 @@
    'create_all_relationships' grew from 48 ms (~25 children) to 137 ms
    (~100). Fix: diff old vs new edges (the in-Rust snapshot has the old
    set) and apply only the delta.
-
 ** Save cost degrades 3-4x within a session of repeated saves
    404 ms -> 1220 ms over 11 consecutive saves; a 'rebuild dbs' resets
    it. Cause: each tiny Tantivy commit spawns a segment and merges fall
    behind. Mostly fixed by the single-commit change above; also consider
    debouncing commits (Tantivy is a rebuildable cache) and dropping the
    forced per-commit 'reader.reload()' in production.
-
 * Problems found while bumping docker-typedb-rust to TypeDB 3.11.5 (2026-06-08)
   Found while updating docker-typedb-rust/typedb.nix from 3.10.3 to 3.11.5
   and adding missing CLI tools to docker.nix.
-
-** (fixed) docker-typedb-rust docs described a Dockerfile that no longer exists
-   There is no Dockerfile in docker-typedb-rust/ (the build is Nix-only:
-   'nix-build docker.nix' + 'docker load'). Yet README.md and
-   PITFALLS.org were framed around "drift between the Dockerfile and
-   docker.nix build paths," and most of PITFALLS.org documented
-   Dockerfile-vs-Nix differences that can no longer drift.
-
-   Fixed 2026-06-08: rewrote PITFALLS.org as "Pitfalls and Maintenance
-   Notes" describing the single Nix path (keeping the load-bearing notes:
-   writable /opt/typedb tree, the FHS loader shim), and reframed
-   README.md away from the Dockerfile. Also fixed a second stale
-   reference there: PITFALLS.org pointed at 'bash/run-servers.sh', which
-   does not exist (the launcher is 'bash/start-servers.sh'; the only
-   run-servers.sh is windows/container/run-servers.sh).
-
-** (fixed) README.md linked to a pre-move absolute path
-   README.md pointed at '/home/ubuntu/docker-typedb-rust/PITFALLS.org',
-   but the folder is now a subfolder at
-   '/home/ubuntu/host/docker-typedb-rust/PITFALLS.org'.
-
-   Fixed 2026-06-08: made it a repo-relative link 'PITFALLS.org', which
-   does not rot when the folder moves.
-
 ** (stale-on-bump) idle-CPU note above cites "TypeDB CE 3.10.3"
    The "One TypeDB process has a fixed idle CPU tax" entry references
    3.10.3 by version. Left as-is because it records a dated observation,
    but worth re-measuring on 3.11.5 — its release notes mention query
    profiling and server-config changes that could move that baseline.
-
-* Problems found while researching local instruction collection (2026-06-09)
-  Found while reading the save-extraction code for
-  TODO/local-instruction-collection/. These all support that vision's
-  premise; if the rewrite happens they die with the old code, but they
-  are real today.
-
-  FIXED 2026-06-10: all four died with the old extraction path when
-  local instruction collection replaced it
-  (TODO/local-instruction-collection/progress.org).
-
-** (fixed) 'DefinenodeCandidateKind::Overridden' is computed and discarded everywhere
-   'collect_savenode_candidates' pushes candidates of kind Overridden,
-   but every consumer filters them out:
-   - 'naive_node_edit_intents_from_candidates' keeps only Ordinary;
-   - 'subscribee_hiderel_intents_from_candidates' keeps only Subscribee;
-   - 'instructiontriples_from_merge_candidates' keeps only Ordinary.
-   So OverriddenCol members are classified, candidate-listed, and then
-   ignored as instruction owners. Either that is intended (members of
-   an OverriddenCol are inert, like read-only col members), in which
-   case the variant should be removed, or their subtrees were meant to
-   be searched for instruction owners and are not — a latent bug.
-
-** (fixed) Four 'SaveRole' variants are computed but never consumed
-   'classify.rs' computes 'AliasDisplay', 'IdDisplay',
-   'HiddenInSubscribeeCol { subscriber, subscribee }', and
-   'HiddenOutsideOfSubscribeeCol { subscriber }'. The latter two do
-   nontrivial grandparent/great-grandparent walks that can return Err
-   and abort a save. No code ever pattern-matches on any of the four
-   (they are handled only by catch-all arms). Wasted work on every
-   save, and an error surface with no corresponding feature.
-
-** (fixed) 'viewforest_with_saveroles' deep-clones the whole buffer per save
-   It clones every ViewNode in the viewforest just to pair it with a
-   SaveRole ('ViewNode_in_Role'), and 'SaveAuthority::from_viewforest'
-   runs on every save (and again in the legacy test wrappers). For
-   large buffers this is a meaningful allocation on the save critical
-   path; profiling-save.org may already reflect it.
-
-** (fixed) 'reconcile_same_id_instructions.rs' is dead in production
-   'server/from_text/viewnodes_to_instructions/reconcile_same_id_instructions.rs'
-   (DefineNode-level same-ID reconciliation) is referenced only by its
-   tests and by a doc comment in 'viewnodes_to_instructions.rs' --
-   and that comment is misleading, because the reconciliation the
-   pipeline actually performs is 'reconcile_nodeIntents' (NodeIntent
-   level) in 'to_naive_instructions.rs'. Slated for deletion in
-   TODO/local-instruction-collection/3_plan.org.
-
 * Problems found during full-schema metaplan 2 research (2026-06-10)
 ** Sharing-col members from inactive sources make a buffer unsavable
    Under a restricted source-set,
@@ -751,20 +433,6 @@
    from col display; merge visible-subset edits with disk's
    inactive members at save; assert no instruction touches an
    inactive source).
-** DONE 'complete_relevant_children_in_viewnodetree' panics on non-Active relevant children
-   Verified fixed 2026-06-12: the orderkey extractor is now typed
-   'View : Fn(&ViewNode) -> Result<Orderkey, String>'
-   (server/update_buffer/util.rs:140); the formerly-panicking closure
-   (to_org/complete/partner_col/child_data.rs:151-155) returns 'Err(...)'.
-   No panic path with that message remains. "Returning Err" was taken.
-   Its orderkey closure panics ("relevant child not a normal graph
-   node") if the relevance predicate ever admits a non-Active
-   viewnode. Today every caller's predicate requires
-   Vognode::Active, so the panic is unreachable, but the invariant
-   lives in a pair of closures rather than in a type or a Result.
-   A future relevance predicate that admits, say, InactiveNode
-   members would turn a save into a server crash. Returning Err
-   would cost little.
 ** Architecture note: "drawn in place of another node" is override-specific data
    Override substitution (TODO/full-schema/
    11_override-rendering-and-navigation.org, executed 2026-06-11)
@@ -786,20 +454,6 @@
    rename to 'drawn_in_place_of', adding a reason enum if consumers
    need distinguishing). Deferred until that second consumer exists
    (Jeff, 2026-06-10).
-** (fixed) 'rerender_view' ignored its 'create_partnerCols' flag
-   Found 2026-06-11 during the heralds stage (the compiler's
-   unused-variable warning exposed it). Stage 9's switch-rerender
-   gave 'rerender_view' ('server/update_buffer.rs') a
-   'create_partnerCols' parameter, documented as "true for the
-   source-switch rerender, where pruning removed them and the new
-   set decides which return" -- but the function hardcoded
-   'create_partnerCols_for_fresh_nodes : false', dropping the flag.
-   Consequence: after a source-set switch, PartnerCols that the
-   convert-and-prune prepass removed were never re-created, so
-   widening the set did NOT reveal cols as intended; the stage-9
-   handler test did not assert col re-creation, so it passed.
-   Fixed 2026-06-11 (one line: pass the flag through). The heralds
-   stage's progress notes record the verification.
 ** (probably fixed) Flaky test: 'ids::save' group in tests/git_diff_view.rs
    'test_delete_id_scaffolds_respawns' (since renamed
    'test_delete_id_scaffolds_aborts') fails intermittently when the
@@ -814,56 +468,6 @@
    run_save_test). Worth a look before trusting plain 'cargo test'
    runs of that target.
 * Problems found while planning the diff-mode-policy stage (2026-06-11)
-** (fixed) A refused or failed source-set switch wedges the Emacs client
-   Both 'skg-view-diff-mode' and 'skg-set-active-source-set' set the
-   stream guard ('skg--stream-in-progress'), lock EVERY Skg buffer,
-   and register the three rerender handlers BEFORE sending their
-   request.  Only the rerender stream unwinds that state:
-   "rerender-lock" unlocks buffers not named in it, and
-   "rerender-done" clears the guard and removes the per-view
-   handler.  But the switch handler's early error paths
-   ('set_active_source_set' in server/serve/handlers/source_sets.rs:
-   missing 'name' field, unknown set name) reply with response-type
-   "error", which the switch flow has no handler for -- Emacs logs
-   "no handler for response type: error" and drops it.  Result: the
-   stream guard stays set (blocking every future save, rerender,
-   toggle and switch), all buffers stay locked, and the rerender
-   handlers dangle, until the TCP connection drops or a
-   busy-initializing message resets state.  One malformed set name
-   wedges the client.
-
-   Fixed 2026-06-11, executing
-   TODO/full-schema/12-2_diff-mode-policy_discussion.org: error and
-   refusal responses keep the endpoint's normal response-type,
-   carrying the explanation as content, followed by an EMPTY
-   rerender stream ("rerender-lock" naming no views, then
-   "rerender-done"), which unwinds Emacs with no elisp changes
-   ('refuse_unwinding' in source_sets.rs; 'stream_empty_rerender'
-   beside 'stream_rerender_views'; pinned by
-   tests/diff_mode_refusals.rs).
-** (fixed) 'phantom_axes' can misattribute a stage sign across relations
-   'phantom_axes' (server/types/phantom.rs) derives a diff-phantom's
-   per-stage membership sign by scanning the parent's relation
-   diffs ('contains_diff', 'subscribes_to_diff', 'hides_diff') in a
-   fixed order and taking the FIRST sign found for the child's ID.
-   The comment claims "a member appears in exactly one of" those
-   lists, but a parent can bear the same ID in two relations (e.g.
-   it both contains and subscribes to N).  If both relations
-   changed for that ID in DIFFERENT stages, the phantom in one col
-   can display the other relation's stage label.  The phantom's
-   existence is never wrong (goal lists are relation-specific);
-   only the staged-vs-unstaged label can mislabel, and only in that
-   double-relation corner.  Correct attribution would require
-   callers to pass which relation their col represents.  Decided
-   2026-06-11 (Jeff): fix it now -- phantoms should not lie, and the
-   mislabeling could become hard to recognize later.
-   Fixed the same day, executing
-   TODO/full-schema/12-2_diff-mode-policy_discussion.org:
-   'phantom_axes' takes a 'NodeRelation' and reads exactly that
-   relation's diff ('NodeRelation::diff_in_nodechanges');
-   'build_child_data' takes an axes closure, so a removed member's
-   axes cannot be derived without naming a relation.  Pinned by the
-   double-relation unit test in tests/unit/types_phantom.rs.
 ** 'skg-view-diff-mode' branches on a "\nWarning:" substring
    elisp/skg-request-git-diff-mode.el.  The git-diff-mode response
    handler pops a window ('skg-big-nonfatal-message') iff the
@@ -873,35 +477,7 @@
    unintentionally.  The diff-mode-policy stage's refusal texts avoid
    the substring; a typed flag in the response would be the real fix,
    deferred until a second message kind needs the pop.
-** (fixed) 'goal_list_for_subscribee_col' reads git HEAD for unchanged owners
-   server/to_org/complete/partner_col/goal_list.rs.  In diff mode it
-   calls 'nodecomplete_from_git_head' for every subscribeeCol on
-   every render, even when the owner's file appears in neither
-   per-stage diff map (so HEAD = worktree and the read changes
-   nothing).  The filter-col goal computers in the same file already
-   short-circuit via 'per_stage_node_changes_for_truenode'.
-   Fixed 2026-06-11: the shared 'goal_list_for_outbound_col'
-   reconstructs both sides from the per-stage diffs already in hand
-   and short-circuits unchanged owners; the filter cols'
-   three-snapshot comparison likewise reads no git objects, so diff
-   rendering now performs NO git reads beyond the initial per-source
-   diff collection.
 * Problems found while executing the diff-mode-policy stage (2026-06-11)
-** (fixed) A buffer containing a hiddenInSubscribeeCol could not be saved
-   Two validators contradicted each other: 'validate_hiddenin'
-   (server/from_text/buffer_to_viewnodes/local.rs) REQUIRES the col
-   to sit under a gnode (the subscribee), while
-   'validate_gnode_identity_and_structure' FORBADE any gnode child
-   of that kind ('cannot_be_child_of_gnode').  So the buffer
-   rendering produces for any definitive subscribee with hidden
-   members could not round-trip through save -- every save of it
-   failed with "TrueNode has a child whose structure belongs
-   elsewhere".  Apparently never noticed because no test saved a
-   buffer holding the col.  Fixed: the gnode check now permits a
-   HiddenInSubscribeeCol child when the gnode is a
-   subscribee-as-such (its parent is a SubscribeeCol), the one
-   position rendering puts it.  Surfaced by, and pinned in,
-   tests/git_diff_view/filter_cols/.
 ** A stale saved buffer can show a removed read-only-col member as live
    Awareness, handled: a read-only col member whose edge vanished
    outside Emacs can still sit in a user's buffer as an Active
@@ -919,19 +495,6 @@
    suite re-run).  Same family as the pre-existing 'ids::save'
    flake above: per-test dbs, so the shared resource is something
    else.  Not chased.
-** (fixed) 'cargo test --test override_substitution' races on the global graph handle
-   Pre-existing (reproduces at the parent of this stage's commits):
-   several tests in that target install the process-global in-Rust
-   graph handle from DIFFERENT fixture sets; under plain 'cargo
-   test' (one process per target) only the first init wins, so
-   later tests can resolve substitution against the wrong graph and
-   fail nondeterministically.  Under 'cargo nextest run' (one
-   process per test) all pass.  The target's header documents the
-   nextest assumption; a fix would mean per-test fixture-compatible
-   globals or a resettable handle.
-   Fixed 2026-06-12 (faster-tests): install_or_swap_global_handle
-   swaps the OnceLock's ArcSwap CONTENTS, each sub-test installs its
-   own fixture graph, and the target is one sequential group.
 ** Save-time override-monogamy check depends on neighbor re-saving
    Found while writing the stage-13 nodeMerge monogamy test
    ('merge_that_collides_two_overriders_is_rejected' in
@@ -980,96 +543,8 @@
    the env graph so test harnesses without the global handle still see
    cols.  The matrix target works around it by installing the handle
    in its render-heavy function only.
-
-* Problems found while reviewing inactive-node save treatment (2026-06-12)
-** DONE Retained inactive nodes emit positional save intentions for their container
-   Verified fixed 2026-06-12 by the strip-inactive-node-fields work:
-   'content_members', 'subscribeeCol_members' and 'partnerCol_members'
-   (traverse.rs:331-407) now all collect only 'Vognode::Active' children;
-   the inactive arm of 'visit' (traverse.rs:76-81) emits nothing;
-   'InactiveNode::collected_id' is deleted. The proposed fix (collect
-   only Active; let the weave own invisible members) is what shipped,
-   and content_members' comment now cites this entry.
-   server/from_text/local_instruction_collection/traverse.rs.
-   The metaplan-2 model for source-set safety (this file, "Sharing-col
-   members from inactive sources make a buffer unsavable", and
-   TODO/full-schema/metaplan_2.org) is: omit inactive members from
-   display, and reconstruct their membership at save by MERGING the
-   visible-subset buffer list with disk's invisible members
-   ('preserve_invisible_members' -> weave / set_difference_merge in
-   from_text/weave.rs). Under that model an inactive node contributes
-   NOTHING to any ancestor's saved list; the disk merge is the sole
-   authority for invisible members.
-
-   The order-meaningless list follows the model: 'partnerCol_members'
-   (overriddenCol) collects only Active children (traverse.rs:336-345),
-   and 'set_difference_merge' restores the inactive overrides from disk.
-
-   The two ORDER-MEANINGFUL lists do not. 'content_members'
-   (traverse.rs:373-389) pushes each non-phantom InactiveNode's
-   'collected_id' into the parent's 'SetContains'; 'subscribeeCol_members'
-   (traverse.rs:353-366) does the same into the owner's 'SetSubscribesTo'.
-   So a RETAINED inactive node (one kept in the view because it has
-   visible descendants) becomes a positional member of its
-   container's/owner's saved list, drawn from the buffer. The comments
-   justify this ("subscribee order matters, so a buffer-present
-   InactiveNode counts as a positional member"), and weave.rs's
-   "POSITIONED ... includes retained InactiveNodes" was co-designed with
-   it -- so this is deliberate drift from the metaplan model, not an
-   oversight. But it is both unnecessary and unsafe:
-
-   - Unnecessary: the weave already restores an omitted invisible
-     member to its correct position by anchoring it to its nearest
-     preceding positioned disk member. With disk [A, X, B] (X inactive)
-     and buffer [A, B], the weave yields [A, X, B] whether or not X is
-     in the buffer list. So excluding X loses no position in the common
-     case.
-
-   - Unsafe: because the buffer list is fed to the weave as authority,
-     including X lets a stale or concurrently-edited buffer RESURRECT an
-     invisible member that was authoritatively removed. Concretely: disk
-     P.contains = [A, B] (another save removed X); a stale buffer still
-     shows [A, X, B] with X retained inactive; saving P (no user edit)
-     extracts SetContains [A, X, B]; the weave pushes every buffer
-     member, so X reappears in P.contains on disk. The noop filter does
-     not catch it (buffer != disk), and write-suppression does not catch
-     it (P's source is active, so P's instruction stands). Symmetrically,
-     reordering a read-only inactive placeholder among visible siblings
-     persists as a real write to the container -- editing the position of
-     something the user cannot edit.
-
-   This is the inbound twin of the original "silent deletion" bug: that
-   one dropped invisible members by omission; this one re-adds them by
-   inclusion. The fix is to make 'content_members' and
-   'subscribeeCol_members' collect only Active members (mirroring
-   'partnerCol_members'), and let the weave own invisible members'
-   presence AND position. Tradeoff to confirm with Jeff: a retained
-   inactive node then cannot be repositioned by the user (its post-save
-   position is weave-determined), which is the correct read-only
-   semantics but a visible behavior change. 'inactiveNode_is_phantom'
-   gating and the InactiveNode 'collected_id' accessor become dead on the
-   save path if this lands.
-
 * Problems found while investigating test-suite speed (2026-06-12)
   See TODO/faster-tests.org for the full investigation.
-
-** (fixed) 'all-tests.sh' bounds build parallelism only for phase 1
-   bash/all-tests.sh. The script's stated purpose is "to keep an
-   interactive machine usable", and 'SKG_CARGO_BUILD_JOBS' (default 2)
-   is applied to the phase-1 'cargo build'. But the phase-2
-   'cargo nextest run' line gets no '--build-jobs', so it compiles and
-   links with the cargo default = every core. With 52 test binaries at
-   ~250MB each (debug), that is 16 concurrent rustc/linker processes
-   on a 15GB-RAM machine -- likely the single biggest contributor to
-   the machine kneeling during a test run, and unaffected by the
-   script's 'nice 15' (which governs CPU priority, not RAM or IO).
-   One-line fix: pass '--build-jobs "$BUILD_JOBS"' (nextest accepts
-   it) or export 'CARGO_BUILD_JOBS' for the phase-2 invocation.
-   Fixed 2026-06-12 (faster-tests commit 1): SKG_NEXTEST_BUILD_JOBS,
-   default half-the-cores capped at 8, in both all-tests.sh and
-   nextest.sh. Binary grouping (faster-tests 10) then shrank the
-   thing being built from 52 binaries to 7.
-
 ** (mostly fixed) Six near-duplicate test-db setup paths
    The same connect / create-db / define-schema / populate / teardown
    sequence is implemented in: 'run_with_test_db' and
@@ -1090,26 +565,6 @@
    single-test files), 'run_with_source_set_test_db'
    (inactive_suppression, partner_col_matrix), and
    collateral_source_move's local setup.
-
-** DONE (obsolete) 'coding-advice/development-process.md' links to a missing file
-   Verified 2026-06-12: the current development-process.md already
-   links '[tests/USAGE.md](../tests/USAGE.md)', not the missing
-   'ai-agents.md'. Resolved before this audit; nothing to do.
-   It says the three kinds of tests are "described in
-   [ai-agents.md](../ai-agents.md)", but no 'ai-agents.md' exists at
-   the repo root. The real file is 'coding-advice/ai-agents.org'
-   (same folder), and it does not actually describe how to run the
-   tests; 'tests/USAGE.md' does. Same family as the already-reported
-   stale 'good-refactors.md' reference.
-
-** DONE (obsolete) 'tests/USAGE.md' says "Emacs tests" twice
-   Verified 2026-06-12: tests/USAGE.md's second paragraph already reads
-   "some ways to run the Rust tests include". Resolved before this
-   audit; nothing to do.
-   Its second paragraph introduces 'cargo test' with "Similarly, some
-   ways to run the Emacs tests include" -- copy-paste slip for "Rust
-   tests".
-
 * Problems found while adding skg-stage-moves (2026-06-13)
 ** (latent, by-design-dependent) Diff helpers use a repo-wide pathspec
    'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'
@@ -1126,17 +581,11 @@
    'path_relative_to_repo'); the older diff path does not. If
    multi-source repos are to be supported, the diff helpers should
    take a source-relative pathspec too.
-** (fixed) find_and_stage_moves.rs was first named for "commit"
-   Fixed 2026-06-13: renamed 'find_and_commit_moves.rs' ->
-   'find_and_stage_moves.rs'. The module only finds moves and emits a
-   script that STAGES them ('git rm' / 'git add'); committing is left
-   to the user, so the new name describes it exactly.
 * Problems found while planning forks (2026-06-13)
   Found while reading the sharing code to write 'TODO/forks/plan.org'.
   The first is a real, fork-independent bug; it is also the prerequisite
   the fork/clone feature depends on, and is discussed at length in that
   plan.
-
 ** The subscribee-as-such display subtracts only hides, not the subscriber's own contains
    'content_goal_list' (server/update_buffer/reconcile/content.rs:398-419)
    computes the content shown under a subscribee-as-such as
@@ -1181,7 +630,6 @@
    both integrated and explicitly hidden does not double-count.
    (If a filter I missed already excludes the subscriber's content
    downstream, this is moot -- but I could not find one.)
-
 ** 'overrides_view_of' has never been written by a save; its round-trip is untested
    Per 'TODO/DONE/sharing/status-before-plan.org', overrides were
    "dead weight": no buffer path populated 'overrides_view_of'. Since
@@ -1245,3 +693,50 @@
    lib.sh approach is the intended one, the Windows bundle and its docs
    should be regenerated/updated to match. Left untouched this round (out
    of scope: the request was about data/bash/).
+* Problems found while diagnosing a diff-mode render crash (2026-06-17)
+  Trigger: in git diff mode, visiting a deciduous node aborted document
+  generation with "Error generating document: find_source: no source for
+  8c24623a-736f-4f07-ba5a-624c3328f5ee". Investigation in this session.
+** (open) No audit catches a container whose contains points at a missing .skg file
+   The ordinary save path does NOT create such dangling references:
+   'apply_delete_propagation_cleanup' (server/save.rs:370-428) runs
+   before the FS write and, via the in-Rust inverse indexes
+   (contained_by / subscribers_of / hiders_of / overriders_of, built
+   from all .skg files at init), synthesizes a verbatim Save for every
+   referencer -- even ones not open in any buffer -- then strips the
+   deleted id from all their lists. So a correct save rewrites the
+   container on disk atomically with the deletion. BUT nothing detects a
+   dangling reference once it exists: the daily audit
+   (server/dbs/in_rust_graph/audit.rs) compares the in-Rust graph to
+   TypeDB only and DELIBERATELY does not report dangling outbound
+   references; it never compares against the filesystem.
+
+   A scan of all sources (this session) found the state IS reachable in
+   real data: at HEAD, 3 ids are referenced but exist in no source
+   (01545418..., 8c24623a..., f0a77ca4...); in the worktree, 1 still is
+   (01545418...). 8c24623a / f0a77ca4 are HEAD-only (already scrubbed in
+   the worktree, like the case here) -- they are partial-commit
+   artifacts that vanish once the scrubbed container is committed. But a
+   *worktree-level* dangling ref (01545418...) means some path other than
+   a clean save produced it: the cleanup is blind when the in-Rust graph
+   is stale relative to disk (a referencer added by direct file editing
+   without a rebuild is invisible to the inverse indexes -- save.rs:396),
+   and direct edits / imports bypass it entirely. Worth: (a) a
+   filesystem-aware consistency check (init/rebuild or the audit) that
+   reports a contains/subscribes/overrides/hides member with no .skg file
+   in any source, and (b) deciding whether such a check should auto-repair
+   (drop the pointer) or only warn. Note textlinks_to body references are
+   intentionally never scrubbed (save.rs:363-369) and degrade to
+   PhantomUnknown when followed; a contains pointer had no such fallback
+   until the fix above.
+** Root cause of THIS instance: a partial commit, not a save bug
+   Recorded for completeness (not a code defect). The node 8c24623a
+   ("earplugs") was a leaf whose only referrer was d40db175 ("backpack").
+   HEAD commit 200b688 deleted 8c24623a.skg but did not touch d40db175,
+   whose committed contains still lists 8c24623a; the worktree edit that
+   drops it (part of a wholesale "DONE backpack" rewrite) is uncommitted.
+   So HEAD is internally inconsistent while the worktree is consistent --
+   precisely the input that made diff mode (HEAD<->worktree) build a
+   removed-member phantom for a node that exists nowhere. Data repair:
+   commit the pending d40db175.skg (the worktree is already correct), or
+   any commit that makes HEAD's d40db175 stop referencing 8c24623a.

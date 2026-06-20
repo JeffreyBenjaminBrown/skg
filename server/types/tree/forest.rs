@@ -46,10 +46,6 @@ impl<T> Forest<T> {
   ) -> Tree<T> {
     self . tree }
 
-  pub fn as_internal_tree (
-    &self,
-  ) -> &Tree<T> {
-    &self . tree }
 
   pub fn as_internal_tree_mut (
     &mut self,

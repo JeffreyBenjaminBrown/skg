@@ -1,13 +1,13 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Expand/strip default fields for TrueNode metadata editing.
+;;; PURPOSE: Expand/strip default fields for ActiveNode metadata editing.
 ;;; After sexp-to-org, expand inserts missing editable fields with defaults.
 ;;; Before org-to-sexp, strip removes default-valued fields.
 ;;;
 ;;; ENTRY POINTS:
-;;;   skg-truenode-sexp-p
-;;;   skg-truenode-expand-defaults-in-org
-;;;   skg-truenode-strip-defaults-from-org
+;;;   skg-activeNode-sexp-p
+;;;   skg-activeNode-expand-defaults-in-org
+;;;   skg-activeNode-strip-defaults-from-org
 ;;;   skg-headlines-to-org
 
 (require 'skg-sexpr-org-bijection)
@@ -17,12 +17,12 @@
 ;; Constants
 ;;
 
-(defconst skg-truenode--canonical-field-order
+(defconst skg-activeNode--canonical-field-order
   '("id" "source"
     "indef" "parentIs" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
-(defconst skg-truenode--editable-defaults
+(defconst skg-activeNode--editable-defaults
   '(("indef"  . "false (default)")
     ("parentIs"      . "affected (default)")
     ("birth"         . "unremarkable (default)")
@@ -34,8 +34,8 @@
 ;; Predicate
 ;;
 
-(defun skg-truenode-sexp-p (sexp)
-  "Return non-nil if SEXP is a TrueNode sexp."
+(defun skg-activeNode-sexp-p (sexp)
+  "Return non-nil if SEXP is an ActiveNode sexp."
   (or (skg-sexp-subtree-p sexp '(skg (node)))
       (skg-sexp-subtree-p sexp '(skg node))))
 
@@ -55,9 +55,9 @@
 ;; Expand
 ;;
 
-(defun skg-truenode-expand-defaults-in-org
+(defun skg-activeNode-expand-defaults-in-org
     (org-text &optional default-source display-title)
-  "Expand default fields in ORG-TEXT for TrueNode metadata editing.
+  "Expand default fields in ORG-TEXT for ActiveNode metadata editing.
 Parses org text to headlines, finds the ** node section,
 reorders fields to canonical order, inserts missing editable
 fields with defaults, and expands bare boolean atoms to have
@@ -68,14 +68,14 @@ If DISPLAY-TITLE is non-nil and non-empty, prepend a read-only
 title display group."
   (let* ((lines (split-string org-text "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (expanded (skg-truenode--expand-headlines
+         (expanded (skg-activeNode--expand-headlines
                     headlines default-source))
          (with-title
-          (skg-truenode--maybe-prepend-title
+          (skg-activeNode--maybe-prepend-title
            expanded display-title)))
     (skg-headlines-to-org with-title)))
 
-(defun skg-truenode--maybe-prepend-title (headlines display-title)
+(defun skg-activeNode--maybe-prepend-title (headlines display-title)
   "Maybe prepend the read-only DISPLAY-TITLE group to HEADLINES."
   (if (and display-title
            (not (string-empty-p (string-trim display-title))))
@@ -84,24 +84,24 @@ title display group."
               headlines)
     headlines))
 
-(defun skg-truenode--expand-headlines (headlines &optional default-source)
+(defun skg-activeNode--expand-headlines (headlines &optional default-source)
   "Expand HEADLINES by reordering fields and inserting defaults.
 DEFAULT-SOURCE, if non-nil, is used for source field defaults.
 Returns a new headline list."
-  (let* ((node-idx (skg-truenode--find-node-headline headlines))
+  (let* ((node-idx (skg-activeNode--find-node-headline headlines))
          (node-level (car (nth node-idx headlines)))
          (child-level (1+ node-level))
          (before-node (cl-subseq headlines 0 (1+ node-idx)))
          (after-node (cl-subseq headlines (1+ node-idx)))
-         (groups (skg-truenode--group-children after-node child-level))
+         (groups (skg-activeNode--group-children after-node child-level))
          (children (car groups))
          (remainder (cdr groups))
          (expanded-children
-          (skg-truenode--expand-and-reorder
+          (skg-activeNode--expand-and-reorder
            children child-level default-source)))
     (append before-node expanded-children remainder)))
 
-(defun skg-truenode--find-node-headline (headlines)
+(defun skg-activeNode--find-node-headline (headlines)
   "Return the index of the '** node' headline in HEADLINES."
   (let ((idx 0)
         (found nil))
@@ -112,10 +112,10 @@ Returns a new headline list."
       (unless found
         (setq idx (1+ idx))))
     (unless found
-      (error "skg-truenode--find-node-headline: no 'node' headline found"))
+      (error "skg-activeNode--find-node-headline: no 'node' headline found"))
     found))
 
-(defun skg-truenode--group-children (headlines child-level)
+(defun skg-activeNode--group-children (headlines child-level)
   "Split HEADLINES into children of node and remainder.
 Children are groups starting at CHILD-LEVEL.
 Returns (CHILDREN . REMAINDER) where CHILDREN is a list of
@@ -143,15 +143,15 @@ headline groups, each being a list of headlines."
       (push (nreverse current-group) children))
     (cons (nreverse children) rest)))
 
-(defun skg-truenode--expand-and-reorder (children child-level
+(defun skg-activeNode--expand-and-reorder (children child-level
                                         &optional default-source)
   "Reorder CHILDREN to canonical order and insert missing defaults.
 CHILDREN is a list of headline groups. CHILD-LEVEL is the level
 for field headlines. DEFAULT-SOURCE, if non-nil, is used for
 source field defaults. Returns a flat list of headlines."
-  (let* ((field-map (skg-truenode--children-to-field-map children))
-         (canonical skg-truenode--canonical-field-order)
-         (known-fields (mapcar #'car skg-truenode--editable-defaults))
+  (let* ((field-map (skg-activeNode--children-to-field-map children))
+         (canonical skg-activeNode--canonical-field-order)
+         (known-fields (mapcar #'car skg-activeNode--editable-defaults))
          (ordered '())
          (seen '()))
     ;; Add fields in canonical order
@@ -163,7 +163,7 @@ source field defaults. Returns a flat list of headlines."
               (let ((group (cdr existing)))
                 (setq ordered
                       (append ordered
-                              (skg-truenode--maybe-expand-field
+                              (skg-activeNode--maybe-expand-field
                                group child-level field-name
                                default-source)))))
           ;; Insert default if it's an editable field
@@ -172,7 +172,7 @@ source field defaults. Returns a flat list of headlines."
             (push field-name seen)
             (let ((default-val
                    (cdr (assoc field-name
-                               skg-truenode--editable-defaults))))
+                               skg-activeNode--editable-defaults))))
               (setq ordered
                     (append ordered
                             (list (cons child-level field-name)
@@ -193,14 +193,14 @@ source field defaults. Returns a flat list of headlines."
         (setq ordered (append ordered (cdr entry)))))
     ordered))
 
-(defun skg-truenode--children-to-field-map (children)
+(defun skg-activeNode--children-to-field-map (children)
   "Convert CHILDREN (list of headline groups) to an alist of (NAME . GROUP)."
   (mapcar
    (lambda (group)
      (cons (cdr (car group)) group))
    children))
 
-(defun skg-truenode--maybe-expand-field (group child-level field-name
+(defun skg-activeNode--maybe-expand-field (group child-level field-name
                                         default-source)
   "Expand GROUP for display. Handles booleans and source defaults.
 Returns the group, possibly with a value child added or modified."
@@ -226,32 +226,32 @@ Returns the group, possibly with a value child added or modified."
 ;; Strip
 ;;
 
-(defun skg-truenode-strip-defaults-from-org (org-text)
+(defun skg-activeNode-strip-defaults-from-org (org-text)
   "Strip default fields from ORG-TEXT before converting back to sexp.
 Removes fields at their default value and collapses boolean
 true values back to bare atoms."
   (let* ((lines (split-string org-text "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (stripped (skg-truenode--strip-headlines headlines)))
+         (stripped (skg-activeNode--strip-headlines headlines)))
     (skg-headlines-to-org stripped)))
 
-(defun skg-truenode--strip-headlines (headlines)
+(defun skg-activeNode--strip-headlines (headlines)
   "Strip default-valued fields from HEADLINES. Returns new headline list."
   (let* ((metadata-headlines
-          (skg-truenode--remove-title-headlines headlines))
-         (node-idx (skg-truenode--find-node-headline metadata-headlines))
+          (skg-activeNode--remove-title-headlines headlines))
+         (node-idx (skg-activeNode--find-node-headline metadata-headlines))
          (node-level (car (nth node-idx metadata-headlines)))
          (child-level (1+ node-level))
          (before-node (cl-subseq metadata-headlines 0 (1+ node-idx)))
          (after-node (cl-subseq metadata-headlines (1+ node-idx)))
-         (groups (skg-truenode--group-children after-node child-level))
+         (groups (skg-activeNode--group-children after-node child-level))
          (children (car groups))
          (remainder (cdr groups))
          (stripped-children
-          (skg-truenode--strip-children children child-level)))
+          (skg-activeNode--strip-children children child-level)))
     (append before-node stripped-children remainder)))
 
-(defun skg-truenode--remove-title-headlines (headlines)
+(defun skg-activeNode--remove-title-headlines (headlines)
   "Remove the display-only title group from HEADLINES, if present."
   (if (and headlines
            (= (caar headlines) 1)
@@ -262,18 +262,18 @@ true values back to bare atoms."
         rest)
     headlines))
 
-(defun skg-truenode--strip-children (children child-level)
+(defun skg-activeNode--strip-children (children child-level)
   "Strip default values from CHILDREN. Returns flat headline list."
   (let ((result '()))
     (dolist (group children)
       (let* ((field-name (string-trim (cdr (car group))))
-             (stripped (skg-truenode--strip-one-field
+             (stripped (skg-activeNode--strip-one-field
                         group field-name child-level)))
         (when stripped
           (setq result (append result stripped)))))
     result))
 
-(defun skg-truenode--strip-one-field (group field-name child-level)
+(defun skg-activeNode--strip-one-field (group field-name child-level)
   "Strip one field GROUP named FIELD-NAME. Returns nil to remove, or headlines.
 CHILD-LEVEL is the level of the field headline."
   (let ((value-text
@@ -283,7 +283,7 @@ CHILD-LEVEL is the level of the field headline."
      ((string= field-name "indef") ;; Boolean field
       (cond
        ((or (null value-text)
-            (skg-truenode--default-false-p value-text))
+            (skg-activeNode--default-false-p value-text))
         nil) ;; remove: at default
        ((string= value-text "true")
         ;; Collapse to bare atom (no children)
@@ -292,19 +292,19 @@ CHILD-LEVEL is the level of the field headline."
      ((string= field-name "parentIs")
       (cond
        ((or (null value-text)
-            (skg-truenode--default-content-p value-text))
+            (skg-activeNode--default-content-p value-text))
         nil) ;; remove: at default (content)
        (t group)))
      ((string= field-name "birth")
       (cond
        ((or (null value-text)
-            (skg-truenode--default-birth-p value-text))
+            (skg-activeNode--default-birth-p value-text))
         nil)
        (t group)))
      ((string= field-name "editRequest")
       (cond
        ((or (null value-text)
-            (skg-truenode--default-none-p value-text))
+            (skg-activeNode--default-none-p value-text))
         nil) ;; remove: at default
        ((string= value-text "delete")
         ;; (editRequest delete) — keep field + value child
@@ -314,7 +314,7 @@ CHILD-LEVEL is the level of the field headline."
         ;; Extract ID, handle org links in the ID child
         (if (> (length group) 2)
             (let* ((id-text (string-trim (cdr (nth 2 group))))
-                   (id (skg-truenode--extract-id-from-text id-text)))
+                   (id (skg-activeNode--extract-id-from-text id-text)))
               (list (cons child-level field-name)
                     (cons (1+ child-level) "merge")
                     (cons (+ child-level 2) id)))
@@ -324,7 +324,7 @@ CHILD-LEVEL is the level of the field headline."
         ;; Restructure to nested: **** merge / ***** ID
         (let* ((rest (string-trim
                       (substring value-text (length "merge"))))
-               (id (skg-truenode--extract-id-from-text rest)))
+               (id (skg-activeNode--extract-id-from-text rest)))
           (list (cons child-level field-name)
                 (cons (1+ child-level) "merge")
                 (cons (+ child-level 2) id))))
@@ -332,51 +332,51 @@ CHILD-LEVEL is the level of the field headline."
      ((string= field-name "viewRequests")
       (cond
        ((and value-text
-             (skg-truenode--default-none-p value-text)
+             (skg-activeNode--default-none-p value-text)
              (= (length group) 2))
         nil) ;; remove: at default
        (t group)))
      ((string= field-name "source")
       (when value-text
         (let ((stripped-val ;; strip " (default)" suffix if present
-               (skg-truenode--strip-default-suffix value-text)))
+               (skg-activeNode--strip-default-suffix value-text)))
           (list (cons child-level field-name)
                 (cons (1+ child-level) stripped-val)))))
      ;; All other fields: keep as-is
      (t group))))
 
-(defun skg-truenode--default-false-p (text)
+(defun skg-activeNode--default-false-p (text)
   "Return non-nil if TEXT represents the default false value."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "false (default)")
         (string= trimmed "false"))))
 
-(defun skg-truenode--default-content-p (text)
+(defun skg-activeNode--default-content-p (text)
   "Return non-nil if TEXT represents the default 'affected' value."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "affected (default)")
         (string= trimmed "affected"))))
 
-(defun skg-truenode--default-birth-p (text)
+(defun skg-activeNode--default-birth-p (text)
   "Return non-nil if TEXT represents the default birth value."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "unremarkable (default)")
         (string= trimmed "unremarkable"))))
 
-(defun skg-truenode--default-none-p (text)
+(defun skg-activeNode--default-none-p (text)
   "Return non-nil if TEXT represents the default none value."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "none (default)")
         (string= trimmed "none"))))
 
-(defun skg-truenode--strip-default-suffix (text)
+(defun skg-activeNode--strip-default-suffix (text)
   "Strip ' (default)' suffix from TEXT if present."
   (let ((trimmed (string-trim text)))
     (if (string-suffix-p " (default)" trimmed)
         (substring trimmed 0 (- (length trimmed) (length " (default)")))
       trimmed)))
 
-(defun skg-truenode--extract-id-from-text (text)
+(defun skg-activeNode--extract-id-from-text (text)
   "Extract an ID from TEXT, handling org links like [[id:X][label]].
 If TEXT is an org link, extracts the ID part. Otherwise returns TEXT trimmed."
   (let ((trimmed (string-trim text)))
@@ -384,4 +384,4 @@ If TEXT is an org link, extracts the ID part. Otherwise returns TEXT trimmed."
         (match-string 1 trimmed)
       trimmed)))
 
-(provide 'skg-truenode-defaults)
+(provide 'skg-activeNode-defaults)

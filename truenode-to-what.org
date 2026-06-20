@@ -1,0 +1,115 @@
+* truenode -> what  (rename record + things to review)
+  Scope (per your answers in questions-for-jeff.org): live code only (.rs,
+  .el). Q1=(a) rename the type too. Q3=rename the files too. All of this is
+  left UNCOMMITTED for your review.
+
+** What was done
+- Every 'truenode' / 'TrueNode' / 'true_node' in .rs and .el became
+  'activeNode' / 'ActiveNode'. Verified zero remain in live code.
+- Rust type: =TrueNode= -> =ActiveNode=, =MpTruenode= -> =MpActiveNode=,
+  =TrueNode_Generic= -> =ActiveNode_Generic=, =from_truenode= ->
+  =from_activeNode=, etc.
+- Per coding-advice/naming.org, 'activeNode' is camel-cased even inside an
+  otherwise snake_case / kebab identifier, as one semantic chunk:
+  =validate_activeNode=, =activeNode_membership=, =process_activeNode_diff=,
+  =skg-activeNode-defaults=, =skg-activeNode-sexp-p=.
+- Files renamed (and their feature symbols + every require/provide updated):
+  - elisp/skg-sexpr/skg-truenode-defaults.el -> .../skg-activeNode-defaults.el
+  - tests/elisp/test-skg-truenode-defaults.el -> .../test-skg-activeNode-defaults.el
+- Verification: full Rust suite green under nextest (460 passed); full elisp
+  suite green (239 passed). One test regex that the token-level rename missed
+  was fixed by hand (a partial 'truenod' in tests/multi_source_errors.rs).
+
+** Why everything resolved to 'activeNode' (and not 'vognode')
+You warned the word is ambiguous: "truly in the graph" (vognode) vs "in the
+graph AND visible" (activeNode). In practice every concrete occurrence is the
+latter:
+- In Rust the word was bound to the type =TrueNode=, which is specifically the
+  =Vognode::Active= payload; =Vognode::Inactive(InactiveNode)= is a separate
+  variant. So 'truenode' there always meant the active node, never a general
+  vognode.
+- In elisp every usage is the active/editable/visible node: it is explicitly
+  contrasted with phantoms ("headlines that are not truenodes (phantoms ...)"),
+  and it carries fields only an active node has (=indef=, =parentIs=, =birth=,
+  =editRequest=). Inactive nodes are dataless =inactiveNode= atoms, not
+  editable, and never matched.
+So I made the call to 'activeNode' everywhere rather than leaving anything
+unrenamed. The judgment calls below are where that call is debatable -- please
+override if you disagree.
+
+** CLOSED (was FLAG 1): the "is this a node sexp?" predicates
+   DISPOSITION: keep the name 'activeNode'. The predicates are named for their
+   intent -- the editable active node -- which is what they actually see in the
+   normal content buffers they run in. The "over-matches phantoms" caveat below
+   is eliminated by the very next change (giving Phantom::Diff its own
+   'diffPhantom' root metadata atom), after which '(skg (node ...))' is
+   active-only and the names are exact. No code change here.
+   - skg-activeNode-sexp-p        (elisp/skg-sexpr/skg-activeNode-defaults.el)
+   - skg--activeNode-sexp-p       (elisp/skg-metadata.el)
+   - skg-sexp-edit--is-activeNode (elisp/skg-sexpr-edit.el; a buffer-local flag
+     set from skg-activeNode-sexp-p)
+   All three reduce to the structural test
+   =(skg-sexp-subtree-p sexp '(skg (node)))= -- "is this a =(skg (node ...))=
+   metadata form?".
+
+   USED BY (all on NORMAL content buffers, never diff buffers):
+   - skg-sexpr-edit.el, the "edit this metadata sexp as org text" feature
+     (skg-sexp-edit--commit / --open-edit-buffer). The is-activeNode flag gates:
+     expand editable default fields on open, make the title headline read-only,
+     and strip defaults on commit. Those default fields
+     (indef/parentIs/birth/editRequest/viewRequests) only an editable node has.
+   - skg-modify-graph.el replace-branch-with-link
+     (skg--content-link-replacement-node-data / --container-data): the branch
+     AND its org-parent container must each satisfy skg--activeNode-sexp-p, else
+     "Cannot replace this branch with a link: it is not an activeNode".
+   - skg-metadata.el recursive source-change (skg--change-source-recursively,
+     line ~206): recurse into a descendant only if it is node-form AND
+     parentIs=affected.
+   - (sibling, not via the predicate) skg-delete-recursive marks node-form
+     descendants for deletion using the same =(skg (node))= structural test
+     inline.
+
+   SHOULD IT COVER PHANTOMS? No. Phantoms exist ONLY in git-diff-mode buffers;
+   every gesture above acts on ordinary content buffers, where each =(node ...)=
+   headline IS an active node. So in practice these predicates only ever see
+   active nodes, and 'activeNode' names their real domain correctly.
+   CAVEAT (pre-existing; surfaced by the rename, not caused by it): the test is
+   purely structural, so IF one of these gestures ran in a diff buffer a phantom
+   (also drawn as =(node ...)=) would match and be treated as an active node. In
+   fact skg-delete-recursive's docstring claims it skips phantoms, but its
+   =(skg (node))= test would NOT -- harmless today (wrong buffer kind) but a
+   latent bug if these ever run in diff mode. If you want them strictly
+   active-only, the predicate could also reject a node carrying diff axes
+   (removedM/newM/removedX), or be renamed to name the form (=skg-node-sexp-p=)
+   to make the looseness honest. CONCLUSION: 'activeNode' is the right name for
+   the intent; I made no behavior change.
+
+** CLOSED (was FLAG 2): nearest_activeNode_ancestor_source -- activeNode is exact
+   (server/update_buffer/viewnodestats.rs:187; sole caller set_source_at_boundary
+   at :166, which sets the sourceAtBoundary viewstat.) The body walks rootward
+   and returns the source of the nearest ancestor matching =Vognode::Active(t)=
+   -- it pattern-matches Active ONLY, so phantoms, inactive nodes and scaffolds
+   are skipped by construction; its docstring says "nearest active vognode
+   ancestor's source". So 'activeNode' is exactly right, and it must NOT cover
+   phantoms/inactive: a source boundary is about where the active, source-bearing
+   nodes change source (inactive nodes are dataless, phantoms aren't source
+   authorities). No concern, no change.
+
+** Out of scope, now STALE (left unchanged per "just the live code")
+   These docs still say 'TrueNode' and no longer match the code. Worth a docs
+   pass later; not touched here.
+   - Living docs: coding-advice/claude-to-claude.org (it actually DEFINES the
+     term: "TrueNode: corresponds to an NodeComplete ..."), api-and-formats.md,
+     docs/COMMANDS.org.
+   - Many historical TODO/ and TODO/DONE/ planning docs, plus a few root .org
+     (complex-birth-to-simple-parent_v1..v3.org, flatter-completion.org,
+     lying-names.org, TODO.org). These record past states; probably leave them.
+
+** Notes
+- Only the 'truenode' token was renamed. Other "true*" tokens are a different
+  word and were deliberately left alone -- e.g. =expand_true_content_at_activeNode=
+  keeps "true_content" (actual graph content), only its '_at_truenode' suffix
+  changed.
+- =inactive_node= / =InactiveNode= / =inactiveNode= are a distinct concept and
+  were preserved (the active_node->activeNode pass protected them; verified no
+  leak).

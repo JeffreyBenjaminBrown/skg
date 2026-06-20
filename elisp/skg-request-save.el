@@ -569,20 +569,6 @@ leave point on the focused headline."
     (display-buffer buffer-name)
     (message "%s" message-text)))
 
-(defun skg-show-save-errors (error-content)
-  "Show save errors in a new buffer with org-mode."
-  (skg-big-nonfatal-message
-   "*SKG Save Errors - Inconsistencies Found*"
-   "Save failed - errors shown in *SKG Save Errors - Inconsistencies Found*"
-   error-content))
-
-(defun skg-show-save-warnings (warning-content)
-  "Show save warnings in a new buffer."
-  (skg-big-nonfatal-message
-   "*SKG Save Warnings*"
-   "Save succeeded with warnings - see *SKG Save Warnings*"
-   warning-content))
-
 (defun skg-show-save-errors-and-warnings
     (errors warnings content-present)
   "Show ERRORS and WARNINGS from a save response in one org buffer."

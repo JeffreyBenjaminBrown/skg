@@ -1,0 +1,6 @@
+pid: parent
+title: parent
+contains:
+  - a
+  - ghost
+  - b

@@ -32,11 +32,6 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
          (new-idx (mod (+ idx direction) (length values))))
     (nth new-idx values)))
 
-(defun skg-sexp-edit--cycle-and-replace (field-value values direction)
-  "Cycle FIELD-VALUE through VALUES by DIRECTION, then replace the headline."
-  (org-edit-headline
-   (skg-sexp-edit--cycle-through field-value values direction)))
-
 ;;
 ;; Cycle values per field
 ;;

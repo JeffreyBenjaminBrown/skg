@@ -2,7 +2,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::viewnode::ViewNode;
-use crate::types::tree::viewnode_nodecomplete::{ pid_and_source_from_treenode, write_at_truenode_in_tree };
+use crate::types::tree::viewnode_nodecomplete::{ pid_and_source_from_treenode, write_at_activeNode_in_tree };
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -26,7 +26,7 @@ pub fn clobberIndefinitiveViewnode (
     nodecomplete_rustFirst_by_pid_and_source ( config, &node_id, &source ) ?;
   let title : String = nodecomplete . title . clone();
   let source : SourceName = nodecomplete . source . clone();
-  write_at_truenode_in_tree (
+  write_at_activeNode_in_tree (
     tree, treeid,
     |t| { t . title = title;
           t . source = source; }
