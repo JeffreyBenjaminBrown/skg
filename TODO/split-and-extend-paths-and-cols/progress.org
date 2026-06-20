@@ -118,6 +118,17 @@
    - Moved the pO latent-bug entry from 'TODO/problems.org' to
      'TODO/DONE/problems.org'.
 
+** Step 7 — read-only col scaffold ☮ herald (commit pending)
+   Added a 'leaf_ro' herald helper (label text + "☮") and applied it to
+   the SIX read-only col scaffolds (subscriberCol, overriderCol,
+   hiderCol, hiddenCol, hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol),
+   meaning "cannot be changed from here". The writable cols
+   (subscribeeCol, overriddenCol, aliasCol) keep their plain green
+   label. Pure herald-table change -- no wire atom, no parser, no server
+   logic; the conformance test is unaffected (☮ is a string child, not a
+   label). Regenerated the elisp fixture. All 462 Rust + 249 elisp tests
+   pass.
+
 * Changes to the plan's envisioned order
   - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
     regenerated WITHIN each herald-touching commit (step 2 here, later

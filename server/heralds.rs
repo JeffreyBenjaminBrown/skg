@@ -86,6 +86,18 @@ fn leaf (
 ) -> RuleChild {
   crule ( color, label, vec! [ s (text) ] ) }
 
+/// (COLOR label "text" "☮") -- a read-only col scaffold leaf: its label
+/// text plus the ☮ marker, meaning "this collection cannot be changed
+/// from here" -- the same sense ☮ ('indef') carries on a node. (A lock
+/// 🔒 here is a one-line swap; the conformance test pins atoms, not the
+/// emitted glyph.)
+fn leaf_ro (
+  color : HeraldColor,
+  label : &'static str,
+  text  : &'static str,
+) -> RuleChild {
+  crule ( color, label, vec! [ s (text), s ("☮") ] ) }
+
 /// (label) -- matches and emits nothing; consumes the atom so the
 /// table documents it. (The engine ignores unmatched atoms anyway;
 /// vacuous rules exist so the conformance test can see them.)
@@ -195,21 +207,24 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("bodyFolded"),
       leaf (Green, QualCol::Alias . repr_in_client (), "aliases"),
       leaf (Green, "alias", "alias"), // Qual::Alias
-      leaf (Green, PartnerCol::HiddenInSubscribee . repr_in_client (),
+      // The six READ-ONLY col scaffolds carry ☮ ("cannot be changed
+      // from here"); the writable cols (subscribeeCol, overriddenCol,
+      // aliasCol) do not.
+      leaf_ro (Green, PartnerCol::HiddenInSubscribee . repr_in_client (),
             "hiddenIn"),
-      leaf (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
+      leaf_ro (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
             "hiddenOut"),
       leaf (Green, PartnerCol::Subscribee . repr_in_client (),
             "it subscribes to these"),
-      leaf (Green, PartnerCol::Subscriber . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Subscriber . repr_in_client (),
             "these subscribe to it"),
-      leaf (Green, PartnerCol::Hidden . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Hidden . repr_in_client (),
             "it hides these from its subscriptions"),
-      leaf (Green, PartnerCol::Hider . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Hider . repr_in_client (),
             "these hide it from their subscriptions"),
       leaf (Green, PartnerCol::Overridden . repr_in_client (),
             "it overrides the view of these"),
-      leaf (Green, PartnerCol::Overrider . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Overrider . repr_in_client (),
             "these override the view of it"),
       leaf (Green, QualCol::ID . repr_in_client (), "IDs"),
       leaf (Green, "id", "ID"), // Qual::ID
