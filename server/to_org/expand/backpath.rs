@@ -15,6 +15,7 @@ use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::Vognode;
@@ -67,7 +68,7 @@ pub async fn build_and_integrate_containerward_path_with_source_set (
   let _ : Vec<ID> = build_and_integrate_backpaths (
     tree, node_id, config, driver,
     "contains", "contained", "container",
-    Birth::ContainsParent,
+    Birth::Backpath (RelationRole::CONTAINER),
     active
   ) . await ?;
   Ok (( )) }
@@ -113,7 +114,7 @@ pub async fn build_and_integrate_sourceward_path_with_source_set (
     build_and_integrate_backpaths (
       tree, node_id, config, driver,
       "textlinks_to", "dest", "source",
-      Birth::LinksToParent,
+      Birth::Backpath (RelationRole::LINK_SOURCE),
       active ) . await ?;
   attach_containerward_ancestries_to_link_sources (
     tree, node_id, config, driver, active ) . await }
@@ -323,9 +324,9 @@ fn extract_pids_from_paths (
         result . push ( id . clone () ); } } }
   result }
 
-/// Walk the subtree under node_id to find every Birth::LinksToParent node.
+/// Walk the subtree under node_id to find every Birth::Backpath(LINK_SOURCE) node.
 /// For each, insert its containerward ancestry as subheadlines
-/// with Birth::ContainsParent.
+/// with Birth::Backpath(CONTAINER).
 async fn attach_containerward_ancestries_to_link_sources (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
@@ -340,7 +341,7 @@ async fn attach_containerward_ancestries_to_link_sources (
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::Vognode (Vognode::Active (t))
           = &node_ref . value () . kind
-        { if t . birth == Birth::LinksToParent {
+        { if t . birth == Birth::Backpath (RelationRole::LINK_SOURCE) {
             result . push ( node_ref . id () ); }} }}
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
@@ -350,7 +351,7 @@ async fn attach_containerward_ancestries_to_link_sources (
 /// every such pid's containerward ancestry from the graph (in
 /// parallel via `ancestry_by_id_from_ids_async`), and prepend any
 /// `Inner`-shaped ancestry under that NodeId as indefinitive
-/// `Birth::ContainsParent` children. NodeIds that aren't ActiveNodes,
+/// `Birth::Backpath(CONTAINER)` children. NodeIds that aren't ActiveNodes,
 /// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
 pub async fn attach_containerward_ancestries_at_nodeids (
@@ -429,7 +430,7 @@ pub fn insert_containerward_ancestry_tree_recursive<'a> (
     let child_nid : NodeId = match
       prepend_indef_indep_child_with_source_set (
         tree, parent_nid, node . id (),
-        config, driver, Birth::ContainsParent, active
+        config, driver, Birth::Backpath (RelationRole::CONTAINER), active
       ) . await ?
     {
       Some (child_nid) => child_nid,

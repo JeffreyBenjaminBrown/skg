@@ -333,10 +333,9 @@ fn activeNode_metadata_to_string (
         parts . push ( "(parentIs independent)" . to_string () ) }
     match activeNode . birth {
       Birth::Unremarkable => {},
-      Birth::ContainsParent =>
-        parts . push ( "(birth containsParent)" . to_string () ),
-      Birth::LinksToParent =>
-        parts . push ( "(birth linksToParent)" . to_string () ) }
+      Birth::Backpath (role) =>
+        parts . push ( format! (
+          "(birth backpath {})", role . rolename () )) }
     if activeNode . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata

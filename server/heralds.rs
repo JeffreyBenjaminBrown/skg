@@ -19,6 +19,7 @@
 /// nested RULE. The special label ANY matches any leaf; IT echoes
 /// the matched value(s).
 
+use crate::dbs::in_rust_graph::relation_accessors::PARTNER_ROLE_VOCAB;
 use crate::types::viewnode::{PartnerCol, Qual, QualCol, ViewRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,6 +122,16 @@ fn interc (
     abut : false, children } ) }
 
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
+
+/// Birth herald children: the literal 'backpath' tag (emits nothing)
+/// plus one orange glyph leaf per partner role, generated from
+/// PARTNER_ROLE_VOCAB so the role<->glyph table is the single source of
+/// truth. Matches '(birth backpath ROLENAME)'.
+fn birth_rule_children () -> Vec<RuleChild> {
+  let mut children : Vec<RuleChild> = vec! [ vac ("backpath") ];
+  for (rolename, _role, glyph) in PARTNER_ROLE_VOCAB {
+    children . push ( leaf (Orange, rolename, glyph) ); }
+  children }
 
 //
 // The table
@@ -237,9 +248,7 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("absent"),
           vac ("affected"),
           leaf (Orange, "independent", "⊥") ]),
-        rule ("birth", vec! [
-          leaf (Orange, "containsParent", "}"),
-          leaf (Orange, "linksToParent",  "←") ]),
+        rule ("birth", birth_rule_children ()),
         // The server emits the abbreviated atom 'indef'
         // (see org_to_text.rs); we match that here.
         leaf_abut (Green, "indef", "☮"),
@@ -470,14 +479,18 @@ fn parentIs_emitted_atoms () -> Vec<&'static str> {
   vec! [ "independent", "absent" ] }
 
 /// Birth values the serializer can emit (Unremarkable stays implicit).
+/// A Backpath emits '(birth backpath ROLENAME)', so the atoms are the
+/// 'backpath' tag plus every ROLENAME in PARTNER_ROLE_VOCAB.
 fn birth_emitted_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::Birth;
   fn guard ( b : Birth ) { // compile error here = update the list below
     match b {
-      Birth::Unremarkable | Birth::ContainsParent | Birth::LinksToParent
+      Birth::Unremarkable | Birth::Backpath (_)
         => () }}
   let _ = guard;
-  vec! [ "containsParent", "linksToParent" ] }
+  let mut atoms : Vec<&'static str> = vec! [ "backpath" ];
+  atoms . extend ( PARTNER_ROLE_VOCAB . iter () . map ( |(name, _, _)| *name ) );
+  atoms }
 
 /// The staged/unstaged axis atoms, from types/git.rs.
 fn axis_atoms () -> Vec<&'static str> {

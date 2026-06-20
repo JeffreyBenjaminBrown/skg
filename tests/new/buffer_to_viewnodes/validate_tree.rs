@@ -529,12 +529,12 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
   // A definitive view request on an indefinitive node whose children
   // are all NON-content (parentIs != Affected) should be permitted: the
   // expansion would fill the node with content, and non-content
-  // children (e.g. 'birth containsParent' ancestry stubs) don't conflict
+  // children (e.g. 'birth backpath container' ancestry stubs) don't conflict
   // with that. Only Container children would be clobbered.
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
-                ** (skg (node (id ancestor) (source main) (parentIs independent) (birth containsParent))) non-content child
+                ** (skg (node (id ancestor) (source main) (parentIs independent) (birth backpath container))) non-content child
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;

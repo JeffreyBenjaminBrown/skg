@@ -179,7 +179,7 @@ fn id_to_pid_if_found (g: &InRustGraph, id: &ID) -> ID {
 /// subsequent neighbor Save references an acquiree pid that's now an
 /// extra_id of this node, 'id_to_pid_if_found' during that neighbor's add
 /// maps the reference to this node's canonical pid.
-fn add_to_inverse_indexes (
+pub(crate) fn add_to_inverse_indexes (
   g: &mut InRustGraph,
   node: &NodeRust
 ) {

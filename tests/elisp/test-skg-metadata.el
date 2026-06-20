@@ -291,7 +291,7 @@ Returns the parsed s-expression or nil if not found."
       "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (parentIs independent) (birth linksToParent))) link child\n"
+      "** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
       "** (skg aliasCol) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))

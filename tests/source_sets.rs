@@ -8,6 +8,7 @@ use indoc::indoc;
 use ego_tree::{NodeId, Tree};
 
 use skg::dbs::init::wipe_then_init_tantivy_db;
+use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::ancestry::AncestryTree;
 use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
@@ -722,7 +723,7 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         config,
         driver,
-        Birth::LinksToParent,
+        Birth::Backpath (RelationRole::LINK_SOURCE),
         Some (&active)) . await ?;
       assert_eq! (
         true_child_ids (&viewforest, child_id),
@@ -746,7 +747,7 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         config,
         driver,
-        Birth::LinksToParent,
+        Birth::Backpath (RelationRole::LINK_SOURCE),
         Some (&active)) . await ?;
       assert! (
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)

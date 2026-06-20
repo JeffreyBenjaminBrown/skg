@@ -17,11 +17,43 @@
    (link-dest view prose + the export "link whose dest" line), and
    'api-and-formats.md' (export "links whose dest" line).
 
+** Step 2 — parameterize Birth -> Backpath(RelationRole) (commit pending)
+   - Added the single-source-of-truth role vocabulary to
+     'relation_accessors.rs': nine 'RelationRole' consts (CONTAINER,
+     LINK_SOURCE, LINK_DEST, OVERRIDER, OVERRIDDEN, HIDER, HIDDEN,
+     SUBSCRIBER, SUBSCRIBEE), the 'PARTNER_ROLE_VOCAB' table
+     (ROLENAME <-> RelationRole <-> glyph), and methods 'rolename',
+     'from_rolename', 'glyph', 'backpath_triple' (triple derived, not
+     stored).
+   - 'Birth' is now '{ Unremarkable, Backpath(RelationRole) }'. Wire
+     form '(birth backpath ROLENAME)'; serialize/parse updated.
+   - 'validate_parentIs_relationships' collapses the two per-variant
+     birth checks into one 'relation_membership_is_real' call keyed by
+     the role; deleted the now-dead 'child_contains_parent' /
+     'child_linksto_parent' helpers.
+   - Birth heralds + 'birth_emitted_atoms' are now GENERATED from
+     PARTNER_ROLE_VOCAB, so all nine role glyphs exist already (step 5
+     adds no herald work). Regenerated 'tests/elisp/herald-rules.sexp'.
+   - All suites green: 460 Rust, 249 elisp, and the four birth-touching
+     integration tests (containerward/sourceward/content-view-from-non-root/
+     search-enrichment).
+
 * Changes to the plan's envisioned order
-  (none yet)
+  - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
+    regenerated WITHIN each herald-touching commit (step 2 here, later
+    steps 6/7), not deferred to step 9, so every commit stays green
+    (the conformance test 'elisp_fixture_matches_the_live_table' pins
+    it). Step 9 still does the final full regen + suite run.
 
 * What's imperfect about what's done
-  (none yet)
+  - The unit-test helper 'graph_with' ('tests/unit/to_org_util.rs')
+    previously built an INCOMPLETE in-Rust graph (nodes only, no inverse
+    indexes). The new birth validation reads the inverse indexes via
+    'relation_membership_is_real' (correct in production, where the
+    graph is fully built), so I fixed 'graph_with' to also call
+    'add_to_inverse_indexes' (newly 'pub(crate)'). This is a test-only
+    correctness fix, not a production change; flagging it because it
+    widened the visibility of an internal helper.
 
 * Choices determining the future
 

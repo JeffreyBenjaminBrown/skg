@@ -1,5 +1,7 @@
 use crate::types::misc::MSV;
 use crate::types::viewnode::{ mk_indefinitive_viewnode, mk_indefinitive_viewnode_with_birth };
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
+use crate::dbs::in_rust_graph::add_to_inverse_indexes;
 use crate::types::viewnode::viewforest_root_viewnode;
 
 use super::*;
@@ -37,6 +39,10 @@ fn graph_with (nodes: Vec<NodeRust>) -> InRustGraph {
     for eid in &n . extra_ids {
       g . extra_id_to_pid . insert (eid . clone (), n . pid . clone ()); } }
   for n in nodes {
+    // Build the inverse indexes too (contained_by, textlinks_in, ...),
+    // so the graph is complete: 'relation_membership_is_real' (used by
+    // the birth-claim validation) reads those inverse maps.
+    add_to_inverse_indexes (&mut g, &n);
     g . nodes . insert (n . pid . clone (), n); }
   g }
 
@@ -72,7 +78,7 @@ fn linksto_false_claim_flipped_to_independent () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::LinksToParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
@@ -96,11 +102,11 @@ fn linksto_true_claim_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::LinksToParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::LinksToParent,
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::LINK_SOURCE),
     "LinksToParent claim with a backing textlink must be preserved");
 }
 
@@ -120,7 +126,7 @@ fn containerof_false_claim_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::ContainsParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
@@ -186,11 +192,11 @@ fn containerof_via_merged_extra_id_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::ContainsParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::ContainsParent,
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
     "Extra_id-aliased parent pid should still satisfy the claim");
 }
 
@@ -212,11 +218,11 @@ fn containerof_view_parent_is_acquiree_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::ContainsParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::ContainsParent,
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
     "When view parent id is the acquiree pid, the claim should \
      still hold via pid_of resolution on the parent side");
 }
@@ -341,11 +347,11 @@ fn moved_containerof_relationship_holds_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::ContainsParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::ContainsParent,
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
     "Moved content child still contains its new parent — keep");
 }
 
@@ -366,7 +372,7 @@ fn moved_containerof_relationship_broken_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::ContainsParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
@@ -442,11 +448,11 @@ fn moved_linksto_relationship_holds_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::LinksToParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::LinksToParent,
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::LINK_SOURCE),
     "Moved linksToParent: C still links to p_new — keep");
 }
 
@@ -466,7 +472,7 @@ fn moved_linksto_relationship_broken_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_indefinitive_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::LinksToParent) ) . id ();
+      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
   validate_parentIs_relationships (&mut viewforest, &graph);
 

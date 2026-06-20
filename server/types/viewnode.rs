@@ -8,6 +8,7 @@
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, SourceName};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
@@ -32,11 +33,17 @@ pub enum ParentIs {
 /// Why a generated node was originally displayed under its visible parent.
 /// This is view history used for display and stale-relation validation,
 /// not save extraction.
+///
+/// A 'Backpath(role)' node was grafted by the backpath engine as an
+/// ancestry partner; the RelationRole names the role that partner plays
+/// toward its org-parent (the origin) -- e.g. 'CONTAINER' for a
+/// containerward ancestor, 'LINK_SOURCE' for a node that links to the
+/// origin. The role determines the wire ROLENAME and the herald glyph
+/// (see PARTNER_ROLE_VOCAB).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Birth {
   Unremarkable,
-  ContainsParent,
-  LinksToParent,
+  Backpath (RelationRole),
 }
 
 //
