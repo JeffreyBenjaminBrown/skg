@@ -5,6 +5,44 @@
   migrated 2026-06-19 in the original problems.org order (oldest
   section first).
 
+* RESOLVED Heralds: the rule table was volatile session state with no self-heal (2026-06-19)
+  The herald rule table ('heralds--transform-rules') is fetched once
+  per connect by 'skg-request-herald-rules' (called from
+  'skg-client-init') and has NO on-disk source. If it became nil,
+  'heralds-minor-mode' just disabled itself with "Heralds disabled: no
+  herald rule table from the server" -- even when the server was
+  perfectly healthy and would answer a re-fetch instantly. The feature
+  looked broken intermittently: the table was lost, then silently
+  restored the next time a skg buffer triggered 'skg-client-init' (the
+  "it broke, then fixed itself without my changing anything" report on
+  2026-06-19). NB commit 8cd3bf00 (the git-add 'org-map-entries'
+  rewrite) was wrongly suspected; it only touches skg-git-add.el and
+  cannot affect the herald table -- it was the *reload while testing
+  it* that tripped the loss path below.
+
+  Two fixes landed:
+  - Loss path closed. 'skg-reload' captured the table, unloaded
+    'heralds-minor-mode' (wiping it), reloaded, then re-installed the
+    captured copy as a plain sequential step -- so any error in a
+    reloaded file aborted the reload before the re-install and lost the
+    table for the session. The re-install is now wrapped in
+    'unwind-protect' (the reload's destructive half split into
+    'skg--reload-modules'), so the table survives a botched reload while
+    the error still propagates. Regression test:
+    tests/elisp/test-skg-reload.el.
+  - Self-heal added. Enabling 'heralds-minor-mode' with a nil table now
+    calls 'skg-herald-rules-ensure', which re-requests the table from
+    the server up to 'skg-herald-rules-max-attempts' (3) times, each
+    with a bounded wait, then gives up cleanly (bounded so a silent or
+    wedged server cannot freeze Emacs). On give-up or hard failure the
+    user gets an informative message and heralds disable. This also
+    backstops a dropped/raced connect-time fetch. The manual fetch
+    command was removed ('skg-request-herald-rules' is no longer
+    'interactive'), since recovery is now automatic. Regression tests
+    in tests/elisp/test-heralds-minor-mode.el
+    (test-heralds-self-heals-missing-rule-table,
+    test-heralds-gives-up-after-bounded-fetch-attempts).
+
 * Problems noted during the forks arc (TODO/forks/)
 ** RESOLVED Forking a foreign node with no owned ancestor
    (Was: the read-only confirmation buffer could not set a clone's

@@ -1,3 +1,4 @@
+* Play two roles, communicate through git.
 * s
 ** correctness
 *** Bug: skg-close-all-buffers
@@ -51,6 +52,9 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
+*** fork request
+To provide a way to fork your own data
+(because the 'edit a foreign one' gesture cannot be applied).
 *** Why is search slow?
 Try a search that was big -- backup my data.
 The view update or the ranking might swamp the other's cost.
@@ -88,6 +92,7 @@ and removes the child from the parent.
 *** return point to not just the same line but the same* char
   * or max within that line if too big)
 ** convenience to coder
+*** I want my config data to be in git.
 *** [[./TODO/better-than-regex-in-emacs-tests.org]]
 *** graphstats should precede even the link source count
 but follow parentIs and indef
