@@ -53,6 +53,13 @@ cannot acquire inconsistent policies in different layers:
   `hiddenOutsideOfSubscribeeCol`): membership is derived from hide
   state rather than from a single relation role.
 
+The SIX read-only cols (the `ReadOnlySet` four plus the `ReadOnlyFilter`
+two) carry the ☮ herald on their col headline, meaning "this collection
+cannot be changed from here" — the same sense ☮ (`indef`) carries on a
+node.  The two `WritableSet` cols and `aliasCol` do not.  This is a
+herald-table fact only (`server/heralds.rs`), with no wire atom of its
+own: which cols are read-only is already known from the col atom.
+
 The stale-member rule is uniform across all eight kinds (decided
 2026-06-10, demote-not-discard): a stale `parentIs=Affected` member
 that is a leaf is deleted; one with children is demoted to

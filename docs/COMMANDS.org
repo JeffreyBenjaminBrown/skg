@@ -240,20 +240,52 @@ detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
 on the node at point; it reports moves across all sources.
-** C-c r : showing more information about a node
-These commands don't edit the graph. Each inserts a request
-into the metadata of the node at point that, on save, causes
-the server to render additional information into the view.
-*** C-c r a : skg-reveal-aliases
-See what other text you could search for to find this node.
-You can always search for its title.
-Most nodes have a title and no aliases.
-*** C-c r c : skg-reveal-containerward
-Show the nodes that contain the node at point -- its ancestry
-in the containment graph, climbing until a fork, cycle, or root.
-*** C-c r s : skg-reveal-sourceward
-Show the nodes that link to the node at point (its textlink
-sources).
+** C-c c : show a COLLECTION (both cols of a relation)
+These commands don't edit the graph. Each inserts a request into the
+metadata of the node at point that, on save, causes the server to
+render the relation's collections (cols) into the view, POPULATED from
+the graph. Each builds BOTH cols of its relation. The read-only-col ☮
+marks a col you cannot change from here. Every command auto-saves.
+*** C-c c a : skg-show-collection-aliases
+The aliasCol -- other text you could search for to find this node
+(you can always search for its title; most nodes have none). Writable:
+type an alias in and save.
+*** C-c c o : skg-show-collection-overrides
+The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+even when empty as an "add an override here" surface) and the
+overriderCol (the nodes that override this one -- read-only, ☮).
+*** C-c c h : skg-show-collection-hides
+The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these cols. On a node that neither
+hides nor is hidden, nothing appears.
+*** C-c c s : skg-show-collection-subscribes
+The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberCol (the nodes that subscribe to
+this one -- read-only, ☮).
+** C-c p : show a PATH (the backpath through one relation role)
+Like the collections, each inserts a request that, on save, grafts the
+partners reached through one relation role as inverted, read-only
+children, climbing transitively until a fork, cycle, or root. UPPER =
+the partner's active (first) role; lower = its passive (second) role.
+Every command auto-saves.
+*** C-c p C : skg-show-paths-through-containers
+The nodes that contain this node (its containment ancestry).
+*** C-c p L : skg-show-paths-through-link-sources
+The nodes that link to this node (its textlink sources).
+*** C-c p l : skg-show-paths-through-link-dests
+The nodes this node links to (its textlink dests).
+*** C-c p O : skg-show-paths-through-overriders
+The nodes that override this node.
+*** C-c p o : skg-show-paths-through-overridden
+The nodes this node overrides.
+*** C-c p H : skg-show-paths-through-hiders
+The nodes that hide this node from their subscriptions.
+*** C-c p h : skg-show-paths-through-hidden
+The nodes this node hides from its subscriptions.
+*** C-c p S : skg-show-paths-through-subscribers
+The nodes that subscribe to this node.
+*** C-c p s : skg-show-paths-through-subscribees
+The nodes this node subscribes to.
 ** C-c s : setting node properties
 *** first some vocab: 'definitive' and 'indefinitive'
 A view of a node can be definitive or indefinitive.

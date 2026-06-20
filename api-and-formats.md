@@ -359,8 +359,32 @@ node participates in the collection represented by its visible parent:
 `(birth ...)` records generated-view provenance, not save intent:
 
 - omitted `birth` means `unremarkable`;
-- `(birth containsParent)` marks containerward ancestry;
-- `(birth linksToParent)` marks sourceward link-source ancestry.
+- `(birth backpath ROLENAME)` marks a node grafted by the backpath
+  engine as an ancestry partner playing ROLENAME toward its org-parent
+  (e.g. `container` for a containerward ancestor, `linkSource` for a
+  node that links to it, also `linkDest`, `overrider`, `overridden`,
+  `hider`, `hidden`, `subscriber`, `subscribee`). ROLENAME is one of the
+  nine in `PARTNER_ROLE_VOCAB`
+  (`server/dbs/in_rust_graph/relation_accessors.rs`), which also fixes
+  its herald glyph.
+
+## View requests: (viewRequests ...)
+
+`(viewRequests ...)` carries client→server REQUESTS for extra views
+(unlike `birth` and the stats below, which are server→client). On save
+the server fulfills each request during view completion and then drops
+the atom, so a request is transient. Three request forms:
+
+- `(col RELNAME)` — build BOTH cols of the relation, populated from the
+  graph. RELNAME is `aliases`, `overrides`, `hides`, or `subscribes`.
+  The writable col (`overriddenCol` / `subscribeeCol` / `aliasCol`)
+  appears even when empty (its editable "add here" surface); an empty
+  read-only col is pruned. Emitted by the `C-c c` commands.
+- `(path ROLENAME)` — build the backpath for one partner role, grafting
+  the partners as inverted read-only children (each marked `(birth
+  backpath ROLENAME)`). ROLENAME is one of the nine in
+  `PARTNER_ROLE_VOCAB`. Emitted by the `C-c p` commands.
+- `definitiveView` — make an indefinitive, childless node editable.
 
 ## Stats metadata: graphStats and viewStats
 
@@ -401,13 +425,19 @@ different parents):
 - `grandparentSubscribes` — herald red "gS"; computed only for an
   Affected child of an `overriddenCol` whose col owner also
   subscribes to it. Not emitted under a `subscribeeCol`.
-- `overridesParent` — herald red "Op"; this node overrides the node
-  of its visible org-parent. Like `containsParent`, necessarily a
-  view stat, since the same node can sit under different parents.
-- `parentOverrides` — herald red "pO"; the inverse of `overridesParent`:
-  this node's visible org-parent overrides it. Computed only where
-  needed (the fork-confirmation buffer, where it marks the original
-  under its clone-to-be), not generally.
+- `overridesParent` / `parentOverrides` — herald red "Op" / "pO"; this
+  node overrides the node of its visible org-parent, or the inverse
+  (the parent overrides this node). Like `containsParent`, necessarily
+  view stats, since the same node can sit under different parents. (pO
+  also marks the original under its clone-to-be in the fork-confirmation
+  buffer.)
+- `subscribesParent` / `parentSubscribes` — herald red "Sp" / "pS"; this
+  node subscribes to its visible org-parent, or the inverse.
+- `hidesParent` / `parentHides` — herald red "Hp" / "pH"; this node
+  hides its visible org-parent (an outbound
+  `hides_from_its_subscriptions` edge), or the inverse. Plain binary
+  edge heralds; the "hidden from which subscription" context lives in
+  the hide cols, not here.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 

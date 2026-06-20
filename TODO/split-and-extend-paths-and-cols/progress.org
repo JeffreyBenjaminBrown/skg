@@ -147,6 +147,37 @@
    - 250 elisp tests pass; the aliases/containerward/sourceward
      integration tests pass with the renamed commands.
 
+** Step 9 — docs, fixtures, conformance, full suite (commit pending)
+   - 'docs/COMMANDS.org': replaced the 'C-c r' section with the full
+     'C-c c' (collections) and 'C-c p' (paths) families, noting per
+     command which col side (if any) is editable and the read-only ☮.
+   - 'api-and-formats.md': updated the '(birth backpath ROLENAME)'
+     grammar, added a '(viewRequests ...)' request-grammar subsection
+     ((col ...)/(path ...)/definitiveView), and added the new viewStats
+     (Sp/pS/Hp/pH) + the now-general pO.
+   - 'glossary.md': documented the read-only-col ☮ on the six read-only
+     cols.
+   - Regenerated 'tests/elisp/herald-rules.sexp' (unchanged since step 7
+     -- it has been kept current per-commit).
+   - FULL SUITE GREEN: 462 Rust ('cargo nextest run'), 250 elisp
+     ('bash/emacs-tests.sh'), and ALL integration tests
+     ('bash/integration-tests.sh').
+
+* What's imperfect about what's done (caught in step 9)
+  - The full integration suite (run only at step 9) surfaced THREE
+     fixtures whose shared helper ('save_collateral_break_cycle/
+     test-helpers.el', also loaded by 'save_collateral_add_content_and_modify_text'
+     and 'git-diff-view-updates') still classified a node's birth via
+     the OLD '(car birth-list)' = containsParent/linksToParent. The
+     step-2 birth-format change ('(birth backpath ROLENAME)') silently
+     reclassified those nodes as 'independent'. Fixed the helper to read
+     '(backpath ROLENAME)' -> ROLENAME and migrated the three tests'
+     relation labels (containsParent -> container). Root cause: I ran
+     only the targeted integration tests per-commit (the full
+     integration suite is slow); the gap is exactly what step 9's full
+     run is for, but a step-2 grep for 'birth' in integration helpers
+     would have caught it earlier.
+
 * Changes to the plan's envisioned order
   - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
     regenerated WITHIN each herald-touching commit (step 2 here, later
