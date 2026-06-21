@@ -90,7 +90,25 @@ plus a one-time data/bash/trim-node-bodies.org migration.
 
 * What's done and went well
 
-(updated as steps complete)
+- *Step 0* (empty bodies impossible): committed. normalize_body at
+  NodeFS::from + into_nodecomplete; migration script + Rust helper.
+- *Steps 2–5 (Rust core)*: committed together (tightly coupled).
+  - server/herald_tokens.rs: the token grammar + assembly, with a
+    dedicated unit test (tests/herald_tokens.rs) pinning every worked
+    example from the plan (aC, 3aC, aC5, C4a, Ca, bS, Ob, dH bC,
+    a(b,c)L collapses, La, Ak/Ik). All green.
+  - GraphNodeStats restructured to directional RelationCounts; the
+    TypeDB-fallback path RETIRED (no graph -> empty stats).
+  - viewnodestats.rs: ancestor-flag pass (parent gnode at gen1; col
+    members via required_ancestor at gen i+2) + birth designation +
+    assembly into ViewNodeStats.{birth_herald,rels_herald}.
+  - org_to_text.rs emits (birthHerald "..") + (rels ".."); viewStats
+    trimmed to cycle/overridesHere/sourceHerald; phantom emits counts-
+    only (rels ..).
+  - parser accepts+discards rels/birthHerald, drops graphStats/birth.
+  - heralds.rs rule table reordered (⊥ ☮ birth rels ...); conformance
+    test green; elisp fixture regenerated.
+  - graphnodestats_hiding.rs reworked to the new directional counts.
 
 * Changes to the plan's envisioned order
 

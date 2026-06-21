@@ -23,7 +23,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, ColRelation,
   Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
-  Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
+  Birth, IndefOrDef, ParentIs,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
@@ -426,8 +426,11 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . source = Some ( SourceName::from (value) ); },
-          "graphStats" => {
-            parse_graphstats_sexp ( &subitems[1..], &mut metadata . graphStats ) ?; },
+          // The relationship / birth heralds are display-only strings
+          // (assembled in Rust, echoed by the rule table). Emacs strips
+          // them before save; if a stale buffer still carries them, we
+          // accept and discard -- the view regenerates them.
+          "rels" | "birthHerald" => {},
           "viewStats" => {
             parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
@@ -446,21 +449,6 @@ fn parse_node_sexp (
               "absent"      => ParentIs::Absent,
               _ => return Err ( format! (
                 "Invalid parentIs value: {}", value )), }; },
-          "birth" => {
-            // (birth backpath ROLENAME)
-            if subitems . len () != 3 {
-              return Err ( "birth requires 'backpath ROLENAME'" . to_string () ); }
-            let kind : String =
-              atom_to_string ( &subitems[1] ) ?;
-            if kind != "backpath" {
-              return Err ( format! ( "Invalid birth kind: {}", kind )); }
-            let rolename : String =
-              atom_to_string ( &subitems[2] ) ?;
-            let role : RelationRole =
-              RelationRole::from_rolename ( &rolename )
-                . ok_or_else ( || format! (
-                  "Invalid birth rolename: {}", rolename )) ?;
-            metadata . birth = Birth::Backpath (role); },
           "staged" => {
             apply_axis_atoms_to_activeNode (
               &subitems[1..],
@@ -603,87 +591,11 @@ fn parse_deleted_sexp (
   Ok (( )) }
 
 
-/// Parse the (graphStats ...) s-expression contents.
-fn parse_graphstats_sexp (
-  items : &[Sexp],
-  stats : &mut GraphNodeStats
-) -> Result<(), String> {
-  // Accumulate containers/contents to build containRels.
-  let mut saw_containers : Option<usize> = None;
-  let mut saw_contents   : Option<usize> = None;
-  // Accumulate linksIn counts to build linksourceRels.
-  let mut saw_links_from_containers : Option<usize> = None;
-  let mut saw_links_from_leaves     : Option<usize> = None;
-  for element in items {
-    match element {
-      Sexp::Atom (_) => {
-        let key : String = atom_to_string (element) ?;
-        match key . as_str () {
-          "aliasing"    => { stats . aliasing    = true; },
-          "extraIDs"    => { stats . extraIDs    = true; },
-          "overriding"  => { stats . overriding  = true; },
-          "subscribing" => { stats . subscribing = true; },
-          "hiding"      => { stats . hiding      = true; },
-          _ => { return Err ( format! (
-            "Unknown graphStats atom: {}", key )); }} },
-      Sexp::List (kv_pair) if kv_pair . len () == 2 => {
-        let key : String =
-          atom_to_string ( &kv_pair[0] ) ?;
-        let value : String =
-          atom_to_string ( &kv_pair[1] ) ?;
-        match key . as_str () {
-          "containers" => {
-            saw_containers = Some (
-              value . parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid containers value: {}", value )) ? ); },
-          "contents" => {
-            saw_contents = Some (
-              value . parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid contents value: {}", value )) ? ); },
-          "linksInFromContainers" => {
-            saw_links_from_containers = Some (
-              value . parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid linksInFromContainers value: {}", value )) ? ); },
-          "linksInFromLeaves" => {
-            saw_links_from_leaves = Some (
-              value . parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid linksInFromLeaves value: {}", value )) ? ); },
-          // Herald fields are output-only; silently discard on parse.
-          "containsHerald" | "linksHerald" => {},
-          // Legacy linksIn field: silently discard.
-          "linksIn" => {},
-          _ => { return Err ( format! ( "Unknown graphStats key: {}",
-                                         key )); }} },
-      _ => { return Err ( "Unexpected element in graphStats"
-                           . to_string () ); }} }
-  if saw_containers . is_some ()
-    || saw_contents . is_some () {
-    // Build containRels if either contain field was present.
-    let cr : &mut NodeContainRels =
-      stats . containRels . get_or_insert (
-        NodeContainRels { containers : 1, contents : 0 } );
-    if let Some (c) = saw_containers { cr . containers = c; }
-    if let Some (c) = saw_contents   { cr . contents   = c; }}
-  if saw_links_from_containers . is_some ()
-    || saw_links_from_leaves . is_some () {
-    // Build linksourceRels if either link field was present.
-    let lr : &mut NodeLinksourceRels =
-      stats . linksourceRels . get_or_insert (
-        NodeLinksourceRels { sources_with_content    : 0,
-                             sources_without_content : 0 } );
-    if let Some (c) = saw_links_from_containers
-      { lr . sources_with_content    = c; }
-    if let Some (c) = saw_links_from_leaves
-      { lr . sources_without_content = c; }}
-  Ok (( )) }
-
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
-/// stats (cycle, containsParent, the parent-relationship heralds) and
-/// the keyed 'overridesHere'/'sourceHerald' sub-forms.
+/// 'cycle' stat and the keyed 'overridesHere' / 'sourceHerald'
+/// sub-forms. (The relationship stats are now display-only herald
+/// strings, parsed -- and discarded -- as the 'rels'/'birthHerald'
+/// atoms instead.)
 fn parse_viewstats_sexp (
   items : &[Sexp],
   stats : &mut ViewNodeStats
@@ -695,15 +607,6 @@ fn parse_viewstats_sexp (
           atom_to_string (element) ?;
         match bare_value . as_str () {
           "cycle"          => stats . cycle = true,
-          "containsParent" => stats . parentIsContent   = true,
-          "grandparentOverrides"  => stats . grandparentOverrides  = true,
-          "grandparentSubscribes" => stats . grandparentSubscribes = true,
-          "overridesParent"       => stats . overridesParent       = true,
-          "parentOverrides"       => stats . parentOverrides       = true,
-          "subscribesParent"      => stats . subscribesParent      = true,
-          "parentSubscribes"      => stats . parentSubscribes      = true,
-          "hidesParent"           => stats . hidesParent           = true,
-          "parentHides"           => stats . parentHides           = true,
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },

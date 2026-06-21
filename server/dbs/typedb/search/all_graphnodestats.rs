@@ -1,121 +1,70 @@
-/// PURPOSE: Fetch all graph-node statistics for a set of PIDs.
+/// PURPOSE: Fetch all graph-node statistics for a set of PIDs from the
+/// in-Rust graph: directional member counts for the five relations, the
+/// alias / extra-id counts, and the "surprising links" =a(b,c)= split.
+/// These feed the uniform-herald token grammar (server/herald_tokens.rs).
 ///
-/// Runs one TypeDB query PER PID, all in parallel.
-/// Each individual query is fast (~15ms) because it matches
-/// exactly one node. The old approach used a single query with
-/// an N-way disjunction, which scaled very non-linearly
-/// (1 PID: 15ms, 24 PIDs: 4300ms).
+/// PITFALL: Assumes input IDs are primary IDs, not extra IDs. Always
+/// true on the graphnodestats path (PIDs come from the built viewnode
+/// tree).
 ///
-/// PITFALL: Assumes input IDs are primary IDs, not extra IDs.
-/// This is always true for the graphnodestats path, which collects
-/// PIDs from the already-built viewnode tree.
+/// The old TypeDB fallback was retired with the uniform-heralds rewrite:
+/// the directional counts and the on-demand surprising-links re-parse
+/// have no reasonable TypeQL form, and the running server always has the
+/// in-Rust graph. When the global graph handle is absent (a few tests
+/// that bypass init), stats are simply empty -- views still render,
+/// without heralds.
 
-use crate::consts::typedb_concurrent_transactions;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
-use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{GraphNodeStats, NodeContainRels, NodeLinksourceRels};
+use crate::types::textlinks::{replace_each_link_with_its_label,
+                              textlinks_from_text};
+use crate::types::viewnode::{GraphNodeStats, RelationCounts};
 
-use futures::stream::{self, StreamExt};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::{
-  answer::{QueryAnswer, ConceptDocument},
-  answer::concept_document::Node,
-  Transaction,
-  TransactionType,
-  TypeDBDriver,
-};
+use typedb_driver::TypeDBDriver;
 
-/// Everything 'set_graphnodestats_in_viewforest' needs from TypeDB.
+/// Everything 'set_graphnodestats_in_viewforest' needs from the graph.
 pub struct AllGraphNodeStats {
-  pub num_containers               : HashMap < ID, usize >,
-  pub num_contents                 : HashMap < ID, usize >,
-  pub num_links_in_from_containers : HashMap < ID, usize >,
-  pub num_links_in_from_leaves     : HashMap < ID, usize >,
-  pub has_subscribes               : HashSet < ID >,
-  pub has_overrides                : HashSet < ID >,
-  pub has_hides                    : HashSet < ID >,
-  pub container_to_contents        : HashMap < ID, HashSet < ID > >,
-  pub content_to_containers        : HashMap < ID, HashSet < ID > >,
+  pub counts                : HashMap < ID, RelationCounts >,
+  pub container_to_contents : HashMap < ID, HashSet < ID > >,
+  pub content_to_containers : HashMap < ID, HashSet < ID > >,
 }
 
 impl AllGraphNodeStats {
   pub fn empty () -> AllGraphNodeStats {
     AllGraphNodeStats {
-      num_containers               : HashMap::new (),
-      num_contents                 : HashMap::new (),
-      num_links_in_from_containers : HashMap::new (),
-      num_links_in_from_leaves     : HashMap::new (),
-      has_subscribes               : HashSet::new (),
-      has_overrides                : HashSet::new (),
-      has_hides                    : HashSet::new (),
-      container_to_contents        : HashMap::new (),
-      content_to_containers        : HashMap::new (),
+      counts                : HashMap::new (),
+      container_to_contents : HashMap::new (),
+      content_to_containers : HashMap::new (),
     } } }
 
-/// Extract GraphNodeStats for a single PID
-/// from AllGraphNodeStats and an optional disk NodeComplete.
+/// Extract GraphNodeStats for a single PID from AllGraphNodeStats and
+/// an optional disk NodeComplete (the source of the alias / extra-id
+/// counts).
 pub fn graphnodestats_for_pid (
-  pid     : &ID,
-  stats   : &AllGraphNodeStats,
+  pid          : &ID,
+  stats        : &AllGraphNodeStats,
   nodecomplete : Option<&NodeComplete>,
 ) -> GraphNodeStats {
-  let aliasing : bool =
+  let aliases : usize =
     nodecomplete
-    . map ( |n| ! n . aliases . or_default () . is_empty () )
-    . unwrap_or (false);
-  let extra_ids : bool =
+    . map ( |n| n . aliases . or_default () . len () )
+    . unwrap_or (0);
+  let extra_ids : usize =
     nodecomplete
-    . map ( |n| ! n . extra_ids . is_empty () )
-    . unwrap_or (false);
-  let contain_rels : Option<NodeContainRels> =
-    stats . num_containers . get (pid) . copied ()
-    . map ( |containers| {
-      let contents : usize =
-        stats . num_contents . get (pid) . copied ()
-        . unwrap_or (0);
-      NodeContainRels { containers, contents }} );
-  let from_containers : usize =
-    stats . num_links_in_from_containers
-    . get (pid) . copied () . unwrap_or (0);
-  let from_leaves : usize =
-    stats . num_links_in_from_leaves
-    . get (pid) . copied () . unwrap_or (0);
-  let linksource_rels : Option<NodeLinksourceRels> =
-    Some ( NodeLinksourceRels {
-      sources_with_content    : from_containers,
-      sources_without_content : from_leaves } );
+    . map ( |n| n . extra_ids . len () )
+    . unwrap_or (0);
   GraphNodeStats {
-    aliasing,
-    extraIDs       : extra_ids,
-    overriding     : stats . has_overrides  . contains (pid),
-    subscribing    : stats . has_subscribes . contains (pid),
-    hiding         : stats . has_hides      . contains (pid),
-    containRels    : contain_rels,
-    linksourceRels : linksource_rels, }}
+    aliases,
+    extra_ids,
+    rels : stats . counts . get (pid) . cloned (), }}
 
-/// Stats for a single PID, returned by 'fetch_one_pid_stats'.
-struct OnePidStats {
-  pid                          : ID,
-  num_containers               : usize,
-  num_contents                 : usize,
-  num_links_in_from_containers : usize,
-  num_links_in_from_leaves     : usize,
-  subscribes                   : bool,
-  overrides                    : bool,
-  hides                        : bool,
-  container_ids                : Vec < ID >,
-  content_ids                  : Vec < ID >,
-}
-
-/// Dispatcher: routes to 'fetch_all_graphnodestats_in_rust' when the
-/// in-Rust graph is initialized, otherwise to
-/// 'fetch_all_graphnodestats_from_typedb'. In the running server the
-/// in-Rust graph path is always taken; the TypeDB path is exercised only by
-/// tests that bypass 'init_global_handle_for_first_time_or_panic'.
+/// Dispatcher kept for signature compatibility; the driver is now
+/// unused (the TypeDB path was retired). Routes to the in-Rust graph,
+/// or empty stats when no graph handle is installed.
 pub async fn fetch_all_graphnodestats (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -125,225 +74,94 @@ pub async fn fetch_all_graphnodestats (
     db_name, driver, pids, None ) . await }
 
 pub async fn fetch_all_graphnodestats_with_source_set (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  pids    : &[ID],
-  active  : Option<&ActiveSourceSet>,
+  _db_name : &str,
+  _driver  : &TypeDBDriver,
+  pids     : &[ID],
+  active   : Option<&ActiveSourceSet>,
 ) -> Result < AllGraphNodeStats, Box<dyn Error> > {
   if pids . is_empty () {
     return Ok ( AllGraphNodeStats::empty() ); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
-  if let Some (graph_snap) = snapshot_global () {
-    return Ok ( fetch_all_graphnodestats_in_rust (
-      &graph_snap, pids, &pid_set, active ) ); }
-  // PITFALL | TODO: TypeDB fallback graphStats are not source-set-aware:
-  // contents, containers, linksIn, subscribing, overriding, and hiding still
-  // count inactive-source related nodes. The running server normally uses the
-  // in-Rust graph path above; this fallback is for tests/startup paths that
-  // bypass the global graph handle.
-  fetch_all_graphnodestats_from_typedb (
-    db_name, driver, pids, &pid_set ) . await }
+  match snapshot_global () {
+    Some (graph_snap) =>
+      Ok ( fetch_all_graphnodestats_in_rust (
+        &graph_snap, pids, &pid_set, active ) ),
+    None =>
+      // No in-Rust graph (tests that bypass init); render without stats.
+      Ok ( AllGraphNodeStats::empty () ), } }
 
-/// TypeDB-backed implementation. Exercised only by tests that bypass
-/// 'init_global_handle_for_first_time_or_panic'; in the running server the dispatcher routes
-/// to 'fetch_all_graphnodestats_in_rust' instead. Uses
-/// 'buffer_unordered (typedb_concurrent_transactions ())' for consistency
-/// with the rest of the TypeDB module.
-async fn fetch_all_graphnodestats_from_typedb (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  pids    : &[ID],
-  pid_set : &HashSet<ID>,
-) -> Result < AllGraphNodeStats, Box<dyn Error> > {
-  let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
-    stream::iter ( pids . iter ()
-      . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) ) )
-    . buffer_unordered ( typedb_concurrent_transactions () )
-    . collect () . await;
-  let mut num_containers : HashMap < ID, usize > = HashMap::new ();
-  let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
-  let mut num_links_in_from_containers : HashMap < ID, usize > =
-    HashMap::new ();
-  let mut num_links_in_from_leaves : HashMap < ID, usize > =
-    HashMap::new ();
-  let mut has_subscribes : HashSet < ID > = HashSet::new ();
-  let mut has_overrides  : HashSet < ID > = HashSet::new ();
-  let mut has_hides      : HashSet < ID > = HashSet::new ();
-  let mut container_to_contents : HashMap < ID, HashSet < ID > > =
-    HashMap::new ();
-  let mut content_to_containers : HashMap < ID, HashSet < ID > > =
-    HashMap::new ();
-  for result in results {
-    let s : OnePidStats = result ?;
-    num_containers . insert ( s . pid . clone (), s . num_containers );
-    num_contents   . insert ( s . pid . clone (), s . num_contents );
-    num_links_in_from_containers . insert (
-      s . pid . clone (), s . num_links_in_from_containers );
-    num_links_in_from_leaves . insert (
-      s . pid . clone (), s . num_links_in_from_leaves );
-    if s . subscribes {
-      has_subscribes . insert ( s . pid . clone () ); }
-    if s . overrides {
-      has_overrides . insert ( s . pid . clone () ); }
-    if s . hides {
-      has_hides . insert ( s . pid . clone () ); }
-    for cid in s . container_ids {
-      if pid_set . contains (&cid) {
-        content_to_containers
-          . entry ( s . pid . clone () )
-          . or_insert_with (HashSet::new)
-          . insert (cid); }}
-    for cid in s . content_ids {
-      if pid_set . contains (&cid) {
-        container_to_contents
-          . entry ( s . pid . clone () )
-          . or_insert_with (HashSet::new)
-          . insert (cid); }}}
-  Ok ( AllGraphNodeStats {
-    num_containers,
-    num_contents,
-    num_links_in_from_containers,
-    num_links_in_from_leaves,
-    has_subscribes,
-    has_overrides,
-    has_hides,
-    container_to_contents,
-    content_to_containers,
-  }) }
-
-/// In-Rust-graph implementation. Computes every field from NodeRust and
-/// the inverse indexes — no TypeDB round-trips.
-///
-/// PITFALL: 'has_subscribes', 'has_overrides' and 'has_hides' are
-/// "in either role": a node qualifies if it's on /either/ side of a
-/// subscribes / overrides / hides_from_its_subscriptions relation.
-/// Matches the TypeDB version's behaviour.
+/// In-Rust-graph implementation. Every field is computed from NodeRust
+/// and the inverse indexes -- no TypeDB round-trips.
 fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
   active  : Option<&ActiveSourceSet>,
 ) -> AllGraphNodeStats {
-  let mut num_containers               : HashMap<ID, usize> = HashMap::new ();
-  let mut num_contents                 : HashMap<ID, usize> = HashMap::new ();
-  let mut num_links_in_from_containers : HashMap<ID, usize> = HashMap::new ();
-  let mut num_links_in_from_leaves     : HashMap<ID, usize> = HashMap::new ();
-  let mut has_subscribes               : HashSet<ID> = HashSet::new ();
-  let mut has_overrides                : HashSet<ID> = HashSet::new ();
-  let mut has_hides                    : HashSet<ID> = HashSet::new ();
+  let mut counts : HashMap<ID, RelationCounts> = HashMap::new ();
   let mut container_to_contents
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   let mut content_to_containers
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   for pid in pids {
     let node_opt = graph . nodes . get (pid);
-    // num_containers: size of inverse-contains set.
-    let n_containers : usize =
-      graph . contained_by . get (pid)
+    // Inbound counts: size of an inverse index, source-filtered.
+    let inbound_count = | index : &im::HashMap<ID, im::HashSet<ID>> | -> usize {
+      index . get (pid)
       . map ( |s| s . iter ()
-        . filter ( |container_pid|
-          pid_source_is_active (graph, active, container_pid) )
+        . filter ( |p| pid_source_is_active (graph, active, p) )
         . count () )
+      . unwrap_or (0) };
+    // Outbound counts: length of an outbound list, mapped to pids and
+    // source-filtered.
+    let outbound_count = | ids : &[ID] | -> usize {
+      ids . iter ()
+      . filter_map ( |id| graph . pid_of (id) )
+      . filter ( |p| pid_source_is_active (graph, active, p) )
+      . count () };
+    let containers : usize = inbound_count (& graph . contained_by);
+    let contents : usize =
+      node_opt . map ( |n| outbound_count (& n . contains) )
       . unwrap_or (0);
-    num_containers . insert ( pid . clone (), n_containers );
-    // num_contents: length of outbound contains.
-    let n_contents : usize =
-      node_opt
-      . map ( |n| n . contains . iter ()
-        . filter_map ( |cid| graph . pid_of (cid) )
-        . filter ( |content_pid|
-          pid_source_is_active (graph, active, content_pid) )
-        . count () )
+    let hiders : usize = inbound_count (& graph . hiders_of);
+    let hides : usize =
+      node_opt . map ( |n| outbound_count (
+        n . hides_from_its_subscriptions . or_default () ) )
       . unwrap_or (0);
-    num_contents . insert ( pid . clone (), n_contents );
-    // Link sources: partition textlinks_in by whether source has
-    // non-empty contains.
-    let (from_containers, from_leaves) : (usize, usize) =
-      if let Some (sources) = graph . textlinks_in . get (pid) {
-        let mut with    : usize = 0;
-        let mut without : usize = 0;
-        for src_pid in sources . iter ()
-          . filter ( |src_pid|
-            pid_source_is_active (graph, active, src_pid) )
-        {
-          let src_has_content : bool =
-            graph . nodes . get (src_pid)
-            . map ( |n| ! n . contains . is_empty () )
-            . unwrap_or (false);
-          if src_has_content { with += 1; } else { without += 1; } }
-        (with, without) }
-      else { (0, 0) };
-    num_links_in_from_containers . insert ( pid . clone (),
-                                            from_containers );
-    num_links_in_from_leaves     . insert ( pid . clone (),
-                                            from_leaves );
-    let out_sub : bool = // subscription out-links
-      node_opt . map ( |n| n . subscribes_to
-                        . or_default () . iter ()
-                        . filter_map ( |id| graph . pid_of (id) )
-                        . any ( |related_pid|
-                          pid_source_is_active (
-                            graph, active, &related_pid) ) )
-      . unwrap_or (false);
-    let in_sub  : bool = // subscription in-links
-      graph . subscribers_of . get (pid)
-      . map ( |s| s . iter ()
-        . any ( |related_pid|
-          pid_source_is_active (graph, active, related_pid) ) )
-      . unwrap_or (false);
-    if out_sub || in_sub { has_subscribes
-                           . insert ( pid . clone () ); }
-    let out_ov : bool = // overrides out-links
-      node_opt . map ( |n| n . overrides_view_of
-                        . or_default () . iter ()
-                        . filter_map ( |id| graph . pid_of (id) )
-                        . any ( |related_pid|
-                          pid_source_is_active (
-                            graph, active, &related_pid) ) )
-      . unwrap_or (false);
-    let in_ov  : bool = // overrides in-links
-      graph . overriders_of . get (pid)
-      . map ( |s| s . iter ()
-        . any ( |related_pid|
-          pid_source_is_active (graph, active, related_pid) ) )
-      . unwrap_or (false);
-    if out_ov || in_ov { has_overrides . insert ( pid . clone () ); }
-    let out_hide : bool = // hides out-links
-      node_opt . map ( |n| n . hides_from_its_subscriptions
-                        . or_default () . iter ()
-                        . filter_map ( |id| graph . pid_of (id) )
-                        . any ( |related_pid|
-                          pid_source_is_active (
-                            graph, active, &related_pid) ) )
-      . unwrap_or (false);
-    let in_hide  : bool = // hides in-links
-      graph . hiders_of . get (pid)
-      . map ( |s| s . iter ()
-        . any ( |related_pid|
-          pid_source_is_active (graph, active, related_pid) ) )
-      . unwrap_or (false);
-    if out_hide || in_hide { has_hides . insert ( pid . clone () ); }
-    // container_to_contents[pid] = contains ∩ pid_set.
-    // n.contains carries raw IDs; map each to its corresponding pid
-    // (which might be itself) before the set-membership test
-    // so references that are actually extra_ids of pids in pid_set
-    // are matched.
+    let subscribers : usize = inbound_count (& graph . subscribers_of);
+    let subscribees : usize =
+      node_opt . map ( |n| outbound_count (
+        n . subscribes_to . or_default () ) )
+      . unwrap_or (0);
+    let overriders : usize = inbound_count (& graph . overriders_of);
+    let overrides_out : usize =
+      node_opt . map ( |n| outbound_count (
+        n . overrides_view_of . or_default () ) )
+      . unwrap_or (0);
+    let (link_total, link_surprising, link_with_content) : (usize, usize, usize) =
+      link_split (graph, active, pid);
+    counts . insert ( pid . clone (), RelationCounts {
+      containers, contents, hiders, hides,
+      subscribers, subscribees, overriders, overrides_out,
+      link_total, link_surprising, link_with_content } );
+    // container_to_contents[pid] = (pid's contents) ∩ pid_set.
+    // n.contains carries raw IDs; map each to its pid before testing.
     if let Some (n) = node_opt {
       let intersected : HashSet<ID> =
         n . contains . iter ()
         . map ( |cid| graph . pid_of (cid)
                  . unwrap_or_else ( || cid . clone () ) )
-        . filter ( |pid| pid_set . contains (pid) )
-        . filter ( |pid| pid_source_is_active (graph, active, pid) )
+        . filter ( |p| pid_set . contains (p) )
+        . filter ( |p| pid_source_is_active (graph, active, p) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
                                          intersected ); }}
-    // content_to_containers[pid] = contained_by ∩ pid_set
-    if let Some (containers) = graph . contained_by . get (pid) {
+    // content_to_containers[pid] = (pid's containers) ∩ pid_set.
+    if let Some (containers_set) = graph . contained_by . get (pid) {
       let intersected : HashSet<ID> =
-        containers . iter ()
+        containers_set . iter ()
         . filter ( |cid| pid_set . contains (*cid) )
         . filter ( |cid| pid_source_is_active (graph, active, cid) )
         . cloned () . collect ();
@@ -351,16 +169,65 @@ fn fetch_all_graphnodestats_in_rust (
         content_to_containers . insert ( pid . clone (),
                                          intersected ); }}}
   AllGraphNodeStats {
-    num_containers,
-    num_contents,
-    num_links_in_from_containers,
-    num_links_in_from_leaves,
-    has_subscribes,
-    has_overrides,
-    has_hides,
+    counts,
     container_to_contents,
     content_to_containers,
-	  } }
+  } }
+
+/// The inbound textlink split =a(b,c)= for one node (option A: re-parse
+/// each source's title+body on demand). a = total active inbound link
+/// sources; c = of those, sources with their own content; b = of those,
+/// sources that differ from this node, are bodyless AND contentless, and
+/// EVERY label they use to link here is "surprising" -- the source's
+/// normalized title is something other than the (normalized) link label.
+fn link_split (
+  graph  : &InRustGraph,
+  active : Option<&ActiveSourceSet>,
+  pid    : &ID,
+) -> (usize, usize, usize) {
+  let sources : Vec<ID> = match graph . textlinks_in . get (pid) {
+    Some (s) => s . iter ()
+      . filter ( |src| pid_source_is_active (graph, active, src) )
+      . cloned () . collect (),
+    None => return (0, 0, 0), };
+  let mut total       : usize = 0;
+  let mut surprising  : usize = 0;
+  let mut with_content : usize = 0;
+  for src_pid in &sources {
+    total += 1;
+    let src = match graph . nodes . get (src_pid) {
+      Some (n) => n, None => continue, };
+    if ! src . contains . is_empty () {
+      with_content += 1;
+      continue; } // c-bucket: sources with content are never "surprising"
+    // Contentless. Surprising iff it differs from this node, is
+    // bodyless, and every label it uses to link here differs from its
+    // normalized title.
+    let differs   : bool = src_pid != pid;
+    let bodyless  : bool = src . body . is_none ();
+    if differs && bodyless {
+      let src_text : String = format! (
+        "{} {}", src . title, src . body . as_deref () . unwrap_or ("") );
+      let labels_here : Vec<String> =
+        textlinks_from_text (& src_text) . into_iter ()
+        . filter ( |tl| graph . pid_of (& tl . id) . as_ref () == Some (pid) )
+        . map ( |tl| tl . label )
+        . collect ();
+      let norm_title : String = normalize_for_compare (& src . title);
+      let all_surprising : bool =
+        ! labels_here . is_empty ()
+        && labels_here . iter () . all (
+          |l| normalize_for_compare (l) != norm_title );
+      if all_surprising { surprising += 1; } } }
+  (total, surprising, with_content) }
+
+/// Normalize text for the surprising-links title/label comparison:
+/// replace each link with its label, then trim and lowercase (matching
+/// the existing Tantivy/search practice).
+fn normalize_for_compare (
+  text : &str,
+) -> String {
+  replace_each_link_with_its_label (text) . trim () . to_lowercase () }
 
 fn pid_source_is_active (
   graph  : &InRustGraph,
@@ -374,134 +241,3 @@ fn pid_source_is_active (
       graph . nodes . get (pid)
       . map ( |node| active . contains_source (&node . source) )
       . unwrap_or (false), } }
-
-async fn fetch_one_pid_stats (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  pid     : &ID,
-) -> Result < OnePidStats, Box<dyn Error> > {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read
-    ) . await ?;
-  // TODO for efficiency : container_link_sources joins textlinks_to with contains, producing one row per content of each source. We only need whether the source has *any* content. `select $sid; distinct;` collapses the duplicates, but TypeDB still does the full join internally — there is no per-row short-circuit (limit inside nested sub-fetches is a parse error in TypeDB 3.4). If a future TypeDB version adds per-source existence checks, replace that sub-fetch.
-  let query : String =
-    format! ( r#"match
-        $node isa node, has id "{}";
-        fetch {{
-          "containers": [
-            match
-              $c1 isa node, has id $c1id;
-              $rel1 isa contains ( container: $c1,
-                                   contained: $node );
-            fetch {{ "id": $c1id }};
-          ],
-          "contents": [
-            match
-              $c2 isa node, has id $c2id;
-              $rel2 isa contains ( container: $node,
-                                   contained: $c2 );
-            fetch {{ "id": $c2id }};
-          ],
-          "link_sources": [
-            match
-              $s isa node, has id $sid;
-              $rel3 isa textlinks_to ( source: $s,
-                                       dest:   $node );
-            fetch {{ "id": $sid }};
-          ],
-          "container_link_sources": [
-            match
-              $s isa node, has id $sid;
-              $rel3 isa textlinks_to ( source: $s,
-                                       dest:   $node );
-              $sc isa node;
-              $screl isa contains ( container: $s,
-                                    contained: $sc );
-            select $sid;
-            distinct;
-            fetch {{ "id": $sid }};
-          ],
-          "subscribes_related": [
-            match
-              $sub isa node, has id $subid;
-              {{ $rel4 isa subscribes ( subscriber: $node,
-                                        subscribee: $sub ); }} or
-              {{ $rel4 isa subscribes ( subscriber: $sub,
-                                        subscribee: $node ); }};
-            fetch {{ "id": $subid }};
-          ],
-          "overrides_related": [
-            match
-              $ov isa node, has id $ovid;
-              {{ $rel5 isa overrides_view_of ( overrider:  $node,
-                                               overridden: $ov ); }} or
-              {{ $rel5 isa overrides_view_of ( overrider:  $ov,
-                                               overridden: $node ); }};
-            fetch {{ "id": $ovid }};
-          ],
-          "hides_related": [
-            match
-              $h isa node, has id $hid;
-              {{ $rel6 isa hides_from_its_subscriptions ( hider:  $node,
-                                                          hidden: $h ); }} or
-              {{ $rel6 isa hides_from_its_subscriptions ( hider:  $h,
-                                                          hidden: $node ); }};
-            fetch {{ "id": $hid }};
-          ]
-        }};"#,
-      pid );
-  let mut container_ids : Vec < ID > = Vec::new ();
-  let mut content_ids   : Vec < ID > = Vec::new ();
-  let mut num_containers               : usize = 0;
-  let mut num_contents                 : usize = 0;
-  let mut num_links_in_total           : usize = 0;
-  let mut num_links_in_from_containers : usize = 0;
-  let mut subscribes                   : bool = false;
-  let mut overrides                    : bool = false;
-  let mut hides                        : bool = false;
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream )
-    = tx . query (query) . await ?
-  { while let Some (doc_result) = stream . next () . await {
-      let doc : ConceptDocument = doc_result ?;
-      if let Some ( Node::Map ( ref map ) ) = doc . root {
-        if let Some ( Node::List (list) ) =
-          map . get ("containers")
-        { num_containers = list . len ();
-          for item in list {
-            if let Some (cid) = extract_id_from_map ( item, "id" ) {
-              container_ids . push (cid); }}}
-        if let Some ( Node::List (list) ) =
-          map . get ("contents")
-        { num_contents = list . len ();
-          for item in list {
-            if let Some (cid) = extract_id_from_map ( item, "id" ) {
-              content_ids . push (cid); }}}
-        if let Some ( Node::List (list) ) =
-          map . get ("link_sources")
-        { num_links_in_total = list . len (); }
-        if let Some ( Node::List (list) ) =
-          map . get ("container_link_sources")
-        { num_links_in_from_containers = list . len (); }
-        if let Some ( Node::List (list) ) =
-          map . get ("subscribes_related")
-        { subscribes = ! list . is_empty (); }
-        if let Some ( Node::List (list) ) =
-          map . get ("overrides_related")
-        { overrides = ! list . is_empty (); }
-        if let Some ( Node::List (list) ) =
-          map . get ("hides_related")
-        { hides = ! list . is_empty (); }}}}
-  Ok ( OnePidStats {
-    pid : pid . clone (),
-    num_containers,
-    num_contents,
-    num_links_in_from_containers,
-    num_links_in_from_leaves
-      : num_links_in_total - num_links_in_from_containers,
-    subscribes,
-    overrides,
-    hides,
-    container_ids,
-    content_ids,
-  }) }

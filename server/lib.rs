@@ -5,6 +5,7 @@ pub mod diff_analysis;
 pub mod export_org;
 pub mod from_text;
 pub mod git_ops;
+pub mod herald_tokens;
 pub mod heralds;
 pub mod import_org_roam;
 pub mod nodeMerge;

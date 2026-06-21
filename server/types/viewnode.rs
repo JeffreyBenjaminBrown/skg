@@ -303,20 +303,27 @@ pub struct ContainerwardPathStats {
   pub cycles : bool,
 }
 
-/// Two counts describing a node's containment relationships.
-/// herald() computes a terse display string on demand.
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeContainRels {
-  pub containers : usize,
-  pub contents   : usize,
-}
-
-/// Two counts describing inbound textlink sources.
-/// herald() computes a terse display string on demand.
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeLinksourceRels {
-  pub sources_with_content    : usize,
-  pub sources_without_content : usize,
+/// Directional member counts for the five graph relations, plus the
+/// "surprising links" split, feeding the uniform-herald token grammar
+/// (server/herald_tokens.rs). All are graph-level (position-independent)
+/// counts of a node's members on each side of each relation.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RelationCounts {
+  pub containers    : usize, // C inbound: nodes that contain it
+  pub contents      : usize, // C outbound: nodes it contains
+  pub hiders        : usize, // H inbound: nodes that hide it
+  pub hides         : usize, // H outbound: nodes it hides
+  pub subscribers   : usize, // S inbound: nodes that subscribe to it
+  pub subscribees   : usize, // S outbound: its subscribees
+  pub overriders    : usize, // O inbound: nodes that override it
+  pub overrides_out : usize, // O outbound: nodes it overrides
+  /// L inbound, the =a(b,c)= split: a = total inbound link sources;
+  /// b = of those, bodyless+contentless sources whose normalized title
+  /// differs from the link label ("surprising"); c = of those, sources
+  /// with their own content.
+  pub link_total        : usize,
+  pub link_surprising   : usize,
+  pub link_with_content : usize,
 }
 
 /// Graph-level statistics about a node.
@@ -324,13 +331,11 @@ pub struct NodeLinksourceRels {
 /// regardless of where/how the node appears in a view.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GraphNodeStats {
-  pub aliasing          : bool, // whether it has aliases
-  pub extraIDs          : bool, // whether it has extra IDs (from merging)
-  pub overriding        : bool, // overrides *or* overridden, anywhere
-  pub subscribing       : bool, // subscriber *or* subscribee, anywhere
-  pub hiding            : bool, // hides *or* is hidden, anywhere
-  pub containRels       : Option<NodeContainRels>,
-  pub linksourceRels    : Option<NodeLinksourceRels>,
+  pub aliases   : usize, // number of aliases (-> Ak)
+  pub extra_ids : usize, // number of extra IDs from merging (-> Ik)
+  /// The directional member counts, or None for a node without stats
+  /// (e.g. a sourceless reference). Feeds the token grammar.
+  pub rels      : Option<RelationCounts>,
 }
 
 /// View-specific statistics about a node.
@@ -339,43 +344,17 @@ pub struct GraphNodeStats {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewNodeStats {
   pub cycle             : bool,
-  pub parentIsContainer : bool,
-  pub parentIsContent   : bool,
   pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest activeNode ancestor.
-  /// For a subscribee-as-such (Affected child of a SubscribeeCol):
-  /// the col's owner also overrides this node. Herald red "gO".
-  /// Not computed under an OverriddenCol, where the col already says it.
-  pub grandparentOverrides  : bool,
-  /// For an Affected child of an OverriddenCol: the col's owner also
-  /// subscribes to this node. Herald red "gS". Not computed under a
-  /// SubscribeeCol, ditto.
-  pub grandparentSubscribes : bool,
-  /// This node overrides its visible org-parent's node. Herald red
-  /// "Op". Like 'parentIsContent' (containsParent), necessarily a
-  /// view stat: the same node can sit under different parents in
-  /// different positions.
-  pub overridesParent       : bool,
-  /// This node's visible org-parent OVERRIDES it -- the inverse of
-  /// 'overridesParent'. Herald red "pO". Computed generally now (in
-  /// 'set_relation_relative_stats'), like 'overridesParent'; also still
-  /// marks the original a fork-to-be (clone) stands over in the
-  /// fork-confirmation buffer.
-  pub parentOverrides       : bool,
-  /// This node SUBSCRIBES TO its visible org-parent's node. Herald red
-  /// "Sp". A view stat like 'overridesParent': the same node under a
-  /// different parent has a different value.
-  pub subscribesParent      : bool,
-  /// This node's visible org-parent SUBSCRIBES TO it -- the inverse of
-  /// 'subscribesParent'. Herald red "pS".
-  pub parentSubscribes      : bool,
-  /// This node HIDES its visible org-parent (an outbound
-  /// 'hides_from_its_subscriptions' edge to it). Herald red "Hp". A
-  /// plain binary edge herald (Q9): the full "hidden from which
-  /// subscription" context lives in the hide cols, not here.
-  pub hidesParent           : bool,
-  /// This node's visible org-parent HIDES it -- the inverse of
-  /// 'hidesParent'. Herald red "pH".
-  pub parentHides           : bool,
+  /// The assembled orange BIRTH herald string (one or more
+  /// space-joined relationship tokens for the relation(s) that explain
+  /// why this node was drawn) -- e.g. "aC", "3bS", "dH bC". None when
+  /// the node has no birth relation in view (roots, parked nodes).
+  /// Computed by the viewnodestats pass (server/herald_tokens.rs).
+  pub birth_herald          : Option<String>,
+  /// The assembled blue relationship-herald string: the non-birth
+  /// relationship tokens plus =Ak= / =Ik=, space-joined -- e.g.
+  /// "3O 2(1)L A2". None when there is nothing to show.
+  pub rels_herald           : Option<String>,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald red "Oh".
   /// LOAD-BEARING, unlike the other view stats: save extraction
@@ -573,27 +552,6 @@ impl MpActiveNode {
     self . viewStats . overridesHere . clone ()
     . or_else ( || self . id . clone () ) }
 }
-
-fn herald_from_pair (
-  left          : usize,
-  left_default  : usize,
-  right         : usize,
-  right_default : usize,
-  separator     : &str,
-) -> Option<String> {
-  if left == left_default && right == right_default { None }
-  else if right == right_default
-    { Some ( format! ("{}{}", left, separator )) }
-  else if left == left_default
-    { Some ( format! ("{}{}", separator, right )) }
-  else
-    { Some ( format! ("{}{}{}", left, separator, right )) }}
-
-impl NodeLinksourceRels {
-  pub fn herald (&self) -> Option<String> {
-    herald_from_pair ( self . sources_with_content,    0,
-                       self . sources_without_content, 0,
-                       "→" ) } }
 
 impl PartnerCol {
   pub fn policy (self) -> ColPolicy {
@@ -839,34 +797,19 @@ impl fmt::Display for ViewRequest {
 impl Default for GraphNodeStats {
   fn default () -> Self {
     GraphNodeStats {
-      aliasing          : false,
-      extraIDs          : false,
-      overriding        : false,
-      subscribing       : false,
-      hiding            : false,
-      containRels       : Some ( NodeContainRels {
-        containers : 1, contents : 0 } ),
-      linksourceRels    : Some ( NodeLinksourceRels {
-        sources_with_content    : 0,
-        sources_without_content : 0 } ),
+      aliases   : 0,
+      extra_ids : 0,
+      rels      : None,
     }} }
 
 impl Default for ViewNodeStats {
   fn default () -> Self {
     ViewNodeStats {
       cycle             : false,
-      parentIsContainer : true,
-      parentIsContent   : false,
       sourceAtBoundary  : false,
-      grandparentOverrides  : false,
-      grandparentSubscribes : false,
-      overridesParent       : false,
-      parentOverrides       : false,
-      subscribesParent      : false,
-      parentSubscribes      : false,
-      hidesParent           : false,
-      parentHides           : false,
-      overridesHere         : None,
+      birth_herald      : None,
+      rels_herald       : None,
+      overridesHere     : None,
     }} }
 
 //
