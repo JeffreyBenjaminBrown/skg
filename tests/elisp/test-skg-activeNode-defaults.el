@@ -398,7 +398,7 @@ is dropped key-and-all, leaving (skg (node (source only)))."
 (ert-deftest test-expand-preserves-existing-source ()
   "Expanding a sexp that already has source preserves it."
   (let* ((sexp '(skg (node (id abc) (source public)
-                           (graphStats (containers 0) (contents 5) (containsHerald 0{5)))))
+                           (rels "C5"))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -410,14 +410,15 @@ is dropped key-and-all, leaving (skg (node (source only)))."
     ;; ID must be preserved
     (should (cl-find "id" headlines :key #'cdr :test #'string=))
     (should (cl-find "abc" headlines :key #'cdr :test #'string=))
-    ;; graphStats must be preserved (as non-canonical, appended at end)
-    (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))
+    ;; the rels herald must be preserved (as non-canonical, appended at end)
+    (should (cl-find "rels" headlines :key #'cdr :test #'string=))))
 
 (ert-deftest test-expand-preserves-source-round-trip ()
-  "Expanding then stripping a sexp with source + graphStats is identity
-for the editable fields (graphStats is readonly and preserved too)."
-  (let* ((sexp '(skg (node (id abc) (source public)
-                           (graphStats (containers 0) (contents 5) (containsHerald 0{5)))))
+  "Expanding then stripping a sexp with id + source is identity. (The
+sexp<->org bijection is symbol-based, so the display-only herald strings
+-- which are stripped before this path anyway -- are not round-tripped
+here; see test-round-trip-with-links-in-herald's removal.)"
+  (let* ((sexp '(skg (node (id abc) (source public))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (stripped (skg-activeNode-strip-defaults-from-org expanded))
@@ -429,11 +430,7 @@ for the editable fields (graphStats is readonly and preserved too)."
 preserves source and all fields."
   (let* ((sexp '(skg (node (id 6972d099)
                            (source public)
-                           (graphStats (containers 0)
-                                       (contents 5)
-                                       (containsHerald 0{5)
-                                       (linksInFromContainers 4)
-                                       (linksHerald 4→)))))
+                           (rels "C5 4(1,1)L"))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -445,23 +442,16 @@ preserves source and all fields."
     (should (cl-find "indef" headlines :key #'cdr :test #'string=))
     (should (cl-find "parentIs" headlines :key #'cdr :test #'string=))
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
-    ;; graphStats must be preserved
-    (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))
+    ;; the rels herald must be preserved
+    (should (cl-find "rels" headlines :key #'cdr :test #'string=))))
 
-(ert-deftest test-round-trip-with-links-in-herald ()
-  "Round-trip: expand then strip preserves linksHerald string (e.g. 3→1)."
-  (let* ((sexp '(skg (node (id abc) (source public)
-                           (graphStats (containers 0)
-                                       (contents 5)
-                                       (containsHerald 0{5)
-                                       (linksInFromContainers 3)
-                                       (linksInFromLeaves 1)
-                                       (linksHerald 3→1)))))
-         (org-text (sexp-to-org sexp))
-         (expanded (skg-activeNode-expand-defaults-in-org org-text))
-         (stripped (skg-activeNode-strip-defaults-from-org expanded))
-         (result (org-to-sexp stripped)))
-    (should (equal result sexp))))
+;; (Removed test-round-trip-with-links-in-herald: it checked that a
+;; herald string survives the sexp<->org bijection. The new herald
+;; tokens are quoted strings -- often with parens/spaces, e.g. "3(1)L" --
+;; which the symbol-based bijection cannot represent. Heralds are
+;; display-only and stripped (skg-strip-heralds-from-sexp) before any
+;; save/edit path that uses the bijection, so this round-trip no longer
+;; applies.)
 
 ;;
 ;; Display-only title group
