@@ -112,15 +112,22 @@ plus a one-time data/bash/trim-node-bodies.org migration.
 - *Step 6 (Emacs)*: committed. Strip fn drops birthHerald/rels; the
   parentIs-container injection retired; the elisp display tests updated;
   252/252 elisp tests green.
-- *Step 7 (goldens)*: in progress. Renderer verified correct by hand on
+- *Step 7 (goldens)*: DONE. Renderer verified correct by hand on
   content/cycle (=2aC1=, =aCa=), subscribee-as-such (=bS=),
   subscriber-as-such (=Sb=), overrider/overridden (=Oa/aO/Ob/bO=),
-  filter-col owner distances, roots, source heralds. Blessed the ~26
-  failing Rust test files (one agent per test binary, using
+  filter-col owner distances (=dH bC=), roots, source heralds. Blessed
+  all failing Rust test files (one agent per test binary, using
   =cargo nextest --test <binary>= to isolate builds; each re-ran to
-  green). Full nextest suite at 469/470 (hidden_from_subscriptions, the
-  92-golden file, finishing). Bash integration goldens
-  (test-emacs.el assertions) in progress.
+  green) and the bash integration =test-emacs.el= assertions. Every
+  blessed value was copied from the renderer's ACTUAL output, never
+  hand-invented.
+
+* FINAL STATUS: plan fully executed
+
+All three suites green:
+- Rust: =cargo nextest run= -> 470/470.
+- Elisp: =bash bash/emacs-tests.sh= -> 252/252.
+- Integration: =bash bash/integration-tests.sh= -> all 32 pass.
 
 * Changes to the plan's envisioned order
 
@@ -143,6 +150,22 @@ plus a one-time data/bash/trim-node-bodies.org migration.
   install the handle per-test (the established pattern:
   'install_or_swap_global_handle(graph_handle_from_config(config)?)'
   after reset, as in view_stats_sharing.rs). Folded into step 7.
+- *Save-driving render tests shared one graph.* hidden_from_subscriptions
+  and definitive_view_cascade_and_budget built a fresh EMPTY local graph
+  ('new_handle(InRustGraph::new())') for the save while the renderer read
+  the GLOBAL handle. That worked when the renderer had no stats; now the
+  stale global makes hidden content reappear / redefined contains be
+  ignored / empty bodies show stale disk text. Fixed by sharing one
+  handle (matching production, which has exactly one graph). Test-only.
+- *The sexp<->org bijection (elisp) is symbol-based*, so it cannot
+  round-trip the new quoted herald strings (=3(1,1)L=). Harmless: heralds
+  are display-only and stripped before any save/edit path that uses the
+  bijection. One obsolete elisp round-trip test was removed.
+- *Integration helper rewrite.* A shared integration helper that
+  classified a backpath graft by reading the old =(birth backpath
+  ROLENAME)= atom now derives the role from the new herald grammar
+  (graft iff =(parentIs independent)=, role from the outbound relation
+  letter). Covers the roles those e2e tests exercise.
 
 * Choices determining the future
 
