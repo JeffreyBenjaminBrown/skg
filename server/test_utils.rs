@@ -177,6 +177,20 @@ pub struct SharedDbSession {
 }
 
 impl SharedDbSession {
+  /// Install the in-Rust graph globally from the session's current
+  /// config (reading the .skg files on disk). View-render tests call
+  /// this after a 'reset' (and after any save that rewrites disk) so the
+  /// production stats path ('snapshot_global', used by graphnodestats +
+  /// viewnodestats) reflects the data -- the uniform-herald stats have
+  /// no TypeDB fallback. Low-level tests that mutate TypeDB directly do
+  /// NOT call it, so their direct-readback paths keep hitting TypeDB.
+  pub fn install_graph_handle (
+    &self,
+  ) -> Result<(), Box<dyn Error>> {
+    crate::dbs::in_rust_graph::install_or_swap_global_handle (
+      graph_handle_from_config (&self . config) ? );
+    Ok (( )) }
+
   /// Restore a pristine state for the next sub-test: wipe all data,
   /// copy `fixtures_folder` to the temp dir, point a config at it,
   /// repopulate, fresh Tantivy index. If the fixtures contain a
