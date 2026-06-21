@@ -3,6 +3,8 @@
 ** a better search UI
 ask the user to type a few characters, any subset of
 (r)egex, (b)ody, ..
+** search should show sources
+It does upon save but not initially.
 ** correctness
 *** Bug: skg-close-all-buffers
 is closing too much, e.g. the first (starred) buffer here:
