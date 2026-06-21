@@ -7,6 +7,15 @@
 (require 'skg-length-prefix)
 (require 'heralds-minor-mode)
 
+(defconst skg--project-root
+  (when (or load-file-name buffer-file-name)
+    (file-name-directory
+     (directory-file-name
+      (file-name-directory
+       (or load-file-name buffer-file-name)))))
+  "Repo root, derived from this file's location at load time.
+Used to locate docs/COMMANDS.org for `skg-search-interactive' help.")
+
 (defun skg-search (search-terms)
   "Text search with the conservative defaults: no regex, titles
 only, no Tantivy operator syntax. Searches all nodes; rooty
@@ -15,14 +24,41 @@ the ranking via their context-origin multiplier."
   (interactive "sSearch terms: ")
   (skg--request-text-search search-terms nil nil nil))
 
-(defun skg-search-interactive (search-terms)
-  "Text search with per-axis prompts for regex, body, operators."
-  (interactive "sSearch terms: ")
-  (let* ((regex     (y-or-n-p "Use per-token regex (not phrase search)? "))
-         (body      (y-or-n-p "Include body text (titles are always searched)? "))
-         (operators (y-or-n-p "Use Tantivy phrase and operator syntax (AND/OR/NOT/+/-)? ")))
-    (skg--request-text-search search-terms
-                              regex body operators)))
+(defun skg-search-interactive (search-terms options)
+  "Text search, choosing axes by typing option characters.
+After the terms, type one character per desired option:
+\"r\" for per-token regex, \"b\" to include body text, \"t\" for
+Tantivy phrase and operator syntax. Type \"h\" to open the docs
+for this command (which abandons the search); unrecognized
+characters are ignored. An empty answer uses the same
+conservative defaults as `skg-search'."
+  (interactive
+   (list (read-string "Search terms: ")
+         (read-string
+          "Type a character for each search option: (r)egex, (b)ody, (t)antivy syntax, (h)elp: ")))
+  (if (string-search "h" options)
+      (skg--search-interactive-help)
+    (skg--request-text-search
+     search-terms
+     (and (string-search "r" options) t)
+     (and (string-search "b" options) t)
+     (and (string-search "t" options) t))))
+
+(defun skg--search-interactive-help ()
+  "Open docs/COMMANDS.org, unfold it, and put point on the
+headline documenting `skg-search-interactive'."
+  (unless skg--project-root
+    (user-error "Cannot locate the repo root to find docs/COMMANDS.org"))
+  (let ((doc (expand-file-name "docs/COMMANDS.org" skg--project-root)))
+    (unless (file-exists-p doc)
+      (user-error "Help file not found: %s" doc))
+    (find-file doc)
+    (org-fold-show-all)
+    (goto-char (point-min))
+    (if (re-search-forward "^\\*+.*skg-search-interactive" nil t)
+        (goto-char (match-beginning 0))
+      (message
+       "Couldn't find the skg-search-interactive headline; showing the whole file."))))
 
 (defun skg--bool-to-string (b)
   "Serialize B as the wire-format \"true\" or \"false\"."

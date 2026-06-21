@@ -37,18 +37,23 @@ phrase and operator syntax.
 Run 'skg-goto' (below) from one of the links in the search
 results to open the view from that node.
 *** C-c f i   : skg-search-interactive
-Same as skg-search but asks for three axis flags before
-sending:
+Same as skg-search, but after the search terms it prompts:
 
-- *Use per-token regex (not phrase search)?* — yes switches
-  to per-token regex. Bypasses the query parser; each
-  whitespace-separated piece is handed to Tantivy's
-  'RegexQuery'.
-- *Body?* — yes adds the body field to the search (titles
-  are always searched).
-- *Use Tantivy phrase and operator syntax (AND/OR/NOT/+/-)?*
-  — yes enables phrase quotes plus AND / OR / NOT / +foo /
-  -bar semantics. In non-regex mode this syntax passes through
+: Type a character for each search option: (r)egex, (b)ody, (t)antivy syntax, (h)elp:
+
+Type one character for each option you want, in any order,
+then RET. An empty answer uses the same conservative defaults
+as =skg-search=. Unrecognized characters are ignored. Typing
+=h= opens this documentation (unfolded, with point on this
+headline) and abandons the search.
+
+- =r= (*regex*) — per-token regex instead of phrase search.
+  Bypasses the query parser; each whitespace-separated piece
+  is handed to Tantivy's 'RegexQuery'.
+- =b= (*body*) — also search the body field (titles are
+  always searched).
+- =t= (*tantivy syntax*) — Tantivy phrase and operator syntax
+  (AND/OR/NOT/+/-). In non-regex mode this passes through
   Tantivy's QueryParser (phrase quotes, grouping, field: all
   work; intra-word operator chars get escaped so =foo:bar=
   remains findable). In regex mode, AND / OR / NOT / +foo /
