@@ -740,3 +740,49 @@
    removed-member phantom for a node that exists nowhere. Data repair:
    commit the pending d40db175.skg (the worktree is already correct), or
    any commit that makes HEAD's d40db175 stop referencing 8c24623a.
+* Problems found while planning uniform heralds (2026-06-21)
+  Found while researching TODO/uniform-heralds/vision.org to write
+  TODO/uniform-heralds/discussion.org. None is required by that vision;
+  recorded here so they are not lost.
+** Stale elisp test inputs reference herald atoms the server can no longer emit
+   tests/elisp/test-heralds-minor-mode.el and
+   tests/elisp/test-skg-sexpr-search.el feed the lens engine OLD
+   pre-baked atoms -- 'containsHerald', 'linksHerald' -- that the
+   server stopped emitting (it now emits raw counts via INTERC, in
+   'graphnodestats_to_sexp', server/org_to_text.rs). These tests still
+   pass (they exercise the engine's tolerance), but they pin a dead
+   vocabulary. The herald conformance test (tests/unit/heralds.rs)
+   covers only EMITTABLE atoms, so it cannot catch test inputs that
+   drifted from the live serializer. Worth a cleanup pass; the uniform-
+   heralds work will force it for the affected tests anyway.
+** The TypeDB-fallback graphStats are not source-set-aware
+   Already flagged in code (the PITFALL/TODO above
+   'fetch_all_graphnodestats_from_typedb',
+   server/dbs/typedb/search/all_graphnodestats.rs): the TypeDB path
+   counts inactive-source related nodes, unlike the in-Rust path. The
+   running server always uses the in-Rust path, so this only bites
+   tests/startup paths that bypass the global handle. Expanding the
+   stats (the uniform-heralds work adds directional H/S/O counts) would
+   widen the divergence between the two implementations; if the TypeDB
+   fallback is truly only for those paths, consider whether it still
+   earns its keep, or at least keep the two in lockstep.
+** Only two of the owner-relative relations are computed today
+   'set_relation_relative_stats' (server/update_buffer/viewnodestats.rs)
+   computes 'grandparentOverrides' and 'grandparentSubscribes' but none
+   of the other owner-relative relations (e.g. grandparent-contains,
+   grandparent-hides), and it can only reach one gnode-hop above a col
+   (via 'VisibleParent::Col'), so it cannot serve the deeper filter cols
+   (HiddenInSubscribee, HiddenOutsideOfSubscribee) at all. Today's
+   heralds are therefore silently incomplete for hidden-col members, not
+   merely non-uniform. The uniform-heralds plan fixes this as a side
+   effect (generalizing owner location through an owning-ancestor table
+   in server/update_buffer/ancestry.rs).
+** Minor: TypeDB path computes from_leaves by subtraction
+   In 'fetch_one_pid_stats'
+   (server/dbs/typedb/search/all_graphnodestats.rs),
+   num_links_in_from_leaves = num_links_in_total -
+   num_links_in_from_containers. This is only as correct as the two
+   sub-fetches' dedup agreeing; the in-Rust path computes it directly
+   and is authoritative. Not worth fixing on its own, but if the
+   surprising-links a(b,c) split replaces this two-way partition, the
+   subtraction goes away regardless.
