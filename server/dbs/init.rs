@@ -2,7 +2,7 @@
 
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
-use crate::context::link_targets_from_nodes;
+use crate::context::link_dests_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
 use crate::dbs::tantivy::{mk_tantivy_schema, open_existing_tantivy_index, tantivy_index_from_index};
@@ -49,7 +49,7 @@ use typedb_driver::{
 pub struct InitContextHandoff {
   pub had_id_set        : HashSet<ID>,
   pub all_node_ids      : HashSet<ID>,
-  pub link_targets      : HashSet<ID>,
+  pub link_dests      : HashSet<ID>,
   pub map_to_content    : MapToContent,
   pub map_to_containers : MapToContainers,
 }
@@ -85,7 +85,7 @@ pub fn initialize_dbs (
         config, &driver, marker_mtime )
       { Ok (( tantivy_index )) => {
           tracing::info! ("Incremental init succeeded.");
-          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-Rust graph (env.in_rust_graph) and the InitContextHandoff (contains maps, had_id_set, link_targets) are rebuilt from scratch on every startup, so they need every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
+          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-Rust graph (env.in_rust_graph) and the InitContextHandoff (contains maps, had_id_set, link_dests) are rebuilt from scratch on every startup, so they need every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
@@ -235,8 +235,8 @@ fn env_and_handoff_from_nodes (
     nodes . iter ()
     . map ( |n| n . pid . clone () )
     . collect ();
-  let link_targets : HashSet<ID> =
-    link_targets_from_nodes (&nodes);
+  let link_dests : HashSet<ID> =
+    link_dests_from_nodes (&nodes);
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
@@ -250,7 +250,7 @@ fn env_and_handoff_from_nodes (
     InitContextHandoff {
       had_id_set,
       all_node_ids,
-      link_targets,
+      link_dests,
       map_to_content,
       map_to_containers } ) }
 

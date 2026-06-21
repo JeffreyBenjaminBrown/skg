@@ -5,6 +5,7 @@ use crate::types::git::SourceDiff;
 use crate::types::misc::{SkgConfig, SourceName};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, Tree};
@@ -59,7 +60,7 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles
 /// every Definitive request at the node's own visit (the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule), so
-/// only Aliases/Containerward/Sourceward should remain here; execute_view_requests
+/// only Col/Path requests should remain here; execute_view_requests
 /// errors loudly if a Definitive one survives.
 fn extract_view_requests (
   tree : &Tree<ViewNode>,
@@ -85,5 +86,5 @@ fn extract_view_requests (
       . map ( |p| matches! ( p . value () . kind, ViewNodeKind::BufferRoot ) )
       . unwrap_or (false);
   if is_view_root {
-    view_requests . remove (& ViewRequest::Containerward); }
+    view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }
   Ok ( view_requests . into_iter () . map ( |req| (node, req) ) . collect () ) }

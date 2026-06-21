@@ -1,9 +1,10 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
-use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request_with_source_set, build_and_integrate_sourceward_view_then_drop_request_with_source_set};
+use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
+use crate::to_org::expand::col_request::build_and_integrate_col_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, activeNode_in_tree_is_indefinitive };
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ColRelation, IndefOrDef, ParentIs };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -23,20 +24,22 @@ pub async fn execute_view_requests (
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
-      ViewRequest::Aliases => {
+      ViewRequest::Col (ColRelation::Aliases) => {
         build_and_integrate_aliases_view_then_drop_request (
           viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
-      ViewRequest::Containerward => {
-        build_and_integrate_containerward_view_then_drop_request_with_source_set (
-          viewforest, node_id, config, typedb_driver, errors,
-          active_source_set )
-          . await ?; },
-      ViewRequest::Sourceward => {
-        build_and_integrate_sourceward_view_then_drop_request_with_source_set (
-          viewforest, node_id, config, typedb_driver, errors,
-          active_source_set )
-          . await ?; },
+      ViewRequest::Col (rel) => {
+        build_and_integrate_col_then_drop_request (
+          viewforest, node_id, rel, config, typedb_driver, errors,
+          active_source_set ) . await ?; },
+      ViewRequest::Path (role) => {
+        // Relation-generic: every partner role routes through the one
+        // backpath engine (container, linkSource, and the seven new
+        // roles alike). A view-ROOT's container request is handled
+        // separately (finish_viewforest) and removed before this pass.
+        build_and_integrate_path_view_then_drop_request (
+          viewforest, node_id, role, config, typedb_driver, errors,
+          active_source_set ) . await ?; },
       ViewRequest::Definitive =>
         // View completion (dispatch_node_update) settles every Definitive
         // request at the node's own visit (apply_definitive_draw_rule, the TODO/DONE/local-view-update/plan_v2.org §5.2

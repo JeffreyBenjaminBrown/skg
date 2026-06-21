@@ -271,6 +271,14 @@ fn activeNode_metadata_to_string (
         parts . push ( "overridesParent" . to_string () ); }
       if activeNode . viewStats . parentOverrides {
         parts . push ( "parentOverrides" . to_string () ); }
+      if activeNode . viewStats . subscribesParent {
+        parts . push ( "subscribesParent" . to_string () ); }
+      if activeNode . viewStats . parentSubscribes {
+        parts . push ( "parentSubscribes" . to_string () ); }
+      if activeNode . viewStats . hidesParent {
+        parts . push ( "hidesParent" . to_string () ); }
+      if activeNode . viewStats . parentHides {
+        parts . push ( "parentHides" . to_string () ); }
       if let Some (ref original) =
         activeNode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
@@ -333,10 +341,9 @@ fn activeNode_metadata_to_string (
         parts . push ( "(parentIs independent)" . to_string () ) }
     match activeNode . birth {
       Birth::Unremarkable => {},
-      Birth::ContainsParent =>
-        parts . push ( "(birth containsParent)" . to_string () ),
-      Birth::LinksToParent =>
-        parts . push ( "(birth linksToParent)" . to_string () ) }
+      Birth::Backpath (role) =>
+        parts . push ( format! (
+          "(birth backpath {})", role . rolename () )) }
     if activeNode . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata

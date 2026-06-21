@@ -3,17 +3,17 @@
 
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
-Birth provenance is more specific than parentIs: birth=containsParent
-returns `containsParent', birth=linksToParent returns `linksToParent',
-otherwise the result is the explicit parentIs or the implicit `affected'."
+Birth provenance is more specific than parentIs: a (birth backpath
+ROLENAME) returns ROLENAME (e.g. `container', `linkSource'); otherwise
+the result is the explicit parentIs or the implicit `affected'."
   (let ((parentIs-list (when sexp
                          (skg-sexp-cdr-at-path sexp
                                                '(skg node parentIs))))
         (birth-list (when sexp
                       (skg-sexp-cdr-at-path sexp '(skg node birth)))))
     (cond
-     ((eq (car birth-list) 'containsParent) 'containsParent)
-     ((eq (car birth-list) 'linksToParent) 'linksToParent)
+     ;; (birth backpath ROLENAME): the partner role is the provenance.
+     ((eq (car birth-list) 'backpath) (cadr birth-list))
      ((or (not parentIs-list)
           (eq (car parentIs-list) 'affected)) 'affected)
      (t (car parentIs-list)))))

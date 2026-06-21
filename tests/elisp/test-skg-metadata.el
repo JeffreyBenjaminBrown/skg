@@ -183,6 +183,22 @@ Returns the parsed s-expression or nil if not found."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s m"))
               'skg-set-merge-request)))
 
+(ert-deftest test-skg-collection-and-path-keybindings ()
+  "A sample of the C-c c (collections) and C-c p (paths) bindings.
+The UPPER/lower path letters select opposite roles, so C-c p O and
+C-c p o must bind to distinct commands."
+  (dolist (pair '(("C-c c a" . skg-show-collection-aliases)
+                  ("C-c c o" . skg-show-collection-overrides)
+                  ("C-c c s" . skg-show-collection-subscribes)
+                  ("C-c p C" . skg-show-paths-through-containers)
+                  ("C-c p L" . skg-show-paths-through-link-sources)
+                  ("C-c p l" . skg-show-paths-through-link-dests)
+                  ("C-c p O" . skg-show-paths-through-overriders)
+                  ("C-c p o" . skg-show-paths-through-overridden)
+                  ("C-c p s" . skg-show-paths-through-subscribees)))
+    (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
+                (cdr pair)))))
+
 (ert-deftest test-skg-set-source ()
   "Test skg-set-source replaces the node source field."
   (with-temp-buffer
@@ -291,7 +307,7 @@ Returns the parsed s-expression or nil if not found."
       "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (parentIs independent) (birth linksToParent))) link child\n"
+      "** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
       "** (skg aliasCol) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))
@@ -408,7 +424,7 @@ Returns the parsed s-expression or nil if not found."
         (should (equal (buffer-string) original))))))
 
 (ert-deftest test-skg-replace-content-with-link-rejects-missing-id ()
-  "Test replacing a new node fails because it has no link target ID."
+  "Test replacing a new node fails because it has no link dest ID."
   (with-temp-buffer
     (org-mode)
     (insert

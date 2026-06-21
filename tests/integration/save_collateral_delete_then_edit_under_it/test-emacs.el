@@ -72,7 +72,7 @@ contains to [], overwriting subee.skg on disk."
     ;; Add aliases view request to node 11.
     (goto-nth-headline-with-title "11" 1)
     (skg-edit-metadata-at-point
-     '(skg (node (viewRequests aliases))))
+     '(skg (node (viewRequests (col aliases)))))
     ;; Append standalone subee root with child.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))

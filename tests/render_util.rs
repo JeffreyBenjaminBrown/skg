@@ -3,6 +3,7 @@
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, GraphNodeStats, NodeContainRels, Birth, ParentIs, ViewNodeStats, default_activeNode };
+use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::types::viewnode::QualCol;
 use std::collections::HashMap;
 
@@ -122,9 +123,9 @@ fn test_birth_affects_container_count_emission () {
   let independent  : String = viewnode_to_text (
     1, &make_node (ParentIs::Independent, Birth::Unremarkable), &cfg ) . unwrap ();
   let container_of : String = viewnode_to_text (
-    1, &make_node (ParentIs::Independent, Birth::ContainsParent), &cfg ) . unwrap ();
+    1, &make_node (ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)), &cfg ) . unwrap ();
   let links_to     : String = viewnode_to_text (
-    1, &make_node (ParentIs::Independent, Birth::LinksToParent), &cfg ) . unwrap ();
+    1, &make_node (ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)), &cfg ) . unwrap ();
   // Affected with containers=1: hide.
   assert! ( ! content . contains ("(containers 1)"),
             "ParentIs=Affected should suppress containers=1: {}", content );

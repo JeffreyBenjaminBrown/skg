@@ -27,7 +27,7 @@ The 'f' is for 'find'.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
 matching node. "Rooty" nodes (roots, cycle members, link
-targets, and nodes that had an org-roam ID before import)
+dests, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 
 Prompts for search terms. All search axes take their conservative
@@ -37,18 +37,23 @@ phrase and operator syntax.
 Run 'skg-goto' (below) from one of the links in the search
 results to open the view from that node.
 *** C-c f i   : skg-search-interactive
-Same as skg-search but asks for three axis flags before
-sending:
+Same as skg-search, but after the search terms it prompts:
 
-- *Use per-token regex (not phrase search)?* — yes switches
-  to per-token regex. Bypasses the query parser; each
-  whitespace-separated piece is handed to Tantivy's
-  'RegexQuery'.
-- *Body?* — yes adds the body field to the search (titles
-  are always searched).
-- *Use Tantivy phrase and operator syntax (AND/OR/NOT/+/-)?*
-  — yes enables phrase quotes plus AND / OR / NOT / +foo /
-  -bar semantics. In non-regex mode this syntax passes through
+: Type a character for each search option: (r)egex, (b)ody, (t)antivy syntax, (h)elp:
+
+Type one character for each option you want, in any order,
+then RET. An empty answer uses the same conservative defaults
+as =skg-search=. Unrecognized characters are ignored. Typing
+=h= opens this documentation (unfolded, with point on this
+headline) and abandons the search.
+
+- =r= (*regex*) — per-token regex instead of phrase search.
+  Bypasses the query parser; each whitespace-separated piece
+  is handed to Tantivy's 'RegexQuery'.
+- =b= (*body*) — also search the body field (titles are
+  always searched).
+- =t= (*tantivy syntax*) — Tantivy phrase and operator syntax
+  (AND/OR/NOT/+/-). In non-regex mode this passes through
   Tantivy's QueryParser (phrase quotes, grouping, field: all
   work; intra-word operator chars get escaped so =foo:bar=
   remains findable). In regex mode, AND / OR / NOT / +foo /
@@ -116,7 +121,7 @@ to MUST.
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
 - Results are ranked by BM25 times a context-origin factor
-  (Root 100×, CycleMember ~32×, Target 10×, HadID 10×,
+  (Root 100×, CycleMember ~32×, Dest 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,
   but every match is returned — search is never filtered by
@@ -240,20 +245,52 @@ detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
 on the node at point; it reports moves across all sources.
-** C-c r : showing more information about a node
-These commands don't edit the graph. Each inserts a request
-into the metadata of the node at point that, on save, causes
-the server to render additional information into the view.
-*** C-c r a : skg-reveal-aliases
-See what other text you could search for to find this node.
-You can always search for its title.
-Most nodes have a title and no aliases.
-*** C-c r c : skg-reveal-containerward
-Show the nodes that contain the node at point (its parents
-in the containment graph, one step out).
-*** C-c r s : skg-reveal-sourceward
-Show the nodes that the node at point links to (its textlink
-targets).
+** C-c c : show a collection (both cols of a relation)
+These commands don't edit the graph. Each inserts a request into the
+metadata of the node at point that, on save, causes the server to
+render the relation's collections (cols) into the view, POPULATED from
+the graph. Each builds BOTH cols of its relation. The read-only-col ☮
+marks a col you cannot change from here. Every command auto-saves.
+*** C-c c a : skg-show-collection-aliases
+The aliasCol -- other text you could search for to find this node
+(you can always search for its title; most nodes have none). Writable:
+type an alias in and save.
+*** C-c c o : skg-show-collection-overrides
+The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+even when empty as an "add an override here" surface) and the
+overriderCol (the nodes that override this one -- read-only, ☮).
+*** C-c c h : skg-show-collection-hides
+The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these cols. On a node that neither
+hides nor is hidden, nothing appears.
+*** C-c c s : skg-show-collection-subscribes
+The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberCol (the nodes that subscribe to
+this one -- read-only, ☮).
+** C-c p : show a path (the backpath through one relation role)
+Like the collections, each inserts a request that, on save, grafts the
+partners reached through one relation role as inverted, read-only
+children, climbing transitively until a fork, cycle, or root. UPPER =
+the partner's active (first) role; lower = its passive (second) role.
+Every command auto-saves.
+*** C-c p C : skg-show-paths-through-containers
+The nodes that contain this node (its containment ancestry).
+*** C-c p L : skg-show-paths-through-link-sources
+The nodes that link to this node (its textlink sources).
+*** C-c p l : skg-show-paths-through-link-dests
+The nodes this node links to (its textlink dests).
+*** C-c p O : skg-show-paths-through-overriders
+The nodes that override this node.
+*** C-c p o : skg-show-paths-through-overridden
+The nodes this node overrides.
+*** C-c p H : skg-show-paths-through-hiders
+The nodes that hide this node from their subscriptions.
+*** C-c p h : skg-show-paths-through-hidden
+The nodes this node hides from its subscriptions.
+*** C-c p S : skg-show-paths-through-subscribers
+The nodes that subscribe to this node.
+*** C-c p s : skg-show-paths-through-subscribees
+The nodes this node subscribes to.
 ** C-c s : setting node properties
 *** first some vocab: 'definitive' and 'indefinitive'
 A view of a node can be definitive or indefinitive.
@@ -330,8 +367,8 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive activeNode for the link target. The parent is
-definitive, so saving records the target as content of the
+indefinitive activeNode for the link dest. The parent is
+definitive, so saving records the dest as content of the
 parent; the replacement child is indefinitive, so its own text is
 not rewritten from the link label.
 *** C-c m l : skg-replace-content-with-link
@@ -499,7 +536,7 @@ stripped of skg metadata. The marker child is omitted.
 Links are rewritten to relative org links. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, via =[[./file.org::*Heading][label]]=. A nested
-export root is shown as a link, not inlined. A link whose target
+export root is shown as a link, not inlined. A link whose dest
 is not exported under the chosen set points to a "some links
 might be broken" note.
 

@@ -11,7 +11,7 @@ use skg::context::{
   compute_and_store_context_types,
   content_maps_from_nodes,
   had_id_set_from_nodes,
-  link_targets_from_nodes,
+  link_dests_from_nodes,
   MapToContent,
   MapToContainers,
 };
@@ -65,11 +65,11 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
             all_node_ids . len (), ids_time);
 
   let t3 : Instant = Instant::now ();
-  let link_targets : HashSet<ID> =
-    link_targets_from_nodes (&nodes);
+  let link_dests : HashSet<ID> =
+    link_dests_from_nodes (&nodes);
   let links_time : f64 = t3 . elapsed () . as_secs_f64 ();
-  println! ("2c. link_targets ({} targets): {:.6}s",
-            link_targets . len (), links_time);
+  println! ("2c. link_dests ({} dests): {:.6}s",
+            link_dests . len (), links_time);
 
   let t4 : Instant = Instant::now ();
   let ( contains_map, reverse_map )
@@ -108,7 +108,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
       &tantivy_index,
       &had_id_set,
       &all_node_ids,
-      &link_targets,
+      &link_dests,
       &contains_map,
       &reverse_map ) ?;
   let context_time : f64 = t6 . elapsed () . as_secs_f64 ();
@@ -143,7 +143,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
       &tantivy_index2,
       &had_id_set,
       &all_node_ids,
-      &link_targets,
+      &link_dests,
       &contains_map,
       &reverse_map ) ?;
     println! ("  Run {}: {:.3}s", i, t . elapsed () . as_secs_f64 ()); }

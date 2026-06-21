@@ -550,7 +550,7 @@ async fn test_budget_aliascol_is_neutral (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
-        * (skg (node (id r) (source main) (viewRequests aliases))) r
+        * (skg (node (id r) (source main) (viewRequests (col aliases)))) r
         ** (skg (node (id c1) (source main))) c1
         *** (skg (node (id c2) (source main))) c2
       "};

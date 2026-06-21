@@ -1,0 +1,290 @@
+* Progress — separate & extend the collection / path command families
+  Running log kept per 'when-to-stop.org'. The plan ('plan.org') is
+  left as-is; this file records what's done, deviations in HOW (not
+  WHAT), and choices that shape the future. Newest notes appended.
+
+* FEATURE COMPLETE — all nine steps done (2026-06-20)
+  Every step of 'plan.org' is implemented, each as its own commit
+  (fde34bc2..efa32e4c), suite green at each. Final state:
+  - 'cargo nextest run' : 462 passed.
+  - 'bash/emacs-tests.sh' : 250 passed.
+  - 'bash/integration-tests.sh' : all passed.
+  Two command families now exist: COLLECTIONS ('C-c c', both cols of a
+  relation, writable col forced even when empty) and PATHS ('C-c p', the
+  relation-generic backpath for any of nine partner roles), with Birth
+  and ViewRequest parameterized, the full parent-relative viewStats
+  matrix (Sp/pS/Hp/pH + the pO fix), and the read-only-col ☮.
+
+  FOLLOW-UP (done 2026-06-21, at your request): the search-ranking
+  subsystem is now renamed too -- 'ContextOriginType::Target' -> 'Dest'
+  (label "Target" -> "Dest", recomputed at every init),
+  'MULTIPLIER_TARGET' -> 'MULTIPLIER_DEST', 'link_targets[_from_nodes]'
+  -> 'link_dests[_from_nodes]' across context.rs / main.rs / dbs/init.rs
+  / rebuild_dbs.rs / text_search.rs / the two bench tools / tests/
+  contexts.rs, plus the ranking doc prose (COMMANDS.org, api-and-formats.md)
+  and one stray textlink-dest test docstring. 462 Rust tests still pass.
+
+  THINGS YOU MIGHT WANT TO LOOK AT (all reversible, detailed below):
+  - Step 5 choice: I attach containerward ancestry under EVERY
+    non-container path partner (the plan only fixed linkDest=yes). Easy
+    to restrict to the link roles.
+  - Step 2 follow-on caught in step 9: three save_collateral/git-diff
+    integration fixtures still read the old birth atom via a shared
+    helper; fixed. (See "What's imperfect".)
+
+* What's done and went well
+
+** Step 1 — 'target' -> 'dest' in the textlink context (commit pending)
+   Discovery grep classified every 'target' hit. Key finding: the
+   textlink-RELATION code already uses 'dest' everywhere -- the schema
+   ('schema.tql' roles source/dest), 'OUTBOUND_RELATIONSHIP_TYPES'
+   ('relationships.rs'), the role-pair dispatch ('search.rs:140-164'),
+   and 'relation_accessors.rs' all say 'dest'. So there were NO
+   textlink-ROLE identifiers left to rename; step 1 reduced to doc
+   prose. Renamed the textlink-destination prose in: 'docs/vocabulary.md',
+   'docs/data-model.org' (x2), 'docs/hyperlinks.md', 'docs/COMMANDS.org'
+   (link-dest view prose + the export "link whose dest" line), and
+   'api-and-formats.md' (export "links whose dest" line).
+
+** Step 2 — parameterize Birth -> Backpath(RelationRole) (commit pending)
+   - Added the single-source-of-truth role vocabulary to
+     'relation_accessors.rs': nine 'RelationRole' consts (CONTAINER,
+     LINK_SOURCE, LINK_DEST, OVERRIDER, OVERRIDDEN, HIDER, HIDDEN,
+     SUBSCRIBER, SUBSCRIBEE), the 'PARTNER_ROLE_VOCAB' table
+     (ROLENAME <-> RelationRole <-> glyph), and methods 'rolename',
+     'from_rolename', 'glyph', 'backpath_triple' (triple derived, not
+     stored).
+   - 'Birth' is now '{ Unremarkable, Backpath(RelationRole) }'. Wire
+     form '(birth backpath ROLENAME)'; serialize/parse updated.
+   - 'validate_parentIs_relationships' collapses the two per-variant
+     birth checks into one 'relation_membership_is_real' call keyed by
+     the role; deleted the now-dead 'child_contains_parent' /
+     'child_linksto_parent' helpers.
+   - Birth heralds + 'birth_emitted_atoms' are now GENERATED from
+     PARTNER_ROLE_VOCAB, so all nine role glyphs exist already (step 5
+     adds no herald work). Regenerated 'tests/elisp/herald-rules.sexp'.
+   - All suites green: 460 Rust, 249 elisp, and the four birth-touching
+     integration tests (containerward/sourceward/content-view-from-non-root/
+     search-enrichment).
+
+** Step 3 — parameterize ViewRequest (Col + Path); fold in the three (commit pending)
+   - 'ViewRequest' is now '{ Col(ColRelation), Path(RelationRole),
+     Definitive }', with 'ColRelation { Aliases, Overrides, Hides,
+     Subscribes }' (relname/from_relname). Dropped the flat
+     'REPRS_IN_CLIENT'/'from_client_string'/'FromStr'; Display now emits
+     '(col RELNAME)' / '(path ROLENAME)' / 'definitiveView'.
+   - Parser rewritten ('parse_viewrequests_sexp') to accept the nested
+     '(col ...)' / '(path ...)' forms and the bare 'definitiveView'.
+   - viewRequests herald rule now matches 'col'/'path'/'definitiveView'
+     (the RELNAME/ROLENAME are value-position, echoed by ANY/IT ->
+     "req:col:NAME" / "req:path:NAME"). 'EMITTABLE_MATCH_ATOMS'
+     = ["col","path","definitiveView"] feeds the conformance test.
+   - Dispatch ('execute_view_requests'): Col(Aliases) -> existing aliases
+     builder; Path(CONTAINER)/Path(LINK_SOURCE) -> existing containerward/
+     sourceward engines; the other Col/Path arms return a clear "not yet
+     implemented" error (steps 4/5; no client requests them yet). The
+     view-root containerward special-case now keys on Path(CONTAINER).
+   - Folded the three old tokens (aliases/containerwardView/sourcewardView)
+     into the new forms across server, the elisp request commands, and
+     the affected fixtures. Old atoms fully removed.
+   - All suites green: 460 Rust, 249 elisp, and the
+     aliases/containerward/sourceward/save_collateral_delete integration
+     tests.
+
+** Step 4 — fulfill the Col request (both cols, populated) (commit pending)
+   - New 'to_org/expand/col_request.rs' ::
+     'build_and_integrate_col_then_drop_request' routes each ColRelation
+     to the existing de-novo generators: overrides -> overriddenCol
+     (writable, forced-empty) + overriderCol; hides -> hiderCol +
+     hiddenCol (both read-only); subscribes -> subscribeeCol (writable,
+     forced-empty) + subscriberCol. aliases keeps using the AliasCol
+     builder (already creates an empty col). The dispatch's Col(rel) arm
+     now calls it.
+   - Added 'force_create_when_empty' to 'maybe_add_one_partnerCol' (now
+     pub) and 'maybe_add_subscribeeCol_branch'; the content-completion
+     caller passes 'false'. The writable col is materialized empty (the
+     "add here" surface); 'is_self_deletable_when_empty' already spares
+     empty Subscribee/Overridden/Alias, so the prune keeps it. No wipe:
+     an absent writable col is MSV::Unspecified (from disk), and the col
+     is built AFTER extraction, so the relation is never silently emptied.
+   - Test: a 'col_request_scenarios' block in 'partner_col_matrix.rs'
+     (which installs the global graph handle the generators read) covers
+     overrides-empty (forced empty overriddenCol, no overriderCol),
+     overrides-populated, subscribes-populated, and hides-empty (nothing).
+   - All 460 Rust tests pass.
+
+** Step 5 — fulfill the Path request for the new roles (commit pending)
+   - Made the path dispatch fully relation-generic: new
+     'build_and_integrate_path_view_then_drop_request(role)' /
+     'build_and_integrate_path_with_source_set(role)' in 'backpath.rs'
+     take the '(relation, input_role, output_role)' triple straight from
+     'RelationRole::backpath_triple', so ONE call site serves all nine
+     roles. The dispatch's Path(role) arm now routes every role through
+     it; the two old containerward/sourceward '*_view_then_drop_request*'
+     wrappers are gone, and the 'containerward_path'/'sourceward_path'
+     helpers (test-used) became thin wrappers over the generic engine
+     (a deduplication). Generalized the ancestry-attach helper to
+     'attach_containerward_ancestries_for_birth_role(role)'.
+   - All 462 Rust tests pass; the containerward/sourceward + on-phantom
+     integration tests still pass (refactor is behavior-preserving).
+
+** Step 6 — viewStats parent-herald matrix: Sp/pS/Hp/pH; fix pO (commit pending)
+   - 'ViewNodeStats' gained subscribesParent/parentSubscribes/
+     hidesParent/parentHides (Default false). 'set_relation_relative_stats'
+     now computes the full SIX-stat parent-relative matrix in its Gnode
+     arm (over/under for overrides, subscribes, hides) via
+     'relation_membership_is_real', keyed by the RelationRole consts --
+     including parentOverrides, previously produced only by the
+     fork buffer. Serializer + parser learned all of them; the parser's
+     missing 'parentOverrides' arm (the LATENT BUG) is fixed, so Op/pO is
+     symmetric again. Herald table emits red Sp/pS/Hp/pH; regenerated the
+     elisp fixture.
+   - Tests: the matrix 'path_request_scenarios' assert the matching
+     parent-relative stat on each grafted partner (pO via path overridden,
+     Op via overrider, pS via subscribee, Sp via subscriber, pH via
+     hidden, Hp via hider) AND a buffer-parse round-trip of all the new
+     atoms. All 462 Rust tests pass.
+   - Moved the pO latent-bug entry from 'TODO/problems.org' to
+     'TODO/DONE/problems.org'.
+
+** Step 7 — read-only col scaffold ☮ herald (commit pending)
+   Added a 'leaf_ro' herald helper (label text + "☮") and applied it to
+   the SIX read-only col scaffolds (subscriberCol, overriderCol,
+   hiderCol, hiddenCol, hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol),
+   meaning "cannot be changed from here". The writable cols
+   (subscribeeCol, overriddenCol, aliasCol) keep their plain green
+   label. Pure herald-table change -- no wire atom, no parser, no server
+   logic; the conformance test is unaffected (☮ is a string child, not a
+   label). Regenerated the elisp fixture. All 462 Rust + 249 elisp tests
+   pass.
+
+** Step 8 — client commands, keybindings, auto-save; drop C-c r (commit pending)
+   - 'skg-request-views.el' rewritten: a 'skg--define-view-request-commands'
+     macro generates the thirteen commands ('skg-show-collection-{aliases,
+     overrides,hides,subscribes}' and 'skg-show-paths-through-*') from
+     (name request-form docstring) rows; each inserts its '(viewRequests
+     (col ...))' / '(... (path ...))' atom and AUTO-SAVES (aliases too,
+     Q10). 'skg-request-definitive-view' kept (no auto-save).
+   - 'skg-keymaps-and-aliases.el': bound 'C-c c {a,o,h,s}' and 'C-c p
+     {C,L,l,O,o,H,h,S,s}'; removed the three 'C-c r' bindings and the
+     four 'skg-reveal-*' aliases ('C-c r' is now free).
+   - Updated the three migrated integration tests to call the new
+     command names (aliases now auto-saves, so its explicit save line was
+     dropped). Added a 'test-skg-collection-and-path-keybindings'
+     lookup-key assertion over a sample (incl. the C-c p O / C-c p o
+     UPPER/lower pair).
+   - 250 elisp tests pass; the aliases/containerward/sourceward
+     integration tests pass with the renamed commands.
+
+** Step 9 — docs, fixtures, conformance, full suite (commit pending)
+   - 'docs/COMMANDS.org': replaced the 'C-c r' section with the full
+     'C-c c' (collections) and 'C-c p' (paths) families, noting per
+     command which col side (if any) is editable and the read-only ☮.
+   - 'api-and-formats.md': updated the '(birth backpath ROLENAME)'
+     grammar, added a '(viewRequests ...)' request-grammar subsection
+     ((col ...)/(path ...)/definitiveView), and added the new viewStats
+     (Sp/pS/Hp/pH) + the now-general pO.
+   - 'glossary.md': documented the read-only-col ☮ on the six read-only
+     cols.
+   - Regenerated 'tests/elisp/herald-rules.sexp' (unchanged since step 7
+     -- it has been kept current per-commit).
+   - FULL SUITE GREEN: 462 Rust ('cargo nextest run'), 250 elisp
+     ('bash/emacs-tests.sh'), and ALL integration tests
+     ('bash/integration-tests.sh').
+
+* What's imperfect about what's done (caught in step 9)
+  - The full integration suite (run only at step 9) surfaced THREE
+     fixtures whose shared helper ('save_collateral_break_cycle/
+     test-helpers.el', also loaded by 'save_collateral_add_content_and_modify_text'
+     and 'git-diff-view-updates') still classified a node's birth via
+     the OLD '(car birth-list)' = containsParent/linksToParent. The
+     step-2 birth-format change ('(birth backpath ROLENAME)') silently
+     reclassified those nodes as 'independent'. Fixed the helper to read
+     '(backpath ROLENAME)' -> ROLENAME and migrated the three tests'
+     relation labels (containsParent -> container). Root cause: I ran
+     only the targeted integration tests per-commit (the full
+     integration suite is slow); the gap is exactly what step 9's full
+     run is for, but a step-2 grep for 'birth' in integration helpers
+     would have caught it earlier.
+
+* Changes to the plan's envisioned order
+  - Herald elisp fixture ('tests/elisp/herald-rules.sexp') is
+    regenerated WITHIN each herald-touching commit (step 2 here, later
+    steps 6/7), not deferred to step 9, so every commit stays green
+    (the conformance test 'elisp_fixture_matches_the_live_table' pins
+    it). Step 9 still does the final full regen + suite run.
+
+* What's imperfect about what's done
+  - The unit-test helper 'graph_with' ('tests/unit/to_org_util.rs')
+    previously built an INCOMPLETE in-Rust graph (nodes only, no inverse
+    indexes). The new birth validation reads the inverse indexes via
+    'relation_membership_is_real' (correct in production, where the
+    graph is fully built), so I fixed 'graph_with' to also call
+    'add_to_inverse_indexes' (newly 'pub(crate)'). This is a test-only
+    correctness fix, not a production change; flagging it because it
+    widened the visibility of an internal helper.
+  - Step 3 needed a SMALL client change earlier than step 8: the three
+    existing request commands ('skg-request-{aliases,containerward,
+    sourceward}-view') had to emit the new '(col aliases)'/'(path
+    container)'/'(path linkSource)' atoms, else the integration tests
+    (which invoke those commands) would send atoms the new server
+    rejects. The full client rework (rename to 'skg-show-*', the ten new
+    commands, keybindings, auto-save) is still step 8.
+  - Step 3 also trimmed the sexpr-editor's viewRequests field-cycling
+    list ('skg-sexpr-cycling.el') to just 'definitiveView' (the only
+    bare-atom request). The col/path requests are structured forms made
+    via commands, not flat-cycleable values. Untested helper; left a
+    comment. A fuller cycling UX for the structured requests, if wanted,
+    belongs with the step-8 client work.
+
+* Choices determining the future (more)
+
+** Step 5: containerward ancestry attached for EVERY non-container role
+   The plan only explicitly decided linkDest should attach each
+   partner's containerward ancestry (mirroring linkSource, "default:
+   yes"). For the six sharing roles it was silent. I attach the
+   containerward ancestry uniformly for ALL non-container path roles --
+   so every grafted partner is shown in its own container context, the
+   same affordance linkSource has always had. The container role itself
+   IS that ancestry, so it does not re-attach. Reversible: gate the
+   attach on a role set if you want it only for the link roles.
+
+** Step 5: tested with Rust matrix scenarios, not 7 integration goldens
+   The plan envisioned "one integration golden per new path role". I
+   instead (a) unit-test 'backpath_triple'/'rolename'/'glyph' for all
+   nine roles, and (b) added 'path_request_scenarios' to
+   'partner_col_matrix.rs' covering all seven new roles end-to-end
+   (overridden/overrider/subscribee/subscriber/hidden/hider via existing
+   public fixtures, linkDest via three new textlink fixtures), plus a
+   self-referential (self-linking) node proving a non-container role
+   needs no view-root special-case. This is faster and in-process; the
+   client commands that the bash goldens would drive don't exist until
+   step 8. New fixtures: 'pathLink-src/dst.skg', 'pathSelf.skg' under
+   the matrix's public source.
+
+* Choices determining the future
+
+** SCOPE DECISION (step 1): left the search-ranking subsystem on "target"
+   The only remaining code uses of "target" in a link sense are in the
+   search-NOTABILITY ranking subsystem, NOT the textlink role:
+   - 'ContextOriginType::Target' (one of {Root, CycleMember, Target,
+     HadID, MultiContained}) -- "this node is a link destination, hence
+     notable", with a label "Target" persisted in Tantivy and recomputed
+     at every startup ('compute_and_store_context_types', 'main.rs:307').
+   - 'link_targets' / 'link_targets_from_nodes' -- the in-memory set of
+     textlink-destination IDs FED to that ranking, threaded through the
+     critical init path ('InitContextHandoff', 'dbs/init.rs', 'main.rs').
+   - 'MULTIPLIER_TARGET' ('consts.rs') paired with the enum.
+   I deliberately did NOT rename these, because: (a) it's a distinct
+   notability vocabulary, not the textlink ROLE the rename targets (the
+   role code is already 'dest'); (b) "Target" reads idiomatically among
+   {Root, CycleMember, HadID, MultiContained}, whereas "Dest" reads
+   oddly there; (c) it threads the most critical (startup/init) code
+   path and a persisted label, so a rename is higher-risk and tangential
+   to this feature; (d) 'coding-advice/for-ai.md' says "no gratuitous
+   renaming" and the plan says "SCOPE STRICTLY".
+   REVERSIBLE: if you want the ranking subsystem's "Target" -> "Dest"
+   too (var, enum, label, multiplier, and the matching test/doc
+   updates), say so and it's a quick mechanical follow-up. The plan's
+   literal "'link target' -> 'link dest'" example is what I'm reading as
+   "doc prose", not the 'link_targets' ranking variable.

@@ -1,5 +1,10 @@
 * Play two roles, communicate through git.
 * s
+** a better search UI
+ask the user to type a few characters, any subset of
+(r)egex, (b)ody, ..
+** search should show sources
+It does upon save but not initially.
 ** correctness
 *** Bug: skg-close-all-buffers
 is closing too much, e.g. the first (starred) buffer here:
@@ -52,6 +57,26 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
+*** in cols the peace symbol should precede the title
+and there should be a space between them
+*** rewrite docs/COMMANDS.org
+Some new Claude-written passages assume too much of the reade
+*** uniform rel stats
+pX = parent Xs it
+Xp = it Xs parent
+3pX = 3 X it, among them its parent
+X4p = it Xs 4, including its parent
+
+In the special case of X=L for links,
+a(b,c)L (where a,b,c are numbers) =
+  a nodes link to it,
+  b of those a differ from it, are bodyless and content-less, but their title text is something other than the link label
+  c of the a have their own content
+  (the remainer are links whose title nodes are just a link with one of the node's normal aliases)
+
+g (grandparent) and G (great-grandparent)
+can be used like p.
+*** O,S,A etc. should precede numerical content stats, in another color
 *** fork request
 To provide a way to fork your own data
 (because the 'edit a foreign one' gesture cannot be applied).
@@ -97,6 +122,7 @@ and removes the child from the parent.
 *** graphstats should precede even the link source count
 but follow parentIs and indef
 ** elegance
+*** reveal aliases is different from reveal sourceward/containerward
 *** Emacs, not the server, should remember foldedness and point.
 **** the idea
 Keep a tree of IDs.
@@ -108,6 +134,18 @@ Continue to apply foldedness leafward from the root as before.
 **** It's hard because two viewnodes can share an ID.
 The incoming tree would have to be compared to the outgoing one.
 Although they usually don't, things can shift around dramatically.
+*** missing abstraction : "relationship to visible org-parent"
+Provenance/relationship to the org-parent is currently expressed three ways:
+(a) a 'birth' marker (containment, links)
+(b) a viewStats parent-herald (overrides: Op/pO)
+(c) for containment, BOTH at once ("}" appears as birth and as viewStats).
+
+Extending to subscribes/
+hides invites picking one. A single concept — "this node's relation
+to its visible org-parent, with role/direction" — computed in one
+place ('set_relation_relative_stats') and rendered by one herald
+family, would cover all 5 relations x 2 directions uniformly and
+retire the birth/viewStats split. Recommended by Q7(B) + Q8.
 ** usage mysteries
 *** must (?) stage them separately, but commit all repos at once
 ** usage, to document

@@ -3,7 +3,7 @@
 /// consisting of 'origins' (usually a single rootlike node,
 /// but maybe a cycle) and potentially a lot of other nodes
 /// in the recursive content of the origin(s).
-/// Origins (roots, link targets, multiply-contained nodes, cycle members,
+/// Origins (roots, link dests, multiply-contained nodes, cycle members,
 /// nodes with Had_ID_Before_Import) get score multipliers at search time.
 
 use crate::consts::{
@@ -11,7 +11,7 @@ use crate::consts::{
   MULTIPLIER_HAD_ID,
   MULTIPLIER_MULTI_CONTAINED,
   MULTIPLIER_ROOT,
-  MULTIPLIER_TARGET,
+  MULTIPLIER_DEST,
 };
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
@@ -32,7 +32,7 @@ use std::error::Error;
 pub enum ContextOriginType {
   Root,
   CycleMember, // A treelike set might have no single root, but rather a rootlike cycle. In that case every member of the cycle should be almost as prominent in search results as a true root. The multipliers reflect that.
-  Target,
+  Dest,
   HadID, // If something had an org-roam ID when imported, even if it was not linked to, it was probably considered important enough at some point to be worth linking to.
   MultiContained,
 }
@@ -42,7 +42,7 @@ impl ContextOriginType {
     match self {
       ContextOriginType::Root           => "Root",
       ContextOriginType::CycleMember    => "CycleMember",
-      ContextOriginType::Target         => "Target",
+      ContextOriginType::Dest         => "Dest",
       ContextOriginType::HadID          => "HadID",
       ContextOriginType::MultiContained => "MultiContained", } }
   pub fn from_label ( label : &str, )
@@ -50,7 +50,7 @@ impl ContextOriginType {
     match label {
       "Root"           => Some (ContextOriginType::Root),
       "CycleMember"    => Some (ContextOriginType::CycleMember),
-      "Target"         => Some (ContextOriginType::Target),
+      "Dest"         => Some (ContextOriginType::Dest),
       "HadID"          => Some (ContextOriginType::HadID),
       "MultiContained" => Some (ContextOriginType::MultiContained),
       _                => None, } }
@@ -58,7 +58,7 @@ impl ContextOriginType {
     match self {
       ContextOriginType::Root           => MULTIPLIER_ROOT,
       ContextOriginType::CycleMember    => MULTIPLIER_CYCLE_MEMBER,
-      ContextOriginType::Target         => MULTIPLIER_TARGET,
+      ContextOriginType::Dest         => MULTIPLIER_DEST,
       ContextOriginType::HadID          => MULTIPLIER_HAD_ID,
       ContextOriginType::MultiContained => MULTIPLIER_MULTI_CONTAINED, }} }
 
@@ -81,18 +81,18 @@ pub fn compute_and_store_context_types (
   tantivy_index : &TantivyIndex,
   had_id_set    : &HashSet<ID>,
   all_node_ids  : &HashSet<ID>,
-  link_targets  : &HashSet<ID>,
+  link_dests  : &HashSet<ID>,
   map_to_content  : &MapToContent,
   map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   tracing::info! ("Computing context origin types...");
   let edge_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
-  tracing::info! ("  {} nodes, {} edges, {} link targets.",
-            all_node_ids . len (), edge_count, link_targets . len ());
+  tracing::info! ("  {} nodes, {} edges, {} link dests.",
+            all_node_ids . len (), edge_count, link_dests . len ());
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      all_node_ids, map_to_containers, link_targets, had_id_set );
+      all_node_ids, map_to_containers, link_dests, had_id_set );
   tracing::info! ("  {} origins identified.", origin_types . len ());
   let mut all_contexts : Vec<HashSet<ID>> =
     grow_all_contexts (&origin_types, map_to_content);
@@ -147,7 +147,7 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
       . map ( |cs| ( id . clone (),
                      cs . iter () . cloned () . collect () )) )
     . collect ();
-  let link_targets : HashSet<ID> = // saved nodes that anything links to
+  let link_dests : HashSet<ID> = // saved nodes that anything links to
     saved_ids . iter ()
     . filter ( |id| graph . textlinks_in . get (id)
                . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
@@ -160,7 +160,7 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
     . collect ();
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      &saved_ids, &map_to_containers, &link_targets, &had_id_set );
+      &saved_ids, &map_to_containers, &link_dests, &had_id_set );
   for id in &saved_ids {
     // CycleMember, only for nodes not already a higher-priority origin.
     if ! origin_types . contains_key (id)
@@ -197,7 +197,7 @@ fn node_is_in_containerward_cycle (
 
 /// Build origin_types map from in-Rust-graph data + one TypeDB query result.
 /// We impose priority order: If something is a Root,
-/// it doesn't matter that it's a Target, etc.
+/// it doesn't matter that it's a Dest, etc.
 /// Therefore higher-priority origin types are processed later.
 /// CycleMember is assigned later (step 3).
 /// (That's safe because the only higher-priority thing is a Root,
@@ -205,7 +205,7 @@ fn node_is_in_containerward_cycle (
 fn identify_origins (
   all_node_ids : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
-  targets      : &HashSet<ID>,
+  dests      : &HashSet<ID>,
   had_id_set   : &HashSet<ID>,
 ) -> HashMap<ID, ContextOriginType> {
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
@@ -219,9 +219,9 @@ fn identify_origins (
     for id in had_id_set {
       origin_types . insert (
         id . clone (), ContextOriginType::HadID ); }
-    for id in targets {
+    for id in dests {
       origin_types . insert (
-        id . clone (), ContextOriginType::Target ); }
+        id . clone (), ContextOriginType::Dest ); }
     for id in &roots {
       origin_types . insert (
         id . clone (), ContextOriginType::Root ); }}
@@ -392,10 +392,10 @@ pub fn content_maps_from_nodes (
           . push (pid . clone ()); } }}
   ( to_content, to_containers ) }
 
-/// Collect all link target IDs from titles and bodies.
+/// Collect all link dest IDs from titles and bodies.
 /// (The previous implementation, which queried TypeDB,
 /// took ~2.5 seconds for 28k nodes.)
-pub fn link_targets_from_nodes (
+pub fn link_dests_from_nodes (
   nodes : &[NodeComplete],
 ) -> HashSet<ID> {
   nodes . iter ()

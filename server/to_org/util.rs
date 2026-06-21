@@ -241,12 +241,10 @@ pub fn mark_view_roots_parent_absent (
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::ContainsParent' on child C with ActiveNode parent P:
-///   claim is "C contains P". Verified against C's 'contains'
-///   list in the in-Rust graph.
-/// - 'Birth::LinksToParent' on child C with ActiveNode parent P:
-///   claim is "C's body/title links to P". Verified against C's
-///   'textlinks_to' in the in-Rust graph.
+/// - 'Birth::Backpath(role)' on child C with ActiveNode parent P:
+///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
+///   P; LINK_SOURCE -> C's body/title links to P). Verified against the
+///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
 /// - 'ParentIs::Affected' on child C with INDEFINITIVE ActiveNode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
@@ -301,10 +299,18 @@ pub fn validate_parentIs_relationships (
         ParentIs::Absent => false, };
       if ! parent_is_claim_ok { to_independent . push ( child_ref . id () ); }
       let birth_claim_ok : bool = match child_tn . birth {
-        Birth::ContainsParent =>
-          child_contains_parent (graph, &child_tn . id, &parent_tn . id),
-        Birth::LinksToParent =>
-          child_linksto_parent (graph, &child_tn . id, &parent_tn . id),
+        Birth::Backpath (role) => {
+          // The child plays 'role' toward the parent (the origin).
+          // Resolve both through pid_of so extra_id aliasing (a
+          // nodeMerge side-effect) doesn't produce a false mismatch.
+          let parent_pid : ID =
+            graph . pid_of (&parent_tn . id)
+              . unwrap_or_else ( || parent_tn . id . clone () );
+          let child_pid : ID =
+            graph . pid_of (&child_tn . id)
+              . unwrap_or_else ( || child_tn . id . clone () );
+          graph . relation_membership_is_real (
+            &parent_pid, &child_pid, role ) }
         Birth::Unremarkable => true, };
       if ! birth_claim_ok { to_unremarkable . push ( child_ref . id () ); }}}
   for id in to_independent {
@@ -373,42 +379,8 @@ pub fn mark_orphans_under_dead_parents_independent (
       = node_mut . value () . kind
     { t . parentIs = ParentIs::Independent; } } }
 
-/// Does 'child's 'contains' list include 'parent' (modulo
-/// extra_id aliasing on either side)?
-fn child_contains_parent (
-  graph     : &InRustGraph,
-  child_id  : &ID,
-  parent_id : &ID,
-) -> bool {
-  let parent_pid : ID =
-    graph . pid_of (parent_id) . unwrap_or_else ( || parent_id . clone () );
-  let child_node : &NodeRust =
-    match graph . get (child_id) {
-      Some (n) => n,
-      None     => return false };
-  child_node . contains . iter () . any ( |x|
-    graph . pid_of (x) . unwrap_or_else ( || x . clone () )
-      == parent_pid ) }
-
-/// Does 'child's 'textlinks_to' include 'parent' (modulo
-/// extra_id aliasing on either side)?
-fn child_linksto_parent (
-  graph     : &InRustGraph,
-  child_id  : &ID,
-  parent_id : &ID,
-) -> bool {
-  let parent_pid : ID =
-    graph . pid_of (parent_id) . unwrap_or_else ( || parent_id . clone () );
-  let child_node : &NodeRust =
-    match graph . get (child_id) {
-      Some (n) => n,
-      None     => return false };
-  child_node . textlinks_to . iter () . any ( |x|
-    graph . pid_of (x) . unwrap_or_else ( || x . clone () )
-      == parent_pid ) }
-
-/// Symmetric to 'child_contains_parent': does 'parent's
-/// 'contains' list include 'child'?
+/// Does 'parent's 'contains' list include 'child' (modulo extra_id
+/// aliasing on either side)? The inverse of "child contains parent".
 fn child_contained_by_parent (
   graph     : &InRustGraph,
   child_id  : &ID,

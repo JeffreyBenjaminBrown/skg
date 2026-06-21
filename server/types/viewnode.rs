@@ -8,6 +8,7 @@
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, SourceName};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
@@ -32,11 +33,17 @@ pub enum ParentIs {
 /// Why a generated node was originally displayed under its visible parent.
 /// This is view history used for display and stale-relation validation,
 /// not save extraction.
+///
+/// A 'Backpath(role)' node was grafted by the backpath engine as an
+/// ancestry partner; the RelationRole names the role that partner plays
+/// toward its org-parent (the origin) -- e.g. 'CONTAINER' for a
+/// containerward ancestor, 'LINK_SOURCE' for a node that links to the
+/// origin. The role determines the wire ROLENAME and the herald glyph
+/// (see PARTNER_ROLE_VOCAB).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Birth {
   Unremarkable,
-  ContainsParent,
-  LinksToParent,
+  Backpath (RelationRole),
 }
 
 //
@@ -349,10 +356,26 @@ pub struct ViewNodeStats {
   /// different positions.
   pub overridesParent       : bool,
   /// This node's visible org-parent OVERRIDES it -- the inverse of
-  /// 'overridesParent'. Herald red "pO". Marks the original a
-  /// fork-to-be (clone) stands over in the fork-confirmation buffer.
-  /// Computed only where needed (that buffer), not generally.
+  /// 'overridesParent'. Herald red "pO". Computed generally now (in
+  /// 'set_relation_relative_stats'), like 'overridesParent'; also still
+  /// marks the original a fork-to-be (clone) stands over in the
+  /// fork-confirmation buffer.
   pub parentOverrides       : bool,
+  /// This node SUBSCRIBES TO its visible org-parent's node. Herald red
+  /// "Sp". A view stat like 'overridesParent': the same node under a
+  /// different parent has a different value.
+  pub subscribesParent      : bool,
+  /// This node's visible org-parent SUBSCRIBES TO it -- the inverse of
+  /// 'subscribesParent'. Herald red "pS".
+  pub parentSubscribes      : bool,
+  /// This node HIDES its visible org-parent (an outbound
+  /// 'hides_from_its_subscriptions' edge to it). Herald red "Hp". A
+  /// plain binary edge herald (Q9): the full "hidden from which
+  /// subscription" context lives in the hide cols, not here.
+  pub hidesParent           : bool,
+  /// This node's visible org-parent HIDES it -- the inverse of
+  /// 'hidesParent'. Herald red "pH".
+  pub parentHides           : bool,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald red "Oh".
   /// LOAD-BEARING, unlike the other view stats: save extraction
@@ -430,13 +453,51 @@ pub enum EditRequest {
   Delete, // request to delete this node
 }
 
+/// Which relation's collection a 'Col' view-request builds. A Col
+/// builds BOTH cols of its relation, so it is named by the RELATION
+/// (relname), unlike a Path, which is named by a single partner ROLE.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ColRelation {
+  Aliases,
+  Overrides,
+  Hides,
+  Subscribes,
+}
+
+impl ColRelation {
+  pub const ALL : [ColRelation; 4] = [
+    ColRelation::Aliases, ColRelation::Overrides,
+    ColRelation::Hides,   ColRelation::Subscribes ];
+
+  pub fn relname (
+    self,
+  ) -> &'static str {
+    match self {
+      ColRelation::Aliases    => "aliases",
+      ColRelation::Overrides  => "overrides",
+      ColRelation::Hides      => "hides",
+      ColRelation::Subscribes => "subscribes", } }
+
+  pub fn from_relname (
+    s : &str,
+  ) -> Option<ColRelation> {
+    match s {
+      "aliases"    => Some (ColRelation::Aliases),
+      "overrides"  => Some (ColRelation::Overrides),
+      "hides"      => Some (ColRelation::Hides),
+      "subscribes" => Some (ColRelation::Subscribes),
+      _            => None, } }
+}
+
 /// Requests for additional views related to a node.
 /// Multiple view requests can be active simultaneously.
+/// - 'Col(rel)' builds BOTH cols of the relation, populated from the graph.
+/// - 'Path(role)' builds the backpath for that one partner role.
+/// - 'Definitive' makes the (indefinitive) node editable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
-  Aliases,
-  Containerward,
-  Sourceward,
+  Col  (ColRelation),
+  Path (RelationRole),
   Definitive,
 }
 
@@ -639,28 +700,14 @@ impl Phantom {
 }
 
 impl ViewRequest {
-  /// Single source of truth for ViewRequest <-> client string bijection.
-  /// Public so the herald conformance test (server/heralds.rs) can
-  /// enumerate the emittable atoms from it.
-  pub const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
-    ("aliases",            ViewRequest::Aliases),
-    ("containerwardView",  ViewRequest::Containerward),
-    ("sourcewardView",     ViewRequest::Sourceward),
-    ("definitiveView",     ViewRequest::Definitive),
-  ];
-
-  /// String representation as used in client metadata.
-  pub fn repr_in_client (&self) -> &'static str {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(_, vr)| vr == self )
-      . map ( |(s, _)| *s )
-      . expect ("REPRS_IN_CLIENT should cover all ViewRequest variants") }
-
-  /// Parse a client string to a ViewRequest.
-  pub fn from_client_string ( s: &str ) -> Option<ViewRequest> {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(cs, _)| *cs == s )
-      . map ( |(_, vr)| *vr ) }
+  /// The MATCH-position atoms the server can emit inside
+  /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
+  /// '(col ...)' / '(path ...)' forms are VALUE-position (echoed by the
+  /// herald's ANY/IT), so they are deliberately absent -- like IDs and
+  /// counts elsewhere. Enumerated for the herald conformance test
+  /// (server/heralds.rs).
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 3] =
+    [ "col", "path", "definitiveView" ];
 }
 
 impl AsRef<ViewNode> for ViewNode {
@@ -780,16 +827,10 @@ impl fmt::Display for ViewRequest {
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    write!(f, "{}", self . repr_in_client()) } }
-
-impl FromStr for ViewRequest {
-  type Err = String;
-
-  fn from_str (
-    s : &str
-  ) -> Result<Self, Self::Err> {
-    Self::from_client_string (s)
-      . ok_or_else ( || format! ( "Unknown ViewRequest value: {}", s ) ) } }
+    match self {
+      ViewRequest::Col  (rel)  => write! (f, "(col {})",  rel  . relname  ()),
+      ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
+      ViewRequest::Definitive  => write! (f, "definitiveView"), } } }
 
 //
 // Defaults
@@ -821,6 +862,10 @@ impl Default for ViewNodeStats {
       grandparentSubscribes : false,
       overridesParent       : false,
       parentOverrides       : false,
+      subscribesParent      : false,
+      parentSubscribes      : false,
+      hidesParent           : false,
+      parentHides           : false,
       overridesHere         : None,
     }} }
 

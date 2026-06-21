@@ -6,7 +6,7 @@
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
 ///                         [(parentIs affected|independent|absent)]
-///                         [(birth linksToParent|containsParent)]
+///                         [(birth backpath ROLENAME)]
 ///                         [indef]   ; short for "indefinitive"
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -21,10 +21,11 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
-  GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
+  GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, ColRelation,
   Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
   Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
 };
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff,
     MpVognode, MpPhantom,
@@ -32,7 +33,6 @@ use crate::types::maybe_placed_viewnode::{
 
 use sexp::Sexp;
 use std::collections::HashSet;
-use std::str::FromStr;
 
 //
 // Parsing-internal types
@@ -447,15 +447,20 @@ fn parse_node_sexp (
               _ => return Err ( format! (
                 "Invalid parentIs value: {}", value )), }; },
           "birth" => {
-            if subitems . len () != 2 {
-              return Err ( "birth requires exactly one value" . to_string () ); }
-            let value : String =
+            // (birth backpath ROLENAME)
+            if subitems . len () != 3 {
+              return Err ( "birth requires 'backpath ROLENAME'" . to_string () ); }
+            let kind : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . birth = match value . as_str () {
-              "linksToParent"    => Birth::LinksToParent,
-              "containsParent"   => Birth::ContainsParent,
-              _ => return Err ( format! (
-                "Invalid birth value: {}", value )), }; },
+            if kind != "backpath" {
+              return Err ( format! ( "Invalid birth kind: {}", kind )); }
+            let rolename : String =
+              atom_to_string ( &subitems[2] ) ?;
+            let role : RelationRole =
+              RelationRole::from_rolename ( &rolename )
+                . ok_or_else ( || format! (
+                  "Invalid birth rolename: {}", rolename )) ?;
+            metadata . birth = Birth::Backpath (role); },
           "staged" => {
             apply_axis_atoms_to_activeNode (
               &subitems[1..],
@@ -676,8 +681,9 @@ fn parse_graphstats_sexp (
       { lr . sources_without_content = c; }}
   Ok (( )) }
 
-/// Parse the (viewStats ...) s-expression contents.
-/// Only handles bare atoms (cycle, containsParent).
+/// Parse the (viewStats ...) s-expression contents: the bare-atom
+/// stats (cycle, containsParent, the parent-relationship heralds) and
+/// the keyed 'overridesHere'/'sourceHerald' sub-forms.
 fn parse_viewstats_sexp (
   items : &[Sexp],
   stats : &mut ViewNodeStats
@@ -693,6 +699,11 @@ fn parse_viewstats_sexp (
           "grandparentOverrides"  => stats . grandparentOverrides  = true,
           "grandparentSubscribes" => stats . grandparentSubscribes = true,
           "overridesParent"       => stats . overridesParent       = true,
+          "parentOverrides"       => stats . parentOverrides       = true,
+          "subscribesParent"      => stats . subscribesParent      = true,
+          "parentSubscribes"      => stats . parentSubscribes      = true,
+          "hidesParent"           => stats . hidesParent           = true,
+          "parentHides"           => stats . parentHides           = true,
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },
@@ -745,21 +756,35 @@ fn parse_editrequest_sexp (
 
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
+/// Each request is either the bare atom 'definitiveView', or a nested
+/// '(col RELNAME)' / '(path ROLENAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
   requests : &mut HashSet<ViewRequest>
 ) -> Result<(), String> {
   for request_element in items {
-    match request_element {
+    let request : ViewRequest = match request_element {
       Sexp::Atom (_) => {
-        let request_str : String =
-          atom_to_string (request_element) ?;
-        let request : ViewRequest =
-          ViewRequest::from_str (&request_str)
-          . map_err (
-            | e | format! ( "Invalid view request: {}", e )) ?;
-        requests . insert (request); },
-      _ => { return Err (
-        "Unexpected element in viewRequests (expected atoms)"
-          . to_string () ); }} }
+        let atom : String = atom_to_string (request_element) ?;
+        if atom == "definitiveView" { ViewRequest::Definitive }
+        else { return Err ( format! (
+          "Invalid view request atom: {}", atom )); } },
+      Sexp::List (sub) if sub . len () == 2 => {
+        let head : String = atom_to_string ( &sub[0] ) ?;
+        let arg  : String = atom_to_string ( &sub[1] ) ?;
+        match head . as_str () {
+          "col"  => ViewRequest::Col (
+            ColRelation::from_relname (&arg)
+              . ok_or_else ( || format! (
+                "Invalid col relname: {}", arg )) ?),
+          "path" => ViewRequest::Path (
+            RelationRole::from_rolename (&arg)
+              . ok_or_else ( || format! (
+                "Invalid path rolename: {}", arg )) ?),
+          _ => return Err ( format! (
+            "Unknown view request form: ({} ...)", head )), } },
+      _ => return Err (
+        "Unexpected element in viewRequests (expected 'definitiveView' \
+         or '(col ...)' / '(path ...)')" . to_string () ), };
+    requests . insert (request); }
   Ok (( )) }

@@ -50,9 +50,11 @@ Returns nil if the field is not cycleable."
    ((string= field-name "source") ;; from the config
     (skg-sexp-edit--source-cycle-values field-value))
    ((string= field-name "viewRequests")
+    ;; Only the bare-atom request 'definitiveView' is field-cycleable.
+    ;; The '(col RELNAME)' / '(path ROLENAME)' requests are structured
+    ;; forms, inserted via their dedicated commands, not by cycling.
     '("none (default)"
-      "aliases" "containerwardView"
-      "sourcewardView" "definitiveView"))))
+      "definitiveView"))))
 
 (defun skg-sexp-edit--source-cycle-values (field-value)
   "Return source names from config as a cycle list.

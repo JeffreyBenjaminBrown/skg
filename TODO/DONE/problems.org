@@ -35,6 +35,29 @@
   nextest tests + the search-enrichment integration test pass; the
   enriched buffer now carries (viewStats containsParent) on containerward
   ancestry nodes.
+* DONE (split-and-extend-paths-and-cols, step 6): parentOverrides ("pO") emit-only/unparseable
+  Fixed. 'parentOverrides' is now computed in the general viewStats pass
+  ('set_relation_relative_stats', 'server/update_buffer/viewnodestats.rs')
+  alongside 'overridesParent', and the viewStats parser
+  ('parse_metadata_sexp.rs') gained match arms for it and the four new
+  parent stats (subscribesParent / parentSubscribes / hidesParent /
+  parentHides). The Op/pO pair is symmetric again, and a
+  'paths-through-overridden' (path overridden) view round-trips pO. The
+  herald table emits red "pO"/"Sp"/"pS"/"Hp"/"pH". Covered by
+  'partner_col_matrix::relationship_matrix' (path scenarios assert the
+  stat on each grafted partner, plus a buffer-parse round-trip).
+* RESOLVED docs/COMMANDS.org misdescribed skg-reveal-sourceward (2026-06-20)
+  'docs/COMMANDS.org' said skg-reveal-sourceward shows "the nodes that
+  the node at point links to (its textlink targets)". The code surfaces
+  the INVERSE: textlink SOURCES, i.e. nodes that link TO the node
+  ('server/to_org/expand/backpath.rs:105-117' passes
+  '("textlinks_to","dest","source")'; in-Rust dispatch reads
+  'textlinks_in' at 'server/dbs/typedb/search.rs:156-158'). The term
+  "sourceward" agreed with the code; only the prose was wrong. Fixed the
+  description (and the adjacent containerward "one step out" claim, which
+  was also wrong -- it climbs the containment ancestry until a
+  fork/cycle/root). Found while scoping the collection/path command
+  split (TODO/split-and-extend-paths-and-cols/).
 * RESOLVED Heralds: the rule table was volatile session state with no self-heal (2026-06-19)
   The herald rule table ('heralds--transform-rules') is fetched once
   per connect by 'skg-request-herald-rules' (called from

@@ -43,7 +43,7 @@ LINE-NUMBER is zero-based."
       (forward-line line-number)
       (setq integration-test-phase
             (format "requesting-sourceward-view-line-%d" line-number))
-      (skg-request-sourceward-view) ;; this also saves the buffer
+      (skg-show-paths-through-link-sources) ;; this also saves the buffer
       (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
@@ -80,7 +80,7 @@ LINE-NUMBER is zero-based."
         (expected-changed
          (concat "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) 1\n"
                  "** (skg (node (id 11) (source main) (graphStats (linksInFromLeaves 1)))) 11\n"
-                 "*** (skg (node (id l-11) (source main) (parentIs independent) (birth linksToParent) indef (graphStats (containers 0)))) [[id:11][a link to 11]]\n"
+                 "*** (skg (node (id l-11) (source main) (parentIs independent) (birth backpath linkSource) indef (graphStats (containers 0)))) [[id:11][a link to 11]]\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))

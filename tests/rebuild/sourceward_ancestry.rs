@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- sourceward_ancestry
 //
 // Tests that sourceward view expansion inserts containerward
-// ancestry beneath each Birth::LinksToParent source node.
+// ancestry beneath each Birth::Backpath (RelationRole::LINK_SOURCE) source node.
 //
 // Graph (see fixtures-sourceward-ancestry/):
 //   Links:        b -> a,  c -> b,  d -> a
@@ -33,6 +33,7 @@ use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::SkgConfig;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
+use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 
 use ego_tree::{NodeId, Tree};
@@ -102,10 +103,10 @@ async fn test_sourceward_ancestry_impl (
   // --- a should have exactly 2 LinkTarget children: b and d ---
   let a_children = children_info (&viewforest, node_a);
   assert! ( a_children . contains (&("b" . into (),
-                                     Birth::LinksToParent)),
+                                     Birth::Backpath (RelationRole::LINK_SOURCE))),
             "a should have LinkTarget child b" );
   assert! ( a_children . contains (&("d" . into (),
-                                     Birth::LinksToParent)),
+                                     Birth::Backpath (RelationRole::LINK_SOURCE))),
             "a should have LinkTarget child d" );
   assert_eq! ( a_children . len (), 2,
                "a should have exactly 2 children" );
@@ -115,10 +116,10 @@ async fn test_sourceward_ancestry_impl (
     . expect ("a should have child b");
   let b_children = children_info (&viewforest, node_b);
   assert! ( b_children . contains (&("bb" . into (),
-                                     Birth::ContainsParent)),
+                                     Birth::Backpath (RelationRole::CONTAINER))),
             "b should have Content child bb" );
   assert! ( b_children . contains (&("c" . into (),
-                                     Birth::LinksToParent)),
+                                     Birth::Backpath (RelationRole::LINK_SOURCE))),
             "b should have LinkTarget child c" );
   assert_eq! ( b_children . len (), 2,
                "b should have exactly 2 children" );
@@ -134,7 +135,7 @@ async fn test_sourceward_ancestry_impl (
     . expect ("b should have child c");
   let c_children = children_info (&viewforest, node_c);
   assert! ( c_children . contains (&("cc" . into (),
-                                 Birth::ContainsParent)),
+                                 Birth::Backpath (RelationRole::CONTAINER))),
             "c should have Content child cc" );
   assert_eq! ( c_children . len (), 1,
                "c should have exactly 1 child" );
@@ -144,10 +145,10 @@ async fn test_sourceward_ancestry_impl (
     . expect ("c should have child cc");
   let cc_children = children_info (&viewforest, node_cc);
   assert! ( cc_children . contains (&("ccc" . into (),
-                                      Birth::ContainsParent)),
+                                      Birth::Backpath (RelationRole::CONTAINER))),
             "cc should have child ccc (Content)" );
   assert! ( cc_children . contains (&("d" . into (),
-                                      Birth::ContainsParent)),
+                                      Birth::Backpath (RelationRole::CONTAINER))),
             "cc should have child d (Content)" );
   assert_eq! ( cc_children . len (), 2,
                "cc should have exactly 2 children" );

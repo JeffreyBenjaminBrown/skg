@@ -19,6 +19,7 @@
 /// nested RULE. The special label ANY matches any leaf; IT echoes
 /// the matched value(s).
 
+use crate::dbs::in_rust_graph::relation_accessors::PARTNER_ROLE_VOCAB;
 use crate::types::viewnode::{PartnerCol, Qual, QualCol, ViewRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +86,18 @@ fn leaf (
 ) -> RuleChild {
   crule ( color, label, vec! [ s (text) ] ) }
 
+/// (COLOR label "text" "☮") -- a read-only col scaffold leaf: its label
+/// text plus the ☮ marker, meaning "this collection cannot be changed
+/// from here" -- the same sense ☮ ('indef') carries on a node. (A lock
+/// 🔒 here is a one-line swap; the conformance test pins atoms, not the
+/// emitted glyph.)
+fn leaf_ro (
+  color : HeraldColor,
+  label : &'static str,
+  text  : &'static str,
+) -> RuleChild {
+  crule ( color, label, vec! [ s (text), s ("☮") ] ) }
+
 /// (label) -- matches and emits nothing; consumes the atom so the
 /// table documents it. (The engine ignores unmatched atoms anyway;
 /// vacuous rules exist so the conformance test can see them.)
@@ -121,6 +134,16 @@ fn interc (
     abut : false, children } ) }
 
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
+
+/// Birth herald children: the literal 'backpath' tag (emits nothing)
+/// plus one orange glyph leaf per partner role, generated from
+/// PARTNER_ROLE_VOCAB so the role<->glyph table is the single source of
+/// truth. Matches '(birth backpath ROLENAME)'.
+fn birth_rule_children () -> Vec<RuleChild> {
+  let mut children : Vec<RuleChild> = vec! [ vac ("backpath") ];
+  for (rolename, _role, glyph) in PARTNER_ROLE_VOCAB {
+    children . push ( leaf (Orange, rolename, glyph) ); }
+  children }
 
 //
 // The table
@@ -184,21 +207,24 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("bodyFolded"),
       leaf (Green, QualCol::Alias . repr_in_client (), "aliases"),
       leaf (Green, "alias", "alias"), // Qual::Alias
-      leaf (Green, PartnerCol::HiddenInSubscribee . repr_in_client (),
+      // The six READ-ONLY col scaffolds carry ☮ ("cannot be changed
+      // from here"); the writable cols (subscribeeCol, overriddenCol,
+      // aliasCol) do not.
+      leaf_ro (Green, PartnerCol::HiddenInSubscribee . repr_in_client (),
             "hiddenIn"),
-      leaf (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
+      leaf_ro (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
             "hiddenOut"),
       leaf (Green, PartnerCol::Subscribee . repr_in_client (),
             "it subscribes to these"),
-      leaf (Green, PartnerCol::Subscriber . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Subscriber . repr_in_client (),
             "these subscribe to it"),
-      leaf (Green, PartnerCol::Hidden . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Hidden . repr_in_client (),
             "it hides these from its subscriptions"),
-      leaf (Green, PartnerCol::Hider . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Hider . repr_in_client (),
             "these hide it from their subscriptions"),
       leaf (Green, PartnerCol::Overridden . repr_in_client (),
             "it overrides the view of these"),
-      leaf (Green, PartnerCol::Overrider . repr_in_client (),
+      leaf_ro (Green, PartnerCol::Overrider . repr_in_client (),
             "these override the view of it"),
       leaf (Green, QualCol::ID . repr_in_client (), "IDs"),
       leaf (Green, "id", "ID"), // Qual::ID
@@ -237,9 +263,7 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("absent"),
           vac ("affected"),
           leaf (Orange, "independent", "⊥") ]),
-        rule ("birth", vec! [
-          leaf (Orange, "containsParent", "}"),
-          leaf (Orange, "linksToParent",  "←") ]),
+        rule ("birth", birth_rule_children ()),
         // The server emits the abbreviated atom 'indef'
         // (see org_to_text.rs); we match that here.
         leaf_abut (Green, "indef", "☮"),
@@ -262,6 +286,10 @@ pub fn herald_rule_table () -> HeraldRule {
           leaf (Red, "grandparentSubscribes", "gS"),
           leaf (Red, "overridesParent",       "Op"),
           leaf (Red, "parentOverrides",       "pO"),
+          leaf (Red, "subscribesParent",      "Sp"),
+          leaf (Red, "parentSubscribes",      "pS"),
+          leaf (Red, "hidesParent",           "Hp"),
+          leaf (Red, "parentHides",           "pH"),
           crule (Red, "overridesHere", vec! [
             // ANY without IT: the marker's ID payload is matched
             // but not echoed; only "Oh" is displayed.
@@ -272,10 +300,9 @@ pub fn herald_rule_table () -> HeraldRule {
           crule (Red, "merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]) ]),
         crule (Green, "viewRequests", vec! [
-          rule ("aliases",           vec! [ s ("req:aliases") ]),
-          rule ("containerwardView", vec! [ s ("req:containers") ]),
-          rule ("sourcewardView",    vec! [ s ("req:sources") ]),
-          rule ("definitiveView",    vec! [ s ("req:definitive") ]) ]),
+          rule ("col",  vec! [ any (vec! [ s ("req:col:"),  RuleChild::It ]) ]),
+          rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
+          rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
           leaf (Green, "newX",     "X"),
@@ -416,8 +443,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( birth_emitted_atoms () );
   atoms . extend ( axis_atoms () );
   atoms . extend ( qual_and_col_atoms () );
-  atoms . extend ( ViewRequest::REPRS_IN_CLIENT . iter ()
-                   . map ( |(s, _)| *s ) );
+  atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
 /// GraphNodeStats atoms, from graphnodestats_to_sexp (org_to_text.rs).
@@ -452,12 +478,18 @@ fn viewstats_atoms () -> Vec<&'static str> {
       grandparentSubscribes : _,
       overridesParent : _,
       parentOverrides : _,
+      subscribesParent : _,
+      parentSubscribes : _,
+      hidesParent : _,
+      parentHides : _,
       overridesHere : _, // keyed form (a viewStats sub-form)
     } = v; }
   let _ = guard;
   vec! [ "cycle", "containsParent", "sourceHerald",
          "grandparentOverrides", "grandparentSubscribes",
-         "overridesParent", "parentOverrides", "overridesHere" ] }
+         "overridesParent", "parentOverrides",
+         "subscribesParent", "parentSubscribes",
+         "hidesParent", "parentHides", "overridesHere" ] }
 
 /// ParentIs values the serializer can emit (Affected stays implicit).
 fn parentIs_emitted_atoms () -> Vec<&'static str> {
@@ -470,14 +502,18 @@ fn parentIs_emitted_atoms () -> Vec<&'static str> {
   vec! [ "independent", "absent" ] }
 
 /// Birth values the serializer can emit (Unremarkable stays implicit).
+/// A Backpath emits '(birth backpath ROLENAME)', so the atoms are the
+/// 'backpath' tag plus every ROLENAME in PARTNER_ROLE_VOCAB.
 fn birth_emitted_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::Birth;
   fn guard ( b : Birth ) { // compile error here = update the list below
     match b {
-      Birth::Unremarkable | Birth::ContainsParent | Birth::LinksToParent
+      Birth::Unremarkable | Birth::Backpath (_)
         => () }}
   let _ = guard;
-  vec! [ "containsParent", "linksToParent" ] }
+  let mut atoms : Vec<&'static str> = vec! [ "backpath" ];
+  atoms . extend ( PARTNER_ROLE_VOCAB . iter () . map ( |(name, _, _)| *name ) );
+  atoms }
 
 /// The staged/unstaged axis atoms, from types/git.rs.
 fn axis_atoms () -> Vec<&'static str> {

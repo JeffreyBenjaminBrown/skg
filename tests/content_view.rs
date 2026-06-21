@@ -196,7 +196,7 @@ async fn test_multi_root_view_with_shared_nodes (
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) (birth backpath container) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
          ** (skg subscribeeCol)
          *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
@@ -243,7 +243,7 @@ async fn test_multi_root_view_with_node_limit (
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) (birth backpath container) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
          ** (skg subscribeeCol)
          *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]

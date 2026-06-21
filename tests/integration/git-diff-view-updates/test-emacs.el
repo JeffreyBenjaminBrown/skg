@@ -44,7 +44,7 @@
     (assert-headline-titles
      buf
      '((1 absent "b")
-       (2 containsParent "a")
+       (2 container "a")
        (2 affected       "c")
        (2 affected       "d")
        (2 affected       "e"))

@@ -60,9 +60,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   println!("  Roots:             {:>6} found in {:.3}s", roots.len(), roots_time);
 
   let t2: Instant = Instant::now();
-  let targets: HashSet<ID> = find_all_link_targets(db_name, &driver).await?;
-  let targets_time: f64 = t2.elapsed().as_secs_f64();
-  println!("  Link targets:      {:>6} found in {:.3}s", targets.len(), targets_time);
+  let dests: HashSet<ID> = find_all_link_dests(db_name, &driver).await?;
+  let dests_time: f64 = t2.elapsed().as_secs_f64();
+  println!("  Link dests:      {:>6} found in {:.3}s", dests.len(), dests_time);
 
   let t3: Instant = Instant::now();
   let multi: HashSet<ID> = find_all_multi_contained(db_name, &driver).await?;
@@ -73,20 +73,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let t4: Instant = Instant::now();
   let (r1, r2, r3) = futures::join!(
     find_all_roots(db_name, &driver),
-    find_all_link_targets(db_name, &driver),
+    find_all_link_dests(db_name, &driver),
     find_all_multi_contained(db_name, &driver)
   );
   r1?; r2?; r3?;
   let parallel_time: f64 = t4.elapsed().as_secs_f64();
   println!("  All 3 in parallel:          {:.3}s (vs {:.3}s sequential)",
-           parallel_time, roots_time + targets_time + multi_time);
+           parallel_time, roots_time + dests_time + multi_time);
 
   // Build origin map
   let mut origin_types: HashMap<ID, ContextOriginType> = HashMap::new();
   for id in &multi {
     origin_types.insert(id.clone(), ContextOriginType::MultiContained); }
-  for id in &targets {
-    origin_types.insert(id.clone(), ContextOriginType::Target); }
+  for id in &dests {
+    origin_types.insert(id.clone(), ContextOriginType::Dest); }
   for id in &roots {
     origin_types.insert(id.clone(), ContextOriginType::Root); }
   println!("\n  Total origins:     {:>6}", origin_types.len());
@@ -303,7 +303,7 @@ async fn find_all_roots(
       result.insert(ID(extract_payload_from_typedb_string_rep(&concept.to_string()))); } }
   Ok(result) }
 
-async fn find_all_link_targets(
+async fn find_all_link_dests(
   db_name: &str,
   driver: &TypeDBDriver,
 ) -> Result<HashSet<ID>, Box<dyn std::error::Error>> {

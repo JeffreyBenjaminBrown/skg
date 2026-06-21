@@ -34,6 +34,7 @@ use crate::dbs::in_rust_graph::snapshot_global;
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
+use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -299,7 +300,7 @@ pub async fn render_initial_view (
     if let Some (mut node_mut) = viewforest . get_mut (root_nid) {
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
-      { t . view_requests . insert ( ViewRequest::Containerward ); }} }
+      { t . view_requests . insert ( ViewRequest::Path (RelationRole::CONTAINER) ); }} }
   let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
@@ -403,7 +404,7 @@ pub async fn rerender_view (
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose ActiveNode
 /// content + git diff have already been completed, it:
-///   - fulfills a ViewRequest::Containerward carried by a view-ROOT (only de-novo
+///   - fulfills a ViewRequest::Path (RelationRole::CONTAINER) carried by a view-ROOT (only de-novo
 ///     sets it; see render_initial_view), building that root's
 ///     containerward ancestry and dropping the request. This is data-driven:
 ///     post-save roots come from the saved buffer WITHOUT the request, so a save
@@ -639,7 +640,7 @@ fn clear_diff_metadata (
         Ok (( )) } ) ?;
   Ok (( )) }
 
-/// Fulfill a ViewRequest::Containerward carried by a view-ROOT: attach that
+/// Fulfill a ViewRequest::Path (RelationRole::CONTAINER) carried by a view-ROOT: attach that
 /// root's full containerward ancestry as its first children, then DROP the
 /// request so it does not round-trip into the saved buffer (a later save must not
 /// re-generate the containerward -- it round-trips as ordinary content instead).
@@ -663,7 +664,7 @@ async fn fulfill_root_containerward_requests (
       . filter ( |nid| viewforest . get (*nid)
           . map ( |n| match &n . value () . kind {
               ViewNodeKind::Vognode (Vognode::Active (t)) =>
-                t . view_requests . contains (& ViewRequest::Containerward),
+                t . view_requests . contains (& ViewRequest::Path (RelationRole::CONTAINER)),
               _ => false } )
           . unwrap_or (false) )
       . collect ();
@@ -674,7 +675,7 @@ async fn fulfill_root_containerward_requests (
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
-      { t . view_requests . remove (& ViewRequest::Containerward); }} }
+      { t . view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }} }
   Ok (( )) }
 
 /// For every RemovedHere phantom in the viewforest, fetch its containerward
