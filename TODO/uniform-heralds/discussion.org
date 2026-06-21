@@ -1,0 +1,449 @@
+#+title: Uniform heralds: plan and problems
+
+* overview
+
+This responds to [[file:vision.org][vision.org]]. It proposes a plan, then
+collects the tricky bits, the architectural choices the vision leaves
+open, and the things I want to push back on. A final section lists
+problems I found that are out of scope.
+
+Throughout, "herald" means one of the short colored tokens the Emacs
+client paints beside an org headline. The data is computed in Rust,
+serialized as =(skg ...)= metadata atoms, and rendered by a generic
+Emacs lens engine driven by a rule table. The relevant code:
+
+- rule table + serializer: [[../../server/heralds.rs][server/heralds.rs]]
+- metadata serialization: [[../../server/org_to_text.rs][server/org_to_text.rs]]
+- graph-level stats: [[../../server/update_buffer/graphnodestats.rs][graphnodestats.rs]] +
+  [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]
+- view-position stats: [[../../server/update_buffer/viewnodestats.rs][viewnodestats.rs]]
+- relation roles + glyphs: [[../../server/dbs/in_rust_graph/relation_accessors.rs][relation_accessors.rs]] ('PARTNER_ROLE_VOCAB')
+- the ancestry table: [[../../server/update_buffer/ancestry.rs][ancestry.rs]]
+- Emacs lens engine: [[../../elisp/skg-sexpr/skg-lens.el][skg-lens.el]]
+- Emacs display layer: [[../../elisp/heralds-minor-mode.el][heralds-minor-mode.el]]
+- types: [[../../server/types/viewnode.rs][viewnode.rs]] ('GraphNodeStats', 'ViewNodeStats', 'Birth', 'ParentIs')
+
+* Tentative plan
+
+** The target grammar, stated precisely
+
+The vision describes a single positional mini-language. Let me pin it
+down, because several details are implied rather than stated.
+
+*** One token per relationship
+
+There are exactly five relationship letters:
+
+| letter | relation     | inbound = "X it"        | outbound = "it X" |
+|--------+--------------+-------------------------+-------------------|
+| C      | contains     | its containers          | its contents      |
+| L      | textlinks_to | nodes that link to it   | nodes it links to |
+| H      | hides        | nodes that hide it      | nodes it hides    |
+| S      | subscribes   | nodes that subscribe to it | its subscribees |
+| O      | overrides    | nodes that override it   | nodes it overrides |
+
+A token reads: =[inNum][inLetters] X [outNum][outLetters]=. The
+letters hug the relationship letter; the numbers sit outside them.
+Worked from the vision's own examples:
+
+- =pC=    : its parent contains it (count 1 = just the parent, so the
+            number is omitted)
+- =3pC=   : 3 nodes contain it, among them its parent
+- =3C=    : 3 nodes contain it (none of them a tracked ancestor)
+- =C4p=   : it contains 4 nodes, among them its parent
+- =pC5=   : its parent contains it, and it contains 5 nodes
+- =Cp=    : it contains its parent (today's "}" / 'containsParent')
+
+The ancestor letters are =p= (parent), =g= (grandparent), =b=
+(bizabuelo / great-grandparent), =t= (tatarabuelo /
+great-great-grandparent). A letter says "this specific ancestor is
+among the members on this side."
+
+*** Number-omission rule
+
+On each side: render the numeric count, then the ancestor letters,
+EXCEPT omit the number when the count equals the number of flagged
+ancestors present (so =pC= not =1pC=, but =3pC= because 3 ≠ 1). If a
+side has no members, that side is empty. See [[*Problems][Problems]] for the one
+genuinely ambiguous case (count 1, member is not a tracked ancestor).
+
+*** Omission of whole tokens
+
+A relationship token is omitted iff both its sides are empty (zero
+inbound, zero outbound) — even for contains, even for roots. This is
+the vision's [[file:vision.org::*omission][omission]] rule. Note the consequence: an ordinary
+content node always has at least its container (the parent), so its C
+token is always present — but it is present as the orange /birth/
+herald (below), not as a separate blue token, so the screen does not
+get noisier.
+
+*** Surprising inbound links: =a(b,c)L=
+
+The L token's inbound side gets a refinement. With =a= inbound links:
+
+- =b= = of those =a=, how many differ from it, are bodyless AND
+  contentless, and whose normalized title is something other than the
+  link label;
+- =c= = of those =a=, how many have their own content;
+- the remainder (=a−b−c=) are "plain" links whose source is just a
+  link with one of this node's aliases as label and nothing else.
+
+Rendered =a(b,c)L=, with the parenthetical collapsing per the vision:
+omit a zero, omit the comma when c=0, keep the comma when b=0, omit the
+whole parenthetical when both are zero.
+
+*** Birth herald: orange, first
+
+Every drawn node has a /birth relationship/ — the single relationship
+to a visible ancestor that explains why it was drawn:
+
+- ordinary content: =contains=, inbound from its parent → its C token
+  (=pC=, =3pC=, =pC5=, ...);
+- a backpath-grafted partner: its 'Birth::Backpath(role)' relation;
+- a member of a writable/read-only partner col: the col's relation
+  toward the col's owning ancestor (e.g. a subscribee-as-such →
+  =gS=, its grandparent subscribes to it; an overrider-as-such →
+  =Og=, it overrides its grandparent).
+
+That ONE relationship's token is moved to the front, placed right
+after the ☮ peace symbol if present, and colored orange. Every other
+relationship token follows it, colored blue.
+
+So the birth relation is shown once (orange), not duplicated. The
+current separate edge heralds (=Op=, =pO=, =Sp=, =pS=, =Hp=, =pH=,
+=gO=, =gS=) cease to be their own tokens; they become ancestor-letter
+annotations inside the five unified tokens.
+
+*** Action / alias heralds
+
+- =A= (aliasing, boolean) → =Ak=, k = number of aliases.
+- =O=, =S= (overriding / subscribing booleans) disappear: the counted
+  O and S tokens are strictly more informative.
+- =H= (hiding boolean) likewise folds into the H token.
+- =I= (extraIDs boolean): see the TODO in [[*Problems][Problems]] — drop, or mirror
+  aliases as =Ik=?
+
+*** Which ancestors to check (efficiency)
+
+The expensive part is not the counts (they are single set-size reads
+off the in-Rust inverse indexes) but deciding which ancestor letters
+to flag. The rule:
+
+- For every node, check its relationship to its immediate visible
+  parent — one hop. This yields the =p= flags. (This is exactly what
+  'set_relation_relative_stats' does today for six edges.)
+- For a col member, additionally check the relationship to its /owning
+  ancestor/ and every intervening vognode, via the owning-ancestor
+  table. This yields the =g=/=b=/=t= flags. The depth is small and
+  fixed per col kind.
+
+** What stays out of scope (unchanged)
+
+Per the vision, only the relationship heralds, the alias/action
+heralds, and the surprising-links refinement change. These keep their
+current behavior: 'cycle' (⟳), 'overridesHere' (=Oh=, which is
+LOAD-BEARING for save extraction, see [[../../server/types/viewnode.rs][viewnode.rs]] 'collected_id'),
+'sourceHerald' (⌂:label), 'parentIs' independent (⊥) / absent,
+'textChanged', the staged/unstaged diff axes, 'notInGit', 'editRequest'
+(delete / merge), 'viewRequests', the deleted / unknown / inactive /
+deadScaffold placeholders, the read-only-col ☮ scaffold markers, and
+the col labels themselves ("aliases", "subscribeeCol", ...). The node
+'indef' ☮ stays but is repositioned to lead, so the birth herald can
+sit right after it.
+
+** Implementation, in order
+
+In order:
+
+1. Pin the grammar and resolve the open questions in [[*Problems][Problems]]
+   (this document). Several are small but change the data we must
+   compute (notably the =g=/=b=/=t= distance convention and the
+   surprising-links label recovery).
+
+2. Build the owning-ancestor table. Extend [[../../server/update_buffer/ancestry.rs][ancestry.rs]] with a
+   function (e.g. 'owning_ancestor') that maps each col kind to
+   =(required_ancestry index, RelationRole)= — the index of the gnode
+   whose graph fact the col represents, and the relation/role
+   connecting a member to that owner. The raw material already exists:
+   'required_ancestry' gives the ancestor-kind chain, and
+   'PartnerCol::relation_member_role' ([[../../server/to_org/complete/partner_col/kind.rs][kind.rs]]) gives the member's
+   role for six of eight cols. The two filter cols (HiddenIn-,
+   HiddenOutsideOf-Subscribee) return None today and need an explicit
+   HIDER role assigned here.
+
+3. Expand the stats computation.
+   - In [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] / 'fetch_all_graphnodestats_in_rust':
+     replace the three booleans ('has_subscribes', 'has_overrides',
+     'has_hides') with directional counts (inbound from the inverse
+     indexes 'subscribers_of' / 'overriders_of' / 'hiders_of';
+     outbound from 'NodeRust' fields). Keep the contains counts.
+     Compute the surprising-links =a(b,c)= split (see the TODO on
+     label recovery).
+   - In [[../../server/update_buffer/viewnodestats.rs][viewnodestats.rs]]: generalize the per-relation ancestor
+     flags. Replace the ad-hoc 'grandparentOverrides' /
+     'grandparentSubscribes' (the only two owner-relative stats today,
+     reachable only one gnode-hop up via 'VisibleParent::Col') with a
+     pass that locates the owning ancestor and intervening vognodes
+     through the table from step 2, and records, per relation and
+     direction, which tracked ancestors are members.
+   - Designate the birth relationship per node (contains for ordinary
+     content via 'parentIsContainer'; the 'Birth::Backpath' role for
+     grafted partners; the col relation for col members).
+
+4. Token assembly + serialization. Add a Rust function (a small new
+   module, or within [[../../server/org_to_text.rs][org_to_text.rs]]) that turns counts + ancestor
+   flags into the compact token string per relationship, applying the
+   number-omission and whole-token-omission rules and the =a(b,c)L=
+   form. Emit the birth relation's token under a distinct atom (so the
+   rule table can place it first and color it orange) and each
+   remaining nonempty token under a per-relation atom (blue). Emit
+   =Ak= (and =Ik=?). Remove the now-folded atoms ('containers',
+   'contents', 'linksInFrom*', 'containsParent', 'overriding',
+   'subscribing', 'hiding', 'aliasing', and the six/eight edge stats).
+
+5. Rule table + conformance + fixture. In [[../../server/heralds.rs][heralds.rs]]: add rules for
+   the new atoms (birth orange, ABUT so it hugs the ☮; per-relation
+   blue), reorder the 'node' rule so 'indef' (☮) leads and the birth
+   herald follows, and update the compile-time guards in
+   'emittable_metadata_atoms'. Regenerate the elisp fixture with
+   =cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp=.
+   Per the Emacs research, NO elisp display/ordering/color logic needs
+   to change — order and color are 100% server-driven.
+
+6. Emacs touch-ups (small). Update 'skg-strip-heralds-from-sexp'
+   ([[../../elisp/skg-sexpr/skg-sexpr-search.el][skg-sexpr-search.el]]) to strip the new herald atoms before save
+   (it currently strips 'containsHerald' / 'linksHerald' /
+   'sourceHerald' / viewStats). Update the elisp display tests
+   ([[../../tests/elisp/test-heralds-minor-mode.el][test-heralds-minor-mode.el]] etc.) to the new tokens.
+
+7. Update the golden tests in layers (parser/serializer, then Rust
+   view-render goldens, then elisp, then integration). This is the
+   bulk of the mechanical work: roughly 400+ =(skg ...)= golden lines
+   across ~17 Rust test files, heaviest in [[../../tests/hidden_from_subscriptions.rs][hidden_from_subscriptions.rs]]
+   (92), [[../../tests/definitive_view_cascade_and_budget.rs][definitive_view_cascade_and_budget.rs]] (94), [[../../tests/initial_view_bfs.rs][initial_view_bfs.rs]]
+   (53), [[../../tests/content_view.rs][content_view.rs]] (29), plus the [[../../tests/git_diff_view][git_diff_view]] subtree. The
+   conformance test in [[../../tests/unit/heralds.rs][heralds.rs (unit)]] is the gate that keeps the
+   table and the emitted vocabulary in sync.
+
+** Current → new mapping (reference)
+
+| current atom / glyph                          | new                                  |
+|-----------------------------------------------+--------------------------------------|
+| graphStats 'containers' N / 'contents' M ({)  | C token counts                       |
+| viewStats 'containsParent' (})                | =Cp= inside C token                  |
+| birth backpath 'container' (})                | C token, orange (birth)              |
+| graphStats 'linksInFromContainers'/'..Leaves' (→) | L token inbound, now =a(b,c)=    |
+| birth backpath 'linkSource'/'linkDest' (←/→)  | L token, orange (birth)              |
+| graphStats 'overriding' (O bool)              | O token counts                       |
+| viewStats 'overridesParent'/'parentOverrides' (Op/pO) | =Op=/=pO= inside O token      |
+| viewStats 'grandparentOverrides' (gO)         | =gO= inside O token                  |
+| graphStats 'subscribing' (S bool)             | S token counts                       |
+| viewStats 'subscribesParent'/'parentSubscribes' (Sp/pS) | =Sp=/=pS= inside S token    |
+| viewStats 'grandparentSubscribes' (gS)        | =gS= inside S token                  |
+| graphStats 'hiding' (H bool)                  | H token counts                       |
+| viewStats 'hidesParent'/'parentHides' (Hp/pH) | =Hp=/=pH= inside H token            |
+| graphStats 'aliasing' (A bool)                | =Ak= (count)                         |
+| graphStats 'extraIDs' (I bool)                | TODO: drop, or =Ik=                  |
+
+Encouragingly, six of the eight 'PARTNER_ROLE_VOCAB' glyphs (=Op pO Hp
+pH Sp pS=) are already in the vision's exact =Xp=/=pX= style, and the
+birth herald is /already/ rendered orange ('birth_rule_children' emits
+orange glyphs). The redesign is mostly: (a) add the missing directional
+counts for H/S/O, (b) refine L, (c) generalize the owner-relative flags
+beyond gO/gS, and (d) reorder + recolor in the rule table.
+
+* Problems
+
+** ONGOING Ancestor-letter distance: the hiddeninsubscribee example is off by one
+
+The herald letters =p/g/b/t= must measure SOME distance. The existing
+code already uses =gO=/=gS= for a subscribee-as-such whose owner is the
+/grandparent/ — i.e. the letter counts TREE ancestors (member → col
+scaffold → owner = 2 levels = "g"), which also matches what a user sees
+(two headline levels up). Good.
+
+But the vision says a hiddeninsubscribeecol member's owning ancestor is
+its "great-grandparent". The actual view tree is
+
+: subscriber → SubscribeeCol → subscribee → HiddenInSubscribeeCol → member
+
+so the subscriber (the owner) is FOUR headline levels up =
+great-/great/-grandparent = =t=, not =b=. The code reconcilers read it
+at col-index 2 (member-index 3), confirming four hops.
+
+Question for you: are the letters tree distance (matching =gS=/=gO=
+and the visible headline count), making the hiddeninsubscribee owner
+=t=? If so the vision's "great-grandparent" is just a slip and the
+plan should use =t=. (If instead you intend the letters to count only
+gnode ancestors, skipping col scaffolds, then a subscribee-as-such's
+owner would be =p=, which contradicts the existing =gS=/=gO= — so I
+don't think that's what you mean. Please confirm.)
+
+*** TODO You're right, I miscounted.
+And yes, they should count all viewnodes, including scaffolding.
+
+Also, I've reconsidered the generation-distance vocabular.
+Let's just use 'a' for 'first ancestor = parent',
+b = grandparent, c = great-grandparent, etc.
+
+** ONGOING extraIDs (=I=): drop it, or show =Ik=?
+
+The vision lumps "I, O and S" together as removable. O and S clearly go
+because the counted O/S tokens replace them. But =I= (extraIDs) is not
+a graph relationship and has no token to fold into. Two readable
+options: drop the bare boolean entirely (the idCol surfaces the extra
+IDs on demand), or mirror aliases and show =Ik= (k = number of extra
+IDs). I lean toward =Ik= for symmetry with =Ak=, but it is your call.
+
+*** TODO Use Ik.
+
+** ONGOING Non-birth relationship heralds: uniformly blue loses the red "alarm"
+
+The vision says non-birth relationship heralds are blue. Today the
+parent-relative edges (=Op=, =pO=, =Sp=, =pS=, =Hp=, =pH=) render RED —
+deliberately, because a node overriding/subscribing-to/hiding its own
+parent is surprising and worth flagging. Folding them into uniformly
+blue tokens removes that signal. Are you happy to lose the red alarm
+for these surprising same-relation-with-an-ancestor cases, or should a
+token that carries a =p=/=g=/=b=/=t= flag on a "surprising" relation
+(H/S/O, not C) stay red while pure-count tokens go blue? I can do
+either; the vision as written says blue.
+
+*** TODO let's lose it
+
+** ONGOING Outbound link count (=L5=): show it or omit it?
+
+The grammar admits =L5= (it links to 5 nodes), but the vision only ever
+discusses inbound links (=a(b,c)L=). Outbound links are visible in the
+node's own body text, so an outbound count may be redundant noise. I
+propose to omit the outbound side of the L token by default (show only
+=a(b,c)L=). Confirm, or say you want =L5= too.
+
+*** TODO I agree, omit those.
+
+** ONGOING Surprising-links =b=: how do we recover each link's label?
+
+Computing =a= and =c= is cheap and already essentially done
+('sources_with_content'). Computing =b= needs, per inbound edge, the
+LABEL the source used in =[[id:thisnode][label]]= — and that label is
+discarded everywhere except in the source node's raw title/body text.
+'textlinks_in' is a 'HashSet<ID>' of source pids only (no labels, no
+multiplicity); 'NodeRust.textlinks_to' drops the label at construction.
+Two options:
+
+- (A) Re-parse each source's title+body on demand (the existing
+  'textlinks_from_node' regex), in memory, no disk/TypeDB. Cheap per
+  node; pays a regex pass per inbound source.
+- (B) Add the label to the 'textlinks_in' index. More invasive (touches
+  add/remove/migrate of the inverse indexes) but O(1) per edge, and it
+  also fixes the current multiplicity loss (a source that links twice
+  collapses to one pid today).
+
+I lean toward (A) first (no data-model churn), unless you already want
+(B) for other reasons. Which do you prefer?
+
+Sub-questions for =b=:
+
+- "Normalized title" has no canonical helper in the code. The closest
+  existing practice ('replace_each_link_with_its_label' then trim +
+  lowercase, as used for Tantivy/search) is my proposed definition.
+  OK?
+- "Bodyless": does that mean 'body == None', or also a whitespace-only
+  body? ('NodeRust.body' is 'Option<String>'.)
+- If one source links to this node twice with two different labels,
+  which bucket does it land in? (Today it is invisible — the HashSet
+  collapses it.)
+
+*** TODO let's go with (A). Bodyless <=> body = None.
+Also, as a step 0
+(there might be many such steps 0; I just mean something to do early)
+we should make empty bodies impossible.
+Strip all leading and trailing empty lines from every body,
+where empty means entirely whitespace
+(so an empty line can be multiple characters).
+
+** ONGOING Birth heralds for the two filter cols
+
+'HiddenInSubscribee' and 'HiddenOutsideOfSubscribee' members have no
+single relation role ('relation_member_role' returns None); their
+membership is /derived/ from the subscriber's hide state. Their birth
+relationship is "the subscriber hides this" — an H token with the owner
+several hops up (=tH= / =bH=, modulo the distance question above). I
+think this is consistent and fine, but it is the one place the vision's
+clean "five relationships" mapping needs a derived (not edge-backed)
+fact. Confirm you want these rendered as H tokens against the
+subscriber ancestor.
+
+*** TODO good catch
+For them, let's frontload (in orange)
+*both* the hides herald and the contains herald,
+with hides first.
+This might mean needing to use a list instead of a singleton somewhere;
+that seems fine.
+
+** (likely solved): The number-omission edge case (count 1, no flagged ancestor)
+
+When a side has count 1 and that single member is NOT a tracked
+ancestor, my rule renders =1C= (bare number). The vision never shows
+this shape because in practice the lone container of a content node IS
+its parent (=pC=). The only way to hit =1C= is viewing a node where its
+single container is off-screen / not an ancestor (e.g. a backpath). I
+think =1C= is the correct, unambiguous rendering there; flagging it
+only so you can veto it.
+
+*** TODO good
+
+** (likely solved): Token strings are assembled in Rust, not in the rule table
+
+The compact grammar (conditional numbers + variable ancestor letters on
+both sides + the =a(b,c)= form) is more positional than the Emacs lens
+engine's INTERC directive can express. Rather than extend the engine, I
+plan to assemble each token string in Rust and emit it as a value the
+rule table echoes (via ANY/IT), with the table still owning color
+(orange/blue) and order (birth first). This keeps Emacs a dumb renderer
+and is consistent with [[../../server/heralds.rs][heralds.rs]] already being the Rust-side
+presentation authority. The cost: the grammar lives in Rust code, not
+in the declarative table, so the table no longer self-documents the
+token shape. I think that is the right trade; tell me if you'd rather
+push the grammar into the lens engine.
+
+*** TODO agreed
+
+** (likely solved): The "owning ancestor" table the vision references does not exist yet
+
+The vision says "a table somewhere in the rust code defines them all."
+It does not — the only "owning ancestor" mentions in the repo are in
+vision.org. What exists is 'required_ancestry' in [[../../server/update_buffer/ancestry.rs][ancestry.rs]] (the
+per-col ancestor-/kind/ chain) plus 'relation_member_role'; the owner
+DEPTH is currently encoded ad hoc in each reconcile call site
+(index 0/1/2). The plan (step 2) is to add the explicit owner mapping
+beside 'required_ancestry'. So: small new table, but built cleanly from
+existing pieces, not invented from scratch.
+
+*** TODO the owning table is always (I think) the last of the required ancestors
+That is, the farthest ancestor.
+Please fact check me, but if I'm right,
+that means we don't need another table.
+
+** (likely solved): Display order and color are entirely server-side
+
+I confirmed the Emacs side does no sorting, grouping, filtering, or
+recoloring — token order is exactly the rule-child order in
+[[../../server/heralds.rs][heralds.rs]], and all five colors (incl. orange) are already wired to
+faces. So "move the birth herald to front, after ☮, orange" is a pure
+[[../../server/heralds.rs][heralds.rs]] change. The only required Emacs edits are the
+strip-before-save function and the display tests (step 6).
+
+** Pushback: the vision under-specifies, but is not over-complex
+
+I do not think any part of the vision is unnecessary or gratuitously
+complex — the unification genuinely removes a mishmash (=}=, ={=, =→=,
+=←=, plus eight separate edge heralds) and replaces it with ≤5 learnable
+tokens. The real risk is the opposite: the compact grammar is dense.
+=3pC4p= is precise but cryptic until learned. That is a deliberate
+density trade you are clearly choosing; I just want it on record that
+the win is "fewer tokens, more to learn per token." The blast radius is
+also large (≈400 golden test strings), so this is a sizable change even
+though the runtime logic is contained.
+
+*** DONE agreed
