@@ -8,10 +8,10 @@
 ;;; file) and unbound the major-mode function (so the buffer's
 ;;; major-mode degraded to `org-mode'). `skg-reload' now omits
 ;;; `skg-buffer' from the unload list and re-loads it plainly
-;;; instead, preserving each buffer's mode and view-uri. As defense
-;;; in depth, `skg-close-all-skg-buffers' also falls back to a
-;;; content heuristic (first-line shape `^\*+ +(skg') when the
-;;; usual signals have been wiped by some other means.
+;;; instead, preserving each buffer's mode and view-uri. Those two
+;;; signals are all `skg-buffer-p' relies on, so a user's own
+;;; .skg.org file (org-mode, no view-uri) is never reaped, even
+;;; when its first heading begins with `(skg'.
 
 (defconst test-skg-close-all--this-dir
   (file-name-directory load-file-name)
@@ -83,21 +83,27 @@ in later loads of the file were silently dropped."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c g RET"))
               #'skg-goto)))
 
-(ert-deftest test-skg-close-all-content-heuristic-fallback ()
-  "Even if a buffer's skg-view-uri and mode are manually wiped,
-`skg-close-all-skg-buffers' must still find it via the first-line
-content heuristic. This guards the defense-in-depth branch of
-`skg-buffer-p'."
-  (let ((buf (test-skg-close-all--make-fake-skg-buffer
-              "*fake-skg-heuristic*")))
-    (with-current-buffer buf
-      (kill-local-variable 'skg-view-uri)
-      (org-mode))
-    (should (buffer-live-p buf))
-    (should-not (with-current-buffer buf
-                  (derived-mode-p 'skg-content-view-mode)))
-    (should-not (buffer-local-value 'skg-view-uri buf))
-    (skg-close-all-skg-buffers)
-    (should-not (buffer-live-p buf))))
+(ert-deftest test-skg-close-all-spares-org-buffer-with-skg-heading ()
+  "A real file the user is editing must survive `skg-close-all-skg-buffers',
+even when it is an org file whose first heading begins with `(skg'
+\(e.g. a .skg.org export). Such a buffer has no skg-view-uri and is
+in plain `org-mode', so `skg-buffer-p' must not claim it."
+  (let* ((tmp (make-temp-file "skg-spare-" nil ".skg.org"))
+         (buf (find-file-noselect tmp)))
+    (unwind-protect
+        (progn
+          (with-current-buffer buf
+            (erase-buffer)
+            (insert "* (skg (node (id real-file-id) (source main))) real title\n")
+            (org-mode)
+            (save-buffer))
+          (should (buffer-live-p buf))
+          (should-not (skg-buffer-p buf))
+          (skg-close-all-skg-buffers)
+          (should (buffer-live-p buf)))
+      (when (buffer-live-p buf)
+        (with-current-buffer buf (set-buffer-modified-p nil))
+        (kill-buffer buf))
+      (delete-file tmp))))
 
 (provide 'test-skg-close-all)
