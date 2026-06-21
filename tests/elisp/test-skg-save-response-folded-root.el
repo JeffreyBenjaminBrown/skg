@@ -129,6 +129,84 @@ isolate the fold-processing path from the focus-processing path."
                     (line-end-position)))))
       (kill-buffer buf))))
 
+(ert-deftest test-save-response-restores-column-within-body-line ()
+  "Point returns to the same character within the restored body line."
+  (let* ((from-rust
+          (concat
+           "* (skg focused (node (id root))) root\n"
+           "body 1\n"
+           "body 2\n"
+           "** (skg (node (id child))) child\n"))
+         (buf (generate-new-buffer "*test-save-response-column*")))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "test-uri")
+          (skg-replace-buffer-with-new-content
+           nil
+           from-rust
+           '(:point-lines-below-focused-headline 2
+             :point-column 4
+             :point-screen-lines-below-window-start 0))
+          (should (string= "body 2"
+                           (buffer-substring-no-properties
+                            (line-beginning-position)
+                            (line-end-position))))
+          (should (= 4 (- (point) (line-beginning-position)))))
+      (kill-buffer buf))))
+
+(ert-deftest test-save-response-clamps-column-to-end-of-shortened-line ()
+  "A saved column past the end of a now-shorter line clamps to the
+line's end and does not spill onto the next line."
+  (let* ((from-rust
+          (concat
+           "* (skg focused (node (id root))) root\n"
+           "ab\n"
+           "** (skg (node (id child))) child\n"))
+         (buf (generate-new-buffer "*test-save-response-clamp-column*")))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "test-uri")
+          (skg-replace-buffer-with-new-content
+           nil
+           from-rust
+           '(:point-lines-below-focused-headline 1
+             :point-column 10
+             :point-screen-lines-below-window-start 0))
+          (should (string= "ab"
+                           (buffer-substring-no-properties
+                            (line-beginning-position)
+                            (line-end-position))))
+          (should (= (line-end-position) (point))))
+      (kill-buffer buf))))
+
+(ert-deftest test-save-response-clamps-line-to-last-line-of-entry ()
+  "When the entry shrinks so the saved line offset would reach another
+headline, point lands on the entry's last line, not on the next
+headline and not back on the focused headline."
+  (let* ((from-rust
+          (concat
+           "* (skg focused (node (id root))) root\n"
+           "only body line\n"
+           "** (skg (node (id child))) child\n"))
+         (buf (generate-new-buffer "*test-save-response-clamp-line*")))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "test-uri")
+          (skg-replace-buffer-with-new-content
+           nil
+           from-rust
+           '(:point-lines-below-focused-headline 5
+             :point-column 0
+             :point-screen-lines-below-window-start 0))
+          (should (string= "only body line"
+                           (buffer-substring-no-properties
+                            (line-beginning-position)
+                            (line-end-position)))))
+      (kill-buffer buf))))
+
 (ert-deftest test-save-response-success-with-warnings-shows_warning_channel ()
   (let ((buf (generate-new-buffer "*test-save-response-warning*"))
         (shown nil))
