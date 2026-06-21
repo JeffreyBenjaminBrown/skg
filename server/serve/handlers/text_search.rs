@@ -19,6 +19,7 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   fetch_all_graphnodestats_with_source_set};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
+use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
@@ -80,6 +81,16 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     tantivy_index,
     config,
     active );
+  set_viewnodestats_in_viewforest (
+    // Mirror the production enrichment path (handle_snapshot_response):
+    // compute view-relative stats so the rendered buffer carries the
+    // sourceHerald at source boundaries. Empty containment maps suffice
+    // here -- sourceAtBoundary is derived from the tree alone; the maps
+    // only feed the containsParent stat, which this test does not assert.
+    &mut viewforest,
+    & HashMap::new (),
+    & HashMap::new (),
+    config );
   Ok ( viewforest_to_string ( &viewforest, config )? ) }
 
 /// Structured enrichment data passed through the slot,

@@ -41,6 +41,7 @@ use crate::types::misc::SourceSetName;
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
+use crate::update_buffer::set_viewnodestats_in_viewforest;
 
 use ego_tree::{NodeId, Tree};
 use std::io::{BufRead, BufReader};
@@ -325,6 +326,11 @@ fn handle_snapshot_response (
       &env . config ); }
   mark_view_roots_parent_absent (
     &mut viewforest );
+  set_viewnodestats_in_viewforest (
+    &mut viewforest,
+    & payload . graphnodestats . container_to_contents,
+    & payload . graphnodestats . content_to_containers,
+    & env . config );
   apply_source_set_to_viewforest (
     &mut viewforest,
     active_source_set );
