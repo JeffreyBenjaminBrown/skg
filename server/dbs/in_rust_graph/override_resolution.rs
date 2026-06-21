@@ -16,11 +16,16 @@
 //!   that ask "what marker would the server have written, ever?"
 //!   (the tamper check) pass None, i.e. visibility-ungated.
 //!
-//! Valid saved data cannot contain user-owned chains or monogamy
-//! violations (see [[./override_invariants.rs]]), so a path longer
-//! than one, a cycle, or a multi-overrider hop signals legacy or
-//! hand-edited data. The resolver must still terminate and be
-//! sensible on such data — a guard, not an assert.
+//! A path of any length is normal: a user-owned override chain
+//! (D overrides C overrides N, all owned) resolves to the end of the
+//! chain, and any node on the path is a node the server could
+//! legitimately draw (see 'carrier_on_user_owned_chain'). Only a
+//! cycle is anomalous — forbidden upstream by the invariant validators
+//! (see [[./override_invariants.rs]]) at save and init/rebuild, and
+//! handled here as a backstop: the resolver still terminates and
+//! substitutes nothing on a cycle. A multi-overrider hop (monogamy
+//! violation) is likewise forbidden upstream; the resolver refuses to
+//! choose a branch.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;

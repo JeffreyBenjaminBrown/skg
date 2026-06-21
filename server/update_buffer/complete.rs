@@ -251,8 +251,7 @@ async fn visit_normal_node (
     context . deleted_by_this_save_pids,
     context . active_source_set,
     settled, cascade, &mut context . node_budget,
-    context . source_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
-    context . warning_sink . as_deref_mut () ) ?;
+    context . source_diffs . is_none () ) ?; // substitution is off in diff mode: diff surfaces show raw graph facts
   // The steps below apply only while the node is still an Active vognode:
   // content reconcile may have converted it to Deleted (a node this save
   // deleted). The flip to a Diff phantom happens at the END of this visit

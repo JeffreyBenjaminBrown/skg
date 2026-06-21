@@ -41,6 +41,25 @@
      is rejected. The existing tamper sub-test still covers the basic
      off-chain rejection.
 
+** DONE Phase C — resolver comments + remove CompoundOverrideChain
+   - C1: rewrote the resolver module doc and the 'path' field doc — a
+     path of any length is normal; only a cycle is anomalous (a
+     backstop here, forbidden upstream). Struck "legacy compound chain
+     / hand-edited data".
+   - C2: removed 'CompletionWarning::CompoundOverrideChain' (variant +
+     render arm + module doc). In content.rs dropped the
+     'resolution.path.len() > 1' block and the 'compound_warnings'
+     vector, and removed the now-purposeless 'warning_sink' threading
+     through the content path (expand_true_content_at_activeNode,
+     reconcile_content_children, complete_content_children,
+     build_child_creation_data) — the ColRepair sink still flows
+     through the col reconcilers, untouched. De-novo renders now return
+     no completion warnings (they repaired silently; the compound
+     notice was the only kind they surfaced). Deleted
+     tests/override_chain_notice.rs (+ its fixtures) and its registration
+     in grouped_overrides.rs.
+   - Full Rust suite (472 tests) green.
+
 * Changes to the plan's envisioned order
   - None of substance. Phase A done first, as sequenced.
   - A5 detail: besides the test edits the plan named, I added the

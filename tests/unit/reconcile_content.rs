@@ -143,11 +143,10 @@ fn independent_same_id_child_is_prefetched () {
   let no_deletes : HashMap<ID, SourceName> = HashMap::new ();
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new ( InRustGraph::new () );
-  let mut compound_warnings : Vec<CompletionWarning> = Vec::new ();
   let data : HashMap<ID, ChildData> =
     build_child_creation_data (
       &tree, parent, &[ goal . clone () ], &config, &graph_snap,
-      &no_deletes, None, false, &mut compound_warnings )
+      &no_deletes, None, false )
       . unwrap ();
   assert! ( data . contains_key (&goal),
             "an Independent same-id child's goal id must be pre-fetched, not \
