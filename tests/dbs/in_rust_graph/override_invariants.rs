@@ -131,22 +131,84 @@ fn extra_id_targets_are_resolved_before_monogamy_check () {
   )); }
 
 #[test]
-fn user_owned_override_chain_is_invalid () {
-  let violations : Vec<OverrideInvariantViolation> =
+fn user_owned_override_chain_is_valid () {
+  // x overrides y overrides z, all owned -- a linear chain, now legal.
+  assert_eq! (
     violations_for (vec![
       node ("z", "owned", &[]),
       node ("y", "owned", &["z"]),
       node ("x", "owned", &["y"]),
-    ]);
-  assert! (violations . iter () . any ( |v| matches!(
-    v,
-    OverrideInvariantViolation::UserOwnedOverrideChain {
-      first_overrider,
-      middle_overrider,
-      ..
-    } if first_overrider == &ID::from ("x")
-         && middle_overrider == &ID::from ("y")
-  ))); }
+    ]),
+    vec![] ); }
+
+#[test]
+fn one_overrider_two_targets_is_valid () {
+  // A single overrider may override several distinct targets; monogamy
+  // gates the overridden end, not the overrider's out-degree.
+  assert_eq! (
+    violations_for (vec![
+      node ("t1", "owned", &[]),
+      node ("t2", "owned", &[]),
+      node ("overrider", "owned", &["t1", "t2"]),
+    ]),
+    vec![] ); }
+
+/// True iff some violation is a user-owned cycle whose member set
+/// equals 'members'.
+fn has_cycle_over (
+  violations : &[OverrideInvariantViolation],
+  members    : &[&str],
+) -> bool {
+  let wanted : HashSet<ID> =
+    members . iter () . map ( |s| ID::from (*s) ) . collect ();
+  violations . iter () . any ( |v| match v {
+    OverrideInvariantViolation::UserOwnedOverrideCycle { cycle } =>
+      cycle . iter () . cloned () . collect::<HashSet<ID>> () == wanted,
+    _ => false } ) }
+
+#[test]
+fn two_node_user_owned_cycle_is_invalid () {
+  // a overrides b, b overrides a, both owned.
+  let nodes = vec![
+    node ("a", "owned", &["b"]),
+    node ("b", "owned", &["a"]),
+  ];
+  assert! ( has_cycle_over (
+    &violations_for (nodes . clone ()), &["a", "b"] ) );
+  for touched in [&["a"][..], &["b"][..]] {
+    assert! ( has_cycle_over (
+      &touched_violations_for (nodes . clone (), touched), &["a", "b"] ),
+      "touched {:?} should detect the 2-cycle", touched ); } }
+
+#[test]
+fn three_node_user_owned_cycle_is_invalid () {
+  // a overrides b, b overrides c, c overrides a, all owned.
+  let nodes = vec![
+    node ("a", "owned", &["b"]),
+    node ("b", "owned", &["c"]),
+    node ("c", "owned", &["a"]),
+  ];
+  assert! ( has_cycle_over (
+    &violations_for (nodes . clone ()), &["a", "b", "c"] ) );
+  for touched in [&["a"][..], &["b"][..], &["c"][..]] {
+    assert! ( has_cycle_over (
+      &touched_violations_for (nodes . clone (), touched),
+      &["a", "b", "c"] ),
+      "touched {:?} should detect the 3-cycle", touched ); } }
+
+#[test]
+fn cycle_through_foreign_link_is_valid () {
+  // a(owned) overrides b(foreign) overrides c(owned) overrides a:
+  // the foreign link breaks the user-owned walk, so no user-owned
+  // cycle exists.
+  let nodes = vec![
+    node ("a", "owned",   &["b"]),
+    node ("b", "foreign", &["c"]),
+    node ("c", "owned",   &["a"]),
+  ];
+  assert_eq! ( violations_for (nodes . clone ()), vec![] );
+  assert_eq! (
+    touched_violations_for (nodes, &["a", "c"]), vec![] ); }
 
 #[test]
 fn chain_through_foreign_middle_is_valid () {
@@ -190,37 +252,18 @@ fn touched_monogamy_detected_via_either_overrider () {
       "touched {:?} should flag the monogamy violation", touched ); } }
 
 #[test]
-fn touched_chain_detected_from_the_first_end () {
-  // x → y → z, all owned. Saving x (the chain's first) flags it.
-  let violations : Vec<OverrideInvariantViolation> =
-    touched_violations_for (vec![
-      node ("z", "owned", &[]),
-      node ("y", "owned", &["z"]),
-      node ("x", "owned", &["y"]),
-    ], &["x"]);
-  assert! (violations . iter () . any ( |v| matches!(
-    v,
-    OverrideInvariantViolation::UserOwnedOverrideChain {
-      first_overrider, middle_overrider, ..
-    } if first_overrider == &ID::from ("x")
-         && middle_overrider == &ID::from ("y") ))); }
-
-#[test]
-fn touched_chain_detected_from_the_middle_end () {
-  // Same chain, but the save touched y (the middle). The new edge could
-  // be at either end, so the middle must also be checked.
-  let violations : Vec<OverrideInvariantViolation> =
-    touched_violations_for (vec![
-      node ("z", "owned", &[]),
-      node ("y", "owned", &["z"]),
-      node ("x", "owned", &["y"]),
-    ], &["y"]);
-  assert! (violations . iter () . any ( |v| matches!(
-    v,
-    OverrideInvariantViolation::UserOwnedOverrideChain {
-      first_overrider, middle_overrider, ..
-    } if first_overrider == &ID::from ("x")
-         && middle_overrider == &ID::from ("y") ))); }
+fn touched_user_owned_chain_validates_from_either_end () {
+  // x → y → z, all owned -- a linear chain, now legal. The touched
+  // validator accepts it whether the save touched the first or middle.
+  let nodes = || vec![
+    node ("z", "owned", &[]),
+    node ("y", "owned", &["z"]),
+    node ("x", "owned", &["y"]),
+  ];
+  for touched in [&["x"][..], &["y"][..]] {
+    assert_eq! (
+      touched_violations_for (nodes (), touched), vec![],
+      "touched {:?} should accept the linear chain", touched ); } }
 
 #[test]
 fn touched_foreign_overriders_do_not_count () {

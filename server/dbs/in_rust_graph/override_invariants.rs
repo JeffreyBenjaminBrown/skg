@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::override_resolution::resolve_override;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 
 use std::collections::{HashMap, HashSet};
@@ -11,10 +12,11 @@ pub enum OverrideInvariantViolation {
   MultipleUserOwnedOverriders {
     overridden: ID,
     overriders: Vec<ID> },
-  UserOwnedOverrideChain {
-    first_overrider: ID,
-    middle_overrider: ID,
-    final_targets: Vec<ID> }}
+  UserOwnedOverrideCycle {
+    // The cycle's nodes in walk order, canonicalized (rotated to the
+    // min pid) so the same cycle reached from different entry points
+    // collapses to one violation.
+    cycle: Vec<ID> }}
 
 pub fn error_unless_override_invariants_hold (
   config : &SkgConfig,
@@ -30,8 +32,9 @@ pub fn error_unless_override_invariants_hold (
 
 /// User-owned data must adhere to two constraints:
 /// - monogamy: No node is overridden by more than one user-owned node.
-/// - no chains: "X overrides Y + Y overrides Z" is invalid
-///   if X and Y are user-owned (regardless of where Z is from)
+/// - no cycles: following the user-owned override edges out of a node
+///   must never return to that node. Linear chains (D overrides C
+///   overrides N, all owned) are allowed.
 pub fn validate_override_invariants (
   config : &SkgConfig,
   graph  : &InRustGraph,
@@ -72,39 +75,45 @@ pub fn validate_override_invariants (
           overridden,
           overriders, } ); }}
 
-  for (first_pid, first_node) in graph . nodes . iter () {
-    // No chains constraint.
-    let Some (first_is_user_owned) = user_owns_node (
-      config, first_pid, &first_node . source, &mut violations )
-    else { continue; };
-    if ! first_is_user_owned { continue; }
-    for middle_id in first_node . overrides_view_of . or_default () {
-      let Some (middle_pid) = graph . pid_of (middle_id) else {
-        continue; };
-      let Some (middle_node) = graph . nodes . get (&middle_pid) else {
-        continue; };
-      let Some (middle_is_user_owned) = user_owns_node (
-        config, &middle_pid, &middle_node . source, &mut violations )
-      else { continue; };
-      if ! middle_is_user_owned { continue; }
-      // The chain violation is the user-owned middle node having any
-      // override target at all.  Resolve final targets for reporting,
-      // but keep unknown raw IDs visible so the user can repair them.
-      let final_targets : Vec<ID> =
-        middle_node . overrides_view_of . or_default ()
-        . iter ()
-        . map ( |target|
-          graph . pid_of (target)
-          . unwrap_or_else ( || target . clone () ) )
-        . collect ();
-      if ! final_targets . is_empty () {
-        violations . push (
-          OverrideInvariantViolation::UserOwnedOverrideChain {
-            first_overrider: first_pid . clone (),
-            middle_overrider: middle_pid,
-            final_targets,
-          } ); }}}
+  { // No cycles constraint. For each user-owned node, walk its
+    // user-owned overrider edges (the shared 'resolve_override' walk,
+    // ungated so it is source-set-independent); a returned cycle is a
+    // violation. Different entry points into the same cycle yield
+    // rotations of one trail, so canonicalizing collapses them.
+    let mut seen_cycles : HashSet<Vec<ID>> = HashSet::new ();
+    for (pid, node) in graph . nodes . iter () {
+      let user_owned : bool =
+        config . sources . get (&node . source)
+        . map ( |sc| sc . user_owns_it )
+        . unwrap_or (false); // unknown source reported by pass 1 above
+      if ! user_owned { continue; }
+      let resolution = resolve_override (config, graph, None, pid);
+      if resolution . cycle_detected {
+        let canonical : Vec<ID> =
+          canonicalize_cycle (resolution . cycle);
+        if seen_cycles . insert (canonical . clone ()) {
+          violations . push (
+            OverrideInvariantViolation::UserOwnedOverrideCycle {
+              cycle : canonical } ); }}}}
   dedup_violations (violations) }
+
+/// Rotate a cycle's nodes so the minimum pid leads, preserving cycle
+/// order. The same directed cycle reached from different entry points
+/// is a rotation of one sequence, so this canonical form lets dedup
+/// collapse them.
+fn canonicalize_cycle (
+  cycle : Vec<ID>,
+) -> Vec<ID> {
+  if cycle . is_empty () { return cycle; }
+  let min_index : usize =
+    cycle . iter () . enumerate ()
+    . min_by ( |(_, a), (_, b)| a . cmp (b) )
+    . map ( |(i, _)| i )
+    . unwrap ();
+  let mut out : Vec<ID> = Vec::with_capacity ( cycle . len () );
+  out . extend_from_slice ( &cycle [min_index ..] );
+  out . extend_from_slice ( &cycle [.. min_index] );
+  out }
 
 /// Save-time override-invariant check, scoped to the nodes a save
 /// touched. The rest of the graph satisfied the invariants before the
@@ -120,10 +129,11 @@ pub fn validate_override_invariants (
 /// - monogamy: for each X that T overrides, flag X if it now has more
 ///   than one user-owned overrider. Only this (target) end needs
 ///   checking — adding the edge T → X can only over-subscribe X.
-/// - no chains: the new edge T → B can sit at either end of a chain, so
-///   check both: T as the chain's middle (some user-owned node
-///   overrides T, while T overrides anything) and T as the chain's
-///   first (T overrides a user-owned B that itself overrides anything).
+/// - no cycles: walk the user-owned override edges out of T (the shared
+///   'resolve_override' walk, ungated). A save that closes a user-owned
+///   cycle leaves a written (touched) node on the cycle, and monogamy
+///   makes the walk functional, so the walk from that T returns to a
+///   repeat. Cost O(touched · chain length).
 pub fn validate_touched_override_invariants (
   config  : &SkgConfig,
   graph   : &InRustGraph,
@@ -154,33 +164,14 @@ pub fn validate_touched_override_invariants (
           OverrideInvariantViolation::MultipleUserOwnedOverriders {
             overridden : overridden . clone (),
             overriders, } ); } }
-    if ! targets . is_empty () {
-      // no chains, T as the middle: first(user-owned) → T → targets
-      for first in user_owned_overriders_of (config, graph, pid) {
+    { // no cycles: the functional, ungated walk out of this touched
+      // user-owned node returns to a repeat iff the save put it on a
+      // cycle.
+      let resolution = resolve_override (config, graph, None, pid);
+      if resolution . cycle_detected {
         violations . push (
-          OverrideInvariantViolation::UserOwnedOverrideChain {
-            first_overrider  : first,
-            middle_overrider : pid . clone (),
-            final_targets    : targets . clone (), } ); } }
-    for middle_pid in &targets {
-      // no chains, T as the first: T → middle(user-owned) → its targets
-      let Some (middle_node) = graph . nodes . get (middle_pid)
-        else { continue; };
-      let Some (middle_is_user_owned) = user_owns_node (
-        config, middle_pid, &middle_node . source, &mut violations )
-        else { continue; };
-      if ! middle_is_user_owned { continue; }
-      let final_targets : Vec<ID> =
-        middle_node . overrides_view_of . or_default () . iter ()
-        . map ( |t| graph . pid_of (t)
-                . unwrap_or_else ( || t . clone () ) )
-        . collect ();
-      if ! final_targets . is_empty () {
-        violations . push (
-          OverrideInvariantViolation::UserOwnedOverrideChain {
-            first_overrider  : pid . clone (),
-            middle_overrider : middle_pid . clone (),
-            final_targets, } ); } } }
+          OverrideInvariantViolation::UserOwnedOverrideCycle {
+            cycle : canonicalize_cycle (resolution . cycle) } ); } } }
   dedup_violations (violations) }
 
 /// The single user-owned node (by pid) that already overrides
@@ -272,18 +263,16 @@ pub fn format_override_invariant_violations (
           "* node {} is overridden by user-owned nodes {}",
           overridden, list ));
       }
-      OverrideInvariantViolation::UserOwnedOverrideChain {
-        first_overrider,
-        middle_overrider,
-        final_targets,
+      OverrideInvariantViolation::UserOwnedOverrideCycle {
+        cycle,
       } => {
-        let list : String =
-          final_targets . iter ()
-          . map ( |id| id . to_string () )
-          . collect::<Vec<String>> ()
-          . join (", ");
+        let arrow : String = { // a -> b -> ... -> a
+          let mut nodes : Vec<String> =
+            cycle . iter () . map ( |id| id . to_string () ) . collect ();
+          if let Some (first) = cycle . first () {
+            nodes . push ( first . to_string () ); }
+          nodes . join (" -> ") };
         lines . push (format!(
-          "* user-owned override chain: {} overrides {}, which overrides {}",
-          first_overrider, middle_overrider, list ));
+          "* user-owned override cycle: {}", arrow ));
       }}}
   lines . join ("\n") }

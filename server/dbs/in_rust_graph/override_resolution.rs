@@ -34,15 +34,22 @@ pub struct OverrideResolution {
   /// user-owned, visible overrider exists.
   pub effective      : ID,
   /// The chain of overriders traversed, in order. Empty = no
-  /// substitution. A length > 1 signals a legacy compound chain;
-  /// consumers surface the "Compound overrides relationship
-  /// traversed..." notice.
+  /// substitution. A path of any length is normal: a user-owned
+  /// override chain (D overrides C overrides N) resolves to the end
+  /// of the chain, and middle carriers are honest (see
+  /// 'carrier_on_user_owned_chain').
   pub path           : Vec<ID>,
   /// True iff the walk met an already-seen PID. In that case no
   /// substitution is performed ('effective' = the input, 'path'
   /// empty), since a cyclic override chain names no sensible
-  /// destination.
+  /// destination. A cycle is forbidden upstream (the invariant
+  /// validators reject it at save and init/rebuild); the resolver
+  /// handles it as a backstop.
   pub cycle_detected : bool,
+  /// The nodes of the detected cycle (the trail from the first repeat
+  /// back to it), in walk order; empty when no cycle. The invariant
+  /// validators report it as 'UserOwnedOverrideCycle'.
+  pub cycle          : Vec<ID>,
 }
 
 pub fn resolve_override (
@@ -68,15 +75,28 @@ pub fn resolve_override (
       return OverrideResolution {
         effective      : current,
         path           : path,
-        cycle_detected : false, }; }
+        cycle_detected : false,
+        cycle          : Vec::new (), }; }
     let next : ID = candidates [0] . clone ();
     if ! seen . insert ( next . clone () ) {
+      let cycle : Vec<ID> = { // the trail from the first repeat back to it
+        // The walk in visit order is input_pid followed by 'path';
+        // 'next' repeats one of these. The cycle is the suffix from
+        // that first occurrence through 'current' (which closes the
+        // loop back to 'next').
+        let mut walk : Vec<ID> = Vec::with_capacity ( path . len () + 1 );
+        walk . push ( input_pid . clone () );
+        walk . extend ( path . iter () . cloned () );
+        match walk . iter () . position ( |x| x == &next ) {
+          Some (i) => walk . split_off (i),
+          None     => Vec::new (), }}; // unreachable: 'next' was seen
       return OverrideResolution {
         // A cyclic chain names no sensible destination, so no
         // substitution at all: effective reverts to the input.
         effective      : input_pid,
         path           : Vec::new (),
-        cycle_detected : true, }; }
+        cycle_detected : true,
+        cycle, }; }
     path . push ( next . clone () );
     current = next; }}
 

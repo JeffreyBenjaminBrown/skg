@@ -1,0 +1,43 @@
+#+TITLE: Override chains — progress
+#+TODO: TODO ONGOING | DONE
+
+* What's done and went well
+** DONE Phase A — invariants: drop "no chains", add "no cycle", dedup the walk
+   - A1: 'OverrideResolution' gained a 'cycle : Vec<ID>' field
+     (override_resolution.rs). On a detected cycle it now carries the
+     trail from the first repeat back to it (walk order); empty
+     otherwise. 'effective'/'path' semantics for substitution callers
+     unchanged (input / empty on a cycle).
+   - A2: renamed 'OverrideInvariantViolation::UserOwnedOverrideChain'
+     -> 'UserOwnedOverrideCycle { cycle : Vec<ID> }'; formatter prints
+     "user-owned override cycle: a -> b -> ... -> a".
+   - A3: global 'validate_override_invariants' keeps pass 1 (monogamy);
+     pass 2 now walks each user-owned node via 'resolve_override(None)'
+     and reports a returned cycle. Cycles are canonicalized (rotate to
+     min pid) and deduped via a local HashSet so the same cycle from
+     different entry points collapses to one violation.
+   - A4: 'validate_touched_override_invariants' keeps the monogamy
+     (target-end) check; the two chain checks are replaced by one
+     'resolve_override(None)' walk from each touched user-owned node.
+   - A5: tests updated (see "order" note). All 35 override tests pass.
+
+* Changes to the plan's envisioned order
+  - None of substance. Phase A done first, as sequenced.
+  - A5 detail: besides the test edits the plan named, I added the
+    'cycle' field to the existing resolver expectation literals in
+    tests/dbs/in_rust_graph/override_resolution.rs (compiler-forced),
+    and fixed a now-false comment there ("Cannot be saved or rebuilt")
+    since linear chains are now savable.
+  - Reused 'resolve_override' as the single ungated walk for both
+    validators (as the plan intended), so the chain/cycle-walking logic
+    lives in exactly one place.
+
+* Unanticipated future potential costs and benefits
+  - The global validator's cycle scan calls 'resolve_override' once per
+    user-owned node without memoizing proven-acyclic pids (the plan
+    permitted skipping memoization on the cold init/rebuild path). Cost
+    is O(V · chain depth) worst case; chains are short in practice.
+    Cheap to add memoization later if init time ever matters.
+
+* Open questions
+  None.

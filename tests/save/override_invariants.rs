@@ -117,7 +117,9 @@ fn merge_that_collides_two_overriders_is_rejected () {
   assert_override_validation_error (result); }
 
 #[test]
-fn save_simulation_rejects_user_owned_override_chain () {
+fn save_simulation_accepts_user_owned_override_chain () {
+  // The graph has y overriding z; saving x overriding y closes a
+  // linear chain x -> y -> z, which is now legal.
   let initial : Vec<NodeComplete> = vec![
     node ("z", &[]),
     node ("y", &["z"]),
@@ -127,6 +129,24 @@ fn save_simulation_rejects_user_owned_override_chain () {
   let result : Result<(), Box<dyn Error>> =
     validate_override_invariants_after_save (
       &[DefineNode::Save (SaveNode (node ("x", &["y"])))],
+      &[],
+      &config (),
+      &graph );
+  result . expect ("a linear user-owned chain should save"); }
+
+#[test]
+fn save_simulation_rejects_user_owned_override_cycle () {
+  // The graph has a overriding b; saving b overriding a closes a
+  // 2-node user-owned cycle, which is rejected.
+  let initial : Vec<NodeComplete> = vec![
+    node ("a", &["b"]),
+    node ("b", &[]),
+  ];
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::from_nodecompletes (&initial));
+  let result : Result<(), Box<dyn Error>> =
+    validate_override_invariants_after_save (
+      &[DefineNode::Save (SaveNode (node ("b", &["a"])))],
       &[],
       &config (),
       &graph );
