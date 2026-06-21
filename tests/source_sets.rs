@@ -818,6 +818,11 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     "active ancestry should render: {}",
     rendered );
   assert! (
+    rendered . contains ("(sourceHerald ⌂:public)"),
+    "enriched search results should show the source herald at the \
+     source boundary (the active-source root): {}",
+    rendered );
+  assert! (
     ! rendered . contains ("private-container"),
     "inactive enrichment ancestry should be truncated before the \
      inactive container: {}",

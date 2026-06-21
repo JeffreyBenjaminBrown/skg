@@ -4,6 +4,37 @@
   to the top of this file (just under this note). The bulk below was
   migrated 2026-06-19 in the original problems.org order (oldest
   section first).
+* RESOLVED Search-result enrichment skipped set_viewnodestats_in_viewforest (2026-06-21)
+  A text-search results buffer showed no source heralds (and no cycle /
+  containsParent viewStats) until the user saved it. The visible source
+  indicator is '(sourceHerald ⌂:LABEL)', emitted only when
+  viewStats.sourceAtBoundary is true (org_to_text.rs:278-282), and that
+  flag is set ONLY by set_viewnodestats_in_viewforest
+  (update_buffer/viewnodestats.rs). Neither search-render path called it:
+  phase 1 (handle_text_search_request) and phase-2 enrichment
+  (handle_snapshot_response) rendered via their own hand-rolled tail,
+  while only the save re-render runs finish_viewforest
+  (update_buffer.rs:454) -- so sources appeared only after a save. Commit
+  0641a897 (2026-06-05) had unified the de-novo and post-save tails into
+  finish_viewforest but left the search path as a separate third path.
+
+  Fix: handle_snapshot_response now calls set_viewnodestats_in_viewforest
+  after setting graphStats, using the containment maps already carried in
+  payload.graphnodestats (container_to_contents / content_to_containers,
+  both public). No extra TypeDB work. The test helper
+  enriched_search_buffer_for_source_set_for_test was updated to mirror
+  this, and the multi-source truncation test now asserts
+  '(sourceHerald ⌂:public)'. The two other tail steps
+  (mark_orphans_under_dead_parents_independent,
+  validate_parentIs_relationships) were intentionally NOT added: they
+  guard against conditions that cannot arise in a fresh search-results
+  buffer (Jeff, 2026-06-21). The principled follow-up -- routing phase 2
+  through finish_viewforest with precomputed graphStats/ancestry so the
+  enriched buffer is byte-identical to the post-save render -- remains
+  open; see search-result-sources.org (repo root). Verified: 222 grouped
+  nextest tests + the search-enrichment integration test pass; the
+  enriched buffer now carries (viewStats containsParent) on containerward
+  ancestry nodes.
 * RESOLVED Heralds: the rule table was volatile session state with no self-heal (2026-06-19)
   The herald rule table ('heralds--transform-rules') is fetched once
   per connect by 'skg-request-herald-rules' (called from
