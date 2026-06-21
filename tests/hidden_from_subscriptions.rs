@@ -9,6 +9,7 @@ use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::test_utils::{
   extract_string_field_from_sexp,
+  graph_handle_from_config,
   read_all_lp_messages,
   run_with_shared_test_db,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
@@ -19,7 +20,9 @@ use std::sync::Arc;
 
 use skg::serve::ViewsState;
 use skg::types::views_state::{OpenViews, ViewUri};
-use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
+use skg::dbs::in_rust_graph::{
+  InRustGraphHandle,
+  install_or_swap_global_handle };
 
 use std::error::Error;
 use std::io::BufReader;
@@ -63,9 +66,16 @@ fn add_definitive_view_request_to_subscribees (
     . lines()
     . map(|line| {
       if line . contains ("subscribee-") && line . contains ("indef") {
-        // Insert viewRequests after the `indef' marker, before ) or (graphStats.
-        line . replace("indef)", "indef (viewRequests definitiveView))")
-            . replace("indef (graphStats", "indef (viewRequests definitiveView) (graphStats")
+        // Insert viewRequests right after the `indef' marker. In the
+        // uniform-herald format `indef' may be followed by `)' (no more
+        // atoms) or by another atom group such as `(birthHerald ...)',
+        // `(rels ...)', or `(viewStats ...)'.
+        if line . contains ("indef)") {
+          line . replace (
+            "indef)", "indef (viewRequests definitiveView))")
+        } else {
+          line . replace (
+            "indef ", "indef (viewRequests definitiveView) ") }
       } else {
         line . to_string()
       }
@@ -286,62 +296,77 @@ fn all_tests
     |s| Box::pin ( async move {
       s . reset ("test_deleting_foreign_subscribee_content_preserves_branch_edit",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_deleting_foreign_subscribee_content_preserves_branch_edit (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_foreign_subscribee_content_infers_hide",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_deleting_foreign_subscribee_content_infers_hide (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_hidden_subscribee_content",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_collateral_view_reflects_newly_hidden_subscribee_content (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_foreign_subscribee_content_to_subscriber_does_not_hide",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_foreign_subscribee_content_elsewhere_still_hides",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_moving_foreign_subscribee_content_elsewhere_still_hides (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_extra_view_child_under_foreign_subscribee_is_deleted",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_extra_view_child_under_foreign_subscribee_is_deleted (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_extra_view_child_under_owned_subscribee_is_deleted",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
+      s . install_graph_handle () ?;
       test_extra_view_child_under_owned_subscribee_is_deleted (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_subscribee_and_filter_cols",
         "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") . await ?;
+      s . install_graph_handle () ?;
       test_subscribee_and_filter_cols (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") . await ?;
+      s . install_graph_handle () ?;
       test_hidden_within_but_none_without (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") . await ?;
+      s . install_graph_handle () ?;
       test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_unhidden_subscribee_content",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") . await ?;
+      s . install_graph_handle () ?;
       test_collateral_view_reflects_newly_unhidden_subscribee_content (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_from_hiddenin_col_does_not_unhide",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") . await ?;
+      s . install_graph_handle () ?;
       test_deleting_from_hiddenin_col_does_not_unhide (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_without_but_none_within",
         "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await ?;
+      s . install_graph_handle () ?;
       test_hidden_without_but_none_within (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_adding_to_hiddenoutside_col_does_not_hide",
         "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within") . await ?;
+      s . install_graph_handle () ?;
       test_adding_to_hiddenoutside_col_does_not_hide (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_overlapping_hidden_within",
         "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await ?;
+      s . install_graph_handle () ?;
       test_overlapping_hidden_within (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
@@ -352,7 +377,8 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -384,7 +410,8 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -423,7 +450,8 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -498,7 +526,8 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -540,7 +569,8 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -577,7 +607,8 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -629,7 +660,8 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -696,13 +728,17 @@ async fn test_subscribee_and_filter_cols (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H3 S2\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id hidden-in-E1) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E1
+       *** (skg (node (id hidden-in-E2) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E2
+       *** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"bH\"))) hidden-for-no-reason
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
-       *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id hidden-for-no-reason) (source main) indef (graphStats (containers 0) hiding))) hidden-for-no-reason
-       ** (skg (node (id R1) (source main))) R1
+       **** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribees are bare leaves; only HiddenOutsideOfSubscribeeCol shown");
@@ -712,7 +748,8 @@ async fn test_subscribee_and_filter_cols (
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        install_or_swap_global_handle (
+          graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -727,19 +764,23 @@ async fn test_subscribee_and_filter_cols (
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H3 S2\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id hidden-in-E1) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E1
+       *** (skg (node (id hidden-in-E2) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E2
+       *** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"bH\"))) hidden-for-no-reason
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id hidden-in-E1) (source main) indef (graphStats hiding))) hidden-in-E1
-       **** (skg (node (id E11) (source main))) E11
-       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
+       ***** (skg (node (id hidden-in-E1) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E1
+       **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
+       *** (skg (node (id E2) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id hidden-in-E2) (source main) indef (graphStats hiding))) hidden-in-E2
-       **** (skg (node (id E21) (source main))) E21
+       ***** (skg (node (id hidden-in-E2) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E2
+       **** (skg (node (id E21) (source main) (birthHerald \"aC\"))) E21
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id hidden-for-no-reason) (source main) indef (graphStats (containers 0) hiding))) hidden-for-no-reason
-       ** (skg (node (id R1) (source main))) R1
+       **** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol shown before content; HiddenOutsideOfSubscribeeCol at end");
@@ -769,10 +810,12 @@ async fn test_hidden_within_but_none_without (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S1\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
-       ** (skg (node (id R1) (source main))) R1
+       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C3\"))) subscribee-1
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribee is bare leaf; H doesn't appear");
@@ -782,7 +825,8 @@ async fn test_hidden_within_but_none_without (
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        install_or_swap_global_handle (
+          graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -799,14 +843,16 @@ async fn test_hidden_within_but_none_without (
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S1\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C3\"))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) indef (graphStats hiding))) H
-       **** (skg (node (id E11) (source main))) E11
-       **** (skg (node (id E12) (source main))) E12
-       ** (skg (node (id R1) (source main))) R1
+       ***** (skg (node (id H) (source main) indef (birthHerald \"dH bC\"))) H
+       **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
+       **** (skg (node (id E12) (source main) (birthHerald \"aC\"))) E12
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol with H before E11 and E12");
@@ -819,7 +865,8 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -869,7 +916,8 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -937,7 +985,8 @@ async fn test_deleting_from_hiddenin_col_does_not_unhide (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -997,13 +1046,15 @@ async fn test_hidden_without_but_none_within (
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id H) (source main) indef (birthHerald \"bH\"))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
-       *** (skg (node (id E2) (source main) indef (graphStats (containers 0) subscribing))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (birthHerald \"bS\"))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id H) (source main) indef (graphStats (containers 0) hiding))) H
-       ** (skg (node (id R1) (source main))) R1
+       **** (skg (node (id H) (source main) indef (birthHerald \"cH\"))) H
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: H in HiddenOutsideOfSubscribeeCol; E1 and E2 are indef bare leaves");
@@ -1012,7 +1063,8 @@ async fn test_hidden_without_but_none_within (
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        install_or_swap_global_handle (
+          graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -1026,16 +1078,18 @@ async fn test_hidden_without_but_none_within (
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id H) (source main) indef (birthHerald \"bH\"))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
-       **** (skg (node (id E11) (source main))) E11
-       **** (skg (node (id E12) (source main) (graphStats (contents 1)))) E12
-       ***** (skg (node (id E121) (source main))) E121
-       *** (skg (node (id E2) (source main) (graphStats (containers 0) subscribing))) subscribee-2
+       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
+       **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
+       **** (skg (node (id E12) (source main) (birthHerald \"aC1\"))) E12
+       ***** (skg (node (id E121) (source main) (birthHerald \"aC\"))) E121
+       *** (skg (node (id E2) (source main) (birthHerald \"bS\"))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id H) (source main) indef (graphStats (containers 0) hiding))) H
-       ** (skg (node (id R1) (source main))) R1
+       **** (skg (node (id H) (source main) indef (birthHerald \"cH\"))) H
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(with_subscribees_expanded, expected_expanded,
       "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol (at end); E1 expanded with E11, E12; E2 expanded but empty");
@@ -1048,7 +1102,8 @@ async fn test_adding_to_hiddenoutside_col_does_not_hide (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (),};
@@ -1101,11 +1156,13 @@ async fn test_overlapping_hidden_within (
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"2C\"))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
-       *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
-       ** (skg (node (id R1) (source main))) R1
+       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C1\"))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (birthHerald \"bS\") (rels \"C1\"))) subscribee-2
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribees are bare leaves; H doesn't appear");
@@ -1115,7 +1172,8 @@ async fn test_overlapping_hidden_within (
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        install_or_swap_global_handle (
+          graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -1128,15 +1186,17 @@ async fn test_overlapping_hidden_within (
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing hiding))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+       ** (skg hiddenCol)
+       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"2C\"))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C1\"))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) indef (graphStats (containers 2) hiding))) H
-       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
+       ***** (skg (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
+       *** (skg (node (id E2) (source main) (birthHerald \"bS\") (rels \"C1\"))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) indef (graphStats (containers 2) hiding))) H
-       ** (skg (node (id R1) (source main))) R1
+       ***** (skg (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
+       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(expanded, expected_expanded,
       "View with expanded subscribees: H appears in HiddenInSubscribeeCol under both E1 and E2");
