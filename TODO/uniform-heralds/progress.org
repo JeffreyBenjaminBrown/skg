@@ -109,6 +109,18 @@ plus a one-time data/bash/trim-node-bodies.org migration.
   - heralds.rs rule table reordered (⊥ ☮ birth rels ...); conformance
     test green; elisp fixture regenerated.
   - graphnodestats_hiding.rs reworked to the new directional counts.
+- *Step 6 (Emacs)*: committed. Strip fn drops birthHerald/rels; the
+  parentIs-container injection retired; the elisp display tests updated;
+  252/252 elisp tests green.
+- *Step 7 (goldens)*: in progress. Renderer verified correct by hand on
+  content/cycle (=2aC1=, =aCa=), subscribee-as-such (=bS=),
+  subscriber-as-such (=Sb=), overrider/overridden (=Oa/aO/Ob/bO=),
+  filter-col owner distances, roots, source heralds. Blessed the ~26
+  failing Rust test files (one agent per test binary, using
+  =cargo nextest --test <binary>= to isolate builds; each re-ran to
+  green). Full nextest suite at 469/470 (hidden_from_subscriptions, the
+  92-golden file, finishing). Bash integration goldens
+  (test-emacs.el assertions) in progress.
 
 * Changes to the plan's envisioned order
 

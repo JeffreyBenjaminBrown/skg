@@ -77,7 +77,7 @@
                       (let ((p-buf (fork-test--buffer-showing "P")))
                         (and p-buf
                              (with-current-buffer p-buf
-                               (string-match-p "overriding subscribing"
+                               (string-match-p "(rels \"1S 1O\")"
                                                (buffer-string))))))
                     10)))
     (unless committed

@@ -534,7 +534,7 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
-                ** (skg (node (id ancestor) (source main) (parentIs independent) (birth backpath container))) non-content child
+                ** (skg (node (id ancestor) (source main) (parentIs independent))) non-content child
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;

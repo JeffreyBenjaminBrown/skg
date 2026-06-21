@@ -116,13 +116,13 @@
                     "*** 121\n"
                     "** 13\n"))
            (expected
-            (concat "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (containers 1) (contents 3)))) 1\n"
-                    "** (skg (node (id 11) (source main))) 11\n"
-                    "** (skg (node (id 12) (source main) (graphStats (contents 1)))) 12\n"
-                    "*** (skg (node (id 1) (source main) (parentIs independent) (birth backpath container) indef (graphStats (containers 1) (contents 3)) (viewStats cycle containsParent))) 1\n"
-                    "**** (skg (node (id 0) (source main) (parentIs independent) (birth backpath container) indef (graphStats (containers 0) (contents 1)) (viewStats containsParent))) 0\n"
-                    "*** (skg (node (id 121) (source main))) 121\n"
-                    "** (skg (node (id 13) (source main))) 13\n")))
+            (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels \"1C3\"))) 1\n"
+                    "** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11\n"
+                    "** (skg (node (id 12) (source main) (birthHerald \"aC1\"))) 12\n"
+                    "*** (skg (node (id 1) (source main) (parentIs independent) indef (birthHerald \"1C3a\") (viewStats cycle))) 1\n"
+                    "**** (skg (node (id 0) (source main) (parentIs independent) indef (birthHerald \"Ca\"))) 0\n"
+                    "*** (skg (node (id 121) (source main) (birthHerald \"aC\"))) 121\n"
+                    "** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13\n")))
 
       (message "Buffer-Content with metadata: %s" buffer-content)
       (message "Expected buffer-content with metadata: %s" expected)

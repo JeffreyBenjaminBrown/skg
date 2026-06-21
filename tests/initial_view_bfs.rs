@@ -19,16 +19,20 @@ fn all_tests
     "skg-test-initial-view-bfs",
     |s| Box::pin ( async move {
       s . reset ("test_bfs_limit_across_multiple_trees", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_bfs_limit_across_multiple_trees (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_bfs_limit_9_three_branches", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_bfs_limit_9_three_branches (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_bfs_limit_8_two_branches", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_bfs_limit_8_two_branches (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_content_beats_subscribers",
                  "tests/initial_view_bfs/fixtures-content-vs-subscribers") . await ?;
+      s . install_graph_handle () ?;
       test_budget_content_beats_subscribers (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
@@ -85,21 +89,21 @@ async fn test_bfs_limit_across_multiple_trees (
 
       println!("BFS multi-tree limit result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-                              ** (skg (node (id 11) (source main))) 11
-                              ** (skg (node (id 12) (source main) (graphStats (contents 3)))) 12
-                              *** (skg (node (id 121) (source main) indef)) 121
-                              *** (skg (node (id 122) (source main) indef)) 122
-                              *** (skg (node (id 123) (source main) indef)) 123
-                              ** (skg (node (id 13) (source main))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (graphStats (contents 3)))) 2
-                              ** (skg (node (id 21) (source main))) 21
-                              ** (skg (node (id 22) (source main) indef (graphStats (contents 3)))) 22
-                              ** (skg (node (id 23) (source main) indef)) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (graphStats (contents 3)))) 3
-                              ** (skg (node (id 31) (source main) indef)) 31
-                              ** (skg (node (id 32) (source main) indef (graphStats (contents 3)))) 32
-                              ** (skg (node (id 33) (source main) indef)) 33
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+                              ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+                              ** (skg (node (id 12) (source main) (birthHerald \"aC3\"))) 12
+                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
+                              *** (skg (node (id 122) (source main) indef (birthHerald \"aC\"))) 122
+                              *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
+                              ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
+                              * (skg (node (id 2) (source main) (parentIs absent) (rels \"C3\"))) 2
+                              ** (skg (node (id 21) (source main) (birthHerald \"aC\"))) 21
+                              ** (skg (node (id 22) (source main) indef (birthHerald \"aC3\"))) 22
+                              ** (skg (node (id 23) (source main) indef (birthHerald \"aC\"))) 23
+                              * (skg (node (id 3) (source main) (parentIs absent) (rels \"C3\"))) 3
+                              ** (skg (node (id 31) (source main) indef (birthHerald \"aC\"))) 31
+                              ** (skg (node (id 32) (source main) indef (birthHerald \"aC3\"))) 32
+                              ** (skg (node (id 33) (source main) indef (birthHerald \"aC\"))) 33
                               "};
       assert_eq!(result, expected,
                  "BFS truncates by the §5.5 budget, leaving whole groups indefinitive");
@@ -132,24 +136,24 @@ async fn test_bfs_limit_9_three_branches (
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-                              ** (skg (node (id 11) (source main))) 11
-                              ** (skg (node (id 12) (source main) (graphStats (contents 3)))) 12
-                              *** (skg (node (id 121) (source main) indef)) 121
-                              *** (skg (node (id 122) (source main) indef)) 122
-                              *** (skg (node (id 123) (source main) indef)) 123
-                              ** (skg (node (id 13) (source main))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (graphStats (contents 3)))) 2
-                              ** (skg (node (id 21) (source main))) 21
-                              ** (skg (node (id 22) (source main) (graphStats (contents 3)))) 22
-                              *** (skg (node (id 221) (source main) indef)) 221
-                              *** (skg (node (id 222) (source main) indef)) 222
-                              *** (skg (node (id 223) (source main) indef)) 223
-                              ** (skg (node (id 23) (source main))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (graphStats (contents 3)))) 3
-                              ** (skg (node (id 31) (source main) indef)) 31
-                              ** (skg (node (id 32) (source main) indef (graphStats (contents 3)))) 32
-                              ** (skg (node (id 33) (source main) indef)) 33
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+                              ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+                              ** (skg (node (id 12) (source main) (birthHerald \"aC3\"))) 12
+                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
+                              *** (skg (node (id 122) (source main) indef (birthHerald \"aC\"))) 122
+                              *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
+                              ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
+                              * (skg (node (id 2) (source main) (parentIs absent) (rels \"C3\"))) 2
+                              ** (skg (node (id 21) (source main) (birthHerald \"aC\"))) 21
+                              ** (skg (node (id 22) (source main) (birthHerald \"aC3\"))) 22
+                              *** (skg (node (id 221) (source main) indef (birthHerald \"aC\"))) 221
+                              *** (skg (node (id 222) (source main) indef (birthHerald \"aC\"))) 222
+                              *** (skg (node (id 223) (source main) indef (birthHerald \"aC\"))) 223
+                              ** (skg (node (id 23) (source main) (birthHerald \"aC\"))) 23
+                              * (skg (node (id 3) (source main) (parentIs absent) (rels \"C3\"))) 3
+                              ** (skg (node (id 31) (source main) indef (birthHerald \"aC\"))) 31
+                              ** (skg (node (id 32) (source main) indef (birthHerald \"aC3\"))) 32
+                              ** (skg (node (id 33) (source main) indef (birthHerald \"aC\"))) 33
                               "};
       assert_eq!(result, expected,
                  "BFS limit=9 fully expands the first two roots; the third stays indefinitive");
@@ -181,20 +185,20 @@ async fn test_bfs_limit_8_two_branches (
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-                              ** (skg (node (id 11) (source main))) 11
-                              ** (skg (node (id 12) (source main) (graphStats (contents 3)))) 12
-                              *** (skg (node (id 121) (source main) indef)) 121
-                              *** (skg (node (id 122) (source main) indef)) 122
-                              *** (skg (node (id 123) (source main) indef)) 123
-                              ** (skg (node (id 13) (source main))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (graphStats (contents 3)))) 2
-                              ** (skg (node (id 21) (source main))) 21
-                              ** (skg (node (id 22) (source main) (graphStats (contents 3)))) 22
-                              *** (skg (node (id 221) (source main) indef)) 221
-                              *** (skg (node (id 222) (source main) indef)) 222
-                              *** (skg (node (id 223) (source main) indef)) 223
-                              ** (skg (node (id 23) (source main))) 23
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+                              ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+                              ** (skg (node (id 12) (source main) (birthHerald \"aC3\"))) 12
+                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
+                              *** (skg (node (id 122) (source main) indef (birthHerald \"aC\"))) 122
+                              *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
+                              ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
+                              * (skg (node (id 2) (source main) (parentIs absent) (rels \"C3\"))) 2
+                              ** (skg (node (id 21) (source main) (birthHerald \"aC\"))) 21
+                              ** (skg (node (id 22) (source main) (birthHerald \"aC3\"))) 22
+                              *** (skg (node (id 221) (source main) indef (birthHerald \"aC\"))) 221
+                              *** (skg (node (id 222) (source main) indef (birthHerald \"aC\"))) 222
+                              *** (skg (node (id 223) (source main) indef (birthHerald \"aC\"))) 223
+                              ** (skg (node (id 23) (source main) (birthHerald \"aC\"))) 23
                               "};
       assert_eq!(result, expected,
                  "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + indefinitive");
@@ -225,12 +229,12 @@ async fn test_budget_content_beats_subscribers (
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) r
+      let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (rels \"C1 S2\"))) r
                               ** (skg subscribeeCol)
-                              *** (skg (node (id s1) (source main) indef (graphStats (containers 0) subscribing))) s1
-                              *** (skg (node (id s2) (source main) indef (graphStats (containers 0) subscribing))) s2
-                              ** (skg (node (id c1) (source main) (graphStats (contents 1)))) c1
-                              *** (skg (node (id c2) (source main))) c2
+                              *** (skg (node (id s1) (source main) indef (birthHerald \"bS\"))) s1
+                              *** (skg (node (id s2) (source main) indef (birthHerald \"bS\"))) s2
+                              ** (skg (node (id c1) (source main) (birthHerald \"aC1\"))) c1
+                              *** (skg (node (id c2) (source main) (birthHerald \"aC\"))) c2
                               "};
       assert_eq!(result, expected,
                  "budget 3 expands the whole content chain; the SubscribeeCol is whole + budget-neutral");

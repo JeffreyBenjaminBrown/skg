@@ -19,26 +19,32 @@ fn all_tests
     |s| Box::pin ( async move {
       s . reset ("run_path_and_root_tests (a mess of stuff)",
                  "tests/content_view/fixtures") . await ?;
+      s . install_graph_handle () ?;
       run_path_and_root_tests (
         &s . config, &s . driver ) . await ?;
       s . reset ("test_multi_root_view_logic",
                  "tests/content_view/fixtures-2") . await ?;
+      s . install_graph_handle () ?;
       test_multi_root_view_logic (
         &s . config, &s . driver ) . await ?;
       s . reset ("test_single_root_view_with_cycle",
                  "tests/typedb/fixtures") . await ?;
+      s . install_graph_handle () ?;
       test_single_root_view_with_cycle (
         &s . config, &s . driver ) . await ?;
       s . reset ("test_multi_root_view_with_shared_nodes",
                  "tests/typedb/fixtures") . await ?;
+      s . install_graph_handle () ?;
       test_multi_root_view_with_shared_nodes (
         &s . config, &s . driver ) . await ?;
       s . reset ("test_multi_root_view_with_node_limit",
                  "tests/typedb/fixtures") . await ?;
+      s . install_graph_handle () ?;
       test_multi_root_view_with_node_limit (
         &s . config, &s . driver ) . await ?;
       s . reset ("test_limit_with_multiple_sibling_groups",
                  "tests/content_view/fixtures-3") . await ?;
+      s . install_graph_handle () ?;
       test_limit_with_multiple_sibling_groups (
         &s . config, &s . driver ) . await ?;
       Ok (( )) } )) }
@@ -152,11 +158,11 @@ async fn test_single_root_view_with_cycle (
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (graphStats (contents 1)))) a
-                              ** (skg (node (id b) (source main) (graphStats (containers 2) (contents 1)))) b
+      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (rels \"C1\"))) a
+                              ** (skg (node (id b) (source main) (birthHerald \"2aC1\"))) b
                               b has a body
-                              *** (skg (node (id c) (source main) (graphStats (contents 1)) (viewStats containsParent))) c
-                              **** (skg (node (id b) (source main) indef (graphStats (containers 2) (contents 1)) (viewStats cycle containsParent))) b
+                              *** (skg (node (id c) (source main) (birthHerald \"aCa\"))) c
+                              **** (skg (node (id b) (source main) indef (birthHerald \"2aCa\") (viewStats cycle))) b
                               "};
       assert_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -188,18 +194,29 @@ async fn test_multi_root_view_with_shared_nodes (
       // indef Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2) hiding))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels \"C2 H2\"))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
-         ** (skg (node (id 5) (source main) (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg hiddenCol)
+         *** (skg (node (id 4) (source main) indef (birthHerald \"bH\") (rels \"2S 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef (birthHerald \"bH\") (rels \"1L 2S O2 I1\"))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) indef (birthHerald \"aC\") (rels \"1L S2 I1\"))) title 2
+         ** (skg (node (id 5) (source main) (rels \"1L aH 2S O2 I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
+         *** (skg hiderCol)
+         **** (skg (node (id 1) (source main) indef (birthHerald \"H2b\") (rels \"C2\") (viewStats cycle))) title 1
+         *** (skg overriddenCol)
+         **** (skg (node (id 3) (source main) indef (birthHerald \"bO\") (rels \"1C 1L S2b I1\"))) title 3
+         **** (skg (node (id 4) (source main) indef (birthHerald \"bO\") (rels \"1H 2S I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg subscriberCol)
+         **** (skg (node (id 2) (source main) indef (birthHerald \"S2b\") (rels \"1C 1L I1\"))) title 2
+         **** (skg (node (id 3) (source main) indef (birthHerald \"S2b\") (rels \"1C 1L bO I1\"))) title 3
+         * (skg (node (id 2) (source main) (parentIs absent) (rels \"1C 1L S2 I1\"))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) (birth backpath container) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) indef (birthHerald \"C2a\") (rels \"H2\"))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef (birthHerald \"2bS\") (rels \"1H 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef (birthHerald \"2bS\") (rels \"1Lb 1H O2 I1\"))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -235,18 +252,29 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + cols (cols are not budget-bound); subscribee members
       // are indef.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2) hiding))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels \"C2 H2\"))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
-         ** (skg (node (id 5) (source main) (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg hiddenCol)
+         *** (skg (node (id 4) (source main) indef (birthHerald \"bH\") (rels \"2S 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef (birthHerald \"bH\") (rels \"1L 2S O2 I1\"))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) indef (birthHerald \"aC\") (rels \"1L S2 I1\"))) title 2
+         ** (skg (node (id 5) (source main) (rels \"1L aH 2S O2 I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
+         *** (skg hiderCol)
+         **** (skg (node (id 1) (source main) indef (birthHerald \"H2b\") (rels \"C2\") (viewStats cycle))) title 1
+         *** (skg overriddenCol)
+         **** (skg (node (id 3) (source main) indef (birthHerald \"bO\") (rels \"1C 1L S2b I1\"))) title 3
+         **** (skg (node (id 4) (source main) indef (birthHerald \"bO\") (rels \"1H 2S I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg subscriberCol)
+         **** (skg (node (id 2) (source main) indef (birthHerald \"S2b\") (rels \"1C 1L I1\"))) title 2
+         **** (skg (node (id 3) (source main) indef (birthHerald \"S2b\") (rels \"1C 1L bO I1\"))) title 3
+         * (skg (node (id 2) (source main) (parentIs absent) (rels \"1C 1L S2 I1\"))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) (birth backpath container) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) indef (birthHerald \"C2a\") (rels \"H2\"))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef (birthHerald \"2bS\") (rels \"1H 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef (birthHerald \"2bS\") (rels \"1Lb 1H O2 I1\"))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");
@@ -285,16 +313,16 @@ async fn test_limit_with_multiple_sibling_groups (
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C2\"))) 1
                               1 body
-                              ** (skg (node (id 11) (source main) (graphStats (contents 2)))) 11
+                              ** (skg (node (id 11) (source main) (birthHerald \"aC2\"))) 11
                               11 body
-                              *** (skg (node (id 111) (source main))) 111
+                              *** (skg (node (id 111) (source main) (birthHerald \"aC\"))) 111
                               111 body
-                              *** (skg (node (id 112) (source main) indef)) 112
-                              ** (skg (node (id 12) (source main) (graphStats (contents 1)))) 12
+                              *** (skg (node (id 112) (source main) indef (birthHerald \"aC\"))) 112
+                              ** (skg (node (id 12) (source main) (birthHerald \"aC1\"))) 12
                               12 body
-                              *** (skg (node (id 121) (source main) indef)) 121
+                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
                               "};
       assert_eq!(result, expected,
                  "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");

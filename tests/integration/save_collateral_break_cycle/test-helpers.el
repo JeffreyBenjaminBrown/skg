@@ -1,19 +1,53 @@
 ;;; Shared helpers for save_collateral integration tests.
 ;;; Load with (load-file "path/to/test-helpers.el").
 
+(defun headline--graft-role-from-herald (herald)
+  "Classify a graft HERALD STRING into its backpath ROLENAME, or nil.
+Under the uniform-herald grammar a node's relationship info lives in its
+orange (birthHerald \"STR\") and/or blue (rels \"STR\") tokens
+(server/herald_tokens.rs). A token has the shape [inSide]X[outSide],
+where X is the relationship letter (C contains, L textlinks_to, H hides,
+S subscribes, O overrides), counts are digits, and lowercase letters
+a/b/... on a side flag a tracked ANCESTOR member there.
+
+A backpath graft reaches an ancestor on its OUTBOUND side: a relation
+letter followed (after any count digits) by lowercase ancestor letters
+(\"Ca\" / \"La\" / \"aC2a\"). That letter maps to the old (birth backpath
+ROLENAME): C->container, L->linkSource, S->subscribee, O->overrider,
+H->hider.  Only call this for nodes already known to be grafts (parentIs
+independent); an ordinary content child can carry the same outbound
+letters (e.g. a cycle's \"aCa\") yet is NOT a graft."
+  (when (and herald (stringp herald)
+             (string-match "\\([CLHSO]\\)[0-9]*[a-z]" herald))
+    (pcase (match-string 1 herald)
+      ("C" 'container)
+      ("L" 'linkSource)
+      ("S" 'subscribee)
+      ("O" 'overrider)
+      ("H" 'hider))))
+
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
-Birth provenance is more specific than parentIs: a (birth backpath
-ROLENAME) returns ROLENAME (e.g. `container', `linkSource'); otherwise
-the result is the explicit parentIs or the implicit `affected'."
-  (let ((parentIs-list (when sexp
-                         (skg-sexp-cdr-at-path sexp
-                                               '(skg node parentIs))))
-        (birth-list (when sexp
-                      (skg-sexp-cdr-at-path sexp '(skg node birth)))))
+Birth provenance is more specific than parentIs: a backpath graft (a node
+with (parentIs independent)) returns its ROLENAME from its birthHerald or
+rels token (e.g. `container', `linkSource'); otherwise the result is the
+explicit parentIs or the implicit `affected'."
+  (let* ((parentIs-list (when sexp
+                          (skg-sexp-cdr-at-path sexp
+                                                '(skg node parentIs))))
+         (birth-herald (when sexp
+                         (car (skg-sexp-cdr-at-path
+                               sexp '(skg node birthHerald)))))
+         (rels-herald (when sexp
+                        (car (skg-sexp-cdr-at-path
+                              sexp '(skg node rels)))))
+         (independent (eq (car parentIs-list) 'independent))
+         (graft-role (when independent
+                       (or (headline--graft-role-from-herald birth-herald)
+                           (headline--graft-role-from-herald rels-herald)))))
     (cond
-     ;; (birth backpath ROLENAME): the partner role is the provenance.
-     ((eq (car birth-list) 'backpath) (cadr birth-list))
+     ;; A backpath graft: independent, with an outbound-ancestor herald.
+     (graft-role graft-role)
      ((or (not parentIs-list)
           (eq (car parentIs-list) 'affected)) 'affected)
      (t (car parentIs-list)))))

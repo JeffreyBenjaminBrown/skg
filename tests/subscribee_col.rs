@@ -65,6 +65,8 @@ fn test_subscribee_col_appears_for_subscribers(
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
       setup_multi_source_test (db_name) . await?;
+    skg::dbs::in_rust_graph::install_or_swap_global_handle (
+      skg::test_utils::graph_handle_from_config (&config) ? );
     let driver : std::sync::Arc<TypeDBDriver> =
       std::sync::Arc::new (driver);
     let (result, _pids, _) : (String, Vec<ID>, _) =
@@ -76,17 +78,17 @@ fn test_subscribee_col_appears_for_subscribers(
     // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
     let expected = indoc! {
-      "* (skg (node (id 1) (source home) (parentIs absent) (graphStats (contents 4)) (viewStats (sourceHerald ⌂:home)))) 1
-      ** (skg (node (id 11) (source home) (graphStats (contents 1) subscribing))) 11
+      "* (skg (node (id 1) (source home) (parentIs absent) (rels \"C4\") (viewStats (sourceHerald ⌂:home)))) 1
+      ** (skg (node (id 11) (source home) (birthHerald \"aC1\") (rels \"S1\"))) 11
       *** (skg subscribeeCol)
-      **** (skg (node (id 11-sees) (source away) indef (graphStats (containers 0) subscribing) (viewStats (sourceHerald ⌂:away)))) 11-sees
-      *** (skg (node (id 111) (source home))) 111
-      ** (skg (node (id 12) (source home) (graphStats subscribing))) 12
+      **** (skg (node (id 11-sees) (source away) indef (birthHerald \"bS\") (viewStats (sourceHerald ⌂:away)))) 11-sees
+      *** (skg (node (id 111) (source home) (birthHerald \"aC\"))) 111
+      ** (skg (node (id 12) (source home) (birthHerald \"aC\") (rels \"S1\"))) 12
       *** (skg subscribeeCol)
-      **** (skg (node (id 12-sees) (source away) indef (graphStats (containers 0) subscribing) (viewStats (sourceHerald ⌂:away)))) 12-sees
-      ** (skg (node (id 13) (source home))) 13
-      ** (skg (node (id 14) (source home) (graphStats (contents 1)))) 14
-      *** (skg (node (id 141) (source home))) 141
+      **** (skg (node (id 12-sees) (source away) indef (birthHerald \"bS\") (viewStats (sourceHerald ⌂:away)))) 12-sees
+      ** (skg (node (id 13) (source home) (birthHerald \"aC\"))) 13
+      ** (skg (node (id 14) (source home) (birthHerald \"aC1\"))) 14
+      *** (skg (node (id 141) (source home) (birthHerald \"aC\"))) 141
 "};
     assert_eq!(result, expected,
       "Nodes with subscriptions should have SubscribeeCol children");

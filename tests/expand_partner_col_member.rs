@@ -73,9 +73,16 @@ fn expanding_subscriberCol_member_is_plain_expansion
         "N's view should show S as an indefinitive subscriberCol \
          member:\n{}", n_view );
       // Request definitive expansion of the subscriberCol member S.
-      let expanded_request : String = n_view
-        . replace ("indef (graphStats",
-                   "indef (viewRequests definitiveView) (graphStats");
+      // Since uniform-heralds the indefinitive member line carries
+      // 'indef (birthHerald ...)' (the old graphStats atom is gone), so
+      // we inject the definitiveView request right after 'indef'. S is
+      // the only indefinitive node in this view.
+      let s_line : String =
+        line_containing (&n_view, "(id S)") . to_string ();
+      let s_line_expanded : String = s_line . replace (
+        " indef ", " indef (viewRequests definitiveView) " );
+      let expanded_request : String =
+        n_view . replace (&s_line, &s_line_expanded);
       let saved : String =
         save (&expanded_request, config, driver, tantivy, &graph)
         . await ? . saved_view;

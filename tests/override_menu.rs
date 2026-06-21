@@ -120,13 +120,16 @@ async fn menu_shows_all_edges_with_op_heralds (
         assert! ( line . contains ("(parentIs independent)"),
           "a menu child must not read as content (saving the menu \
            must not edit Z's contains):\n{}", menu );
-        assert! ( line . contains ("overridesParent"),
-          "the Op herald marks each overrider:\n{}", menu ); }
+        // Since uniform-heralds the Op herald is the blue token "Oa"
+        // (this overrider overrides its visible parent a = Z), inside
+        // (rels "...").
+        assert! ( line . contains ("Oa"),
+          "the Oa (Op) herald marks each overrider:\n{}", menu ); }
       { let (f2_depth, f2_line) =
           line_with_id (&menu, "F2")
           . expect ("the foreign chain continues: F2 overrides F");
         assert_eq! ( f2_depth, 3, "{}", menu );
-        assert! ( f2_line . contains ("overridesParent"),
+        assert! ( f2_line . contains ("Oa"),
                   "{}", menu ); }
       Ok (( )) }
 
