@@ -138,7 +138,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::EditRequestOnIndefinitive (id) =>
         write!(f, "Edit request on indefinitive (phantom) node {:?}. Phantoms are indefinitive; indefinitive nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
-        write!(f, "Node {:?} carries the marker (overridesHere {:?}), but the server would draw {:?} in place of that original. The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
+        write!(f, "Node {:?} carries the marker (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 

@@ -21,6 +21,26 @@
      'resolve_override(None)' walk from each touched user-owned node.
    - A5: tests updated (see "order" note). All 35 override tests pass.
 
+** DONE Phase B — tamper check accepts any honest carrier on the chain
+   - B1: added 'carrier_on_user_owned_chain' to override_resolution.rs:
+     true iff the carrier is ON the original's user-owned override chain
+     ('resolve_override(None).path.contains(carrier)'), so a middle
+     carrier (drawn when a later link's source is hidden) passes and an
+     off-chain marker still fails.
+   - B2: 'overridesHere_marker_errors' now uses that predicate instead
+     of '== effective'. Kept the fail-closed branch (graph handle
+     absent, or marker on an id-less node). Updated the
+     'OverridesHere_Mismatch' message: the carrier is "not on the
+     override chain of" the original.
+   - B3: new on-disk chain fixture
+     (tests/override_substitution/fixtures-chain/) D overrides C
+     overrides N, end D in source 'other'. New sub-test
+     'chain_half_visible_keeps_the_original': under 'all' the end D is
+     drawn, under 'main' (hiding 'other') the middle C is drawn; saving
+     the half-visible view keeps N in P's contains; an off-chain marker
+     is rejected. The existing tamper sub-test still covers the basic
+     off-chain rejection.
+
 * Changes to the plan's envisioned order
   - None of substance. Phase A done first, as sequenced.
   - A5 detail: besides the test edits the plan named, I added the

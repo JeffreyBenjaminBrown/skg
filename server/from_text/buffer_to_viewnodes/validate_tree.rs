@@ -1,7 +1,8 @@
 pub mod contradictory_instructions;
 
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
-use crate::dbs::in_rust_graph::override_resolution::resolve_override;
+use crate::dbs::in_rust_graph::override_resolution::{
+  carrier_on_user_owned_chain, resolve_override};
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
@@ -162,13 +163,16 @@ async fn idCol_membership_errors (
 /// marker the server would not have drawn must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
-/// must equal 'resolve_override (N).effective' computed
-/// VISIBILITY-UNGATED (active = None): ownership still gates, but a
-/// marker that was honest when rendered must not start failing
-/// because the source-set switched afterward. Markers on retained
-/// InactiveNodes are checked identically. If the global graph
-/// handle is unavailable (some test harnesses), a present marker is
-/// an error too: fail closed, since the marker cannot be verified.
+/// must be ON N's user-owned override chain
+/// ('carrier_on_user_owned_chain', VISIBILITY-UNGATED so ownership
+/// still gates but a marker honest when rendered does not start
+/// failing after a source-set switch). With chains the drawn node can
+/// be a MIDDLE link (when a later link's source is hidden), so the
+/// check accepts any honest carrier and rejects only an off-chain
+/// marker. Markers on retained InactiveNodes are checked identically.
+/// If the global graph handle is unavailable (some test harnesses), a
+/// present marker is an error too: fail closed, since the marker
+/// cannot be verified.
 #[allow(non_snake_case)]
 fn overridesHere_marker_errors (
   viewforest : &MpViewForest,
@@ -190,11 +194,19 @@ fn overridesHere_marker_errors (
         // marker, so it can never mismatch.
         MpViewnodeKind::Vognode (MpVognode::Inactive (_)) => continue,
         _ => continue };
-    let effective : Option<ID> =
-      graph . as_ref () . map ( |g|
-        resolve_override (config, g, None, &original)
-        . effective );
-    if effective . as_ref () != carrier . as_ref () {
+    let chain_ok : bool =
+      match (&graph, &carrier) {
+        (Some (g), Some (c)) =>
+          carrier_on_user_owned_chain (config, g, &original, c),
+        // Fail closed: no graph handle to verify against, or a marker
+        // on an id-less node (never a node the server legitimately
+        // drew as a substitute).
+        _ => false };
+    if ! chain_ok {
+      let effective : Option<ID> = // the chain end, for the message
+        graph . as_ref () . map ( |g|
+          resolve_override (config, g, None, &original)
+          . effective );
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
           carrier, original, effective )); }}}

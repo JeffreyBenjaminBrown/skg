@@ -100,6 +100,25 @@ pub fn resolve_override (
     path . push ( next . clone () );
     current = next; }}
 
+/// Whether 'carrier' is a node ON 'original''s user-owned override
+/// chain — i.e. a node the server could legitimately draw, marked
+/// '(overridesHere original)', wherever 'original' would appear as
+/// content. The tamper check at save uses this: with chains the drawn
+/// node can be any link of the chain (a MIDDLE carrier, when a later
+/// link's source is hidden), not only the end, so it must accept any
+/// honest carrier and reject only an off-chain (faked/stale) marker.
+/// VISIBILITY-UNGATED ('active' = None) so a marker that was honest
+/// when rendered does not start failing after a source-set switch;
+/// 'path' is the full user-owned chain (ownership still gates).
+pub fn carrier_on_user_owned_chain (
+  config   : &SkgConfig,
+  graph    : &InRustGraph,
+  original : &ID,   // the marker's N
+  carrier  : &ID,   // the drawn node's own id
+) -> bool {
+  resolve_override (config, graph, None, original)
+    . path . contains (carrier) }
+
 /// The overriders of 'pid' that substitution may follow: user-owned
 /// (per the config; an unknown source counts as not followable) and,
 /// when 'active' is supplied, from an active source. Modeled on
