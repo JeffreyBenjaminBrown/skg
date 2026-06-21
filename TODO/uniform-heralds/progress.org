@@ -1,0 +1,113 @@
+#+title: Uniform heralds: progress
+
+This is the live progress log for executing [[file:plan.org][plan.org]]. The plan stays
+as-is; deviations on HOW are recorded here (per when-to-stop.org).
+
+* Design decisions locked in (the "how")
+
+** Emission model (the key architectural choice)
+
+The five relationship tokens are DISPLAY-ONLY strings assembled in
+Rust and echoed by the rule table. They do NOT round-trip into
+structured data (saves regenerate all stats). So:
+
+- Each Active node emits at most two new atoms inside =(node ...)=:
+  - =(birthHerald "STR")= — orange, ABUT (hugs the ☮). STR is the
+    space-joined birth token(s), e.g. ="aC"=, ="3bS"=, ="dH bC"=.
+  - =(rels "STR")= — blue. STR is the space-joined non-birth
+    relationship tokens plus =Ak=/=Ik=, e.g. ="3O 2(1)L A2 I1"=.
+- A PhantomDiff emits =(rels "STR")= only (counts-only: no flags, no
+  birth), inside =(diffPhantom ...)=.
+- Token strings are QUOTED in the metadata because L tokens contain
+  parens/commas (=2(1,1)L=) and the joined strings contain spaces.
+  Both the Rust =sexp::parse= and Emacs =read= handle quoted strings;
+  the lens engine echoes the single value via =(ANY IT)=.
+
+The whole =(graphStats ...)= form DISAPPEARS from emission (its counts
+are consumed into the token strings). =(viewStats ...)= is TRIMMED to
+just =cycle=, =overridesHere= (LOAD-BEARING), and =sourceHerald=.
+
+** Birth enum: no longer serialized
+
+=.birth= is never read after parse (grep-confirmed); the Birth enum is
+recomputed on every render. So =(birth backpath ROLENAME)= is dropped
+from emission AND from the parser. The Birth enum stays in Rust, used
+only to compute the birthHerald token. =birth_rule_children= /
+=birth_emitted_atoms= are removed.
+
+** GraphNodeStats restructured to directional counts
+
+Replaces the 3 booleans + containRels + linksourceRels with, when the
+node has stats (Option, None for sourceless):
+- aliases:usize, extra_ids:usize  (-> Ak, Ik)
+- containers/contents, hiders/hides, subscribers/subscribees,
+  overriders/overrides_out  (8 directional counts)
+- link_total a, link_surprising b, link_with_content c  (L inbound)
+
+** ViewNodeStats: drop the 8 edge bools + containsParent; add tokens
+
+Removed: grandparentOverrides/Subscribes, overridesParent/parentOverrides,
+subscribesParent/parentSubscribes, hidesParent/parentHides,
+parentIsContent (folds into C-out flag), parentIsContainer (only fed
+birth designation; recomputed locally). Kept: cycle, sourceAtBoundary,
+overridesHere. Added: birth_herald:Option<String>, rels_herald:Option<String>.
+
+** Ancestor flags + generation distance
+
+Letters a=parent(gen1), b=grandparent(gen2), c, d... counting ALL
+viewnodes incl. col scaffolds. For each Active node, the "tracked
+ancestors" checked are: the immediate visible parent IF an Active
+gnode (gen1); for a col member, the col's required_ancestry real-node
+entries (owner = last entry) at their tree-gen distances. For each
+tracked ancestor A at gen g and each relation R, both directions are
+checked via relation_membership_is_real; a hit records flag g on that
+side.
+
+Birth designation (which relation token(s) are orange + order):
+- parent-gnode & parent contains it -> [Contains]
+- Birth::Backpath(role)            -> [role.relation] (side per role)
+- edge col member (Affected)       -> [relation_member_role.relation]
+- HiddenInSubscribee member        -> [Hides, Contains]   (H first)
+- HiddenOutsideOfSubscribee member -> [Hides]
+
+** Token grammar (render_token)
+
+Side render(count, flags): letters = flags.sorted->a/b/c...;
+- count==0 && no flags -> empty
+- flags present && count==flags.len() -> just letters (omit number)
+- else -> "{count}{letters}"
+Token = "{in_side}{LETTER}{out_side}", None if both empty.
+L special: inbound is the digit form a(b,c) (collapse zeros; never
+ancestor letters); outbound shows letters only (the linkSource-birth
+=La= case), no count.
+
+** Body normalization (step 0)
+
+normalize_body(Option<String>): drop leading & trailing whitespace-only
+lines; empty -> None. Applied at NodeFS::from (every disk write =
+save+import) AND into_nodecomplete (the in-memory save NodeComplete),
+plus a one-time data/bash/trim-node-bodies.org migration.
+
+* What's done and went well
+
+(updated as steps complete)
+
+* Changes to the plan's envisioned order
+
+- Steps 2–5 (GraphNodeStats, ViewNodeStats+birth, token assembly,
+  rule table/parser) are tightly coupled — implemented together as one
+  compiling change rather than strictly sequentially.
+- Birth enum round-trip dropped entirely (plan implied keeping the
+  =(birth ...)= atom; grep showed it is display-only, so removing it is
+  simpler and the new birthHerald token subsumes its display).
+
+* What's imperfect about what's done
+
+(updated as steps complete)
+
+* Choices determining the future
+
+- New display atoms: =birthHerald=, =rels= (both echo one quoted
+  string). =graphStats= and the 8 edge =viewStats= atoms removed.
+- Token strings are assembled in Rust (server/herald_tokens.rs), not in
+  the rule table — the table only colors/orders/echoes.

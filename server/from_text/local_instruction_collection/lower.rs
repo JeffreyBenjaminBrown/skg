@@ -125,7 +125,8 @@ impl NodeSaveIntent {
       source                       : self . source,
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
-      body                         : self . body,
+      body                         :
+        crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
         self . contains . or_default() . to_vec(),
       subscribes_to                : self . subscribes_to,

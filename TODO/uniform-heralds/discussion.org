@@ -100,6 +100,11 @@ Rendered =a(b,c)L=, with the parenthetical collapsing per the vision:
 omit a zero, omit the comma when c=0, keep the comma when b=0, omit the
 whole parenthetical when both are zero.
 
+When an inbound link source is also a tracked ancestor (e.g. a backpath
+linkSource graft), the ancestor letter is SUPPRESSED on this side
+(settled 2026-06-21): the inbound L herald is always just =a(b,c)L=,
+never =ba(b,c)L=.
+
 *** Birth herald: orange, first
 
 Every drawn node has a /birth relationship/ — the single relationship
@@ -112,10 +117,12 @@ to a visible ancestor that explains why it was drawn:
   toward the col's owning ancestor (e.g. a subscribee-as-such →
   =bS=, its grandparent subscribes to it; an overrider-as-such →
   =Ob=, it overrides its grandparent);
-- a member of a filter col ('HiddenInSubscribee' /
-  'HiddenOutsideOfSubscribee'): TWO birth heralds (settled 2026-06-21)
-  — the hides herald (to the subscriber owner) first, then the
-  contains herald. So the birth herald is a LIST, usually of length 1.
+- a member of a filter col (settled 2026-06-21): a 'HiddenInSubscribee'
+  member gets TWO birth heralds — the hides herald (to the subscriber
+  owner) first, then the contains herald (to the subscribee that
+  contains it); a 'HiddenOutsideOfSubscribee' member gets ONLY the
+  hides herald (it has no in-view container). So the birth herald is a
+  LIST, usually of length 1.
 
 That ONE relationship's token is moved to the front, placed right
 after the ☮ peace symbol if present, and colored orange. Every other
@@ -174,10 +181,11 @@ In order (the early "step 0" items first):
    the surprising-links =bodyless= test). Strip leading and trailing
    whitespace-only lines from every body (an "empty" line may contain
    multiple whitespace characters); a body that is empty after
-   stripping becomes 'None'. After this, "bodyless" is exactly
-   'body == None'. See the open TODO under [[*Problems][Problems]] for where to apply
-   this (save-time and/or import) and whether to bulk-normalize
-   existing data.
+   stripping is dropped entirely ('None'). After this, "bodyless" is
+   exactly 'body == None'. Enforce at BOTH save-time and import. For
+   existing data, add a one-time script 'data/bash/trim-node-bodies.org'
+   that prompts for a folder, recurses for '.skg' files, and trims each
+   body (removing the field when the result is empty).
 
 1. Pin the remaining open questions in [[*Problems][Problems]] (this document): the
    surprising-links title-normalization rule and double-label case,
@@ -216,9 +224,10 @@ In order (the early "step 0" items first):
    - Designate the birth relationship(s) per node — a LIST, usually of
      length 1 (contains for ordinary content via 'parentIsContainer';
      the 'Birth::Backpath' role for grafted partners; the col relation
-     for col members), but length 2 for a filter-col member: hides (to
-     the subscriber owner) first, then contains (to the containing
-     vognode ancestor).
+     for col members). A 'HiddenInSubscribee' member is length 2: hides
+     (to the subscriber owner) first, then contains (to the subscribee
+     that contains it). A 'HiddenOutsideOfSubscribee' member is length
+     1: hides only (no in-view container).
 
 4. Token assembly + serialization. Add a Rust function (a small new
    module, or within [[../../server/org_to_text.rs][org_to_text.rs]]) that turns counts + ancestor
@@ -354,7 +363,7 @@ propose to omit the outbound side of the L token by default (show only
 
 *** DONE I agree, omit those.
 
-** ONGOING Surprising-links =b=: how do we recover each link's label?
+** DONE Surprising-links =b=: how do we recover each link's label?
 
 Computing =a= and =c= is cheap and already essentially done
 ('sources_with_content'). Computing =b= needs, per inbound edge, the
@@ -404,28 +413,28 @@ links to this node TWICE with two different labels (today invisible —
 source count as "surprising" if ANY of its labels is surprising, or
 only if ALL are? Absent guidance I'll default to "surprising iff every
 label it uses is surprising".
-**** TODO that's perfect
-*** ONGOING (me) Where to apply step-0 body normalization, and existing data?
+**** DONE that's perfect
+*** DONE (me) Where to apply step-0 body normalization, and existing data?
 Strip at save-time (the save pipeline normalizes each body before
 write), at import, or both? And do we bulk-normalize the existing
 on-disk bodies once (a rebuild/migration), or only normalize each node
 on its next save? The =bodyless= test is only fully reliable once
 existing data is normalized — so I lean toward a one-time pass plus
 save-time enforcement. Confirm.
-**** TODO yes and
+**** DONE yes and
 Strip at save-time and at import.
 Add a script at data/bash/trim-node-bodies.org
 that trims every .skg file found
 (prompting the user for which folder to search recursively for .skg files).
 Where the result would be an empty string, remove the body field entirely.
-*** ONGOING (me) How do ancestor flags compose with =a(b,c)L= on the inbound side?
+*** DONE (me) How do ancestor flags compose with =a(b,c)L= on the inbound side?
 When an inbound link source is also a tracked ancestor — e.g. a
 backpath linkSource graft, where the L token IS the birth herald — the
 inbound side carries both an ancestor letter and the =(b,c)= split. I
 propose the ancestor letter prefixes the count, e.g. =b3(1,1)L=. This
 is rare; say if you'd rather suppress the letter there.
-**** TODO let's suppress
-** ONGOING Birth heralds for the two filter cols
+**** DONE let's suppress
+** DONE Birth heralds for the two filter cols
 
 'HiddenInSubscribee' and 'HiddenOutsideOfSubscribee' members have no
 single relation role ('relation_member_role' returns None); their
@@ -437,13 +446,13 @@ clean "five relationships" mapping needs a derived (not edge-backed)
 fact. Confirm you want these rendered as H tokens against the
 subscriber ancestor.
 
-*** TODO good catch
+*** DONE good catch
 For them, let's frontload (in orange)
 *both* the hides herald and the contains herald,
 with hides first.
 This might mean needing to use a list instead of a singleton somewhere;
 that seems fine.
-*** ONGOING (me) What is the contains ancestor for a HiddenOutsideOfSubscribee member?
+*** DONE (me) What is the contains ancestor for a HiddenOutsideOfSubscribee member?
 Folded into the plan (birth herald is now a list). One detail to
 settle: for a 'HiddenInSubscribee' member the contains herald points at
 the subscribee that contains it (its =b= ancestor) — clean. But a
@@ -455,7 +464,7 @@ in-view container to flag. Options: (i) show the node's graph container
 count with no ancestor letter, or (ii) omit the contains herald for
 these, leaving only the orange hides herald. I lean toward (ii) — omit
 when there is no in-view container. Confirm.
-**** TODO oops
+**** DONE oops
 Good point. For a hiddenOut we should only frontload 'hides'.
 There is no 'contains' ancestor.
 ** (likely solved): The number-omission edge case (count 1, no flagged ancestor)
@@ -499,11 +508,11 @@ just reads the last entry, and the member→owner ROLE still comes from
 'relation_member_role' (plus an explicit HIDER for the two filter
 cols).
 
-*** ONGOING the owning table is always (I think) the last of the required ancestors
+*** DONE the owning table is always (I think) the last of the required ancestors
 That is, the farthest ancestor.
 Please fact check me, but if I'm right,
 that means we don't need another table.
-**** TODO (me) Confirmed — the owner is always the last required ancestor
+**** DONE (me) Confirmed — the owner is always the last required ancestor
 I checked all three chains in 'required_ancestry':
 - ANC_NORMAL =[NormalVognode]= — owner = that vognode (the 6 simple
   partner cols + the 2 QualCols);

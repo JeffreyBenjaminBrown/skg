@@ -54,6 +54,26 @@ impl NodeComplete {
 // Functions
 //
 
+/// Normalize a node body: drop leading and trailing whitespace-only
+/// lines (a line is whitespace-only iff it trims to empty); if nothing
+/// remains, the body becomes 'None'. After this, "bodyless" is exactly
+/// 'body == None' -- the invariant the surprising-links =bodyless= test
+/// relies on. Idempotent; enforced at every disk write ('NodeFS::from')
+/// and on the in-memory save NodeComplete ('into_nodecomplete'), with a
+/// one-time migration ('data/bash/trim-node-bodies.org') for old data.
+pub fn normalize_body (
+  body : Option<String>,
+) -> Option<String> {
+  let s : String = body ?;
+  let lines : Vec<&str> = s . lines () . collect ();
+  let first : Option<usize> =
+    lines . iter () . position ( |l| ! l . trim () . is_empty () );
+  let last : Option<usize> =
+    lines . iter () . rposition ( |l| ! l . trim () . is_empty () );
+  match (first, last) {
+    (Some (a), Some (b)) => Some ( lines [a ..= b] . join ("\n") ),
+    _ => None, }}
+
 /// Useful for making tests more readable.
 pub fn empty_node_complete () -> NodeComplete {
   NodeComplete {

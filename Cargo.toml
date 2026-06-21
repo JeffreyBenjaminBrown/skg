@@ -31,6 +31,10 @@ name = "emit-herald-rules"
 path = "tools/emit-herald-rules.rs"
 
 [[bin]]
+name = "trim-node-bodies"
+path = "tools/trim-node-bodies.rs"
+
+[[bin]]
 name = "delete-one-db"
 path = "tools/delete-one-db.rs"
 
