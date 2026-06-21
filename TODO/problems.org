@@ -786,3 +786,32 @@
    and is authoritative. Not worth fixing on its own, but if the
    surprising-links a(b,c) split replaces this two-way partition, the
    subtraction goes away regardless.
+* Problems noted during override-chains planning (TODO/override-chains/)
+** TODO Override invariants are validated by two divergent implementations
+   Monogamy (and, once
+   [[./override-chains/1_plan.org][the override-chains plan]] lands,
+   cycle-freedom) is checked in BOTH 'validate_override_invariants' (a
+   full O(V) scan) and 'validate_touched_override_invariants' (an
+   incremental O(touched) scan), in
+   server/dbs/in_rust_graph/override_invariants.rs. They already hand-roll
+   the same "follow user-owned overrider edges, resolving extra-ids via
+   'pid_of'" logic twice; adding cycle detection duplicates it a third and
+   fourth time. A divergence (e.g. one resolves extra-ids, the other
+   forgets) would let bad data through the fast save path and only catch it
+   at the next rebuild. Opportunity: extract one shared primitive (e.g.
+   'user_owned_override_cycle_through(pid)', or have the validators reuse
+   'resolve_override''s seen-set/=cycle_detected=) so the save-time and
+   init/rebuild gates cannot disagree. Pre-existing (monogamy is already
+   duplicated); surfaced while planning override chains.
+** The CompoundOverrideChain warning is near-dead under current invariants
+   'CompletionWarning::CompoundOverrideChain' (server/update_buffer/warnings.rs)
+   fires when override resolution traverses a path of length > 1. But the
+   current "no user-owned chains" invariant forbids exactly such data on
+   disk, so today this warning can only fire on legacy / hand-edited /
+   in-memory-test graphs -- effectively dead in normal operation, while its
+   text already says chains are "legal". This self-inconsistency is
+   resolved by the override-chains plan (which legalizes chains); noted here
+   only so the warning's fate (keep as informational / narrow / drop, and a
+   rename away from "legacy"/"compound") is decided deliberately rather than
+   left as an accident. See
+   [[./override-chains/1_plan.org][the plan]], Work item 4.
