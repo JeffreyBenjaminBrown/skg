@@ -422,6 +422,16 @@ pub async fn populate_data_from_config (
     db_name, driver, &typedb_nodes ) . await ?;
   create_all_relationships (
     db_name, driver, &typedb_nodes ) . await ?;
+  // Install the in-Rust graph globally so the production stats path
+  // ('snapshot_global', used by graphnodestats + viewnodestats) reflects
+  // the populated data. The uniform-herald stats have no TypeDB
+  // fallback, so without this every rendered view's heralds would be
+  // empty. Swap (not init) so repeated resets in a shared session each
+  // refresh the graph.
+  crate::dbs::in_rust_graph::install_or_swap_global_handle (
+    crate::dbs::in_rust_graph::new_handle (
+      crate::dbs::in_rust_graph::InRustGraph::from_nodecompletes (
+        &nodes )));
   Ok (( )) }
 
 /// Run a test future with a TestDbGuard safety net, then clean up.

@@ -88,7 +88,7 @@ async fn readonly_col_order_is_preserved_impl (
   driver  : &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic (
+  skg::dbs::in_rust_graph::install_or_swap_global_handle (
     graph_handle_from_config (config) ? );
   let (complete_buffer, _pids, _tree)
     : (String, Vec<ID>, _) =

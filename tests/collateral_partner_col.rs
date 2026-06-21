@@ -27,7 +27,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
 use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, init_global_handle_for_first_time_or_panic};
+  InRustGraphHandle, install_or_swap_global_handle};
 use skg::test_utils::{
   run_with_test_db, graph_handle_from_config,
   extract_string_field_from_sexp, read_all_lp_messages};
@@ -91,7 +91,7 @@ fn collateral_partner_col_update_and_warning_scoping
     |config, driver, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      init_global_handle_for_first_time_or_panic ( graph . clone () );
+      install_or_swap_global_handle ( graph . clone () );
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views        : OpenViews::new (), };

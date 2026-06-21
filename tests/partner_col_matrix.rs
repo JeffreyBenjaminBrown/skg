@@ -334,7 +334,7 @@ fn relationship_matrix
       // it (this is the only installer in the target).
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic (
+      skg::dbs::in_rust_graph::install_or_swap_global_handle (
         graph . clone () );
       let mut fails : Fails = Fails::new ();
 
