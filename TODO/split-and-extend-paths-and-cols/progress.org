@@ -15,10 +15,16 @@
   and ViewRequest parameterized, the full parent-relative viewStats
   matrix (Sp/pS/Hp/pH + the pO fix), and the read-only-col ☮.
 
+  FOLLOW-UP (done 2026-06-21, at your request): the search-ranking
+  subsystem is now renamed too -- 'ContextOriginType::Target' -> 'Dest'
+  (label "Target" -> "Dest", recomputed at every init),
+  'MULTIPLIER_TARGET' -> 'MULTIPLIER_DEST', 'link_targets[_from_nodes]'
+  -> 'link_dests[_from_nodes]' across context.rs / main.rs / dbs/init.rs
+  / rebuild_dbs.rs / text_search.rs / the two bench tools / tests/
+  contexts.rs, plus the ranking doc prose (COMMANDS.org, api-and-formats.md)
+  and one stray textlink-dest test docstring. 462 Rust tests still pass.
+
   THINGS YOU MIGHT WANT TO LOOK AT (all reversible, detailed below):
-  - Step 1 scope: I left the search-ranking 'ContextOriginType::Target'
-    / 'link_targets' subsystem on "target" (renamed only the textlink
-    ROLE prose). Say the word to rename it too.
   - Step 5 choice: I attach containerward ancestry under EVERY
     non-container path partner (the plan only fixed linkDest=yes). Easy
     to restrict to the link roles.

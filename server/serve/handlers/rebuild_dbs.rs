@@ -2,7 +2,7 @@ use crate::context::{
   compute_and_store_context_types,
   content_maps_from_nodes,
   had_id_set_from_nodes,
-  link_targets_from_nodes};
+  link_dests_from_nodes};
 use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config;
@@ -64,12 +64,12 @@ pub fn handle_rebuild_dbs_request (
     let all_node_ids = nodes . iter ()
       . map ( |n| n . pid . clone () )
       . collect ();
-    let link_targets = link_targets_from_nodes (&nodes);
+    let link_dests = link_dests_from_nodes (&nodes);
     let (map_to_content, map_to_containers) =
       content_maps_from_nodes (&nodes);
     compute_and_store_context_types (
       &env . tantivy_index, &had_id_set, &all_node_ids,
-      &link_targets, &map_to_content, &map_to_containers )
+      &link_dests, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
     { // Rebuild the in-Rust graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.

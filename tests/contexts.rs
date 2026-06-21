@@ -8,7 +8,7 @@ use skg::context::{
   content_maps_from_nodes,
   context_origin_types_for_saved_from_in_rust_graph,
   had_id_set_from_nodes,
-  link_targets_from_nodes,
+  link_dests_from_nodes,
   find_roots_and_multiply_contained,
   extend_context,
   extend_contexts_for_cycles,
@@ -29,7 +29,7 @@ fn test_label_roundtrip () {
   let types : Vec<ContextOriginType> = vec![
     ContextOriginType::Root,
     ContextOriginType::CycleMember,
-    ContextOriginType::Target,
+    ContextOriginType::Dest,
     ContextOriginType::HadID,
     ContextOriginType::MultiContained ];
   for ct in types {
@@ -56,7 +56,7 @@ fn test_had_id_set_from_nodes_mixed () {
   assert! (result . contains (&ID::new ("has-id"))); }
 
 #[test]
-fn test_link_targets_from_nodes () {
+fn test_link_dests_from_nodes () {
   let mut node1 : NodeComplete = empty_node_complete ();
   node1 . pid = ID::new ("src");
   node1 . title =
@@ -67,11 +67,11 @@ fn test_link_targets_from_nodes () {
   node2 . pid = ID::new ("other");
   node2 . title = "no links here" . to_string ();
   let nodes : Vec<NodeComplete> = vec![node1, node2];
-  let targets : HashSet<ID> =
-    link_targets_from_nodes (&nodes);
-  assert_eq! (targets . len (), 2);
-  assert! (targets . contains (&ID::new ("tgt1")));
-  assert! (targets . contains (&ID::new ("tgt2"))); }
+  let dests : HashSet<ID> =
+    link_dests_from_nodes (&nodes);
+  assert_eq! (dests . len (), 2);
+  assert! (dests . contains (&ID::new ("tgt1")));
+  assert! (dests . contains (&ID::new ("tgt2"))); }
 
 #[test]
 fn test_origin_type_priority () {
@@ -84,7 +84,7 @@ fn test_origin_type_priority () {
   origin_types . insert (
     ID::new ("a"), ContextOriginType::MultiContained);
   origin_types . insert (
-    ID::new ("a"), ContextOriginType::Target);
+    ID::new ("a"), ContextOriginType::Dest);
   origin_types . insert (
     ID::new ("a"), ContextOriginType::Root);
   // Last insert wins (Root).
@@ -128,7 +128,7 @@ fn in_rust_context_types_for_saved_nodes () {
   assert_eq! (got ("linker"), Some ("Root"));
   assert_eq! (got ("multi"),  Some ("MultiContained"));
   assert_eq! (got ("hadid"),  Some ("HadID"));
-  assert_eq! (got ("tgt"),    Some ("Target"));
+  assert_eq! (got ("tgt"),    Some ("Dest"));
   assert_eq! (got ("ord"),    None,
     "a singly-contained ordinary node is not an origin");
   assert_eq! (got ("cyc1"),   Some ("CycleMember"));
@@ -195,7 +195,7 @@ fn test_grow_context_truncates_at_other_origin () {
   let origins : HashMap<ID, ContextOriginType> =
     HashMap::from ([
       (ID::new ("a"), ContextOriginType::Root),
-      (ID::new ("c"), ContextOriginType::Target) ]);
+      (ID::new ("c"), ContextOriginType::Dest) ]);
   let mut ctx_a : HashSet<ID> = HashSet::new ();
   extend_context (
     &mut ctx_a, &ID::new ("a"), &origins, &contains_map );
@@ -285,8 +285,8 @@ fn test_full_context_pipeline () {
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
-  let link_targets : HashSet<ID> =
-    link_targets_from_nodes (&nodes);
+  let link_dests : HashSet<ID> =
+    link_dests_from_nodes (&nodes);
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
   let all_node_ids : HashSet<ID> =
@@ -294,8 +294,8 @@ fn test_full_context_pipeline () {
     . map ( |n| n . pid . clone () )
     . collect ();
   assert_eq! (all_node_ids . len (), 15);
-  assert_eq! (link_targets . len (), 1);
-  assert! (link_targets . contains (&ID::new ("link-target")));
+  assert_eq! (link_dests . len (), 1);
+  assert! (link_dests . contains (&ID::new ("link-target")));
   assert_eq! (had_id_set . len (), 1);
   assert! (had_id_set . contains (&ID::new ("had-id")));
   // Step 1: identify origins.
@@ -318,9 +318,9 @@ fn test_full_context_pipeline () {
   for id in &had_id_set {
     origin_types . insert (
       id . clone (), ContextOriginType::HadID ); }
-  for id in &link_targets {
+  for id in &link_dests {
     origin_types . insert (
-      id . clone (), ContextOriginType::Target ); }
+      id . clone (), ContextOriginType::Dest ); }
   for id in &roots {
     origin_types . insert (
       id . clone (), ContextOriginType::Root ); }
@@ -334,7 +334,7 @@ fn test_full_context_pipeline () {
   assert_eq! (origin_types [&ID::new ("shared")],
               ContextOriginType::MultiContained);
   assert_eq! (origin_types [&ID::new ("link-target")],
-              ContextOriginType::Target);
+              ContextOriginType::Dest);
   assert_eq! (origin_types [&ID::new ("had-id")],
               ContextOriginType::HadID);
   // Step 2: grow treelike contexts.

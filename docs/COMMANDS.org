@@ -27,7 +27,7 @@ The 'f' is for 'find'.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
 matching node. "Rooty" nodes (roots, cycle members, link
-targets, and nodes that had an org-roam ID before import)
+dests, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 
 Prompts for search terms. All search axes take their conservative
@@ -116,7 +116,7 @@ to MUST.
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
 - Results are ranked by BM25 times a context-origin factor
-  (Root 100×, CycleMember ~32×, Target 10×, HadID 10×,
+  (Root 100×, CycleMember ~32×, Dest 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,
   but every match is returned — search is never filtered by

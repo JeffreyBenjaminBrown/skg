@@ -59,7 +59,7 @@ pub const BUSYSIGNAL_POLL_INTERVAL_MS : u64 = 100;
 /// (3.2 is approximately the square root of 10.)
 pub const MULTIPLIER_ROOT             : f32 = 100.0;
 pub const MULTIPLIER_CYCLE_MEMBER     : f32 =  32.0;
-pub const MULTIPLIER_TARGET           : f32 =  10.0;
+pub const MULTIPLIER_DEST           : f32 =  10.0;
 pub const MULTIPLIER_HAD_ID           : f32 =  10.0;
 pub const MULTIPLIER_MULTI_CONTAINED  : f32 =   3.2;
 

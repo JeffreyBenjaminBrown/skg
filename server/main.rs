@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   let ( env,
         InitContextHandoff { had_id_set,
                              all_node_ids,
-                             link_targets,
+                             link_dests,
                              map_to_content,
                              map_to_containers },
         nodes )
@@ -141,7 +141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   compute_context_rankings (
     &env . tantivy_index, had_id_set, all_node_ids,
-    link_targets, map_to_content, map_to_containers );
+    link_dests, map_to_content, map_to_containers );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()
@@ -298,7 +298,7 @@ fn compute_context_rankings (
   tantivy_index     : &TantivyIndex,
   had_id_set        : HashSet<ID>,
   all_node_ids      : HashSet<ID>,
-  link_targets      : HashSet<ID>,
+  link_dests      : HashSet<ID>,
   map_to_content    : MapToContent,
   map_to_containers : MapToContainers,
 ) {
@@ -308,7 +308,7 @@ fn compute_context_rankings (
     tantivy_index,
     &had_id_set,
     &all_node_ids,
-    &link_targets,
+    &link_dests,
     &map_to_content,
     &map_to_containers )
   { Ok (_) => {}

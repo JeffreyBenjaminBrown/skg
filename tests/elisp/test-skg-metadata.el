@@ -424,7 +424,7 @@ C-c p o must bind to distinct commands."
         (should (equal (buffer-string) original))))))
 
 (ert-deftest test-skg-replace-content-with-link-rejects-missing-id ()
-  "Test replacing a new node fails because it has no link target ID."
+  "Test replacing a new node fails because it has no link dest ID."
   (with-temp-buffer
     (org-mode)
     (insert

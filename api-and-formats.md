@@ -12,7 +12,7 @@ So far there are these endpoints:
 
 ## Text search
   - Request: ((request . "text search") (terms . "SEARCH_TERMS") (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))
-    - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link targets, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
+    - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link dests, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
     - `regex`, `body`, `operators` are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
