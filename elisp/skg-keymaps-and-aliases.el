@@ -98,6 +98,8 @@ and hide INTERNAL from M-x completion."
   (setcdr map nil)
   (progn;; save
     (define-key map (kbd "C-x C-s") #'skg-request-save-buffer))
+  (progn;; C-a toggles between line start and title start (after metadata)
+    (define-key map (kbd "C-a") #'skg-beginning-of-line))
   (progn;; delete (prefix arg => recursive)
     (define-key map (kbd "C-c <backspace>") #'skg-delete))
   (progn;; text search

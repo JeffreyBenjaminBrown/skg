@@ -457,6 +457,29 @@ including asterisks and metadata, but not the trailing newline."
       (end-of-line)
       (buffer-substring-no-properties start (point)))))
 
+(defun skg-beginning-of-line ()
+  "Toggle point between the start of the line and the start of the title.
+On a headline, the title is the text following the stars and skg
+metadata: press once to jump there, again to return to the true
+beginning of the line. On a non-headline, just move to the beginning
+of the line. Reuses `skg-split-as-stars-metadata-title' to locate the
+title, so it never re-implements metadata parsing."
+  (interactive)
+  (let* ((parts (and (org-at-heading-p)
+                     (skg-split-as-stars-metadata-title
+                      (skg-get-current-headline-text))))
+         (title-pos
+          (and parts
+               (save-excursion
+                 (goto-char (+ (line-beginning-position)
+                               (length (nth 0 parts))
+                               (length (nth 1 parts))))
+                 (skip-chars-forward " \t")
+                 (point)))))
+    (if (and title-pos (/= (point) title-pos))
+        (goto-char title-pos)
+      (beginning-of-line))))
+
 (defun skg-parse-metadata-sexp (metadata-sexp)
   "Parse METADATA-SEXP string containing (skg ...) s-expression.
 Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare values."
