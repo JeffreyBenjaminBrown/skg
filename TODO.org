@@ -1,17 +1,6 @@
 * Play two roles, communicate through git.
 * s
-** a better search UI
-ask the user to type a few characters, any subset of
-(r)egex, (b)ody, ..
-** search should show sources
-It does upon save but not initially.
 ** correctness
-*** Bug: skg-close-all-buffers
-is closing too much, e.g. the first (starred) buffer here:
-
- *   skg.skg.org            43283 Org              ~/hodal/skg/skg.skg.org
- *%  *Completions*            223 Completion List
-  %  magit: skg              7768 Magit            ~/hodal/skg/
 *** I want this todo list in Skg.
 Git review after reshaping it is hell.
 **** merge & export these notes
@@ -26,14 +15,6 @@ but one is the color of isParent and the other the color of viewStats.
 *** bugfix : strip last empty line from buffer on save
 Or strip pure-whitespace bodies.
 *** Bug ? Saving doesn't regenerate heralds if there were no changes?
-*** Does the new inactive node treatment mean they don't need IDs?
-*** Emacs can lose heralds
-Editing the rule table in Rust requires regenerating
-tests/elisp/herald-rules.sexp via cargo run --bin emit-herald-rules. A
-Rust test fails with exactly that instruction until you do, so it can't
-drift silently — but it is one generated artifact that exists so batch
-Emacs tests can use the real table without a server. Presentation
-tweaks break no other test, per your atoms-only decision.
 *** suppressed container count rule for subscribees-as-such is wrong
 It suppresses 1, should suppress 0.
 Maybe simplify the rule: always suppress 1 and nothing else.
@@ -57,8 +38,6 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
-*** in cols the peace symbol should precede the title
-and there should be a space between them
 *** rewrite docs/COMMANDS.org
 Some new Claude-written passages assume too much of the reade
 *** uniform rel stats

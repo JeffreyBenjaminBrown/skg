@@ -1,0 +1,60 @@
+Currently there is some redundancy and a lot of inhomogeneity
+in how heralds are displayed.
+This proposal covers only a subset of those heralds;
+what it doesn't describe should continue to be shown as they are now.
+* Relationship heralds can be made uniform.
+** syntax sketch
+pX = its parent Xs it (X is a relation, e.g. 'hides', 'contains')
+Xp = it Xs its parent
+3X = 3 nodes X it
+3pX = 3 nodes X it, among them its parent
+X4p = it Xs 4 nodes, including its parent
+g (grandparent), b (bizabuelo) and t (tatarabuelo) can be used like p.
+** uniformity across the relationships
+Today we use a mishmash of }, {, ->, O, S, etc.
+Instead, use capital letters for all five relationships:
+(C)ontains, text(L)inks_to, (H)ides, (S)ubscribes, (O)verrides
+** special treatment for "surprising links"
+We use a herald 'a(b,c)L' where a,b,c are numbers and L means "textlinks_to".
+In that case:
+  'a' nodes link to it,
+  'b' of those 'a' differ from it, are bodyless and content-less, and their title text (after normalization) is something other than the link label: maybe more, maybe less, maybe totally different
+  'c' of the 'a' have their own content
+  (the remainer are links whose title nodes are just a link with one of the node's normal aliases for a label and no other text)
+
+If either b or c would be zero but the other nonzero, the zero can be omitted,
+and the comma too if c=0 but not if b=0.
+If both are zero, that whole parenthetical is omitted.
+* how to avoid some redundancy
+A node's birth might correspond to one of the stats --
+e.g. usually it was drawn because it is content of its parent
+(more precisely, the graphnode this viewnode represents
+is content of the graphnode represented by this viewnode's view-parent).
+In that case, that specific relation herald
+(usually pC or pCk for some integer k) is moved to the front,
+right after the peace symbol if present, and colored orange.
+
+Any such herald that is not about the birth relationship
+will be later and colored blue.
+* more clarity
+The 'action' heralds I,O and S can maybe go away entirely.
+These are strictly more informative.
+The 'aliases' herald should be made similar to the others:
+Ak, where k is the number of aliases.
+* omission
+A relationship herald is omitted if both values would be zero.
+This should hold even for the content relationship, and even for roots.
+(The alternative asks too much of a user.)
+* which relationships to check
+I suspect it will be too slow to compute generate all these viewstats every time.
+Instead, for most nodes, let's only check relationships one hopp away --
+e.g. for content we check parent and children, no further.
+
+Exceptions, though, must arise for certain kinds of nodes.
+For each kind of col, there is an 'owning ancestor'.
+(A table somewhere in the rust code defines them all --
+e.g. a subscribee-as-such's owning ancestor is its grandparent,
+and that of a member of a hiddeninsubscribeecol is its great-grandparent.)
+In these cases we should include its relationship to its owning ancestor
+and every intervening vognode, but still otherwise only consider
+single-hop relationships from it.

@@ -18,7 +18,7 @@ define
     relates container,
     relates contained;
 
-  # these are not stored to disk,
+  # These are not stored to disk,
   # but rather inferred by rust from a node's text content
   # and from there loaded into typedb.
   # textlinks are org-roam style plain text,
@@ -49,13 +49,17 @@ define
   relation subscribes,
     relates subscriber,
     relates subscribee;
-  # A hider hides one of its subscribed nodes from its own view of a
-  # subscription. Recorded explicitly on save when the user deletes a
-  # subscribee-as-such's child; ordinary integrated content is hidden
-  # implicitly.
+
+  # If node N hides node H, then H will not be visible in N's subscriptions.
+  # That is, if N subscribes to E and hides H, and E contains H,
+  # a user viewing E *as one of R's subscriptions*
+  # will not see H among E's content. It's important to note that
+  # E can be viewed in other ways. If the user instead visits E normally,
+  # they will, per normal, see H in E's content.
   relation hides_from_its_subscriptions,
     relates hider,
     relates hidden;
+
   # An overrider stands in for the overridden node wherever the
   # overridden node would be drawn as recursive content (override
   # substitution; see `docs/sharing-model.md` and `glossary.md`). The
@@ -69,12 +73,12 @@ define
     relates overrider,
     relates overridden;
 
-  # Connects each node to the configured source it came from.
+  # This connects each node to the configured source it came from.
   relation has_source,
     relates node,
     relates source;
 
-  # "the graph" is made of nodes, which resemble org-headlines.
+  # "The graph" is made of nodes, which resemble org-headlines.
   entity node,
     owns id @key,
     plays contains:container,
