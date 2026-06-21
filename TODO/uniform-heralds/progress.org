@@ -121,7 +121,16 @@ plus a one-time data/bash/trim-node-bodies.org migration.
 
 * What's imperfect about what's done
 
-(updated as steps complete)
+- *Test stats require the in-Rust handle.* Retiring the TypeDB stats
+  fallback means a rendered view's heralds come only from
+  'snapshot_global'. I first tried installing the handle process-wide in
+  'populate_data_from_config', but that REGRESSED low-level tests
+  (typedb/delete_nodes, merge_nodes): they mutate TypeDB directly and
+  read back through paths that PREFER the in-Rust graph, so a
+  populate-time snapshot goes stale. Reverted. The render tests instead
+  install the handle per-test (the established pattern:
+  'install_or_swap_global_handle(graph_handle_from_config(config)?)'
+  after reset, as in view_stats_sharing.rs). Folded into step 7.
 
 * Choices determining the future
 
