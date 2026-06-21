@@ -10,6 +10,7 @@
   (let ((sexp (skg--save-request-sexp
                "uri-1"
                '(:point-lines-below-focused-headline 0
+                 :point-column 0
                  :point-screen-lines-below-window-start 0))))
     (should (equal (cdr (assoc 'request sexp)) "save buffer"))
     (should-not (assoc 'fork-approved sexp))))
@@ -19,6 +20,7 @@
   (let ((sexp (skg--save-request-sexp
                "uri-1"
                '(:point-lines-below-focused-headline 0
+                 :point-column 0
                  :point-screen-lines-below-window-start 0)
                t)))
     (should (equal (cdr (assoc 'fork-approved sexp)) "true"))))
@@ -28,6 +30,7 @@
   (let ((sexp (skg--save-request-sexp
                "uri-1"
                '(:point-lines-below-focused-headline 0
+                 :point-column 0
                  :point-screen-lines-below-window-start 0)
                t)))
     (should-not (assoc 'fork-sources sexp))))
@@ -37,6 +40,7 @@
   (let* ((sexp (skg--save-request-sexp
                 "uri-1"
                 '(:point-lines-below-focused-headline 0
+                  :point-column 0
                   :point-screen-lines-below-window-start 0)
                 t
                 '(("N" . "owned2") ("M" . "owned"))))

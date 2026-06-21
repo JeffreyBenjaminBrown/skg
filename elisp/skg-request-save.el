@@ -166,6 +166,10 @@ field (fork-sources ((N . SOURCE) ...))."
       . ,(number-to-string
           (plist-get save-point-position
                      :point-lines-below-focused-headline)))
+     (point-column
+      . ,(number-to-string
+          (plist-get save-point-position
+                     :point-column)))
      (point-screen-lines-below-window-start
       . ,(number-to-string
           (plist-get save-point-position
@@ -178,14 +182,17 @@ field (fork-sources ((N . SOURCE) ...))."
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
 - text-line offset: relative to the focused headline
+- column: the character offset of point within its line
 - screen-line offset: relative to the top *visible* line of the window
-WHY: A character offset from buffer start is not stable enough: saving can make branches appear or disappear above point. The focused headline is already preserved by metadata, so record point relative to that headline and to the window top."
+WHY: A character offset from buffer start is not stable enough: saving can make branches appear or disappear above point. The focused headline is already preserved by metadata, so record point relative to that headline and to the window top. The within-line column is stable regardless of what happens above, so it is recorded as a plain offset."
   (let ((point-line (line-number-at-pos (point) t))
         (window (get-buffer-window (current-buffer) t)))
     (list :point-lines-below-focused-headline
           (save-excursion
             (org-back-to-heading t)
             (- point-line (line-number-at-pos (point) t)))
+          :point-column
+          (- (point) (line-beginning-position))
           :point-screen-lines-below-window-start
           (if window
               (max 0
@@ -458,6 +465,9 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   (list :point-lines-below-focused-headline
         (skg--nat-from-response response
                                 'point-lines-below-focused-headline)
+        :point-column
+        (skg--nat-from-response response
+                                'point-column)
         :point-screen-lines-below-window-start
         (skg--nat-from-response response
                                 'point-screen-lines-below-window-start)))
@@ -518,37 +528,46 @@ moves point to focused headline, and removes focus marker."
     (let ((point-lines-below-focused-headline
            (plist-get save-point-position
                       :point-lines-below-focused-headline))
+          (point-column
+           (plist-get save-point-position
+                      :point-column))
           (point-screen-lines-below-window-start
            (plist-get save-point-position
                       :point-screen-lines-below-window-start)))
       (when point-lines-below-focused-headline
         (skg--restore-point-below-focused-headline
-         point-lines-below-focused-headline))
+         point-lines-below-focused-headline point-column))
       (when point-screen-lines-below-window-start
         (skg--recenter-current-buffer-window
          point-screen-lines-below-window-start)))))
 
-(defun skg--restore-point-below-focused-headline (line-offset)
-  "Move LINE-OFFSET body lines below the focused headline if possible.
-If that line no longer belongs to the focused headline's entry,
-leave point on the focused headline."
-  (let ((focused-heading (point)))
-    (when (> line-offset 0)
-      (let ((candidate
-             (save-excursion
-               (forward-line line-offset)
-               (point)))
-            (next-heading
-             (save-excursion
-               (when (outline-next-heading)
-                 (point)))))
-        (if (and (or (null next-heading)
-                     (< candidate next-heading))
-                 (not (save-excursion
-                        (goto-char candidate)
-                        (org-at-heading-p))))
-            (goto-char candidate)
-          (goto-char focused-heading))))))
+(defun skg--restore-point-below-focused-headline (line-offset column)
+  "Move LINE-OFFSET lines below the focused headline, then to COLUMN.
+Assumes point starts on the focused headline.
+The target line is clamped to the focused headline's own entry: if the
+entry has shrunk so that LINE-OFFSET lines down would reach another
+headline (or the buffer end), point lands on the entry's last line
+instead of crossing into a different headline.
+Within the target line, point is clamped to the line's end, so a
+shortened line never spills point onto the following line.
+COLUMN is a character offset from the line's start; nil means column 0."
+  (let* ((entry-end ;; first position past the focused headline's entry
+          (save-excursion
+            (if (outline-next-heading)
+                (line-beginning-position)
+              (point-max))))
+         (target-bol ;; start of the chosen line, clamped to the entry
+          (save-excursion
+            (forward-line line-offset)
+            (when (>= (point) entry-end)
+              ;; Entry shrank: fall back to the entry's last line.
+              (goto-char entry-end)
+              (forward-line -1))
+            (line-beginning-position))))
+    (goto-char (min (+ target-bol (or column 0))
+                    (save-excursion
+                      (goto-char target-bol)
+                      (line-end-position))))))
 
 (defun skg--recenter-current-buffer-window (screen-line)
   "Place point on SCREEN-LINE in a displayed window for this buffer."

@@ -54,6 +54,7 @@ pub struct SaveResponse {
 #[derive(Clone)]
 pub struct SavePointPosition {
   pub point_lines_below_focused_headline    : usize,
+  pub point_column                          : usize,
   pub point_screen_lines_below_window_start : usize,
 }
 
@@ -241,6 +242,13 @@ fn push_save_point_position_to_sexp_items (
   items . push (
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S (
+        "point-column" . to_string () )),
+      Sexp::Atom ( Atom::I (
+        point_position . point_column
+        as i64 )), ] ));
+  items . push (
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S (
         "point-screen-lines-below-window-start" . to_string () )),
       Sexp::Atom ( Atom::I (
         point_position . point_screen_lines_below_window_start
@@ -253,12 +261,17 @@ fn save_point_position_from_request (
     nat_from_request (
       request,
       "point-lines-below-focused-headline" ) ?;
+  let point_column : usize =
+    nat_from_request (
+      request,
+      "point-column" ) ?;
   let point_screen_lines_below_window_start : usize =
     nat_from_request (
       request,
       "point-screen-lines-below-window-start" ) ?;
   Some ( SavePointPosition {
     point_lines_below_focused_headline,
+    point_column,
     point_screen_lines_below_window_start, } ) }
 
 fn nat_from_request (
