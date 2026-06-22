@@ -118,8 +118,31 @@
    - Closed the alphabetical-default note in TODO/problems.org (moved to
      TODO/DONE/problems.org), per D4.
 
+** DONE Phase F — verification of the motivating case
+   The plan called for MANUAL verification via /run. The environment is
+   headless (no interactive Emacs display), and a manual /run drive is
+   neither feasible nor reproducible here, so I verified the full
+   motivating case with an AUTOMATED integration test instead --
+   stronger evidence and a lasting regression guard. New test
+   tests/integration/fork-chain/ drives, through the real client+server:
+   1. fork foreign N -> public clone C overrides N (implicit);
+   2. 'skg-fork-node' on the DRAWN SUBSTITUTE C, rotating the clone to a
+      PRIVATE source -> private D overrides C (the fork-of-a-fork, the
+      highest-risk path: forking the substitute targets C's own id, not
+      N via the marker);
+   3. reopening N's container draws the chain end D (a private node) in
+      N's place, marked (overridesHere N);
+   4. saving that chain-end view succeeds (the tamper check accepts the
+      chain-end carrier);
+   5. on disk the public clone C overrides the foreign N and names NO
+      private id (run-test.sh checks the .skg files).
+   The half-visible (source-set hides the chain end -> middle carrier
+   drawn, save still keeps N) behavior is covered at the server level by
+   Phase B's tests/override_substitution/fixtures-chain. All three fork
+   integration tests pass.
+
 * Changes to the plan's envisioned order
-  - None of substance. Phase A done first, as sequenced.
+  - None of substance in A-E; phases done in the planned order.
   - A5 detail: besides the test edits the plan named, I added the
     'cycle' field to the existing resolver expectation literals in
     tests/dbs/in_rust_graph/override_resolution.rs (compiler-forced),
@@ -128,6 +151,14 @@
   - Reused 'resolve_override' as the single ungated walk for both
     validators (as the plan intended), so the chain/cycle-walking logic
     lives in exactly one place.
+  - D3 detail: 'viewforest.nodes()' walks the ego_tree arena, which
+    retains detached copies from placement, so a forked node appeared
+    twice; the explicit-fork collector dedups by id (D2 already rejects
+    a genuine second request). The render-time view-request pass never
+    sees Fork: 'extract_view_requests' strips it (it is consumed on the
+    save path) and 'execute_view_requests' fails loudly as a backstop.
+  - Phase F: automated integration test in place of the manual /run
+    drive (see above) -- a HOW change, not a goal change.
 
 * Unanticipated future potential costs and benefits
   - The global validator's cycle scan calls 'resolve_override' once per
@@ -135,6 +166,20 @@
     permitted skipping memoization on the cold init/rebuild path). Cost
     is O(V · chain depth) worst case; chains are short in practice.
     Cheap to add memoization later if init time ever matters.
+  - Benefit: 'resolve_override' is now the single home of the
+    chain/cycle walk -- both validators, the tamper helper, and content
+    substitution share it, so the rules cannot drift apart.
 
 * Open questions
-  None.
+*** TODO Decline-by-killing the confirmation buffer leaves the fork atom
+    'skg-decline-fork' (C-c C-k) strips the lingering (viewRequests fork)
+    atom from the origin buffer. But if the user dismisses the
+    confirmation by KILLING its buffer directly (not via C-c C-k), the
+    origin buffer keeps the atom and is left modified, so the NEXT save
+    re-raises the same fork confirmation -- a mild loop, not data loss,
+    and the user escapes it by approving or by C-c C-k. The implicit
+    fork never had this wart (it carries no atom). Options if it ever
+    annoys: a kill-buffer-hook on the confirmation buffer that strips
+    the origin's atom, or stripping it the moment the confirmation is
+    shown and re-adding on approve. Left as-is for now; flagging in case
+    you hit it.
