@@ -2,8 +2,7 @@
 
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, GraphNodeStats, NodeContainRels, Birth, ParentIs, ViewNodeStats, default_activeNode };
-use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
+use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, default_activeNode };
 use skg::types::viewnode::QualCol;
 use std::collections::HashMap;
 
@@ -77,7 +76,6 @@ fn test_metadata_ordering () {
   let t : ActiveNode = ActiveNode {
     viewStats : ViewNodeStats {
       cycle             : true,
-      parentIsContainer : false,
       .. ViewNodeStats::default() },
     .. default_activeNode ( ID::from ("xyz"),
                           SourceName::from ("main"),
@@ -93,52 +91,30 @@ fn test_metadata_ordering () {
   assert_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
 
 #[test]
-fn test_birth_affects_container_count_emission () {
-  // A node with containers=1, contents=0.
-  // Birth::Unremarkable itself is omitted from metadata. Non-default
-  // birth values are emitted, and they also override the parentIs-specific
-  // suppression rule for `(graphStats (containers N))`:
-  //   - Affected: hide when containers == 1.
-  //   - Independent/Absent: hide when containers == 0.
-  //   - ContainsParent/LinksToParent birth: always show.
-  // The client builds the compound herald from the raw atoms; the
-  // `(containsHerald ...)` atom is not emitted server-side.
-  let make_node = | parentIs : ParentIs, birth : Birth | -> ViewNode {
+fn test_birth_and_rels_heralds_emitted () {
+  // The assembled birth (orange) and rels (blue) strings round-trip
+  // verbatim as quoted atoms; a node with neither emits neither.
+  let mk = | birth : Option<&str>, rels : Option<&str> | -> String {
     let t : ActiveNode = ActiveNode {
-      parentIs,
-      birth,
-      graphStats : GraphNodeStats {
-        containRels : Some ( NodeContainRels {
-          containers : 1, contents : 0 } ),
-        .. GraphNodeStats::default () },
+      viewStats : ViewNodeStats {
+        birth_herald : birth . map ( |s| s . to_string () ),
+        rels_herald  : rels  . map ( |s| s . to_string () ),
+        .. ViewNodeStats::default () },
       .. default_activeNode ( ID::from ("n"),
                             SourceName::from ("main"),
                             "N" . to_string () ) };
-    ViewNode { focused : false, folded : false, body_folded : false,
-               kind : ViewNodeKind::Vognode (Vognode::Active (t)) } };
-  let cfg : SkgConfig =
-    SkgConfig::dummyFromSources ( HashMap::new () );
-  let content      : String = viewnode_to_text (
-    1, &make_node (ParentIs::Affected, Birth::Unremarkable), &cfg ) . unwrap ();
-  let independent  : String = viewnode_to_text (
-    1, &make_node (ParentIs::Independent, Birth::Unremarkable), &cfg ) . unwrap ();
-  let container_of : String = viewnode_to_text (
-    1, &make_node (ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)), &cfg ) . unwrap ();
-  let links_to     : String = viewnode_to_text (
-    1, &make_node (ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)), &cfg ) . unwrap ();
-  // Affected with containers=1: hide.
-  assert! ( ! content . contains ("(containers 1)"),
-            "ParentIs=Affected should suppress containers=1: {}", content );
-  // Independent with containers=1: 1 != 0 so show.
-  assert! ( independent . contains ("(containers 1)"),
-            "ParentIs=Independent should show containers>=1: {}", independent );
-  // Non-default birth provenance: always show.
-  assert! ( container_of . contains ("(containers 1)"),
-            "ContainsParent should always show containers: {}", container_of );
-  assert! ( links_to . contains ("(containers 1)"),
-            "LinksToParent should always show containers: {}", links_to );
-  // No `containsHerald` atom on any of them.
-  for (name, s) in [("content", &content), ("independent", &independent),
-                    ("container_of", &container_of), ("links_to", &links_to)] {
-    assert! ( ! s . contains ("containsHerald"),
-              "{}: server should not emit containsHerald; got {}", name, s ); } }
+    let node = ViewNode {
+      focused : false, folded : false, body_folded : false,
+      kind : ViewNodeKind::Vognode (Vognode::Active (t)) };
+    viewnode_to_text (
+      1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+      . unwrap () };
+  let with_both : String = mk ( Some ("aC"), Some ("3O 2(1,1)L A2") );
+  assert! ( with_both . contains (r#"(birthHerald "aC")"#),
+            "birthHerald not emitted: {}", with_both );
+  assert! ( with_both . contains (r#"(rels "3O 2(1,1)L A2")"#),
+            "rels not emitted: {}", with_both );
+  let neither : String = mk ( None, None );
+  assert! ( ! neither . contains ("birthHerald") );
+  assert! ( ! neither . contains ("(rels ") );
+  assert_eq! ( neither, "* (skg (node (id n) (source main))) N\n" ); }

@@ -78,7 +78,7 @@ async fn rerender_is_idempotent_impl (
   // Install the process-global in-Rust graph so the de-novo render creates
   // PartnerCols (maybe_add_one_partnerCol reads snapshot_global). nextest
   // runs each test in its own process, so this OnceCell set is safe here.
-  skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic (
+  skg::dbs::in_rust_graph::install_or_swap_global_handle (
     graph_handle_from_config (config) ? );
   // The complete de-novo view of root `a`, which we then feed back through the
   // pipeline as if the user saved it unchanged.

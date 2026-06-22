@@ -8,8 +8,10 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 
-use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
-use skg::test_utils::run_with_shared_test_db;
+use skg::dbs::in_rust_graph::{
+  InRustGraphHandle,
+  install_or_swap_global_handle };
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::misc::{SkgConfig, TantivyIndex};
@@ -36,29 +38,37 @@ fn all_tests
     "skg-test-definitive-view-cascade-and-budget",
     |s| Box::pin ( async move {
       s . reset ("test_definitive_view_ample_budget", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_ample_budget (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_limit_5_or_6", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_limit_5_or_6 (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_limit_1_to_4", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_limit_1_to_4 (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_conflicting", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_conflicting (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_with_cycle",
                  "tests/definitive_view_cascade_and_budget/fixtures-cycle") . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_with_cycle (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_with_repeat", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_with_repeat (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_request_cleared", fixtures) . await ?;
+      s . install_graph_handle () ?;
       test_definitive_view_request_cleared (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_aliascol_is_neutral",
                  "tests/definitive_view_cascade_and_budget/fixtures-aliases") . await ?;
+      s . install_graph_handle () ?;
       test_budget_aliascol_is_neutral (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
@@ -86,7 +96,8 @@ async fn test_definitive_view_ample_budget (
         let mut config = config . clone();
         config . initial_node_limit = 20;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -102,25 +113,25 @@ async fn test_definitive_view_ample_budget (
 
       // With an ample budget, all children should be expanded
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-        ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+        ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+        ** (skg (node (id 12) (source main) (birthHerald \"aC4\"))) 12
         12 body
-        *** (skg (node (id 121) (source main) (graphStats (contents 2)))) 121
+        *** (skg (node (id 121) (source main) (birthHerald \"aC2\"))) 121
         121 body
-        **** (skg (node (id 1211) (source main))) 1211
+        **** (skg (node (id 1211) (source main) (birthHerald \"aC\"))) 1211
         1211 body
-        **** (skg (node (id 1212) (source main))) 1212
+        **** (skg (node (id 1212) (source main) (birthHerald \"aC\"))) 1212
         1212 body
-        *** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
+        *** (skg (node (id 122) (source main) (birthHerald \"aC1\"))) 122
         122 body
-        **** (skg (node (id 1221) (source main))) 1221
+        **** (skg (node (id 1221) (source main) (birthHerald \"aC\"))) 1221
         1221 body
-        *** (skg (node (id 123) (source main))) 123
+        *** (skg (node (id 123) (source main) (birthHerald \"aC\"))) 123
         123 body
-        *** (skg (node (id 124) (source main))) 124
+        *** (skg (node (id 124) (source main) (birthHerald \"aC\"))) 124
         124 body
-        ** (skg (node (id 13) (source main))) 13
+        ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
@@ -154,7 +165,8 @@ async fn test_definitive_view_limit_5_or_6 (
         let mut config5 = config . clone();
         config5 . initial_node_limit = 5;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -169,7 +181,8 @@ async fn test_definitive_view_limit_5_or_6 (
         let mut config6 = config . clone();
         config6 . initial_node_limit = 6;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -194,33 +207,33 @@ async fn test_definitive_view_limit_5_or_6 (
       // and drew its WHOLE group 121..124, but the budget hit 0 at 13, so when
       // 121..124 are visited they stay indefinitive (none expands -> no gen-3).
       let expected_5 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-        ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+        ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+        ** (skg (node (id 12) (source main) (birthHerald \"aC4\"))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef (graphStats (contents 2)))) 121
-        *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
-        *** (skg (node (id 123) (source main) indef)) 123
-        *** (skg (node (id 124) (source main) indef)) 124
-        ** (skg (node (id 13) (source main))) 13
+        *** (skg (node (id 121) (source main) indef (birthHerald \"aC2\"))) 121
+        *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
+        *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
+        *** (skg (node (id 124) (source main) indef (birthHerald \"aC\"))) 124
+        ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
       // limit=6: one more expansion than limit=5 -- 121 (the 6th) now expands and
       // draws its whole gen-3 group 1211,1212 (both then indefinitive, budget
       // spent); 122..124 remain indefinitive.
       let expected_6 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-        ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+        ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+        ** (skg (node (id 12) (source main) (birthHerald \"aC4\"))) 12
         12 body
-        *** (skg (node (id 121) (source main) (graphStats (contents 2)))) 121
+        *** (skg (node (id 121) (source main) (birthHerald \"aC2\"))) 121
         121 body
-        **** (skg (node (id 1211) (source main) indef)) 1211
-        **** (skg (node (id 1212) (source main) indef)) 1212
-        *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
-        *** (skg (node (id 123) (source main) indef)) 123
-        *** (skg (node (id 124) (source main) indef)) 124
-        ** (skg (node (id 13) (source main))) 13
+        **** (skg (node (id 1211) (source main) indef (birthHerald \"aC\"))) 1211
+        **** (skg (node (id 1212) (source main) indef (birthHerald \"aC\"))) 1212
+        *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
+        *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
+        *** (skg (node (id 124) (source main) indef (birthHerald \"aC\"))) 124
+        ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
@@ -256,7 +269,8 @@ async fn test_definitive_view_limit_1_to_4 (
         let mut config1 = config . clone();
         config1 . initial_node_limit = 1;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -270,7 +284,8 @@ async fn test_definitive_view_limit_1_to_4 (
         let mut config4 = config . clone();
         config4 . initial_node_limit = 4;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -293,25 +308,25 @@ async fn test_definitive_view_limit_1_to_4 (
       // all three are then indefinitive (budget spent), so 12 never expands and
       // none of 121.. is created. Root 2 still expands (root exemption).
       let expected_1 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-        ** (skg (node (id 11) (source main) indef)) 11
-        ** (skg (node (id 12) (source main) indef (graphStats (contents 4)))) 12
-        ** (skg (node (id 13) (source main) indef)) 13
+        * (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+        ** (skg (node (id 11) (source main) indef (birthHerald \"aC\"))) 11
+        ** (skg (node (id 12) (source main) indef (birthHerald \"aC4\"))) 12
+        ** (skg (node (id 13) (source main) indef (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
       // limit=4: expansions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
       // whole group 121..124, all indefinitive (budget spent); 13 is reached
       // after the budget is gone, so it too is indefinitive.
       let expected_4 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-        ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
+        ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
+        ** (skg (node (id 12) (source main) (birthHerald \"aC4\"))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef (graphStats (contents 2)))) 121
-        *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
-        *** (skg (node (id 123) (source main) indef)) 123
-        *** (skg (node (id 124) (source main) indef)) 124
-        ** (skg (node (id 13) (source main) indef)) 13
+        *** (skg (node (id 121) (source main) indef (birthHerald \"aC2\"))) 121
+        *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
+        *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
+        *** (skg (node (id 124) (source main) indef (birthHerald \"aC\"))) 124
+        ** (skg (node (id 13) (source main) indef (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
@@ -348,7 +363,8 @@ async fn test_definitive_view_conflicting (
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -366,13 +382,13 @@ async fn test_definitive_view_conflicting (
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 1)))) 1
-         ** (skg (node (id 12) (source main) indef (graphStats (contents 1)))) 12
-         *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
-         * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 1)))) 12
-         ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels \"C1\"))) 1
+         ** (skg (node (id 12) (source main) indef (birthHerald \"aC1\"))) 12
+         *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
+         * (skg (node (id 12) (source main) (parentIs absent) (rels \"1C1\"))) 12
+         ** (skg (node (id 122) (source main) (birthHerald \"aC1\"))) 122
          122 body
-         *** (skg (node (id 1221) (source main))) 1221
+         *** (skg (node (id 1221) (source main) (birthHerald \"aC\"))) 1221
          1221 body
       "};
 
@@ -401,7 +417,8 @@ async fn test_definitive_view_with_cycle (
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -416,11 +433,11 @@ async fn test_definitive_view_with_cycle (
 
       // a should expand to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (node (id cyc-a) (source main) (parentIs absent) (graphStats (containers 1) (contents 1)))) cyc-a
+        * (skg (node (id cyc-a) (source main) (parentIs absent) (rels \"1C1\"))) cyc-a
         cyc-a body
-        ** (skg (node (id cyc-b) (source main) (graphStats (contents 1)) (viewStats containsParent))) cyc-b
+        ** (skg (node (id cyc-b) (source main) (birthHerald \"aCa\"))) cyc-b
         cyc-b body
-        *** (skg (node (id cyc-a) (source main) indef (graphStats (contents 1)) (viewStats cycle containsParent))) cyc-a
+        *** (skg (node (id cyc-a) (source main) indef (birthHerald \"aCa\") (viewStats cycle))) cyc-a
       "};
 
       assert_eq!(result, expected,
@@ -448,7 +465,8 @@ async fn test_definitive_view_with_repeat (
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -462,25 +480,24 @@ async fn test_definitive_view_with_repeat (
       println!("Result with repeat:\n{}", result);
 
       let expected = indoc! {
-        // Upon saving, the indef view of node 12 had no effect,
-        // but the definitive view of 121 (definitive in the *buffer*)
-        // deleted its children at extraction. In the rerender, node 12's
-        // definitiveView cascades (§5.3) a DVR onto its content child 121,
-        // which is Final and so clobbers the Tentative bare root 121 (§5.2:
-        // "the explicit request wins; the origin is demoted"). So the bare
+        // Upon saving, the indef view of node 12 had no effect, but the
+        // definitive view of 121 (definitive in the *buffer*) deleted its
+        // children at extraction. In the rerender, node 12's definitiveView
+        // cascades (§5.3) a DVR onto its content child 121, which is Final
+        // and so clobbers the Tentative bare root 121 (§5.2). So the bare
         // root 121 is now indefinitive and 12's child 121 is the definitive
         // occurrence (childless, since the save emptied 121's contains).
-        "* (skg (node (id 121) (source main) (parentIs absent) indef (graphStats (containers 1)))) 121
-         * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 4)))) 12
+        "* (skg (node (id 121) (source main) (parentIs absent) indef (rels \"1C\"))) 121
+         * (skg (node (id 12) (source main) (parentIs absent) (rels \"1C4\"))) 12
          12 body
-         ** (skg (node (id 121) (source main))) 121
-         ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
+         ** (skg (node (id 121) (source main) (birthHerald \"aC\"))) 121
+         ** (skg (node (id 122) (source main) (birthHerald \"aC1\"))) 122
          122 body
-         *** (skg (node (id 1221) (source main))) 1221
+         *** (skg (node (id 1221) (source main) (birthHerald \"aC\"))) 1221
          1221 body
-         ** (skg (node (id 123) (source main))) 123
+         ** (skg (node (id 123) (source main) (birthHerald \"aC\"))) 123
          123 body
-         ** (skg (node (id 124) (source main))) 124
+         ** (skg (node (id 124) (source main) (birthHerald \"aC\"))) 124
          124 body
       "};
 
@@ -506,7 +523,8 @@ async fn test_definitive_view_request_cleared (
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -558,7 +576,8 @@ async fn test_budget_aliascol_is_neutral (
         let mut config = config . clone();
         config . initial_node_limit = 3;
         let graph : InRustGraphHandle =
-          new_handle (InRustGraph::new ());
+          install_or_swap_global_handle (
+            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -572,12 +591,12 @@ async fn test_budget_aliascol_is_neutral (
       println!("alias-budget (budget 3):\n{}", result);
 
       let expected = indoc! {"
-        * (skg (node (id r) (source main) (parentIs absent) (graphStats (contents 1) aliasing))) r
+        * (skg (node (id r) (source main) (parentIs absent) (rels \"C1 A2\"))) r
         ** (skg aliasCol)
         *** (skg alias) first alias
         *** (skg alias) second alias
-        ** (skg (node (id c1) (source main) (graphStats (contents 1)))) c1
-        *** (skg (node (id c2) (source main))) c2
+        ** (skg (node (id c1) (source main) (birthHerald \"aC1\"))) c1
+        *** (skg (node (id c2) (source main) (birthHerald \"aC\"))) c2
       "};
       assert_eq!(result, expected,
         "budget 3 expands the whole content chain; the AliasCol is whole + budget-neutral");

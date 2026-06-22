@@ -1,10 +1,11 @@
+use crate::herald_tokens::assemble_counts_only;
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats,
-  Birth, ParentIs,
+  ParentIs,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -250,10 +251,12 @@ fn activeNode_metadata_to_string (
     activeNode : & ActiveNode,
     config    : & SkgConfig,
   ) -> String {
-    fn graph_stats ( activeNode : & ActiveNode ) -> Option < String > {
-      graphnodestats_to_sexp ( & activeNode . graphStats,
-                                 activeNode . parentIs,
-                                 activeNode . birth ) }
+    fn birth_herald ( activeNode : & ActiveNode ) -> Option < String > {
+      activeNode . viewStats . birth_herald . as_ref () . map (
+        |s| format! ("(birthHerald {})", quote_herald (s)) ) }
+    fn rels_herald ( activeNode : & ActiveNode ) -> Option < String > {
+      activeNode . viewStats . rels_herald . as_ref () . map (
+        |s| format! ("(rels {})", quote_herald (s)) ) }
     fn view_stats (
       activeNode : & ActiveNode,
       config    : & SkgConfig,
@@ -261,24 +264,6 @@ fn activeNode_metadata_to_string (
       let mut parts : Vec < String > = Vec::new ();
       if activeNode . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
-      if activeNode . viewStats . parentIsContent {
-        parts . push ( "containsParent" . to_string () ); }
-      if activeNode . viewStats . grandparentOverrides {
-        parts . push ( "grandparentOverrides" . to_string () ); }
-      if activeNode . viewStats . grandparentSubscribes {
-        parts . push ( "grandparentSubscribes" . to_string () ); }
-      if activeNode . viewStats . overridesParent {
-        parts . push ( "overridesParent" . to_string () ); }
-      if activeNode . viewStats . parentOverrides {
-        parts . push ( "parentOverrides" . to_string () ); }
-      if activeNode . viewStats . subscribesParent {
-        parts . push ( "subscribesParent" . to_string () ); }
-      if activeNode . viewStats . parentSubscribes {
-        parts . push ( "parentSubscribes" . to_string () ); }
-      if activeNode . viewStats . hidesParent {
-        parts . push ( "hidesParent" . to_string () ); }
-      if activeNode . viewStats . parentHides {
-        parts . push ( "parentHides" . to_string () ); }
       if let Some (ref original) =
         activeNode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
@@ -339,17 +324,14 @@ fn activeNode_metadata_to_string (
         parts . push ( "(parentIs absent)" . to_string () ),
       ParentIs::Independent =>
         parts . push ( "(parentIs independent)" . to_string () ) }
-    match activeNode . birth {
-      Birth::Unremarkable => {},
-      Birth::Backpath (role) =>
-        parts . push ( format! (
-          "(birth backpath {})", role . rolename () )) }
     if activeNode . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "indef" . to_string () ); }
-    if let Some (s) = graph_stats (activeNode)
+    if let Some (s) = birth_herald (activeNode)
+    { parts . push (s); }
+    if let Some (s) = rels_herald (activeNode)
     { parts . push (s); }
     if let Some (s) = view_stats (activeNode, config)
     { parts . push (s); }
@@ -398,8 +380,7 @@ fn phantomDiff_metadata_to_string (
     // parentIs is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
     parts . push ( "indef" . to_string () );
-    if let Some (s) = graphnodestats_to_sexp (
-      & phantom . graphStats, ParentIs::Affected, Birth::Unremarkable )
+    if let Some (s) = phantom_rels_atom (& phantom . graphStats)
     { parts . push (s); }
     { let mut atoms : Vec<&'static str> = Vec::new ();
       if let Some (a) = phantom . existence  . staged_atom () { atoms . push (a); }
@@ -487,58 +468,24 @@ fn deleted_scaff_metadata_to_string (
   parts . push ( "(deletedScaffold deadScaffold)" . to_string () );
   parts . join (" ") }
 
-fn graphnodestats_to_sexp (
-  gs       : &GraphNodeStats,
-  parentIs : ParentIs,
-  birth    : Birth,
+/// The blue relationship-herald atom for a phantom: counts-only tokens
+/// (no ancestor flags, no birth, no view position) plus =Ak= / =Ik=.
+fn phantom_rels_atom (
+  gs : &GraphNodeStats,
 ) -> Option < String > {
-  let mut parts : Vec < String > = Vec::new ();
-  if let Some (ref c) = gs . containRels {
-    // Per-parentIs suppression of the containers count. The client
-    // INTERCs (containers N) and (contents M) into a combined
-    // herald with `{` between them; here, the server merely decides
-    // whether each raw atom is worth emitting.
-    // - Affected   : hide the common case of exactly 1 container
-    //                (every content-child has at least one
-    //                container; the number only matters when it's
-    //                0 or >1).
-    // - Independent|Absent: hide the common case of 0 containers (a view
-    //                       root is typically standalone).
-    // - Non-default birth provenance: always show (the birth metadata
-    //                indicates that the node is *related* to the view
-    //                root via the graph, so the count is always
-    //                informative).
-    let show_containers : bool =
-      if birth != Birth::Unremarkable { true
-      } else { match parentIs {
-        ParentIs::Affected                       => c . containers != 1,
-        ParentIs::Independent | ParentIs::Absent => c . containers != 0 }};
-    let show_contents : bool = c . contents != 0;
-    if show_containers {
-      parts . push ( format! ("(containers {})", c . containers) ); }
-    if show_contents {
-      parts . push ( format! ("(contents {})", c . contents) ); } }
-  if let Some (ref l) = gs . linksourceRels {
-    // Client INTERCs these two into a linksHerald via `→`.
-    if l . sources_with_content != 0 {
-      parts . push ( format! ("(linksInFromContainers {})",
-                              l . sources_with_content) ); }
-    if l . sources_without_content != 0 {
-      parts . push ( format! ("(linksInFromLeaves {})",
-                              l . sources_without_content) ); } }
-  if gs . aliasing {
-    parts . push ( "aliasing" . to_string () ); }
-  if gs . extraIDs {
-    parts . push ( "extraIDs" . to_string () ); }
-  if gs . overriding {
-    parts . push ( "overriding" . to_string () ); }
-  if gs . subscribing {
-    parts . push ( "subscribing" . to_string () ); }
-  if gs . hiding {
-    parts . push ( "hiding" . to_string () ); }
-  if parts . is_empty () { None }
-  else { Some ( format! (
-           "(graphStats {})", parts . join (" ") )) }}
+  gs . rels . as_ref ()
+    . and_then ( |counts| assemble_counts_only (
+      counts, gs . aliases, gs . extra_ids ) )
+    . map ( |s| format! ("(rels {})", quote_herald (&s)) ) }
+
+/// Quote an assembled herald string for the metadata sexp. The strings
+/// contain spaces and parens (e.g. =2(1,1)L=), so they MUST be quoted;
+/// both the Rust 'sexp' parser and Emacs 'read' accept quoted strings.
+fn quote_herald (
+  s : &str,
+) -> String {
+  format! ( "\"{}\"",
+            s . replace ('\\', "\\\\") . replace ('"', "\\\"") ) }
 
 fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level . max (1)) }

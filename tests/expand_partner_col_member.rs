@@ -15,7 +15,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, init_global_handle_for_first_time_or_panic};
+  InRustGraphHandle, install_or_swap_global_handle};
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
@@ -62,7 +62,7 @@ fn expanding_subscriberCol_member_is_plain_expansion
     |config, driver, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      init_global_handle_for_first_time_or_panic ( graph . clone () );
+      install_or_swap_global_handle ( graph . clone () );
       let (n_view, _pids, _tree)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
@@ -73,9 +73,16 @@ fn expanding_subscriberCol_member_is_plain_expansion
         "N's view should show S as an indefinitive subscriberCol \
          member:\n{}", n_view );
       // Request definitive expansion of the subscriberCol member S.
-      let expanded_request : String = n_view
-        . replace ("indef (graphStats",
-                   "indef (viewRequests definitiveView) (graphStats");
+      // Since uniform-heralds the indefinitive member line carries
+      // 'indef (birthHerald ...)' (the old graphStats atom is gone), so
+      // we inject the definitiveView request right after 'indef'. S is
+      // the only indefinitive node in this view.
+      let s_line : String =
+        line_containing (&n_view, "(id S)") . to_string ();
+      let s_line_expanded : String = s_line . replace (
+        " indef ", " indef (viewRequests definitiveView) " );
+      let expanded_request : String =
+        n_view . replace (&s_line, &s_line_expanded);
       let saved : String =
         save (&expanded_request, config, driver, tantivy, &graph)
         . await ? . saved_view;

@@ -1,0 +1,34 @@
+#+title: One-time migration: trim node bodies
+
+* What this does
+
+Normalizes the =body= of every =.skg= file under a folder you choose:
+leading and trailing whitespace-only lines are stripped, and a body
+that is empty after stripping is removed entirely. After running it,
+"bodyless" is exactly "no =body= field" -- the invariant the
+uniform-heralds surprising-links test relies on.
+
+It is YAML-aware: each file is round-tripped through the server's own
+=NodeFS= serde type (=tools/trim-node-bodies.rs=), so a multi-line
+=body: |2= block scalar is never corrupted the way naive line-stripping
+(sed/awk) could.
+
+Save-time and import already enforce the same normalization
+(=NodeFS::from= / =into_nodecomplete=); this script is only for
+existing on-disk data that predates that enforcement.
+
+* How to run
+
+Prompts for the folder to search recursively for =.skg= files, then
+rewrites only the files whose body actually changes.
+
+#+begin_src bash :results output
+  read -r -p "Folder to recurse for .skg files: " folder
+  if [ -z "$folder" ] || [ ! -d "$folder" ]; then
+    echo "Not a directory: $folder" >&2
+    exit 1
+  fi
+  # Run from the repo root so cargo finds the workspace.
+  cd "$(git -C "$folder" rev-parse --show-toplevel 2>/dev/null || pwd)"
+  cargo run --quiet --bin trim-node-bodies -- "$folder"
+#+end_src

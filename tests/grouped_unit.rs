@@ -29,6 +29,9 @@ mod git_ops;
 #[path = "graphnodestats_hiding.rs"]
 mod graphnodestats_hiding;
 
+#[path = "herald_tokens.rs"]
+mod herald_tokens;
+
 #[path = "import_org_roam.rs"]
 mod import_org_roam;
 

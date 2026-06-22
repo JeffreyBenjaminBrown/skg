@@ -153,7 +153,9 @@ impl From<&NodeComplete> for NodeFS {
       aliases                      : c . aliases . clone (),
       pid                          : c . pid . clone (),
       extra_ids                    : c . extra_ids . clone (),
-      body                         : c . body . clone (),
+      body                         :
+        crate::types::nodes::complete::normalize_body (
+          c . body . clone () ),
       contains                     : c . contains . clone (),
       subscribes_to                : c . subscribes_to . clone (),
       hides_from_its_subscriptions : c . hides_from_its_subscriptions . clone (),

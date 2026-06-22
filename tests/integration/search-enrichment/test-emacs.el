@@ -25,11 +25,11 @@
       (message "✗ FAIL: leaf-b search root is independent during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent) (birth backpath container)" line)
+    (when (string-match-p "(parentIs independent) indef (birthHerald \"Ca\")" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent) (birth backpath linkSource)" line)
+    (when (string-match-p "(parentIs independent) indef (birthHerald \"La\")" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))
@@ -85,16 +85,16 @@
        content
        "enriched search results")
       (message "✓ containerward path enrichment arrived")
-      ;; Phase 3: verify graphnodestats in enriched results.
-      ;; container-a is a root with 1 content,
-      ;; so its line should include (graphStats (containers 0) (contents 1)).
-      (if (string-match-p "graphStats" content)
+      ;; Phase 3: verify node relationship stats in enriched results.
+      ;; leaf-b is a root with 1 content,
+      ;; so its line should include (rels "1C").
+      (if (string-match-p "(rels \"1C\")" content)
           (progn
-            (message "✓ PASS: graphnodestats present in enriched search results")
+            (message "✓ PASS: node relationship stats present in enriched search results")
             (message "Buffer content:\n%s" content)
             (kill-emacs 0))
         (progn
-          (message "✗ FAIL: graphnodestats not found in enriched search results")
+          (message "✗ FAIL: node relationship stats not found in enriched search results")
           (message "Buffer content:\n%s" content)
           (kill-emacs 1))))))
 

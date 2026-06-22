@@ -81,32 +81,47 @@ fn assert_sharing_stats_in_view_of_R (
   assert_eq! ( e_lines . len (), 2,
     "{}: E should appear under both the subscribeeCol and the \
      overriddenCol:\n{}", label, buf );
+  // Since uniform-heralds the parent-relative stats are blue rels
+  // tokens: the OLD grandparentOverrides ("gO") is the token "bO" (the
+  // grandparent b=R overrides E) and grandparentSubscribes ("gS") is
+  // "bS" (b=R subscribes to E). They render inside (rels "..."); E's
+  // birthHerald carries the col-defining relation (bS under subscribee,
+  // bO under overridden), so we look only inside the (rels "...") chunk.
+  let rels_of = | line : &str | -> String {
+    match line . find ("(rels \"") {
+      Some (i) => { let rest : &str = & line [ i + 7 .. ];
+        match rest . find ('"') {
+          Some (j) => rest [ .. j ] . to_string (),
+          None => String::new (), } },
+      None => String::new (), } };
   for (col, line) in &e_lines {
+    let rels : String = rels_of (line);
     match *col {
       "subscribeeCol" => {
-        assert! ( line . contains ("grandparentOverrides"),
-          "{}: the subscribee-as-such copy of E carries gO:\n{}",
+        assert! ( rels . contains ("bO"),
+          "{}: the subscribee-as-such copy of E carries bO (gO):\n{}",
           label, buf );
-        assert! ( ! line . contains ("grandparentSubscribes"),
-          "{}: the subscribee-as-such copy of E must not carry gS \
+        assert! ( ! rels . contains ("bS"),
+          "{}: the subscribee-as-such copy of E must not carry bS (gS) \
            (the col itself already says R subscribes):\n{}",
           label, buf ); },
       "overriddenCol" => {
-        assert! ( line . contains ("grandparentSubscribes"),
-          "{}: the overriddenCol copy of E carries gS:\n{}",
+        assert! ( rels . contains ("bS"),
+          "{}: the overriddenCol copy of E carries bS (gS):\n{}",
           label, buf );
-        assert! ( ! line . contains ("grandparentOverrides"),
-          "{}: the overriddenCol copy of E must not carry gO:\n{}",
+        assert! ( ! rels . contains ("bO"),
+          "{}: the overriddenCol copy of E must not carry bO (gO):\n{}",
           label, buf ); },
       other => panic! (
         "{}: E drawn outside any col ({:?}):\n{}", label, other, buf ),
     }}
   for f_line in lines_containing (buf, "(id F)") {
-    assert! ( ! f_line . contains ("grandparentOverrides")
-              && ! f_line . contains ("grandparentSubscribes")
-              && ! f_line . contains ("overridesParent"),
+    let f_rels : String = rels_of (f_line);
+    assert! ( ! f_rels . contains ("bO")
+              && ! f_rels . contains ("bS")
+              && ! f_rels . contains ("Oa"),
       "{}: F, a subscribee R does not override, carries none of the \
-       three stats:\n{}", label, buf ); }
+       three stats (bO/bS/Oa):\n{}", label, buf ); }
   { // Since override substitution (plan 11), a fresh view of R draws
     // C in place of P (C overrides P), marked; the Op position (C
     // under a drawn P) is asserted from a view of P instead, in
@@ -121,10 +136,12 @@ fn assert_op_in_view_of_P (
   label : &str,
 ) {
   let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
+  // Since uniform-heralds the old overridesParent ("Op") is the blue
+  // token "Oa" (C overrides its visible parent a=P) inside (rels "...").
   assert! ( c_lines . iter ()
-            . any ( |l| l . contains ("overridesParent") ),
+            . any ( |l| l . contains ("Oa") ),
     "{}: C drawn as content of P (which it overrides) carries \
-     Op:\n{}", label, buf ); }
+     Oa (Op):\n{}", label, buf ); }
 
 async fn save_and_rerender (
   buf     : &str,

@@ -1,0 +1,175 @@
+#+title: Uniform heralds: progress
+
+This is the live progress log for executing [[file:plan.org][plan.org]]. The plan stays
+as-is; deviations on HOW are recorded here (per when-to-stop.org).
+
+* Design decisions locked in (the "how")
+
+** Emission model (the key architectural choice)
+
+The five relationship tokens are DISPLAY-ONLY strings assembled in
+Rust and echoed by the rule table. They do NOT round-trip into
+structured data (saves regenerate all stats). So:
+
+- Each Active node emits at most two new atoms inside =(node ...)=:
+  - =(birthHerald "STR")= — orange, ABUT (hugs the ☮). STR is the
+    space-joined birth token(s), e.g. ="aC"=, ="3bS"=, ="dH bC"=.
+  - =(rels "STR")= — blue. STR is the space-joined non-birth
+    relationship tokens plus =Ak=/=Ik=, e.g. ="3O 2(1)L A2 I1"=.
+- A PhantomDiff emits =(rels "STR")= only (counts-only: no flags, no
+  birth), inside =(diffPhantom ...)=.
+- Token strings are QUOTED in the metadata because L tokens contain
+  parens/commas (=2(1,1)L=) and the joined strings contain spaces.
+  Both the Rust =sexp::parse= and Emacs =read= handle quoted strings;
+  the lens engine echoes the single value via =(ANY IT)=.
+
+The whole =(graphStats ...)= form DISAPPEARS from emission (its counts
+are consumed into the token strings). =(viewStats ...)= is TRIMMED to
+just =cycle=, =overridesHere= (LOAD-BEARING), and =sourceHerald=.
+
+** Birth enum: no longer serialized
+
+=.birth= is never read after parse (grep-confirmed); the Birth enum is
+recomputed on every render. So =(birth backpath ROLENAME)= is dropped
+from emission AND from the parser. The Birth enum stays in Rust, used
+only to compute the birthHerald token. =birth_rule_children= /
+=birth_emitted_atoms= are removed.
+
+** GraphNodeStats restructured to directional counts
+
+Replaces the 3 booleans + containRels + linksourceRels with, when the
+node has stats (Option, None for sourceless):
+- aliases:usize, extra_ids:usize  (-> Ak, Ik)
+- containers/contents, hiders/hides, subscribers/subscribees,
+  overriders/overrides_out  (8 directional counts)
+- link_total a, link_surprising b, link_with_content c  (L inbound)
+
+** ViewNodeStats: drop the 8 edge bools + containsParent; add tokens
+
+Removed: grandparentOverrides/Subscribes, overridesParent/parentOverrides,
+subscribesParent/parentSubscribes, hidesParent/parentHides,
+parentIsContent (folds into C-out flag), parentIsContainer (only fed
+birth designation; recomputed locally). Kept: cycle, sourceAtBoundary,
+overridesHere. Added: birth_herald:Option<String>, rels_herald:Option<String>.
+
+** Ancestor flags + generation distance
+
+Letters a=parent(gen1), b=grandparent(gen2), c, d... counting ALL
+viewnodes incl. col scaffolds. For each Active node, the "tracked
+ancestors" checked are: the immediate visible parent IF an Active
+gnode (gen1); for a col member, the col's required_ancestry real-node
+entries (owner = last entry) at their tree-gen distances. For each
+tracked ancestor A at gen g and each relation R, both directions are
+checked via relation_membership_is_real; a hit records flag g on that
+side.
+
+Birth designation (which relation token(s) are orange + order):
+- parent-gnode & parent contains it -> [Contains]
+- Birth::Backpath(role)            -> [role.relation] (side per role)
+- edge col member (Affected)       -> [relation_member_role.relation]
+- HiddenInSubscribee member        -> [Hides, Contains]   (H first)
+- HiddenOutsideOfSubscribee member -> [Hides]
+
+** Token grammar (render_token)
+
+Side render(count, flags): letters = flags.sorted->a/b/c...;
+- count==0 && no flags -> empty
+- flags present && count==flags.len() -> just letters (omit number)
+- else -> "{count}{letters}"
+Token = "{in_side}{LETTER}{out_side}", None if both empty.
+L special: inbound is the digit form a(b,c) (collapse zeros; never
+ancestor letters); outbound shows letters only (the linkSource-birth
+=La= case), no count.
+
+** Body normalization (step 0)
+
+normalize_body(Option<String>): drop leading & trailing whitespace-only
+lines; empty -> None. Applied at NodeFS::from (every disk write =
+save+import) AND into_nodecomplete (the in-memory save NodeComplete),
+plus a one-time data/bash/trim-node-bodies.org migration.
+
+* What's done and went well
+
+- *Step 0* (empty bodies impossible): committed. normalize_body at
+  NodeFS::from + into_nodecomplete; migration script + Rust helper.
+- *Steps 2–5 (Rust core)*: committed together (tightly coupled).
+  - server/herald_tokens.rs: the token grammar + assembly, with a
+    dedicated unit test (tests/herald_tokens.rs) pinning every worked
+    example from the plan (aC, 3aC, aC5, C4a, Ca, bS, Ob, dH bC,
+    a(b,c)L collapses, La, Ak/Ik). All green.
+  - GraphNodeStats restructured to directional RelationCounts; the
+    TypeDB-fallback path RETIRED (no graph -> empty stats).
+  - viewnodestats.rs: ancestor-flag pass (parent gnode at gen1; col
+    members via required_ancestor at gen i+2) + birth designation +
+    assembly into ViewNodeStats.{birth_herald,rels_herald}.
+  - org_to_text.rs emits (birthHerald "..") + (rels ".."); viewStats
+    trimmed to cycle/overridesHere/sourceHerald; phantom emits counts-
+    only (rels ..).
+  - parser accepts+discards rels/birthHerald, drops graphStats/birth.
+  - heralds.rs rule table reordered (⊥ ☮ birth rels ...); conformance
+    test green; elisp fixture regenerated.
+  - graphnodestats_hiding.rs reworked to the new directional counts.
+- *Step 6 (Emacs)*: committed. Strip fn drops birthHerald/rels; the
+  parentIs-container injection retired; the elisp display tests updated;
+  252/252 elisp tests green.
+- *Step 7 (goldens)*: DONE. Renderer verified correct by hand on
+  content/cycle (=2aC1=, =aCa=), subscribee-as-such (=bS=),
+  subscriber-as-such (=Sb=), overrider/overridden (=Oa/aO/Ob/bO=),
+  filter-col owner distances (=dH bC=), roots, source heralds. Blessed
+  all failing Rust test files (one agent per test binary, using
+  =cargo nextest --test <binary>= to isolate builds; each re-ran to
+  green) and the bash integration =test-emacs.el= assertions. Every
+  blessed value was copied from the renderer's ACTUAL output, never
+  hand-invented.
+
+* FINAL STATUS: plan fully executed
+
+All three suites green:
+- Rust: =cargo nextest run= -> 470/470.
+- Elisp: =bash bash/emacs-tests.sh= -> 252/252.
+- Integration: =bash bash/integration-tests.sh= -> all 32 pass.
+
+* Changes to the plan's envisioned order
+
+- Steps 2–5 (GraphNodeStats, ViewNodeStats+birth, token assembly,
+  rule table/parser) are tightly coupled — implemented together as one
+  compiling change rather than strictly sequentially.
+- Birth enum round-trip dropped entirely (plan implied keeping the
+  =(birth ...)= atom; grep showed it is display-only, so removing it is
+  simpler and the new birthHerald token subsumes its display).
+
+* What's imperfect about what's done
+
+- *Test stats require the in-Rust handle.* Retiring the TypeDB stats
+  fallback means a rendered view's heralds come only from
+  'snapshot_global'. I first tried installing the handle process-wide in
+  'populate_data_from_config', but that REGRESSED low-level tests
+  (typedb/delete_nodes, merge_nodes): they mutate TypeDB directly and
+  read back through paths that PREFER the in-Rust graph, so a
+  populate-time snapshot goes stale. Reverted. The render tests instead
+  install the handle per-test (the established pattern:
+  'install_or_swap_global_handle(graph_handle_from_config(config)?)'
+  after reset, as in view_stats_sharing.rs). Folded into step 7.
+- *Save-driving render tests shared one graph.* hidden_from_subscriptions
+  and definitive_view_cascade_and_budget built a fresh EMPTY local graph
+  ('new_handle(InRustGraph::new())') for the save while the renderer read
+  the GLOBAL handle. That worked when the renderer had no stats; now the
+  stale global makes hidden content reappear / redefined contains be
+  ignored / empty bodies show stale disk text. Fixed by sharing one
+  handle (matching production, which has exactly one graph). Test-only.
+- *The sexp<->org bijection (elisp) is symbol-based*, so it cannot
+  round-trip the new quoted herald strings (=3(1,1)L=). Harmless: heralds
+  are display-only and stripped before any save/edit path that uses the
+  bijection. One obsolete elisp round-trip test was removed.
+- *Integration helper rewrite.* A shared integration helper that
+  classified a backpath graft by reading the old =(birth backpath
+  ROLENAME)= atom now derives the role from the new herald grammar
+  (graft iff =(parentIs independent)=, role from the outbound relation
+  letter). Covers the roles those e2e tests exercise.
+
+* Choices determining the future
+
+- New display atoms: =birthHerald=, =rels= (both echo one quoted
+  string). =graphStats= and the 8 edge =viewStats= atoms removed.
+- Token strings are assembled in Rust (server/herald_tokens.rs), not in
+  the rule table — the table only colors/orders/echoes.

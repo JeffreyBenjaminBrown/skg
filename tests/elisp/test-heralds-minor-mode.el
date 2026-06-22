@@ -9,8 +9,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (node (id 123) (graphStats (contents 2) (containsHerald (contents 2))) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (graphStats (linksInFromContainers 3) (linksHerald 3→)) (editRequest delete))) more text\n")
+      (insert "Test line with (skg (node (id 123) (rels \"C2\") (viewStats cycle))) herald\n")
+      (insert "Another line (skg (node (id 456) (rels \"3(3)L\") (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -38,7 +38,7 @@
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "Test that the display property is properly set and cleared."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (parentIs independent) (birth backpath linkSource) (graphStats (containers 3) (containsHerald (containers 3)) (linksInFromLeaves 1) (linksHerald →1)) (viewStats cycle) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (parentIs independent) (birthHerald \"La\") (rels \"3(1)L\") (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ;; Find the overlay covering our herald
@@ -53,14 +53,17 @@
                            overlays-at-herald )) )
         (should display-overlay) ;; Should have a display overlay
         (should ( stringp ( overlay-get display-overlay 'display )) )
-        (let ;; The display should contain our herald symbols
+        (let ;; The display should contain our herald symbols: the
+             ;; orange birth herald "La", the blue rels "3(1)L", the
+             ;; cycle ⟳, the independent ⊥, and the delete request --
+             ;; with the orange birth herald before the blue rels.
             ( ( display-text ( overlay-get display-overlay 'display )) )
-          ( should ( string-match "←" display-text ))
+          ( should ( string-match "⊥" display-text ))
+          ( should ( string-match "La" display-text ))
           ( should ( string-match "⟳" display-text ))
-          ( should ( string-match "3{" display-text ))
-          ( should ( string-match "→1" display-text ))
-          ( should (< (string-match "→1" display-text)
-                      (string-match "3{" display-text)) )
+          ( should ( string-match "3(1)L" display-text ))
+          ( should (< (string-match "La" display-text)
+                      (string-match "3(1)L" display-text)) )
           ( should ( string-match "delete" display-text )) )) )
     (progn ;; what happens upon disabling it
       (heralds-minor-mode -1) ;; disable
@@ -194,7 +197,7 @@ would leak content the user hid by restricting the source-set."
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg (node (id 1) (source s) (graphStats (contents 2) (containsHerald (contents 2)))))\n")
+    (insert "(skg (node (id 1) (source s) (rels \"C2\")))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
@@ -221,7 +224,7 @@ the fixture table."
     (cl-letf (((symbol-function 'skg-request-herald-rules)
                (lambda () (skg-test-install-herald-rules))))
       (with-temp-buffer
-        (insert "(skg (node (id 1) (source s) (graphStats (contents 2) (containsHerald (contents 2)))))\n")
+        (insert "(skg (node (id 1) (source s) (rels \"C2\")))\n")
         (heralds-minor-mode 1)
         (should heralds-minor-mode)       ;; stayed on
         (should heralds--transform-rules) ;; table recovered

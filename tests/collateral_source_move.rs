@@ -10,7 +10,7 @@ use skg::dbs::init::{
 use skg::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
-  init_global_handle_for_first_time_or_panic,
+  install_or_swap_global_handle,
   new_handle};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
@@ -59,7 +59,7 @@ fn test_source_move_updates_collateral_view_metadata (
       &tantivy_folder ) ) ?;
   let graph : InRustGraphHandle =
     new_handle ( InRustGraph::from_nodecompletes (&initial_nodes) );
-  init_global_handle_for_first_time_or_panic (graph . clone ());
+  install_or_swap_global_handle (graph . clone ());
 
   let (_save_response, collateral_buffer)
     : (SaveResponse, String) =

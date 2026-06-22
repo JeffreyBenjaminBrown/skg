@@ -50,14 +50,10 @@ directives, ANY/IT, ABUT, and INTERC are documented there. The rule
 patterns the table uses are documented on `herald_rule_table` in
 server/heralds.rs.
 
-NORMALISATION
-
-The server leaves parentIs=affected implicit in `(node ...)'. Before
-this table runs, `heralds--read-metadata' calls
-`heralds--inject-default-parentIs' to add `(parentIs container)' when
-missing, so the table's `(parentIs (BLUE container \"{\") ...)'
-sub-rule can fire for omitted ordinary content. `container' is thus
-an Emacs-internal atom; the server never emits it.")
+No client-side normalisation is needed: the ordinary-content herald is
+the orange birth herald the server assembles, `(node ... (birthHerald
+\"aC\") ..)', so omitted parentIs=affected content carries no parentIs
+herald of its own.")
 
 (defun heralds-install-rules (rules)
   "Install RULES (a list whose car is `skg') as the herald rule table.
@@ -271,43 +267,14 @@ parse as an `(skg ...)' form."
     (heralds--tokens->text tokens)))
 
 (defun heralds--read-metadata (metadata-sexp)
-  "Read METADATA-SEXP string into a Lisp object and normalise it.
-Returns nil if parsing fails. Normalisation currently means: if
-the sexp is an (skg (node ...)) form whose node has no explicit
-(parentIs ...) sub-form, insert (parentIs container) -- the server
-leaves 'affected' membership implicit
-(see `activeNode_metadata_to_string' in org_to_text.rs),
-but the herald rules use this internal marker to preserve the ordinary
-content herald."
-  (let ((parsed (condition-case nil
-                    (car (read-from-string metadata-sexp))
-                  (error nil))))
-    (heralds--inject-default-parentIs parsed)))
-
-(defun heralds--inject-default-parentIs (sexp)
-  "If SEXP is `(skg (node ...) ...)` and the node has no (parentIs ...)
-child, return a copy with `(parentIs container)' inserted into the
-node. Otherwise return SEXP unchanged."
-  (if (and (listp sexp)
-           (eq (car-safe sexp) 'skg))
-      (cons 'skg
-            (mapcar
-             (lambda (child)
-               (if (and (listp child) (eq (car-safe child) 'node)
-                        (not (cl-some
-                              (lambda (sub)
-                                (and (listp sub)
-                                     (eq (car-safe sub) 'parentIs)))
-                              (cdr child))))
-                   ;; insert (parentIs container) immediately after the
-                   ;; `node' symbol; its position in the list doesn't
-                   ;; affect matching but keeps the normalised form
-                   ;; readable if ever inspected.
-                   (cons 'node
-                         (cons '(parentIs container) (cdr child)))
-                 child))
-             (cdr sexp)))
-    sexp))
+  "Read METADATA-SEXP string into a Lisp object.
+Returns nil if parsing fails. The ordinary-content herald is now the
+orange birth herald the server assembles (an (skg (node ... (birthHerald
+\"aC\") ..)) form), so no client-side normalisation is needed: omitted
+'affected' membership simply has no parentIs herald of its own."
+  (condition-case nil
+      (car (read-from-string metadata-sexp))
+    (error nil)))
 
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."

@@ -57,7 +57,7 @@ parent's (source X) with each child's (id N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
     (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef (viewStats parentOverrides))) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef (rels \"aO\"))) N-original\n")
     (org-mode)
     (should (equal (skg--fork-sources-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
@@ -84,7 +84,7 @@ ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (parentIs independent) indef (viewStats parentOverrides))) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (parentIs independent) indef (rels \"aO\"))) N-original\n"
                     origin)))
           (unwind-protect
               (with-current-buffer buf

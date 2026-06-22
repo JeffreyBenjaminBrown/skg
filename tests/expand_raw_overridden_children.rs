@@ -17,7 +17,7 @@
 use std::error::Error;
 
 use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, init_global_handle_for_first_time_or_panic};
+  InRustGraphHandle, install_or_swap_global_handle};
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::ID;
@@ -34,7 +34,7 @@ fn raw_drawn_overridden_root_children_are_raw
     |config, driver, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      init_global_handle_for_first_time_or_panic ( graph . clone () );
+      install_or_swap_global_handle ( graph . clone () );
       let (x_view, _pids, _tree)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (

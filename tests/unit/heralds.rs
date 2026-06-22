@@ -4,13 +4,10 @@ use std::collections::HashSet;
 
 /// Atoms that legitimately appear in the rule table although the
 /// server never emits them:
-/// - "container" is injected by Emacs's normalization
-///   ('heralds--inject-default-parentIs') for implicit
-///   parentIs=affected content;
 /// - "affected" is accepted by the parser but left implicit by the
 ///   serializer; its vacuous rule documents that.
-const ACCEPTED_NOT_EMITTED_ATOMS : [&str; 2] =
-  [ "container", "affected" ];
+const ACCEPTED_NOT_EMITTED_ATOMS : [&str; 1] =
+  [ "affected" ];
 
 // The required core of the herald migration: every metadata atom the
 // server can emit has a rule, and every rule names a live atom.

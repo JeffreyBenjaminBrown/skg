@@ -125,16 +125,16 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
 ;;
 
 (ert-deftest test-strip-heralds-removes-herald-subfields ()
-  "Heralds (containsHerald, linksHerald, sourceHerald) are removed; a
-stats form emptied by the removal is dropped, other data is kept."
+  "Heralds (the node-level birthHerald / rels display strings, and
+sourceHerald inside viewStats) are removed; a viewStats emptied by the
+removal is dropped, other data is kept."
   (should (equal
            (skg-strip-heralds-from-sexp
             '(skg (node (id x)
-                        (graphStats (containers 3) (containsHerald 0{5)
-                                    (linksHerald 4→))
+                        (birthHerald "aC")
+                        (rels "3C")
                         (viewStats (sourceHerald ⌂:priv) cycle))))
-           '(skg (node (id x) (graphStats (containers 3))
-                       (viewStats cycle))))))
+           '(skg (node (id x) (viewStats cycle))))))
 
 (ert-deftest test-strip-heralds-drops-stats-form-with-only-heralds ()
   "A graphStats/viewStats holding only herald subfields is dropped."

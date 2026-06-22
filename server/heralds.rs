@@ -19,7 +19,6 @@
 /// nested RULE. The special label ANY matches any leaf; IT echoes
 /// the matched value(s).
 
-use crate::dbs::in_rust_graph::relation_accessors::PARTNER_ROLE_VOCAB;
 use crate::types::viewnode::{PartnerCol, Qual, QualCol, ViewRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +56,7 @@ pub struct HeraldRule {
 // Constructor sugar, so the table below stays close to the sexp it serializes to.
 //
 
-use HeraldColor::{Red, Green, Blue, Yellow, Orange};
+use HeraldColor::{Red, Green, Blue, Orange};
 
 /// (label children...)
 fn rule (
@@ -122,6 +121,15 @@ fn any (
 ) -> RuleChild {
   rule ( "ANY", children ) }
 
+/// (ANY ABUT children...) -- an ANY leaf whose echoed token glues onto
+/// the preceding token (so the orange birth herald hugs the ☮).
+fn any_abut (
+  children : Vec<RuleChild>,
+) -> RuleChild {
+  RuleChild::Rule ( HeraldRule {
+    color : None, interc : None, label : Some ("ANY"),
+    abut : true, children } ) }
+
 /// ([COLOR] INTERC "sep" [label] children...)
 fn interc (
   color    : Option<HeraldColor>,
@@ -134,16 +142,6 @@ fn interc (
     abut : false, children } ) }
 
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
-
-/// Birth herald children: the literal 'backpath' tag (emits nothing)
-/// plus one orange glyph leaf per partner role, generated from
-/// PARTNER_ROLE_VOCAB so the role<->glyph table is the single source of
-/// truth. Matches '(birth backpath ROLENAME)'.
-fn birth_rule_children () -> Vec<RuleChild> {
-  let mut children : Vec<RuleChild> = vec! [ vac ("backpath") ];
-  for (rolename, _role, glyph) in PARTNER_ROLE_VOCAB {
-    children . push ( leaf (Orange, rolename, glyph) ); }
-  children }
 
 //
 // The table
@@ -259,37 +257,21 @@ pub fn herald_rule_table () -> HeraldRule {
         vac ("id"),
         vac ("source"),
         rule ("parentIs", vec! [
-          leaf (Blue, "container", "{"),
           vac ("absent"),
           vac ("affected"),
           leaf (Orange, "independent", "⊥") ]),
-        rule ("birth", birth_rule_children ()),
         // The server emits the abbreviated atom 'indef'
-        // (see org_to_text.rs); we match that here.
+        // (see org_to_text.rs); we match that here. It leads so the
+        // orange birth herald can hug it.
         leaf_abut (Green, "indef", "☮"),
-        rule ("graphStats", vec! [
-          interc (Some (Yellow), "→", None, vec! [
-            rule ("linksInFromContainers", vec! [ any (vec! [RuleChild::It]) ]),
-            rule ("linksInFromLeaves",     vec! [ any (vec! [RuleChild::It]) ]) ]),
-          interc (Some (Blue), "{", None, vec! [
-            crule (Yellow, "containers", vec! [ any (vec! [RuleChild::It]) ]),
-            crule (Blue,   "contents",   vec! [ any (vec! [RuleChild::It]) ]) ]),
-          leaf (Blue, "aliasing",    "A"),
-          leaf (Blue, "extraIDs",    "I"),
-          leaf (Blue, "overriding",  "O"),
-          leaf (Blue, "subscribing", "S"),
-          leaf (Blue, "hiding",      "H") ]),
+        // The orange BIRTH herald: one quoted string of space-joined
+        // relationship tokens, assembled in Rust (server/herald_tokens.rs)
+        // and echoed verbatim. ABUT so it hugs the ☮.
+        crule (Orange, "birthHerald", vec! [ any_abut (vec! [RuleChild::It]) ]),
+        // The blue relationship heralds: another assembled string.
+        crule (Blue, "rels", vec! [ any (vec! [RuleChild::It]) ]),
         crule (Blue, "viewStats", vec! [
           leaf (Blue, "cycle", "⟳"),
-          rule ("containsParent", vec! [ s ("}") ]),
-          leaf (Red, "grandparentOverrides",  "gO"),
-          leaf (Red, "grandparentSubscribes", "gS"),
-          leaf (Red, "overridesParent",       "Op"),
-          leaf (Red, "parentOverrides",       "pO"),
-          leaf (Red, "subscribesParent",      "Sp"),
-          leaf (Red, "parentSubscribes",      "pS"),
-          leaf (Red, "hidesParent",           "Hp"),
-          leaf (Red, "parentHides",           "pH"),
           crule (Red, "overridesHere", vec! [
             // ANY without IT: the marker's ID payload is matched
             // but not echoed; only "Oh" is displayed.
@@ -326,18 +308,7 @@ pub fn herald_rule_table () -> HeraldRule {
         vac ("id"),
         vac ("source"),
         leaf_abut (Green, "indef", "☮"),
-        rule ("graphStats", vec! [
-          interc (Some (Yellow), "→", None, vec! [
-            rule ("linksInFromContainers", vec! [ any (vec! [RuleChild::It]) ]),
-            rule ("linksInFromLeaves",     vec! [ any (vec! [RuleChild::It]) ]) ]),
-          interc (Some (Blue), "{", None, vec! [
-            crule (Yellow, "containers", vec! [ any (vec! [RuleChild::It]) ]),
-            crule (Blue,   "contents",   vec! [ any (vec! [RuleChild::It]) ]) ]),
-          leaf (Blue, "aliasing",    "A"),
-          leaf (Blue, "extraIDs",    "I"),
-          leaf (Blue, "overriding",  "O"),
-          leaf (Blue, "subscribing", "S"),
-          leaf (Blue, "hiding",      "H") ]),
+        crule (Blue, "rels", vec! [ any (vec! [RuleChild::It]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
           leaf (Green, "newX",     "X"),
@@ -431,8 +402,10 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "deletedScaffold",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "source",
-    "parentIs", "birth", "indef", "notInGit",
-    "graphStats", "viewStats", "editRequest", "viewRequests",
+    "parentIs", "indef", "notInGit",
+    // The two assembled herald-string atoms (server/herald_tokens.rs):
+    "birthHerald", "rels",
+    "viewStats", "editRequest", "viewRequests",
     "staged", "unstaged",
     // EditRequest atoms:
     "delete", "merge",
@@ -440,56 +413,41 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( graphstats_atoms () );
   atoms . extend ( viewstats_atoms () );
   atoms . extend ( parentIs_emitted_atoms () );
-  atoms . extend ( birth_emitted_atoms () );
   atoms . extend ( axis_atoms () );
   atoms . extend ( qual_and_col_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
-/// GraphNodeStats atoms, from graphnodestats_to_sexp (org_to_text.rs).
-/// The destructuring pattern is the exhaustiveness guard: a new field
-/// on GraphNodeStats fails to compile here until this list (and the
-/// rule table, via the conformance test) learns its atom.
+/// GraphNodeStats emits NO match atoms now: its counts feed the
+/// assembled 'birthHerald'/'rels' strings (value position). The
+/// destructuring pattern is the exhaustiveness guard -- a new field
+/// fails to compile here until it is accounted for.
 fn graphstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::GraphNodeStats;
   fn guard ( g : GraphNodeStats ) {
     let GraphNodeStats {
-      aliasing : _, extraIDs : _, overriding : _, subscribing : _,
-      hiding : _,
-      containRels : _,    // -> the containers / contents atoms
-      linksourceRels : _, // -> the linksInFrom* atoms
+      aliases : _,   // -> Ak, inside the rels string
+      extra_ids : _, // -> Ik, inside the rels string
+      rels : _,      // -> the relationship tokens, inside birthHerald/rels
     } = g; }
   let _ = guard;
-  vec! [ "aliasing", "extraIDs", "overriding", "subscribing", "hiding",
-         "containers", "contents",
-         "linksInFromContainers", "linksInFromLeaves" ] }
+  vec! [] }
 
-/// ViewNodeStats atoms, from activeNode_metadata_to_string's
-/// view_stats (org_to_text.rs). Guard as in graphstats_atoms.
+/// ViewNodeStats match atoms, from activeNode_metadata_to_string's
+/// view_stats (org_to_text.rs). The birth/rels herald strings are
+/// node-level atoms (in the base list above), not viewStats sub-forms.
 fn viewstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ViewNodeStats;
   fn guard ( v : ViewNodeStats ) {
     let ViewNodeStats {
       cycle : _,
-      parentIsContainer : _, // never serialized (the default state makes no noise)
-      parentIsContent : _,   // -> the containsParent atom
-      sourceAtBoundary : _,  // -> the sourceHerald atom
-      grandparentOverrides : _,
-      grandparentSubscribes : _,
-      overridesParent : _,
-      parentOverrides : _,
-      subscribesParent : _,
-      parentSubscribes : _,
-      hidesParent : _,
-      parentHides : _,
-      overridesHere : _, // keyed form (a viewStats sub-form)
+      sourceAtBoundary : _, // -> the sourceHerald atom
+      birth_herald : _,     // -> the node-level birthHerald atom
+      rels_herald : _,      // -> the node-level rels atom
+      overridesHere : _,    // keyed form (a viewStats sub-form)
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "containsParent", "sourceHerald",
-         "grandparentOverrides", "grandparentSubscribes",
-         "overridesParent", "parentOverrides",
-         "subscribesParent", "parentSubscribes",
-         "hidesParent", "parentHides", "overridesHere" ] }
+  vec! [ "cycle", "sourceHerald", "overridesHere" ] }
 
 /// ParentIs values the serializer can emit (Affected stays implicit).
 fn parentIs_emitted_atoms () -> Vec<&'static str> {
@@ -500,20 +458,6 @@ fn parentIs_emitted_atoms () -> Vec<&'static str> {
         => () }}
   let _ = guard;
   vec! [ "independent", "absent" ] }
-
-/// Birth values the serializer can emit (Unremarkable stays implicit).
-/// A Backpath emits '(birth backpath ROLENAME)', so the atoms are the
-/// 'backpath' tag plus every ROLENAME in PARTNER_ROLE_VOCAB.
-fn birth_emitted_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::Birth;
-  fn guard ( b : Birth ) { // compile error here = update the list below
-    match b {
-      Birth::Unremarkable | Birth::Backpath (_)
-        => () }}
-  let _ = guard;
-  let mut atoms : Vec<&'static str> = vec! [ "backpath" ];
-  atoms . extend ( PARTNER_ROLE_VOCAB . iter () . map ( |(name, _, _)| *name ) );
-  atoms }
 
 /// The staged/unstaged axis atoms, from types/git.rs.
 fn axis_atoms () -> Vec<&'static str> {
