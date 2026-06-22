@@ -1,4 +1,16 @@
+* ONGOING override chains
+** skg3  --resume 25126e37-d0ef-4790-a58b-2f6da928478e
+** dogfood : User-owned forks are all kinds of wrong.
+* TODO remove empty bodies from my data
+There's a script for it.
+* AWAITS better user-owned forks : [[./TODO/user-owned_autofork_chain/]]
 * Play two roles, communicate through git.
+** gecko feet, biologist and bank robber
+Scientist studies gecko feet.
+Bank robber searches scientist's
+** shark teeth, biologist and chip-designer
+Denticles are good for drag and anti-bacterial.
+Chip designer lists places where bacteria have been growing.
 * s
 ** correctness
 *** No two forks in a user-owned chain of forks should share a source.
@@ -43,45 +55,16 @@ and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
 *** rewrite docs/COMMANDS.org
 Some new Claude-written passages assume too much of the reade
-*** uniform rel stats
-pX = parent Xs it
-Xp = it Xs parent
-3pX = 3 X it, among them its parent
-X4p = it Xs 4, including its parent
-
-In the special case of X=L for links,
-a(b,c)L (where a,b,c are numbers) =
-  a nodes link to it,
-  b of those a differ from it, are bodyless and content-less, but their title text is something other than the link label
-  c of the a have their own content
-  (the remainer are links whose title nodes are just a link with one of the node's normal aliases)
-
-g (grandparent) and G (great-grandparent)
-can be used like p.
-*** O,S,A etc. should precede numerical content stats, in another color
-*** fork request
-To provide a way to fork your own data
-(because the 'edit a foreign one' gesture cannot be applied).
-*** Why is search slow?
-Try a search that was big -- backup my data.
-The view update or the ranking might swamp the other's cost.
-*** show content roots of all modified nodes
 *** a function to relabel link labels
 The label could be a special string like ":skg default label:".
 That is, the target got a better title, and you would like
 everything that uses the default title to switch to the new one.
-*** recursive git rm for removed nodes
-*** Each parentIs herald should be a different color.
-and always first
-*** C-a should alternate between title start and line start
+*** text search across containment paths
 *** the diff report should
 **** explain the maximum badness in each category
 **** include empty top-level categories
 so a reader can remember what those categories are,
 and thus (e.g.) that nothing was orphaned.
-*** git add for both sides of moved source
-*** each new root view sohuld be drawn with a link sources ancestry
-that is, linksource-ancestry as view-descendents
 *** command to reverse the [where I learned it] contains [it] link
 One can then easily place the source under a branch named 'source'.
 **** elaboration
@@ -95,16 +78,17 @@ A command to reverse the direction of a contains relationship
 would make it easy to clean such data -- run from a child,
 it makes the child contain its parent,
 and removes the child from the parent.
-*** text search across containment paths
-*** return point to not just the same line but the same* char
-  * or max within that line if too big)
+*** Why is search slow?
+Try a search that was big -- backup my data.
+The view update or the ranking might swamp the other's cost.
+*** show content roots of all modified nodes
+*** each new root view should be drawn with a link sources ancestry
+that is, linksource-ancestry as view-descendents
+*** recursive git rm for removed nodes
 ** convenience to coder
 *** I want my config data to be in git.
 *** [[./TODO/better-than-regex-in-emacs-tests.org]]
-*** graphstats should precede even the link source count
-but follow parentIs and indef
 ** elegance
-*** reveal aliases is different from reveal sourceward/containerward
 *** Emacs, not the server, should remember foldedness and point.
 **** the idea
 Keep a tree of IDs.
@@ -116,18 +100,6 @@ Continue to apply foldedness leafward from the root as before.
 **** It's hard because two viewnodes can share an ID.
 The incoming tree would have to be compared to the outgoing one.
 Although they usually don't, things can shift around dramatically.
-*** missing abstraction : "relationship to visible org-parent"
-Provenance/relationship to the org-parent is currently expressed three ways:
-(a) a 'birth' marker (containment, links)
-(b) a viewStats parent-herald (overrides: Op/pO)
-(c) for containment, BOTH at once ("}" appears as birth and as viewStats).
-
-Extending to subscribes/
-hides invites picking one. A single concept — "this node's relation
-to its visible org-parent, with role/direction" — computed in one
-place ('set_relation_relative_stats') and rendered by one herald
-family, would cover all 5 relations x 2 directions uniformly and
-retire the birth/viewStats split. Recommended by Q7(B) + Q8.
 ** usage mysteries
 *** must (?) stage them separately, but commit all repos at once
 ** usage, to document
@@ -135,11 +107,17 @@ retire the birth/viewStats split. Recommended by Q7(B) + Q8.
 Someone can if they find a way to use it.
 They might never use it.
 It's cheap.
+** DONE , probably
+*** skg2 : TODO/uniform-heralds/
+**** what it was
+Where I introduced the uniform aXb syntax,
+for a,b integers and X one of the five relations (C,L,S,O,H).
+**** claude --resume 177c504c-58d9-4f48-9b3c-1c7fce73fd74
 * easy
 ** beep also once the db has rebuilt
 ** remap C-c C-o during Skg
 in skg buffers
-** show what the herald it is responsible for next to each field in the metadata
+** show the herald it is responsible for next to each field in the metadata
 ** IDs should not be writeable in the metadata view
 And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?
@@ -147,12 +125,6 @@ Why would you split up your skg stuff?
 * bugs
 ** making a node multicontained does not update its container count
 in the buffer it was copied from
-** after a big edit to the CS for econ course notes, C-c t A took forever
-I had created a big tree of new nodes.
-** What's the second blue { in the herald for?
-Saw it looking at 'address', common to Valentina and Maps.
-** DONE 'compute_interleaved_diff' can collide for large unique-item lists
-WARNING: That is a verbatim heading title from TODO/problems.org
 * maybe
 ** a way to present more nodes on one line
 Just triple the relationship character and color it differently.

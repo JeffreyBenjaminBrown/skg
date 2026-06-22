@@ -1,0 +1,57 @@
+* To unify a user's forks, use a "user-owned auto-fork chain" ("UOAFC").
+** some vocab
+Node K (the "fork") forks node E (the "forkee")
+  iff K both subscribes to and overrides E.
+** the idea
+Currently, if someone forks their own data (for privacy),
+they must consciously maintain both nodes.
+Better would be to experience both (or all) forks as one viewnode,
+choosing which source each child is in,
+and have a fork system automatically created,
+ideally without restating lots of IDs,
+so that the public one need not even mention private node IDs.
+** It might be hard.
+What if the user wants a more-private fork to have a different order?
+What if it hides some of the nodes from the forkee?
+In either case anchoring this node's content relative to the other's
+becomes hard.
+** Easier to make a special "owned auto-fork" case.
+A chain C1 ... Cn of nodes is an autofork if:
+- For each i, Ci has a distinct source.
+- No fork hides anything from its subscriptions to its in-chain forkee.
+- Each fork relies on its forkee's content being a sublist
+  (i.e. preserving order) of its own content.
+  Indeed this should hold even for non-content relationships.
+  This only applies if both fork and forkee are in the samed owned auto-fork;
+  they can still hide things outside of the chain.
+In this case, each fork can
+define the placement of the new content it adds to the view
+(note that by "no in-chain hides" above, none subtract from the view)
+as a list of the form (mine: IDs) [(forkee: ID) (mine: IDs)] --
+that is, the IDs it prepends to the list,
+followed by a series of lists of things it inserts into the list,
+each anchored to an ID from the forkee, which they are drawn immediately after.
+
+Wait, no -- the anchor might not be from the forkee,
+but from a forkee of the forkee, or even farther down the chain.
+This is still feasible, though, because we can
+build up the target list of IDs to render from the first forkee.
+A fork later down the chain does not need to know
+which forkeeward ancestor its anchor is listed as content of.
+** to visually identify a user-owned auto-fork chain
+Give it a UFk ("yoU (auto)Fork") herald,
+where k is the length of the visible (active source) portion of the chain.
+** autofork is incompatible with (explicit) override|subscribe|hide
+I think best would be to disallow the graph from having both
+- the (formal) autofork relationship
+- ((explicit) subscribes or override relationships between two nodes in the same user-owned autofork chain
+The syntax, after all, for placing nodes
+is different (relative rather than absolute) in an autofork.
+(This is true for every fork in the chain, but not the first forkee in it,
+because the first forkee is not a fork (in that user-owned autofork chain).
+** make autofork a formal typedb rel
+It could imply override and subscribes-to.
+Can TypeDB let me define such implications via rules?
+That would be way better than having to rewrite a gazilliion queries
+to consider the new autofork case
+alongside the existing subscribe and override cases.

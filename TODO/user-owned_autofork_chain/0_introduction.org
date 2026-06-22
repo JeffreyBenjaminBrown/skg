@@ -1,0 +1,34 @@
+Welcome, Claude! Please read coding-advice/ORIENTATION.org, and whatever it refers to (recursively), for orientation.
+
+Then I would like you to read
+TODO/user-owned_autofork_chain/vision.org
+and call out everything you think is lacking:
+- unmade decisions
+- incorrect things
+- awkward, inelegant or overly complex things
+- dangerous things
+- missing concepts or abstractions 9esp. types)
+  if they would make things safer or clearer
+
+Please write your analysis in a new org document, sibling to 1_vision.org,
+called 2_discussion.org.
+
+If an issue you raise is likely solved,
+please prefix its title with '(likely solved): '.
+Where you cannot execute without my weighing in,
+please put a (standard org-style) TODO prefix on the headline.
+
+Wrap function names in single quotes, not equals signs or tildes.
+That way I can use M-. to go to the function's definition.
+Similarly, write files as org-mode links [[../../path/to/whatever.md][like this]], so I can follow them fast.
+
+If, in researching this, you find any:
+- bugs or deviations from spec
+- noteworthy inefficiencies
+- opportunities to improve the architecture
+please report them (as described elsewhere) in TODO/problems.org.
+
+If you run into strange behavior, and need to investigate,
+feel free to design experiments! Sometimes that's much faster
+than reasoning through the code.
+Also, feel free to add temporary debugging code to server/ or elisp/.
