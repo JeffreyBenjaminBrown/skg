@@ -273,6 +273,13 @@ which would trigger overlay modification-hooks if still present."
           (skg-handle-save-sexp payload)))
     (skg--unlock-all-save-locked)) )
 
+(defconst skg-fork-source-placeholder "PICK-A-SOURCE"
+  "Sentinel source the server pre-fills for each clone-to-be in the
+fork-confirmation buffer. The user must replace it (C-c s s) with a real
+owned source before approving; `skg-approve-fork' refuses while any clone
+still carries it. Must match FORK_SOURCE_PLACEHOLDER in
+server/from_text/fork.rs.")
+
 (defvar-local skg--fork-origin-buffer nil
   "In a fork-confirmation buffer, the source buffer whose save raised the
 forks. `skg-approve-fork' re-saves it (approved); `skg-decline-fork'
@@ -413,12 +420,21 @@ child's id N -- the key by which the server applies the chosen source."
   "Approve the forks listed in this *SKG Fork Confirmation* buffer:
 extract each clone's chosen source, re-save the originating buffer with
 the forks approved (carrying those sources), then kill the confirmation
-buffer."
+buffer.
+
+Refuses while any clone-to-be still carries the `skg-fork-source-placeholder'
+source: every clone's source must be picked deliberately (C-c s s) before
+approving. The confirmation buffer is left open so you can do so."
   (interactive)
   (let ((origin skg--fork-origin-buffer)
         (fork-sources (skg--fork-sources-from-confirmation-buffer)))
     (unless (buffer-live-p origin)
       (error "The buffer that requested these forks is no longer open"))
+    (when (seq-some (lambda (pair)
+                      (string= (cdr pair) skg-fork-source-placeholder))
+                    fork-sources)
+      (user-error
+       "Pick a source for each clone first: point on a clone-to-be headline, then C-c s s"))
     ;; The atom must survive to the re-save (which commits the fork; the
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)

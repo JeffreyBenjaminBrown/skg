@@ -381,15 +381,15 @@ over a public clone =C= that already overrides a foreign =N=.
 Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's snapshot matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
-the usual fork-confirmation buffer. Approve with =C-c C-c= (rotate
-the clone's source first with =C-c s s=, e.g. to your private
-source), or decline with =C-c C-k= (which also strips the fork
-request so the next save does not re-fork).
+the usual fork-confirmation buffer. There you MUST set the clone's
+source with =C-c s s= (it starts as the placeholder PICK-A-SOURCE,
+with your config-first owned source suggested above it), then
+approve with =C-c C-c=; or decline with =C-c C-k= (which also
+strips the fork request so the next save does not re-fork).
 
-The clone subscribes to and overrides the node, the original keeps
-its own (owned) content, and the clone's source defaults to your
-config-first owned source. A node may have at most one clone you
-own; forking an already-forked node is rejected, naming the
+The clone subscribes to and overrides the node, and the original
+keeps its own (owned) content. A node may have at most one clone
+you own; forking an already-forked node is rejected, naming the
 existing clone. See =docs/forks.md=.
 *** C-c m l : skg-replace-content-with-link
 Replace the branch at point with a link to the node that used to

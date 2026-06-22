@@ -186,3 +186,21 @@
    Stripping is idempotent, so it is a harmless no-op after a decline.
    The fork-owned integration test gained a part that dismisses the
    confirmation by killing it directly and asserts the atom is stripped.
+
+** DONE The confirmation buffer forces a deliberate source pick (all forks)
+   Per Jeff: a fork must not silently land in a default source. The
+   fork-confirmation buffer now pre-fills each clone-to-be's source with
+   the placeholder 'PICK-A-SOURCE' (server const 'FORK_SOURCE_PLACEHOLDER'
+   in from_text/fork.rs; client const 'skg-fork-source-placeholder'); the
+   computed source (inferred-from-ancestor, or config-first owned) is
+   shown only as a "# Suggested source ..." comment above each clone.
+   'skg-approve-fork' refuses (user-error, buffer left open) while any
+   clone still carries the placeholder, so the user must set each with
+   C-c s s. Applies to BOTH fork paths (chosen via AskUserQuestion:
+   "All forks"). The server-side default-source resolution is unchanged
+   (it now feeds the suggestion); a server-driven approve that bypasses
+   the confirmation buffer still works, and the placeholder, if ever
+   sent, is rejected as an unknown source -- defense in depth. Docs
+   (forks.md, sharing-model.md, COMMANDS.org) updated; the confirmation
+   unit test and all three fork integration tests (which now pick a
+   source, and assert approve is refused without one) pass.

@@ -69,6 +69,17 @@ Fails the test if it is not found."
       (unless (string-match-p "(id M)" (buffer-string))
         (test-fail "confirmation buffer does not list M:\n%s" (buffer-string)))
       (message "✓ skg-fork-node produced a fork-confirmation listing M")
+      ;; Approving before picking a source is refused.
+      (condition-case nil
+          (progn (skg-approve-fork)
+                 (test-fail "approve must be refused until a source is picked"))
+        (error nil))
+      (message "✓ approve refused until a source is picked")
+      ;; Pick the clone's source, then approve.
+      (goto-char (point-min))
+      (re-search-forward "^\\* (skg (node (source ")
+      (beginning-of-line)
+      (skg--change-source-at-point "owned")
       (skg-approve-fork)))
 
   ;; 5. Reopen Q fresh: override substitution now draws the clone in M's

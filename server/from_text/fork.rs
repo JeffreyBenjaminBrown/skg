@@ -95,43 +95,61 @@ pub fn fork_spec_from_buffer_node (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (buffer_node, disk_title, clone_source) ) }
 
+/// The sentinel source the confirmation buffer pre-fills for every
+/// clone-to-be. The user MUST replace it (C-c s s) with a real owned
+/// source before approving; the client refuses to approve while any
+/// clone still carries it (and the server would reject it as an unknown
+/// source anyway). Must match 'skg-fork-source-placeholder' in
+/// [[../../elisp/skg-request-save.el]].
+pub const FORK_SOURCE_PLACEHOLDER : &str = "PICK-A-SOURCE";
+
 /// Build the fork-confirmation buffer: read-only EXCEPT each clone's
-/// source. Two levels per fork, because one headline cannot honestly
-/// stand for both the original N and the (possibly re-titled) clone C:
+/// source, which the user MUST set. Two levels per fork, because one
+/// headline cannot honestly stand for both the original N and the
+/// (possibly re-titled) clone C:
 ///
-///   * <edited title>     -- the CLONE-TO-BE C: its owned source (the one
-///                           editable field, rotated with C-c s s), the
-///                           user's edited title, NO id (none yet).
+///   # Suggested source for the clone below: <src> ...
+///   * <edited title>     -- the CLONE-TO-BE C: its source starts as the
+///                           PICK-A-SOURCE placeholder (the one editable
+///                           field, set with C-c s s), the user's edited
+///                           title, NO id (none yet).
 ///   ** <original title>  -- the ORIGINAL N that C overrides: its real id,
-///                           real (foreign) source, indefinitive,
+///                           real source, indefinitive,
 ///                           parentIs=independent, marked "pO".
 ///
-/// The client shows this and asks the user to approve (re-save the origin
-/// with the chosen sources) or decline (kill the buffer). Every headline
-/// carries real (skg ...) metadata so the buffer stays navigable -- the
-/// usual ID-stack-push / search commands work on it.
+/// The clone's COMPUTED source (inferred from an owned ancestor, or the
+/// config-first owned default) is shown only as a SUGGESTION comment, so
+/// the user must make a deliberate choice rather than accept a silent
+/// default. The client shows this and asks the user to approve (re-save
+/// the origin with the chosen sources) or decline (kill the buffer).
+/// Every headline carries real (skg ...) metadata so the buffer stays
+/// navigable -- the usual ID-stack-push / search commands work on it.
 pub fn build_fork_confirmation_buffer (
   fork_specs : &[ForkSpec],
 ) -> String {
   let mut out : String = String::new ();
-  out . push_str (
+  out . push_str ( & format! (
     "# FORK CONFIRMATION (read-only except each clone's source)\n\
-     # Saving edited foreign nodes forks them: each becomes an editable\n\
-     # clone in a source you own, which SUBSCRIBES TO and OVERRIDES the\n\
-     # original. Below, each TOP headline is the clone-to-be (your edited\n\
-     # title); its SOURCE is the one editable field -- rotate it with C-c\n\
-     # s s. Its CHILD is the original it forks (real id, foreign source,\n\
-     # marked \"pO\": its visible parent overrides it).\n\
-     # APPROVE with your client's fork-approve command (in Emacs: C-c\n\
-     #   C-c here) -- it re-saves the origin, committing the forks into\n\
-     #   the sources shown.\n\
-     # DECLINE with C-c C-k (or just leave this buffer): nothing is\n\
-     #   written, and this buffer stays open so you can search it for IDs.\n\n" );
+     # Forking turns a node into an editable clone in a source you own,\n\
+     # which SUBSCRIBES TO and OVERRIDES the original. Below, each TOP\n\
+     # headline is the clone-to-be; its CHILD is the original it forks\n\
+     # (real id, marked \"pO\": its visible parent overrides it).\n\
+     # YOU MUST PICK A SOURCE for each clone before approving: put point\n\
+     #   on a clone-to-be headline and set its source with C-c s s. It\n\
+     #   starts as {}; a suggested source is noted above each clone.\n\
+     # APPROVE with C-c C-c -- it re-saves the origin, committing the\n\
+     #   forks into the sources you chose. (Approving before every\n\
+     #   clone's source is set is refused.)\n\
+     # DECLINE with C-c C-k (or kill this buffer): nothing is written.\n\n",
+    FORK_SOURCE_PLACEHOLDER ) );
   for spec in fork_specs {
-    let clone_source : &SourceName = & spec . clone . 0 . source;
+    out . push_str ( & format! (
+      "# Suggested source for the clone below: {} (set it with C-c s s).\n",
+      spec . clone . 0 . source ));
     out . push_str ( & format! (
       "* (skg (node (source {}) (viewStats (sourceHerald ⌂:{})))) {}\n",
-      clone_source, clone_source, spec . clone . 0 . title ));
+      FORK_SOURCE_PLACEHOLDER, FORK_SOURCE_PLACEHOLDER,
+      spec . clone . 0 . title ));
     out . push_str ( & format! (
       "** (skg (node (id {}) (source {}) (parentIs independent) indef \
        (viewStats parentOverrides))) {}\n",

@@ -31,13 +31,17 @@ foreign source, marked `pO` — "its parent overrides it"). One headline
 cannot honestly stand for both, since you may have re-titled the clone
 and the two live in different sources.
 
-The buffer is read-only **except each clone's source**, the one field you
-may change: put point on a clone-to-be headline and rotate its source
-with `C-c s s` (it offers the sources you own). This is how you place — or
-redirect — a clone whose source could not be inferred (below).
+The buffer is read-only **except each clone's source**, which you
+**must** set: put point on a clone-to-be headline and pick its source
+with `C-c s s` (it offers the sources you own). Each clone's source
+starts as the placeholder `PICK-A-SOURCE`, with a suggested source noted
+just above it (the inferred source for a foreign fork, or your
+config-first owned source otherwise); approving before you have set every
+clone's source is refused. Requiring a deliberate pick keeps a fork from
+silently landing in a default source.
 
 - **Approve** (`C-c C-c` in that buffer) commits the forks into the
-  sources shown and completes the save.
+  sources you chose and completes the save.
 - **Decline** (`C-c C-k`, or just leave the buffer) aborts the *whole*
   save — nothing is written. The confirmation buffer stays open, so you
   can still search it for the IDs involved.
@@ -57,14 +61,14 @@ you own. `C`:
   place from then on, without `N`'s containers being rewritten to point
   at `C`.
 
-`C`'s source is resolved in priority order: the source you chose in the
-confirmation buffer (`C-c s s`), else the source **inferred** from `N`'s
-nearest owned ancestor in the view, else a **default** of your first
-owned source. So a foreign node with no owned ancestor still forks — it
-defaults to an owned source you can then rotate. The fork only fails for
-lack of a source if you own **no** source at all. (The inference takes
-`N`'s *immediate* owned container, never a distant owned node reached by
-skipping a foreign ancestor.)
+`C`'s source is the one you **pick** in the confirmation buffer
+(`C-c s s`) — you must pick it. The buffer *suggests* a source: the one
+**inferred** from `N`'s nearest owned ancestor in the view, or, with no
+owned ancestor, your config-first owned source. So a foreign node with no
+owned ancestor still forks — it just suggests a default you confirm or
+change. The fork can only fail for lack of a source if you own **no**
+source at all. (The inference takes `N`'s *immediate* owned container,
+never a distant owned node reached by skipping a foreign ancestor.)
 
 `N` itself is left completely untouched on disk.
 
@@ -79,8 +83,8 @@ Put point on the node's headline and run it. It refuses if the buffer has
 unsaved changes ("Save the buffer before forking.") — so the clone is
 built from the node's saved snapshot, exactly what you see. Otherwise it
 marks the node and auto-saves, and you get the **same fork-confirmation
-buffer** as the implicit fork: approve with `C-c C-c` (rotate the clone's
-source first with `C-c s s` — e.g. to your *private* source), or decline
+buffer** as the implicit fork: set the clone's source with `C-c s s` —
+e.g. to your *private* source — then approve with `C-c C-c`, or decline
 with `C-c C-k` (which here also strips the fork request so the next save
 does not re-fork).
 
@@ -89,10 +93,10 @@ Two differences from the implicit fork:
 - The original is **yours**, so it is *not* dropped — your edits to it
   still save normally; the gesture only *adds* the clone that overrides
   it.
-- The clone's source defaults to your **config-first** owned source (the
+- The **suggested** source is your **config-first** owned source (the
   first `[[sources]]` you own in `skgconfig.toml`), since there is no
-  foreign ancestor to infer from. Rotate it in the confirmation buffer as
-  usual.
+  foreign ancestor to infer from — but, as for every fork, you must
+  still pick the source explicitly in the confirmation buffer.
 
 The result is an **override chain**: `D overrides C overrides N`. Chains
 of any length are legal (only a *cycle* is forbidden — see

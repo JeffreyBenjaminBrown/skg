@@ -60,7 +60,13 @@
   (let ((confirm-buf (skg-test-wait-for
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation for N appeared"))
-    (with-current-buffer confirm-buf (skg-approve-fork)))
+    (with-current-buffer confirm-buf
+      ;; Pick the clone's source (required), then approve.
+      (goto-char (point-min))
+      (re-search-forward "^\\* (skg (node (source ")
+      (beginning-of-line)
+      (skg--change-source-at-point "public")
+      (skg-approve-fork)))
   (message "✓ foreign N forked into a public clone")
 
   ;; 4. Reopen P: the public clone C is drawn in N's place.
@@ -87,7 +93,7 @@
     (unless confirm-buf (test-fail "no fork-confirmation for the clone appeared"))
     (with-current-buffer confirm-buf
       (goto-char (point-min))
-      (unless (re-search-forward "^\\* (skg (node (source public)" nil t)
+      (unless (re-search-forward "^\\* (skg (node (source " nil t)
         (test-fail "could not find the clone-to-be headline:\n%s" (buffer-string)))
       (beginning-of-line)
       (skg--change-source-at-point "private")

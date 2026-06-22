@@ -65,7 +65,11 @@
         (test-fail "confirmation buffer lacks its header:\n%s" (buffer-string)))
       (message "✓ fork-confirmation buffer lists N")
 
-      ;; 5. Approve: re-save the origin, committing the fork.
+      ;; 5. Pick the clone's source (required), then approve.
+      (goto-char (point-min))
+      (re-search-forward "^\\* (skg (node (source ")
+      (beginning-of-line)
+      (skg--change-source-at-point "owned")
       (skg-approve-fork)))
 
   ;; 6. The fork commits: when P's saved view re-renders, N is now

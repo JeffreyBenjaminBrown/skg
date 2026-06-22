@@ -108,13 +108,20 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   let buf : String =
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited () ] );
   let lines : Vec<&str> = buf . lines () . collect ();
-  // The clone-to-be parent: a LEVEL-1 headline ("* "), edited title,
-  // owned source, NO id. (starts_with pins the level marker so a "* " ->
-  // "** " drift is caught -- the elisp walk keys off the level.)
+  // The clone-to-be parent: a LEVEL-1 headline ("* "), edited title, and
+  // the PICK-A-SOURCE placeholder source the user must replace (NO id).
+  // (starts_with pins the level marker so a "* " -> "** " drift is caught
+  // -- the elisp walk keys off the level.)
   assert! ( lines . iter () . any ( |l|
-      l . starts_with ("* (skg (node (source owned2)")
+      l . starts_with (
+        & format! ("* (skg (node (source {})", FORK_SOURCE_PLACEHOLDER) )
       && l . ends_with ("N-edited") ),
-    "clone-to-be parent (level-1, edited title, owned source) missing:\n{}", buf );
+    "clone-to-be parent (level-1, edited title, placeholder source) missing:\n{}", buf );
+  // The computed source is shown only as a SUGGESTION comment.
+  assert! ( lines . iter () . any ( |l|
+      l . starts_with ("# Suggested source")
+      && l . contains ("owned2") ),
+    "the clone's suggested source must be noted:\n{}", buf );
   assert! ( ! buf . contains ("(id N) (source owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a LEVEL-2 headline ("** "), real id, foreign
