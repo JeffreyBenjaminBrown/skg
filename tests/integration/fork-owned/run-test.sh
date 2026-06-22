@@ -28,7 +28,8 @@ restore_fork_fixtures() {
   # Remove any clone .skg the test wrote into the owned source.
   find "$TEST_DIR/data/owned" -name '*.skg' \
     ! -name 'Q.skg' ! -name 'M.skg' \
-    ! -name 'Q2.skg' ! -name 'M2.skg' -delete 2>/dev/null || true
+    ! -name 'Q2.skg' ! -name 'M2.skg' \
+    ! -name 'Q3.skg' ! -name 'M3.skg' -delete 2>/dev/null || true
 }
 trap 'cleanup; restore_fork_fixtures' EXIT
 restore_fork_fixtures

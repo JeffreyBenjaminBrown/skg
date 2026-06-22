@@ -125,6 +125,36 @@ Fails the test if it is not found."
                    (buffer-string))))
     (message "✓ decline committed nothing (no clone overrides M2)"))
 
+  ;; 7. KILLING the confirmation buffer directly (not via C-c C-k) must
+  ;;    also strip the lingering fork atom from the origin.
+  (skg-request-single-root-content-view-from-id "Q3")
+  (let ((q3-buf (skg-test-wait-for (lambda () (fork-test--buffer-showing "Q3")) 10)))
+    (unless q3-buf (test-fail "Q3's view never appeared"))
+    (with-current-buffer q3-buf
+      (fork-test--goto-headline "M3")
+      (skg-fork-node)))
+  ;; The M2 decline left a confirmation buffer open (it reuses one name),
+  ;; so wait until it actually shows M3 before dismissing it.
+  (let ((confirm-buf (skg-test-wait-for
+                      (lambda ()
+                        (let ((b (get-buffer "*SKG Fork Confirmation*")))
+                          (and b
+                               (with-current-buffer b
+                                 (string-match-p "(id M3)" (buffer-string)))
+                               b)))
+                      10)))
+    (unless confirm-buf (test-fail "no fork-confirmation for M3 appeared"))
+    ;; Dismiss by killing the buffer directly -- no approve, no decline.
+    (let ((kill-buffer-query-functions nil))
+      (kill-buffer confirm-buf)))
+  (let ((q3-buf (fork-test--buffer-showing "Q3")))
+    (unless (buffer-live-p q3-buf) (test-fail "Q3's buffer vanished after kill"))
+    (with-current-buffer q3-buf
+      (when (string-match-p "(viewRequests" (buffer-string))
+        (test-fail "killing the confirmation must strip the fork atom:\n%s"
+                   (buffer-string))))
+    (message "✓ killing the confirmation buffer stripped the fork atom"))
+
   (message "PASS: Explicit-fork integration test successful!")
   (kill-emacs 0))
 

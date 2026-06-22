@@ -278,6 +278,24 @@ which would trigger overlay modification-hooks if still present."
 forks. `skg-approve-fork' re-saves it (approved); `skg-decline-fork'
 leaves things untouched.")
 
+(defvar-local skg--fork-suppress-strip-on-kill nil
+  "When non-nil, `skg--fork-confirmation-on-kill' does NOT strip the
+origin's fork atom. `skg-approve-fork' sets it before killing this
+buffer, because its re-save still needs the atom to commit the fork.")
+
+(defun skg--fork-confirmation-on-kill ()
+  "`kill-buffer-hook' for a fork-confirmation buffer: dismissing it
+WITHOUT approving strips the lingering (viewRequests fork) atom from the
+origin buffer, so the next save does not silently re-fork. This covers
+killing the buffer directly (C-x k, q, etc.); `skg-decline-fork' already
+strips explicitly, and `skg-approve-fork' suppresses this (its re-save
+needs the atom, and the server drops it on re-render). Stripping is
+idempotent, so a redundant call after a decline is a harmless no-op."
+  (unless skg--fork-suppress-strip-on-kill
+    (when (buffer-live-p skg--fork-origin-buffer)
+      (with-current-buffer skg--fork-origin-buffer
+        (skg-strip-fork-requests-in-buffer)))))
+
 (defun skg--fork-confirmation-handler (save-buffer payload)
   "Handle a `fork-confirmation' LP message: the save edited foreign
 node(s) and was not pre-approved, so NOTHING was committed. Show the
@@ -337,6 +355,10 @@ nodes. Only C-c C-c (approve) and C-c C-k (decline) act on it."
       ;; rejects M-x skg-request-save-buffer on it.
       (setq skg-view-uri nil)
       (setq skg--fork-origin-buffer save-buffer)
+      (setq skg--fork-suppress-strip-on-kill nil)
+      ;; Dismissing this buffer without approving (killing it directly,
+      ;; not via C-c C-k) must still strip the origin's fork atom.
+      (add-hook 'kill-buffer-hook #'skg--fork-confirmation-on-kill nil t)
       ;; Copy the mode map first so these overrides stay buffer-local --
       ;; local-set-key mutates (current-local-map) in place, which is the
       ;; shared skg-content-view-mode-map; rebinding C-x C-s on the shared
@@ -397,6 +419,9 @@ buffer."
         (fork-sources (skg--fork-sources-from-confirmation-buffer)))
     (unless (buffer-live-p origin)
       (error "The buffer that requested these forks is no longer open"))
+    ;; The atom must survive to the re-save (which commits the fork; the
+    ;; server then drops it on re-render), so suppress the kill-hook strip.
+    (setq skg--fork-suppress-strip-on-kill t)
     (let ((kill-buffer-query-functions nil))
       (kill-buffer (current-buffer)))
     (with-current-buffer origin

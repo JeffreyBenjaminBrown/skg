@@ -171,15 +171,18 @@
     substitution share it, so the rules cannot drift apart.
 
 * Open questions
-*** TODO Decline-by-killing the confirmation buffer leaves the fork atom
-    'skg-decline-fork' (C-c C-k) strips the lingering (viewRequests fork)
-    atom from the origin buffer. But if the user dismisses the
-    confirmation by KILLING its buffer directly (not via C-c C-k), the
-    origin buffer keeps the atom and is left modified, so the NEXT save
-    re-raises the same fork confirmation -- a mild loop, not data loss,
-    and the user escapes it by approving or by C-c C-k. The implicit
-    fork never had this wart (it carries no atom). Options if it ever
-    annoys: a kill-buffer-hook on the confirmation buffer that strips
-    the origin's atom, or stripping it the moment the confirmation is
-    shown and re-adding on approve. Left as-is for now; flagging in case
-    you hit it.
+  None.
+
+* Follow-ups completed after the initial run
+** DONE Dismissing the confirmation buffer (any way) strips the fork atom
+   Originally only 'skg-decline-fork' (C-c C-k) stripped the lingering
+   (viewRequests fork) atom; killing the confirmation buffer directly
+   left it, so the next save re-raised the fork. Fixed: the
+   fork-confirmation buffer now carries a buffer-local 'kill-buffer-hook'
+   ('skg--fork-confirmation-on-kill') that strips the origin's fork atom
+   on ANY dismissal. 'skg-approve-fork' suppresses it (the atom must
+   survive to its re-save, which commits the fork; the server then drops
+   it on re-render) via the buffer-local 'skg--fork-suppress-strip-on-kill'.
+   Stripping is idempotent, so it is a harmless no-op after a decline.
+   The fork-owned integration test gained a part that dismisses the
+   confirmation by killing it directly and asserts the atom is stripped.
