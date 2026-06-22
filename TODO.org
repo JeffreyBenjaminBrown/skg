@@ -1,6 +1,9 @@
+* ONGOING override chains
+** skg3  --resume 25126e37-d0ef-4790-a58b-2f6da928478e
+** dogfood : User-owned forks are all kinds of wrong.
 * TODO remove empty bodies from my data
 There's a script for it.
-* [[./TODO/user-owned_autofork_chain.org]]
+* AWAITS better user-owned forks : [[./TODO/user-owned_autofork_chain/]]
 * Play two roles, communicate through git.
 ** gecko feet, biologist and bank robber
 Scientist studies gecko feet.
