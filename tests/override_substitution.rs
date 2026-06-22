@@ -37,7 +37,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::{
   multi_root_view, multi_root_view_with_source_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::views_state::OpenViews;
@@ -71,6 +71,10 @@ fn all_tests
                              "tests/override_substitution/fixtures-multi/skgconfig.toml") . await ?;
       ownership_and_visibility_gate_substitution (
         &s . config, &s . driver ) . await ?;
+      s . reset_from_config ("chain_half_visible_keeps_the_original",
+                             "tests/override_substitution/fixtures-chain/skgconfig.toml") . await ?;
+      chain_half_visible_keeps_the_original (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 fn marked_lines<'a> (
@@ -505,4 +509,108 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( ! view . contains ("(id R3)"),
           "its overrider must not be drawn in its place (the \
            marker would name an inactive node):\n{}", view ); }
+      Ok (( )) }
+
+/// Save 'buf' under a specific active source-set (the test shims save
+/// under 'all'). Asserts no save errors and returns the rerendered
+/// view.
+async fn save_under_set (
+  buf     : &str,
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+  set     : &ActiveSourceSet,
+) -> Result<String, Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  let mut env : skg::types::env::SkgEnv =
+    skg::test_utils::skg_env_from_parts (
+      config, Arc::clone (driver), tantivy, &graph );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false,
+    open_views        : OpenViews::new (), };
+  let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let response =
+    skg::serve::handlers::save_buffer::update_from_and_rerender_buffer (
+      &mut stream, buf, &mut env, false,
+      &Err (String::new ()), &mut views_state,
+      Some (set), true,
+      &std::collections::HashMap::new () ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "save must not error; got: {:?}", response . errors );
+  Ok ( response . saved_view ) }
+
+/// A half-visible user-owned chain: D overrides C overrides N, with the
+/// end D in source 'other'. Under 'all' the END D substitutes for N;
+/// under 'main' (hiding 'other') the MIDDLE C substitutes. Saving the
+/// half-visible view accepts the middle carrier (it is on N's chain)
+/// and keeps N in P's contains; an off-chain marker is rejected.
+async fn chain_half_visible_keeps_the_original (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ? );
+      { // Under 'all', the chain end D is drawn in N's place.
+        let (view, _p, _t) =
+          multi_root_view (
+            driver, config, Some (tantivy),
+            &[ ID::from ("P") ], false ) . await ?;
+        let marked : Vec<&str> = marked_lines (&view, "N");
+        assert_eq! ( marked . len (), 1,
+          "one substitute for N under all:\n{}", view );
+        assert! ( marked [0] . contains ("(id D)"),
+          "the chain end D is drawn under all:\n{}", view ); }
+      let main_set : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName ("main" . to_string ())) ?;
+      let view_main : String = {
+        // Under 'main', D's source 'other' is inactive, so the MIDDLE
+        // C is drawn instead.
+        let (view, _p, _t) =
+          multi_root_view_with_source_set (
+            driver, config, Some (tantivy),
+            &[ ID::from ("P") ], false, &main_set ) . await ?;
+        let marked : Vec<&str> = marked_lines (&view, "N");
+        assert_eq! ( marked . len (), 1,
+          "one substitute for N under main:\n{}", view );
+        assert! ( marked [0] . contains ("(id C)"),
+          "the chain middle C is drawn under main:\n{}", view );
+        view };
+      { // Saving the half-visible view accepts the middle carrier and
+        // keeps N (not C) in P's contains.
+        let saved : String =
+          save_under_set (&view_main, config, driver, tantivy, &main_set)
+          . await ?;
+        assert_eq! ( marked_lines (&saved, "N") . len (), 1,
+          "the rerendered saved view still draws a marked substitute \
+           for N:\n{}", saved );
+        let p_file : String = {
+          let main_path : &std::path::Path =
+            & config . sources
+              . get ( &SourceName::from ("main") ) . unwrap () . path;
+          std::fs::read_to_string ( main_path . join ("P.skg") )
+            . unwrap () };
+        assert! ( p_file . contains ("- N"),
+          "P still contains N after the half-visible save:\n{}", p_file );
+        assert! ( ! p_file . contains ("- C"),
+          "P must NOT be rewritten to contain the carrier C:\n{}",
+          p_file ); }
+      { // A marker on a node NOT on N's chain is rejected.
+        let buffer = indoc! {"
+          * (skg (node (id P) (source main))) P
+          ** (skg (node (id D) (source other) (viewStats (overridesHere P)) indef)) D
+        "};
+        match define_nodes_from (buffer, config, driver) . await {
+          Err (SaveError::BufferValidationErrors { errors, .. }) =>
+            assert! ( errors . iter () . any ( |e| matches! (
+              e, BufferValidationError::OverridesHere_Mismatch (..) )),
+              "off-chain marker must abort; got: {:?}", errors ),
+          other => panic! (
+            "off-chain marker must abort the save; got: {:?}",
+            other . map ( |v| v . len () ) ), }}
       Ok (( )) }

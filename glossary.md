@@ -89,15 +89,24 @@ In Skg a fork can split into any number.
 
 ## clone, and the fork operation
 
-To **fork** a *foreign* node N (one in a source you do not own, hence
-read-only) is to turn it into an editable **clone** C in a source you do
-own. The gesture is implicit: make N definitive (`C-c s d`), edit it, and
-save; any real change to N is read as a fork request, and the save asks
-you to confirm. C copies N's title, body, and child-list (the child IDs
+To **fork** a node N is to turn it into an editable **clone** C in a
+source you own. C copies N's title, body, and child-list (the child IDs
 only — shallow), `subscribes_to` N (so N's later additions surface to C
 as unintegrated subscribed content) and `overrides_view_of` N (so
-override substitution draws C wherever N would appear). N itself is left
-untouched. A node may have at most one clone you own (override monogamy).
+override substitution draws C wherever N would appear). A node may have
+at most one clone you own (override monogamy).
+
+Forking spans two gestures, foreign and owned:
+
+- *implicit* (foreign N): make N definitive (`C-c s d`), edit it, and
+  save; any real change to a foreign node is read as a fork request, and
+  the save asks you to confirm. N is left untouched on disk.
+- *explicit* (owned N): `skg-fork-node` (`C-c m f`), for a node you
+  already own — used to deepen an override chain (D overrides C overrides
+  N, all owned). N keeps its own content; only the clone is added. The
+  clone is built from N's saved snapshot, so the command refuses a dirty
+  buffer.
+
 See `docs/forks.md` and `docs/sharing-model.md`.
 
 ## hiderel = "hides" relationship
@@ -166,11 +175,15 @@ but might not, is maybe-placed.
 
 When view completion would CREATE a viewnode for node N as
 recursive content, it draws the EFFECTIVE OVERRIDER of N instead:
-the end of the chain of user-owned, currently-visible
-'overrides_view_of' edges leading out of N (usually one edge; the
-resolver is 'resolve_override' in
-'server/dbs/in_rust_graph/override_resolution.rs'). Foreign
-override edges are display-only facts and never substitute.
+the end of the chain of user-owned, currently-VISIBLE
+'overrides_view_of' edges leading out of N. The chain is often one
+edge, but may be longer (a user-owned chain D overrides C overrides
+N is legal; only a cycle is forbidden), and visibility gating can
+stop it at a MIDDLE node when a later link's source is inactive --
+so the drawn node is the last visible link, not necessarily the
+chain's end. The resolver is 'resolve_override' in
+'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override
+edges are display-only facts and never substitute.
 
 The drawn substitute carries the MARKER '(overridesHere N)'
 (herald red "Oh"), naming the original it stands for. A viewnode's

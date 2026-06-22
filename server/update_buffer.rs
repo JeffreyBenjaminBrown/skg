@@ -331,18 +331,11 @@ pub async fn render_initial_view (
                          else         { None },
     warning_sink : Some (&mut sink), };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
-  let denovo_warnings : Vec<String> =
-    { let compound_only : Vec<CompletionWarning> =
-        // De-novo rendering REPAIRS silently (repairs do not
-        // correspond to edits the user just made), but a legacy
-        // compound override chain deserves its notice on fresh
-        // views too (Jeff, 2026-06-11) -- so keep only that kind.
-        sink . into_iter ()
-        . filter ( |w| matches! (
-            w, CompletionWarning::CompoundOverrideChain { .. } ))
-        . collect ();
-      render_completion_warnings (&compound_only) };
-  Ok (( viewforest, denovo_warnings )) }
+  // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
+  // correspond to edits the user just made, so a fresh view carries no
+  // completion warnings.
+  drop (sink);
+  Ok (( viewforest, Vec::new () )) }
 
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.

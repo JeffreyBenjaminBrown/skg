@@ -84,7 +84,8 @@ fn no_overrider_resolves_to_self () {
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn foreign_overriders_are_ignored () {
@@ -98,7 +99,8 @@ fn foreign_overriders_are_ignored () {
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn a_single_owned_overrider_substitutes () {
@@ -112,7 +114,8 @@ fn a_single_owned_overrider_substitutes () {
     OverrideResolution {
       effective      : ID::from ("overrider"),
       path           : vec![ ID::from ("overrider") ],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn an_inactive_owned_overrider_does_not_substitute () {
@@ -129,7 +132,8 @@ fn an_inactive_owned_overrider_does_not_substitute () {
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
@@ -145,12 +149,13 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
     OverrideResolution {
       effective      : ID::from ("overrider"),
       path           : vec![ ID::from ("overrider") ],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn a_chain_of_two_resolves_transitively_with_path () {
-  // Legacy-shaped data: X overrides Y overrides Z, all user-owned.
-  // Cannot be saved or rebuilt; built directly here.
+  // A user-owned chain X overrides Y overrides Z; resolves to the end
+  // of the chain, carrying the full path. Linear chains are legal.
   assert_eq! (
     resolve (
       vec![
@@ -162,7 +167,8 @@ fn a_chain_of_two_resolves_transitively_with_path () {
     OverrideResolution {
       effective      : ID::from ("x"),
       path           : vec![ ID::from ("y"), ID::from ("x") ],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn per_edge_visibility_stops_a_chain_at_an_inactive_middle () {
@@ -180,7 +186,8 @@ fn per_edge_visibility_stops_a_chain_at_an_inactive_middle () {
     OverrideResolution {
       effective      : ID::from ("z"),
       path           : vec![],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn a_cycle_is_detected_and_substitutes_nothing () {
@@ -194,7 +201,8 @@ fn a_cycle_is_detected_and_substitutes_nothing () {
     OverrideResolution {
       effective      : ID::from ("a"),
       path           : vec![],
-      cycle_detected : true, } ); }
+      cycle_detected : true,
+      cycle          : vec![ ID::from ("a"), ID::from ("b") ], } ); }
 
 #[test]
 fn extra_id_input_and_extra_id_edge_both_resolve () {
@@ -216,7 +224,8 @@ fn extra_id_input_and_extra_id_edge_both_resolve () {
     OverrideResolution {
       effective      : ID::from ("overrider"),
       path           : vec![ ID::from ("overrider") ],
-      cycle_detected : false, } );
+      cycle_detected : false,
+      cycle          : vec![], } );
   let by_pid : OverrideResolution =
     resolve_override (
       &config (), &graph, None, &ID::from ("target") );
@@ -236,7 +245,8 @@ fn multiple_owned_overriders_substitute_nothing () {
     OverrideResolution {
       effective      : ID::from ("target"),
       path           : vec![],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }
 
 #[test]
 fn an_unknown_id_resolves_to_itself () {
@@ -245,4 +255,5 @@ fn an_unknown_id_resolves_to_itself () {
     OverrideResolution {
       effective      : ID::from ("never-heard-of-it"),
       path           : vec![],
-      cycle_detected : false, } ); }
+      cycle_detected : false,
+      cycle          : vec![], } ); }

@@ -1,0 +1,323 @@
+#+TITLE: Override chains — build plan
+#+TODO: TODO ONGOING | DONE
+
+* How to read this
+  Goal: permit *user-owned override chains* (=D overrides C overrides N=,
+  all owned), keep *monogamy* (no node has two user-owned overriders),
+  replace acyclicity with a *no-cycle* check, and add an explicit
+  *'skg-fork-node'* gesture that creates the "fork your own node" edge.
+
+  This file is self-contained: you can implement it without reading anything
+  else. Each phase names the files, functions, and edits; function names are
+  in 'single quotes' so =M-.= jumps to them, and file links are relative.
+  The conceptual model, the motivating use case, and the full design
+  discussion (every decision and why) live in
+  [[./1_discussion.org][1_discussion.org]], for the curious — nothing here
+  requires it.
+
+* Vocabulary (enough to execute)
+  - *override substitution*: when content node =N= would be drawn, the
+    server instead draws the /effective overrider/ — the end of the chain of
+    user-owned, currently-/visible/ =overrides_view_of= edges out of =N= —
+    carrying the marker =(overridesHere N)= (herald "Oh"). Resolver:
+    'resolve_override' in [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]].
+  - *carrier / original*: the /carrier/ is the node a marker sits on (the
+    one drawn); the /original/ =N= is the node named inside the marker.
+  - *chain / path*: =D -> C -> N= is a chain; 'resolve_override' returns the
+    ordered =path= of overriders it walked.
+  - *visibility gating*: under a restricted source-set an edge is followed
+    only if the overrider's source is active; so the drawn node can be a
+    *middle* of the full chain when a later link is hidden. Passing
+    =active = None= to 'resolve_override' is *ungated* (ownership still
+    gates).
+  - *monogamy makes the walk functional*: at most one user-owned overrider
+    per node, so "follow my overrider" is a function and a user-owned cycle
+    is always a simple cycle the seen-set catches.
+
+* Decisions (settled)
+  - Cycle = *hard error* at save and init/rebuild (not a silent resolver
+    bail).
+  - 'skg-fork-node' = *full fork* (clone + =subscribes_to= + =overrides_view_of=),
+    and it *auto-saves* on invoke, surfacing the existing fork-confirmation
+    buffer.
+  - Clone source for 'skg-fork-node': pre-fill the *config-first* owned
+    source; the user rotates/approves as usual (no special latch).
+  - 'skg-fork-node' refuses to run on a *dirty* buffer (unsaved changes),
+    explaining in the minibuffer.
+  - *Drop* the CompoundOverrideChain warning entirely.
+  - *Deduplicate* the override walk: one routine ('resolve_override') serves
+    the validators and the tamper helper.
+  - New violation variant 'UserOwnedOverrideCycle' (an in-place rename of
+    'UserOwnedOverrideChain'; compiler-enforced, safe).
+  - One overrider may override several distinct targets — already supported
+    end to end; no code change, just a confirming test.
+  - No data migration: owned chains were always rejected at save and
+    rebuild, so none exist on disk; the only new producer of a chain is a
+    fresh save.
+
+* Phase A — Invariants: drop "no chains", add "no cycle", dedup the walk
+  Files: [[../../server/dbs/in_rust_graph/override_invariants.rs][override_invariants.rs]],
+  [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]].
+
+** A1. Expose the cycle from the resolver (the shared walk)
+   'resolve_override' already follows the user-owned, pid-resolved overrider
+   edges with a seen-set and sets =cycle_detected=, but on a cycle it
+   discards the trail (=path= becomes empty). Add a field 'cycle : Vec<ID>'
+   to 'OverrideResolution', populated with the nodes of the detected cycle
+   (the trail from the first repeat back to it) and empty otherwise.
+   =effective= / =path= semantics for the substitution callers are unchanged
+   (still input / empty on a cycle). With this,
+   'resolve_override(config, graph, None, x)' is the *single* ungated walk
+   that every consumer below (both validators, the tamper helper) reuses, so
+   the cycle/chain-walking logic lives in exactly one place.
+
+** A2. Enum + formatter
+   Rename 'OverrideInvariantViolation::UserOwnedOverrideChain' ->
+   'UserOwnedOverrideCycle { cycle : Vec<ID> }'. Update
+   'format_override_invariant_violations': drop the chain arm, add
+   "user-owned override cycle: a -> b -> ... -> a". The compiler flags every
+   site that must change (so the rename is safe); sweep prose/strings that
+   still say "chain" by hand.
+
+** A3. Global validator 'validate_override_invariants'
+   Keep pass 1 (monogamy, 'MultipleUserOwnedOverriders'). Replace pass 2 (the
+   chain scan) with: for each user-owned node not yet proven acyclic, call
+   'resolve_override(config, graph, None, pid)'; if =cycle_detected=, push
+   'UserOwnedOverrideCycle { cycle }'. Dedup cycles by their member set
+   ('dedup_violations' already removes exact dupes; canonicalize the cycle
+   vector — rotate to its min pid — so the same cycle from different entry
+   points collapses). Memoizing proven-acyclic pids keeps it O(V); init and
+   rebuild are cold paths, so even O(V·depth) is fine if memoization is
+   skipped.
+
+** A4. Incremental validator 'validate_touched_override_invariants'
+   Keep the monogamy (target-end) check. Replace the two chain checks with:
+   for each touched user-owned pid =T=, call
+   'resolve_override(config, simulated_graph, None, T)'; on =cycle_detected=,
+   push 'UserOwnedOverrideCycle'. Correct and complete because a save that
+   closes a user-owned cycle leaves a written (touched) node on the cycle,
+   and monogamy makes the walk functional. Cost O(touched · chain length).
+
+** A5. Tests (Phase A)
+   In [[../../tests/dbs/in_rust_graph/override_invariants.rs][override_invariants.rs]]:
+   - delete/replace the three chain-rejection tests
+     ('user_owned_override_chain_is_invalid',
+     'touched_chain_detected_from_the_first_end',
+     'touched_chain_detected_from_the_middle_end') with positive
+     "a user-owned chain validates" tests;
+   - keep 'touched_chain_through_foreign_middle_is_valid' and the monogamy
+     tests;
+   - add cycle tests: a 2- and 3-node user-owned cycle is rejected by both
+     the global and the touched validator; a cycle whose middle is foreign
+     is *not* a user-owned cycle and validates;
+   - add a multi-target test: one overrider overriding two distinct targets
+     validates and round-trips both.
+   In [[../../tests/save/override_invariants.rs][override_invariants.rs (save)]]:
+   invert 'save_simulation_rejects_user_owned_override_chain' to assert the
+   chain-creating save now succeeds, and add one asserting a cycle-creating
+   save is rejected.
+
+* Phase B — Tamper check: accept any honest carrier on the chain
+  File: [[../../server/from_text/buffer_to_viewnodes/validate_tree.rs][validate_tree.rs]], 'overridesHere_marker_errors'.
+
+  Why it must change: the marker =(overridesHere N)= is load-bearing — at
+  save, extraction collects =N= (not the carrier) into the parent's
+  =contains=, so the tamper check must reject a marker the server would never
+  have drawn. Today it demands =carrier == resolve_override(N, None).effective=
+  (the ungated *end* of the chain). With chains, the node actually drawn can
+  be a *middle* (=C=, when end =D='s source is hidden), so the old equality
+  wrongly rejects an honest save. Fix: accept any node *on* =N='s chain.
+
+** B1. Helper
+   Add to [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]]:
+   #+begin_src rust
+   pub fn carrier_on_user_owned_chain (
+     config   : &SkgConfig,
+     graph    : &InRustGraph,
+     original : &ID,   // the marker's N
+     carrier  : &ID,   // the drawn node's own id
+   ) -> bool {
+     resolve_override (config, graph, None, original)
+       . path . contains (carrier)
+   }
+   #+end_src
+   =None= keeps it visibility-ungated and source-set-independent (so a marker
+   honest when rendered does not start failing after a source-set switch);
+   =path= is the full user-owned chain, so a /middle/ carrier passes and an
+   off-chain (faked/stale) marker still fails.
+
+** B2. Swap the predicate
+   In 'overridesHere_marker_errors' replace =effective == carrier= with
+   ='carrier_on_user_owned_chain'(config, graph, &original, &carrier)=.
+   Keep the existing fail-closed branch when the global graph handle is
+   absent. Update the error text on 'OverridesHere_Mismatch' (in
+   [[../../server/types/errors.rs][errors.rs]]) to say the carrier is "not on the override chain of"
+   the original, rather than "is not what the server would draw".
+
+** B3. Tests (Phase B)
+   Under a restricted source-set that hides chain end =D=, a buffer drawing
+   =C= with =(overridesHere N)= *saves* (accepts the middle carrier); a
+   buffer with =(overridesHere N)= on a node *not* on =N='s chain is
+   rejected; the half-visible-chain round-trip keeps =N= in the container's
+   =contains= (open under =all=, switch to a set that hides =D=, save).
+
+* Phase C — Resolver comments + remove the warning
+** C1. Resolver comments
+   In [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]] rewrite the module doc and the
+   'OverrideResolution::path' doc: a path of any length is now *normal*; only
+   a cycle is anomalous (forbidden upstream, handled here as a backstop).
+   Strike "legacy compound chain / hand-edited data".
+
+** C2. Remove CompoundOverrideChain
+   - [[../../server/update_buffer/warnings.rs][warnings.rs]]: delete the
+     'CompletionWarning::CompoundOverrideChain' variant and its arm in
+     'render_completion_warnings'. Keep 'ColRepair' and the 'warning_sink'
+     plumbing.
+   - [[../../server/update_buffer/reconcile/content.rs][content.rs]]: in
+     'build_child_creation_data' delete the =resolution.path.len() > 1= block
+     and the local 'compound_warnings' vector; substitution still reads
+     =resolution.effective=. Drop the warning threading where it only carried
+     compound warnings.
+   - Delete [[../../tests/override_chain_notice.rs][override_chain_notice.rs]]
+     (its sole purpose was to assert this warning) and remove it from the
+     test module list.
+
+* Phase D — The 'skg-fork-node' gesture
+  The explicit command that creates =D -> C= (a private fork of a node you
+  already own). Depends on Phase A: the new edge =D -> C= with =C -> N= is a
+  user-owned chain, which only validates once "no chains" is gone.
+
+** D1. Server: new view-request
+   - [[../../server/types/viewnode.rs][viewnode.rs]]: add 'ViewRequest::Fork'
+     to the enum (the existing variants are 'Col', 'Path', 'Definitive').
+   - [[../../server/serve/parse_metadata_sexp.rs][parse_metadata_sexp.rs]]:
+     in 'parse_viewrequests_sexp', map the atom ="fork"= to
+     'ViewRequest::Fork', exactly as ="definitiveView"= maps to
+     'ViewRequest::Definitive'.
+
+** D2. Server: validate the request
+   Add 'validate_fork_view_requests' beside 'validate_definitive_view_requests'
+   in [[../../server/from_text/buffer_to_viewnodes/validate_tree.rs][validate_tree.rs]], called from 'find_buffer_errors_for_saving':
+   - at most one fork request per id;
+   - the node must have an id that exists in the graph (you cannot fork an
+     unsaved/id-less headline) — else a new
+     'BufferValidationError::ForkRequestOnUnknownNode';
+   - if the node already has a user-owned overrider, fail early with
+     'ForkAlreadyExists' (reusing 'existing_user_owned_overrider_of') so the
+     user gets the helpful message instead of a later monogamy abort.
+
+** D3. Server: turn the request into a ForkSpec
+   Collect, from the maybe-placed viewforest during the save-side validation
+   pass, the pids whose nodes carry 'ViewRequest::Fork'. For each, fetch its
+   current 'NodeComplete' from the graph/disk
+   ('nodecomplete_rustFirst_by_pid_and_source') and build the clone with the
+   existing 'build_fork_clone' (which already sets =subscribes_to=[N]=,
+   =overrides_view_of=[N]=, a shallow =contains= copy, a fresh pid). Cloning
+   the *saved* snapshot is unambiguous because the client refuses to fork
+   from a dirty buffer (D5), so disk == what the user sees. Feed these specs
+   into the *same* pipeline the foreign-implicit forks use: merge with
+   'apply_foreign_policy''s specs, run 'validate_fork_specs' (monogamy /
+   owned / active), then 'build_fork_confirmation_buffer'.
+
+   *Highest-risk wiring — read before starting.* Unlike 'ViewRequest::Definitive'
+   (consumed during view completion / rendering), a fork request must be
+   consumed on the *save* path, at fork detection — a different stage. The
+   request data is available there ('find_buffer_errors_for_saving' already
+   reads view_requests off the maybe-placed tree, as
+   'validate_definitive_view_requests' shows), but today's fork detection
+   ('apply_foreign_policy') keys off foreign-and-changed 'SaveNode's, which
+   do *not* carry view_requests. So this step must collect the fork-requested
+   pids from the viewforest and thread that set into the fork stage alongside
+   the foreign-changed specs. Pin down the exact insertion point in the save
+   handler / 'apply_foreign_policy' early; it is the one nontrivial piece of
+   plumbing.
+
+** D4. Server: clone source default
+   Do not infer the clone source from an owned ancestor for the explicit
+   gesture. Initialize the clone-to-be source to the user's *config-first*
+   owned source; the confirmation buffer pre-fills it and the user rotates
+   with =C-c s s= and approves as usual. "Config-first" needs the server to
+   honor TOML order, but 'SkgConfig.sources' is a =HashMap= and
+   'SkgConfig::first_owned_source' is *alphabetical*. So carry the
+   declaration order in 'SkgConfig' — add 'source_order : Vec<SourceName>'
+   filled at parse time — and add
+   'SkgConfig::first_owned_source_in_config_order' for the fork default;
+   while there, align the existing alphabetical default (this also closes the
+   pre-existing alphabetical-default note in [[../problems.org][TODO/problems.org]]).
+   A side =Vec= avoids swapping the map type and its many lookups.
+
+** D5. Client: the command + binding
+   - [[../../elisp/skg-request-views.el][skg-request-views.el]]: 'skg-fork-node',
+     modeled on 'skg-request-definitive-view'. FIRST refuse if the buffer has
+     unsaved changes ('buffer-modified-p'), explaining in the minibuffer
+     ("Save the buffer before forking."); this also makes the clone's saved
+     snapshot match what the user sees (D3). Otherwise stamp
+     =(viewRequests fork)= into the headline's =(skg (node ...))= via
+     'skg-edit-metadata-at-point', then *save* (auto-save, unlike definitive).
+     Use the headline's *own* =(id ...)=, never an =(overridesHere N)= marker
+     it may carry: if the node on screen is a drawn substitute =D= standing
+     in for =N=, forking must target =D= (legally deepening the chain to
+     =E -> D -> C -> N=), not re-fork the already-overridden =N=. The server
+     side likewise must not resolve the fork target through the marker.
+   - [[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]]:
+     alias + =C-c m f= -> 'skg-fork-node' (=C-c m f= is free).
+
+** D6. Client: confirmation reuse, approve, decline
+   No new confirmation code: the server returns the usual fork-confirmation
+   buffer; 'skg--fork-confirmation-handler' / 'skg-approve-fork' /
+   'skg-decline-fork' ([[../../elisp/skg-request-save.el][skg-request-save.el]]) handle it.
+   - *Idempotent approve.* Approval re-saves the origin buffer with
+     =fork-approved=true=, and that buffer still carries the
+     =(viewRequests fork)= atom. The commit path must treat the atom as
+     already-honored — build no second ForkSpec, raise no second prompt —
+     exactly as the implicit fork's =fork-approved= short-circuits
+     re-detection. Verify the explicit path shares that short-circuit; test
+     that approving does not re-loop.
+   - *Decline strips the atom.* On decline, 'skg-decline-fork' must remove the
+     lingering =(viewRequests fork)= atom from the origin headline, so the
+     buffer is not left silently primed to re-fork on the next save.
+
+** D7. Tests (Phase D)
+   - Server unit: a node with 'ViewRequest::Fork' produces a ForkSpec from
+     disk content; the monogamy pre-check rejects a second fork; a fork
+     request on an id-less node errors.
+   - Integration (elisp + server), mirroring the existing fork tests
+     ([[../../tests/integration/fork/test-emacs.el][test-emacs.el]]): run
+     'skg-fork-node' on an owned node, approve, and assert the clone exists,
+     subscribes to and overrides the original, and that override substitution
+     then draws the clone in the original's place; assert a fork from a dirty
+     buffer is refused, and that decline strips the atom and writes nothing.
+
+* Phase E — Docs
+  - [[../../schema.tql][schema.tql]] and [[../../docs/sharing-model.md][sharing-model.md]]: replace "acyclicity (no
+    user-owned override chains)" with "no user-owned override *cycles*
+    (linear chains are allowed)"; add the override-your-own-overrider
+    motivation to sharing-model.md.
+  - [[../../docs/forks.md][forks.md]]: keep the monogamy paragraph; add a section on the explicit
+    'skg-fork-node' gesture for owned nodes, distinguishing it from the
+    implicit (foreign, on-edit) fork.
+  - [[../../docs/COMMANDS.org][COMMANDS.org]]: document 'skg-fork-node' / =C-c m f=.
+  - [[../../glossary.md][glossary.md]]: "fork" now spans foreign and owned; chains are followed
+    to the last *visible* node.
+
+* Phase F — Verification (manual, via /run)
+  After D lands, drive the real app for the motivating case:
+  1. Fork a foreign node -> public clone =C= overrides foreign =N=.
+  2. 'skg-fork-node' on =C=, rotate the clone source to your *private*
+     source, approve -> private =D= overrides =C=.
+  3. With all sources active: viewing =N='s container draws =D=
+     (=overridesHere N=); save keeps =N= in the container's =contains=.
+  4. Switch to a source-set that hides the private source: the same view now
+     draws =C=; save still succeeds and still keeps =N=.
+  5. Confirm the public =C='s =.skg= file names no private id.
+
+* Sequencing & checkpoints
+  1. Phase A (+ A5 tests) — independent; the foundation.
+  2. Phase B (+ B3 tests) — independent; prerequisite for chains under a
+     restricted source-set.
+  3. Phase C — resolver comments + warning removal.
+  4. Phase D (needs A) — the gesture; pin down the save-path wiring (D3)
+     early, it is the riskiest integration point.
+  5. Phase E — docs.
+  6. Phase F — manual verification.
+  Each phase compiles and tests green before the next.

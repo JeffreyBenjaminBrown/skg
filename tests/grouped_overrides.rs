@@ -37,9 +37,6 @@ mod inactive_suppression;
 #[path = "overridden_as_such.rs"]
 mod overridden_as_such;
 
-#[path = "override_chain_notice.rs"]
-mod override_chain_notice;
-
 #[path = "override_menu.rs"]
 mod override_menu;
 

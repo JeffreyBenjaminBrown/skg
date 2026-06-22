@@ -385,6 +385,10 @@ the atom, so a request is transient. Three request forms:
   backpath ROLENAME)`). ROLENAME is one of the nine in
   `PARTNER_ROLE_VOCAB`. Emitted by the `C-c p` commands.
 - `definitiveView` — make an indefinitive, childless node editable.
+- `fork` — the explicit `skg-fork-node` gesture: clone this (owned)
+  node into a private fork that overrides it. Consumed on the save path
+  at fork detection (not during view completion), then dropped. Emitted
+  by `skg-fork-node` (`C-c m f`).
 
 ## Stats metadata: graphStats and viewStats
 
@@ -445,9 +449,9 @@ different parents):
 
 When view completion would CREATE a viewnode for node N as
 recursive content, and a user-owned overrider R of N is visible
-under the active source-set, it draws R instead -- transitively
-(legacy compound chains surface the warning "Compound overrides
-relationship traversed..."), cycle-guarded, and never in diff mode.
+under the active source-set, it draws R instead -- transitively (a
+user-owned chain D overrides C overrides N is legal and resolves to
+the last visible link), cycle-guarded, and never in diff mode.
 Existing viewnodes are never rewritten (closing and reopening
 normalizes), and only content substitutes: PartnerCol members,
 view roots, search results, ancestry insertions and phantoms always
@@ -469,8 +473,12 @@ ID, so a container's contains list round-trips to the original
 instead of being rewritten to the overrider. Edits to the drawn
 node itself (title, body, cols) still save to the drawn node.
 A buffer whose marker the server would not have drawn (the carrier
-is not the ownership-gated, visibility-UNGATED resolution of N)
-aborts the save with an explanation. A source-set switch that makes a
+is not on N's user-owned override chain -- the ownership-gated,
+visibility-UNGATED walk out of N) aborts the save with an
+explanation. With chains the honest carrier may be a MIDDLE link
+(drawn when a later link's source is hidden), so the check accepts
+any node on the chain and rejects only off-chain markers. A
+source-set switch that makes a
 drawn substitute's source inactive turns it into an anonymous
 `inactiveNode` (the marker does not survive -- an inactive node is
 dataless); the original it stood for is preserved in its container's

@@ -48,6 +48,8 @@ pub enum BufferValidationError {
                                   SourceName),  // C's resolved owned source, which is INACTIVE under the active source-set
   ForkSourceNotOwned             (ID,           // N's pid
                                   SourceName),  // C's chosen source, which the user does NOT own (a typed or hand-edited source the rotation would never offer)
+  ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
+  ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (parentIs=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
@@ -121,6 +123,10 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot fork node {:?}: the clone's source '{}' is inactive under the current source-set. Activate it first; an invisible clone is never created silently.", id, source),
       BufferValidationError::ForkSourceNotOwned(id, source) =>
         write!(f, "Cannot fork node {:?}: the clone's source '{}' is not one you own. Choose an owned source for the clone (C-c s s in the confirmation buffer).", id, source),
+      BufferValidationError::ForkRequestOnUnknownNode(id) =>
+        write!(f, "Cannot fork node {:?}: it is not in the graph. Only a saved node can be forked; save it first, then fork.", id),
+      BufferValidationError::ForkRequestMultiple(id) =>
+        write!(f, "Multiple fork requests for the same node {:?}. At most one fork request per node is allowed.", id),
       BufferValidationError::OverrideInvariantViolation(msg) =>
         write!(f, "{}", msg),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) =>
@@ -138,7 +144,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::EditRequestOnIndefinitive (id) =>
         write!(f, "Edit request on indefinitive (phantom) node {:?}. Phantoms are indefinitive; indefinitive nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
-        write!(f, "Node {:?} carries the marker (overridesHere {:?}), but the server would draw {:?} in place of that original. The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
+        write!(f, "Node {:?} carries the marker (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 

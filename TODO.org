@@ -11,6 +11,9 @@ Denticles are good for drag and anti-bacterial.
 Chip designer lists places where bacteria have been growing.
 * s
 ** correctness
+*** No two forks in a user-owned chain of forks should share a source.
+regardless of whether the chain is manual or,
+in the future per [[./TODO/user-owned_autofork_chain.org]], automated
 *** I want this todo list in Skg.
 Git review after reshaping it is hell.
 **** merge & export these notes

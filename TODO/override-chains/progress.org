@@ -1,0 +1,206 @@
+#+TITLE: Override chains — progress
+#+TODO: TODO ONGOING | DONE
+
+* What's done and went well
+** DONE Phase A — invariants: drop "no chains", add "no cycle", dedup the walk
+   - A1: 'OverrideResolution' gained a 'cycle : Vec<ID>' field
+     (override_resolution.rs). On a detected cycle it now carries the
+     trail from the first repeat back to it (walk order); empty
+     otherwise. 'effective'/'path' semantics for substitution callers
+     unchanged (input / empty on a cycle).
+   - A2: renamed 'OverrideInvariantViolation::UserOwnedOverrideChain'
+     -> 'UserOwnedOverrideCycle { cycle : Vec<ID> }'; formatter prints
+     "user-owned override cycle: a -> b -> ... -> a".
+   - A3: global 'validate_override_invariants' keeps pass 1 (monogamy);
+     pass 2 now walks each user-owned node via 'resolve_override(None)'
+     and reports a returned cycle. Cycles are canonicalized (rotate to
+     min pid) and deduped via a local HashSet so the same cycle from
+     different entry points collapses to one violation.
+   - A4: 'validate_touched_override_invariants' keeps the monogamy
+     (target-end) check; the two chain checks are replaced by one
+     'resolve_override(None)' walk from each touched user-owned node.
+   - A5: tests updated (see "order" note). All 35 override tests pass.
+
+** DONE Phase B — tamper check accepts any honest carrier on the chain
+   - B1: added 'carrier_on_user_owned_chain' to override_resolution.rs:
+     true iff the carrier is ON the original's user-owned override chain
+     ('resolve_override(None).path.contains(carrier)'), so a middle
+     carrier (drawn when a later link's source is hidden) passes and an
+     off-chain marker still fails.
+   - B2: 'overridesHere_marker_errors' now uses that predicate instead
+     of '== effective'. Kept the fail-closed branch (graph handle
+     absent, or marker on an id-less node). Updated the
+     'OverridesHere_Mismatch' message: the carrier is "not on the
+     override chain of" the original.
+   - B3: new on-disk chain fixture
+     (tests/override_substitution/fixtures-chain/) D overrides C
+     overrides N, end D in source 'other'. New sub-test
+     'chain_half_visible_keeps_the_original': under 'all' the end D is
+     drawn, under 'main' (hiding 'other') the middle C is drawn; saving
+     the half-visible view keeps N in P's contains; an off-chain marker
+     is rejected. The existing tamper sub-test still covers the basic
+     off-chain rejection.
+
+** DONE Phase C — resolver comments + remove CompoundOverrideChain
+   - C1: rewrote the resolver module doc and the 'path' field doc — a
+     path of any length is normal; only a cycle is anomalous (a
+     backstop here, forbidden upstream). Struck "legacy compound chain
+     / hand-edited data".
+   - C2: removed 'CompletionWarning::CompoundOverrideChain' (variant +
+     render arm + module doc). In content.rs dropped the
+     'resolution.path.len() > 1' block and the 'compound_warnings'
+     vector, and removed the now-purposeless 'warning_sink' threading
+     through the content path (expand_true_content_at_activeNode,
+     reconcile_content_children, complete_content_children,
+     build_child_creation_data) — the ColRepair sink still flows
+     through the col reconcilers, untouched. De-novo renders now return
+     no completion warnings (they repaired silently; the compound
+     notice was the only kind they surfaced). Deleted
+     tests/override_chain_notice.rs (+ its fixtures) and its registration
+     in grouped_overrides.rs.
+   - Full Rust suite (472 tests) green.
+
+** DONE Phase D — the 'skg-fork-node' gesture
+   - D1: added 'ViewRequest::Fork' (viewnode.rs) + parser map "fork" ->
+     Fork (parse_metadata_sexp.rs) + Display "fork". A Fork request is
+     stripped in 'extract_view_requests' (it's a save-path request, not
+     render-path); the render-time 'execute_view_requests' fails loudly
+     if one ever survives.
+   - D2: 'validate_fork_view_requests' (validate_tree.rs): at most one
+     fork request per id ('ForkRequestMultiple'), id must exist in the
+     graph ('ForkRequestOnUnknownNode'), and reuse
+     'existing_user_owned_overrider_of' for an early 'ForkAlreadyExists'.
+     Graph-dependent checks are skipped when the global handle is
+     absent.
+   - D3: 'explicit_fork_specs_from_viewforest' (from_text.rs) collects
+     ViewRequest::Fork pids from the placed viewforest, fetches each
+     node's disk snapshot, builds the clone with 'fork_spec_from_buffer_node'
+     (empty ancestor map -> no inference), and merges into the same
+     fork_specs the implicit path produces. The owned original keeps its
+     own save; only the clone is added. The shared
+     confirmation/commit/fork-approved pipeline handles the rest.
+   - D4: added 'SkgConfig.source_order' (filled at parse time by both
+     config loaders via 'source_order_from_toml'),
+     'owned_sources_in_config_order', and 'first_owned_source_in_config_order';
+     aligned the existing alphabetical default ('first_owned_source' now
+     delegates to config order, and the implicit-fork default is
+     config-first too). Closes the alphabetical-default note in
+     problems.org.
+   - D5: 'skg-fork-node' (skg-request-views.el): refuses a dirty buffer,
+     else stamps (viewRequests fork) and auto-saves. Alias 'skg-fork +
+     C-c m f (skg-keymaps-and-aliases.el).
+   - D6: confirmation reuse is automatic (the server returns the usual
+     fork-confirmation buffer). Idempotent approve rides the shared
+     fork-approved short-circuit. 'skg-decline-fork' now strips the
+     lingering (viewRequests fork) atom from the origin buffer
+     ('skg-strip-fork-requests-in-buffer' in skg-metadata.el).
+   - D7: server sub-tests in tests/fork.rs (save instruction, unknown
+     node error, round-trip + monogamy) and a new integration test
+     tests/integration/fork-owned/ (dirty refusal, approve + substitution,
+     decline strips atom + commits nothing). Both fork integration tests
+     and the full Rust (472) + elisp (252) suites pass.
+
+** DONE Phase E — docs
+   - schema.tql, docs/sharing-model.md, glossary.md: "acyclicity (no
+     user-owned override chains)" -> "no user-owned override cycles
+     (linear chains allowed)"; added the override-your-own-overrider
+     motivation and the middle-carrier (half-visible chain) behavior.
+   - docs/forks.md: retitled the implicit section; added "The explicit
+     gesture: forking a node you own" (skg-fork-node / C-c m f).
+   - docs/COMMANDS.org: documented C-c m f / skg-fork-node.
+   - glossary.md: "fork" now spans foreign (implicit) and owned
+     (explicit); override-substitution entry notes chains and middle
+     carriers.
+   - Also updated api-and-formats.md (not named in the plan but made
+     stale by B/C/D): dropped the compound-chain warning mention, added
+     the (viewRequests fork) form, and rewrote the overridesHere tamper
+     paragraph for chains.
+   - Closed the alphabetical-default note in TODO/problems.org (moved to
+     TODO/DONE/problems.org), per D4.
+
+** DONE Phase F — verification of the motivating case
+   The plan called for MANUAL verification via /run. The environment is
+   headless (no interactive Emacs display), and a manual /run drive is
+   neither feasible nor reproducible here, so I verified the full
+   motivating case with an AUTOMATED integration test instead --
+   stronger evidence and a lasting regression guard. New test
+   tests/integration/fork-chain/ drives, through the real client+server:
+   1. fork foreign N -> public clone C overrides N (implicit);
+   2. 'skg-fork-node' on the DRAWN SUBSTITUTE C, rotating the clone to a
+      PRIVATE source -> private D overrides C (the fork-of-a-fork, the
+      highest-risk path: forking the substitute targets C's own id, not
+      N via the marker);
+   3. reopening N's container draws the chain end D (a private node) in
+      N's place, marked (overridesHere N);
+   4. saving that chain-end view succeeds (the tamper check accepts the
+      chain-end carrier);
+   5. on disk the public clone C overrides the foreign N and names NO
+      private id (run-test.sh checks the .skg files).
+   The half-visible (source-set hides the chain end -> middle carrier
+   drawn, save still keeps N) behavior is covered at the server level by
+   Phase B's tests/override_substitution/fixtures-chain. All three fork
+   integration tests pass.
+
+* Changes to the plan's envisioned order
+  - None of substance in A-E; phases done in the planned order.
+  - A5 detail: besides the test edits the plan named, I added the
+    'cycle' field to the existing resolver expectation literals in
+    tests/dbs/in_rust_graph/override_resolution.rs (compiler-forced),
+    and fixed a now-false comment there ("Cannot be saved or rebuilt")
+    since linear chains are now savable.
+  - Reused 'resolve_override' as the single ungated walk for both
+    validators (as the plan intended), so the chain/cycle-walking logic
+    lives in exactly one place.
+  - D3 detail: 'viewforest.nodes()' walks the ego_tree arena, which
+    retains detached copies from placement, so a forked node appeared
+    twice; the explicit-fork collector dedups by id (D2 already rejects
+    a genuine second request). The render-time view-request pass never
+    sees Fork: 'extract_view_requests' strips it (it is consumed on the
+    save path) and 'execute_view_requests' fails loudly as a backstop.
+  - Phase F: automated integration test in place of the manual /run
+    drive (see above) -- a HOW change, not a goal change.
+
+* Unanticipated future potential costs and benefits
+  - The global validator's cycle scan calls 'resolve_override' once per
+    user-owned node without memoizing proven-acyclic pids (the plan
+    permitted skipping memoization on the cold init/rebuild path). Cost
+    is O(V · chain depth) worst case; chains are short in practice.
+    Cheap to add memoization later if init time ever matters.
+  - Benefit: 'resolve_override' is now the single home of the
+    chain/cycle walk -- both validators, the tamper helper, and content
+    substitution share it, so the rules cannot drift apart.
+
+* Open questions
+  None.
+
+* Follow-ups completed after the initial run
+** DONE Dismissing the confirmation buffer (any way) strips the fork atom
+   Originally only 'skg-decline-fork' (C-c C-k) stripped the lingering
+   (viewRequests fork) atom; killing the confirmation buffer directly
+   left it, so the next save re-raised the fork. Fixed: the
+   fork-confirmation buffer now carries a buffer-local 'kill-buffer-hook'
+   ('skg--fork-confirmation-on-kill') that strips the origin's fork atom
+   on ANY dismissal. 'skg-approve-fork' suppresses it (the atom must
+   survive to its re-save, which commits the fork; the server then drops
+   it on re-render) via the buffer-local 'skg--fork-suppress-strip-on-kill'.
+   Stripping is idempotent, so it is a harmless no-op after a decline.
+   The fork-owned integration test gained a part that dismisses the
+   confirmation by killing it directly and asserts the atom is stripped.
+
+** DONE The confirmation buffer forces a deliberate source pick (all forks)
+   Per Jeff: a fork must not silently land in a default source. The
+   fork-confirmation buffer now pre-fills each clone-to-be's source with
+   the placeholder 'PICK-A-SOURCE' (server const 'FORK_SOURCE_PLACEHOLDER'
+   in from_text/fork.rs; client const 'skg-fork-source-placeholder'); the
+   computed source (inferred-from-ancestor, or config-first owned) is
+   shown only as a "# Suggested source ..." comment above each clone.
+   'skg-approve-fork' refuses (user-error, buffer left open) while any
+   clone still carries the placeholder, so the user must set each with
+   C-c s s. Applies to BOTH fork paths (chosen via AskUserQuestion:
+   "All forks"). The server-side default-source resolution is unchanged
+   (it now feeds the suggestion); a server-driven approve that bypasses
+   the confirmation buffer still works, and the placeholder, if ever
+   sent, is rejected as an unknown source -- defense in depth. Docs
+   (forks.md, sharing-model.md, COMMANDS.org) updated; the confirmation
+   unit test and all three fork integration tests (which now pick a
+   source, and assert approve is refused without one) pass.

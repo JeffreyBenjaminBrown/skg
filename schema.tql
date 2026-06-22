@@ -66,9 +66,10 @@ define
   # fork gesture creates this edge alongside a `subscribes` edge (above).
   # Invariants on USER-OWNED edges, validated at save and at
   # init/rebuild: monogamy (at most one user-owned overrider per
-  # overridden node) and acyclicity (no user-owned override chains).
-  # Foreign override edges are display-only facts and never
-  # substitute.
+  # overridden node) and no user-owned override CYCLES. Linear chains
+  # are allowed -- D overrides C overrides N, all owned, resolves to the
+  # end of the chain. Foreign override edges are display-only facts and
+  # never substitute.
   relation overrides_view_of,
     relates overrider,
     relates overridden;

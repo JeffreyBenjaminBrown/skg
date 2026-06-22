@@ -1,0 +1,655 @@
+#+TITLE: Override chains: permit user-owned chains, redefine monogamy, add a fork-your-own-node gesture
+#+TODO: TODO ONGOING | DONE
+
+* Summary
+  Today an =overrides_view_of= edge (overrider -> overridden) obeys two
+  invariants on /user-owned/ edges, checked at save and at init/rebuild
+  (see [[../../server/dbs/in_rust_graph/override_invariants.rs][override_invariants.rs]]):
+  - *monogamy*: no node has more than one user-owned overrider;
+  - *acyclicity ("no chains")*: if user-owned X overrides Y and
+    user-owned Y overrides Z, that is a violation.
+
+  We want to:
+  1. *Permit user-owned chains.* A user may override their own overrider.
+     Concretely: a public clone =C= overrides foreign =N=; a private clone
+     =D= overrides own =C=. The chain =D -> C -> N=, all user-owned, must
+     become legal. Motivation: a paranoiac wants a public fork of someone
+     else's node /and/ a private fork of their own, so that even the
+     /existence/ of private thoughts is not leaked. (A foreign reader of
+     your public =C= can see that =C='s =contains= names an ID absent from
+     your public data; routing the private material through a separate
+     private overrider =D= keeps =C= clean.)
+  2. *Keep monogamy*, restated as "no two user-owned nodes override the
+     same node (owned or not)". This is /exactly/ the current target-end
+     check; nothing changes but the prose.
+  3. *Confirm* that one node may override several distinct targets. It
+     already can, end to end; no code change.
+  4. *Replace* acyclicity with a *no-cycle* check, since the resolver must
+     still terminate, and a cycle is now reachable through normal gestures.
+  5. Add an explicit *'skg-fork-node'* command (=C-c m f=, new
+     =(viewRequests fork)= request) so the user can fork a node they own —
+     the gesture that /creates/ =D -> C=.
+
+  The work is small in the resolver and data model (which already tolerate
+  chains) and concentrated in three places: the *invariant validators*, the
+  *tamper check*, and the *new fork gesture*. One subtlety is load-bearing
+  and easy to miss — the tamper check breaks under a restricted source-set
+  (see [[*Work item 3: Generalize the overridesHere tamper check (the subtle one)][Work item 3]]).
+
+* Background (terms, so the open questions read standalone)
+  - *override substitution*: when content =N= would be drawn, the server
+    draws the /effective overrider/ instead — the end of the chain of
+    user-owned, currently-/visible/ =overrides_view_of= edges out of =N=.
+    The drawn node carries the marker =(overridesHere N)= (herald "Oh").
+    Resolver: 'resolve_override' in
+    [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]].
+  - *collected id*: what a drawn viewnode contributes to its parent's saved
+    =contains=. For a substitute it is the marker's original (=N=), not the
+    drawn node — so substitution never rewrites a container's =contains=.
+    'collected_id' in [[../../server/types/viewnode.rs][viewnode.rs]].
+  - *visibility gating*: under a restricted source-set the resolver follows
+    an edge only if the overrider's source is /active/. So the effective
+    (drawn) node can be a *middle* node of the full chain, when a later
+    link is invisible.
+  - *the tamper check*: 'overridesHere_marker_errors' in
+    [[../../server/from_text/buffer_to_viewnodes/validate_tree.rs][validate_tree.rs]]
+    rejects a save whose =(overridesHere N)= marker the server "would not
+    have drawn", to stop a hand-edited/yanked/stale marker from silently
+    rewriting a =contains= list.
+  - *monogamy makes the overrider-walk functional*: with at most one
+    user-owned overrider per node, "follow my overrider" is a partial
+    /function/, so a user-owned cycle is always a simple cycle and the
+    resolver's seen-set catches it.
+
+* The conceptual change, in three clauses
+** (a) Monogamy: unchanged
+   The current 'MultipleUserOwnedOverriders' check /is/ "no two user-owned
+   nodes override the same node". It is a target-end check:
+   'user_owned_overriders_of' groups overriders by the node they override
+   and flags any group of size > 1. Keep it verbatim. The fork monogamy
+   pre-check 'existing_user_owned_overrider_of' (used by 'validate_fork_specs'
+   in [[../../server/from_text/fork.rs][fork.rs]]) also stays — it is what makes a
+   second fork of the same node fail with =ForkAlreadyExists=.
+
+** (b) One overrider, many targets: already legal (verified, no change)
+   =overrides_view_of= is an =MSV<ID>= (a list) from disk through
+   'NodeComplete', the inverse index =overriders_of= is keyed per target,
+   the resolver imposes monogamy /per target/ (not per overrider), save
+   lowering serializes the whole list, stats count every target, and the
+   round-trip is per-container via the =overridesHere= marker. Drawing the
+   same overrider =R= under two containers (for two different originals)
+   round-trips each correctly, because each position carries its own
+   =(overridesHere ...)=. *No code change; add a confirming test.*
+
+** (c) Chains: permitted; cycles: forbidden
+   Drop the "no chains" prohibition. Add a no-cycle invariant in its place,
+   enforced at the same two gates (save, init/rebuild). A user-owned cycle
+   is now /reachable/ (see [[*Danger: a cycle is reachable via the writable overriddenCol][the danger note]]), so this is mandatory, not
+   decorative.
+
+* tentative plan
+** Work item 1: Invariant validators — drop "no chains", add "no cycle"
+  File: [[../../server/dbs/in_rust_graph/override_invariants.rs][override_invariants.rs]].
+
+  1. *Enum.* Replace 'OverrideInvariantViolation::UserOwnedOverrideChain'
+     with 'UserOwnedOverrideCycle { cycle : Vec<ID> }' (the pids on the
+     cycle, sorted/rotated for a stable message). Keep 'UnknownSource' and
+     'MultipleUserOwnedOverriders'. Update 'format_override_invariant_violations'
+     accordingly (drop the chain arm, add a cycle arm).
+  2. *Global validator* 'validate_override_invariants'. Keep pass 1
+     (monogamy). Replace pass 2 (lines ~75-106, the chain scan) with a
+     functional-graph cycle scan over user-owned overrider edges: for each
+     user-owned node not yet proven acyclic, walk 'user_owned_overriders_of'
+     forward with a seen-set; on a repeat, emit 'UserOwnedOverrideCycle';
+     memoize proven-acyclic pids so the whole scan is O(V). Resolve every
+     hop through 'pid_of' (extra-id safety), exactly as the existing passes
+     do.
+  3. *Incremental validator* 'validate_touched_override_invariants'. Keep
+     the monogamy (target-end) check. Replace the two chain checks (T as
+     "middle", T as "first", lines ~157-183) with a cycle check on the
+     touched nodes only. The clean implementation reuses the resolver:
+     for each touched user-owned pid =T=, call
+     'resolve_override(config, simulated_graph, None, T)' and emit a
+     cycle violation if =cycle_detected=. This is correct and complete:
+     a save that closes a user-owned cycle puts a touched node /on/ that
+     cycle (the new edge is incident to a written node), monogamy makes the
+     overrider-walk functional, and 'resolve_override' already does the
+     pid_of resolution and the seen-set. Cost is O(touched x chain length).
+  4. *Call sites unchanged* in shape: 'error_unless_override_invariants_hold'
+     ([[../../server/dbs/init.rs][init.rs]], [[../../server/serve/handlers/rebuild_dbs.rs][rebuild_dbs.rs]]) and
+     'validate_override_invariants_after_save' ([[../../server/save.rs][save.rs]]) keep
+     their signatures; only the violation set they can produce changes.
+  5. *Deduplicate the walk* (decided — see problems). The global scan (pt 2),
+     the touched scan (pt 3), and the tamper helper (Work item 3) all "follow
+     user-owned overrider edges, pid-resolved, with a seen-set". Factor ONE
+     primitive — e.g.
+     'user_owned_override_cycle_through(config, graph, pid) -> Option<Vec<ID>>'
+     (or simply reuse 'resolve_override''s =cycle_detected=) — and have the
+     global scan call it per node (memoizing proven-acyclic pids) instead of
+     hand-rolling a second walk, so the save-time and init/rebuild gates
+     cannot drift apart. The rename 'UserOwnedOverrideChain' ->
+     'UserOwnedOverrideCycle' is compiler-enforced (the build fails until
+     every 'match' arm and constructor is updated), so the low-churn in-place
+     rename is safe; only prose mentioning "chain" needs a manual sweep.
+
+** Work item 2: The resolver — no code change, comments only
+  File: [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]].
+  'resolve_override' already walks a legal chain to its visible end, stops
+  on the monogamy branch (=candidates.len() != 1=), and is cycle-guarded
+  and total. *No logic change.* But the module doc and the
+  'OverrideResolution::path' doc call a length > 1 path "legacy compound
+  chain / hand-edited data"; that is now false. Rewrite those comments: a
+  path of any length is normal; only a *cycle* is anomalous (and forbidden
+  upstream, handled gracefully here as a backstop).
+
+** Work item 3: Generalize the overridesHere tamper check (the subtle one)
+  File: [[../../server/from_text/buffer_to_viewnodes/validate_tree.rs][validate_tree.rs]], 'overridesHere_marker_errors'.
+
+  *The bug the feature introduces.* Today the check demands
+  =carrier == resolve_override(N, active=None).effective= — the
+  visibility-/ungated/ end of the chain. For a single override that is
+  always the drawn node, so it holds. For a chain =D -> C -> N= rendered
+  under a source-set where =D='s source is *inactive*:
+  - rendering (gated) draws =C= (the visible prefix end), marked
+    =(overridesHere N)=;
+  - the tamper check (ungated) computes effective = =D=;
+  - =carrier C != effective D= -> the save *aborts* with
+    =OverridesHere_Mismatch=, even though =C= is an honest carrier.
+  This is *confirmed* by tracing 'build_child_creation_data'
+  ([[../../server/update_buffer/reconcile/content.rs][content.rs]], the marker's original is always the goal id =N=)
+  and the ungated resolve in 'overridesHere_marker_errors'.
+
+  *The fix.* The honest carriers of =(overridesHere N)= are exactly the
+  nodes on =N='s user-owned override chain — under some source-set, each is
+  the visible prefix end. So replace the equality with membership:
+  =carrier ∈ resolve_override(N, active=None).path=. Add a helper
+  'carrier_on_user_owned_chain(config, graph, original, carrier) -> bool'
+  in [[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]] (cohesion with the chain logic) and call
+  it from the tamper check. Keep the existing fail-closed behavior when the
+  global graph handle is unavailable.
+
+  *Why not just gate the check to the connection's source-set?* That looks
+  simpler (=carrier == resolve_override(N, active=connection_set).effective=)
+  but it reintroduces the very failure the current ungated design was built
+  to avoid: a marker that was honest when rendered must not start failing
+  because the source-set changed afterward (a yanked marker line, a stale
+  buffer). The ungated-/path/ predicate is source-set-independent and still
+  rejects a marker on a node that is /not/ on =N='s chain — so it does not
+  weaken the check: it admits exactly the legitimate substitutes (each of
+  which legitimately stands for =N=, so collecting =N= for its position is
+  correct).
+
+** Work item 4: Remove the CompoundOverrideChain warning entirely
+  Decided (problems / "drop", "no reason to keep legacy syntax"): a compound
+  chain is now the normal case, so the warning is pure noise. Delete it
+  rather than rename or narrow it.
+  - Drop 'CompletionWarning::CompoundOverrideChain' and its render arm in
+    [[../../server/update_buffer/warnings.rs][warnings.rs]].
+  - Drop the emission block (the =resolution.path.len() > 1= test and the
+    'compound_warnings' plumbing) in 'build_child_creation_data'
+    ([[../../server/update_buffer/reconcile/content.rs][content.rs]]); substitution still uses =resolution.effective=,
+    it just no longer warns.
+  - Delete the test that exists only to assert the warning
+    ([[../../tests/override_chain_notice.rs][override_chain_notice.rs]]; see Work item 7).
+
+** Work item 5: The 'skg-fork-node' gesture (the creation path)
+  Forking is today /implicit and foreign-only/: editing a foreign node and
+  saving is read as a fork (detection in 'apply_foreign_policy'). An owned
+  node cannot be forked that way — editing it just edits it. So
+  "override my own overrider" needs an *explicit* gesture. Per the decision
+  in this thread, model it on the definitive-view request.
+
+*** Client (Emacs)
+   - New command 'skg-fork-node' in [[../../elisp/skg-request-views.el][skg-request-views.el]],
+     mirroring 'skg-request-definitive-view': stamp =(viewRequests fork)=
+     into the headline's =(skg (node ...))= metadata via
+     'skg-edit-metadata-at-point'. Unlike definitive (which the user then
+     edits before saving), forking has nothing to pre-edit, so it should
+     /save immediately/ and let the existing fork-confirmation flow take
+     over (see [[*Open decision: auto-save?][the open decision]]).
+   - Alias + binding in [[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]]:
+     bind =C-c m f= to 'skg-fork-node'. The =C-c m= prefix currently holds
+     only =C-c m c= / =C-c m l=, so =C-c m f= is free.
+   - Reuse the existing confirmation machinery in
+     [[../../elisp/skg-request-save.el][skg-request-save.el]] ('skg--fork-confirmation-handler',
+     'skg-approve-fork', 'skg-decline-fork') unchanged — the server returns
+     the same confirmation buffer, approval re-saves with =fork-approved=true=.
+
+*** Server
+   - New 'ViewRequest::Fork' variant in [[../../server/types/viewnode.rs][viewnode.rs]],
+     parsed from the atom ="fork"= in 'parse_viewrequests_sexp'
+     ([[../../server/serve/parse_metadata_sexp.rs][parse_metadata_sexp.rs]]), exactly as ="definitiveView"= maps to
+     'ViewRequest::Definitive'.
+   - Fork detection: in the save pipeline, a node carrying
+     'ViewRequest::Fork' becomes a fork candidate /regardless of ownership
+     or whether its text changed/. Build its 'ForkSpec' from the node's
+     current graph/disk 'NodeComplete' (not from buffer text — the node may
+     be indefinitive in the view), via the existing 'build_fork_clone',
+     which already sets =subscribes_to=[N]=, =overrides_view_of=[N]=, a
+     shallow =contains= copy, a fresh pid, and an owned source. For an owned
+     =N= this is identical to the foreign case.
+   - *Clone source (decided)*: for the explicit gesture, do NOT infer the
+     source from an owned ancestor. Initialize the clone-to-be's source to
+     the FIRST owned source in config order (what =C-c s s= cycling starts
+     from) and require the user to confirm/rotate it in the confirmation
+     buffer. Caveat: "config order" needs the config to preserve source
+     order, but today the default owned source is ALPHABETICAL
+     ('SkgConfig.sources' is a =HashMap=) — see the open follow-up in
+     [[*Default clone source for an explicit owned fork][problems]]
+     and [[../problems.org][TODO/problems.org]].
+   - 'validate_fork_specs' is reused verbatim: its monogamy pre-check
+     ('existing_user_owned_overrider_of') makes a /second/ private fork of
+     the same node fail with =ForkAlreadyExists= — so monogamy still caps a
+     node at one user-owned overrider, even through the new gesture.
+   - Add a 'validate_*' pass for the fork request analogous to
+     'validate_definitive_view_requests' (at most one fork request per id;
+     reject a fork request on a node that already has a user-owned
+     overrider — same message as =ForkAlreadyExists=, surfaced early).
+   - *Dependency:* this gesture cannot land before Work item 1. The new
+     edge =D -> C= with =C -> N= is precisely a user-owned chain; today's
+     'validate_touched_override_invariants' would reject the commit. Sequence
+     Work item 1 first.
+
+** Work item 6: Docs
+  - [[../../schema.tql][schema.tql]] (overrides_view_of comment): replace "acyclicity (no
+    user-owned override chains)" with "no user-owned override /cycles/
+    (linear chains are allowed)".
+  - [[../../docs/sharing-model.md][sharing-model.md]] (the two-invariants paragraph): same edit; add a
+    sentence that you may override your own overrider, with the
+    public/private fork motivation.
+  - [[../../docs/forks.md][forks.md]]: the monogamy paragraph ("at most one clone you own") stays
+    true. Add a short section on the explicit 'skg-fork-node' gesture for
+    owned nodes.
+  - [[../../docs/COMMANDS.org][COMMANDS.org]]: document 'skg-fork-node' / =C-c m f=.
+  - [[../../glossary.md][glossary.md]] (override substitution / "fork"): note chains are
+    followed to the last /visible/ node; "fork" now applies to owned nodes
+    too.
+
+** Work item 7: Tests
+  - *Delete / invert* the tests that assert chains are rejected:
+    - [[../../tests/dbs/in_rust_graph/override_invariants.rs][override_invariants.rs]]:
+      'user_owned_override_chain_is_invalid',
+      'touched_chain_detected_from_the_first_end',
+      'touched_chain_detected_from_the_middle_end' -> now /legal/; replace
+      with positive "chain is accepted" tests. Keep
+      'touched_chain_through_foreign_middle_is_valid' and the monogamy
+      tests.
+    - [[../../tests/save/override_invariants.rs][override_invariants.rs (save)]]:
+      'save_simulation_rejects_user_owned_override_chain' -> the save now
+      succeeds; invert.
+    - [[../../tests/override_chain_notice.rs][override_chain_notice.rs]]: DELETE
+      outright — it exists only to assert the now-removed warning (Work item 4).
+  - *Add*: a user-owned /cycle/ is rejected (global and touched); a legal
+    =D -> C -> N= chain saves, renders =D= in =N='s place, and round-trips
+    =N= into the container's =contains=; one overrider with two targets
+    round-trips both; the tamper check accepts a /middle/ carrier under a
+    restricted source-set and still rejects a marker on an off-chain node;
+    and a source-set switch on a half-visible chain (open under =all=, switch
+    to a set that hides =D=, save) succeeds and keeps =N= in its container's
+    =contains=.
+  - *Keep* (already chain-aware, re-comment only): 'override_menu' tests
+    ([[../../tests/override_menu.rs][override_menu.rs]] — the recursive all-edges walk + path-set guard
+    in [[../../server/to_org/render/override_menu.rs][override_menu.rs]] already renders chains and stops cycles)
+    and the resolver chain tests
+    ([[../../tests/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]]).
+
+** Suggested sequencing
+  1. Work item 1 (invariants: drop chain, add cycle) + its tests.
+  2. Work item 3 (tamper check) + its test — independently correct, and a
+     prerequisite for chains under restricted source-sets.
+  3. Work item 2 + 4 (resolver-comment rewrite; remove the warning).
+  4. Work item 5 (the 'skg-fork-node' gesture), which depends on 1.
+  5. Work item 6 (docs).
+
+* problems
+  Beefs with the plan above, per Jeff's categories. Headlines needing a
+  decision from Jeff carry a =TODO=.
+
+** Unmade decisions
+
+*** DONE Cycle: hard error, or soft "resolver bails"?
+The plan makes a user-owned cycle a /hard/ save+rebuild error
+('UserOwnedOverrideCycle'). The alternative is to add no invariant and
+lean on the resolver's existing seen-set (a cycle just yields no
+substitution). Hard error is recommended: a cycle is meaningless data,
+a soft bail leaves a silently broken graph (confirmed: nothing else
+would catch it once "no chains" is gone), and the resolver guard is a
+backstop, not a gatekeeper. But it /is/ a new failure mode the user can
+hit through the writable overriddenCol — confirm you want the save to
+refuse rather than to quietly drop the offending edge.
+
+**** DONE agreed, hard error
+***** DONE In the plan: Work item 1 makes it a hard =UserOwnedOverrideCycle= at save + init/rebuild.
+
+*** DONE Does 'skg-fork-node' subscribe-and-override, or override-only?
+    "Fork" historically means clone + =subscribes_to= + =overrides_view_of=.
+    For a private fork of your own node, the subscription is harmless and
+    consistent (your private =D= sees =C='s later additions as unintegrated
+    content). The plan assumes full fork (reusing 'build_fork_clone'
+    verbatim). If the intent is "a private /overriding/ twin, but not a
+    subscriber", we would build an override-only clone — a new shape worth
+    naming. I lean full-fork (matches the word and the machinery); confirm.
+
+**** DONE yes, full override, both relationships
+***** DONE In the plan: Work item 5 reuses 'build_fork_clone', which writes both =subscribes_to= and =overrides_view_of=.
+
+*** DONE Should 'skg-fork-node' auto-save, or just stamp the atom?
+    Definitive does /not/ auto-save (you make it definitive, then edit,
+    then save). Col/path requests /do/ auto-save. Fork has nothing to
+    pre-edit, so the plan auto-saves (immediately surfacing the
+    confirmation buffer). The only argument for not auto-saving is letting
+    the user stack a fork request with other edits before saving. I lean
+    auto-save; confirm.
+
+**** DONE agreed
+***** DONE In the plan: Work item 5 (auto-save, then the confirmation buffer).
+
+*** ONGOING Default clone source for an explicit owned fork
+    For a /foreign/ fork the clone must go to an owned source, inferred from
+    the nearest owned ancestor else first-owned. For an /owned/ =N= the
+    inference would resolve to =N='s own source — but the paranoiac wants
+    =D= in a /different/ (private) source, so they will rotate it with
+    =C-c s s= in the confirmation buffer. Question: what default minimizes
+    surprise — =N='s own source, first-owned, or "force the user to pick"?
+    Related to the pre-existing alphabetical-default-source item already in
+    [[../problems.org][TODO/problems.org]].
+
+**** ONGOING force the user to pick
+starting (I think this is already what set-source cycling does)
+from the first repo listed in their config
+***** ONGOING (Claude) Behaviour folded into Work item 5 (no ancestor inference;
+      init the clone source to the config-first owned source; user rotates +
+      approves). One snag worth your call: "first repo listed in your config"
+      needs the server to preserve config source ORDER, but today the default
+      owned source is ALPHABETICAL ('SkgConfig.sources' is a =HashMap=) — the
+      pre-existing item in [[../problems.org][TODO/problems.org]]. So: fix
+      config-order now (small — carry an ordered =Vec<SourceName>= alongside
+      the map), or accept alphabetical-first for the moment and file the
+      order fix separately? I lean "fix it now", since your decision names
+      config order explicitly.
+****** TODO agreed
+And maybe I should mention that eventually there will be a *tree*
+of sources, and the UI for choosing them will be ordinary org navigation.
+That's probably neither here nor thare but I just say it
+so that we can avoid now accidentally making that difficult later.
+
+*** DONE Keep, narrow, or drop the CompoundOverrideChain notice?
+    Once chains are normal, a notice on /every/ multi-hop render may be
+    noise. Options: keep (informational); narrow to depth > 2 or to
+    cross-source chains (most confusing); drop. Cosmetic, but it is a
+    user-facing string. The name "compound"/"legacy" is now misleading
+    regardless — rename if kept.
+
+**** DONE drop
+And remember that there's never any reason to keep legacy syntax;
+I'm the only dev and only user so far.
+***** DONE Folded: Work item 4 now REMOVES the warning (enum + emission + render); Work item 7 deletes its test.
+
+*** DONE Name of the new violation: variant vs reuse
+    The plan replaces 'UserOwnedOverrideChain' with a new
+    'UserOwnedOverrideCycle'. Renaming-in-place (keeping the error
+    plumbing, changing semantics) is less churn but risks a stale name
+    elsewhere. A clean new variant is clearer. Trivial, but it is a
+    type-name decision.
+
+**** DONE
+That's a fine name.
+I don't really understand the correctness danger, but
+do the low-churn strategy if and only if it would be correct.
+***** DONE (Claude) Low-churn IS correct, so we'll do it. I overstated the
+"danger". Renaming the enum variant in place
+('UserOwnedOverrideChain' -> 'UserOwnedOverrideCycle', and changing its
+fields) is compiler-enforced: Rust will not build until every 'match'
+arm and every place that constructs the variant is updated, so nothing
+can silently keep the old meaning. The ONLY thing the compiler can't
+catch is prose — a doc-comment or an error string still saying "chain"
+— which we sweep by hand. Net: in-place rename, manual prose sweep.
+Folded into Work item 1, pt 5.
+** Incorrect things
+
+*** (likely solved): The tamper check silently breaks the headline feature
+    Without [[*Work item 3: Generalize the overridesHere tamper check (the subtle one)][Work item 3]], the very use case that motivates the feature —
+    a public + a private fork, viewed with the private source inactive —
+    would render fine but *fail to save* (=OverridesHere_Mismatch=). This
+    is the most dangerous interaction and the easiest to ship without,
+    because it only bites under a restricted source-set, which unit tests
+    rarely exercise. Marked "likely solved" because the plan calls it out
+    and fixes it; flagged here so it is not dropped during implementation.
+    Verified by adversarial trace of 'build_child_creation_data' and
+    'overridesHere_marker_errors'.
+
+** Awkward / inelegant / overly complex
+
+*** DONE Two override validators must agree — divergence risk
+    Monogamy (and now the cycle check) lives in /both/
+    'validate_override_invariants' (full scan) and
+    'validate_touched_override_invariants' (incremental). They already
+    duplicate monogamy; the plan duplicates cycle logic too. A future bug
+    where the two disagree (e.g. one resolves =pid_of=, the other does not)
+    would let bad data in via the fast path and only be caught at rebuild.
+    Consider extracting a single 'user_owned_override_cycle_through(pid)'
+    primitive both call. (Pre-existing smell, widened by this change — see
+    also the note appended to [[../problems.org][TODO/problems.org]].)
+
+**** DONE yes please, dedup that code
+***** DONE Folded into Work item 1, pt 5 (one shared 'user_owned_override_cycle_through' primitive).
+
+*** DONE The "ungated path" tamper predicate is a little surprising
+    "carrier is anywhere on the original's chain" is correct but less
+    obvious than an equality. Mitigate with a sharply-worded helper and
+    doc-comment ('carrier_on_user_owned_chain'), and a test that pins both
+    the accept (middle carrier) and the reject (off-chain marker) cases.
+
+**** DONE I don't understand. Please elaborate.
+This feels like neuralese. Giving me a glossary might help.
+***** DONE (Claude) Plain-English version + glossary.
+****** Tiny glossary (for this note only):
+- /marker/: a hidden tag =(overridesHere N)= the server puts on a node
+  it draws, meaning "I'm standing in for node N right here".
+- /carrier/: the node the marker is attached to — the node actually
+  shown on screen.
+- /original/ (=N=): the node being stood-in-for (the one named inside
+  the marker).
+- /chain/: =D overrides C overrides N=. Each node stands in for the
+  next one down.
+- /effective overrider/: which node actually gets drawn in =N='s place.
+  With every source visible it's the far end of the chain (=D=). If
+  =D='s source is hidden, the server can only draw as far as =C=, so
+  =C= is effective then.
+- /ungated/: "ignore which sources are visible right now" — i.e. walk
+  the WHOLE chain.
+- /path/: the list of nodes the chain runs through, e.g. =[C, D]=.
+- /tamper check/: when you save, the server re-derives every marker it
+  would itself have drawn and refuses the save if your buffer carries a
+  marker it would NOT have drawn — so a hand-typed or yanked marker
+  can't trick the save into rewriting some parent's child list.
+****** The actual point, in three steps:
+1. OLD rule: "the carrier must equal the one node the server would draw
+   for =N=, ignoring visibility" — that's the far end of the chain
+   (=D=). This was fine while chains were illegal, because then a chain
+   was always ONE hop, so the far end was the only overrider there was.
+2. PROBLEM once chains are legal: the node actually drawn can be a
+   MIDDLE of the chain — =C=, whenever =D='s source is hidden. So the
+   carrier on screen is =C=, but the old rule still demands =D=. They
+   differ, and the save is wrongly rejected. (This is exactly your
+   public-=C= / private-=D= use case viewed with the private source
+   off.)
+3. NEW rule: "the carrier must be SOMEWHERE on =N='s chain" — =C= or
+   =D=, either is acceptable. Every node on =N='s chain genuinely
+   stands in for =N=, so accepting any of them is safe; a marker on a
+   node that is NOT on =N='s chain (a faked/stale one) is still
+   rejected, so the check is not weakened. "Ungated path membership"
+   is just shorthand for: take the whole chain (ungated) and check the
+   carrier is one of its nodes (path membership), instead of demanding
+   it equal the last node.
+
+If that's clear, the only code consequence is the one-line helper
+'carrier_on_user_owned_chain' in Work item 3 (==  one-of instead of
+==  equals).
+******* TODO clear and agreed
+** Dangerous things
+
+*** Danger: a cycle is reachable via the writable overriddenCol
+    *Confirmed* end to end: the writable overriddenCol lowers to
+    =overrides_view_of= graph edges with no ownership/target restriction
+    ('visit_overriddencol' -> =SetOverrides= -> 'msv_from_slot' ->
+    'NodeComplete.overrides_view_of', in
+    [[../../server/from_text/local_instruction_collection/traverse.rs][traverse.rs]] and lower.rs). So a user can add an entry to a
+    node's overriddenCol that closes a loop (=N='s overriddenCol gains =D=
+    while =D -> C -> N= exists). Today "no chains" blocks this; once it is
+    gone, *only* the new cycle invariant stands between the user and a
+    broken graph. This is why the cycle check is mandatory, not optional
+    (Work item 1).
+
+*** (likely solved): No legacy owned-chain data exists to migrate
+    Because owned chains were rejected at /both/ save and rebuild, none can
+    exist on disk — so legalization needs no migration, and init/rebuild on
+    existing data cannot suddenly surface a chain that downstream code has
+    never seen. (The one path that /can/ now load a chain is a fresh save
+    that creates one.) Marked solved; worth a one-line confirmation in the
+    PR description.
+
+*** DONE Source-set switch on a half-visible chain
+    Switching the active source-set re-renders open views; a chain whose
+    end becomes invisible re-resolves to a middle node, flipping the drawn
+    substitute and its =(overridesHere)= carrier. The tamper fix makes the
+    /save/ robust to this, but it is worth an explicit test that opening
+    under "all", switching to a set that hides =D=, and saving, succeeds and
+    keeps =N= in the container's =contains=.
+
+**** DONE agreed, please do
+***** DONE Folded into Work item 7 (explicit half-visible-chain save test).
+
+** Missing concepts / abstractions (esp. types)
+
+*** DONE A first-class cycle type instead of an ad hoc walk
+    'UserOwnedOverrideCycle { cycle : Vec<ID> }' (Work item 1) makes the
+    only-anomaly explicit and gives 'resolve_override''s =cycle_detected=
+    flag a named consumer at validation time, instead of two hand-rolled
+    walks. Recommended.
+
+**** DONE agreed
+***** DONE In the plan: Work item 1 (=UserOwnedOverrideCycle { cycle : Vec<ID> }=).
+
+*** DONE A shared "user-owned override walk" primitive
+    The resolver, both validators, and the tamper helper all walk the same
+    user-owned, pid-resolved override edges. A single primitive (or reusing
+    'resolve_override' from the validators, as Work item 1 proposes) would
+    remove three subtly-different copies of "follow my user-owned overrider,
+    resolving extra-ids, with a seen-set". This is the cleanest guard
+    against the divergence risk above.
+
+**** DONE agreed
+***** DONE Folded into Work item 1, pt 5 (the primitive both validators + the tamper helper share).
+
+*** DONE Naming: "fork" now spans foreign and owned
+    Today "fork" is defined as foreign -> owned clone. After Work item 5 it
+    also means owned -> owned. The glossary/forks.md entries should make the
+    two cases explicit so the implicit (foreign, on edit) and explicit
+    (owned, on 'skg-fork-node') triggers are not confused.
+
+**** DONE agreed
+***** DONE In the plan: Work item 6 (glossary + forks.md distinguish foreign-implicit vs owned-explicit fork).
+
+* problems, round 2
+  New issues that surfaced while writing 2_plan.org,
+  moved here just to keep the plan uncluttered.
+
+** DONE P5. Clone-source default: config-order, and "force the user to pick"
+Your answer in 1_discussion.org was "force the user to pick, starting from
+the first repo in your config." Two concrete sub-questions the build hits:
+***  *Config order.* "
+First repo in your config" needs the server to know
+config order, but 'SkgConfig.sources' is a =HashMap= and
+'SkgConfig::first_owned_source' returns the *alphabetically* first owned
+source (the pre-existing item in [[../problems.org][TODO/problems.org]]).
+The Emacs side already uses TOML-first ('skg--default-source'). Options:
+(a) fix the server to carry an ordered =Vec<SourceName>= and honor TOML
+order (small, also closes the old inconsistency); (b) let the *client*
+supply the starting source for the fork confirmation (it already knows
+TOML-first); (c) accept alphabetical-first for now. I lean (a).
+**** DONE (a)
+***** DONE Folded into D4: 'SkgConfig' gains a TOML-order 'source_order : Vec<SourceName>' + 'first_owned_source_in_config_order'; closes the old problems.org item.
+*** *"Force" strength.*
+Does "force the user to pick" mean (R1) pre-fill the
+config-first source and require the normal approval (the user rotates if
+they like), or (R2) start the clone source *unset* and *block approval*
+until the user explicitly chooses — a real safety latch so a private
+fork is never accidentally committed into a public source? R2 is more
+work but matches the paranoiac use case better. Which did you mean?
+**** DONE R1
+***** DONE Folded into D4: pre-fill config-first, normal approval; no unset-source latch.
+** DONE P2. Fork-node clones disk state, or unsaved buffer edits?
+The implicit fork clones the *edited* foreign node. 'skg-fork-node' fires
+on a node that may be unexpanded, so D3 fetches the node's *saved*
+'NodeComplete' from the graph/disk — i.e. it clones the node *as last
+saved*, ignoring any unsaved edits to that node in the current buffer.
+That is simpler and predictable, but if you had just edited =C= in the
+buffer and then forked it, you might expect the edit in =D=. Confirm
+"clone the saved snapshot" is the intended semantics (recommended), or we
+special-case: if the node is definitive/edited, clone the buffer content.
+*** DONE Let's disallow forking from a dirty buffer.
+(where dirty = any unsaved changes)
+explaining why in the minibuffer
+**** DONE Folded into D5 (client 'buffer-modified-p' guard, minibuffer message); D3 drops the snapshot-vs-edits hedge, since disk == buffer.
+** P3. Fork-node must target the node's OWN id, not its overridesHere original
+   If you invoke 'skg-fork-node' on a node that is itself a drawn substitute
+   (it carries =(overridesHere N)=, e.g. you are looking at =D= drawn in
+   =N='s place), the gesture must fork the *drawn* node by its own id, not
+   the marker's original =N=. Otherwise it would try to re-fork =N= (already
+   overridden -> 'ForkAlreadyExists') instead of forking =D=. The client
+   reads the headline's own =(id ...)=, which is correct; flagged so the
+   server side does not "helpfully" resolve through the marker. (Forking a
+   substitute legitimately deepens the chain, =E -> D -> C -> N=, which is
+   now legal.) I will encode this; no decision needed.
+
+** P1. Where 'ViewRequest::Fork' is consumed differs from 'Definitive'
+   'ViewRequest::Definitive' is consumed during *view completion*
+   (rendering). 'ViewRequest::Fork' must be consumed on the *save* path, at
+   fork detection — a different stage. The data is available there (the
+   save-side 'find_buffer_errors_for_saving' already reads view_requests off
+   the maybe-placed tree, as 'validate_definitive_view_requests' shows), but
+   today's fork detection ('apply_foreign_policy') keys off foreign-and-changed
+   'SaveNode's, which do *not* carry view_requests. So D3 must collect the
+   fork-requested pids from the viewforest and thread that set into the fork
+   stage alongside the foreign-changed specs. The exact insertion point in
+   the save handler / 'apply_foreign_policy' is the one piece of wiring to
+   pin down during implementation; calling it out so it is not discovered
+   late. No decision needed, but it is the highest-risk integration point.
+
+** P4. Idempotency of the approved re-save
+   Approval re-saves the origin buffer with =fork-approved=true=; that buffer
+   still carries the =(viewRequests fork)= atom. The commit path must treat
+   the atom as already-honored (build no second spec, raise no second
+   prompt) — exactly as the implicit fork's =fork-approved= short-circuits
+   re-detection. Verify the explicit path shares that short-circuit; add a
+   test that approving does not re-loop. No decision needed.
+
+** DONE P7. On decline, the stamped fork atom lingers (minor)
+   New, from the P2 decision. 'skg-fork-node' stamps =(viewRequests fork)=
+   then auto-saves; if you then *decline* the confirmation, nothing is
+   written to disk but the origin buffer still carries the atom and is now
+   modified. This mirrors the implicit fork (declining leaves your edits in
+   place), so my default is to leave it — undo or re-save to retry.
+   Alternatively 'skg-decline-fork' could strip a lingering
+   =(viewRequests fork)= atom on decline. Low stakes; I lean "leave it".
+
+*** TODO let's strip it
+
+** (likely solved) P6. Backward compatibility
+   Owned chains were rejected at both save and rebuild, so none exist on
+   disk; legalization needs no migration and init/rebuild cannot surface a
+   chain that downstream code has never seen. The only new producer is a
+   fresh chain-creating save. Noted for the PR description; no action.
+*** DONE also note that no other users or devs exist
+Until that's not true, backward-compatibility is actually an anti-feature.
+**** DONE Taken: no migration, no compat shims — where this work meets legacy paths, delete them rather than preserve them.
+* Open questions for Jeff (process)
+  All load-bearing decisions are settled and folded into the plan above:
+  cycle = hard error; 'skg-fork-node' = full fork; auto-save = yes; drop the
+  CompoundOverrideChain warning; dedup the validators. Three TODO children
+  remain for you under [[*problems][problems]]:
+  - *default clone source* — a follow-up on config-order vs alphabetical;
+  - *the violation rename* — a one-line confirmation that low-churn is fine;
+  - *the ungated-path tamper predicate* — I added a plain-English glossary;
+    tell me whether it lands.

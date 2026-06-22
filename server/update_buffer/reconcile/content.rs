@@ -6,7 +6,6 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
-use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::phantom::source_from_disk;
 use crate::types::nodes::complete::NodeComplete;
@@ -77,7 +76,6 @@ pub fn expand_true_content_at_activeNode (
   cascade                        : bool,
   node_budget                    : &mut usize,
   substitution_enabled           : bool, // false in diff mode: diff surfaces show raw graph facts.
-  warning_sink                   : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and expands
   // real content nodes.
@@ -130,8 +128,7 @@ pub fn expand_true_content_at_activeNode (
     tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
     active_source_set,
-    substitution_enabled,
-    warning_sink ) ?;
+    substitution_enabled ) ?;
   if cascade {
     attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -208,7 +205,6 @@ fn reconcile_content_children (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
   substitution_enabled           : bool,
-  warning_sink                   : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -265,7 +261,7 @@ fn reconcile_content_children (
   complete_content_children(
     tree, node, &apparent_content_ids, config, graph_snap,
     deleted_since_head_pid_src_map, active_source_set,
-    substitution_for_children, warning_sink ) ?;
+    substitution_for_children ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
   convert_nonmember_unknown_children_to_dead(
@@ -455,18 +451,12 @@ fn complete_content_children (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set  : Option<&ActiveSourceSet>,
   substitution_enabled : bool,
-  warning_sink       : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
-  let child_data : HashMap<ID, ChildData> = {
-    let mut compound_warnings : Vec<CompletionWarning> = Vec::new ();
-    let data : HashMap<ID, ChildData> =
-      build_child_creation_data(
-        tree, node, goal_list, config, graph_snap,
-        deleted_since_head_pid_src_map, active_source_set,
-        substitution_enabled, &mut compound_warnings ) ?;
-    if let Some (sink) = warning_sink {
-      sink . extend (compound_warnings); }
-    data };
+  let child_data : HashMap<ID, ChildData> =
+    build_child_creation_data(
+      tree, node, goal_list, config, graph_snap,
+      deleted_since_head_pid_src_map, active_source_set,
+      substitution_enabled ) ?;
   // The RepairSummary is dropped: content is not a generated
   // collection, so its reconciliation is not a "repair" to warn about.
   complete_relevant_children_in_viewnodetree(
@@ -617,7 +607,6 @@ fn build_child_creation_data (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set  : Option<&ActiveSourceSet>,
   substitution_enabled : bool,
-  compound_warnings  : &mut Vec<CompletionWarning>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
@@ -690,12 +679,10 @@ fn build_child_creation_data (
         let resolution : OverrideResolution =
           resolve_override (
             config, graph_snap, active_source_set, id );
+        // A chain of any length resolves to its end; substitution
+        // draws that effective overrider (the carrier collects the
+        // original id, so the parent's contains round-trips to N).
         if resolution . effective != *id {
-          if resolution . path . len () > 1 {
-            compound_warnings . push (
-              CompletionWarning::CompoundOverrideChain {
-                original  : id . clone (),
-                effective : resolution . effective . clone () } ); }
           Some ( resolution . effective )
         } else { None }
       } else { None };

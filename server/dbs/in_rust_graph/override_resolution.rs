@@ -16,11 +16,16 @@
 //!   that ask "what marker would the server have written, ever?"
 //!   (the tamper check) pass None, i.e. visibility-ungated.
 //!
-//! Valid saved data cannot contain user-owned chains or monogamy
-//! violations (see [[./override_invariants.rs]]), so a path longer
-//! than one, a cycle, or a multi-overrider hop signals legacy or
-//! hand-edited data. The resolver must still terminate and be
-//! sensible on such data — a guard, not an assert.
+//! A path of any length is normal: a user-owned override chain
+//! (D overrides C overrides N, all owned) resolves to the end of the
+//! chain, and any node on the path is a node the server could
+//! legitimately draw (see 'carrier_on_user_owned_chain'). Only a
+//! cycle is anomalous — forbidden upstream by the invariant validators
+//! (see [[./override_invariants.rs]]) at save and init/rebuild, and
+//! handled here as a backstop: the resolver still terminates and
+//! substitutes nothing on a cycle. A multi-overrider hop (monogamy
+//! violation) is likewise forbidden upstream; the resolver refuses to
+//! choose a branch.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
@@ -34,15 +39,22 @@ pub struct OverrideResolution {
   /// user-owned, visible overrider exists.
   pub effective      : ID,
   /// The chain of overriders traversed, in order. Empty = no
-  /// substitution. A length > 1 signals a legacy compound chain;
-  /// consumers surface the "Compound overrides relationship
-  /// traversed..." notice.
+  /// substitution. A path of any length is normal: a user-owned
+  /// override chain (D overrides C overrides N) resolves to the end
+  /// of the chain, and middle carriers are honest (see
+  /// 'carrier_on_user_owned_chain').
   pub path           : Vec<ID>,
   /// True iff the walk met an already-seen PID. In that case no
   /// substitution is performed ('effective' = the input, 'path'
   /// empty), since a cyclic override chain names no sensible
-  /// destination.
+  /// destination. A cycle is forbidden upstream (the invariant
+  /// validators reject it at save and init/rebuild); the resolver
+  /// handles it as a backstop.
   pub cycle_detected : bool,
+  /// The nodes of the detected cycle (the trail from the first repeat
+  /// back to it), in walk order; empty when no cycle. The invariant
+  /// validators report it as 'UserOwnedOverrideCycle'.
+  pub cycle          : Vec<ID>,
 }
 
 pub fn resolve_override (
@@ -68,17 +80,49 @@ pub fn resolve_override (
       return OverrideResolution {
         effective      : current,
         path           : path,
-        cycle_detected : false, }; }
+        cycle_detected : false,
+        cycle          : Vec::new (), }; }
     let next : ID = candidates [0] . clone ();
     if ! seen . insert ( next . clone () ) {
+      let cycle : Vec<ID> = { // the trail from the first repeat back to it
+        // The walk in visit order is input_pid followed by 'path';
+        // 'next' repeats one of these. The cycle is the suffix from
+        // that first occurrence through 'current' (which closes the
+        // loop back to 'next').
+        let mut walk : Vec<ID> = Vec::with_capacity ( path . len () + 1 );
+        walk . push ( input_pid . clone () );
+        walk . extend ( path . iter () . cloned () );
+        match walk . iter () . position ( |x| x == &next ) {
+          Some (i) => walk . split_off (i),
+          None     => Vec::new (), }}; // unreachable: 'next' was seen
       return OverrideResolution {
         // A cyclic chain names no sensible destination, so no
         // substitution at all: effective reverts to the input.
         effective      : input_pid,
         path           : Vec::new (),
-        cycle_detected : true, }; }
+        cycle_detected : true,
+        cycle, }; }
     path . push ( next . clone () );
     current = next; }}
+
+/// Whether 'carrier' is a node ON 'original''s user-owned override
+/// chain — i.e. a node the server could legitimately draw, marked
+/// '(overridesHere original)', wherever 'original' would appear as
+/// content. The tamper check at save uses this: with chains the drawn
+/// node can be any link of the chain (a MIDDLE carrier, when a later
+/// link's source is hidden), not only the end, so it must accept any
+/// honest carrier and reject only an off-chain (faked/stale) marker.
+/// VISIBILITY-UNGATED ('active' = None) so a marker that was honest
+/// when rendered does not start failing after a source-set switch;
+/// 'path' is the full user-owned chain (ownership still gates).
+pub fn carrier_on_user_owned_chain (
+  config   : &SkgConfig,
+  graph    : &InRustGraph,
+  original : &ID,   // the marker's N
+  carrier  : &ID,   // the drawn node's own id
+) -> bool {
+  resolve_override (config, graph, None, original)
+    . path . contains (carrier) }
 
 /// The overriders of 'pid' that substitution may follow: user-owned
 /// (per the config; an unknown source counts as not followable) and,

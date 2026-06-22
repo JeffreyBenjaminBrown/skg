@@ -39,21 +39,3 @@ fn warnings_batch_per_col_and_owner () {
   assert! ( rendered [1] . contains ("removed 1 duplicate member(s): d") );
   assert! ( ! rendered [1] . contains ("edited from the other side"),
     "no restoration, no explainer: {}", rendered [1] ); }
-
-#[test]
-fn compound_chain_warnings_render_once_per_pair () {
-  let warnings : Vec<CompletionWarning> = vec! [
-    CompletionWarning::CompoundOverrideChain {
-      original  : ID::from ("z"),
-      effective : ID::from ("x") },
-    CompletionWarning::CompoundOverrideChain { // duplicate: deduped
-      original  : ID::from ("z"),
-      effective : ID::from ("x") },
-  ];
-  let rendered : Vec<String> =
-    render_completion_warnings (&warnings);
-  assert_eq! ( rendered . len (), 1, "{:?}", rendered );
-  assert! ( rendered [0] . contains (
-    "Compound overrides relationship traversed" ));
-  assert! ( rendered [0] . contains (
-    "Node x was drawn in place of node z" )); }

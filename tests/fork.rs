@@ -55,6 +55,32 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
   ** (skg (node (id N2) (source foreign) indef)) N2
   "};
 
+/// The explicit 'skg-fork-node' gesture: an OWNED node (P) carries
+/// (viewRequests fork). Unlike the implicit foreign fork, P keeps its
+/// own save; saving adds a clone C that overrides P, built from P's disk
+/// snapshot.
+const EXPLICIT_FORK_BUFFER : &str = indoc! {"
+  * (skg (node (id P) (source owned) (viewRequests fork))) P-container
+  ** (skg (node (id N) (source foreign) indef)) N
+  "};
+
+/// An explicit fork request on a brand-new (id-less) headline: enrichment
+/// mints a fresh pid that is not in the graph, so the fork is rejected.
+const EXPLICIT_FORK_UNKNOWN_BUFFER : &str = indoc! {"
+  * (skg (node (source owned) (viewRequests fork))) Brand New
+  "};
+
+fn clone_overriding_on_disk (
+  config : &SkgConfig,
+  target : &str,
+) -> Result<NodeComplete, Box<dyn Error>> {
+  read_all_skg_files_from_sources (config) ?
+    . into_iter ()
+    . find ( |node| node . overrides_view_of . or_default ()
+             . contains (& ID::from (target)) )
+    . ok_or_else ( || format! (
+        "no clone (overrides_view_of [{}]) on disk", target ) . into () ) }
+
 fn mk_test_tcp_stream () -> std::net::TcpStream {
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -130,7 +156,115 @@ fn all_tests
       s . reset ("fork_user_set_source_not_owned_rejected", two_owned) . await ?;
       fork_user_set_source_not_owned_rejected (
         &s . config, &s . driver ) . await ?;
+      s . reset ("explicit_fork_save_instruction", fixtures) . await ?;
+      explicit_fork_save_instruction (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("explicit_fork_on_unknown_node_errors", fixtures) . await ?;
+      explicit_fork_on_unknown_node_errors (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("explicit_fork_round_trip_and_monogamy", fixtures) . await ?;
+      explicit_fork_round_trip_and_monogamy (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+/// The explicit fork of an OWNED node P: the SavePlan carries one
+/// ForkSpec whose clone copies P's DISK snapshot (title/contains),
+/// subscribes_to=[P], overrides_view_of=[P], in the config-first owned
+/// source. P itself keeps its own (owned) save -- it is not dropped like
+/// a foreign fork's original.
+async fn explicit_fork_save_instruction (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let fork_specs : Vec<ForkSpec> =
+    fork_specs_from (EXPLICIT_FORK_BUFFER, config, driver) . await ?;
+  assert_eq! ( fork_specs . len (), 1,
+    "exactly one explicit fork (of P): {:?}", fork_specs );
+  let spec : &ForkSpec = &fork_specs[0];
+  assert_eq! ( spec . original_id, ID::from ("P") );
+  let c : &NodeComplete = &spec . clone . 0;
+  assert_eq! ( c . title, "P-container",
+    "clone copies P's disk title (not a buffer edit)" );
+  assert_eq! ( c . contains, vec! [ ID::from ("N") ],
+    "clone copies P's disk contains (shallow)" );
+  assert_eq! ( c . subscribes_to . or_default (), &[ ID::from ("P") ],
+    "clone subscribes to P" );
+  assert_eq! ( c . overrides_view_of . or_default (), &[ ID::from ("P") ],
+    "clone overrides P" );
+  assert_eq! ( c . source, SourceName::from ("owned"),
+    "clone defaults to the config-first owned source; got {:?}",
+    c . source );
+  assert_ne! ( c . pid, ID::from ("P"),
+    "clone has a fresh pid, not P's" );
+  Ok (( )) }
+
+/// An explicit fork request on a node not in the graph (a brand-new
+/// headline, whose minted pid is unknown) is rejected with
+/// 'ForkRequestOnUnknownNode' -- you can only fork a saved node.
+async fn explicit_fork_on_unknown_node_errors (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let result = buffer_to_validated_saveplan (
+    EXPLICIT_FORK_UNKNOWN_BUFFER, config, driver, None ) . await;
+  match result {
+    Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
+      assert! ( errors . iter () . any ( |e| matches! ( e,
+        BufferValidationError::ForkRequestOnUnknownNode (_) )),
+        "expected ForkRequestOnUnknownNode, got {:?}", errors ); }
+    other => panic! (
+      "expected ForkRequestOnUnknownNode, got {:?}", other ), }
+  Ok (( )) }
+
+/// The explicit fork commits a clone overriding the owned P (override
+/// substitution then draws it in P's place), and a SECOND explicit fork
+/// of the now-overridden P is rejected with 'ForkAlreadyExists'.
+async fn explicit_fork_round_trip_and_monogamy (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let response = update_from_and_rerender_buffer_with_fork_approval_test (
+    &mut stream, EXPLICIT_FORK_BUFFER, driver, config, tantivy, &graph,
+    false, &Err ( String::new () ), &mut views_state,
+    /* fork_approved = */ true ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "the approved explicit fork must commit: {:?}", response . errors );
+  let clone : NodeComplete = clone_overriding_on_disk (config, "P") ?;
+  assert_eq! ( clone . subscribes_to . or_default (), &[ ID::from ("P") ],
+    "the clone subscribes to P" );
+  assert! ( config . user_owns_source (& clone . source),
+    "the clone lives in an owned source" );
+  // P is untouched (still owns its container role).
+  assert_eq! ( node_from_disk (config, "P") ? . contains,
+               vec! [ ID::from ("N") ],
+    "P keeps its own contains; the explicit fork does not rewrite it" );
+
+  // Forking P again is rejected: it now has a user-owned overrider.
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let result = buffer_to_validated_saveplan (
+    EXPLICIT_FORK_BUFFER, config, driver, None ) . await;
+  match result {
+    Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
+      assert! ( errors . iter () . any ( |e| matches! ( e,
+        BufferValidationError::ForkAlreadyExists (orig, existing)
+          if *orig == ID::from ("P") && *existing == clone . pid )),
+        "expected ForkAlreadyExists(P, {}), got {:?}",
+        clone . pid . 0, errors ); }
+    other => panic! (
+      "expected ForkAlreadyExists rejecting the re-fork, got {:?}",
+      other ), }
+  Ok (( )) }
 
 /// Under a restricted source-set, the clone-source DEFAULT must prefer an
 /// owned source that is ACTIVE. Here "owned" (alphabetically first owned)
