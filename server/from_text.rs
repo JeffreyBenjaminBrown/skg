@@ -25,12 +25,18 @@ use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use fork::{owned_ancestor_sources_for_foreign_vognodes, validate_fork_specs};
+use fork::{
+  fork_spec_from_buffer_node,
+  owned_ancestor_sources_for_foreign_vognodes,
+  validate_fork_specs};
 use local_instruction_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
 
-use std::collections::HashMap;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::types::nodes::complete::NodeComplete;
+use crate::types::viewnode::{ViewNodeKind, Vognode, ViewRequest};
+use std::collections::{HashMap, HashSet};
 use crate::types::misc::SourceName;
 use crate::types::save::ForkSpec;
 use typedb_driver::TypeDBDriver;
@@ -132,21 +138,21 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     owned_ancestor_sources_for_foreign_vognodes (&viewforest, config);
   let default_clone_source : Option<SourceName> = {
     // The active-aware default for a fork whose source can be neither
-    // user-set nor inferred: prefer an owned source that is ACTIVE under
-    // the restricted set, so the fork reaches the confirmation buffer
-    // (where the user can rotate it) instead of dead-ending on
-    // ForkSourceInactive when an inactive owned source happens to sort
-    // first. Falls back to any owned source -- then ForkSourceInactive
-    // fires only when the user owns no ACTIVE source at all (the genuine
-    // "activate one first" case), and ForkSourceUnresolved only when the
-    // user owns no source at all.
+    // user-set nor inferred: prefer the CONFIG-FIRST owned source that
+    // is ACTIVE under the restricted set, so the fork reaches the
+    // confirmation buffer (where the user can rotate it) instead of
+    // dead-ending on ForkSourceInactive when an inactive owned source
+    // happens to sort first. Falls back to the config-first owned source
+    // -- then ForkSourceInactive fires only when the user owns no ACTIVE
+    // source at all (the genuine "activate one first" case), and
+    // ForkSourceUnresolved only when the user owns no source at all.
+    let owned_in_order : Vec<SourceName> =
+      config . owned_sources_in_config_order ();
     let active_owned : Option<SourceName> = restricted_source_set . and_then (
-      |active| config . sources . values ()
-        . filter ( |s| s . user_owns_it
-                   && active . contains_source (& s . name) )
-        . map ( |s| s . name . clone () )
-        . min () );
-    active_owned . or_else ( || config . first_owned_source () ) };
+      |active| owned_in_order . iter ()
+        . find ( |name| active . contains_source (name) )
+        . cloned () );
+    active_owned . or_else ( || owned_in_order . into_iter () . next () ) };
   let ( define_nodes, fork_specs )
     : ( Vec<DefineNode>, Vec<ForkSpec> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -165,6 +171,22 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     &nonmerge_plan . source_moves, &nodeMerge_instructions )
     . map_err ( |errors| SaveError::BufferValidationErrors {
       errors, warnings : parsing_warnings . clone () } ) ?;
+  let fork_specs : Vec<ForkSpec> = {
+    // Explicit 'skg-fork-node' gesture: a node carrying ViewRequest::Fork
+    // is an OWNED node the user asked to fork. Unlike the implicit
+    // foreign fork (where N's own save is dropped), N keeps its own save
+    // (it is owned); we only ADD the clone C overriding N. C copies N's
+    // saved disk snapshot -- the client refuses to fork a dirty buffer,
+    // so disk == what the user sees. These specs join the implicit ones
+    // for the shared confirmation / commit pipeline below.
+    let mut specs : Vec<ForkSpec> = fork_specs;
+    specs . extend (
+      explicit_fork_specs_from_viewforest (
+        &viewforest, config, fork_sources,
+        default_clone_source . as_ref () )
+      . map_err ( |errors| SaveError::BufferValidationErrors {
+          errors, warnings : parsing_warnings . clone () } ) ? );
+    specs };
   { // Reject forks monogamy or the source-set forbids (before any
     // commit). Monogamy reads the live graph; the source-set check uses
     // the active set.
@@ -185,3 +207,47 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
           source_moves : nonmerge_plan . source_moves,
           fork_specs },
         warnings )) }
+
+/// Build a ForkSpec for each node carrying 'ViewRequest::Fork' (the
+/// explicit 'skg-fork-node' gesture, for an OWNED node). The clone C is
+/// built from N's current disk/graph snapshot (not the buffer): the
+/// client refuses to fork a dirty buffer, so disk == what the user sees,
+/// and N's own owned save proceeds separately. The clone source resolves
+/// user-set-else-config-first-owned; unlike the implicit foreign fork
+/// there is NO owned-ancestor inference (an empty inference map). D2's
+/// 'validate_fork_view_requests' has already rejected an unsaved or
+/// already-forked target, so this only builds.
+fn explicit_fork_specs_from_viewforest (
+  viewforest      : &ViewForest,
+  config          : &SkgConfig,
+  user_set_source : &HashMap<ID, SourceName>,
+  default_source  : Option<&SourceName>,
+) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
+  let no_inference : HashMap<ID, SourceName> = HashMap::new ();
+  let mut specs  : Vec<ForkSpec> = Vec::new ();
+  let mut errors : Vec<BufferValidationError> = Vec::new ();
+  let mut seen   : HashSet<ID> = HashSet::new ();
+  for node in viewforest . nodes () {
+    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+      else { continue; };
+    if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
+    let pid : &ID = & t . id;
+    // 'viewforest.nodes()' walks the ego_tree arena, which retains
+    // detached copies left by placement; dedup so one forked node yields
+    // one spec. (D2 already rejected a genuine second fork request.)
+    if ! seen . insert (pid . clone ()) { continue; }
+    let snapshot : NodeComplete =
+      match nodecomplete_rustFirst_by_pid_and_source (
+        config, pid, & t . source ) {
+        Ok (nc) => nc,
+        Err (e) => {
+          errors . push ( BufferValidationError::Other ( format! (
+            "Cannot fork node {}: {}", pid . 0, e )));
+          continue; }};
+    match fork_spec_from_buffer_node (
+      & snapshot, & snapshot . title, & no_inference,
+      user_set_source, default_source )
+    { Ok (spec) => specs . push (spec),
+      Err (e)   => errors . push (e), }}
+  if ! errors . is_empty () { return Err (errors); }
+  Ok (specs) }

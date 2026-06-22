@@ -80,4 +80,27 @@ The node must be indefinitive and childless. Does NOT auto-save."
     (skg-edit-metadata-at-point
      `(skg (node (viewRequests definitiveView))))))
 
+(defun skg-fork-node ()
+  "Fork the (owned) node at point: create a private clone that overrides it.
+This is the explicit counterpart to the implicit foreign fork: it forks a
+node you ALREADY own, deepening an override chain (e.g. E overrides D
+overrides C overrides N).
+
+Refuses if the buffer has unsaved changes (\"Save the buffer before
+forking.\"), so the clone's saved snapshot matches what you see. Otherwise
+stamps (viewRequests fork) into the headline's own (skg (node ...)) --
+targeting the headline's OWN id, never an (overridesHere N) marker it may
+carry -- and auto-saves (unlike `skg-request-definitive-view'). The server
+returns the usual fork-confirmation buffer; approve with C-c C-c (rotate
+the clone's source first with C-c s s if you like) or decline with C-c
+C-k."
+  (interactive)
+  (if (buffer-modified-p)
+      (message "Save the buffer before forking.")
+    (save-excursion
+      (org-back-to-heading t)
+      (skg-edit-metadata-at-point
+       `(skg (node (viewRequests fork)))))
+    (skg-request-save-buffer)))
+
 (provide 'skg-request-views)

@@ -3,6 +3,7 @@ pub mod contradictory_instructions;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_user_owned_chain, resolve_override};
+use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
@@ -75,6 +76,8 @@ pub async fn find_buffer_errors_for_saving (
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
     viewforest, &mut errors);
+  validate_fork_view_requests(
+    viewforest, config, &mut errors);
   idCol_membership_errors (
     viewforest, config, driver, &mut errors ) . await ?;
   overridesHere_marker_errors (
@@ -210,6 +213,49 @@ fn overridesHere_marker_errors (
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
           carrier, original, effective )); }}}
+
+/// For each node carrying a Fork view request (the explicit
+/// 'skg-fork-node' gesture):
+/// - at most one fork request per id ('ForkRequestMultiple');
+/// - the id must exist in the graph -- you cannot fork an unsaved
+///   headline ('ForkRequestOnUnknownNode'); a new headline got a fresh
+///   pid from enrichment, which is not in the graph;
+/// - if the node already has a user-owned overrider, fail early with
+///   'ForkAlreadyExists' (the helpful message) rather than a later
+///   monogamy abort at commit.
+/// The graph-dependent checks are skipped when the process-global graph
+/// handle is unavailable (some test harnesses); the commit-time
+/// invariant check is then the backstop.
+#[allow(non_snake_case)]
+fn validate_fork_view_requests (
+  viewforest : &MpViewForest,
+  config     : &SkgConfig,
+  errors     : &mut Vec<BufferValidationError>,
+) {
+  let graph : Option<std::sync::Arc<InRustGraph>> =
+    snapshot_global ();
+  let mut ids_with_requests : HashSet<ID> = HashSet::new ();
+  for edge in viewforest . root () . traverse () {
+    let Edge::Open (node_ref) = edge else { continue; };
+    let MpViewnodeKind::Vognode (MpVognode::Active (t)) =
+      & node_ref . value () . kind else { continue; };
+    if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
+    let Some (id) = & t . id else { continue; }; // enrichment gives every node a pid
+    if ! ids_with_requests . insert (id . clone ()) {
+      errors . push (
+        BufferValidationError::ForkRequestMultiple (id . clone ()) );
+      continue; }
+    if let Some (graph) = graph . as_deref () {
+      if graph . pid_of (id) . is_none () {
+        // Not in the graph: an unsaved headline cannot be forked.
+        errors . push (
+          BufferValidationError::ForkRequestOnUnknownNode (id . clone ()) );
+        continue; }
+      if let Some (existing) =
+        existing_user_owned_overrider_of (config, graph, id) {
+        errors . push (
+          BufferValidationError::ForkAlreadyExists (
+            id . clone (), existing )); }}}}
 
 fn validate_view_roots (
   viewforest : &MpViewForest,

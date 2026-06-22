@@ -24,6 +24,25 @@ pub fn validate_source_paths_creating_owned_ones_if_needed (
                   source_name, source . path )) ); }} }
   Ok(( )) }
 
+/// The source names in TOML declaration order, read from the raw
+/// '[[sources]]' array. The parsed 'SkgConfig.sources' is a HashMap and
+/// loses order, so the loaders re-extract it here to fill
+/// 'SkgConfig.source_order' (used by the config-first fork default).
+/// Empty when the TOML has no parseable sources array.
+fn source_order_from_toml (
+  contents : &str,
+) -> Vec<SourceName> {
+  toml::from_str::<toml::Value> (contents) . ok ()
+    . as_ref ()
+    . and_then ( |v| v . get ("sources") )
+    . and_then ( |s| s . as_array () )
+    . map ( |arr| arr . iter ()
+            . filter_map ( |t| t . get ("name")
+                           . and_then ( |n| n . as_str () )
+                           . map (SourceName::from) )
+            . collect () )
+    . unwrap_or_default () }
+
 pub fn load_config (
   path: &str )
   -> Result <SkgConfig,
@@ -32,9 +51,10 @@ pub fn load_config (
     return Err(format!("Config file not found: {}",
                        path)
                . into( )); }
-  let mut config: SkgConfig = {
-    let contents: String = fs::read_to_string (path) ?;
-    toml::from_str (&contents) ? };
+  let contents: String = fs::read_to_string (path) ?;
+  let mut config: SkgConfig =
+    toml::from_str (&contents) ?;
+  config . source_order = source_order_from_toml (&contents);
   config . config_path =
     fs::canonicalize (path)
     . unwrap_or_else ( |_| PathBuf::from (path) );
@@ -92,9 +112,10 @@ pub fn load_config_with_overrides (
 ) -> Result <SkgConfig, Box<dyn std::error::Error>> {
   if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}", path) . into()); }
-  let mut config: SkgConfig = {
-    let contents: String = fs::read_to_string (path)?;
-    toml::from_str (&contents)? };
+  let contents: String = fs::read_to_string (path)?;
+  let mut config: SkgConfig =
+    toml::from_str (&contents)?;
+  config . source_order = source_order_from_toml (&contents);
   config . config_path =
     fs::canonicalize (path)
     . unwrap_or_else ( |_| PathBuf::from (path) );

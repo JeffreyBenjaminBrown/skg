@@ -48,7 +48,14 @@ pub async fn execute_view_requests (
         // silently dropping it.
         return Err ( "execute_view_requests: a ViewRequest::Definitive survived \
           to the view-request pass; it should have been consumed by the draw \
-          rule at the node's visit" . into () ), }}
+          rule at the node's visit" . into () ),
+      ViewRequest::Fork =>
+        // A Fork request is consumed on the SAVE path (fork detection),
+        // and 'extract_view_requests' strips it before this render-time
+        // pass; reaching here means that stripping was bypassed.
+        return Err ( "execute_view_requests: a ViewRequest::Fork survived \
+          to the view-request pass; it should have been consumed on the \
+          save path and stripped before rendering" . into () ), }}
   Ok (( )) }
 
 /// The result of applying the TODO/DONE/local-view-update/plan_v2.org §5.2 Tentative/Final draw rule to a node that

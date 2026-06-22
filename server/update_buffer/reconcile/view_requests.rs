@@ -87,4 +87,8 @@ fn extract_view_requests (
       . unwrap_or (false);
   if is_view_root {
     view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }
+  // A Fork request is consumed on the SAVE path (fork detection in
+  // from_text), not during rendering; it must never reach the
+  // render-time view-request pass.
+  view_requests . remove (& ViewRequest::Fork);
   Ok ( view_requests . into_iter () . map ( |req| (node, req) ) . collect () ) }

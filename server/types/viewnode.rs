@@ -473,11 +473,15 @@ impl ColRelation {
 /// - 'Col(rel)' builds BOTH cols of the relation, populated from the graph.
 /// - 'Path(role)' builds the backpath for that one partner role.
 /// - 'Definitive' makes the (indefinitive) node editable.
+/// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
+///   node into a private fork that overrides it. Consumed on the save
+///   path (fork detection), not during view completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
   Col  (ColRelation),
   Path (RelationRole),
   Definitive,
+  Fork,
 }
 
 //
@@ -788,7 +792,8 @@ impl fmt::Display for ViewRequest {
     match self {
       ViewRequest::Col  (rel)  => write! (f, "(col {})",  rel  . relname  ()),
       ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
-      ViewRequest::Definitive  => write! (f, "definitiveView"), } } }
+      ViewRequest::Definitive  => write! (f, "definitiveView"),
+      ViewRequest::Fork        => write! (f, "fork"), } } }
 
 //
 // Defaults

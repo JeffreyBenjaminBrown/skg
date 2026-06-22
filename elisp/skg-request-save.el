@@ -403,9 +403,17 @@ buffer."
       (skg-request-save-buffer t fork-sources))))
 
 (defun skg-decline-fork ()
-  "Decline the forks; nothing was written. Leave this confirmation buffer
-open (it is navigable -- search it for relevant IDs)."
+  "Decline the forks; nothing was written. Strip any lingering explicit
+\(viewRequests fork) atom from the origin buffer -- otherwise the next save
+of that buffer would silently re-fork -- then leave this confirmation
+buffer open (it is navigable -- search it for relevant IDs).
+
+Stripping is a no-op for an implicit (foreign) fork, whose origin headline
+carries no fork atom."
   (interactive)
+  (when (buffer-live-p skg--fork-origin-buffer)
+    (with-current-buffer skg--fork-origin-buffer
+      (skg-strip-fork-requests-in-buffer)))
   (message
    "Fork declined; nothing was saved. This buffer is left open for reference."))
 

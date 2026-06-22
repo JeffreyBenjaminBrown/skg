@@ -209,6 +209,12 @@ fn format_buffer_validation_error (
     BufferValidationError::ForkSourceNotOwned(id, source) => {
       format!("Cannot fork into a source you do not own:\n- Foreign node: {}\n- Clone's chosen source: {}\n- Pick an owned source for the clone (C-c s s in the confirmation buffer).\n",
               id . 0, source) },
+    BufferValidationError::ForkRequestOnUnknownNode(id) => {
+      format!("Cannot fork an unsaved node:\n- Node: {}\n- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
+              id . 0) },
+    BufferValidationError::ForkRequestMultiple(id) => {
+      format!("Multiple fork requests for the same node:\n- Node: {}\n- At most one fork request per node is allowed.\n",
+              id . 0) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
     BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) => {

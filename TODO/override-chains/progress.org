@@ -60,6 +60,46 @@
      in grouped_overrides.rs.
    - Full Rust suite (472 tests) green.
 
+** DONE Phase D — the 'skg-fork-node' gesture
+   - D1: added 'ViewRequest::Fork' (viewnode.rs) + parser map "fork" ->
+     Fork (parse_metadata_sexp.rs) + Display "fork". A Fork request is
+     stripped in 'extract_view_requests' (it's a save-path request, not
+     render-path); the render-time 'execute_view_requests' fails loudly
+     if one ever survives.
+   - D2: 'validate_fork_view_requests' (validate_tree.rs): at most one
+     fork request per id ('ForkRequestMultiple'), id must exist in the
+     graph ('ForkRequestOnUnknownNode'), and reuse
+     'existing_user_owned_overrider_of' for an early 'ForkAlreadyExists'.
+     Graph-dependent checks are skipped when the global handle is
+     absent.
+   - D3: 'explicit_fork_specs_from_viewforest' (from_text.rs) collects
+     ViewRequest::Fork pids from the placed viewforest, fetches each
+     node's disk snapshot, builds the clone with 'fork_spec_from_buffer_node'
+     (empty ancestor map -> no inference), and merges into the same
+     fork_specs the implicit path produces. The owned original keeps its
+     own save; only the clone is added. The shared
+     confirmation/commit/fork-approved pipeline handles the rest.
+   - D4: added 'SkgConfig.source_order' (filled at parse time by both
+     config loaders via 'source_order_from_toml'),
+     'owned_sources_in_config_order', and 'first_owned_source_in_config_order';
+     aligned the existing alphabetical default ('first_owned_source' now
+     delegates to config order, and the implicit-fork default is
+     config-first too). Closes the alphabetical-default note in
+     problems.org.
+   - D5: 'skg-fork-node' (skg-request-views.el): refuses a dirty buffer,
+     else stamps (viewRequests fork) and auto-saves. Alias 'skg-fork +
+     C-c m f (skg-keymaps-and-aliases.el).
+   - D6: confirmation reuse is automatic (the server returns the usual
+     fork-confirmation buffer). Idempotent approve rides the shared
+     fork-approved short-circuit. 'skg-decline-fork' now strips the
+     lingering (viewRequests fork) atom from the origin buffer
+     ('skg-strip-fork-requests-in-buffer' in skg-metadata.el).
+   - D7: server sub-tests in tests/fork.rs (save instruction, unknown
+     node error, round-trip + monogamy) and a new integration test
+     tests/integration/fork-owned/ (dirty refusal, approve + substitution,
+     decline strips atom + commits nothing). Both fork integration tests
+     and the full Rust (472) + elisp (252) suites pass.
+
 * Changes to the plan's envisioned order
   - None of substance. Phase A done first, as sequenced.
   - A5 detail: besides the test edits the plan named, I added the

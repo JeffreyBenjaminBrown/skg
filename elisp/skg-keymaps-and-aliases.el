@@ -22,6 +22,7 @@ and hide INTERNAL from M-x completion."
 
 (skg-alias skg-save                   skg-request-save-buffer)
 (skg-alias skg-set-definitive         skg-request-definitive-view)
+(skg-alias skg-fork                    skg-fork-node)
 (skg-alias skg-limit-source-set       skg-set-active-source-set)
 (skg-alias skg-view-heralds-mode      heralds-minor-mode)
 (skg-alias skg-view-metadata          skg-edit-metadata)
@@ -140,6 +141,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s S") #'skg-set-source-recursive))
   (progn;; graph modifications
     (define-key map (kbd "C-c m c") #'skg-replace-link-with-content)
+    (define-key map (kbd "C-c m f") #'skg-fork-node)
     (define-key map (kbd "C-c m l") #'skg-replace-content-with-link))
   (progn;; view (buffer-level view state)
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)

@@ -90,6 +90,13 @@ pub struct SkgConfig {
   #[serde ( deserialize_with = "deserialize_sources" )]
   pub sources        : HashMap<SourceName, SkgfileSource>,
 
+  // The source names in TOML declaration order ('sources' is a HashMap,
+  // which loses it). Filled at parse time by the config loaders; empty
+  // for dummy/test configs, where the config-order helpers fall back to
+  // alphabetical. Used for the "config-first owned source" fork default.
+  #[serde (skip)]
+  pub source_order   : Vec<SourceName>,
+
   #[serde(default, deserialize_with = "deserialize_source_sets")]
   pub source_sets    : HashMap<SourceSetName, SourceSet>,
 
@@ -359,6 +366,7 @@ impl SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       sources,
+      source_order       : Vec::new (),
       source_sets        : HashMap::new (),
       default_source_set : SourceSetName::from ("all"),
       db_name            : "unused" . to_string(),
@@ -382,6 +390,7 @@ impl SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       sources,
+      source_order       : Vec::new (),
       source_sets        : HashMap::new (),
       default_source_set : SourceSetName::from ("all"),
       db_name            : db_name . to_string(),
@@ -403,19 +412,41 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
+  /// The owned source names in TOML declaration order (config-first).
+  /// Falls back to alphabetical order when declaration order is
+  /// unavailable (a dummy/test config, whose 'source_order' is empty),
+  /// so the result is always deterministic.
+  pub fn owned_sources_in_config_order (
+    &self,
+  ) -> Vec<SourceName> {
+    let ordered : Vec<SourceName> =
+      if self . source_order . is_empty () {
+        // No declaration order recorded: alphabetical, for determinism.
+        let mut names : Vec<SourceName> =
+          self . sources . keys () . cloned () . collect ();
+        names . sort ();
+        names
+      } else { self . source_order . clone () };
+    ordered . into_iter ()
+      . filter ( |name| self . user_owns_source (name) )
+      . collect () }
+
   /// The default owned source for a fork's clone when its source could
-  /// not be inferred from an owned ancestor: the alphabetically-first
-  /// owned source name. (Sources are stored in a HashMap, so the TOML's
-  /// order is not preserved; alphabetical is a deterministic stand-in
-  /// for "the user's first owned source".) None only when the user owns
-  /// no source at all -- the one case 'ForkSourceUnresolved' still fires.
+  /// not be inferred or user-set: the user's CONFIG-FIRST owned source
+  /// (matching the Emacs client's 'skg--default-source', which is
+  /// TOML-first). None only when the user owns no source at all -- the
+  /// one case 'ForkSourceUnresolved' still fires.
+  pub fn first_owned_source_in_config_order (
+    &self,
+  ) -> Option<SourceName> {
+    self . owned_sources_in_config_order () . into_iter () . next () }
+
+  /// Backwards-compatible name for the config-first owned source
+  /// default; see 'first_owned_source_in_config_order'.
   pub fn first_owned_source (
     &self,
   ) -> Option<SourceName> {
-    self . sources . values ()
-      . filter ( |s| s . user_owns_it )
-      . map ( |s| s . name . clone () )
-      . min () }
+    self . first_owned_source_in_config_order () }
 
   pub fn default_source_set_name (
     &self,

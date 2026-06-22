@@ -670,6 +670,7 @@ fn parse_viewrequests_sexp (
       Sexp::Atom (_) => {
         let atom : String = atom_to_string (request_element) ?;
         if atom == "definitiveView" { ViewRequest::Definitive }
+        else if atom == "fork" { ViewRequest::Fork }
         else { return Err ( format! (
           "Invalid view request atom: {}", atom )); } },
       Sexp::List (sub) if sub . len () == 2 => {

@@ -371,6 +371,51 @@ checks\" entry in PITFALLs.org."
           (skg-replace-current-line
            (skg-format-headline stars new-metadata-sexp title)))))))
 
+(defun skg--remove-fork-from-viewrequests (host-sexp)
+  "Return HOST-SEXP with the `fork' symbol removed from its node's
+\(viewRequests ...) form, dropping that form entirely if it becomes empty.
+HOST-SEXP is a (skg (node ...) ...) sexp. The result is `equal' to
+HOST-SEXP when there was no fork request, so callers can detect a no-op."
+  (cons
+   'skg
+   (mapcar
+    (lambda (elem)
+      (if (and (consp elem) (eq (car elem) 'node))
+          (cons 'node
+                (delq nil
+                      (mapcar
+                       (lambda (ne)
+                         (if (and (consp ne) (eq (car ne) 'viewRequests))
+                             (let ((kept (delq 'fork
+                                               (copy-sequence (cdr ne)))))
+                               (and kept (cons 'viewRequests kept)))
+                           ne))
+                       (cdr elem))))
+        elem))
+    (cdr host-sexp))))
+
+(defun skg-strip-fork-requests-in-buffer ()
+  "Remove every (viewRequests ... fork ...) fork request from the headlines
+of the current buffer. Used on fork-decline so a lingering explicit-fork
+atom does not silently re-fork on the next save."
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward org-heading-regexp nil t)
+      (beginning-of-line)
+      (let* ((headline-text (skg-get-current-headline-text))
+             (match (skg-split-as-stars-metadata-title headline-text)))
+        (when (and match (not (string-empty-p (nth 1 match))))
+          (let* ((stars (nth 0 match))
+                 (sexp (read (nth 1 match)))
+                 (title (nth 2 match))
+                 (stripped (skg--remove-fork-from-viewrequests sexp)))
+            (unless (equal stripped sexp)
+              (skg-replace-current-line
+               (skg-format-headline
+                stars (substring-no-properties (format "%S" stripped))
+                title))))))
+      (forward-line 1))))
+
 (defun skg-edit-metadata-at-point (edits)
   "Use EDITS to edit the metadata of the headline at point.
 If there is metadata, merges it with existing metadata.
