@@ -10,7 +10,7 @@ relations (`subscribes`, `overrides_view_of`,
 `hides_from_its_subscriptions`) and `glossary.md` ("fork", "clone",
 "subscribee as such", "override substitution").
 
-## The gesture
+## The implicit gesture: editing a foreign node
 
 You do not run a special command. You just **edit the foreign node**:
 
@@ -67,6 +67,46 @@ lack of a source if you own **no** source at all. (The inference takes
 skipping a foreign ancestor.)
 
 `N` itself is left completely untouched on disk.
+
+## The explicit gesture: forking a node you own
+
+Editing a foreign node forks it implicitly. To fork a node you **already
+own** — for example a public clone `C` you made above, which you now want
+to layer a *private* version `D` on top of — there is an explicit
+command, **`skg-fork-node`** (`C-c m f`, alias `skg-fork`).
+
+Put point on the node's headline and run it. It refuses if the buffer has
+unsaved changes ("Save the buffer before forking.") — so the clone is
+built from the node's saved snapshot, exactly what you see. Otherwise it
+marks the node and auto-saves, and you get the **same fork-confirmation
+buffer** as the implicit fork: approve with `C-c C-c` (rotate the clone's
+source first with `C-c s s` — e.g. to your *private* source), or decline
+with `C-c C-k` (which here also strips the fork request so the next save
+does not re-fork).
+
+Two differences from the implicit fork:
+
+- The original is **yours**, so it is *not* dropped — your edits to it
+  still save normally; the gesture only *adds* the clone that overrides
+  it.
+- The clone's source defaults to your **config-first** owned source (the
+  first `[[sources]]` you own in `skgconfig.toml`), since there is no
+  foreign ancestor to infer from. Rotate it in the confirmation buffer as
+  usual.
+
+The result is an **override chain**: `D overrides C overrides N`. Chains
+of any length are legal (only a *cycle* is forbidden — see
+[the sharing model](sharing-model.md)). When all sources are active,
+viewing `N`'s container draws the chain's end `D`; restrict the
+source-set to hide `D`'s source and the same view draws the middle `C`
+instead — either way `N` stays in the container's contents. If you point
+`skg-fork-node` at a node that is *itself* a drawn substitute (one
+carrying an `overridesHere` marker), it forks the node on screen — the
+overrider — deepening the chain, never re-forking the node it stands for.
+
+If the node already has a clone you own, `skg-fork-node` is rejected by
+the same monogamy rule (below); deepen the chain by forking the
+*overrider*, not the already-overridden node.
 
 ## Unintegrated content: the subscribeeCol
 

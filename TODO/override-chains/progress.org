@@ -100,6 +100,24 @@
      decline strips atom + commits nothing). Both fork integration tests
      and the full Rust (472) + elisp (252) suites pass.
 
+** DONE Phase E — docs
+   - schema.tql, docs/sharing-model.md, glossary.md: "acyclicity (no
+     user-owned override chains)" -> "no user-owned override cycles
+     (linear chains allowed)"; added the override-your-own-overrider
+     motivation and the middle-carrier (half-visible chain) behavior.
+   - docs/forks.md: retitled the implicit section; added "The explicit
+     gesture: forking a node you own" (skg-fork-node / C-c m f).
+   - docs/COMMANDS.org: documented C-c m f / skg-fork-node.
+   - glossary.md: "fork" now spans foreign (implicit) and owned
+     (explicit); override-substitution entry notes chains and middle
+     carriers.
+   - Also updated api-and-formats.md (not named in the plan but made
+     stale by B/C/D): dropped the compound-chain warning mention, added
+     the (viewRequests fork) form, and rewrote the overridesHere tamper
+     paragraph for chains.
+   - Closed the alphabetical-default note in TODO/problems.org (moved to
+     TODO/DONE/problems.org), per D4.
+
 * Changes to the plan's envisioned order
   - None of substance. Phase A done first, as sequenced.
   - A5 detail: besides the test edits the plan named, I added the

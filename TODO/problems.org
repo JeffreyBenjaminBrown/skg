@@ -19,19 +19,6 @@
    ForkSourceInactive on BufferValidationError) but DEFERRED the broad
    string consolidation -- it is a nice-to-have touching fs/git/diff
    layers, out of proportion to the fork work. Worth doing on its own.
-** TODO Default clone source is alphabetical, not config order
-   'SkgConfig.sources' is a HashMap, so the TOML order is lost.
-   'SkgConfig::first_owned_source' returns the alphabetically-first
-   owned source, while the Emacs client's 'skg--default-source'
-   returns the TOML-first owned source. They coincide for a
-   single-owned-source user but can disagree for multi-owned-source
-   users. Low impact (the confirmation buffer shows the server's
-   choice and the user can rotate it), but the two "defaults" are
-   inconsistent. Making them match would mean preserving source order
-   server-side (an ordered map / Vec<SourceName>) -- out of scope for
-   the fork work. (The fork default is now active-aware -- it prefers an
-   owned source ACTIVE under a restricted set -- but still alphabetical
-   among the candidates, so this inconsistency stands.)
 ** Minor: confirmation-buffer sourceHerald shows the raw source name
    'build_fork_confirmation_buffer' emits the clone's '(sourceHerald
    ⌂:NAME)' with the raw SourceName, not the configured abbreviation

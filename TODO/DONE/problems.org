@@ -4,6 +4,18 @@
   to the top of this file (just under this note). The bulk below was
   migrated 2026-06-19 in the original problems.org order (oldest
   section first).
+* RESOLVED Default clone source is alphabetical, not config order (2026-06-22)
+  Fixed in the override-chains arc (Phase D4). 'SkgConfig' now carries
+  'source_order : Vec<SourceName>', filled at parse time by the config
+  loaders ('source_order_from_toml' in dbs/filesystem/not_nodes.rs).
+  'owned_sources_in_config_order' and
+  'first_owned_source_in_config_order' return owned sources in TOML
+  declaration order (alphabetical fallback for dummy/test configs whose
+  source_order is empty). The fork default -- both the explicit
+  'skg-fork-node' gesture and the implicit foreign fork -- now picks the
+  config-first owned source (active-aware under a restricted set),
+  matching the Emacs client's 'skg--default-source'. 'first_owned_source'
+  was kept as a thin alias delegating to the config-order version.
 * RESOLVED Search-result enrichment skipped set_viewnodestats_in_viewforest (2026-06-21)
   A text-search results buffer showed no source heralds (and no cycle /
   containsParent viewStats) until the user saved it. The visible source
