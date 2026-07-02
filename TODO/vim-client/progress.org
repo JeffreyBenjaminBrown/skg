@@ -4,6 +4,29 @@
 # Newest entries go at the top of each section.
 
 * what's done and went well
+- 2026-07-02: FULL TEST PARITY reached. Every applicable tests/elisp
+  suite has a plenary.busted mirror (~200 specs), and all 34
+  tests/integration directories carry a passing test-nvim.lua beside
+  their test-emacs.el, validated against live servers. Per the
+  farm-out agreement, the 32 non-exemplar mirrors and the
+  COMMANDS-nvim.org conversion were written by seven delegated Sonnet
+  agents against a briefing + two exemplars I wrote; every file was
+  then validated (and, where needed, fixed) here. Quality was high:
+  28 of 30 test files passed on their first live run.
+- 2026-07-02: The port surfaced and fixed a STALE pre-existing emacs
+  test: fork-source asserted '(source owned)' in the fork-confirmation
+  buffer, predating the documented PICK-A-SOURCE placeholder; it was
+  failing for the emacs client too. Both clients' versions now assert
+  the documented behavior and pass (entry moved to DONE/problems.org).
+- 2026-07-02: bash/all-tests.sh runs a labeled Neovim unit phase and
+  every integration dir once per client (CLIENT/DIRECTORY lines;
+  SKG_SKIP_NVIM_INTEGRATION=1 skips the second pass). Docs done:
+  docs/COMMANDS-nvim.org, nvim/README.org, and the final deviations
+  report at ./deviations.org.
+- 2026-07-02: Ops lesson banked: four plenary child nvims orphaned by
+  a timed-out harness run spun at full CPU for an hour (the user's
+  laptop-heat report). bash/nvim-tests.sh now reaps such orphans
+  (headless + plenary.busted + parent PID 1) before each run.
 - 2026-07-02: Save pipeline ported: lock (modifiable-flag locks +
   single-flight stream guard, joined to the connection-reset hooks),
   save (marker round-trip, the four-handler stream with the
