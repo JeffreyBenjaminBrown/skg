@@ -4,6 +4,18 @@
 # Newest entries go at the top of each section.
 
 * what's done and went well
+- 2026-07-02: Buffers & display tier ported: payload/messages helpers,
+  buffer (view registry on vim.b, skg:// naming, acwrite + BufWriteCmd
+  so ':w' saves, close-view on delete, first-change warning),
+  heralds (extmark conceal + inline virt_text; all 8 elisp test
+  scenarios mirrored incl. self-heal and bounded retry; structural-
+  colon stripping byte-verified against the elisp function on five
+  cases), content_view (open/switch-to-view/override-menu/messages),
+  keymaps (the complete localleader surface + :Skg* Ex commands with
+  lazy module resolution, so unported commands report politely).
+  Verified live against real data: a content view of a real node
+  opened with correct title-derived name and heralds rendering
+  '1C ⌂decid', matching the Emacs display.
 - 2026-07-02: Networking tier ported and verified LIVE: state (handler
   registry, LP receiver state, linkstack home, connection-reset
   hooks), length_prefix (framing machine + dispatcher),

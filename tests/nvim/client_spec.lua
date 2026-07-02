@@ -4,48 +4,15 @@
 -- busy-initializing, sentinel cleanup -- without a real skg server.
 -- (The real-server counterparts live in tests/integration/.)
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
+
 local client = require('skg.client')
 local config = require('skg.config')
 local state = require('skg.state')
 
----A minimal TCP server on 127.0.0.1: calls ON_REQUEST(line, respond)
----for each newline-terminated request line; respond(text) writes raw
----bytes back. Returns {port, close}.
-local function fake_server (on_request)
-  local server = vim.uv.new_tcp()
-  server:bind('127.0.0.1', 0)
-  local clients = {}
-  server:listen(16, function ()
-    local connection = vim.uv.new_tcp()
-    server:accept(connection)
-    table.insert(clients, connection)
-    local pending = ''
-    connection:read_start(function (err, chunk)
-      if err or chunk == nil then return end
-      pending = pending .. chunk
-      local line, rest = pending:match('^([^\n]*)\n(.*)$')
-      if line then
-        pending = rest
-        on_request(line, function (text) connection:write(text) end)
-      end
-    end)
-  end)
-  return {
-    port = server:getsockname().port,
-    close = function ()
-      for _, connection in ipairs(clients) do
-        pcall(function ()
-          connection:read_stop()
-          connection:close() end)
-      end
-      pcall(function () server:close() end)
-    end }
-end
-
-local function framed (payload)
-  return string.format('Content-Length: %d\r\n\r\n%s',
-                       #payload, payload)
-end
+local fake_server = helpers.fake_server
+local framed = helpers.framed
 
 describe('skg.client', function ()
   local server

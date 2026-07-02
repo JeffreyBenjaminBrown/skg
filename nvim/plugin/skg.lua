@@ -32,3 +32,16 @@ vim.api.nvim_create_user_command('SkgConnectionEnd', function ()
 end, {
   desc = 'Close the TCP connection to the skg server',
 })
+
+-- The rest of the command surface (one :Skg* command per user-facing
+-- command, lazily resolved) lives in lua/skg/keymaps.lua.
+require('skg.keymaps').define_ex_commands()
+
+-- .skg files get the goto/id-navigation/linkstack subset (the analog
+-- of skg-file-minor-mode, auto-enabled by find-file-hook).
+vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile' }, {
+  pattern = '*.skg',
+  callback = function (event)
+    require('skg.keymaps').attach_file_buffer(event.buf)
+  end,
+})

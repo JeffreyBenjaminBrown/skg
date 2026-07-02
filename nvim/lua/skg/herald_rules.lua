@@ -49,8 +49,8 @@ function M.request_herald_rules ()
   state.register_response_handler('herald-rules',
     function (_payload, response)
       local ok, err = pcall(function ()
-        local misc = require('skg.misc_requests')
-        local content = misc.response_field(response, 'content')
+        local content =
+          require('skg.payload').field(response, 'content')
         M.install_rules(sexpr.read(content))
       end)
       if not ok then
