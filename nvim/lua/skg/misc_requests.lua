@@ -1,7 +1,7 @@
 -- PURPOSE: The small one-shot request/response commands:
--- verify-connection now; rebuild-dbs joins when the stream consumers
--- land. The Lua port of elisp/skg-request-verify-connection.el (and
--- eventually skg-request-rebuild-dbs.el).
+-- verify-connection and rebuild-dbs. The Lua port of
+-- elisp/skg-request-verify-connection.el and
+-- elisp/skg-request-rebuild-dbs.el.
 
 local client = require('skg.client')
 local payload = require('skg.payload')
@@ -24,6 +24,21 @@ function M.connection_verify ()
     end, true)
   state.lp_reset()
   client.send_string('((request . "verify connection"))\n')
+end
+
+---Wipe and rebuild TypeDB and Tantivy from the .skg files on disk.
+---Does not touch the filesystem -- only the derived databases.
+function M.rebuild_dbs ()
+  vim.notify('Rebuilding databases (this may take a while) ...')
+  state.register_response_handler('rebuild-dbs',
+    function (_payload, response)
+      local content = payload.field_text(response, 'content')
+      vim.notify((content or 'Rebuild complete.')
+                 .. '\nExisting skg views are now invalid.'
+                 .. ' Run :SkgCloseAllSkgBuffers to close them.')
+    end, true)
+  state.lp_reset()
+  client.send_string('((request . "rebuild dbs"))\n')
 end
 
 return M
