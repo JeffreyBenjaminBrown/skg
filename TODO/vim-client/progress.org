@@ -1,0 +1,21 @@
+#+TITLE: Progress: the Neovim client
+# Running log kept during execution of ./plan.org, per
+# ../../coding-advice/when-to-stop.org. Categories per that document.
+# Newest entries go at the top of each section.
+
+* what's done and went well
+- 2026-07-02: Plan settled (all nine questions answered; decisions
+  folded into plan.org's "Settled decisions"). Execution begun on the
+  'nvim' branch.
+
+* Changes to the plan's envisioned order
+(none yet)
+
+* what's imperfect about what's done
+(none yet)
+
+* choices determining the future
+- Test-parity depth is FULL (Q6 option A), not the recommended B: every
+  applicable tests/elisp file gets a busted mirror and every
+  tests/integration dir gets a test-nvim.lua. bash/all-tests.sh must
+  echo which client suite it is running, so slow runs are attributable.

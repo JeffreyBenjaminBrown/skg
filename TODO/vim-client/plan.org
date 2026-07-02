@@ -12,6 +12,22 @@ does, to the extent possible; where not possible, a final report describes
 every necessary deviation. Zero server changes are anticipated (one open
 question below confirms this constraint).
 
+* Settled decisions (folded from the open questions, 2026-07-02)
+- Q1: Neovim-only, in Lua; minimum nvim 0.11.
+- Q2: build on nvim-orgmode unless impossible; self-rolled fallback
+  stays open, recorded in progress.org if taken.
+- Q3: parse s-expressions in Lua; zero server changes.
+- Q4: the localleader scheme as proposed (':w' saves; '<localleader>' +
+  the Emacs mnemonic letters; ']i'/'[i' motions; ':Skg*' Ex commands).
+- Q5: git UI targets neogit, with diffview/plain-diff fallback.
+- Q6: FULL test parity — every applicable tests/elisp file mirrored AND
+  a test-nvim.lua in every tests/integration dir; bash/all-tests.sh
+  runs them and echoes clearly that it is doing so (so slowness is
+  attributable and skippable later).
+- Q7: layout/naming defaults as listed under "Layout" and Q7.
+- Q8: commit incrementally, on the 'nvim' branch (created by Jeff).
+- Q9: port all of it; nothing dropped.
+
 The Emacs client is ~7,850 lines of elisp across ~40 files, plus 31 unit
 test files and ~35 integration test directories. The port is a full
 rewrite of the client tier against the same wire protocol.
@@ -283,7 +299,8 @@ would abandon Neovim users)? My recommendation: Neovim-only, Lua,
 minimum version 0.11 (what nvim-orgmode requires; the container has
 0.12.3). Everything below assumes this.
 
-*** TODO agreed, neovim
+*** DONE agreed, neovim
+Folded into 'Settled decisions' (Q1).
 
 ** Q2: Org substrate — build on nvim-orgmode, or self-roll the outline layer?
 The client needs from "org": headline folding + TAB visibility cycling,
@@ -303,7 +320,8 @@ capture — none of skg's business.
 If A hits a wall mid-execution I would switch to B for the affected
 buffers and record it in progress.org rather than stopping.
 
-*** TODO agreed, reuse nvim-orgmode unless impossible
+*** DONE agreed, reuse nvim-orgmode unless impossible
+Folded into 'Settled decisions' (Q2).
 
 ** Q3: Wire format — parse s-expressions in Lua (no server changes)?
 The server speaks elisp-flavored s-expressions in both directions.
@@ -317,7 +335,8 @@ The server speaks elisp-flavored s-expressions in both directions.
 Note even option B doesn't remove the sexp need entirely: '(skg ...)'
 headline metadata inside buffer text is sexp regardless.
 
-*** TODO definitely A
+*** DONE definitely A
+Folded into 'Settled decisions' (Q3).
 
 ** Q4: Keybinding scheme
 Terminal vim cannot use the Emacs chords (C-c is taken; C-x C-s is
@@ -345,7 +364,8 @@ literal-as-possible Ctrl chords (I advise against — collisions with
 core vim bindings are unavoidable). Also: default '<localleader>'
 suggestion? (vim convention is often ',' or '\'; users can override.)
 
-*** TODO your first proposal
+*** DONE your first proposal
+Folded into 'Settled decisions' (Q4).
 
 ** Q5: Git UI — what should goto-in-magit and readable-ids target?
 Four commands open magit views ('skg-goto-in-magit', '-parent',
@@ -364,7 +384,8 @@ UUID-bearing buffers (magit status/diff and raw .skg files) with titles.
 Either way this is the area most likely to appear in the deviations
 report.
 
-*** TODO A
+*** DONE A
+Folded into 'Settled decisions' (Q5).
 
 ** Q6: Test parity — how deep?
 - Option A: mirror everything — all applicable tests/elisp files in
@@ -384,7 +405,8 @@ report.
   recommended: the streams are where a second client will actually
   break.
 
-*** TODO A
+*** DONE A
+Folded into 'Settled decisions' (Q6), including the all-tests.sh echo.
 Be sure to update bash/all-tests.sh so that it does those,
 and echoes to screen making clear that it does.
 (When I get annoyed at how slow it's taking,
@@ -408,7 +430,8 @@ by skipping those tests sometimes.)
   'bash/all-tests.sh'.
 - Minimum nvim version 0.11; developed against 0.12.3.
 
-*** TODO perfect
+*** DONE perfect
+Folded into 'Settled decisions' (Q7).
 
 ** Q8: Commit policy during execution
 Your convention: no commits while planning. During execution I'd like
@@ -417,7 +440,9 @@ reviews as a readable sequence — either directly on main or on a
 branch 'vim-client' you merge after review. Which do you prefer, or
 should I leave everything uncommitted for you to commit?
 
-*** TODO commit incrementally
+*** DONE commit incrementally
+Folded into 'Settled decisions' (Q8): incremental commits on the 'nvim' branch.
+I just checked out a new 'nvim' branch; use that.
 
 ** Q9: Anything to drop, defer, or add?
 Default scope is every command in docs/COMMANDS.org plus the supporting
@@ -429,4 +454,5 @@ anyway), or if there's a vim-specific nicety you want added while I'm
 in there, say so here. Otherwise I port everything and the deviations
 report covers the gaps.
 
-*** TODO all of it
+*** DONE all of it
+Folded into 'Settled decisions' (Q9).
