@@ -55,7 +55,12 @@
   'nvim' branch.
 
 * Changes to the plan's envisioned order
-(none yet)
+- The goto-in-git PARENT variant went straight to the plan's fallback
+  (a plain git-diff buffer searched for the id) rather than trying
+  neogit first: neogit exposes no stable API for landing on a hunk
+  line, and the fallback carries the same information. The FILE
+  variant does open neogit, landing on the file entry by text search
+  over the status buffer.
 
 * what's imperfect about what's done
 - Fold deviations, unavoidable in vim's fold model (documented in

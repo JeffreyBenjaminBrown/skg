@@ -54,10 +54,27 @@ vim.keymap.set('c', '<C-x>L', function ()
   { desc = 'skg: pop a link to the top-of-stack node' })
 
 -- .skg files get the goto/id-navigation/linkstack subset (the analog
--- of skg-file-minor-mode, auto-enabled by find-file-hook).
+-- of skg-file-minor-mode, auto-enabled by find-file-hook) plus
+-- readable ids (title-annotated UUIDs).
 vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile' }, {
   pattern = '*.skg',
   callback = function (event)
     require('skg.keymaps').attach_file_buffer(event.buf)
+    require('skg.readable_ids').enable(event.buf)
+  end,
+})
+
+-- Re-annotate readable ids whenever neogit refreshes its status (the
+-- magit-post-refresh-hook analog).
+vim.api.nvim_create_autocmd('User', {
+  pattern = 'NeogitStatusRefreshed',
+  callback = function ()
+    local readable_ids = require('skg.readable_ids')
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_is_valid(buf)
+         and readable_ids.enabled_p(buf) then
+        readable_ids.annotate_buffer(buf)
+      end
+    end
   end,
 })
