@@ -17,6 +17,22 @@ echo -e "${YELLOW}Running Skg Neovim Tests...${NC}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source "$SCRIPT_DIR/test-runner-lib.sh"
 
+# Reap orphaned test children before starting. If a previous harness
+# run was killed (timeout, C-c), plenary's per-spec child nvims are
+# reparented to init and can spin forever at full CPU. The match is
+# deliberately narrow -- headless + plenary.busted + parent PID 1 --
+# so it can never touch an interactive nvim.
+ps -eo pid=,ppid=,args= | while read -r pid ppid args; do
+    case "$args" in
+        *nvim*--headless*plenary.busted*)
+            if [ "$ppid" = "1" ]; then
+                kill -9 "$pid" 2>/dev/null \
+                  && echo "Reaped orphaned test nvim (pid $pid)"
+            fi
+            ;;
+    esac
+done
+
 TEST_DIR="$SCRIPT_DIR/../tests/nvim"
 
 if [ ! -d "$TEST_DIR" ]; then
