@@ -60,8 +60,12 @@ function M.set_up_window (window)
   vim.wo[window][0].foldenable = true
 end
 
----Unfold everything (the stand-in for org-show-all).
+---Unfold everything (the stand-in for org-show-all). Also forces the
+---fold expression to re-evaluate ('zx'): after a whole-buffer
+---replacement vim recomputes expr folds lazily, and a fold that has
+---not materialized yet cannot be closed.
 function M.show_all ()
+  vim.cmd('silent! normal! zx')
   vim.cmd('silent! %foldopen!')
 end
 
@@ -147,6 +151,7 @@ end
 function M.fold_marked_headlines ()
   M.show_all()
   M.fold_bodies_of_bodyfolded_headlines()
+  local previous_found = nil
   while true do
     local found = nil
     local last = vim.api.nvim_buf_line_count(0)
@@ -158,6 +163,12 @@ function M.fold_marked_headlines ()
         break end
     end
     if not found then return end
+    if found == previous_found then
+      -- Closing the parent did not hide this headline (it can happen
+      -- when the window lacks the skg fold model); stop rather than
+      -- spin.
+      return end
+    previous_found = found
     local level = metadata.outline_level(found)
     local parent = metadata.parent_heading_line(found, level)
     if not parent then return end

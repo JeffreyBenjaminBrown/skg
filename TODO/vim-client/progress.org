@@ -4,6 +4,18 @@
 # Newest entries go at the top of each section.
 
 * what's done and went well
+- 2026-07-02: Save pipeline ported: lock (modifiable-flag locks +
+  single-flight stream guard, joined to the connection-reset hooks),
+  save (marker round-trip, the four-handler stream with the
+  save-relax-lock pending-count subtleties preserved, point/scroll
+  restoration with entry clamping, error/warning channels), and the
+  full fork-confirmation flow (source walk, placeholder refusal,
+  approve re-save with fork-sources pairs, decline strip). All
+  exercised end-to-end through the loopback fake server, including
+  the collateral lock lifecycle. Two fixes surfaced by these tests:
+  the sexp reader now follows the elisp reader on \n/\t escapes, and
+  fold restoration forces expr-fold recomputation (zx) and cannot
+  spin when a close fails.
 - 2026-07-02: Buffers & display tier ported: payload/messages helpers,
   buffer (view registry on vim.b, skg:// naming, acwrite + BufWriteCmd
   so ':w' saves, close-view on delete, first-change warning),

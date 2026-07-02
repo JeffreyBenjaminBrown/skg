@@ -33,6 +33,12 @@ describe('skg.sexpr.parse reading atoms', function ()
     assert.are.equal('two\nlines', read1('"two\nlines"'))
   end)
 
+  it('follows the elisp reader on backslash-n and backslash-t',
+     function ()
+    assert.are.equal('a\nb', read1('"a\\nb"'))
+    assert.are.equal('a\tb', read1('"a\\tb"'))
+  end)
+
   it('reads integers and floats', function ()
     assert.are.equal(7, read1('7'))
     assert.are.equal(-42, read1('-42'))

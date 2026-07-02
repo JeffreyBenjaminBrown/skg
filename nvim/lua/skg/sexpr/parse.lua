@@ -176,9 +176,10 @@ function M.read_list (text, position)
 end
 
 ---Read a string body. POSITION is just after the opening quote.
----Escapes: backslash makes the next byte literal, covering the \\ and
----\" the server emits. (A literal newline inside a string is legal and
----passes through.)
+---Escapes follow the elisp reader: \n and \t become newline and tab,
+---any other backslashed byte becomes itself (covering the \\ and \"
+---the server emits). A literal newline inside a string also passes
+---through, which is how the server sends multi-line content.
 ---@param text string
 ---@param position integer
 ---@return string value
@@ -195,7 +196,10 @@ function M.read_string (text, position)
       position = position + 1
       if position > #text then
         error('skg.sexpr.read: dangling backslash in string') end
-      table.insert(chunks, text:sub(position, position))
+      local escaped = text:sub(position, position)
+      if escaped == 'n' then escaped = '\n'
+      elseif escaped == 't' then escaped = '\t' end
+      table.insert(chunks, escaped)
     else
       table.insert(chunks, byte) end
     position = position + 1
