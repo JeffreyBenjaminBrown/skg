@@ -281,6 +281,14 @@ live smoke tests throughout. Progress and how-deviations are recorded in
   callees, comments inside the blocks they describe, no history
   comments, plus LuaLS-style '---@param'/'---@return' annotations as the
   Lua stand-in for your everything-gets-a-type-signature rule.
+- Rote work is farmed out to smaller models (Jeff's request,
+  2026-07-02): where a phase reduces to many instances of one
+  well-specified template, I write the template plus one exemplar
+  myself, fan the remaining instances out to Sonnet subagents, and
+  review/test everything they return before it lands. Planned
+  farm-out sites: the integration-test mirroring (one test-nvim.lua
+  per tests/integration dir) and the COMMANDS-nvim.org command-table
+  conversion. Design-bearing code stays here.
 
 * Open questions — please answer all before I start
 Each question is self-contained. Where I recommend, the recommendation
