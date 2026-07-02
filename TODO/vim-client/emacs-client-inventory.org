@@ -1,0 +1,839 @@
+#+TITLE: skg Emacs client — inventory for the Neovim/Lua port
+# Compiled 2026-07-02 by Claude, from reading every file in elisp/
+# (ignoring abandoned/, experim/, *~), elisp/PITFALLs.org,
+# docs/COMMANDS.org, tests/elisp/ and tests/integration/.
+# Reference material for TODO/vim-client/plan.org.
+
+* 0. Orientation and architecture
+
+The skg Emacs client is a thin(ish) presentation + editing layer over a Rust
+TCP server. All *graph semantics* live in Rust; Emacs is responsible for:
+rendering server-supplied org text, letting the user edit it, translating edits
+into '(skg ...)' metadata s-expressions embedded in org headlines, and shipping
+buffers back to the server over a length-prefixed TCP protocol. There is *no
+file on disk* behind a view buffer — the buffer text comes from the server and
+goes back to the server.
+
+Load order is defined by 'skg-init.el' (sets 'load-path' for elisp/,
+elisp/skg-sexpr, elisp/skg-request-save, elisp/skg-sexpr-edit, then
+requires the tree). 'skg-client.el' is the top-level require hub and defines
+'skg-client-init'. Runtime entry is 'skg-client-init' (reads port from
+skgconfig.toml, opens the TCP connection, verifies it, fetches the herald rule
+table).
+
+Two cross-cutting hazards drive much of the code (from elisp/PITFALLs.org):
+- *org-fold fragility*: any raw delete-region+insert on a folded heading
+  line can crash or clobber a hidden subtree. Every in-place heading rewrite is
+  routed through 'skg-replace-current-line', which wraps the edit in
+  'org-fold-core-ignore-fragility-checks'.
+- *Emacs 'forward-sexp' cannot parse skg metadata* because herald fields use
+  '{', '⌂:', '→' characters that confuse the syntax table. A hand-rolled
+  paren-counter 'skg-find-sexp-end' is used everywhere instead.
+
+Both hazards *disappear in a Neovim/Lua port* (there is no org-fold and no
+Emacs sexp reader), but they explain the shape of the current code and the
+metadata-editing indirection.
+
+* 1. File-by-file inventory
+
+** Core protocol / state / connection
+
+*** skg-state.el
+Global mutable state for the whole client. Holds 'skg-rust-tcp-proc' (the
+persistent network process), 'skg-response-handler-map' (alist
+response-type-symbol → (handler . one-shot-p)), the length-prefix receiver state
+('skg-lp--buf' unibyte accumulator, 'skg-lp--bytes-left', 'skg-lp--pending-count'),
+'skg-config-dir', and 'skg-id-stack' (the linkstack: list of (id title) pairs).
+Key functions: 'skg-register-response-handler' (register/replace a dispatch
+handler, bump pending count if one-shot), 'skg-lp-reset'. Depends on nothing skg.
+A port must reproduce this registry-of-handlers-keyed-by-response-type design.
+
+*** skg-length-prefix.el
+The inbound message reassembler and dispatcher — a byte-accumulating state
+machine. 'skg-lp-handle-generic-chunk' is the process filter body: append bytes,
+then loop 'skg-lp-step' (which alternates between parsing a
+'Content-Length: N\r\n\r\n' header via 'skg-lp-try-parse-header' and consuming
+N body bytes via 'skg-lp-try-consume-body', decoding UTF-8). On a completed
+body, 'skg-lp--dispatch-by-type' reads the payload as an s-exp, extracts
+'(response-type X)', looks up the handler, funcalls it, and removes it if
+one-shot (decrementing pending count). Depends on skg-log, skg-state. This is
+the heart of the wire protocol; a port needs an equivalent framing parser.
+
+*** skg-client.el
+Connection lifecycle + the require hub. 'skg-client-init' (init sequence).
+'skg-tcp-connect-to-rust' (idempotent make-network-process to 127.0.0.1:port,
+binary coding, filter = 'skg-handle-rust-response', sentinel = 'skg--tcp-sentinel').
+'skg-handle-rust-response' special-cases a '((busy-initializing ...))' message
+(server still starting: message the user, tear down streams/handlers) and
+otherwise forwards to the LP machine. 'skg--tcp-sentinel' unlocks all buffers and
+clears the handler map on connection drop (so a server crash mid-save doesn't
+leave buffers permanently locked). 'skg-connection-end' (interactive) closes the
+socket. 'skg--server-unavailable-message' builds a helpful error pointing at log
+files. Depends on nearly every module (require hub).
+
+** Buffers, modes, view registry
+
+*** skg-buffer.el
+Defines the major mode 'skg-content-view-mode' (derived from org-mode, sets
+'org-adapt-indentation' nil), the buffer-local *view-uri registry variable*
+'skg-view-uri' (marked permanent-local so it survives major-mode changes), and
+the buffer lifecycle. 'skg-open-org-buffer-from-text' creates/populates a view
+buffer, assigns a view-uri (server-supplied or a fresh 'org-id-uuid'), enables
+heralds, and installs kill-buffer-hook ('skg-send-close-view' → tells the server
+to drop the view) and first-change-hook ('skg-warn-if-other-buffer-modified').
+Buffer-name generation from the top headline title ('skg-content-view-buffer-name',
+link-shortening, sanitizing). 'skg-find-buffer-by-uri' (the registry lookup),
+'skg-buffer-p', and interactive 'skg-close-all-skg-buffers'. Depends on
+heralds-minor-mode, skg-sexpr-search, skg-keymaps-and-aliases.
+
+*** skg-keymaps-and-aliases.el
+The single source of truth for *all keybindings and user-facing aliases*. Defines
+the 'skg-alias' macro (defalias + hide the internal name from M-x via
+'completion-predicate'). Populates: global map (C-c f search, C-c v l), the magit
+map, the minibuffer map (id-stack paste/pop), the shell map, and the mode maps
+'skg-file-minor-mode-map', 'skg-content-view-mode-map' (the big one — every C-c
+command), 'skg-id-stack-mode-map', 'skg-diff-analysis-mode-map',
+'skg-sexp-edit-mode-map'. Uses a 'setcdr map nil' + repopulate idiom so reloads
+pick up binding edits while preserving keymap object identity. No skg requires
+(would cycle). *This file is the primary reference for section 2.*
+
+*** skg-file-minor-mode.el
+'skg-file-minor-mode' (minor mode) auto-enabled via find-file-hook in buffers
+visiting .skg files; gives 'skg-goto'/'skg-id-next'/paste-pop keys over UUIDs and
+.skg filenames in a raw file. Keymap lives in skg-keymaps-and-aliases.
+
+** Metadata parsing/editing (the org↔metadata boundary)
+
+*** skg-metadata.el
+The central metadata utility layer and several user commands. Splits a headline
+into (stars metadata-sexp title) ('skg-split-as-stars-metadata-title', using
+'skg-find-sexp-end'), parses/reconstructs metadata into alist+bare-value sets,
+formats headlines. The critical primitive 'skg-replace-current-line'
+(fragility-safe in-place line rewrite) and the metadata-merge command
+'skg-edit-metadata-at-point' (reads existing metadata, applies an edit s-exp via
+'skg-edit-nested-sexp', rewrites the line). Interactive commands:
+'skg-delete'/'skg-delete-recursive' (mark for deletion), 'skg-set-indefinitive',
+'skg-set-source'/'skg-set-source-recursive' (with owned-source prompt + herald
+update), 'skg-set-merge-request', 'skg-view-without-metadata',
+'skg-beginning-of-line' (C-a toggle line-start↔title-start). Fork-stripping
+('skg-strip-fork-requests-in-buffer'). *'org-todo' around-advice* strips and
+re-inserts metadata so TODO cycling sees a plain heading. Depends on org,
+org-fold-core, skg-config, skg-sexpr-search.
+
+*** skg-focus.el
+Read/write/act on the 'focused' metadata marker: 'skg-add-focused-marker'
+(before a save, tag the current heading), 'skg-goto-focused-headline' (after
+redraw, move point there), 'skg-remove-focused-marker',
+'skg-headline-has-focused-in-view-p'. Depends on org, skg-metadata,
+skg-sexpr-search. This is how point survives the save/rerender round-trip.
+
+*** skg-org-fold.el
+Serializes/restores fold state as per-headline metadata markers so folds survive
+the round-trip. 'skg-add-folded-markers' (mark invisible headlines 'folded';
+mark visible-but-body-hidden headlines 'bodyFolded'), 'skg-fold-marked-headlines'
+(restore: unfold all, hide bodyFolded entries, then iteratively fold parents of
+folded headlines), 'skg-remove-folded-markers' (strip markers and re-apply
+folds). Foldedness is detected via '(invisible-p (point))' and org-fold
+primitives ('org-fold-hide-entry', 'org-fold-hide-subtree', 'org-cycle',
+'org-show-all'). Depends on org, skg-metadata, skg-sexpr-search. *Deeply
+org-bound — see section 6.*
+
+** Graph-modification commands
+
+*** skg-modify-graph.el
+User commands that restructure the org tree locally then auto-save:
+'skg-goto-biggest-branch' (outline heuristic — count org-descendents among
+siblings or children, jump to the max), 'skg-replace-content-with-link' (replace
+a subtree with an [[id:...][...]]-style link, guarding parent
+ownership/definitiveness, y-or-n-p if the title already has a link),
+'skg-replace-link-with-content' (replace a leaf that has exactly one id-link
+with an indefinitive ActiveNode). Link parsing/label reduction helpers. Depends
+on org, org-fold-core, skg-config, skg-metadata.
+
+*** skg-request-views.el
+The C-c c (collections) and C-c p (paths) command families, generated by the
+'skg--define-view-request-commands' macro: each command splices a
+'(viewRequests (col RELNAME))' or '(viewRequests (path ROLENAME))' atom into the
+headline and auto-saves, letting the server graft the requested data on save.
+4 collection + 10 path commands. Also 'skg-request-definitive-view' (aliased
+'skg-set-definitive', does *not* auto-save) and 'skg-fork-node' (aliased
+'skg-fork'; refuses if buffer modified, stamps '(viewRequests fork)',
+auto-saves). Depends on skg-metadata, skg-request-save, org, org-element.
+
+** The save pipeline and its multi-message protocol
+
+*** skg-request-save.el
+The largest and most protocol-heavy file. 'skg-request-save-buffer' (aliased
+'skg-save', C-x C-s): confirm-if-other-unsaved warning (yes-or-no-p), record
+point position ('skg--current-save-point-position' — line offset below focused
+headline, column, screen-line offset from window top), add folded/focused
+markers, build the request sexp, lock all skg buffers, register the four save
+handlers, and send request line + Content-Length header + body. Handlers:
+- 'skg--save-lock-handler' (early broad lock → narrow to collateral set),
+- 'skg--collateral-view-handler' (stream: unlock + replace each rerendered buffer),
+- 'skg--save-result-handler' (terminal: remove streaming handlers, unlock, apply),
+- 'skg--fork-confirmation-handler' (the *alternative* terminal message: show the
+  editable fork-confirmation buffer, yes-or-no-p to approve).
+Point restoration after redraw: 'skg-replace-buffer-with-new-content'
+(erase+insert, 'org-fold-show-all', re-place focus, re-apply folds, restore
+point/window), 'skg--restore-point-below-focused-headline' (clamps to the
+focused entry). Fork flow: 'skg-approve-fork'/'skg-decline-fork'/
+'skg--fork-confirmation-refuse-save', 'skg--fork-sources-from-confirmation-buffer',
+'skg-fork-source-placeholder'. Error/warning display
+('skg-show-save-errors-and-warnings', 'skg-big-nonfatal-message'). Depends on
+skg-log, skg-length-prefix, skg-org-fold, skg-focus, skg-metadata, skg-buffer,
+skg-lock-buffers. *See section 4.*
+
+*** skg-request-save/skg-lock-buffers.el
+Buffer locking via *overlays* (chosen over buffer-read-only for a custom error
+message and because inhibit-read-only doesn't suppress overlay hooks). Overlay
+spans the whole buffer with modification-hooks / insert-in-front/behind-hooks =
+'skg--save-lock-signal'. 'skg--lock-for-save', 'skg--unlock-after-save',
+'skg--lock-all-skg-buffers', 'skg--unlock-non-collateral-buffers',
+'skg--unlock-buffers-not-in-uri-list'. Also the single-flight stream guard
+'skg--begin-stream'/'skg--end-stream' ('skg--stream-in-progress'). Buffer-local
+'skg--save-lock-overlay'. *This whole mechanism has no direct Neovim analog —
+see section 8.*
+
+** Streaming rerender + view/source-set operations
+
+*** skg-request-rerender-all-views.el
+The rerender-lock → rerender-view* → rerender-done streaming protocol.
+'skg--register-rerender-stream-handlers' (shared by diff-mode toggle and
+source-set switch). 'skg--apply-streamed-view-update' (shared with the save
+stream) unlocks + replaces one buffer by view-uri. Depends on skg-length-prefix,
+skg-request-save, skg-buffer, skg-lock-buffers.
+
+*** skg-request-git-diff-mode.el
+'skg-view-diff-mode' (C-c v d): refuse if any skg buffer unsaved, lock all, send
+"git diff mode toggle", handle the git-diff-mode ack then the rerender stream.
+
+*** skg-request-source-sets.el
+'skg-list-source-sets', 'skg-active-source-set', and 'skg-set-active-source-set'
+(aliased 'skg-limit-source-set', C-c v l): yes-or-no-p confirm, then send +
+drive the rerender stream. Depends on skg-buffer, skg-config, skg-lock-buffers,
+skg-request-rerender-all-views.
+
+*** skg-request-diff-analysis.el
+'skg-diff-report' (C-c t r): two y-or-n-p prompts (staged? unstaged?), refuse if
+unsaved buffers, request "diff analysis", show the org report in
+'skg-diff-analysis-mode' (a minor mode with its own keymap for search/goto/nav).
+
+*** skg-request-stage-moves.el
+'skg-stage-moves' (C-c t m): request a bash script for detected node "moves"
+between sources, display it in sh-mode.
+
+*** skg-request-export-org.el
+'skg-export-some-to-org' (no keybinding): prompt source-set (cycling selector) +
+output dir, request "export to org", show the server's report. Server-side logic.
+
+*** skg-request-rebuild-dbs.el / skg-request-verify-connection.el
+'skg-rebuild-dbs' (rebuild TypeDB+Tantivy from disk) and 'skg-connection-verify'
+(ping). Both are minimal one-shot request/response commands.
+
+*** skg-request-herald-rules.el
+Fetches the herald *rule table* from the server (it lives only in Rust,
+server/heralds.rs). 'skg-request-herald-rules' (low-level async fetch, installs
+via 'heralds-install-rules') and 'skg-herald-rules-ensure' (bounded-retry
+self-heal with accept-process-output waiting). Called at connect time and when
+heralds mode needs to self-heal. No interactive command. Depends on
+heralds-minor-mode, skg-length-prefix, skg-state.
+
+*** skg-request-single-root-content-view.el
+'skg-request-single-root-content-view-from-id': the core "open a view of node X"
+request. Handles the switch-to-view response (node already a root of an open
+view → switch buffers instead of duplicating), server-overridden view-uri
+(override-choice menus), the override-choice bypass field, and errors/warnings.
+This is the workhorse behind all the skg-goto* commands.
+
+*** skg-request-text-search.el
+'skg-search' (C-c f RET) and 'skg-search-interactive' (C-c f i, reads option
+chars r/b/t/h; 'h' opens docs/COMMANDS.org to the relevant headline). The
+*multi-message search protocol*: search-results (immediate), request-snapshot
+(server asks for a snapshot of the search buffer → client freezes it read-only
+and sends its text back), search-enrichment (enriched results replace the
+buffer). Provides 'skg--search-buffer-setup-hook' for the make-link workflow.
+Depends on skg-client, skg-buffer, heralds-minor-mode.
+
+*** skg-search-make-link.el
+'skg-search-make-link' (C-c f l): records (buffer . point), runs a search, and
+in the resulting buffer activates 'skg-search-make-link-mode' (minor mode,
+C-c C-c = 'skg-search-make-link-finish') which picks the nearest id, kills the
+search buffer, returns to origin, and inserts an [[id:X][LABEL]] link. Uses the
+search-setup hook. Documents a PITFALL (no eager save). Depends on skg-id-search.
+
+** IDs, navigation, the linkstack
+
+*** skg-id-search.el
+Everything about IDs and the linkstack. ID detection at point: UUID-v4 regex,
+metadata id (ActiveNode / diffPhantom / deleted shapes), inline id-link, .skg
+filename ('skg--id-at-point', 'skg-nearest-id'). Navigation
+'skg-id-next'/'skg-id-prev' (hop among metadata ids and inline links). Goto
+family: 'skg-goto', 'skg-goto-bypassOverride', 'skg-goto-by-id', and the
+*-and-close-this variants; magit buffers auto-bypass the override menu
+('skg--bypass-override-here-p' by major-mode name). The linkstack
+('skg-id-stack'): 'skg-id-push', 'skg-paste-id/link/node',
+'skg-pop-id/link/node', and the editable stack buffer ('skg-view-id-stack',
+'skg-id-stack-mode', validate/save). 'skg-visit-link' (follow an id-link; note:
+*not* itself interactive). 'skg-replace-links-with-labels'. Depends on
+skg-buffer, skg-metadata, skg-request-single-root-content-view,
+skg-sexpr-search, skg-state.
+
+** Sexpr subsystem (skg-sexpr/)
+
+*** skg-sexpr/skg-sexpr-search.el
+The herald-safe sexp reader and path utilities. 'skg-find-sexp-end' (manual
+paren counter, the replacement for forward-sexp), 'skg-first-sexpr-on-line',
+'skg-sexp-at-or-after-point', 'skg--read-sexp-at-point-on-line'.
+'skg-strip-heralds-from-sexp' (remove display-only birthHerald/rels/sourceHerald
+fields before saving — they are regenerated by Rust). 'skg-sexp-cdr-at-path'
+(walk '(skg node id)'-style paths). Requires skg-sexpr-dsl-for-edits,
+skg-compare-sexpr, skg-lens.
+
+*** skg-sexpr/skg-sexpr-dsl-for-edits.el
+'skg-edit-nested-sexp' — a declarative sexp-merge engine with four operations:
+DELETE, REPLACE, ENSURE (replace-or-insert), and default merge (recursive).
+This is what powers every metadata edit ('skg-edit-metadata-at-point' dispatches
+edit s-exps to it). Pure, no dependencies. *A port must reimplement this
+tree-merge DSL.*
+
+*** skg-sexpr/skg-compare-sexpr.el
+'skg-sexp-subtree-p' — "is STRUCTURE a semantic (label-ancestry, unordered)
+subtree of OBJECT?" Used everywhere for shape tests (activeNode?, has-marker?,
+contains-id?). Pure.
+
+*** skg-sexpr/skg-lens.el
+The generic declarative sexp→tokens transform engine,
+'skg-transform-sexp-flat', driven by a *rule table*. Supports color directives
+(RED/GREEN/BLUE/YELLOW/ORANGE as 'skg-color' text properties), ANY/IT (wildcard
++ value capture), ABUT (join-without-separator marker via 'skg-abut' property),
+and INTERC (intercalate sub-rule outputs into one token with a separator).
+Emits propertized strings. Pure. This is the abstract machine that heralds are
+one application of. *Central to the herald port — see section 5.*
+
+*** skg-sexpr/skg-sexpr-org-bijection.el
+Roughly-bijective 'sexp-to-org' / 'org-to-sexp' (atom-headed, paren-terse sexps
+↔ org outline). Validates atom-headed / paren-terse / single-root /
+no-level-jump. Used by the metadata *edit buffer* (view metadata as an editable
+org tree). Pure.
+
+*** skg-sexpr/skg-activeNode-defaults.el
+Expand/strip default fields for the ActiveNode metadata edit buffer: after
+sexp-to-org, insert missing editable fields with default text (e.g. "affected
+(default)"); before org-to-sexp, drop default-valued fields and collapse
+booleans. Canonical field ordering. Also 'skg-activeNode-sexp-p',
+'skg-headlines-to-org'. Depends on skg-sexpr-org-bijection, skg-compare-sexpr.
+
+** Sexpr edit buffer (skg-sexpr-edit/)
+
+*** skg-sexpr-edit.el
+'skg-edit-metadata' (aliased 'skg-view-metadata', C-c v m): open a temporary org
+buffer where the headline's metadata sexp is rendered as an editable org tree
+(via sexp-to-org + activeNode default expansion). 'skg-sexp-edit-mode' (minor
+mode). 'skg-sexp-edit--commit' (C-c C-c: strip defaults, org-to-sexp, write back
+to the source buffer region). Read-only title display group
+(add-text-properties read-only). *After-advice on
+'org-insert-heading-respect-content'* → new level-1 headings get a source
+prompt. Empty-node view path. Depends on skg-buffer, skg-config, skg-metadata,
+skg-sexpr-org-bijection, skg-activeNode-defaults, skg-sexpr-cycling, skg-state.
+
+*** skg-sexpr-edit/skg-sexpr-cycling.el
+S-left/S-right value cycling inside the metadata edit buffer, dispatched by
+parent headline name (indef, parentIs, editRequest, source, viewRequests).
+'merge' prompts for a target id. 'skg-sexp-edit-cycle-left'/'-right'.
+
+** Heralds and readable-ids (display transforms)
+
+*** heralds-minor-mode.el
+'heralds-minor-mode' (aliased 'skg-view-heralds-mode', C-c v h): lens each
+headline's '(skg ...)' metadata into a short colored glyph string, displayed via
+a display-property *overlay* covering the metadata text. 'heralds-apply-to-line'
+(find the '(skg' extent with 'skg-find-sexp-end', transform via
+'skg-transform-sexp-flat' + the fetched rule table, build the string, overlay
+it). Incremental refresh on after-change-functions. Overlays tagged 'heralds'
+so orphans (from major-mode switches) can be reaped. Faces
+heralds-{blue,green,red,yellow,orange}-face. Rule table fetched from server;
+self-heals via 'heralds--ensure-rules'. *See sections 5 and 8.*
+
+*** skg-readable-ids.el
+'skg-readable-ids-mode' (C-c v r): in magit and .skg file buffers, shorten each
+UUID to its first 8 chars (a display overlay on the tail) and append the node's
+title (an after-string overlay, face 'skg-magit-title-face'), fetched from the
+server via a FIFO of titles-by-ids requests (generation counter drops stale
+responses). Sets truncate-lines nil (PITFALL mitigation). Auto-enabled on .skg
+files (find-file-hook) and refreshed on magit-post-refresh-hook. Depends on
+skg-id-search, skg-state, skg-length-prefix.
+
+** Config, logging, reload, misc views
+
+*** skg-config.el
+Reads skgconfig.toml (hand-rolled TOML scanning): port, source names/paths,
+owned sources, source-sets. 'skg--completing-read-with-cycle' (the reusable
+completing-read + S-left/S-right cycling + optional C-? helper used by every
+source picker). Path resolution 'skg--abs-path-for-id-and-source' (client-side,
+so git-add needs no server round-trip). 'skg-view-source-list' (org buffer of
+sources).
+
+*** skg-log.el
+Structured JSON-lines logging ('skg-log' level category fmt args),
+backtrace-walk to find the caller, level/category filters, 'skg-log-file'
+toggle.
+
+*** skg-reload.el
+'skg-reload' — unload-feature every skg module and reload from disk (dev
+convenience). Deliberately spares skg-buffer (permanent-local + major mode) and
+skg-keymaps-and-aliases (reloaded by hand). Preserves the session-only herald
+rule table across the unload via unwind-protect.
+
+*** skg-git-add.el
+'skg-git-add-if-new-recursive' (C-c t A) and '-preview' (C-c t a): scan the
+subtree for ActiveNodes with '(unstaged newX)', resolve paths client-side, and
+build an executable elisp progn that 'git ls-files --error-unmatch's then
+'git add's only truly-untracked files. Preview shows it in emacs-lisp-mode +
+skg-readable-ids-mode; the non-preview version evals it. Walks with
+'outline-next-heading' (avoids org's element cache). Depends on skg-config,
+skg-id-search, skg-readable-ids, skg-sexpr-search.
+
+*** skg-request-file-path.el
+The magit-integration commands 'skg-goto-in-magit' / 'skg-goto-in-magit-parent'
+(+ -and-close-this): request the node's on-disk .skg path, open magit-status on
+its repo, find the file's section(s) (unstaged/staged/untracked via
+'magit-get-section'/oref on section objects), navigate to it (or, for the parent
+variant, to the first hunk line containing the child's id), warning on
+ambiguity. *Deeply magit-bound — see section 8.*
+
+*** skg-view-new-empty.el / skg-view-org-ancestry.el
+'skg-view-new-empty' (C-c v e): prompt owned source, open a fresh
+indefinitive-root buffer. 'skg-view-org-ancestry' (C-c v o): open a new buffer
+showing only the outline ancestry of the heading at point (pure org, no server).
+
+*** skg-test-utils.el
+Test load-path setup, 'skg-test-install-herald-rules' (inject the pinned fixture
+tests/elisp/herald-rules.sexp so batch tests need no server),
+'find-skg-content-buffer'.
+
+* 2. Command inventory (by prefix / category)
+
+Keybindings are from skg-content-view-mode-map unless noted. Aliases
+(user-facing names) from skg-keymaps-and-aliases:
+'skg-save'→'skg-request-save-buffer', 'skg-set-definitive'→
+'skg-request-definitive-view', 'skg-fork'→'skg-fork-node',
+'skg-limit-source-set'→'skg-set-active-source-set', 'skg-view-heralds-mode'→
+'heralds-minor-mode', 'skg-view-metadata'→'skg-edit-metadata'.
+
+** Save / delete
+- C-x C-s → skg-request-save-buffer (skg-save) — save the view; server rebuilds it.
+- C-c <backspace> → skg-delete (prefix arg / C-u ⇒ skg-delete-recursive) — mark node (and descendents) for deletion.
+
+** Text search (C-c f, "find") — also bound globally and in diff-analysis mode
+- C-c f RET → skg-search — conservative-default title search.
+- C-c f i → skg-search-interactive — search choosing r/b/t/h option chars.
+- C-c f l → skg-search-make-link — search then insert a link to a pick.
+
+** Goto (C-c g / C-c G; capital-G variants also kill the origin buffer)
+- C-c g RET → skg-goto / C-c G RET → skg-goto-and-close-this — open view of the nearest id.
+- (M-x) skg-goto-bypassOverride — open the node itself, ignoring the override menu.
+- C-c g b → skg-goto-biggest-branch — jump to the biggest sibling/child branch.
+- C-c g i → skg-goto-by-id / C-c G i → skg-goto-by-id-and-close-this — open a literal UUID.
+- C-c g m → skg-goto-in-magit / C-c G m → …-and-close-this — magit view of the node's file.
+- C-c g M → skg-goto-in-magit-parent / C-c G M → …-and-close-this — magit view of the parent's file at this id.
+
+(In magit-mode-map: C-c g RET, C-c G RET, C-c i n, C-c i p. In
+skg-file-minor-mode-map: goto + id-nav + paste/pop. In
+skg-diff-analysis-mode-map: search + goto + view + id-nav + stack.)
+
+** Git operations (C-c t)
+- C-c t a → skg-git-add-if-new-recursive-preview / C-c t A → skg-git-add-if-new-recursive.
+- C-c t r → skg-diff-report — semantic-change report (asks staged/unstaged).
+- C-c t m → skg-stage-moves — bash script staging cross-source node moves.
+
+** Show a collection (C-c c) — both cols of a relation; each auto-saves
+- C-c c a skg-show-collection-aliases · C-c c o skg-show-collection-overrides ·
+  C-c c h skg-show-collection-hides · C-c c s skg-show-collection-subscribes.
+
+** Show a path (C-c p) — backpath through one relation role; each auto-saves
+- C-c p C containers · C-c p L link-sources · C-c p l link-dests ·
+  C-c p O overriders · C-c p o overridden · C-c p H hiders · C-c p h hidden ·
+  C-c p S subscribers · C-c p s subscribees → skg-show-paths-through-*.
+
+** Set node properties (C-c s)
+- C-c s d skg-set-definitive · C-c s i skg-set-indefinitive ·
+  C-c s m skg-set-merge-request · C-c s s skg-set-source ·
+  C-c s S skg-set-source-recursive.
+
+** Other graph modifications (C-c m)
+- C-c m c skg-replace-link-with-content · C-c m f skg-fork-node (skg-fork) ·
+  C-c m l skg-replace-content-with-link.
+
+** View-level (C-c v)
+- C-c v d skg-view-diff-mode · C-c v e skg-view-new-empty ·
+  C-c v h skg-view-heralds-mode · C-c v l skg-limit-source-set ·
+  C-c v m skg-view-metadata · C-c v o skg-view-org-ancestry ·
+  C-c v r skg-readable-ids-mode · C-c v s skg-view-id-stack ·
+  C-c v w skg-view-without-metadata.
+
+** IDs and the linkstack (C-c i / C-c u / C-c o / C-c O)
+- C-c i n skg-id-next · C-c i p skg-id-prev.
+- C-c u skg-id-push.
+- C-c o i skg-paste-id · C-c o l skg-paste-link · C-c o n skg-paste-node (paste, don't pop).
+- C-c O i skg-pop-id · C-c O l skg-pop-link · C-c O n skg-pop-node (pop).
+- (paste/pop id/link also bound in the minibuffer and shell maps.)
+
+** Line motion
+- C-a → skg-beginning-of-line — toggle line-start ↔ title-start.
+
+** No keybinding (M-x only)
+- skg-export-some-to-org, skg-connection-verify, skg-connection-end,
+  skg-rebuild-dbs, skg-close-all-skg-buffers, skg-reload, skg-list-source-sets,
+  skg-active-source-set, skg-view-source-list, skg-goto-bypassOverride,
+  skg-request-single-root-content-view-from-id (interactive).
+
+** Minor/major modes and their maps
+- skg-content-view-mode (major, derived org) → skg-content-view-mode-map (all the above).
+- heralds-minor-mode (lighter " ⟪Y⟫") — toggled by C-c v h; no own keys.
+- skg-readable-ids-mode (" skg-titles") — C-c v r; no own keys.
+- skg-file-minor-mode (" skg") → its map (goto/id-nav/paste-pop).
+- skg-id-stack-mode (" ID-Stack") → its map (C-x C-s → skg--save-id-stack-buffer).
+- skg-sexp-edit-mode (" SExp-Edit") → its map (C-c C-c commit, S-left/right cycle).
+- skg-diff-analysis-mode (" SKG-Analysis") → its map.
+- skg-search-make-link-mode (" skg-link") → own map (C-c C-c finish).
+- fork-confirmation buffer: buffer-local copied map with C-c C-c approve,
+  C-c C-k decline, C-x C-s refuse.
+
+* 3. Emacs-specific facilities used (per feature) — porting notes
+
+- *Overlays with display property* (heralds): the metadata sexp text stays in
+  the buffer but is *replaced visually* by a glyph string. Nvim analog: extmarks
+  with conceal + inline virtual text (virt_text chunks carry per-chunk highlight
+  groups, matching the lens token output).
+- *Overlays with after-string / display on tails* (readable-ids): append a
+  title after a UUID and shorten the UUID. Nvim analog: extmark virt_text +
+  conceal for the tail.
+- *Overlays as edit locks* (lock-buffers): whole-buffer overlay with
+  modification-hooks that signal. No Nvim analog; a port would use the
+  'modifiable' flag + a Lua-side "buffer busy" state. Section 8.
+- *Text properties*: skg-color/skg-abut (lens engine, neutral carriers mapped
+  to faces at render), read-only + rear-nonsticky (edit-buffer title group,
+  fork-confirmation buffer). Nvim: highlight groups; per-range read-only does
+  not exist (needs a guard or commit-time validation).
+- *Faces / defface*: heralds-{blue,green,red,yellow,orange}-face,
+  skg-magit-title-face. Nvim: highlight groups.
+- *org-fold / outline*: invisible-p, org-fold-hide-entry/subtree, org-cycle,
+  org-show-all/org-fold-show-all, outline-next-heading, org-back-to-heading,
+  org-up-heading-safe, org-end-of-subtree, org-outline-level,
+  org-heading-regexp, and org-fold-core-ignore-fragility-checks. Nvim: no
+  org-fold; the port needs its own fold model. The folded/bodyFolded
+  serialization protocol ports; the mechanism does not. Section 6.
+- *Minibuffer prompts*: y-or-n-p (replace-content confirm), yes-or-no-p
+  (save-despite-unsaved, source-set switch, fork approve), read-string (search
+  terms, ids, labels, source, output dir), completing-read via
+  'skg--completing-read-with-cycle' (source pickers with S-left/S-right cycling
+  and C-? helper), minibuffer-with-setup-hook (install id-stack paste/pop keys
+  in the minibuffer). Nvim: vim.ui.input / vim.ui.select / vim.fn.confirm; the
+  cycling-completing-read is a custom picker to re-create.
+- *magit integration*: magit-status-setup-buffer, magit-toplevel,
+  magit-get-section, magit-section-goto/show, magit-section-show-level-2-all,
+  section objects via oref (type/value/children/start/end), magit-mode-map,
+  magit-post-refresh-hook. All of skg-goto-in-magit* and skg-readable-ids. Nvim
+  has no magit; re-target at a git plugin (neogit/diffview) or raw git.
+  Section 8.
+- *Process / network*: make-network-process (persistent TCP, :filter,
+  :sentinel, :coding binary), process-send-string, process-live-p,
+  delete-process, accept-process-output (herald-rules synchronous wait). Nvim:
+  vim.uv TCP socket with an on-read callback = the LP filter, plus a disconnect
+  callback = the sentinel; vim.schedule to touch buffers from callbacks.
+- *Buffer-local variables*: skg-view-uri (permanent-local — survives mode
+  changes; the view registry key), skg--save-lock-overlay, heralds-overlays,
+  skg-readable-ids--{positions,generation}, skg--fork-origin-buffer,
+  skg-sexp-edit--{source-buffer,start,end,is-activeNode},
+  skg--link-from-search-target. Nvim: buffer-scoped Lua tables keyed by bufnr /
+  vim.b.
+- *Hooks*: kill-buffer-hook (skg-send-close-view, fork-confirmation strip),
+  first-change-hook (skg-warn-if-other-buffer-modified — a one-shot re-armed
+  each redraw), after-change-functions (heralds incremental refresh),
+  find-file-hook (auto-enable file/readable-ids modes),
+  magit-post-refresh-hook, after-revert-hook, and the custom
+  skg--search-buffer-setup-hook. Nvim: autocommands (BufWipeout, TextChanged,
+  BufReadPost) + custom pub/sub.
+- *Advice*: org-todo :around (strip/reinsert metadata around TODO cycling),
+  org-insert-heading-respect-content :after (source-prompt new roots). Nvim: no
+  advice; equivalent behavior must be wired into the insert/toggle commands the
+  port owns.
+- *'read' of server payloads*: server sends s-expressions; the client uses the
+  Emacs Lisp reader (read/read-from-string) to parse every response and every
+  metadata block, and prin1-to-string / format "%S" to serialize requests and
+  metadata. *This is the single most Emacs-bound dependency* — a Lua port needs
+  a Lisp-ish s-expression reader/writer. Section 8.
+- *Echo-area messaging*: message everywhere for status; to-minibuffer
+  responses; inhibit-message around logging. Nvim: vim.notify / nvim_echo.
+- *font-lock*: not used directly (heralds/readable-ids use overlays+faces, not
+  font-lock keywords).
+- *Length-prefix framing*: 'Content-Length: N\r\n\r\n' + N UTF-8 bytes, both
+  directions. Reproduce exactly.
+
+* 4. Protocol / state machine
+
+** Connection
+'skg-tcp-connect-to-rust' opens one persistent TCP process to 127.0.0.1:PORT
+(binary coding). :filter = 'skg-handle-rust-response' feeds bytes to the LP
+machine; :sentinel = 'skg--tcp-sentinel' tears down on disconnect (unlock all
+buffers, clear handler map, reset pending count). A '((busy-initializing ...))'
+prefix short-circuits the filter (server still starting).
+
+** Framing + dispatch (skg-length-prefix.el + skg-state.el)
+Inbound: append chunk to 'skg-lp--buf'; 'skg-lp-step' alternates header-parse
+('skg-lp-try-parse-header', finds \r\n\r\n, reads Content-Length) and
+body-consume ('skg-lp-try-consume-body', decode N bytes as UTF-8). On a
+complete body, 'skg-lp--dispatch-by-type' reads the sexp, pulls
+'(response-type SYM)', and calls the registered handler; one-shot handlers are
+removed after firing and 'skg-lp--pending-count' decremented. Multiple messages
+can arrive in one chunk (the loop continues while buffer remains non-empty).
+Handlers are registered by 'skg-register-response-handler' into
+'skg-response-handler-map' (keyed by response-type, *not* by request —
+documented PITFALL: two same-type requests in flight collide). Outbound
+length-prefixing is done inline where messages are sent (request line, then
+Content-Length header, then body).
+
+** The save stream (three-or-four messages)
+Request "save buffer" carries: view-uri, and point position
+(point-lines-below-focused-headline, point-column,
+point-screen-lines-below-window-start), plus optional fork-approved /
+fork-sources. Server replies with a stream:
+1. save-lock (one-shot) — early broad lock; 'skg--save-lock-handler' unlocks
+   buffers not in the collateral URI list.
+2. save-relax-lock (non-one-shot) — the exact post-SavePlan collateral set;
+   narrows the lock further. Registered non-one-shot so an *invalid* save
+   (which errors before this is emitted) does not leak the pending count.
+   (NOTE: absent from api-and-formats.md; reported in TODO/problems.org.)
+3. collateral-view (non-one-shot, one per rerendered buffer) —
+   'skg--collateral-view-handler' / 'skg--apply-streamed-view-update' unlock +
+   replace that buffer by view-uri.
+4. save-result (one-shot, terminal) — 'skg--save-result-handler' removes the
+   streaming handlers (collateral-view, save-relax-lock, fork-confirmation),
+   ends the stream, unlocks all, and applies the saved buffer's final content.
+Alternative terminal: fork-confirmation (non-one-shot) — the save edited a
+foreign node and wasn't pre-approved; *nothing was committed*; show the
+editable confirmation buffer and ask to approve (re-save with fork-approved) or
+decline. The two terminals each remove the other; the fork handler also
+decrements the never-fired save-result one-shot's pending count so the count
+balances.
+
+Buffer locking: all skg buffers are locked *before send* (eliminating the race
+window); the keep-locked set shrinks as save-lock / save-relax-lock /
+collateral-view arrive; the saved buffer stays locked until save-result. The
+single-flight guard 'skg--begin-stream'/'skg--end-stream' blocks a second
+concurrent stream.
+
+Point restoration: markers 'focused' (added outbound, its heading located after
+redraw) + 'folded'/'bodyFolded' (fold state) round-trip in metadata;
+'skg--restore-save-point-position' then re-places point relative to the focused
+headline (line offset clamped to the entry, column clamped to line end) and
+recenters the window row.
+
+** The rerender stream (diff-mode toggle, source-set switch, rerender-all)
+rerender-lock (one-shot, unlock non-listed) → rerender-view (non-one-shot, one
+per view, 'skg--apply-streamed-view-update') → rerender-done (one-shot
+terminal: remove rerender-view handler, end stream, unlock, show
+errors/warnings). Shared via 'skg--register-rerender-stream-handlers'. The
+diff-mode toggle prepends a git-diff-mode ack; the source-set switch prepends
+an active-source-set ack.
+
+** The search stream (three messages)
+search-results (one-shot, immediate render) → request-snapshot (non-one-shot;
+server asks for the search buffer's current text → client freezes it read-only
+and sends back a length-prefixed snapshot so ancestry enrichment doesn't lose
+edits) → search-enrichment (one-shot; replace the buffer with enriched results,
+restore point, drop read-only).
+
+** Single-message request/response
+content-view (content-view or switch-to-view), titles-by-ids (FIFO-queued,
+generation-guarded), get-file-path, herald-rules, verify-connection,
+rebuild-dbs, source-sets / active-source-set, diff-analysis, stage-moves,
+export-to-org, close-view (fire-and-forget on buffer kill).
+
+** View-uri registry + point restoration
+'skg-view-uri' (permanent-local per buffer) is the routing key: every streamed
+update finds its buffer via 'skg-find-buffer-by-uri'. The server may override
+the client-generated uri (override-choice menus register under
+"override-menu:PID"). A nil view-uri is a hard guard against unfiltered /
+ineffective saves.
+
+* 5. Heralds (the metadata→glyph display transform)
+
+Two layers:
+- *Generic engine* skg-lens.el ('skg-transform-sexp-flat'): interprets a *rule
+  table* against a metadata sexp, producing a list of propertized *token*
+  strings. Rules support: label-ancestry matching, color directives →
+  'skg-color' text property, ANY/IT (path exists / capture the values found),
+  ABUT → 'skg-abut' property (glue token to predecessor with no separator),
+  INTERC (slot-based interpolation into one composite token). Pure and general.
+- *Herald application* heralds-minor-mode.el: the rule table lives *only in
+  Rust* (server/heralds.rs), fetched at connect ('skg-request-herald-rules')
+  and cached in 'heralds--transform-rules' (self-healing if missing).
+  'heralds-from-metadata' runs the engine; 'heralds--tokens->text' joins tokens
+  (space, or none if skg-abut), strips "structural" colons, and converts
+  skg-color ranges → faces ('heralds--color-to-face' → the five heralds-*
+  faces).
+
+*Display / concealment mechanism*: for each line, 'heralds-apply-to-line' finds
+the '(skg' extent (via 'skg-find-sexp-end') and creates an *overlay with the
+display property* set to the herald string — so the full metadata text remains
+in the buffer (and round-trips to the server verbatim) but is *shown* as the
+short colored heralds. evaporate + a heralds tag let overlays be reaped (orphan
+guard for major-mode switches). Incremental refresh via after-change-functions
+('heralds-after-change' re-lenses only touched lines).
+
+*Round-trip*: edits never touch the concealed metadata directly — the user
+edits the *title* (after the metadata) or uses metadata commands that rewrite
+the whole line through 'skg-replace-current-line'; on save the *buffer text*
+(full metadata, not the herald overlay) is sent. Display-only herald fields the
+server injects (birthHerald, rels, sourceHerald) are stripped before save by
+'skg-strip-heralds-from-sexp' and regenerated by Rust on every render.
+
+*Port note*: Nvim extmarks give conceal + inline virtual text; per-character
+colored ranges within one virtual chunk map to virt_text chunk lists. The rule
+engine itself ports cleanly to Lua (it is pure), but the *table must still be
+fetched from the server* (single source of truth) — don't vendor a copy.
+
+* 6. Folding / visibility
+
+Org folding features used (skg-org-fold.el, and scattered org-fold-show-all in
+the save/edit paths):
+- Detection: '(invisible-p (point))' for "hidden inside a folded ancestor",
+  plus 'skg-headline-body-hidden-p' (first body line invisible while the next
+  heading is visible) for "entry folded but heading visible".
+- Serialization: hidden headlines get a bare 'folded' metadata marker;
+  body-folded headlines get 'bodyFolded'. These ride through the save/rerender
+  round-trip.
+- Restoration: 'skg-fold-marked-headlines' unfolds all, hides bodyFolded
+  entries ('org-fold-hide-entry'), then iteratively folds parents of 'folded'
+  headlines with org-cycle / org-fold-hide-subtree (looping because folding one
+  parent hides more markers).
+- org-fold-show-all / org-show-all is called before any metadata edit (so
+  delete-region never touches a fold boundary — the PITFALL) and after every
+  redraw before re-applying folds.
+- 'skg-view-org-ancestry' uses plain outline (outline-up-heading,
+  org-current-level, org-get-heading) with no server round-trip.
+
+Port implication: none of org-fold exists in Nvim. The port must (a) choose its
+own fold model (Nvim folds / tree-sitter), (b) keep the folded/bodyFolded
+metadata-marker *protocol* (the server round-trips them regardless of client),
+and (c) drop the entire org-fold-core-ignore-fragility-checks machinery — it
+exists solely to work around org-fold's reveal-on-touch heuristic.
+
+* 7. Tests (to mirror coverage)
+
+** Unit tests — tests/elisp/
+- test-heralds-minor-mode.el — toggle, viewrequests/scaffold/diff/inactive-node
+  display, survive major-mode switch, self-heal + bounded retry of missing rule
+  table.
+- test-skg-lens.el — the transform engine: flat/nested/ANY/IT rules,
+  ordering-independence, complex rules.
+- test-sexp-org-bijection.el — sexp↔org round-trips and all validation
+  rejections (atom-headed, paren-terse, single-root, level-jump, empty).
+- test-skg-activeNode-defaults.el — expand/strip defaults, canonical ordering,
+  editRequest merge/delete, source-default handling, display-title, round-trips.
+- test-skg-compare-sexpr.el — skg-sexp-subtree-p matrix.
+- test-skg-edit-nested-sexp.el — DELETE/REPLACE/ENSURE/merge, nil/empty/
+  mismatched targets.
+- test-skg-metadata.el — parse/reconstruct, set-indefinitive, strip-metadata,
+  view-without-metadata, set-source (+ herald update, recursive parentIs
+  pruning), merge-request (bare id / link), minibuffer id-stack bindings,
+  replace-content↔link (all guard paths), collection/path keybindings.
+- test-skg-metadata-editing.el — delete kv-pair / bare value.
+- test-skg-org-fold.el — fold round-trip, remove-folded-markers.
+- test-skg-save-response-folded-root.el — save-response point/column/line
+  restoration and clamping, folded-root preservation, no-focus case,
+  warning/error channels.
+- test-skg-id-search.el — id-next/prev, id-push (headline + inline link), stack
+  validate/replace/format, paste/pop-node, view-id-stack, save-id-stack.
+- test-skg-search-make-link.el — link-label reduction, finish at
+  link/headline/no-target.
+- test-skg-sexpr-search.el — first/at-point sexp reading, multiline errors,
+  herald-stripping (no fabrication, pass-through non-skg).
+- test-skg-length-prefix.el — binary chunk with non-ASCII payload dispatch.
+- test-skg-client.el — connect-failure message points to startup logs.
+- test-skg-close-all.el / test-skg-reload.el — reload preserves
+  mode/view-uri/keymaps/herald-rules (incl. on load error), close-all spares
+  real .skg org buffers.
+- test-skg-view-uri-persistence.el — permanent-local view-uri survives mode
+  changes/erase/revert/rename; goes stale correctly.
+- test-skg-readable-ids.el — stale-response dropping (generation), shorten
+  inactive ids without title overlay.
+- test-skg-git-add.el — preview collects only unstaged-new files, runs from
+  body, does not touch git, print-length safety.
+- test-skg-diff-analysis.el — staged/unstaged prompt wiring, analysis-mode
+  keymap, warnings display.
+- test-skg-fork-confirmation.el — save-request fork-approved/fork-sources
+  fields, two-level source walk (+ no leak), editable/navigable buffer,
+  shared-map non-mutation, approve-with-gone-origin error.
+- test-skg-override-bypass.el — single-root request default menu vs bypass
+  field, magit bypass detection.
+- test-skg-warning-channel.el — content-view/rerender-done error/warning
+  surfacing.
+- test-skg-insert-heading*.el — source prompt on new heading, single-source
+  no-prompt, cycling wrap, empty-node view/commit paths, config readers with
+  interleaved tables.
+- test-skg-biggest-branch.el — largest sibling vs children fallback.
+
+** Integration tests — tests/integration/*/test-emacs.el (drive a live server)
+Save/collateral: content-view-and-save, empty-content-save,
+valid_and_invalid_saves, save-body-with-tabs, root-folded-save,
+save_lock_lifecycle, save_collateral_break_cycle,
+save_collateral_add_content_and_modify_text,
+save_collateral_delete_then_edit_under_it. Folding: fold-preservation,
+body-fold-preservation, focus-and-folded-markers. Views/paths/collections:
+aliases-view-request, containerward-view-request, containerward-on-phantom,
+sourceward-view-request, content-view-from-non-root. Search:
+search-enrichment, search-escape-chars, search-for-title-and-visit-link,
+search-make-link, visit-link. Fork/override: fork, fork-owned, fork-source,
+fork-chain, override-menu. Git/magit: view-magit, view-magit-phantom,
+view-magit-phantom-deleted-file, git-diff-view-updates, source-cycling. Misc:
+verify-connection, herald-rules. Shared helper tests/integration/test-wait.el.
+
+* 8. Deeply Emacs-bound features (hard to port) — flagged
+
+1. *S-expression payloads parsed with the Emacs Lisp reader.* Every server
+   response and every headline's '(skg ...)' metadata is parsed with 'read' and
+   re-serialized with prin1 / %S. Lua has no Lisp reader. Either write a robust
+   Lisp-sexp reader/printer in Lua (must tolerate the herald characters '{',
+   '⌂:', '→' and metadata atoms) or negotiate a different wire format with the
+   server. The single biggest port component.
+2. *Herald display via display-property overlays.* In-place visual replacement
+   of a buffer range with a shorter, per-character-colored string. Nvim
+   extmarks (conceal + inline virtual text) approximate but do not exactly
+   reproduce this; layout and cursor interaction will differ.
+   (heralds-minor-mode.el, skg-readable-ids.el.)
+3. *org-fold and the fragility-check workaround.* The entire folded/bodyFolded
+   detect/serialize/restore machinery and org-fold-core-ignore-fragility-checks
+   are org-mode internals. The wire *protocol* (markers) ports; the mechanism
+   does not. (skg-org-fold.el, PITFALLs.org.)
+4. *Buffer-lock overlays with modification-hooks.* No Nvim equivalent for "make
+   a range refuse edits with a custom error while a save streams." A port needs
+   a different mechanism ('modifiable' off + Lua guard). (skg-lock-buffers.el.)
+5. *magit integration.* skg-goto-in-magit* and readable-ids reach into magit's
+   section object model (oref, magit-get-section, hunk start/end, refresh
+   hook). Nvim has no magit; these commands must be re-targeted at a different
+   git UI or reimplemented against raw git. (skg-request-file-path.el,
+   skg-readable-ids.el.)
+6. *Advice on org-todo and org-insert-heading-respect-content.* Behavior
+   injected by advising org functions; a port must instead own its
+   heading-insert and todo-cycle commands. (skg-metadata.el, skg-sexpr-edit.el.)
+7. *permanent-local buffer variables* (skg-view-uri surviving major-mode
+   changes) — the registry relies on this Emacs-specific persistence semantics;
+   a Lua port keeps its own bufnr→view-uri table instead.
+8. *completion-predicate command hiding* and *M-x aliasing* (skg-alias) — a
+   cosmetic Emacs-command-discovery feature with no Nvim analog; the port just
+   exposes the public command names it wants.
+9. *completing-read + S-left/S-right cycling + C-? helper* selector
+   (skg-config.el) — must be rebuilt as a custom picker.
+10. *Synchronous accept-process-output wait* in 'skg-herald-rules-ensure' — a
+    blocking pump of the event loop; Nvim/libuv would model this as vim.wait
+    with a condition, or an async continuation.
+
+Note: the pure logic layers — the edit DSL (skg-sexpr-dsl-for-edits.el), the
+subtree comparator (skg-compare-sexpr.el), the lens engine (skg-lens.el), the
+sexp↔org bijection, the activeNode defaults, the LP framing math, the
+config/TOML readers, and all path/id/regex helpers — port to Lua
+straightforwardly and should be migrated first (they are already covered by the
+tests/elisp unit suite, which the port can mirror).
