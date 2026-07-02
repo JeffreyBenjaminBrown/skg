@@ -4,6 +4,14 @@
 # Newest entries go at the top of each section.
 
 * what's done and went well
+- 2026-07-02: The pure logic tier is ported with mirrored tests, all
+  green: sexpr/parse (the read/prin1 stand-in; round-trips the pinned
+  herald-rules fixture and prints byte-identically to Emacs prin1 on
+  wire shapes), sexpr/compare, sexpr/edit_dsl, sexpr/lens (tokens are
+  chunk lists, the shape nvim virtual text wants), sexpr/org_bijection,
+  sexpr/activenode_defaults, config (TOML scan). ~140 specs.
+- 2026-07-02: Scaffolding: nvim/ plugin layout, log, reload,
+  plenary.busted harness, bash/nvim-tests.sh.
 - 2026-07-02: Plan settled (all nine questions answered; decisions
   folded into plan.org's "Settled decisions"). Execution begun on the
   'nvim' branch.

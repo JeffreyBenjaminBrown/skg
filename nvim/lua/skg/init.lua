@@ -35,6 +35,7 @@ function M.init (config_toml_path)
   if vim.fn.filereadable(absolute) == 0 then
     error('skg: no readable config at ' .. absolute) end
   M.config_path = absolute
+  require('skg.config').config_file_path = absolute
 end
 
 return M
