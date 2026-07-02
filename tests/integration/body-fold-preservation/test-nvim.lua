@@ -53,6 +53,13 @@ end
 ---@return string
 local function bfp_snapshot (buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  if lines[#lines] == '' then
+    -- The trailing empty line (the server content's final newline) is
+    -- not org content; whether vim counts it inside the preceding
+    -- fold varies with fold recomputation timing, so it is excluded
+    -- from the snapshot.
+    table.remove(lines)
+  end
   local acc = {}
   for line_number, line in ipairs(lines) do
     local vis = folds.line_invisible_p(line_number) and '[H]' or '[V]'
@@ -72,8 +79,15 @@ local function bfp_build_buffer (name)
     'root body line one',
     'root body line two',
     '** (skg (node (source main))) child',
-    'child body line',
-  }, '\n')
+    -- Two body lines: vim cannot close a SINGLE-line fold (the
+    -- documented one-line-body deviation in skg/folds.lua), so a
+    -- one-line child body could never reach scenario B's folded
+    -- BEFORE state in this client.
+    'child body line one',
+    'child body line two',
+  }, '\n') .. '\n'
+  -- The trailing newline matches the server's rendering convention,
+  -- so the redraw does not change the line count under the snapshot.
   return buffer.open_org_buffer_from_text(content, 'skg://bfp-' .. name)
 end
 
@@ -129,7 +143,8 @@ local diff_a = bfp_run_scenario(
   .. '[H] root body line one\n'
   .. '[H] root body line two\n'
   .. '[H] ** child\n'
-  .. '[H] child body line\n',
+  .. '[H] child body line one\n'
+  .. '[H] child body line two\n',
   function () folds.close_fold_at(1) end)
 
 local diff_b = bfp_run_scenario(
@@ -138,7 +153,11 @@ local diff_b = bfp_run_scenario(
   .. '[V] root body line one\n'
   .. '[V] root body line two\n'
   .. '[V] ** child\n'
-  .. '[H] child body line\n',
+  -- A closed vim fold DISPLAYS its first line as the fold
+  -- placeholder (the documented deviation from org, which hid the
+  -- whole entry), so the body's first line reads visible here.
+  .. '[V] child body line one\n'
+  .. '[H] child body line two\n',
   function () folds.hide_entry(4) end)
 
 local diffs = {}
