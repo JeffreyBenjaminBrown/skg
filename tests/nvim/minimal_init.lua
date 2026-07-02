@@ -10,6 +10,9 @@ vim.opt.runtimepath:prepend(repo_root .. '/nvim')
 -- The harness starts children with --noplugin; force the packpath
 -- plugins (plenary, orgmode, neogit, ...) onto the runtimepath anyway.
 vim.cmd('packloadall!')
+-- Many spec processes run concurrently; swap files only cause
+-- spurious E303s for their throwaway buffers.
+vim.o.swapfile = false
 
 ---Where the repo lives, for specs that need fixtures.
 ---@return string

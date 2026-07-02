@@ -46,7 +46,14 @@
 (none yet)
 
 * what's imperfect about what's done
-(none yet)
+- Fold deviations, unavoidable in vim's fold model (documented in
+  nvim/lua/skg/folds.lua and destined for deviations.org): a closed
+  fold shows a one-line placeholder where org hid text entirely; a
+  ONE-LINE body cannot be body-folded (vim cannot close a single-line
+  fold), so bodyFolded on such a body degrades gracefully -- the body
+  stays visible and the marker is not re-recorded on save.
+- The picker drops the elisp prompt's C-? show-all-sources helper key
+  (few terminals deliver C-?); :SkgViewSourceList provides the list.
 
 * choices determining the future
 - Test-parity depth is FULL (Q6 option A), not the recommended B: every

@@ -167,8 +167,21 @@ function M.configure_view_buffer (buf, uri)
   heralds.enable(buf)
   require('skg.keymaps').attach_content_view(buf)
   M.arm_first_change_warning(buf)
+  do -- The skg fold model, on every window that shows this buffer.
+    local folds = require('skg.folds')
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      if vim.api.nvim_win_get_buf(win) == buf then
+        folds.set_up_window(win) end
+    end
+  end
   if not vim.b[buf].skg_lifecycle_autocmds then
     vim.b[buf].skg_lifecycle_autocmds = true
+    vim.api.nvim_create_autocmd('BufWinEnter', {
+      buffer = buf,
+      callback = function ()
+        require('skg.folds').set_up_window(
+          vim.api.nvim_get_current_win())
+      end })
     vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
       buffer = buf,
       callback = function () M.send_close_view(buf) end })

@@ -297,6 +297,23 @@ function M.attach_content_view (buf)
   vim.keymap.set('n', '^', function () M.invoke('BeginningOfLine') end,
                  { buffer = buf,
                    desc = M.commands.BeginningOfLine.desc })
+  vim.keymap.set('n', '<Tab>', 'za',
+                 { buffer = buf, desc = 'Toggle the fold at point' })
+  vim.keymap.set('n', '<S-Tab>', function ()
+    -- Global visibility toggle: all closed <-> all open.
+    if vim.wo.foldlevel > 0 then
+      vim.wo.foldlevel = 0
+    else
+      vim.wo.foldlevel = 99 end
+  end, { buffer = buf, desc = 'Toggle global fold visibility' })
+  vim.keymap.set('n', 'cit', function ()
+    require('skg.metadata').todo_cycle(1)
+  end, { buffer = buf,
+         desc = 'Cycle TODO keyword (metadata-safe)' })
+  vim.keymap.set('n', 'ciT', function ()
+    require('skg.metadata').todo_cycle(-1)
+  end, { buffer = buf,
+         desc = 'Cycle TODO keyword backward (metadata-safe)' })
 end
 
 ---Attach the .skg-file subset to BUF.
