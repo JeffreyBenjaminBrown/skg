@@ -37,6 +37,22 @@ end, {
 -- command, lazily resolved) lives in lua/skg/keymaps.lua.
 require('skg.keymaps').define_ex_commands()
 
+-- Linkstack paste/pop inside command-line prompts, the analog of the
+-- elisp minibuffer bindings (C-c chords are not available in the
+-- cmdline; <C-x> chords are free there).
+vim.keymap.set('c', '<C-x>i', function ()
+  require('skg.linkstack').paste_id() end,
+  { desc = 'skg: paste the top-of-stack id' })
+vim.keymap.set('c', '<C-x>l', function ()
+  require('skg.linkstack').paste_link() end,
+  { desc = 'skg: paste a link to the top-of-stack node' })
+vim.keymap.set('c', '<C-x>I', function ()
+  require('skg.linkstack').pop_id() end,
+  { desc = 'skg: pop the top-of-stack id' })
+vim.keymap.set('c', '<C-x>L', function ()
+  require('skg.linkstack').pop_link() end,
+  { desc = 'skg: pop a link to the top-of-stack node' })
+
 -- .skg files get the goto/id-navigation/linkstack subset (the analog
 -- of skg-file-minor-mode, auto-enabled by find-file-hook).
 vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile' }, {
