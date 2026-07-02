@@ -25,9 +25,9 @@ end
 ---@type string|nil
 M.config_path = nil
 
----Initialize the client against a server config.
----The analog of 'skg-client-init': remember the config, then (as the
----networking tier lands) connect, verify, and fetch herald rules.
+---Initialize the client against a server config: remember the
+---config, connect, verify, and fetch the herald rule table.
+---The analog of 'skg-client-init'.
 ---@param config_toml_path string path to a skgconfig.toml
 function M.init (config_toml_path)
   M.check_nvim_version()
@@ -35,7 +35,13 @@ function M.init (config_toml_path)
   if vim.fn.filereadable(absolute) == 0 then
     error('skg: no readable config at ' .. absolute) end
   M.config_path = absolute
-  require('skg.config').config_file_path = absolute
+  local config = require('skg.config')
+  config.config_file_path = absolute
+  local client = require('skg.client')
+  client.port = config.port_from_toml(absolute)
+  client.connect()
+  require('skg.misc_requests').connection_verify()
+  require('skg.herald_rules').request_herald_rules()
 end
 
 return M

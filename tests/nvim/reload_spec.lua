@@ -22,11 +22,37 @@ describe('skg.reload', function ()
   end)
 
   it('reports no herald rules when none are loaded', function ()
+    package.loaded['skg.herald_rules'] = nil
     assert.is_nil(reload.herald_rules_if_loaded())
   end)
 
-  -- Herald-rule preservation across reload (including across a FAILED
-  -- reload, the unwind-protect case of test-skg-reload.el) is asserted
-  -- in herald_rules_spec.lua once skg.herald_rules lands, where the
-  -- rule table and its installer actually exist.
+  it('preserves the herald rule table across a reload', function ()
+    -- Mirrors test-skg-reload.el's herald-table preservation.
+    local herald_rules = require('skg.herald_rules')
+    local rules = require('skg.sexpr.parse').read(
+      '(skg (focused) (node (id)))')
+    herald_rules.install_rules(rules)
+    reload.reload()
+    local reloaded = require('skg.herald_rules')
+    assert.are.equal(rules, reloaded.get_rules())
+  end)
+
+  it('preserves the herald rule table even when the reload fails',
+     function ()
+    -- The unwind-protect case: a load error must not cost the session
+    -- its only copy of the table.
+    local herald_rules = require('skg.herald_rules')
+    local rules = require('skg.sexpr.parse').read('(skg (folded))')
+    herald_rules.install_rules(rules)
+    local real_require = _G.require
+    _G.require = function (name)
+      if name == 'skg' then error('simulated load error') end
+      return real_require(name)
+    end
+    local ok = pcall(reload.reload)
+    _G.require = real_require
+    assert.is_false(ok) -- the reload error still propagates
+    local reloaded = require('skg.herald_rules')
+    assert.are.equal(rules, reloaded.get_rules())
+  end)
 end)

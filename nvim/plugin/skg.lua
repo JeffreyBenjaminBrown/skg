@@ -20,3 +20,15 @@ vim.api.nvim_create_user_command('SkgReload', function ()
 end, {
   desc = 'Reload all skg Lua modules from disk (dev convenience)',
 })
+
+vim.api.nvim_create_user_command('SkgConnectionVerify', function ()
+  require('skg.misc_requests').connection_verify()
+end, {
+  desc = 'Ping the skg server and echo its reply',
+})
+
+vim.api.nvim_create_user_command('SkgConnectionEnd', function ()
+  require('skg.client').connection_end()
+end, {
+  desc = 'Close the TCP connection to the skg server',
+})
