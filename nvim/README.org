@@ -1,0 +1,49 @@
+* The skg Neovim client
+This directory is a standard Neovim plugin implementing a full skg
+client -- the Neovim counterpart of ../elisp/. It speaks the same TCP
+protocol to the same Rust server (see ../api-and-formats.md); the two
+clients are interchangeable.
+
+Requires Neovim 0.11+ (developed against 0.12). The docker image
+described in ../coding-advice/docker.org bakes in everything it uses:
+nvim-orgmode (org highlighting for view buffers), neogit (+ plenary)
+for the git-status jumps, and plenary's busted harness for the tests.
+
+* Setup
+Add this directory to the runtimepath and initialize against a
+skgconfig.toml (the analog of docs/setup.org's elisp snippet):
+
+#+begin_src lua
+  vim.opt.runtimepath:append('/path/to/skg/nvim')
+  -- after startup, or in init.lua:
+  require('skg').init('/path/to/skg/data/skgconfig.toml')
+#+end_src
+
+or interactively:
+
+: :set rtp+=/path/to/skg/nvim
+: :SkgInit /path/to/skg/data/skgconfig.toml
+
+The server must be running (../bash/start-servers.sh). Init connects,
+verifies the connection, and fetches the herald rule table.
+
+* Usage
+See [[../docs/COMMANDS-nvim.org][docs/COMMANDS-nvim.org]] -- the command list, mirroring
+docs/COMMANDS.org with this client's keybindings. In brief: ':w'
+saves a view; '<localleader>' plus the same mnemonic letters as the
+Emacs client's 'C-c' chords runs everything else; every command is
+also an ':Skg*' Ex command.
+
+* Where things live
+- lua/skg/ -- the modules; the map from elisp file to Lua module is
+  the table in ../TODO/vim-client/plan.org.
+- plugin/skg.lua -- the Ex-command surface and autocmds.
+- ../tests/nvim/ -- unit tests (plenary.busted; run
+  ../bash/nvim-tests.sh).
+- ../tests/integration/*/test-nvim.lua -- integration tests, one per
+  directory beside each test-emacs.el, dispatched by
+  SKG_TEST_CLIENT=nvim ./run-test.sh.
+
+* Deviations from the Emacs client
+Every intentional behavioral difference is cataloged in
+[[../TODO/vim-client/deviations.org][TODO/vim-client/deviations.org]].
