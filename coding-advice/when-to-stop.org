@@ -1,0 +1,32 @@
+I won't review until the plan is executed.
+Please continue, and only stop to report if things go sideways:
+- reasons to stop
+  - architectural decisions we didn't anticipate
+  - stumper mysteries
+
+A stumper mystery presents as at least one goal from the plan
+that you don't see how to do, or not without doing something ugly.
+
+Note that the reasons to stop do not include deviations from the plan on
+*how* to achieve the plan's goals.
+Those deviations should be recorded, in progress.org
+(leave the original plan as is)
+but -- because I trust you -- do not constitute reason to stop.
+
+When you do stop, report what's new in progress.org,
+divided into these categories:
+- 'what's done and went well',
+- "Changes to the plan's envisioned order."
+- 'what's imperfect about what's done,"
+  Don't include things just because they are missing now but part of the plan.
+- "choices determining the future"
+
+If you have no questions for me, do not stop. Keep your report in progress.org,
+but then return to executing more of the plan.
+
+Even if you do have questions for me,
+after writing them, you might decide that they are trivial.
+Do not stop in that case, either.
+If you are uncertain of the answer to a question,
+but the choice would not be hard to reverse later,
+then just go with what seems best to you.

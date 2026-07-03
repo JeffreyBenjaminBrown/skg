@@ -1,0 +1,432 @@
+#+TITLE: Plan: a Neovim client for skg
+# Written 2026-07-02 by Claude. Companion documents:
+# - ./emacs-client-inventory.org  (complete inventory of the Emacs client,
+#   compiled for this plan; the definitive list of what must be ported)
+# - ../../vim-client-flavor.org   (the earlier advisory on which vim flavor)
+# Discussion protocol: answer the "Open questions" section at the bottom
+# (it is self-contained; you can read it first). Mark your responses TODO.
+
+* Goal
+Write a second skg client, for vim, that does everything the Emacs client
+does, to the extent possible; where not possible, a final report describes
+every necessary deviation. Zero server changes are anticipated (one open
+question below confirms this constraint).
+
+The Emacs client is ~7,850 lines of elisp across ~40 files, plus 31 unit
+test files and ~35 integration test directories. The port is a full
+rewrite of the client tier against the same wire protocol.
+
+* What the client actually is (summary; details in the inventory)
+A view buffer's text comes entirely from the server and returns entirely
+to the server; no file backs it. The client's five real jobs:
+1. A persistent TCP connection with length-prefixed
+   ('Content-Length: N\r\n\r\n' + N bytes) s-expression messages, and a
+   response-type → handler dispatch registry that supports multi-message
+   streams (save-lock → save-relax-lock → collateral-view* → save-result;
+   rerender-lock → rerender-view* → rerender-done; search-results →
+   request-snapshot → search-enrichment).
+2. Org-style display of server text: outline folding, TODO cycling, and
+   the herald transform (conceal each headline's '(skg ...)' metadata,
+   render short colored glyphs in its place, driven by a rule table
+   fetched from the server).
+3. Metadata surgery: parse a headline into (stars, metadata sexp, title),
+   apply declarative edits (the DELETE/REPLACE/ENSURE merge DSL), write
+   the line back. All ~30 graph commands reduce to this plus auto-save.
+4. Round-trip state preservation: 'focused', 'folded', 'bodyFolded'
+   markers added before save, acted on and stripped after redraw; point
+   and scroll restoration from server-echoed offsets; buffer locking
+   while a save/rerender stream is in flight.
+5. Odds and ends: text search UI, the linkstack, git helpers (git-add
+   script generation, goto-in-magit, readable-ids annotations), the
+   metadata edit buffer (sexp ↔ org bijection), config/TOML reading,
+   source pickers, logging, reload.
+
+* Confirmed groundwork (verified in this container, 2026-07-02)
+- nvim 0.12.3 with the baked-in plugins from docker.nix: nvim-orgmode
+  (whose org tree-sitter parser loads and parses a scratch buffer),
+  neogit + plenary + diffview.
+- Extmarks with conceal + inline virt_text work — the herald mechanism.
+  virt_text chunk lists carry per-chunk highlight groups, which matches
+  the lens engine's colored-token output exactly.
+- 'vim.uv' TCP handles are available (networking).
+- 'plenary.busted' and 'plenary.test_harness' load — the Lua unit-test
+  harness, already in the image as neogit's dependency.
+
+* Architecture
+** Layout (pending Q7)
+A top-level 'nvim/' directory, sibling of 'elisp/', in standard plugin
+shape so 'set rtp+=<repo>/nvim' is all a user needs:
+- nvim/lua/skg/*.lua — the modules (map below)
+- nvim/plugin/skg.lua — Ex command definitions (:Skg*), autocmds for
+  .skg files, filetype wiring
+- nvim/README.org — setup (the analog of the elisp snippet in
+  docs/setup.org: rtp line + require('skg').init("path/to/skgconfig.toml"))
+Entry point mirrors 'skg-client-init': read port from skgconfig.toml,
+connect, verify, fetch herald rules.
+
+** Module map (elisp → lua)
+| elisp                               | nvim/lua/skg/            |
+|-------------------------------------+--------------------------|
+| skg-state.el                        | state.lua                |
+| skg-length-prefix.el                | length_prefix.lua        |
+| skg-client.el                       | client.lua               |
+| (elisp built-in 'read' / 'prin1')   | sexpr/parse.lua (NEW)    |
+| skg-sexpr/skg-sexpr-search.el       | sexpr/search.lua         |
+| skg-sexpr/skg-sexpr-dsl-for-edits   | sexpr/edit_dsl.lua       |
+| skg-sexpr/skg-compare-sexpr.el      | sexpr/compare.lua        |
+| skg-sexpr/skg-lens.el               | sexpr/lens.lua           |
+| skg-sexpr/skg-sexpr-org-bijection   | sexpr/org_bijection.lua  |
+| skg-sexpr/skg-activeNode-defaults   | sexpr/activenode_defaults.lua |
+| skg-config.el                       | config.lua               |
+| skg-log.el                          | log.lua                  |
+| skg-buffer.el                       | buffer.lua               |
+| skg-metadata.el                     | metadata.lua             |
+| skg-focus.el                        | focus.lua                |
+| skg-org-fold.el                     | folds.lua                |
+| heralds-minor-mode.el               | heralds.lua              |
+| skg-request-herald-rules.el         | herald_rules.lua         |
+| skg-request-save.el + lock-buffers  | save.lua + lock.lua      |
+| skg-request-rerender-all-views.el   | rerender.lua             |
+| skg-request-single-root-content-view| content_view.lua         |
+| skg-request-text-search.el          | search.lua               |
+| skg-search-make-link.el             | search_make_link.lua     |
+| skg-id-search.el                    | id_search.lua + linkstack.lua |
+| skg-modify-graph.el                 | modify_graph.lua         |
+| skg-request-views.el                | view_requests.lua        |
+| skg-request-git-diff-mode.el        | diff_mode.lua            |
+| skg-request-source-sets.el          | source_sets.lua          |
+| skg-request-diff-analysis.el        | diff_analysis.lua        |
+| skg-request-stage-moves.el          | stage_moves.lua          |
+| skg-request-export-org.el           | export.lua               |
+| skg-request-rebuild-dbs / -verify   | misc_requests.lua        |
+| skg-request-file-path.el            | goto_git.lua             |
+| skg-readable-ids.el                 | readable_ids.lua         |
+| skg-git-add.el                      | git_add.lua              |
+| skg-view-new-empty.el               | view_new_empty.lua       |
+| skg-view-org-ancestry.el            | org_ancestry.lua         |
+| skg-sexpr-edit.el + cycling         | metadata_edit.lua        |
+| skg-file-minor-mode.el              | (autocmds in plugin/skg.lua) |
+| skg-keymaps-and-aliases.el          | keymaps.lua              |
+| skg-reload.el                       | reload.lua               |
+| skg-test-utils.el                   | tests/nvim helpers       |
+
+** Mechanism translation (the load-bearing substitutions)
+| Emacs facility                       | Neovim replacement                                         | fidelity |
+|--------------------------------------+------------------------------------------------------------+----------|
+| process filter/sentinel on TCP       | 'vim.uv' tcp read callback + on-close; 'vim.schedule' to touch buffers | full |
+| elisp 'read' / 'prin1' of payloads   | hand-written Lua sexp reader/printer                       | full (largest new component) |
+| display-property overlays (heralds)  | extmark: conceal over the metadata extent + inline virt_text chunks | high; cursor-adjacent conceal behavior differs (tunable via 'concealcursor') |
+| after-string overlays (readable-ids) | extmark virt_text (eol/inline) + conceal on the UUID tail  | high |
+| whole-buffer lock overlays           | 'modifiable' off + Lua busy-state; generic E21 instead of the custom message | partial (deviation) |
+| per-range read-only text             | none; validate at commit time instead                      | partial (deviation) |
+| permanent-local 'skg-view-uri'       | 'vim.b[buf].skg_view_uri' + a bufnr→uri table              | full (the hazard it guards against doesn't exist) |
+| first-change-hook                    | 'TextChanged'/'TextChangedI' autocmd, re-armed per redraw  | full |
+| kill-buffer-hook (close-view)        | 'BufUnload'/'BufWipeout' autocmd                           | full |
+| C-x C-s on a non-file buffer         | name buffers 'skg://<view-uri>' + 'BufWriteCmd' so ':w' saves | full |
+| y-or-n-p / yes-or-no-p               | 'vim.fn.confirm'                                           | full |
+| read-string                          | 'vim.fn.input' / 'vim.ui.input'                            | full |
+| completing-read + S-arrows + C-?     | custom picker ('vim.ui.select' plus a cycling input variant) | high |
+| minibuffer keymap (linkstack paste)  | command-line mode mappings ('cnoremap' scoped to our prompts) | high |
+| advice on org-todo / insert-heading  | own commands wrapping/replacing the org plugin's           | full |
+| org-fold detect/restore              | native folds: 'foldclosed()', 'foldclose()'/'foldopen()', fold model per Q2 | high (bodyFolded needs care) |
+| invisible-p                          | 'foldclosed(lnum) ~= -1'                                   | full |
+| echo area / message                  | 'vim.notify' / 'nvim_echo'                                 | full |
+| accept-process-output wait           | 'vim.wait' with condition                                  | full |
+| magit                                | neogit + diffview, or raw-git buffers (Q5)                 | partial (deviation risk) |
+| ERT unit tests                       | plenary.busted, run headless                               | full |
+
+One byte-vs-character note (cf. coding-advice/pitfall-bytes-vs-characters.org):
+Lua strings and the nvim API are byte-oriented (extmark columns are byte
+columns), while elisp columns are character-oriented. The LP framing is
+byte-based, so it gets *simpler* in Lua; but 'point-column' math and
+extmark placement around herald glyphs (⌂, →, ⤊ are 3-byte chars) must
+consistently use byte columns internally and convert only at the wire
+boundary where the server expects what Emacs sent. The save-request
+'point-column' field's unit (chars, from Emacs 'current-column') will be
+pinned by a test against the live server.
+
+* Execution, in order
+Each step lands with its unit tests (mirrored from tests/elisp/ where one
+exists) before the next begins; 'cargo run --bin skg' + typedb stay up for
+live smoke tests throughout. Progress and how-deviations are recorded in
+./progress.org as they happen (per ../../coding-advice/when-to-stop.org).
+
+- Scaffolding: nvim/ layout, plugin/skg.lua, log.lua, reload.lua, the
+  test harness wiring (bash/nvim-tests.sh analog of bash/emacs-tests.sh),
+  and a first do-nothing busted test proving the harness runs headless.
+- The sexp reader/printer (sexpr/parse.lua): the highest-risk new
+  component, so first. Must round-trip every payload shape in
+  api-and-formats.md and the metadata grammar, including herald
+  characters and non-ASCII; property-tested against fixtures captured
+  from the live server, plus the pinned tests/elisp/herald-rules.sexp.
+- The pure logic tier, each with its mirrored test file: sexpr/compare,
+  sexpr/edit_dsl, sexpr/lens, sexpr/org_bijection,
+  sexpr/activenode_defaults, config (TOML scan), the id/UUID regex
+  helpers.
+- Networking: state.lua (handler registry), length_prefix.lua (framing
+  state machine), client.lua (uv TCP, busy-initializing, sentinel
+  behavior: on disconnect unlock all + clear handlers). Live
+  verify-connection + herald-rules fetch as the first integration smoke.
+- Buffers and display: buffer.lua (view registry, skg:// naming,
+  BufWriteCmd, close-view autocmd, unsaved-elsewhere warning),
+  content_view.lua (open view, switch-to-view, override menu + bypass),
+  heralds.lua (extmark conceal + virt_text, incremental refresh on
+  change), the org substrate per Q2 (filetype, folding, TAB cycling),
+  keymaps.lua per Q4.
+- Metadata commands: metadata.lua (split/reconstruct/replace-line,
+  delete, set-indefinitive, set-source ± recursive, merge-request,
+  view-without-metadata, beginning-of-line toggle), focus.lua, folds.lua.
+- The save pipeline: lock.lua, save.lua (markers out, four-handler
+  stream, fork-confirmation buffer + approve/decline, point/scroll
+  restoration, error/warning display). This is the center of gravity;
+  the fold/focus round-trip integration tests land here.
+- Navigation and search: id_search.lua (goto family, id-next/prev),
+  linkstack.lua (push/paste/pop, stack buffer), search.lua (three-message
+  flow incl. the read-only snapshot phase), search_make_link.lua.
+- The remaining command families: view_requests.lua (C-c c / C-c p
+  equivalents, definitive view, fork command), modify_graph.lua
+  (replace-content↔link, biggest-branch), view_new_empty.lua,
+  org_ancestry.lua, metadata_edit.lua (edit buffer + value cycling +
+  new-heading source prompt).
+- Stream consumers and server utilities: rerender.lua, diff_mode.lua,
+  source_sets.lua, diff_analysis.lua, stage_moves.lua, export.lua,
+  misc_requests.lua.
+- Git tier: git_add.lua (generate a shell script instead of an elisp
+  progn — same guard: 'git ls-files --error-unmatch' before add),
+  goto_git.lua per Q5, readable_ids.lua (works on .skg files and on the
+  chosen git UI's buffers).
+- Integration tests per Q6; then docs (per Q7) and the final
+  deviations report (./deviations.org), which also absorbs the
+  how-deviations accumulated in progress.org.
+
+* Testing
+- Unit: tests/nvim/ mirroring tests/elisp/ file-for-file where the
+  feature ports (the inventory section 7 is the checklist). Runner:
+  headless 'nvim -l' with plenary.busted; wrapper script alongside
+  bash/emacs-tests.sh, wired into bash/all-tests.sh.
+- Integration: the existing tests/integration/*/ dirs each hold fixtures,
+  a run-test.sh, and a test-emacs.el. Ports add a test-nvim.lua beside
+  test-emacs.el, sharing the fixtures and config; a shared
+  tests/integration/test-wait.lua mirrors test-wait.el. Depth per Q6.
+- Every live test reads its port from the test's own skgconfig.toml
+  (never hardcoded — several servers share this host's network).
+
+* Expected deviations (known before starting; final report will confirm)
+- Keybindings: vim is modal and terminal C-c is unusable, so the Emacs
+  chords cannot be literal. Proposed scheme in Q4.
+- Lock messages: a locked buffer rejects edits with vim's generic
+  "E21: Cannot make changes, 'modifiable' is off" rather than the
+  custom "wait for the save to finish" message. (Mitigation: also set a
+  winbar/notify hint while locked.)
+- The fork-confirmation buffer's protected title region and the metadata
+  edit buffer's read-only display group become commit-time validation
+  instead of type-time rejection (nvim has no per-range read-only text).
+- Conceal behavior on the cursor line differs from an Emacs display
+  overlay (vim reveals concealed text depending on 'concealcursor'; we
+  will pick the closest setting, likely 'nc', so insert-mode on a
+  metadata line shows the raw sexp — arguably clearer, but different).
+- M-x cosmetics (alias hiding via completion-predicate) have no analog;
+  the Ex-command surface simply exposes the public names.
+- Shell-map linkstack bindings: Emacs binds paste/pop in shell-mode;
+  nvim terminal buffers get a terminal-mode paste mapping (feeds keys),
+  pop-variants likely dropped there.
+- skg-reload: 'package.loaded' clearing reloads Lua modules, but
+  autocmds/extmark namespaces are re-created rather than preserved by
+  identity; behavior equivalent, mechanism different.
+
+* Risks (candidate stumpers; each has a planned fallback)
+- nvim-orgmode interference: it may bring mappings or edits (indent,
+  todo behavior) that fight server-owned text. Fallback (Q2): a
+  self-rolled minimal org layer (foldexpr on stars + TAB cycle +
+  tree-sitter highlighting only).
+- bodyFolded fidelity: representing "body hidden, children visible" in
+  vim's line-range folds needs the foldexpr to give a body its own fold
+  one level deeper than its headline. If a corner case can't be
+  represented, the deviation is recorded (marker still round-trips).
+- goto-in-magit-parent's "point on the first hunk line containing this
+  id" requires programmatic section/hunk navigation; neogit's API may
+  not expose it. Fallback: open the repo's diff in diffview or a plain
+  git-diff buffer and search for the id — same information, different
+  chrome.
+- The response-handler registry is keyed by response-type (same as
+  Emacs), so the same in-flight-collision PITFALL applies; the port
+  reproduces the Emacs behavior rather than redesigning it.
+
+* Working agreements for execution
+(Per ../../coding-advice/when-to-stop.org and your standing conventions.)
+- I keep ./progress.org updated (what's done and went well / order
+  changes / imperfections / choices determining the future) and only
+  stop for unanticipated architectural decisions or stumper mysteries.
+- Problems found in existing code go to ../problems.org (three doc-gap
+  entries already filed from this planning round: the undocumented
+  'save-relax-lock' message, the undocumented 'point-column' save field,
+  and stale tests/USAGE.md).
+- Lua code follows the repo's spirit: long clear names, callers before
+  callees, comments inside the blocks they describe, no history
+  comments, plus LuaLS-style '---@param'/'---@return' annotations as the
+  Lua stand-in for your everything-gets-a-type-signature rule.
+
+* Open questions — please answer all before I start
+Each question is self-contained. Where I recommend, the recommendation
+is listed first. Mark your responses TODO per our usual protocol.
+
+** Q1: Confirm the flavor — Neovim-only, in Lua?
+../../vim-client-flavor.org analyzed this and recommended Neovim/Lua
+over portable legacy Vimscript (Vim ~24% of developers vs Neovim ~14%,
+but plugin-installing users concentrate in Neovim; nvim-orgmode is
+maintained while vim-orgmode is stale; Lua is a real language for the
+client's async/state/parsing work). Its three sub-questions, compressed:
+(a) is the target audience "people who install editor plugins" (→
+Neovim) or "everyone with vi on a server" (→ legacy Vimscript, worse
+everything else)? (b) any interest in Vim9script (Vim-only language;
+would abandon Neovim users)? My recommendation: Neovim-only, Lua,
+minimum version 0.11 (what nvim-orgmode requires; the container has
+0.12.3). Everything below assumes this.
+
+*** TODO agreed, neovim
+
+** Q2: Org substrate — build on nvim-orgmode, or self-roll the outline layer?
+The client needs from "org": headline folding + TAB visibility cycling,
+TODO keyword cycling, and org syntax highlighting. Links, agenda, dates,
+capture — none of skg's business.
+- Option A (recommended): set filetype=org and let the baked-in
+  nvim-orgmode provide highlighting, folding, and cycling; skg's own
+  code only reads/writes fold state via the generic fold API
+  ('foldclosed()' etc.), so its dependence on the plugin stays shallow.
+  Any plugin behavior that rewrites buffer text in skg views gets
+  disabled buffer-locally. Risk: fighting its default mappings/behaviors;
+  mitigations exist per-buffer, and the fallback below stays open.
+- Option B: a self-rolled minimal org layer (foldexpr counting stars,
+  a TAB cycle command, tree-sitter-org highlighting only). Zero plugin
+  coupling, ~150-300 lines, but re-implements cycling/TODO behavior and
+  loses whatever org niceties users expect.
+If A hits a wall mid-execution I would switch to B for the affected
+buffers and record it in progress.org rather than stopping.
+
+*** TODO agreed, reuse nvim-orgmode unless impossible
+
+** Q3: Wire format — parse s-expressions in Lua (no server changes)?
+The server speaks elisp-flavored s-expressions in both directions.
+- Option A (recommended): write a small, well-tested sexp
+  reader/printer in Lua (~200-300 lines; the grammar is constrained and
+  documented in api-and-formats.md). Zero server changes, one protocol,
+  both clients exercise the same server paths.
+- Option B: teach the server an alternative JSON encoding, negotiated
+  per connection. Easier client parsing, but a second wire dialect to
+  maintain and test forever, against your no-legacy-support instincts.
+Note even option B doesn't remove the sexp need entirely: '(skg ...)'
+headline metadata inside buffer text is sexp regardless.
+
+*** TODO definitely A
+
+** Q4: Keybinding scheme
+Terminal vim cannot use the Emacs chords (C-c is taken; C-x C-s is
+untypeable). Proposed scheme, normal-mode, in skg buffers only:
+- ':w' saves (BufWriteCmd), replacing C-x C-s.
+- '<localleader>' replaces the C-c prefix, then the SAME mnemonic
+  letters as Emacs: 'C-c f i' → '<localleader>fi', 'C-c g b' →
+  '<localleader>gb', 'C-c s d' → '<localleader>sd', 'C-c v h' →
+  '<localleader>vh', 'C-c p C' → '<localleader>pC', etc. Where Emacs
+  uses RET as the final key, the letter doubles: skg-search
+  ('C-c f RET') → '<localleader>ff', skg-goto ('C-c g RET') →
+  '<localleader>gg'. Capital variants keep their capitals
+  ('C-c G m' → '<localleader>Gm', 'C-c O i' → '<localleader>Oi').
+  Delete ('C-c <backspace>') → '<localleader>dd', recursive
+  '<localleader>dR' (no prefix-arg idiom worth keeping).
+- Motions get vim idioms too: id-next/id-prev also on ']i' / '[i';
+  the C-a title-toggle becomes remapped '^' (first press: title start;
+  again: column 0).
+- Everything is also an Ex command (':SkgGoto', ':SkgSearch', ...), the
+  discoverable/mappable surface, so users can rebind freely.
+- Inside prompts (our command-line inputs), linkstack paste/pop get
+  c-mode mappings, mirroring the Emacs minibuffer bindings.
+Alternative if you prefer: a which-key-style menu under one key, or
+literal-as-possible Ctrl chords (I advise against — collisions with
+core vim bindings are unavoidable). Also: default '<localleader>'
+suggestion? (vim convention is often ',' or '\'; users can override.)
+
+*** TODO your first proposal
+
+** Q5: Git UI — what should goto-in-magit and readable-ids target?
+Four commands open magit views ('skg-goto-in-magit', '-parent',
+'-and-close-this' variants) and 'skg-readable-ids-mode' annotates
+UUID-bearing buffers (magit status/diff and raw .skg files) with titles.
+- Option A (recommended): target neogit (the magit clone already baked
+  into the docker image) for status views, falling back to
+  diffview/plain 'git diff' buffers where neogit's API can't express
+  the jump (notably "land on the first hunk line containing this id").
+  readable-ids attaches by scanning any buffer for UUIDs, so it works
+  on neogit, diffview, fugitive, and .skg buffers alike.
+- Option B: skip the git-status chrome; open a plain git-diff buffer
+  for the node's file with readable-ids on, and let users bring their
+  own git plugin. Less fidelity to the Emacs experience, fewer moving
+  parts.
+Either way this is the area most likely to appear in the deviations
+report.
+
+*** TODO A
+
+** Q6: Test parity — how deep?
+- Option A: mirror everything — all applicable tests/elisp files in
+  plenary.busted AND a test-nvim.lua counterpart in every
+  tests/integration dir (sharing fixtures). Highest confidence; roughly
+  doubles client-test code and adds meaningful execution time to
+  bash/all-tests.sh.
+- Option B (recommended): mirror ALL unit tests for ported logic (the
+  pure tier is nearly free to mirror and pins the port's correctness),
+  plus integration coverage for the protocol-heavy flows — save/
+  collateral/lock lifecycle, fold+focus round-trip, search+enrichment,
+  fork family, override menu, diff-mode updates, herald rules,
+  verify-connection (roughly 2/3 of the dirs) — deferring the
+  remaining integration dirs (magit-specific ones get replaced by
+  whatever Q5 chooses) to a follow-up pass.
+- Option C: unit tests only + manual smoke of the streams. Not
+  recommended: the streams are where a second client will actually
+  break.
+
+*** TODO A
+Be sure to update bash/all-tests.sh so that it does those,
+and echoes to screen making clear that it does.
+(When I get annoyed at how slow it's taking,
+this will let me know why,
+and will point the way to how to save time later
+by skipping those tests sometimes.)
+
+** Q7: Naming, layout, docs — defaults I'll use unless you object
+- Directory: 'nvim/' top-level (sibling of 'elisp/'), plugin-standard
+  inside ('nvim/lua/skg/', 'nvim/plugin/skg.lua').
+- Ex-command namespace: ':Skg...' (':SkgGoto', ':SkgSearch',
+  ':SkgDiffReport', ...). Lua API: require('skg').
+- User docs: a new 'docs/COMMANDS-nvim.org' generated to mirror
+  COMMANDS.org's structure (same command vocabulary, vim keys), plus a
+  keybinding column note in COMMANDS.org pointing there. Alternative:
+  one merged doc with two key columns — heavier to maintain.
+- The deviations report: 'TODO/vim-client/deviations.org', linked from
+  nvim/README.org.
+- Test locations: 'tests/nvim/' + 'test-nvim.lua' files inside existing
+  tests/integration dirs; runner 'bash/nvim-tests.sh'; wired into
+  'bash/all-tests.sh'.
+- Minimum nvim version 0.11; developed against 0.12.3.
+
+*** TODO perfect
+
+** Q8: Commit policy during execution
+Your convention: no commits while planning. During execution I'd like
+to commit at each landed step (module + its tests green) so the work
+reviews as a readable sequence — either directly on main or on a
+branch 'vim-client' you merge after review. Which do you prefer, or
+should I leave everything uncommitted for you to commit?
+
+*** TODO commit incrementally
+
+** Q9: Anything to drop, defer, or add?
+Default scope is every command in docs/COMMANDS.org plus the supporting
+modes (readable-ids, heralds, file-minor-mode equivalents, the metadata
+edit buffer, linkstack, reload). If any feature is not worth porting
+(candidates you might consider: the magit-parent jump; the shell-map
+linkstack bindings; 'skg-view-org-ancestry', which exists in org-mode
+anyway), or if there's a vim-specific nicety you want added while I'm
+in there, say so here. Otherwise I port everything and the deviations
+report covers the gaps.
+
+*** TODO all of it

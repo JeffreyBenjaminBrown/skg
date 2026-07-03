@@ -773,6 +773,34 @@
    and is authoritative. Not worth fixing on its own, but if the
    surprising-links a(b,c) split replaces this two-way partition, the
    subtraction goes away regardless.
+* Problems found while planning the vim client (2026-07-02)
+  Found while inventorying the Emacs client and the wire protocol to plan
+  the Neovim port (TODO/vim-client/). All three are doc-vs-code gaps; the
+  first two matter because api-and-formats.md is the spec a second client
+  is written against.
+** api-and-formats.md omits the 'save-relax-lock' message from the save stream
+   The "Save buffer" section documents the response stream as
+   save-lock -> collateral-view* -> save-result. The implementation
+   (server/serve/protocol.rs; elisp/skg-request-save.el) also emits
+   'save-relax-lock' between save-lock and the collateral views: the
+   exact post-SavePlan collateral set, narrowing the early
+   over-approximate lock. A client written from the doc alone would
+   not register a handler for it.
+** api-and-formats.md omits the 'point-column' field of the save request
+   The doc lists two point fields ('point-lines-below-focused-headline',
+   'point-screen-lines-below-window-start'), but the client sends and
+   the server echoes a third, 'point-column'
+   (server/serve/protocol.rs:169; elisp/skg-request-save.el). Same
+   risk as above: a from-the-doc client would restore point without
+   its column.
+** tests/USAGE.md is stale
+   It points at 'tests/emacs/test.el' (the directory is now
+   tests/elisp/, run via bash/emacs-tests.sh), does not mention
+   bash/integration-tests.sh or cargo nextest, and says the Docker
+   container does not include Emacs, which coding-advice/docker.org
+   contradicts (the image bakes in emacs and now nvim). The accurate
+   description lives in coding-advice/claude-to-claude.org, "Running
+   Tests"; USAGE.md should defer to or copy it.
 * Problems noted during override-chains planning (TODO/override-chains/)
 ** TODO Override invariants are validated by two divergent implementations
    Monogamy (and, once

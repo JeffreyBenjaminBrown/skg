@@ -1,0 +1,87 @@
+* You are coding skg inside a Docker container
+  The skg working tree is bind-mounted at =/home/ubuntu/host= (your
+  primary working dir). The mount is live and bidirectional: files you
+  write there are visible on the host and vice-versa.
+
+  The image is =jeffreybbrown/hode=, built with Nix from
+  =other-projects/docker-typedb-rust/docker.nix= (there is no Dockerfile).
+  The container runs with =--network host= (so container ports are host
+  ports) and bind-mounts the host's =/nix/store= read-only (so the image's
+  store references resolve against the host store at runtime).
+
+* The host/container split -- this shapes what you can do
+  You (Claude) are inside the container. =nix=, =nix-instantiate=, and
+  =docker= are NOT installed here; they run on the HOST, driven by Jeff.
+  You cannot build, load, or run the image yourself, and you cannot
+  evaluate Nix. Consequences you must plan around:
+
+  - *Changing the image is a request, not an action you take.* Edit
+    =docker.nix=, then ask Jeff to rebuild on the host
+    (=nix-build docker.nix && docker load < result=, ~10 min). A rebuilt
+    image only takes effect in a NEWLY started container -- the running
+    container keeps whatever it launched with.
+  - *You can't attr-check Nix yourself.* nixpkgs attribute names are
+    easy to get wrong (they follow the plugin/package *repo* name, not
+    the upstream project name). Before a ~10-min build, have Jeff run a
+    =nix-instantiate --eval= one-liner (seconds) to confirm every new
+    attribute/expression exists in his pin. A typo fails fast at eval
+    time, but a wrong-yet-valid name wastes the whole build plus a
+    container start to notice.
+  - *Hand back command output through the mounted tree, never /tmp.* The
+    host's =/tmp= is not shared into the container. When you need the
+    output of a command Jeff runs, tell him to =... | tee some-file.log=
+    into the project tree (e.g. the working dir), then Read it there.
+
+* What is in the container, for coding skg
+  - Rust: =cargo=, =rustc=, =cargo-nextest=, =cargo-watch=.
+  - TypeDB: the =typedb= server binary.
+  - Native build deps are already present (=gcc=, =gnumake=, =cmake=,
+    =pkg-config=, =openssl=, alsa/pipewire/dbus/glib, etc.), so
+    =cargo build= of skg's C-linked crates works out of the box.
+  - Editors: =emacs= (with magit) -- the current skg client lives in
+    =elisp/=. =nvim= (with nvim-orgmode + its org tree-sitter parser,
+    plus neogit and diffview) is baked in as of the latest image, for the
+    planned vim client (see =../vim-client-flavor.org=). Note: a container
+    started from an older image will not have =nvim= yet.
+  - Everyday tools: =git=, =rg=, =fd=, =jq=, =bat=, =tmux=, etc.
+  - The skg server itself is NOT baked into the image -- it is compiled
+    at runtime from the mounted source (=cargo run --bin skg=). So skg's
+    own Rust dependencies live in =Cargo.toml=, not in =docker.nix=.
+
+* Running and testing skg here
+  - Ports and collisions: the container runs =--network host=, so every
+    skg (and TypeDB) TCP port lands directly on the host and is shared
+    across all the containers. Jeff usually runs ~3 containers at once
+    (two dev, one prod), each launched with its OWN =skgconfig.toml= that
+    picks distinct TCP port(s), db name, and data/tantivy folders so they
+    do not clobber each other's traffic or data. There is therefore NO
+    fixed skg API port -- never hardcode or assume one; read the
+    =skgconfig.toml= the running server was started with. Treat TypeDB's
+    port the same way: config-governed, verify before assuming. See
+    =development-process.md= for isolating instances.
+  - =bash/start-servers.sh= brings up TypeDB + a skg server;
+    =bash/stop-servers.sh= tears them down. Many tests need one or both
+    running -- see =tests/USAGE.md= and =development-process.md= for which.
+    =bash/all-tests.sh= runs the whole suite; =cargo nextest run= the Rust
+    tests (needs TypeDB up).
+  - Source of truth is the =.skg= files on disk; TypeDB and Tantivy are
+    derived caches, rebuilt from disk on failure. Any change that
+    correctly lands on the filesystem is recoverable.
+
+* Modifying the image
+  - Add packages to the =contents= list in =docker.nix=. To bundle an
+    editor together with its plugins, follow the existing patterns:
+    =emacsWithMagit= for Emacs, and the wrapped =pkgs.neovim.override=
+    block for Neovim. (That Neovim block wires nvim-orgmode's tree-sitter
+    parser in a non-obvious way; if you need to touch it, read
+    =../other-projects/docker-typedb-rust/docker-travails.org= first.)
+  - That directory is its own git repo, untracked by the skg repo. Its
+    =PITFALLS.org= holds the deeper build/maintenance facts you'll need
+    for non-trivial edits: pinning the TypeDB tarball hash in =typedb.nix=
+    (and keeping the =typedb-driver= crate in =Cargo.toml= in step with
+    the TypeDB major version), the FHS loader shim that lets the
+    npm-installed =claude=/=codex= run, and how Claude's own state
+    persists across rebuilds via =CLAUDE_CONFIG_DIR=.
+  - PITFALL: because the container uses the host's =/nix/store= read-only,
+    aggressive nix GC on the host can break an already-loaded image at
+    runtime. Jeff should keep the built =result= (or a GC root) around.
