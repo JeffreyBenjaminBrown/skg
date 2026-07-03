@@ -1,16 +1,56 @@
+* BUG :: make-content cleanup -> collateral view not found
+** the bug
+Make a link into content. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
+** a test case
+Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
+* Warn the user when they make dead links.
+* If viewing an overrider-as-such, frontload the O herald.
+Identical to how other birth-rels are frontloaded.
+Skip the Oh herald.
+* strip trailing whitespace from each line at save
 * ONGOING override chains
 ** skg3  --resume 25126e37-d0ef-4790-a58b-2f6da928478e
 ** dogfood : User-owned forks are all kinds of wrong.
 * AWAITS better user-owned forks : [[./TODO/user-owned_autofork_chain/]]
 * Play two roles, communicate through git.
+** order in which to introduce features
+*** The content relationship.
+*** Nesting.
+*** Multiple containment.
+*** Links.
+*** Two views of the same data.
+First owned by the same person.
+Then owned by distinct user.
+  Call the other helium. Speak normally except in a high voice.
+*** Auto-filtering by data source.
+*** Subscription
+*** Hiding
+*** Forking
+**** Override
+*** Merge
 ** gecko feet, biologist and bank robber
 Scientist studies gecko feet.
 Bank robber searches scientist's
 ** shark teeth, biologist and chip-designer
 Denticles are good for drag and anti-bacterial.
 Chip designer lists places where bacteria have been growing.
+** play someone forking my [[id:5704b01c-3eaf-4adc-98a8-0c2c6804da08][air filter, homemade]] notes
+to promote things from my 'obvious to me' branch
+* Where to put this comment?
+where it =  *   *skg stage moves*       1061 Shell-script
+
+I CHECKED IT a lot myself: no staged changes, move something,
+do this, now there are staged changes and they correspond.
+* herald legibility
+** yellow for leading rels, blue for later rels
+** within both leading and later rels, orange for unusual things
+** uncolored whitespace on either side of each rel
+** purple for A and I
 * s
 ** correctness
+*** strip trailing whitespace from body lines
+*** don't complain if point is before first headline on save
+just put it at the first headline
 *** No two forks in a user-owned chain of forks should share a source.
 regardless of whether the chain is manual or,
 in the future per [[./TODO/user-owned_autofork_chain.org]], automated
@@ -51,6 +91,9 @@ e.g. gO, gS, etc.
 Some viewstats are unliekly in most places,
 and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
+*** Warn the user when any change is discarded on save.
+This should in particular cover (it currently doesn't)
+whether a source was changed on an indefinitive node.
 *** rewrite docs/COMMANDS.org
 Some new Claude-written passages assume too much of the reade
 *** a function to relabel link labels

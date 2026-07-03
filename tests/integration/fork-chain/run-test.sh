@@ -65,7 +65,7 @@ EOF
 
 start_skg_server
 
-run_emacs_test "test-emacs.el"
+run_client_test
 
 # Disk verification (step 5): the public clone C overrides the foreign N
 # and names NO private id; the private clone D overrides C.

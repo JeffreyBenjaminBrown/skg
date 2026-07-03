@@ -151,7 +151,7 @@ if [ $attempt -ge $max_attempts ]; then
   exit 1
 fi
 
-run_emacs_test "test-emacs.el"
+run_client_test
 
 echo ""
 echo "=== Test Complete ==="

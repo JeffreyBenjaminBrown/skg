@@ -1,0 +1,126 @@
+#+TITLE: The Neovim client's deviations from the Emacs client
+# The final report requested with the port: every place the Neovim
+# client intentionally behaves differently from the Emacs client, and
+# why the difference was necessary (or, in two marked cases, an
+# improvement taken deliberately). Anything not listed here is
+# intended to behave identically; if it doesn't, that's a bug worth
+# reporting in ../problems.org.
+#
+# Wire compatibility is total: same protocol, same requests, same
+# metadata grammar, zero server changes.
+
+* Input model (necessary: vim is modal, and C-c belongs to the terminal)
+- The Emacs 'C-c ...' chords become '<localleader>' plus the same
+  mnemonic letters ('C-c s d' -> '<localleader>sd'); where Emacs ended
+  a chord with RET the family letter doubles ('C-c g RET' ->
+  '<localleader>gg'); capitals stay capitals. 'C-x C-s' becomes ':w'
+  (skg buffers are 'acwrite'; ':w' runs the save pipeline). Every
+  command is also an ':Skg*' Ex command. The full table lives in
+  nvim/lua/skg/keymaps.lua and docs/COMMANDS-nvim.org.
+- Extra vim-idiomatic surfaces beyond the Emacs set: ']i' / '[i' as
+  id-next/prev motions; '^' plays the C-a title toggle; '<Tab>'
+  toggles the fold at point and '<S-Tab>' global visibility.
+- TODO-keyword cycling is 'cit' / 'ciT' (wrapping the org plugin so
+  metadata survives, as the Emacs org-todo advice did). Vim's fold
+  cycling is two-state (open/closed) rather than org's three-state
+  cycle.
+- The minibuffer linkstack bindings ('C-c o i' etc. in prompts) become
+  command-line-mode mappings '<C-x>i', '<C-x>l', '<C-x>I', '<C-x>L'.
+  The Emacs shell-mode linkstack bindings have no terminal-mode
+  equivalent here; paste the id from a buffer instead.
+- The source prompts cycle with S-Left/S-Right and complete with TAB,
+  as in Emacs; the 'C-?' show-all-sources helper key inside the prompt
+  is dropped (terminals rarely deliver C-?); ':SkgViewSourceList'
+  shows the same list.
+- There is no automatic source prompt when a brand-new level-1
+  headline is created: Emacs hooked its insert-heading command, and
+  vim users simply type headlines, so there is no seam to hook. The
+  quick path is '<localleader>ss' on the new headline (populates
+  minimal metadata, prompting for the source), or '<localleader>vm'
+  for the full metadata view.
+
+* Buffer locking (necessary: nvim has no overlay modification hooks)
+- A buffer locked during a save/rerender stream rejects edits with
+  vim's generic "E21: Cannot make changes, 'modifiable' is off"
+  instead of Emacs's custom "skg: buffer locked -- save in progress".
+- Consequently a second save attempted mid-stream is refused by the
+  lock (E21) rather than by the stream guard's message; the guard
+  still exists as the second line of defense, exactly as in Emacs.
+
+* Read-only text regions (necessary: nvim has no per-range read-only)
+- The metadata edit buffer's display-only title group is editable
+  while typing; edits to it are DISCARDED at commit (the strip step
+  drops the title group whatever it holds). Emacs rejected the edits
+  at type time.
+- The fork-confirmation buffer similarly relies on commit-time
+  validation (the placeholder-source refusal) rather than type-time
+  protection.
+
+* Folding (necessary: vim folds are line ranges on windows)
+- A closed fold always displays vim's one-line fold placeholder; org
+  hid the text entirely.
+- A ONE-LINE body cannot be body-folded (vim cannot close a
+  single-line fold). A 'bodyFolded' marker on such a body degrades
+  gracefully: the body stays visible and the marker is simply not
+  re-recorded at the next save. Multi-line bodies body-fold normally.
+- Fold state lives on windows, so fold restoration after a save/
+  rerender applies to a window showing the buffer; a collateral view
+  updated while not displayed anywhere gets its markers stripped but
+  has no fold state to restore into, and appears fully open when next
+  displayed. (Emacs restored folds even in undisplayed buffers.)
+- skg view buffers use skg's own foldexpr (a body gets its own fold
+  one level below its headline, which is what makes 'bodyFolded'
+  representable) rather than nvim-orgmode's folding; the org plugin
+  still provides syntax highlighting.
+
+* The git jumps (necessary: no magit exists for vim)
+- 'skg-goto-in-magit' -> ':SkgGotoInGit': opens neogit (the closest
+  magit analog, baked into the docker image) on the source's repo and
+  lands on the file's entry by text search, warning when the file
+  appears in several sections. Magit's section-object navigation has
+  no neogit API equivalent.
+- 'skg-goto-in-magit-parent' -> ':SkgGotoInGitParent': opens a plain
+  git-diff buffer ('skg://git-diff/FILE', readable-ids enabled) with
+  the cursor on the first changed line containing the node's id --
+  the same information magit showed, without the status chrome.
+- The git-add PREVIEW is a shell script (run it from anywhere; each
+  file is re-checked against the git index before adding) rather than
+  Emacs's evaluable elisp buffer. The non-preview command runs the
+  same logic directly, as before.
+
+* Display details
+- Heralds conceal the metadata rather than covering it with a display
+  overlay. With 'concealcursor=nc', entering insert mode on a line
+  reveals its raw metadata (arguably clearer for editing); Emacs never
+  revealed it. Semantics, colors and the server-owned rule table are
+  identical.
+- Readable-ids shortens UUIDs by concealing the tail to an ellipsis
+  and renders titles as inline virtual text; same behavior, same
+  server round-trip, different mechanism.
+- View buffers are named 'skg://TITLE' (search: 'skg://?TERMS');
+  Emacs used '*TITLE*'. Message/report buffers live under
+  'skg://messages/...', 'skg://diff-analysis', 'skg://stage-moves',
+  etc.
+
+* Small semantic notes
+- 'point-column' in the save round-trip is a byte offset here and a
+  character offset in Emacs. The server merely echoes it, so each
+  client round-trips its own convention; on lines containing
+  multibyte characters before point, a buffer saved in one client and
+  restored in the other would land point a few cells off. Harmless in
+  single-client use.
+- The Lua sexp printer renders the empty list as '()' where elisp
+  prints 'nil'; the server's parser accepts both, and the reader maps
+  both to the same value.
+- ':SkgReload' (the dev-convenience module reload) CLOSES the TCP
+  connection before discarding the module holding it, where Emacs
+  left the old process object dangling in its process list. Marked as
+  a deliberate improvement, not a fidelity gap. The client reconnects
+  on the next request either way.
+- 'view-without-metadata' takes the visual selection (or the last
+  visual marks); Emacs took the active region.
+- 'search-interactive''s 'h' option opens docs/COMMANDS-nvim.org
+  (falling back to COMMANDS.org).
+- The 'M-x' cosmetic machinery (alias names, completion-predicate
+  hiding of internal names) has no analog; the ':Skg*' commands ARE
+  the public names.

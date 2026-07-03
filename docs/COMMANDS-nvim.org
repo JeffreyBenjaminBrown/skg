@@ -1,0 +1,679 @@
+# This file is generated to mirror docs/COMMANDS.org (the Emacs-client
+# command reference), translated to Neovim keybindings and :Skg*
+# Ex commands. nvim/lua/skg/keymaps.lua is the authoritative source
+# for every binding named here; if this file and that module disagree,
+# keymaps.lua wins. Where COMMANDS.org describes Emacs-only mechanics
+# (the minibuffer, magit), the text below is rewritten for the nvim
+# equivalents (vim command-line prompts, neogit / plain git-diff
+# buffers) rather than translated word for word.
+* user-facing skg commands
+** :w : :SkgSave
+Each time you save, your view is rebuilt.
+This is because you can put 'requests' into your view,
+in which you request more data,
+such as a node's ancestors, or the nodes that link to it.
+Since views can overlap,
+saving one open view can change another.
+For this reason the client will warn you
+if you have unsaved edits in one view
+and begin to edit another one.
+It won't stop you, but the results could be bad.
+If you try to save while another skg buffer already has unsaved
+edits, you also get a 'Save anyway?' confirmation before the
+request is sent.
+
+':w' is the BufWriteCmd on every skg view buffer, so plain saving
+works as expected; ':SkgSave' does the same thing as an explicit
+Ex command.
+** <localleader>dd : deletion
+***     <localleader>dd : :SkgDelete
+Marks the node at point for deletion from the graph.
+Upon saving the view, it will vanish not just from this view,
+but from the graph itself.
+*** <localleader>dR : :SkgDeleteRecursive
+Same as Delete, but also marks every activeNode org-descendent
+of the node at point. Descendent headlines that are not activeNodes
+(phantoms, aliascol, id-col, etc.) are skipped.
+
+Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
+protocol to reuse here the way Emacs's C-u did. Call it directly as
+<localleader>dR, or as ':SkgDeleteRecursive'.
+** <localleader>f : text search
+The 'f' is for 'find'.
+*** <localleader>ff : :SkgSearch
+Text search across titles and aliases, returning every
+matching node. "Rooty" nodes (roots, cycle members, link
+dests, and nodes that had an org-roam ID before import)
+are bumped in the ranking via their context-origin multiplier.
+
+Prompts for search terms. All search axes take their conservative
+defaults: no per-token regex, titles only (no body), no Tantivy
+phrase and operator syntax.
+
+Run 'Goto' (<localleader>gg, below) from one of the links in the
+search results to open the view from that node.
+*** <localleader>fi : :SkgSearchInteractive (search-interactive)
+Same as Search, but after the search terms it prompts:
+
+: Type a character for each search option: (r)egex, (b)ody, (t)antivy syntax, (h)elp:
+
+Type one character for each option you want, in any order,
+then press Enter. An empty answer uses the same conservative
+defaults as ':SkgSearch'. Unrecognized characters are ignored.
+Typing =h= opens this documentation (docs/COMMANDS-nvim.org,
+falling back to docs/COMMANDS.org if that file is missing), with
+all folds opened and the cursor searched onto this headline -- and
+abandons the search. If the headline can't be found the whole file
+is still shown, with a notice that the search failed.
+
+- =r= (*regex*) — per-token regex instead of phrase search.
+  Bypasses the query parser; each whitespace-separated piece
+  is handed to Tantivy's 'RegexQuery'.
+- =b= (*body*) — also search the body field (titles are
+  always searched).
+- =t= (*tantivy syntax*) — Tantivy phrase and operator syntax
+  (AND/OR/NOT/+/-). In non-regex mode this passes through
+  Tantivy's QueryParser (phrase quotes, grouping, field: all
+  work; intra-word operator chars get escaped so =foo:bar=
+  remains findable). In regex mode, AND / OR / NOT / +foo /
+  -bar combine the per-piece RegexQueries at the document
+  level; phrase syntax does not apply there. See the regex=true
+  section below.
+**** Query syntax with default axes (phrase/operators=false, regex=false)
+Queries are literal. The query string is split on whitespace,
+and any word containing a Tantivy operator character
+(=+ - & | ! ( ) { } [ ] ^ " ~ * ? : \=) or the bare keyword
+=AND= / =OR= / =NOT= is wrapped as a phrase so its contents
+are searched literally. Words without specials pass through.
+- *OR between words*. "dog cat" matches titles containing
+  either word; a title with both outranks one with only one.
+- *Literal special characters*. A title like "C++ tips",
+  "[draft] plan", or "cat:dog" is findable by typing its
+  literal text.
+**** Query syntax with phrase/operators=true
+The query is handed to Tantivy's QueryParser, with one
+heuristic adjustment: any operator character sitting strictly
+inside a word (with word chars on both sides, scanning
+through consecutive operators within the same token) is
+backslash-escaped. So =foo:bar= stays findable as a literal,
+but =AND= / =OR= / =+foo= / =-bar= / ="fox in socks"= /
+=(dog OR cat)= keep their operator meaning.
+
+Known imperfection: the heuristic can't distinguish a
+configured field name from a user word, so
+=title_or_alias:dog= gets its =:= escaped too. Field-
+qualified queries need manual =\:= in operators mode.
+**** Query syntax with regex=true
+The query is split on whitespace and each piece is handed to
+'tantivy::query::RegexQuery' as its own pattern. Matches are
+against *tokens*, not raw text: the indexer lowercases and
+splits on whitespace, so no stored token ever contains a
+space. That's why splitting is the only way multi-word regex
+queries return anything. Patterns like =histor.*= work for
+prefix search ('history', 'historical'), and =polit.* scien.*=
+combines two such prefix searches. Combine with body=true to
+also search body fields.
+
+The *=*= gotcha*: in regex =*= means "zero or more of the
+previous character", NOT "any characters" (that's =.*=). So
+=sci*= matches the tokens =sc=, =sci=, =scii=, … — not
+"anything starting with sci". Use =sci.*= for that.
+
+With operators=false, pieces are OR'd (SHOULD-combined)
+like the non-regex default.
+
+With phrase/operators=true (the wire flag is still
+=operators=true=), the keywords =AND= / =OR= / =NOT= and the
+prefixes =+piece= / =-piece= combine the per-piece RegexQueries
+at the document level:
+- =poli.* AND sci.*= — documents whose tokens include one
+  matching =poli.*= AND one matching =sci.*=.
+- =poli.* NOT bio.*= — documents matching =poli.*= and NOT
+  any token matching =bio.*=.
+- =+poli.* -bio.*= — same as above, without the keywords.
+- =poli.* OR sci.*= — explicit OR, same as the default.
+Keywords are consumed rather than matched as patterns. An
+=AND= adjacent to a piece on either side promotes that piece
+to MUST.
+**** Caveats
+- Each alias is indexed as its own document, so a query can
+  match on an alias even when the title doesn't mention the
+  searched word. The returned node is still the aliased one.
+- Results are ranked by BM25 times a context-origin factor
+  (Root 100×, CycleMember ~32×, Dest 10×, HadID 10×,
+  MultiContained ~3.2×, everything else 1×). A weaker text
+  match on a root can outrank a stronger match on a leaf,
+  but every match is returned — search is never filtered by
+  graph role.
+- Regex distance is tokenwise: a pattern never spans
+  whitespace, because we split the query on whitespace before
+  handing the pieces to RegexQuery. A true whole-title regex
+  (one pattern that matches across spaces) would need a
+  separate non-tokenized =raw_title= field. Not done yet.
+*** <localleader>fl : :SkgSearchMakeLink
+Search-then-link: pick a result, return here, get a link.
+
+Like ':SkgSearch' but tailored for inserting a link to a node
+you don't yet know the ID of. The buffer and cursor position you
+called it from are remembered. The same conservative search
+defaults as ':SkgSearch' apply.
+
+Unlike the Emacs client, the source buffer is NOT saved before
+the search runs -- only its position is recorded. (Saving first
+can let the server's rerender collapse a freshly typed blank
+line, leaving the remembered position dangling on the next
+headline, so the inserted link would glue itself to the wrong
+spot.) Save your own edits first if you want them preserved
+before detouring into the search.
+
+In the resulting search buffer, find the result you want and
+press <CR> (or <localleader>cc). The search buffer closes; you
+return to the buffer you started in, at the position you were at;
+and a =[[id:X][LABEL]]= link is inserted at point.
+
+The label is the result's title with any inline links inside
+it reduced to their labels (so the new link's label is plain
+text, never another link inside a link).
+** <localleader>g : going to a node
+*** <localleader>gg : :SkgGoto
+Calling this when the cursor is on a link, a node's metadata,
+a bare UUID, or a .skg filename
+will open a new view from the ID it finds there,
+or go to the view of it that was already open if that exists.
+
+If the node is overridden, this opens the override-choice menu
+instead -- the node as root, its overriders beneath it -- and
+explains so in the echo area; run Goto on the overrider you
+want, or GotoBypassOverride to open the original. From a neogit
+buffer or a plain git-diff buffer (=skg://git-diff/...=), Goto
+bypasses the menu automatically (a readable-ID jump lands on the
+raw node).
+
+If you're not sure whether the cursor is on something visitable
+(a link or a node's metadata),
+use IdNext and IdPrev (the ]i / [i motions, or <localleader>in /
+<localleader>ip)
+to identify where those are.
+*** :SkgGotoBypassOverride
+Like Goto, but if the node is overridden, opens the node
+itself instead of the override-choice menu. The escape hatch from
+the menu (or from anywhere) to the original node. Recursive
+content beneath the opened node still draws overriders in place
+of what they override.
+*** <localleader>GG : :SkgGotoAndCloseThis
+Like Goto, but also closes the buffer it was called from.
+*** <localleader>gb : :SkgGotoBiggestBranch
+Go to the branch near point with the most recursive content,
+estimated by counting org-descendents in the current buffer.
+
+If the node at point has siblings, this considers that sibling
+set. If it has no siblings, it considers the node's immediate
+children instead.
+
+This can help when a view is loading slowly:
+replacing the content relationship to its biggest branch
+with a link relationship (<localleader>ml)
+reduces the view's demands on the server.
+*** <localleader>gi : :SkgGotoById
+'Goto' is usually more convenient.
+
+This requires a literal v4 UUID string, like
+3861db2c-7f16-4814-b403-52b5e05d5e0a
+It can be useful going from git to skg.
+*** <localleader>Gi : :SkgGotoByIdAndCloseThis
+*** <localleader>gm : :SkgGotoInGit
+Opens a neogit status view of the changes to the file containing
+the node at point. If the file appears in multiple sections
+(unstaged, staged, untracked), point lands on the first and
+the user is warned. (If neogit is unavailable, this falls back
+to the plain git-diff view described below.)
+*** <localleader>Gm : :SkgGotoInGitAndCloseThis
+*** <localleader>gM : :SkgGotoInGitParent
+Opens a plain git-diff buffer (named =skg://git-diff/FILE=) of
+the *parent*'s file -- the combined staged+unstaged diff, or the
+untracked file's own content if it has no HEAD diff -- with point
+on the first line in that buffer containing this node's ID.
+Warns if the ID appears multiple times. (Emacs's magit has an API
+for landing on a specific line within a status section; neogit
+doesn't, so this variant uses a plain diff buffer instead of a
+neogit view -- same information, different chrome.)
+*** <localleader>GM : :SkgGotoInGitParentAndCloseThis
+** <localleader>t : git operations
+*** <localleader>ta         : :SkgGitAddIfNewRecursivePreview
+Brings up a buffer (=skg://git-add-new-files=) with the text of a
+shell script which, if run, 'git add's some nodes. The nodes
+should consist only of nodes new to git, and only of nodes in
+the recursive content (inclusive) of the node from which
+GitAddIfNewRecursivePreview was called. The buffer has readable
+ids enabled.
+
+Unlike the Emacs client, which shows executable elisp you run in
+place with C-x C-e, this is a plain shell script: review it, then
+run it yourself (copy it into a shell, or write the buffer to a
+file and execute that).
+*** <localleader>tA         : :SkgGitAddIfNewRecursive
+Like GitAddIfNewRecursivePreview,
+but it doesn't show you the script;
+it instead runs that logic for you directly.
+*** <localleader> (g|G)(m|M) : :SkgGotoInGit*
+These four commands are described elsewhere in this document.
+*** <localleader>tr         : :SkgDiffReport
+Asks whether to include staged changes and, if so,
+whether to include unstaged changes.
+Then opens an org report (=skg://diff-analysis=) summarizing
+semantic graph changes across all configured sources.
+
+The report is based on git/index/worktree state,
+so the command refuses to run while any Skg view buffer
+has unsaved edits.
+*** <localleader>tm         : :SkgStageMoves
+Scans the git status of every configured source and finds each
+node whose .skg file "moved": it vanished from exactly one source
+(committed there in git HEAD, now gone from that source's worktree)
+and appeared in exactly one other source (present in that source's
+worktree, not yet committed). A node that vanished from, or appeared
+in, more than one source is ambiguous and is skipped.
+
+Opens a buffer (=skg://stage-moves=) holding a bash script: a list
+of the moves followed by one loop that 'git rm's each file in its
+old source and 'git add's it in the new one. Before removing, the
+loop checks that the file is already gone from the old source's
+worktree (that is how the move was detected); a file still present
+there is skipped, not deleted, since 'git rm' would silently remove
+it. Review the script, then run it from the skg data root. Unlike
+most commands here, this one does not depend on the node at point;
+it reports moves across all sources.
+** <localleader>c : show a collection (both cols of a relation)
+These commands don't edit the graph. Each inserts a request into the
+metadata of the node at point that, on save, causes the server to
+render the relation's collections (cols) into the view, POPULATED from
+the graph. Each builds BOTH cols of its relation. The read-only-col ☮
+marks a col you cannot change from here. Every command auto-saves.
+*** <localleader>ca : :SkgShowCollectionAliases
+The aliasCol -- other text you could search for to find this node
+(you can always search for its title; most nodes have none). Writable:
+type an alias in and save.
+*** <localleader>co : :SkgShowCollectionOverrides
+The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+even when empty as an "add an override here" surface) and the
+overriderCol (the nodes that override this one -- read-only, ☮).
+*** <localleader>ch : :SkgShowCollectionHides
+The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these cols. On a node that neither
+hides nor is hidden, nothing appears.
+*** <localleader>cs : :SkgShowCollectionSubscribes
+The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberCol (the nodes that subscribe to
+this one -- read-only, ☮).
+** <localleader>p : show a path (the backpath through one relation role)
+Like the collections, each inserts a request that, on save, grafts the
+partners reached through one relation role as inverted, read-only
+children, climbing transitively until a fork, cycle, or root. UPPER =
+the partner's active (first) role; lower = its passive (second) role.
+Every command auto-saves.
+*** <localleader>pC : :SkgShowPathsThroughContainers
+The nodes that contain this node (its containment ancestry).
+*** <localleader>pL : :SkgShowPathsThroughLinkSources
+The nodes that link to this node (its textlink sources).
+*** <localleader>pl : :SkgShowPathsThroughLinkDests
+The nodes this node links to (its textlink dests).
+*** <localleader>pO : :SkgShowPathsThroughOverriders
+The nodes that override this node.
+*** <localleader>po : :SkgShowPathsThroughOverridden
+The nodes this node overrides.
+*** <localleader>pH : :SkgShowPathsThroughHiders
+The nodes that hide this node from their subscriptions.
+*** <localleader>ph : :SkgShowPathsThroughHidden
+The nodes this node hides from its subscriptions.
+*** <localleader>pS : :SkgShowPathsThroughSubscribers
+The nodes that subscribe to this node.
+*** <localleader>ps : :SkgShowPathsThroughSubscribees
+The nodes this node subscribes to.
+** <localleader>s : setting node properties
+*** first some vocab: 'definitive' and 'indefinitive'
+A view of a node can be definitive or indefinitive.
+Typically the first place in the buffer that depicts a node
+is the definitive view of it. So that other views of that node
+cannot contradict it, they are 'indefinitive': Edits to them
+cannot affect the node they depict. They are also truncated --
+that is, shown without content --
+in order to prevent the view from becoming redundant and huge.
+*** PITFALL: Don't make something 'definitive' by directly editing its metadata.
+Instead, use 'SetDefinitive' (<localleader>sd), below.
+That's because Skg has to make other instances of it
+(in this same buffer -- and maybe in the future other buffers too)
+indefinitive. That's because a buffer can only be saved
+if it has at most one definitive instance of a node.
+Otherwise, two definitive nodes could contradict each other.
+
+This same caveat does not apply to making a node indefinitive.
+While there does exist a command for that ('SetIndefinitive')
+you can also 'do it yourself'
+by visiting a metadata buffer for the node ('ViewMetadata',
+<localleader>vm).
+*** <localleader>sd : :SkgSetDefinitive
+If you want to see the definitive view of that node
+from a place where it is currently shown in an indefinitive form,
+call this function. It will make the current definitive view
+(if it exists) indefinitive, and then draw a definitive view here.
+*** <localleader>si : :SkgSetIndefinitive
+This marks a node as 'indefinitive',
+as described above.
+In brief, it means edits to its title, body or
+  (more importantly) children
+will not affect it
+  (although edits to its children will affect those children,
+  unless they are also indefinitive).
+*** <localleader>ss : :SkgSetSource
+Changes the source of the node at point.
+The prompt starts with the current source as editable command-line
+text. You can type the new source name directly,
+or use S-Left / S-Right to cycle through owned sources;
+TAB completes among all configured source names.
+
+The Emacs client's C-? helper (which opened an org buffer listing
+every source from inside the minibuffer) has no cmdline analog --
+few terminals deliver C-? reliably -- so it's dropped; run
+':SkgViewSourceList' beforehand (or afterward) instead. It shows
+the same thing: an org buffer listing every configured source name
+as a headline, with that source's path as the headline body.
+
+The command only edits the node's metadata in the current buffer.
+Save the view afterward (':w') to apply the move.
+*** <localleader>sS : :SkgSetSourceRecursive
+Like 'SetSource', but it also
+changes the source of every content descendent of the node at point
+whose source matches the original source of the node at point.
+Only descendents for which ParentIs=Affected are traversed.
+*** <localleader>sm : :SkgSetMergeRequest
+(See [[./merging.org][the docs on merging]] for why would you merge two nodes,
+and what it means to do that.)
+
+Run this from the acquirer node.
+It prompts for the acquiree, accepting either a bare ID
+or an org link like =[[id:ID][label]]=,
+and edits the acquirer's metadata to request a merge.
+
+The command only edits the node's metadata in the current buffer.
+Save the view afterward to apply the merge.
+** <localleader>m : other graph modifications
+*** <localleader>mc : :SkgReplaceLinkWithContent
+Replace the leaf at point with a content relationship to the
+node it links to, then save the buffer.
+
+Point can be on the headline or in the node body. The node at
+point can be new or already in the graph. If it already has an
+ID, the command warns that the old node might become an orphan.
+
+The headline title plus body must contain exactly one org bracket
+link, and that link must be an =id:= link. The node must have no
+org-descendents. Its org-parent must be a definitive activeNode
+whose source is owned in =skgconfig.toml=.
+
+The command replaces the whole leaf with a same-level
+indefinitive activeNode for the link dest. The parent is
+definitive, so saving records the dest as content of the
+parent; the replacement child is indefinitive, so its own text is
+not rewritten from the link label.
+*** <localleader>mf : :SkgFork
+Fork the node at point that you ALREADY own: create a private
+clone that overrides it. This is the explicit counterpart to the
+implicit fork (which is triggered by editing a /foreign/ node);
+use it to deepen an override chain, e.g. to layer a private =D=
+over a public clone =C= that already overrides a foreign =N=.
+
+Refuses if the buffer has unsaved changes ("Save the buffer
+before forking."), so the clone's snapshot matches what you see.
+Otherwise it stamps the node and auto-saves; the server returns
+the usual fork-confirmation buffer (=skg://fork-confirmation=).
+There you MUST set the clone's source with 'SetSource'
+(<localleader>ss) (it starts as the placeholder PICK-A-SOURCE,
+with your config-first owned source suggested above it), then
+approve with <localleader>cc; or decline with <localleader>ck
+(which also strips the fork request so the next save does not
+re-fork). ':w' on the fork-confirmation buffer refuses and points
+you back at these two keys.
+
+The clone subscribes to and overrides the node, and the original
+keeps its own (owned) content. A node may have at most one clone
+you own; forking an already-forked node is rejected, naming the
+existing clone. See =docs/forks.md=.
+*** <localleader>ml : :SkgReplaceContentWithLink
+Replace the branch at point with a link to the node that used to
+be there, then save the buffer.
+
+Point can be on the headline or in the node body.
+The command uses the headline either way.
+
+The node being replaced must be an existing activeNode with an ID,
+and an org-child of a definitive activeNode whose source is
+owned in =skgconfig.toml=. The command acts locally,
+replacing only this occurrence in the current buffer:
+the headline at point and all of its org-descendents,
+including scaffolds and phantoms,
+are removed from the view and replaced by a same-level headline
+whose title is an =[[id:...][...]]= link to the original node.
+
+If the original headline title already contains a link, the
+command asks "Are you sure?" before proceeding.
+** <localleader>v : view-level commands
+*** <localleader>vd : :SkgViewDiffMode
+If you use git to manage your data,
+enable this view to see what you've changed since your last commit,
+i.e. how your worktree differs from HEAD.
+Refuses while any skg buffer has unsaved edits.
+*** <localleader>ve : :SkgViewNewEmpty
+Asks you to pick a data source,
+and then provides a root node with that source.
+**** why
+Every node needs a source.
+Children can inherit from their parents,
+but to make a root (which has no parents)
+you need to choose its source explicitly.
+*** <localleader>vh : :SkgHeraldsToggle
+This command toggles it.
+This toggles whether, at the start of every node,
+metadata is shown in its full plain-text glory,
+or is instead summarized via brief 'heralds'.
+It is turned on at every view by default.
+*** <localleader>vl : :SkgLimitSourceSet
+Limits display and search to one configured source-set for this
+Neovim connection.
+
+The command asks which source-set to activate, with TAB completion
+and S-Left / S-Right cycling. It then closes open Skg
+buffers after confirmation, and tells the server to use that
+source-set for subsequent requests. Choose =all= to remove the
+limit.
+*** <localleader>vm : :SkgViewMetadata
+When called from a node in a view of the graph,
+this switches to a view of the metadata of that node,
+with one field per org branch. ':w' (or <localleader>cc) commits
+the edited tree back into the source headline; ':bd!' cancels;
+S-Left / S-Right cycle a field's value (indef, parentIs,
+editRequest, source, ...).
+It's easy to edit this way.
+Note that some properties don't make sense to edit,
+like the count of how many contents it has.
+(If you want to change how much content a node has,
+don't change the node's metadata; change its children in the view.)
+*** <localleader>vo : :SkgViewOrgAncestry
+If you're at a headline so deep in the tree
+that you can't remember where it came from,
+this brings you to a new view showing only that ancestry.
+This actually works in org-mode outside of skg.
+(skg uses org-mode, but org-mode can be used without skg.)
+*** <localleader>vr : :SkgReadableIdsToggle
+This changes how node IDs are displayed.
+The ID itself is a kind of special random gibberish called UUID v4.
+When ReadableIdsToggle is on,
+only the first 8 characters of the ID are shown (the rest is
+concealed to an ellipsis, though the underlying text -- and
+copy-paste -- still has the full ID),
+and they are followed by the title of the node with that ID,
+if Skg can figure it out. Works in .skg file buffers and in
+git-status / git-diff buffers alike.
+(It doesn't yet know how to read the git history
+to find titles for deleted files.)
+*** <localleader>vs : :SkgViewIdStack
+View and maybe edit the set of links you've stored.
+(See "the linkstack" below.)
+*** <localleader>vw : :SkgViewWithoutMetadata
+If a Visual-mode selection is active (or was just left, via the
+='<,'>= marks), opens a new org buffer containing that region,
+but with the '(skg ...)' metadata stripped from every headline.
+Otherwise it does nothing.
+This is useful for copying a read-only projection of some data
+into another application.
+** <localleader>{i|u|o} : IDs, links and the linkstack
+*** some background
+**** IDs are mostly invisible, but good to know about.
+Every node has an ID,
+which you can see if you disable heralds ('HeraldsToggle',
+<localleader>vh).
+Every link also has an ID and a label,
+but all you see when you look at the ID is the label,
+unless you disable org-mode (say, by switching to text-mode).
+You should never need to see IDs explicitly.
+**** The linkstack
+is, like it sounds, a stack of links.
+A stack is just a list that you interact with,
+mostly from one side, the 'top':
+You can 'push' something onto the top of the stack,
+and you can 'pop' something off of the top of the stack.
+But you can also jump to a view of your entire stack,
+using (copying, pasting, deleting) it
+without any restrictions on order.
+*** ]i (also <localleader>in) : :SkgIdNext
+Makes the cursor hop among two kinds of IDs:
+The ID associated with a node in the view,
+and the ID associated with a link in a node's title.
+Every node has an ID,
+but a title can include multiple or no links.
+*** [i (also <localleader>ip) : :SkgIdPrev
+See IdNext, above.
+*** the stack of links/ids
+<localleader>u for push, <localleader>o _ for paste,
+<localleader>O _ for pop.
+
+Inside a Vim command-line prompt (search, an Ex command's argument,
+...), <localleader> chords aren't available, so paste and pop also
+ride cmdline-mode mappings: <C-x>i pastes the top id, <C-x>l pastes
+a link to it, <C-x>I pops the id, <C-x>L pops the link. (Push, and
+pasting/popping a full node, have no cmdline form -- do those from
+a buffer.)
+**** <localleader>u : :SkgIdPush
+Stores, in the id stack,
+a link to the node the cursor is on.
+**** <localleader>oi : :SkgPasteId
+Inserts the ID at the top of the id stack at the cursor.
+Does not modify the stack.
+**** <localleader>Oi : :SkgPopId
+Like PasteId,
+but also removes the node from the stack.
+**** <localleader>ol : :SkgPasteLink
+Inserts, at the cursor, a link to the node
+whose ID is at the top of the id stack.
+Does not modify the stack.
+**** <localleader>Ol : :SkgPopLink
+Like PasteLink,
+but also removes the node from the stack.
+**** <localleader>on : :SkgPasteNode
+This is the easiest way to give a node multiple containers --
+push it to the stack, then paste it as a node somewhere else.
+
+Inserts, at the cursor, an indefinitive view
+of the node whose ID is at the top of the id stack.
+Its metadata includes only the ID and =indef=,
+and its title comes from the stack.
+Does not modify the stack or save.
+Saving will provide the rest of its metadata.
+**** <localleader>On : :SkgPopNode
+Like PasteNode,
+but also removes the node from the stack.
+**** <localleader>vs : :SkgViewIdStack
+repeated here; described earlier in this doc
+** buffer mechanics with no Emacs-chord counterpart
+These are defined directly in =attach_content_view=
+(nvim/lua/skg/keymaps.lua) rather than translated from a =C-c=
+chord: they ride keys nvim already gives special meaning to.
+*** <Tab> : toggle the fold at point
+Equivalent to org's own =za=: opens or closes the fold under the
+cursor.
+*** <S-Tab> : toggle global fold visibility
+All folds closed <-> all folds open, buffer-wide.
+*** ^ : :SkgBeginningOfLine
+Toggles the cursor between the start of the line and the start of
+the title (the text after the stars and any =(skg ...)= metadata).
+The nvim analog of the Emacs client's C-a toggle. On a
+non-headline, it's just beginning-of-line.
+*** cit / ciT : cycle the TODO keyword
+Cycles the headline's TODO keyword forward (=cit=) or backward
+(=ciT=) without corrupting its metadata: the =(skg ...)= sexp is
+stripped before org's own TODO-cycling runs, then re-inserted
+after the stars and before the (possibly new) keyword.
+** exporting to org
+*** :SkgExportToOrg
+Exports Skg data to plain =.org= files, so the data can be read
+(and navigated on GitHub) without running Skg. No keybinding.
+
+It asks two things:
+- which source-set to export (command-line input with TAB
+  completion and S-Left / S-Right cycling); only nodes from that
+  set are included. Choose a public-facing source-set so private
+  notes are not exported; exporting =all= warns you about this.
+- which directory to write to (default =org-exports=). This path
+  is interpreted *by the server*, relative to the project root the
+  server runs from. Because the server may run inside a Docker
+  container whose filesystem differs from the host running Neovim,
+  this prompt has no path completion. An absolute path is used
+  as-is.
+
+A node is exported when one of its children's title links to the
+export-instruction node and that child's body gives a
+=target_filepath= (TOML-ish: =target_filepath = docs/setup=,
+quoted if it contains whitespace). That parent is written to
+=<output-dir>/<target_filepath>.org= as a recursive content view,
+stripped of skg metadata. The marker child is omitted.
+
+Links are rewritten to relative org links. A link to another
+exported file's root points at that file; a link to a non-root
+node points deep, via =[[./file.org::*Heading][label]]=. A nested
+export root is shown as a link, not inlined. A link whose dest
+is not exported under the chosen set points to a "some links
+might be broken" note.
+
+Existing files in the output dir are overwritten in place; other
+files there are left untouched. (The same export is available
+from the command line for scripting:
+=cargo run --bin skg -- export-org [config] [source-set] [output-dir]=.)
+** connection, reload, rebuild dbs
+Unless you're coding or troubleshooting,
+you probably won't need these.
+*** :SkgConnectionVerify
+Sends a ping to the Rust server
+to check if the connection is working.
+Displays the result in the echo area.
+*** :SkgConnectionEnd
+Closes the TCP connection to the Rust server.
+*** :SkgRebuildDbs
+Rebuilds TypeDB and Tantivy databases,
+using the .skg files on disk.
+Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
+to close them.
+*** :SkgCloseAllSkgBuffers
+This may be warranted after a database rebuild.
+Kills every skg view buffer (each triggers a close-view notice to
+the server first).
+*** :SkgReload
+Unloads all skg Lua modules and reloads them from disk.
+Useful when you've changed Lua code
+and want to pick up the changes without restarting Neovim.
+* TODO edits for the above
+** division scheme
+Globally change view
+do to Viewnode
+do to Webnode
+do to Text
+Copy
+Paste
