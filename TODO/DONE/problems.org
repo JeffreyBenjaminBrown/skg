@@ -1,3 +1,24 @@
+** The fork-source integration test is stale and fails (emacs client)
+   tests/integration/fork-source/test-emacs.el asserts the
+   fork-confirmation buffer contains '(source owned)' -- the inferred
+   source written directly into the clone-to-be's metadata. But the
+   server (server/from_text/fork.rs) always pre-fills the
+   PICK-A-SOURCE placeholder there and only SUGGESTS the inferred
+   source in a comment line ('# Suggested source for the clone below:
+   owned ...'). That placeholder mechanism is the documented, intended
+   behavior (docs/COMMANDS.org on skg-fork-node; glossary.md), so the
+   TEST predates it and fails today; verified by running it during the
+   vim-client port (2026-07-02). Its file date (Jun 13) vs the other
+   fork tests (Jun 22) supports this reading. The rest of the test
+   (rotate to owned2, approve, clone lands in owned2) is still
+   sensible. The nvim mirror
+   (tests/integration/fork-source/test-nvim.lua) asserts the
+   documented placeholder behavior instead and passes; the elisp
+   assertion should be updated the same way.
+   RESOLVED 2026-07-02, same session: the elisp assertion was updated
+   to expect the placeholder plus the suggestion comment (mirroring
+   the nvim test), and both clients' fork-source tests now pass.
+
 * HOW TO USE THIS FILE
   Finished problems, moved out of TODO/problems.org. When a problem in
   that file is done (fixed, resolved, or obsolete), PREPEND its entry

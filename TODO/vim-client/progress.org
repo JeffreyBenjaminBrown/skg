@@ -1,0 +1,102 @@
+#+TITLE: Progress: the Neovim client
+# Running log kept during execution of ./plan.org, per
+# ../../coding-advice/when-to-stop.org. Categories per that document.
+# Newest entries go at the top of each section.
+
+* what's done and went well
+- 2026-07-02: FULL TEST PARITY reached. Every applicable tests/elisp
+  suite has a plenary.busted mirror (~200 specs), and all 34
+  tests/integration directories carry a passing test-nvim.lua beside
+  their test-emacs.el, validated against live servers. Per the
+  farm-out agreement, the 32 non-exemplar mirrors and the
+  COMMANDS-nvim.org conversion were written by seven delegated Sonnet
+  agents against a briefing + two exemplars I wrote; every file was
+  then validated (and, where needed, fixed) here. Quality was high:
+  28 of 30 test files passed on their first live run.
+- 2026-07-02: The port surfaced and fixed a STALE pre-existing emacs
+  test: fork-source asserted '(source owned)' in the fork-confirmation
+  buffer, predating the documented PICK-A-SOURCE placeholder; it was
+  failing for the emacs client too. Both clients' versions now assert
+  the documented behavior and pass (entry moved to DONE/problems.org).
+- 2026-07-02: bash/all-tests.sh runs a labeled Neovim unit phase and
+  every integration dir once per client (CLIENT/DIRECTORY lines;
+  SKG_SKIP_NVIM_INTEGRATION=1 skips the second pass). Docs done:
+  docs/COMMANDS-nvim.org, nvim/README.org, and the final deviations
+  report at ./deviations.org.
+- 2026-07-02: Ops lesson banked: four plenary child nvims orphaned by
+  a timed-out harness run spun at full CPU for an hour (the user's
+  laptop-heat report). bash/nvim-tests.sh now reaps such orphans
+  (headless + plenary.busted + parent PID 1) before each run.
+- 2026-07-02: Save pipeline ported: lock (modifiable-flag locks +
+  single-flight stream guard, joined to the connection-reset hooks),
+  save (marker round-trip, the four-handler stream with the
+  save-relax-lock pending-count subtleties preserved, point/scroll
+  restoration with entry clamping, error/warning channels), and the
+  full fork-confirmation flow (source walk, placeholder refusal,
+  approve re-save with fork-sources pairs, decline strip). All
+  exercised end-to-end through the loopback fake server, including
+  the collateral lock lifecycle. Two fixes surfaced by these tests:
+  the sexp reader now follows the elisp reader on \n/\t escapes, and
+  fold restoration forces expr-fold recomputation (zx) and cannot
+  spin when a close fails.
+- 2026-07-02: Buffers & display tier ported: payload/messages helpers,
+  buffer (view registry on vim.b, skg:// naming, acwrite + BufWriteCmd
+  so ':w' saves, close-view on delete, first-change warning),
+  heralds (extmark conceal + inline virt_text; all 8 elisp test
+  scenarios mirrored incl. self-heal and bounded retry; structural-
+  colon stripping byte-verified against the elisp function on five
+  cases), content_view (open/switch-to-view/override-menu/messages),
+  keymaps (the complete localleader surface + :Skg* Ex commands with
+  lazy module resolution, so unported commands report politely).
+  Verified live against real data: a content view of a real node
+  opened with correct title-derived name and heralds rendering
+  '1C ⌂decid', matching the Emacs display.
+- 2026-07-02: Networking tier ported and verified LIVE: state (handler
+  registry, LP receiver state, linkstack home, connection-reset
+  hooks), length_prefix (framing machine + dispatcher),
+  client (vim.uv TCP with scheduled main-loop delivery,
+  busy-initializing teardown, sentinel cleanup), misc_requests
+  (verify-connection), herald_rules (fetch + bounded-retry ensure).
+  Unit specs include a loopback fake server (connect, one-byte-chunk
+  reassembly, busy-initializing, sentinel). Against the real server:
+  init handled busy-initializing during TypeDB startup, then verified
+  the connection and fetched+parsed the 25-entry herald rule table.
+  Wire fact worth recording: the Rust sexp crate prints string atoms
+  BARE unless they need quoting, so response-type values arrive as
+  symbols; the api-and-formats.md examples that show them quoted are
+  notational only.
+- 2026-07-02: The pure logic tier is ported with mirrored tests, all
+  green: sexpr/parse (the read/prin1 stand-in; round-trips the pinned
+  herald-rules fixture and prints byte-identically to Emacs prin1 on
+  wire shapes), sexpr/compare, sexpr/edit_dsl, sexpr/lens (tokens are
+  chunk lists, the shape nvim virtual text wants), sexpr/org_bijection,
+  sexpr/activenode_defaults, config (TOML scan). ~140 specs.
+- 2026-07-02: Scaffolding: nvim/ plugin layout, log, reload,
+  plenary.busted harness, bash/nvim-tests.sh.
+- 2026-07-02: Plan settled (all nine questions answered; decisions
+  folded into plan.org's "Settled decisions"). Execution begun on the
+  'nvim' branch.
+
+* Changes to the plan's envisioned order
+- The goto-in-git PARENT variant went straight to the plan's fallback
+  (a plain git-diff buffer searched for the id) rather than trying
+  neogit first: neogit exposes no stable API for landing on a hunk
+  line, and the fallback carries the same information. The FILE
+  variant does open neogit, landing on the file entry by text search
+  over the status buffer.
+
+* what's imperfect about what's done
+- Fold deviations, unavoidable in vim's fold model (documented in
+  nvim/lua/skg/folds.lua and destined for deviations.org): a closed
+  fold shows a one-line placeholder where org hid text entirely; a
+  ONE-LINE body cannot be body-folded (vim cannot close a single-line
+  fold), so bodyFolded on such a body degrades gracefully -- the body
+  stays visible and the marker is not re-recorded on save.
+- The picker drops the elisp prompt's C-? show-all-sources helper key
+  (few terminals deliver C-?); :SkgViewSourceList provides the list.
+
+* choices determining the future
+- Test-parity depth is FULL (Q6 option A), not the recommended B: every
+  applicable tests/elisp file gets a busted mirror and every
+  tests/integration dir gets a test-nvim.lua. bash/all-tests.sh must
+  echo which client suite it is running, so slow runs are attributable.

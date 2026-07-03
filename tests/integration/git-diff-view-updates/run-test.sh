@@ -115,7 +115,7 @@ EOF
 start_skg_server
 
 export SKG_DATA_DIR="$SKG_DATA"
-run_emacs_test "test-emacs.el"
+run_client_test
 
 echo ""
 echo "=== Test Complete ==="
