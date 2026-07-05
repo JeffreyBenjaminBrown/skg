@@ -196,3 +196,30 @@ run_emacs_test() {
     TEST_RESULT=1
   fi
 }
+
+# Function to run an nvim-client integration test, the analog of
+# run_emacs_test. The test file is a Lua script driven headless.
+run_nvim_test() {
+  local test_file="$1"
+  echo ""
+  echo "Running Neovim integration test..."
+  cd "$TEST_DIR"
+  if SKG_TEST_PORT="$AVAILABLE_PORT" nvim --headless -l "$test_file"; then
+    echo "✓ Integration test PASSED."
+    TEST_RESULT=0
+  else
+    echo "✗ Integration test FAILED."
+    TEST_RESULT=1
+  fi
+}
+
+# Dispatch on SKG_TEST_CLIENT: each run-test.sh calls this instead of
+# run_emacs_test directly, so the same test directory serves both
+# clients (bash/all-tests.sh runs the directory once per client).
+run_client_test() {
+  if [ "${SKG_TEST_CLIENT:-emacs}" = "nvim" ]; then
+    run_nvim_test "test-nvim.lua"
+  else
+    run_emacs_test "test-emacs.el"
+  fi
+}

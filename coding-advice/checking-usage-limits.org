@@ -1,0 +1,111 @@
+* Checking usage limits (Claude Code only -- NOT Codex)
+
+  This whole file is about *Claude Code* running against an
+  Anthropic subscription. If some future incarnation of this repo is
+  being driven by *Codex* (OpenAI), none of the specifics below apply:
+  the credential file, the token shape, the API endpoint, and the
+  rate-limit header names are all different. The *idea* -- "read your
+  remaining quota from response headers and downshift the model when
+  it's running low" -- might carry over, but the mechanism would have
+  to be rebuilt for OpenAI's headers. As of this writing Jeff expects
+  to keep using Claude, but Jeff is not his future self, so: if you're
+  Codex, stop reading and don't trust the two scripts named here.
+
+* The problem this solves
+
+  An agent that could see how much of its usage window it has burned
+  could *modulate its own model use* -- e.g. drop from Opus to Sonnet
+  to Haiku as the session window fills, or pause until the window
+  resets -- instead of blindly hitting a wall.
+
+  The catch: the numbers you see in the interactive =/usage= screen are
+  *not* stored anywhere on disk, and the debug/TUI output that would
+  show them is suppressed when stdout isn't a real terminal. So you
+  can't scrape =/usage=, and you can't usefully "echo into" a Claude
+  session to read it back.
+
+* Where the numbers actually live
+
+  Every =/v1/messages= API *response* carries them, in headers:
+
+  | header                                       | meaning                                  |
+  |----------------------------------------------+------------------------------------------|
+  | anthropic-ratelimit-unified-5h-utilization   | fraction of the *session* (5h) window used |
+  | anthropic-ratelimit-unified-5h-reset         | epoch when the session window resets     |
+  | anthropic-ratelimit-unified-7d-utilization   | fraction of the *weekly* (7d) window used  |
+  | anthropic-ratelimit-unified-7d-reset         | epoch when the weekly window resets       |
+  | anthropic-ratelimit-unified-representative-claim | which window is currently binding    |
+
+  utilization is a fraction: 0.1 means 10% used. This is the same raw
+  data the =/usage= screen renders.
+
+  A live agent doing real work is *already receiving* these headers on
+  every turn -- they just aren't surfaced to the model, and there's no
+  hook that exposes response headers. So to read them you have to make
+  a request whose headers you can inspect.
+
+* The two tools (both in =bash/=)
+
+** =claude-usage.sh= -- on-demand probe
+
+   Reads the OAuth access token from =.credentials.json= (read-only --
+   it never writes your credentials), makes one =max_tokens:1= Haiku
+   call, and prints JSON:
+
+   #+begin_example
+   { "session_5h": { "used_pct": 25.0, "reset_epoch": ..., "seconds_left": 7487 },
+     "weekly_7d":  { "used_pct": 4.0,  "reset_epoch": ..., "seconds_left": 277487 },
+     "binding_window": "five_hour" }
+   #+end_example
+
+   Cost: one tiny call per invocation. Fine for a decision point; too
+   costly if every agent calls it constantly. For that, use the poller.
+
+** =claude-usage-poller.sh= -- shared background snapshot
+
+   #+begin_example
+   nohup ./bash/claude-usage-poller.sh [interval_secs] [out_file] &>/dev/null &
+   # defaults: 180s cadence, snapshot at $HOME/.claude-usage.json
+   #+end_example
+
+   One daemon polls on a fixed cadence and writes the JSON (plus a
+   =polled_at= epoch) to a file via an atomic rename. Then *any* number
+   of agents read that file for *free* -- no per-check API call. The
+   trade is: instead of N agents each spending a call, one poller
+   spends a negligible call every =interval= (~100 Haiku calls over a
+   5h window at the 180s default).
+
+   Readers should check =polled_at=: if it's old, the poller died or
+   its probe is failing, and the numbers are stale.
+
+* How an agent uses this to modulate model choice
+
+  Read the snapshot at natural decision points (not every turn) and
+  branch on =session_5h.used_pct=. A reasonable policy:
+
+  - < 80%  -> proceed normally
+  - 80-95% -> downshift (Opus -> Sonnet, or Sonnet -> Haiku)
+  - > 95%  -> do only cheap/essential work, or wait out =seconds_left=
+
+  Tune the thresholds to how much headroom you want. =binding_window=
+  tells you whether the 5h or the 7d window is the one about to bite.
+
+* Caveats
+
+  - *Coarse numbers.* utilization is rounded (e.g. 0.1), good enough
+    for throttling thresholds, not for precise accounting.
+
+  - *Token expiry.* Both scripts read whatever access token
+    =.credentials.json= currently holds. Claude Code refreshes that
+    token in the background, so while a live session is running the
+    scripts ride along fine. But a *detached* poller with no live
+    Claude Code to refresh the token will start getting 401s once the
+    token expires (~every several hours); its snapshot then goes stale
+    and =polled_at= stops advancing. We deliberately did NOT add
+    self-refresh (reading the refreshToken and minting a new access
+    token), because the intended use is an agent inside a live session.
+    If you later need an unattended, long-lived poller, that
+    self-refresh is the missing piece to add.
+
+  - *Reading, not writing, credentials.* Per =coding-advice/ai-agents.org=,
+    don't touch Jeff's credentials. These scripts only read them.

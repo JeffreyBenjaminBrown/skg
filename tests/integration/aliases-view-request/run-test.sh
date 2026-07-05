@@ -103,7 +103,7 @@ EOF
 
 start_skg_server
 
-run_emacs_test "test-emacs.el"
+run_client_test
 
 echo ""
 echo "=== Test Complete ==="

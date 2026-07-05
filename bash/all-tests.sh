@@ -20,14 +20,18 @@ usage () {
   cat <<EOF
 Usage: $0 [--no-sound]
 
-Runs Emacs, nextest, and integration tests sequentially with conservative
-internal concurrency.
+Runs Emacs, Neovim, nextest, and integration tests sequentially with
+conservative internal concurrency. Integration tests run once per
+client (emacs, then nvim), labeled CLIENT/DIRECTORY in the output.
 
 Options:
   --no-sound   Do not play the completion sound.
   -h, --help   Show this help.
 
 Environment:
+  SKG_SKIP_NVIM_INTEGRATION=1
+                             Skip the nvim-client integration pass
+                             (halves integration wall-clock).
   SKG_CARGO_BUILD_JOBS       Cargo build jobs. Default: 2.
   SKG_NEXTEST_BUILD_JOBS     Build jobs for the nextest phase.
                              Default: half the cores, capped at 8.
@@ -117,6 +121,20 @@ else
 fi
 ELAPSED_EMACS=$((SECONDS - T_EMACS))
 
+T_NVIM=$SECONDS
+echo -n "  Neovim tests ... "
+if (
+  cd "$PROJECT_ROOT"
+  skg_low_priority "$SCRIPT_DIR/nvim-tests.sh"
+) >"$RESULTS_DIR/nvim.log" 2>&1; then
+  EXIT_NVIM=0
+  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_NVIM))s)${NC}"
+else
+  EXIT_NVIM=$?
+  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_NVIM))s)${NC}"
+fi
+ELAPSED_NVIM=$((SECONDS - T_NVIM))
+
 T_NEXTEST=$SECONDS
 echo -n "  Nextest ... "
 if (
@@ -138,34 +156,46 @@ fi
 ELAPSED_NEXTEST=$((SECONDS - T_NEXTEST))
 
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
-INTEGRATION_NAMES=()
+INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
 INTEGRATION_STARTED=()
 INTEGRATION_EXITS=()
 INTEGRATION_ELAPSED=()
-INTEGRATION_FAILED=()
+INTEGRATION_FAILED=()  # entries are "CLIENT/DIR-NAME"
 
-echo "  Integration tests ..."
+# Every integration directory runs once per client. The nvim pass is
+# the second half of the wall-clock cost; skip it in a hurry with
+# SKG_SKIP_NVIM_INTEGRATION=1.
+INTEGRATION_CLIENTS=(emacs nvim)
+if [ "${SKG_SKIP_NVIM_INTEGRATION:-0}" = "1" ]; then
+  INTEGRATION_CLIENTS=(emacs)
+fi
 
-for dir in "$INTEGRATION_DIR"/*/; do
-  [ -f "$dir/run-test.sh" ] || continue
-  name="$(basename "$dir")"
-  t_integration=$SECONDS
-  INTEGRATION_NAMES+=("$name")
-  INTEGRATION_STARTED+=($t_integration)
-  echo -n "    $name ... "
-  if (
-    cd "$dir"
-    skg_low_priority ./run-test.sh
-  ) >"$RESULTS_DIR/integration-$name.log" 2>&1; then
-    rc=0
-    echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - t_integration))s)${NC}"
-  else
-    rc=$?
-    echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - t_integration))s)${NC}"
-    INTEGRATION_FAILED+=("$name")
-  fi
-  INTEGRATION_EXITS+=($rc)
-  INTEGRATION_ELAPSED+=($((SECONDS - t_integration)))
+for client in "${INTEGRATION_CLIENTS[@]}"; do
+  echo "  Integration tests ($client client) ..."
+  for dir in "$INTEGRATION_DIR"/*/; do
+    [ -f "$dir/run-test.sh" ] || continue
+    if [ "$client" = "nvim" ] && [ ! -f "$dir/test-nvim.lua" ]; then
+      continue
+    fi
+    name="$client/$(basename "$dir")"
+    t_integration=$SECONDS
+    INTEGRATION_NAMES+=("$name")
+    INTEGRATION_STARTED+=($t_integration)
+    echo -n "    $name ... "
+    if (
+      cd "$dir"
+      SKG_TEST_CLIENT="$client" skg_low_priority ./run-test.sh
+    ) >"$RESULTS_DIR/integration-${client}-$(basename "$dir").log" 2>&1; then
+      rc=0
+      echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - t_integration))s)${NC}"
+    else
+      rc=$?
+      echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - t_integration))s)${NC}"
+      INTEGRATION_FAILED+=("$name")
+    fi
+    INTEGRATION_EXITS+=($rc)
+    INTEGRATION_ELAPSED+=($((SECONDS - t_integration)))
+  done
 done
 
 echo ""
@@ -187,11 +217,14 @@ if [ ${#INTEGRATION_FAILED[@]} -gt 0 ]; then
     "$PROJECT_ROOT/target/debug/cleanup-test-dbs" >/dev/null 2>&1 || true
     echo -n "  $name ... "
 
+    # NAME is "CLIENT/DIR-NAME"; split it back apart.
+    retry_client="${name%%/*}"
+    retry_dir="${name#*/}"
     T_RETRY=$SECONDS
     (
-      cd "$INTEGRATION_DIR/$name"
-      skg_low_priority ./run-test.sh
-    ) >"$RESULTS_DIR/retry-$name.log" 2>&1
+      cd "$INTEGRATION_DIR/$retry_dir"
+      SKG_TEST_CLIENT="$retry_client" skg_low_priority ./run-test.sh
+    ) >"$RESULTS_DIR/retry-${retry_client}-${retry_dir}.log" 2>&1
     rc=$?
     elapsed=$((SECONDS - T_RETRY))
 
@@ -222,6 +255,13 @@ else
   overall=1
 fi
 
+if [ $EXIT_NVIM -eq 0 ]; then
+  echo -e "  ${GREEN}PASS${NC}  Neovim tests"
+else
+  echo -e "  ${RED}FAIL${NC}  Neovim tests  (see nvim.log)"
+  overall=1
+fi
+
 if [ $EXIT_NEXTEST -eq 0 ]; then
   echo -e "  ${GREEN}PASS${NC}  Nextest"
 else
@@ -240,7 +280,7 @@ elif [ $n_real -eq 0 ]; then
 else
   echo -e "  ${RED}FAIL${NC}  Integration    ($n_real real failure(s))"
   for name in "${RETRY_STILL_FAILING[@]}"; do
-    echo -e "         ${RED}-${NC} $name  (see retry-$name.log)"
+    echo -e "         ${RED}-${NC} $name  (see retry-${name%%/*}-${name#*/}.log)"
   done
   overall=1
 fi
@@ -280,6 +320,13 @@ ORG="$RESULTS_DIR/ALL.org"
     echo "** FAIL : Emacs tests (${ELAPSED_EMACS}s) [[file:emacs.log]]"
   fi
 
+  # Neovim
+  if [ $EXIT_NVIM -eq 0 ]; then
+    echo "** PASS : Neovim tests (${ELAPSED_NVIM}s) [[file:nvim.log]]"
+  else
+    echo "** FAIL : Neovim tests (${ELAPSED_NVIM}s) [[file:nvim.log]]"
+  fi
+
   # Nextest
   if [ $EXIT_NEXTEST -eq 0 ]; then
     echo "** PASS : Nextest (${ELAPSED_NEXTEST}s) [[file:nextest.log]]"
@@ -298,15 +345,18 @@ ORG="$RESULTS_DIR/ALL.org"
   # *** primary run — failures first, then passes
   echo "*** primary run"
   echo "    Failures are listed first."
+  echo "    Names are CLIENT/DIRECTORY; every directory runs once per client."
   for i in "${!INTEGRATION_NAMES[@]}"; do
     [ ${INTEGRATION_EXITS[$i]} -ne 0 ] || continue
     name="${INTEGRATION_NAMES[$i]}"
-    echo "**** FAIL  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:integration-$name.log]]"
+    logname="integration-${name%%/*}-${name#*/}.log"
+    echo "**** FAIL  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:$logname]]"
   done
   for i in "${!INTEGRATION_NAMES[@]}"; do
     [ ${INTEGRATION_EXITS[$i]} -eq 0 ] || continue
     name="${INTEGRATION_NAMES[$i]}"
-    echo "**** PASS  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:integration-$name.log]]"
+    logname="integration-${name%%/*}-${name#*/}.log"
+    echo "**** PASS  $name (${INTEGRATION_ELAPSED[$i]}s) [[file:$logname]]"
   done
 
   # *** retry — only if there were primary-run failures
@@ -318,12 +368,14 @@ ORG="$RESULTS_DIR/ALL.org"
     for j in "${!RETRY_NAMES[@]}"; do
       [ ${RETRY_EXITS[$j]} -ne 0 ] || continue
       name="${RETRY_NAMES[$j]}"
-      echo "**** FAIL  $name (${RETRY_ELAPSED[$j]}s) [[file:retry-$name.log]]"
+      logname="retry-${name%%/*}-${name#*/}.log"
+      echo "**** FAIL  $name (${RETRY_ELAPSED[$j]}s) [[file:$logname]]"
     done
     for j in "${!RETRY_NAMES[@]}"; do
       [ ${RETRY_EXITS[$j]} -eq 0 ] || continue
       name="${RETRY_NAMES[$j]}"
-      echo "**** PASS  $name (${RETRY_ELAPSED[$j]}s) [[file:retry-$name.log]]"
+      logname="retry-${name%%/*}-${name#*/}.log"
+      echo "**** PASS  $name (${RETRY_ELAPSED[$j]}s) [[file:$logname]]"
     done
   fi
 

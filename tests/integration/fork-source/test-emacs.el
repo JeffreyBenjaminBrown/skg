@@ -62,8 +62,18 @@ the clone landed in the rotated source."
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
     (with-current-buffer confirm-buf
-      (unless (string-match-p "(source owned)" (buffer-string))
-        (test-fail "clone-to-be should default to source 'owned':\n%s"
+      ;; The server pre-fills the PICK-A-SOURCE placeholder and only
+      ;; SUGGESTS the inferred source in a comment line (fork.rs;
+      ;; documented in docs/COMMANDS.org and glossary.md). An earlier
+      ;; version of this test asserted "(source owned)" directly,
+      ;; which predates the placeholder mechanism -- see the 2026-07-02
+      ;; entry in TODO/problems.org.
+      (unless (string-match-p "(source PICK-A-SOURCE)" (buffer-string))
+        (test-fail "clone-to-be should carry the PICK-A-SOURCE placeholder:\n%s"
+                   (buffer-string)))
+      (unless (string-match-p "Suggested source for the clone below: owned"
+                              (buffer-string))
+        (test-fail "the inferred source 'owned' should be suggested:\n%s"
                    (buffer-string)))
       ;; Move to the clone-to-be parent (the first, level-1 headline) and
       ;; rotate its source -- what C-c s s does interactively.
