@@ -66,6 +66,15 @@ that is a leaf is deleted; one with children is demoted to
 `parentIs=Independent` so the user keeps any subtree they built under
 it; duplicates are deleted; missing graph members are restored.
 
+**Col scaffolds read the process-global graph handle.**  De-novo
+rendering of a node's cols (all the read-only cols, and the outbound
+`hiddenCol`/`overriddenCol`) consults `snapshot_global`, not the
+render environment's own in-Rust graph; only the `subscribeeCol` is
+built from the owner's outbound edges alone.  Production always has
+the handle installed, but a test harness that renders without it will
+see those cols silently missing (see `tests/partner_col_matrix.rs`,
+which installs the handle in its render-heavy function).
+
 **Independent children jump above the members.**  An `Independent`
 (non-member) child parked inside any col is reordered above the
 generated members on save (`complete_relevant_children` moves

@@ -56,6 +56,10 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
   (interactive)
   (skg--confirm-save-despite-other-unsaved)
+  (when (org-before-first-heading-p)
+    ;; Rather than complain, save as if point were at the first headline.
+    (goto-char (point-min))
+    (outline-next-heading))
   (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
          (save-excursion
            (org-back-to-heading t)

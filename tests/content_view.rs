@@ -201,7 +201,7 @@ async fn test_multi_root_view_with_shared_nodes (
          *** (skg (node (id 4) (source main) indef (birthHerald \"bH\") (rels \"2S 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (birthHerald \"bH\") (rels \"1L 2S O2 I1\"))) this title includes a [[id:22][textlink to another file]]
          ** (skg (node (id 2) (source main) indef (birthHerald \"aC\") (rels \"1L S2 I1\"))) title 2
-         ** (skg (node (id 5) (source main) (rels \"1L aH 2S O2 I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 5) (source main) (birthHerald \"O2\") (rels \"1L aH 2S I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg hiderCol)
          **** (skg (node (id 1) (source main) indef (birthHerald \"H2b\") (rels \"C2\") (viewStats cycle))) title 1
@@ -259,7 +259,7 @@ async fn test_multi_root_view_with_node_limit (
          *** (skg (node (id 4) (source main) indef (birthHerald \"bH\") (rels \"2S 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (birthHerald \"bH\") (rels \"1L 2S O2 I1\"))) this title includes a [[id:22][textlink to another file]]
          ** (skg (node (id 2) (source main) indef (birthHerald \"aC\") (rels \"1L S2 I1\"))) title 2
-         ** (skg (node (id 5) (source main) (rels \"1L aH 2S O2 I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 5) (source main) (birthHerald \"O2\") (rels \"1L aH 2S I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg hiderCol)
          **** (skg (node (id 1) (source main) indef (birthHerald \"H2b\") (rels \"C2\") (viewStats cycle))) title 1

@@ -45,3 +45,49 @@ fn test_newhere_cycle_survives_save()
     Ok(())
   })
 }
+
+/// Same round-trip as 'test_newhere_cycle_survives_save' but with the
+/// fixture transition staged (git add) rather than unstaged. The
+/// respawned cycle child should keep '(staged newM)' instead of
+/// '(unstaged newM)' -- guards the save-rerender pipeline's per-stage
+/// attribution for the newhere-cycle scaffold, mirroring
+/// ids::save::test_delete_id_col_scaffold_respawns_staged.
+#[test]
+fn test_newhere_cycle_survives_save_staged()
+  -> Result<(), Box<dyn Error>>
+{
+  let db_name = "skg-test-git-diff-view-newhere-cycle-save-staged";
+  let tantivy_folder = "/tmp/tantivy-test-git-diff-view-newhere-cycle-save-staged";
+
+  let temp_dir = TempDir::new()?;
+  let repo_path = temp_dir . path();
+  setup_git_repo_with_fixtures_staged (repo_path)?;
+
+  block_on(async {
+    let (config, driver, mut tantivy) =
+      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+
+    // First render the initial view (view pipeline — known to work).
+    let root_ids = vec![ID("1" . to_string())];
+    let (initial_view, _pids, _) : (String, Vec<ID>, _) =
+      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+
+    // Round-trip through the save pipeline.
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views            : OpenViews::new (),};
+    let (mut stream, _) = mk_test_tcp_stream_pair ();
+    let response = update_from_and_rerender_buffer(
+      &mut stream,
+      &initial_view, &driver, &config, &mut tantivy, &graph, true,
+      &Err ( String::new () ), &mut views_state ) . await?;
+
+    assert_buffer_contains( &response . saved_view,
+                            GIT_DIFF_VIEW_STAGED);
+
+    cleanup_test_dbs(db_name, &driver, Some(Path::new (tantivy_folder))) . await?;
+    Ok(())
+  })
+}

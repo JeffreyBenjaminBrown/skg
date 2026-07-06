@@ -18,10 +18,13 @@ pub fn render_report (
   let mut any_nodes : bool =
     ! report . duplicate_ids . is_empty ();
   for bucket in &report . buckets {
+    // Empty categories are rendered too (as bare headings), so a
+    // reader can see what the categories are, and thus (e.g.)
+    // that nothing was orphaned.
+    out . push_str (&format! ("** {}\n", bucket . name));
     if bucket . nodes . is_empty () {
       continue; }
     any_nodes = true;
-    out . push_str (&format! ("** {}\n", bucket . name));
     for node in &bucket . nodes {
       render_node_report (&mut out, node, report, &abbreviations); }}
   if ! any_nodes {

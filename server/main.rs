@@ -83,6 +83,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   init_tracing (&config);
 
+  { // Log which binary this is and how old it is, so a stale
+    // long-running server (one predating a code change) is obvious
+    // from the logs.
+    let exe : std::path::PathBuf =
+      std::env::current_exe ()
+      . unwrap_or_else ( |_| "unknown" . into () );
+    let age : String =
+      exe . metadata ()
+      . and_then ( |m| m . modified () )
+      . ok () . and_then ( |t| t . elapsed () . ok () )
+      . map ( |d| { let s : u64 = d . as_secs ();
+                    format! ( "{}h {}m {}s",
+                              s / 3600, (s % 3600) / 60, s % 60 ) } )
+      . unwrap_or_else ( || "unknown" . to_string () );
+    tracing::info! ( exe = %exe . display (),
+                     binary_age = %age,
+                     "Server binary" ); }
+
   let listener: TcpListener = // precedes initialize_dbs so Emacs can connect during init
     TcpListener::bind (
       & format! ("0.0.0.0:{}", config . port) ) ?;

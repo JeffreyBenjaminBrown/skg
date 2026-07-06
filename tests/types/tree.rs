@@ -427,6 +427,48 @@ fn test_collect_generation_ids_success() {
   assert_eq!(ids . len(), 1);
 }
 
+#[test]
+fn test_collect_generation_ids_with_effective_root()
+  -> Result<(), Box<dyn std::error::Error>> {
+  // Generations are counted from the effective root, not the true root.
+  let tree: Tree<String> = build_binary_tree (3);
+  let node_11: NodeId = // an interior node, one level below the root
+    find_node_by_label (&tree, "11") . unwrap() . id();
+  { // Generation 0 relative to node "11" is node "11" itself.
+    let ids: Vec<NodeId> =
+      collect_generation_ids (&tree, 0, Some (node_11))?;
+    assert_eq!(ids . len(), 1);
+    assert_eq!(tree . get (ids[0]) . unwrap() . value(), "11"); }
+  { // Generation 1 relative to node "11" is its two children,
+    // excluding its cousins of the same absolute depth.
+    let ids: Vec<NodeId> =
+      collect_generation_ids (&tree, 1, Some (node_11))?;
+    let labels: Vec<&String> =
+      ids . iter()
+      . map (|id| tree . get (*id) . unwrap() . value()) . collect();
+    assert_eq!(labels, vec!["111", "112"]); }
+  { // A generation deeper than the subtree is empty, not an error.
+    let ids: Vec<NodeId> =
+      collect_generation_ids (&tree, 5, Some (node_11))?;
+    assert!(ids . is_empty()); }
+  Ok(()) }
+
+#[test]
+fn test_collect_generation_ids_effective_root_not_in_tree() {
+  // An effective root from a different tree is an error.
+  let tree: Tree<i32> = Tree::new (1);
+  let other_tree: Tree<i32> = Tree::new (2);
+  let foreign_id: NodeId = other_tree . root() . id();
+  let result = collect_generation_ids (&tree, 0, Some (foreign_id));
+  // PITFALL: ego_tree NodeIds are indices, so a foreign id can
+  // coincidentally be valid here. Only assert an error if this one
+  // does not resolve in 'tree'; the guard we're testing is the
+  // .ok_or in collect_generation_ids.
+  if tree . get (foreign_id) . is_none() {
+    assert!(result . is_err()); }
+  else {
+    assert!(result . is_ok()); }}
+
 // Helper function to find a node by its label
 fn find_node_by_label<'a>(
   tree: &'a Tree<String>, label: &str

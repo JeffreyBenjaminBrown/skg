@@ -272,10 +272,10 @@ pub fn herald_rule_table () -> HeraldRule {
         crule (Blue, "rels", vec! [ any (vec! [RuleChild::It]) ]),
         crule (Blue, "viewStats", vec! [
           leaf (Blue, "cycle", "⟳"),
-          crule (Red, "overridesHere", vec! [
-            // ANY without IT: the marker's ID payload is matched
-            // but not echoed; only "Oh" is displayed.
-            any (vec! [ s ("Oh") ]) ]),
+          // overridesHere is displayed as the orange O birth herald
+          // (frontloaded in viewnodestats.rs), not here. The atom's
+          // ID payload is load-bearing save metadata, never displayed.
+          vac ("overridesHere"),
           crule (Green, "sourceHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
           leaf (Red, "delete", "delete"),

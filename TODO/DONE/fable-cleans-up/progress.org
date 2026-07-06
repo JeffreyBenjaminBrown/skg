@@ -1,0 +1,175 @@
+* PURPOSE
+  Log of the fable-cleans-up session (2026-07-03): triage of TODO.org,
+  TODO/problems.org, and the .skg notes for wishes that are feasible
+  and leave no substantial room for choice, followed by implementation
+  of the low-token ones. Sibling documents:
+  - [[./deferring-for-verification.org]] -- feasible but I had qualms.
+  - [[./by-jeff-for-jeff-to-interpret.org]] -- I couldn't pin down the wish.
+* how the .skg notes were surveyed
+  The org exporter only exports marked roots, so I temporarily added
+  export-marker nodes (per instruction node 3d9aa9be) under
+  9c5619e5 (the skg collection root), 215bc36a ("TODO plans | wishes"),
+  and aa20bffb ("skg docs"), ran 'cargo run --bin skg -- export-org',
+  and then reverted the data files byte-for-byte (no git ops in data/,
+  nothing committed). The three exports were read in full; per your
+  aesthetic-filter instruction, only wishes that looked clear AND easy
+  got deep analysis.
+* what's done and went well
+  All four test suites pass after every change below:
+  cargo nextest run (473/473), bash/emacs-tests.sh (252/252),
+  bash/nvim-tests.sh (7/7 files), bash/integration-tests.sh (all).
+** documentation (TODO/problems.org, "vim client" section)
+   - api-and-formats.md now documents the 'save-relax-lock' message
+     (between save-lock and the collateral stream) and the
+     'point-column' field of the save request and save-result.
+   - tests/USAGE.md rewritten: it pointed at the nonexistent
+     tests/emacs/test.el, omitted nextest and the integration runner,
+     and falsely claimed the Docker image lacks Emacs. It now defers
+     to coding-advice/claude-to-claude.org "Running Tests".
+** skg wish 79009c04 "Don't search a repo's .git folder."
+   Survey result: every production scanner of skg sources is a flat
+   (non-recursive) read_dir filtered to *.skg, so none can descend
+   into .git -- EXCEPT the org-roam importer, whose WalkDir recursed
+   into everything. server/import_org_roam.rs now uses
+   'filter_entry' to skip .git.
+** TODO.org "the diff report should include empty top-level categories"
+   server/diff_analysis/render.rs now renders every bucket heading,
+   empty or not, so a reader can see that (e.g.) nothing was orphaned.
+   Choices made (flagged here because they were mine): the
+   "IDs duplicated across sources" section is still suppressed when
+   empty (it is a warning, not a routine category), and the
+   "** no affected nodes" summary line is kept.
+** TODO.org "strip trailing whitespace from each line at save" (also under "s > correctness")
+   'divide_into_viewNodeLineCols'
+   (server/from_text/buffer_to_viewnodes/uninterpreted.rs) now maps
+   str::trim_end over the buffer's lines. Titles were already trimmed
+   downstream; this is what strips body lines. No test pinned trailing
+   whitespace, and the whole suite stayed green.
+** TODO.org "don't complain if point is before first headline on save"
+   skg-request-save-buffer (elisp/skg-request-save.el) now moves point
+   to the first headline instead of letting org-back-to-heading raise
+   "Before first headline". The nvim client already no-ops in that
+   case ('owning_headline_line' returns nil), so no parity gap.
+** TODO.org "remap C-c C-o during Skg in skg buffers" (under "easy")
+   C-c C-o is now bound to skg-goto in skg-content-view-mode-map and
+   skg-diff-analysis-mode-map (elisp/skg-keymaps-and-aliases.el),
+   shadowing org-open-at-point, which cannot follow skg links.
+   skg-goto was chosen over the non-interactive skg-visit-link because
+   it is the canonical follow-what's-at-point command (handles links,
+   raw UUIDs, metadata, filenames, and the override-choice menu).
+** TODO.org "beep also once the db has rebuilt" (under "easy")
+   The rebuild-dbs response handler (elisp/skg-request-rebuild-dbs.el)
+   now calls (ding) before its message. Note: I found no existing beep
+   anywhere in elisp/, so the "also" presumably refers to something in
+   your personal config.
+** problems.org "'mk_indefinitive_from_viewnode' silently drops fields"
+   Rewritten to mutate the ActiveNode in place (sets parentIs, birth,
+   indef_or_def; keeps view_requests, diff axes, graphStats, viewStats,
+   and any future fields). The Phantom::Diff arm still rebuilds, since
+   a phantom has none of those fields. Entry moved to
+   TODO/DONE/problems.org.
+** TODO.org "If viewing an overrider-as-such, frontload the O herald ... Skip the Oh herald."
+   The overriderCol-member case was already frontloaded ("Ob"), so I
+   read this as the DRAWN overrider -- a node rendered in place of one
+   it overrides, marked by viewStats.overridesHere, which used to show
+   only the red "Oh". Changes:
+   - 'birth_relations' (server/update_buffer/viewnodestats.rs) now
+     takes an overridesHere flag and frontloads
+     NodeRelation::OverridesViewOf, exactly like the other birth rels
+     (the token moves from the blue rels string to the orange birth
+     string automatically, via assemble_active's existing filter).
+   - The "Oh" display is gone: the rule table (server/heralds.rs) now
+     has a vacuous 'overridesHere' rule. The '(overridesHere N)' atom
+     itself still flows on the wire -- it is load-bearing save
+     metadata -- it just isn't displayed.
+   - tests/elisp/herald-rules.sexp regenerated via emit-herald-rules;
+     the two content_view.rs goldens updated (node 5 now reads
+     '(birthHerald "O2") (rels "1L aH 2S I1")').
+** problems.org "De-novo PartnerCol rendering depends on the global graph handle"
+   Took the documentation remedy (the entry offered a glossary note or
+   a rerouting): glossary.md's PartnerCol section now states that col
+   scaffolds read 'snapshot_global', with the test-harness caveat. The
+   deeper rerouting (col creation through the env graph) remains open
+   in problems.org.
+** problems.org "Long-running SKG server can hide code/protocol fixes"
+   Of the two remedies offered (version endpoint, or logging build
+   identity at startup), took the simpler: server startup now logs the
+   executable path and its age ("Server binary exe=... binary_age=...",
+   server/main.rs, right after init_tracing). A stale long-running
+   binary is now obvious from the first log line. Verified live via
+   the verify-connection integration test. Entry left open in
+   problems.org since a version ENDPOINT (client-visible) could still
+   be wanted.
+** TODO.org "QA > add tests > collect_generation_ids: test the new effective root logic"
+   tests/types/tree.rs: added
+   test_collect_generation_ids_with_effective_root (generations
+   counted from an interior node; cousins excluded; too-deep
+   generation is empty-not-error) and
+   test_collect_generation_ids_effective_root_not_in_tree. The
+   existing tests had only exercised effective_root = None.
+** problems.org "Test coverage: every git-diff-view test exercises only unstaged"
+   The missing staged variants now exist:
+   text::save::test_delete_text_changed_scaffold_respawns_staged,
+   content::save::test_delete_removed_node_respawns_staged,
+   newhere_cycle::save::test_newhere_cycle_survives_save_staged.
+   collateral::save turned out to already have a staged twin, so that
+   module was left alone. Entry moved to TODO/DONE/problems.org.
+   (Mixed staged+unstaged-on-one-file tests remain unwritten; noted in
+   the DONE entry.)
+* found already done (no code change; bookkeeping only)
+  Per problems.org's own protocol, entries verified fixed were moved
+  to TODO/DONE/problems.org:
+  - "Tantivy is written and committed twice per save": the save path
+    now computes context types first and commits once.
+  - "Override validation re-scans the whole graph on every save": the
+    save path now validates only touched pids. (But see the NEW entry
+    I filed -- the simulation still deep-clones the whole graph.)
+  - "Stale elisp test inputs reference herald atoms...": both named
+    test files already use the live vocabulary.
+  Also: skg wish d2659d52 ("Ttest that all IDs are distinct") is
+  already satisfied by 'check_for_duplicate_ids_across_sources'
+  (details in by-jeff-for-jeff-to-interpret.org).
+* diagnosed, not fixed
+** TODO.org "BUG :: make-content cleanup -> collateral view not found"
+   Fully diagnosed (mechanism: the server's ViewsState never
+   unregisters views on delete and turns its own stale bookkeeping
+   into a user-facing "Collateral view ...: no viewforest found"
+   error; the client already handles missing buffers silently).
+   Deferred because the two candidate fixes trade off differently;
+   details and my recommendation are in
+   [[./deferring-for-verification.org]].
+* changes to the plan's envisioned order
+  None imposed from outside; the only sequencing surprise was that two
+  of the four profiling-save inefficiencies turned out to be already
+  fixed, which converted "implement" items into "verify and file"
+  items.
+* what's imperfect about what's done
+  - The drawn-overrider herald change removes the "Oh" glyph
+    everywhere, including for an InactiveNode substitute (which never
+    had herald machinery). Since org_to_text only emits overridesHere
+    for ActiveNodes, nothing is displayed either way for inactive
+    substitutes -- but if a future change emits it for them, there is
+    now no fallback glyph.
+  - The empty-categories diff report prints bare headings with no
+    body; if you would rather see an explicit "(none)" child, that is
+    a two-line change in render_report.
+  - The C-c C-o comment in skg-keymaps-and-aliases.el says it shadows
+    org-open-at-point; that is literally true only in org-derived
+    modes (content view). In skg-diff-analysis-mode it simply adds the
+    binding.
+  - During implementation, two concurrent test runs (mine and a
+    subagent's) collided on TypeDB and produced spurious failures
+    (fork::all_tests, collateral::save). Everything passes in a clean
+    serial run; this matches the known "shared resource" flake family
+    already recorded in problems.org.
+* choices determining the future
+  - Interpretation of "overrider-as-such" as the drawn/substituted
+    overrider (the col-member case was already done). If you meant
+    something else, the change is small and isolated to
+    birth_relations + the rule table.
+  - The O birth token is prepended to (rather than replacing) any
+    other birth relation the position earns, mirroring the
+    [Hides, Contains] precedent for HiddenInSubscribee members.
+  - New problems.org entry filed: "Override validation deep-clones the
+    whole in-Rust graph per save" (successor to the fixed full-scan
+    entry).

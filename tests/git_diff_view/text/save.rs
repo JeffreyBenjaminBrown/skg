@@ -16,6 +16,7 @@ fn all_tests
       test_edit_text_changed_scaffold_respawns (s) . await ?;
       test_move_text_changed_scaffold_respawns (s) . await ?;
       test_move_text_changed_to_unedited_node_respawns (s) . await ?;
+      test_delete_text_changed_scaffold_respawns_staged (s) . await ?;
       Ok (( )) } )) }
 
 /// Deleting a textChanged scaffold should be a no-op.
@@ -215,6 +216,50 @@ async fn test_move_text_changed_to_unedited_node_respawns (
       Ok(()) }) }) . await
 }
 
+/// Same as 'test_delete_text_changed_scaffold_respawns' but with the
+/// fixture transition staged (git add) rather than unstaged. The
+/// respawned scaffold should report '(textChanged staged)' instead
+/// of '(textChanged unstaged)' -- guards the save-rerender pipeline's
+/// per-stage attribution for text changes, mirroring
+/// ids::save::test_delete_id_col_scaffold_respawns_staged.
+async fn test_delete_text_changed_scaffold_respawns_staged (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
+{
+  run_save_test_staged(
+    s,
+    "skg-test-save-del-textchanged-staged",
+    |config, driver, tantivy, repo_path| { Box::pin(async move {
+      // User deletes the textChanged scaffold under node 1
+      let input = without_lines_containing(
+        GIT_DIFF_VIEW_STAGED, "textChanged");
+
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views            : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
+
+      // DISK: 1.skg should still have the new title
+      let node_1 = read_nodecomplete(repo_path, "1")?;
+      assert_eq!(node_1 . title, "1 has a new title.",
+        "1.skg should still have the new title");
+
+      // DISK: 11.skg should still have the new body
+      let node_11 = read_nodecomplete(repo_path, "11")?;
+      assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
+        "11.skg should still have the new body");
+
+      // BUFFER: textChanged scaffolds should respawn, staged
+      assert_buffer_contains(
+        &response . saved_view, GIT_DIFF_VIEW_STAGED);
+      Ok(( )) }) }) . await }
+
 //
 // Test runner helper
 //
@@ -232,9 +277,45 @@ where
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
+  run_save_test_with_setup(
+    s, subtest_name, setup_git_repo_with_fixtures, test_fn) . await
+}
+
+async fn run_save_test_staged<F>(
+  s: &mut SharedDbSession,
+  subtest_name: &str,
+  test_fn: F,
+) -> Result<(), Box<dyn Error>>
+where
+  F: for<'a> FnOnce(
+    &'a SkgConfig,
+    &'a Arc<TypeDBDriver>,
+    &'a mut TantivyIndex,
+    &'a Path
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
+{
+  run_save_test_with_setup(
+    s, subtest_name, setup_git_repo_with_fixtures_staged, test_fn) . await
+}
+
+async fn run_save_test_with_setup<S, F>(
+  s: &mut SharedDbSession,
+  subtest_name: &str,
+  setup   : S,
+  test_fn : F,
+) -> Result<(), Box<dyn Error>>
+where
+  S: FnOnce (&Path) -> Result<Repository, Box<dyn Error>>,
+  F: for<'a> FnOnce(
+    &'a SkgConfig,
+    &'a Arc<TypeDBDriver>,
+    &'a mut TantivyIndex,
+    &'a Path
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
+{
   let temp_dir = TempDir::new()?;
   let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
+  setup (repo_path)?;
   s . reset_with_source_path (subtest_name, repo_path) . await ?;
 
   test_fn(&s . config, &s . driver, &mut s . tantivy, repo_path) . await

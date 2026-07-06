@@ -4,10 +4,10 @@ Make a link into content. This orphans the linking node. Visit the linking node.
 ** a test case
 Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
 * Warn the user when they make dead links.
-* If viewing an overrider-as-such, frontload the O herald.
+* DONE If viewing an overrider-as-such, frontload the O herald.
 Identical to how other birth-rels are frontloaded.
 Skip the Oh herald.
-* strip trailing whitespace from each line at save
+* DONE strip trailing whitespace from each line at save
 * ONGOING override chains
 ** skg3  --resume 25126e37-d0ef-4790-a58b-2f6da928478e
 ** dogfood : User-owned forks are all kinds of wrong.
@@ -48,8 +48,8 @@ do this, now there are staged changes and they correspond.
 ** purple for A and I
 * s
 ** correctness
-*** strip trailing whitespace from body lines
-*** don't complain if point is before first headline on save
+*** DONE strip trailing whitespace from body lines
+*** DONE don't complain if point is before first headline on save
 just put it at the first headline
 *** No two forks in a user-owned chain of forks should share a source.
 regardless of whether the chain is manual or,
@@ -103,7 +103,7 @@ everything that uses the default title to switch to the new one.
 *** text search across containment paths
 *** the diff report should
 **** explain the maximum badness in each category
-**** include empty top-level categories
+**** DONE include empty top-level categories
 so a reader can remember what those categories are,
 and thus (e.g.) that nothing was orphaned.
 *** command to reverse the [where I learned it] contains [it] link
@@ -155,8 +155,8 @@ Where I introduced the uniform aXb syntax,
 for a,b integers and X one of the five relations (C,L,S,O,H).
 **** claude --resume 177c504c-58d9-4f48-9b3c-1c7fce73fd74
 * easy
-** beep also once the db has rebuilt
-** remap C-c C-o during Skg
+** DONE beep also once the db has rebuilt
+** DONE remap C-c C-o during Skg
 in skg buffers
 ** show the herald it is responsible for next to each field in the metadata
 ** IDs should not be writeable in the metadata view
@@ -445,7 +445,7 @@ That is, the save should still succeed.
 ** Is it natural that skg-request-save-buffer issues so many distinct calls to process-send-string?
 * QA
 ** add tests
-*** collect_generation_ids
+*** DONE collect_generation_ids
     test the new effective root logic
 ** This seems like it could have been more efficient.
    server/to_org/definitive_branch.rs

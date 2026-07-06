@@ -68,18 +68,22 @@ So far there are these endpoints:
     command `skg-goto-bypassOverride`, the menu's escape hatch.
 
 ## Save buffer
-  - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
+  - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
     - `point-lines-below-focused-headline` is global to the buffer save: the number of text lines from the focused headline to point before save.
-    - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes both point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
+    - `point-column` is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
+    - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Early lock message (sent immediately, before the expensive pipeline):
        `Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("URI1" "URI2" ...)))`
        The URI list contains every other open view sharing at least one node with the saved view. Over-approximates: may include views that won't actually change. Emacs uses this to lock collateral buffers against edits.
-    2. Zero or more collateral-view messages (one per affected view, streamed as each finishes):
+    2. Save-relax-lock message (sent once the save plan is known):
+       `Content-Length: N\r\n\r\n((response-type save-relax-lock) (lock-views ("URI1" "URI2" ...)))`
+       Sent once the save plan is known, before the collateral-view stream; carries the exact set of views that will be rerendered, narrowing the earlier over-approximate save-lock set. The client may unlock any view that was locked by save-lock but is absent from this list.
+    3. Zero or more collateral-view messages (one per affected view, streamed as each finishes):
        `Content-Length: N\r\n\r\n((response-type collateral-view) (view-uri "URI") (content "..."))`
        Emacs unlocks and updates each buffer as it arrives.
-    3. Final save response:
-       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-screen-lines-below-window-start M))`
+    4. Final save response:
+       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))`
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of failure-explaining strings. `warnings` is a list of nonfatal messages. Both lists are present and empty if none.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 

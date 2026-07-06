@@ -104,11 +104,13 @@ fn set_herald_strings_in_viewnode (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, parentIs, birth) : (GraphNodeStats, ParentIs, Birth) = {
+  let (gstats, parentIs, birth, overridesHere)
+    : (GraphNodeStats, ParentIs, Birth, bool) = {
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . parentIs, t . birth ) };
+    ( t . graphStats . clone (), t . parentIs, t . birth,
+      t . viewStats . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
     None => return, }; // no stats -> no heralds
@@ -121,7 +123,8 @@ fn set_herald_strings_in_viewnode (
       &mut flags, graph, container_to_contents, content_to_containers,
       node_pid, &anc_pid, generation ); }
   let birth_rels : Vec<NodeRelation> =
-    birth_relations (&parent_kind, parentIs, birth, &flags);
+    birth_relations (&parent_kind, parentIs, birth, &flags,
+                     overridesHere);
   let strings : HeraldStrings = assemble_active (
     &counts, gstats . aliases, gstats . extra_ids, &flags, &birth_rels );
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
@@ -216,20 +219,30 @@ fn birth_relations (
   parentIs    : ParentIs,
   birth       : Birth,
   flags       : &AncestorFlags,
+  overridesHere : bool, // whether the node is drawn in place of a node it overrides
 ) -> Vec<NodeRelation> {
-  // A backpath graft's birth is its role's relation, regardless of
-  // parentIs (grafts are typically Independent/Indefinitive).
-  if let Birth::Backpath (role) = birth {
-    return vec![ role . relation ]; }
-  if parentIs != ParentIs::Affected { return Vec::new (); }
-  match parent_kind {
-    ParentKind::Gnode (_) =>
-      // Ordinary content: born of its parent containing it.
-      if flags . contains_in . contains (&1) {
-        vec![ NodeRelation::Contains ]
-      } else { Vec::new () },
-    ParentKind::Col (col, _) => birth_relations_for_col (*col),
-    ParentKind::Other => Vec::new (), } }
+  let mut rels : Vec<NodeRelation> = {
+    // A backpath graft's birth is its role's relation, regardless of
+    // parentIs (grafts are typically Independent/Indefinitive).
+    if let Birth::Backpath (role) = birth {
+      vec![ role . relation ]
+    } else if parentIs != ParentIs::Affected { Vec::new ()
+    } else {
+      match parent_kind {
+        ParentKind::Gnode (_) =>
+          // Ordinary content: born of its parent containing it.
+          if flags . contains_in . contains (&1) {
+            vec![ NodeRelation::Contains ]
+          } else { Vec::new () },
+        ParentKind::Col (col, _) => birth_relations_for_col (*col),
+        ParentKind::Other => Vec::new (), }}};
+  if overridesHere
+    && ! rels . contains (&NodeRelation::OverridesViewOf) {
+    // A drawn overrider (drawn in place of a node it overrides) is
+    // born of that override: it leads with the O herald, like every
+    // other birth relation.
+    rels . insert (0, NodeRelation::OverridesViewOf); }
+  rels }
 
 fn birth_relations_for_col (
   col : PartnerCol,

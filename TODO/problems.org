@@ -3,6 +3,29 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noted while writing forking-and-privacy.org
+** Fork deliberate-pick rule is enforced only client-side
+   docs/forks.md promises "approving before you have set every
+   clone's source is refused", to keep a fork from silently landing
+   in a default source. The refusal lives in 'skg-approve-fork'
+   (checks for the PICK-A-SOURCE placeholder); the server's only
+   backstop is that the placeholder is not a configured source. A
+   client that re-sends the save with (fork-approved . "true") and NO
+   (fork-sources ...) field commits the clones into the
+   inferred-or-default source ('fork_spec_from_buffer_node' falls
+   through user-set -> inferred -> default) -- exactly the silent
+   default the docs rule out. Immaterial while Emacs is the only
+   client; if other clients appear (nvim/), consider having the
+   server refuse an approved save whose fork_sources map does not
+   cover every fork spec.
+** Cosmetic: api-and-formats.md says search filters "before grouping"
+   The text-search section says the active source-set is applied
+   "before grouping, ranking, alias/title selection, and display
+   truncation". In code, 'group_matches_by_id' runs first and
+   'filter_match_groups_to_active_sources' then filters the groups,
+   before ranking and truncation. Behaviorally identical (groups are
+   per-ID and source is a function of ID), so this is a doc wording
+   nit only.
 * Problems noted during the forks arc (TODO/forks/)
 ** Quasi-duplication: "Source '...' not found in config" across ~9 sites
    The plan asked to consolidate the duplicated "source not found"
@@ -63,36 +86,7 @@
    The eventual feature implementation probably needs to ensure that
    a HiddenInSubscribeeCol is inserted when the updated hide list
    intersects a subscribee's content.
-** 'mk_indefinitive_from_viewnode' silently drops fields
-   server/types/viewnode.rs line 538.
-   It rebuilds a fresh viewnode via 'mk_indefinitive_viewnode',
-   losing 'view_requests', 'diff', 'graphStats', 'viewStats',
-   and any future fields added to TrueNode.
-
-   Any new field (like 'parent_relation' if added)
-   must be manually preserved here, which is easy to forget.
-
-   Consider refactoring to mutate in place:
-   clear body, set indef_or_def to Indefinitive,
-   update parentIs — but keep everything else.
 * Problems found during the staged/unstaged diff axis refactor
-** Test coverage: every git-diff-view test exercises only unstaged
-   tests/git_diff_view/common.rs.
-   'setup_git_repo_with_fixtures' copies fixtures, commits, then
-   overwrites the worktree without staging. Every integration test
-   therefore uses unstaged changes; the staged code paths were
-   entirely uncovered, which is how phantom_axes, TextChanged, and
-   the node_changes_for_truenode merge bugs all slipped through.
-
-   Added 'setup_git_repo_with_fixtures_staged' and one staged
-   save-path test (ids::save::test_delete_id_col_scaffold_respawns_staged)
-   that exercises the save-rerender pipeline with staged changes,
-   which caught the most recent bug.
-
-   Still missing: parallel staged-variant tests for the other save
-   scenarios (text, content, newhere_cycle, collateral) plus tests
-   that mix staged + unstaged on the same file. Without these, the
-   remaining node_changes_for_truenode callers could easily regress.
 ** (dormant) 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes
    Dormant as of 2026-06-12: 'mk_removed_child_viewnode' now lives in
    server/to_org/expand/unused_but_nice.rs ("Held for someday, not
@@ -227,6 +221,11 @@
    makes client bugs look nondeterministic after code changes. A small
    version/build-id endpoint, or logging the executable build hash at
    startup, would make stale-server cases obvious.
+   PARTLY RESOLVED 2026-07-03 (fable-cleans-up): the logging remedy is
+   done -- startup now logs the executable's path and age ("Server
+   binary exe=... binary_age=...", server/main.rs, right after
+   init_tracing). Open only in case a client-visible version endpoint
+   is still wanted.
 ** Emacs client can hold stale TCP state after server/data replacement
    Observed 2026-05-06 after stopping the server, replacing data/,
    and restarting. The Rust server was listening on 1730 and a fresh
@@ -351,25 +350,20 @@
   Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
   found four inefficiencies, in impact order. Full evidence, numbers,
   and recommendations are in the top-level 'profiling-save.org'.
-** Override validation re-scans the whole graph on every save (~24%)
-   'validate_override_invariants_after_save' (server/save.rs), called
-   unconditionally from 'update_graph_including_merges', runs
-   'validate_override_invariants' (server/dbs/in_rust_graph/
-   override_invariants.rs), which iterates 'graph.nodes' twice over all
-   ~60k nodes. The cost is O(total graph), independent of the save, so
-   every save slows as the user's data grows. Disabling it cut the save
-   from 343 ms to 256 ms. Fix: validate only the saved nodes and their
-   'overrides_view_of' neighborhood.
-** Tantivy is written and committed twice per save (~38%)
-   'update_tantivy_from_saveinstructions' (server/save.rs) indexes each
-   saved node with 'context_origin_type = ""'; then
-   'update_context_origin_types' (server/dbs/tantivy/context_update.rs)
-   opens a second 50 MB IndexWriter, reads those docs back, deletes and
-   re-adds them with the computed type, and commits again. Skipping the
-   second pass cut the context phase from 71 ms to 4 ms. The file's own
-   header comment names the fix ("compute origin types before
-   indexing"): compute the type first, index once, commit once, and
-   reuse one long-lived IndexWriter.
+  (Two of the four -- the override full-scan and the Tantivy double
+  commit -- are fixed; their entries are in TODO/DONE/problems.org.)
+** Override validation deep-clones the whole in-Rust graph per save
+   'validate_override_invariants_after_save' (server/save.rs) builds
+   its simulated post-save graph via '(*graph_snap) . clone ()' -- a
+   deep clone of every node -- before applying the save's DefineNodes
+   and running the (now incremental) touched-only validation. The
+   validation itself is O(touched), but the clone is O(total graph)
+   in time and memory, so every save still pays a whole-graph cost.
+   Fix direction: simulate with a lightweight overlay (the base
+   snapshot plus a small map of changed nodes consulted first)
+   instead of cloning, or clone only the neighborhood the validator
+   can reach. Successor to the fixed "re-scans the whole graph"
+   entry, discovered while verifying that fix (2026-07-03).
 ** TypeDB relationship update is delete-all-then-recreate-all (~15%, O(children))
    'update_typedb_from_saveinstructions' (server/save.rs) deletes and
    recreates ALL outbound edges of each saved node every save, so
@@ -380,9 +374,10 @@
 ** Save cost degrades 3-4x within a session of repeated saves
    404 ms -> 1220 ms over 11 consecutive saves; a 'rebuild dbs' resets
    it. Cause: each tiny Tantivy commit spawns a segment and merges fall
-   behind. Mostly fixed by the single-commit change above; also consider
-   debouncing commits (Tantivy is a rebuildable cache) and dropping the
-   forced per-commit 'reader.reload()' in production.
+   behind. Mostly fixed by the single-commit change (see the Tantivy
+   entry in TODO/DONE/problems.org); also consider debouncing commits
+   (Tantivy is a rebuildable cache) and dropping the forced per-commit
+   'reader.reload()' in production.
 * Problems found while bumping docker-typedb-rust to TypeDB 3.11.5 (2026-06-08)
   Found while updating docker-typedb-rust/typedb.nix from 3.10.3 to 3.11.5
   and adding missing CLI tools to docker.nix.
@@ -530,6 +525,11 @@
    the env graph so test harnesses without the global handle still see
    cols.  The matrix target works around it by installing the handle
    in its render-heavy function only.
+   PARTLY RESOLVED 2026-07-03 (fable-cleans-up): the glossary-note
+   remedy is done (glossary.md, "Col scaffolds read the process-global
+   graph handle").  Open only for the rerouting option (col creation
+   through the env graph, so harnesses without the handle still see
+   cols).
 * Problems found while investigating test-suite speed (2026-06-12)
   See TODO/faster-tests.org for the full investigation.
 ** (mostly fixed) Six near-duplicate test-db setup paths
@@ -731,17 +731,6 @@
   Found while researching TODO/uniform-heralds/vision.org to write
   TODO/uniform-heralds/discussion.org. None is required by that vision;
   recorded here so they are not lost.
-** Stale elisp test inputs reference herald atoms the server can no longer emit
-   tests/elisp/test-heralds-minor-mode.el and
-   tests/elisp/test-skg-sexpr-search.el feed the lens engine OLD
-   pre-baked atoms -- 'containsHerald', 'linksHerald' -- that the
-   server stopped emitting (it now emits raw counts via INTERC, in
-   'graphnodestats_to_sexp', server/org_to_text.rs). These tests still
-   pass (they exercise the engine's tolerance), but they pin a dead
-   vocabulary. The herald conformance test (tests/unit/heralds.rs)
-   covers only EMITTABLE atoms, so it cannot catch test inputs that
-   drifted from the live serializer. Worth a cleanup pass; the uniform-
-   heralds work will force it for the affected tests anyway.
 ** The TypeDB-fallback graphStats are not source-set-aware
    Already flagged in code (the PITFALL/TODO above
    'fetch_all_graphnodestats_from_typedb',
@@ -773,34 +762,6 @@
    and is authoritative. Not worth fixing on its own, but if the
    surprising-links a(b,c) split replaces this two-way partition, the
    subtraction goes away regardless.
-* Problems found while planning the vim client (2026-07-02)
-  Found while inventorying the Emacs client and the wire protocol to plan
-  the Neovim port (TODO/vim-client/). All three are doc-vs-code gaps; the
-  first two matter because api-and-formats.md is the spec a second client
-  is written against.
-** api-and-formats.md omits the 'save-relax-lock' message from the save stream
-   The "Save buffer" section documents the response stream as
-   save-lock -> collateral-view* -> save-result. The implementation
-   (server/serve/protocol.rs; elisp/skg-request-save.el) also emits
-   'save-relax-lock' between save-lock and the collateral views: the
-   exact post-SavePlan collateral set, narrowing the early
-   over-approximate lock. A client written from the doc alone would
-   not register a handler for it.
-** api-and-formats.md omits the 'point-column' field of the save request
-   The doc lists two point fields ('point-lines-below-focused-headline',
-   'point-screen-lines-below-window-start'), but the client sends and
-   the server echoes a third, 'point-column'
-   (server/serve/protocol.rs:169; elisp/skg-request-save.el). Same
-   risk as above: a from-the-doc client would restore point without
-   its column.
-** tests/USAGE.md is stale
-   It points at 'tests/emacs/test.el' (the directory is now
-   tests/elisp/, run via bash/emacs-tests.sh), does not mention
-   bash/integration-tests.sh or cargo nextest, and says the Docker
-   container does not include Emacs, which coding-advice/docker.org
-   contradicts (the image bakes in emacs and now nvim). The accurate
-   description lives in coding-advice/claude-to-claude.org, "Running
-   Tests"; USAGE.md should defer to or copy it.
 * Problems noted during override-chains planning (TODO/override-chains/)
 ** TODO Override invariants are validated by two divergent implementations
    Monogamy (and, once

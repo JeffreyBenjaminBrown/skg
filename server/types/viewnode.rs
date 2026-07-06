@@ -938,21 +938,29 @@ pub fn mk_indefinitive_viewnode_with_birth (
 /// Discards body and edit_request.
 /// Errors if the input is not an ActiveNode.
 pub fn mk_indefinitive_from_viewnode (
-  viewnode : ViewNode,
+  mut viewnode : ViewNode,
   parentIs    : ParentIs,
   birth       : Birth,
 ) -> Result < ViewNode, String > {
-  let (id, source, title) : (ID, SourceName, String) =
-    match viewnode . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
-        ( t . id, t . source, t . title ),
-      ViewNodeKind::Phantom (Phantom::Diff (p)) =>
-        ( p . id, p . source, p . title ),
-      _ => return Err (
-        "mk_indefinitive_from_viewnode: expected ActiveNode"
-          . to_string () ) };
-  Ok ( mk_indefinitive_viewnode_with_birth (
-    id, source, title, parentIs, birth )) }
+  match &mut viewnode . kind {
+    ViewNodeKind::Vognode (Vognode::Active (t)) => {
+      // Mutate in place, so that every field not named here
+      // (view_requests, diff axes, graphStats, viewStats, and any
+      // field added later) is preserved rather than silently reset.
+      t . parentIs = parentIs;
+      t . birth = birth;
+      t . indef_or_def = // discards body and edit_request
+        IndefOrDef::Indefinitive;
+      Ok (viewnode) },
+    ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+      // A phantom carries none of the fields preserved above,
+      // so it is rebuilt rather than mutated.
+      Ok ( mk_indefinitive_viewnode_with_birth (
+        p . id . clone (), p . source . clone (), p . title . clone (),
+        parentIs, birth )),
+    _ => Err (
+      "mk_indefinitive_from_viewnode: expected ActiveNode"
+        . to_string () ) }}
 
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
