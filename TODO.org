@@ -1,3 +1,6 @@
+* staging new files (C-c t [a|A]) : explain if git diff mode off
+rather than acting like the user did it right
+and stating that 0 files were added
 * BUG :: make-content cleanup -> collateral view not found
 ** the bug
 Make a link into content. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
