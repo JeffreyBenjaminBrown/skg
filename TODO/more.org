@@ -74,9 +74,16 @@ boolean-expression parser over the pieces in
 * C-c g i should work from anywhere.
 Regardless of buffer type.
 * If indefinitive, add a B to that symbol where body is hidden.
-* when staging new files (C-c t [a|A]), explain if git diff mode off
+* DONE when staging new files (C-c t [a|A]), explain if git diff mode off
 rather than acting like the user did it right
 and stating that 0 files were added
+** Claude : done
+The client now mirrors the server's per-connection diff-mode state
+(new 'skg--git-diff-mode-enabled' in skg-state.el, set by the toggle
+handler, reset on reconnect). When either C-c t a/A finds zero new
+files AND diff mode is off, it explains that new files are recognized
+via the newX markers only a diff-mode view carries, and suggests
+C-c v d. With diff mode on, the old zero-count report stands.
 * BUG :: make-content cleanup -> collateral view not found
 ** the bug
 Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.

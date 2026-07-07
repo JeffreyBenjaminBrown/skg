@@ -1,4 +1,11 @@
-* staging new files (C-c t [a|A]) : explain if git diff mode off
+* testing forking
+** override another's
+** override your own
+takes a minibuffer command
+** override an overrider
+** view them
+** ? mutual fork
+* DONE staging new files (C-c t [a|A]) : explain if git diff mode off
 rather than acting like the user did it right
 and stating that 0 files were added
 * BUG :: make-content cleanup -> collateral view not found

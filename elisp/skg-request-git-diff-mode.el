@@ -4,6 +4,7 @@
 (require 'skg-lock-buffers)
 (require 'skg-request-save) ; for skg-big-nonfatal-message
 (require 'skg-request-rerender-all-views)
+(require 'skg-state) ; for skg--git-diff-mode-enabled
 
 (defun skg-view-diff-mode ()
   "Toggle git diff mode on the server and rerender all views.
@@ -30,6 +31,13 @@ rerender-done."
      (lambda (_tcp-proc payload)
        (let* ((response (read payload))
               (content (cadr (assoc 'content response))))
+         (cond
+          ;; Mirror the server's per-connection state. A refusal (any
+          ;; other content) leaves the mirror unchanged.
+          ((and content (string-prefix-p "Git diff mode enabled" content))
+           (setq skg--git-diff-mode-enabled t))
+          ((and content (string-prefix-p "Git diff mode disabled" content))
+           (setq skg--git-diff-mode-enabled nil)))
          (if (and content (string-match-p "\nWarning:" content))
              (skg-big-nonfatal-message
               "*skg diff-mode warnings*"
