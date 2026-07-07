@@ -168,7 +168,7 @@ for a,b integers and X one of the five relations (C,L,S,O,H).
 ** DONE beep also once the db has rebuilt
 ** DONE remap C-c C-o during Skg
 in skg buffers
-** show the herald it is responsible for next to each field in the metadata
+** DONE show the herald it is responsible for next to each field in the metadata
 ** IDs should not be writeable in the metadata view
 And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?

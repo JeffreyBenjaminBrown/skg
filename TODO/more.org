@@ -147,8 +147,18 @@ are scanned (the noop filter already dropped unchanged ones), so an
 OLD dead link warns again exactly when its carrier is edited.
 Implemented as 'dead_link_warnings' in server/from_text.rs; test in
 tests/collateral_delete.rs.
-* Show the herald it is responsible for next to each field in the metadata.
+* DONE Show the herald it is responsible for next to each field in the metadata.
 That is, when the user uses C-c v m,
 each value that produces a herald should contain that herald,
 colored per herald rules, in (uncolored) parentheses,
 after the rest of the title.
+** Claude : done
+The C-c v m buffer now appends, per headline, the herald its label
+path produces: the path is nested back into a minimal sexp and run
+through the same lens engine the heralds view uses
+(skg-transform-sexp-flat + the served rule table), so the hint is
+colored exactly per herald rules, inside uncolored parens. The hints
+are OVERLAYS, not buffer text -- committing reads titles, and a baked-
+in hint would corrupt the sexp. Two caveats: without a server
+connection there is no rule table, so no hints; and the hints show
+open-time values (S-left/right cycling does not refresh them).

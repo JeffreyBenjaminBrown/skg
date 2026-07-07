@@ -5,8 +5,10 @@
 ;;; to open a new 'sexp edit' buffer,
 ;;; where the sexp is rendered as an org-tree.
 
+(require 'heralds-minor-mode) ;; rule table + token rendering, for the per-field herald hints
 (require 'skg-buffer)
 (require 'skg-config)
+(require 'skg-lens)
 (require 'skg-metadata)
 (require 'skg-sexpr-org-bijection)
 (require 'skg-activeNode-defaults)
@@ -93,10 +95,66 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
         (outline-next-heading))
       (outline-next-heading))
     (skg-sexp-edit-mode 1)
+    (skg-sexp-edit--decorate-with-heralds)
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
     (setq-local skg-sexp-edit--is-activeNode is-activeNode)))
+
+(defun skg-sexp-edit--decorate-with-heralds ()
+  "Append, per headline, the herald its metadata path produces:
+colored per herald rules, inside (uncolored) parentheses, after the
+rest of the title (TODO/more.org). Implemented as overlays, so the
+hints never become buffer text -- committing reads titles, and a
+herald baked into a title would corrupt the sexp. A no-op without a
+rule table (e.g. no server connection). Hints reflect the values at
+open time; cycling a value does not refresh them."
+  (when (bound-and-true-p heralds--transform-rules)
+    (save-excursion
+      (goto-char (point-min))
+      (let (( path nil )) ;; ((level . title) ...), outermost first
+        (while (re-search-forward "^\\(\\*+\\) \\(.*\\)$" nil t)
+          (let* (( level (length (match-string 1)) )
+                 ( title (string-trim
+                          (substring-no-properties (match-string 2)) )))
+            (setq path
+                  (append (cl-remove-if (lambda (entry)
+                                          (>= (car entry) level))
+                                        path)
+                          (list (cons level title))))
+            (let (( herald (skg-sexp-edit--herald-for-label-path
+                            (mapcar #'cdr path)) ))
+              (when herald
+                (let (( ov (make-overlay (line-end-position)
+                                         (line-end-position)) ))
+                  (overlay-put ov 'after-string
+                               (concat " (" herald ")"))
+                  (overlay-put ov 'skg-sexp-edit-herald t))))))))))
+
+(defun skg-sexp-edit--herald-for-label-path (labels)
+  "The herald display string for the metadata-view headline whose
+label path from the buffer's root is LABELS (title strings, outermost
+first), or nil when that path produces none. Builds a minimal object
+sexp along the path and runs the same lens engine the heralds view
+uses, so the hint matches what the content view would show."
+  (when (and (bound-and-true-p heralds--transform-rules)
+             labels)
+    (let* (( object (skg-sexp-edit--nest-label-path labels) )
+           ( tokens (ignore-errors
+                      (skg-transform-sexp-flat
+                       object heralds--transform-rules)) )
+           ( text (and tokens (heralds--tokens->text tokens)) ))
+      (when (and text (not (string-empty-p text)))
+        text))))
+
+(defun skg-sexp-edit--nest-label-path (labels)
+  "Nest LABELS (title strings, outermost first) into an object sexp:
+the labels skg, node, indef become (skg (node indef))."
+  (let* (( syms (mapcar #'intern labels) )
+         ( acc (car (last syms)) ))
+    (dolist (label (reverse (butlast syms)))
+      (setq acc (list label acc)))
+    (if (listp acc) acc (list acc))))
 
 (defun skg-sexp-edit--make-title-headlines-read-only ()
   "Make the display-only title group read-only, if it is present."
