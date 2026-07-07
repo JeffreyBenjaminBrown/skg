@@ -35,6 +35,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f RET") #'skg-search)
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
   (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
+  (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from ANY buffer: it only reads a typed/pasted ID (TODO/more.org).
   (global-set-key (kbd "C-c v l")   #'skg-limit-source-set))
 
 (with-eval-after-load 'magit ;; Magit
