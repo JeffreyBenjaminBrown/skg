@@ -1,12 +1,24 @@
-* staging new files (C-c t [a|A]) : explain if git diff mode off
+* When staging a change in magit, should update any view with that node.
+Might be hard in the containment direction but at least
+when updating the file corresponding to that node.
+* Source sets should be concentric privacy supersets.
+I would like to be able to say 'these note sources are [public]', 'these, a superset of those, are [more private]," etc.
+
+Then, when forking my own note, I can
+* DONE ? C-a is failing when point is after a folded text symbol.
+Probably it thinks point is on another line,
+because in some sense it is,
+and is moving it to the front of that line,
+which has no visible effect.
+* AWAITS staging new files (C-c t [a|A]) : explain if git diff mode off
 rather than acting like the user did it right
 and stating that 0 files were added
-* BUG :: make-content cleanup -> collateral view not found
+* AWAITS BUG :: make-content cleanup -> collateral view not found
 ** the bug
-Make a link into content. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
+Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
 ** a test case
 Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
-* Warn the user when they make dead links.
+* AWAITS Warn the user when they make dead links.
 * If viewing an overrider-as-such, frontload the O herald.
 Identical to how other birth-rels are frontloaded.
 Skip the Oh herald.

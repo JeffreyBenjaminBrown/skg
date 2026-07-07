@@ -583,6 +583,12 @@ Unloads all skg elisp modules and reloads them from disk.
 Useful when you've changed elisp code
 and want to pick up the changes without restarting Emacs.
 * TODO edits for the above
+alternatives
+** C-c g -> git, C-c v -> visit, C-c s -> show
+** maybe lots of stuff under 'show'
+Add a letter to the shortcut.
+C-c s : show locally
+C-c g : show globally
 ** division scheme
 Globally change view
 do to Viewnode
