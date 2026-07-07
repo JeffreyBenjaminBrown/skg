@@ -67,8 +67,7 @@ overlays, and they do not refresh when you cycle a value with
 S-left/S-right. Refreshing on cycle would be a small follow-up.
 
 * From TODO/fork-fixes.org
-
-* How I read "It should not ask me if I have already specified a source in the saved metadata"
+** How I read "It should not ask me if I have already specified a source in the saved metadata"
 Your Case 2 buffer specifies a source only on the NEW node ('(source
 else-public)' on "Can I add to this?"). The clone-to-be (of the
 foreign root) is not itself present in the origin buffer, so the only
@@ -94,7 +93,7 @@ such new children. I therefore implemented:
 - If several new children explicitly name DIFFERENT owned sources,
   that is ambiguous, so the flow falls back to asking.
 
-* The y/n confirmation itself still happens in Case 2
+** The y/n confirmation itself still happens in Case 2
 I read your "It should not ask me" as being about the SOURCE question,
 not about fork confirmation as such: your same sentence continues
 "...it ask me to choose each before allowing me to say 'do it'",
@@ -106,7 +105,7 @@ want a fully silent fork when the source was specified, say so; it is
 a small change in 'skg--fork-confirmation-handler' (and arguably in
 the server, to skip the confirmation round-trip entirely).
 
-* In Case 1, the new node lands in the clone's source
+** In Case 1, the new node lands in the clone's source
 A metadata-less new node under a foreign parent now joins the fork
 instead of erroring. Its own source: I put it in THE SAME source the
 clone ends up in (the one you pick/confirm in the confirmation flow),
@@ -117,7 +116,7 @@ node follows it. Alternatives I did not build: asking separately for
 the new node's source, or defaulting it to your config-first owned
 source independent of the clone.
 
-* Where the "choose each source" ask happens: minibuffer prompts at confirmation time
+** Where the "choose each source" ask happens: minibuffer prompts at confirmation time
 When a clone's source is unspecified, the client now prompts you in
 the minibuffer (completing-read over the sources you own, suggestion
 pre-filled as the default, S-left/S-right cycling) for EACH unresolved
@@ -129,7 +128,7 @@ prompting to match "it ask me to choose each before allowing me to
 say 'do it'" better than the old silent expectation that you go find
 C-c s s.
 
-* The silent-nothing bug's cause, for the record
+** The silent-nothing bug's cause, for the record
 Answering "yes" while a clone still carried PICK-A-SOURCE called
 'skg-approve-fork', whose 'user-error' ("Pick a source for each clone
 first...") was swallowed by the surrounding 'condition-case' in
@@ -138,7 +137,7 @@ hence "nothing happens". The interactive flow now runs outside that
 'condition-case' (which continues to guard response parsing), so any
 refusal is loud.
 
-* Hide-on-removal: scope of the new rule
+** Hide-on-removal: scope of the new rule
 Your third item ("If my fork F contains C and so does the original O,
 and I remove C from F, F should now hide C") I implemented as a
 general subscriber rule, not a fork-specific one: on save, for any
@@ -163,7 +162,7 @@ hides_from_its_subscriptions"). Consequences you might weigh in on:
   (previously it was born with no hides, so deleted-at-fork-time
   children would have reappeared as unintegrated subscribed content).
 
-* Confirmation-buffer header: an org headline with body text
+** Confirmation-buffer header: an org headline with body text
 Per your complaint, the long '#' comment block is gone. The buffer now
 opens with one top-level headline ("Fork confirmation -- what this
 buffer is") whose BODY holds a shortened explanation, so you can fold
