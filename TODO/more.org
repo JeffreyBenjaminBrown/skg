@@ -137,7 +137,16 @@ Two things would pin it down:
    switch).
 If you can paste the exact message (or reproduce with
 data/logs/server.jsonl timing on), I can finish this.
-* Warn the user when they make dead links.
+* DONE Warn the user when they make dead links.
+** Claude : done
+The save pipeline now appends a nonfatal warning per dead textlink it
+writes: a [[id:X][label]] in a saved title/body where X is neither in
+the graph nor created by the same save ("Dead link: node <pid> links
+to unknown id <X> (label ...)"). Only nodes the save actually writes
+are scanned (the noop filter already dropped unchanged ones), so an
+OLD dead link warns again exactly when its carrier is edited.
+Implemented as 'dead_link_warnings' in server/from_text.rs; test in
+tests/collateral_delete.rs.
 * Show the herald it is responsible for next to each field in the metadata.
 That is, when the user uses C-c v m,
 each value that produces a herald should contain that herald,

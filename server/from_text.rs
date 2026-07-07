@@ -228,6 +228,8 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   let warnings : Vec<String> = {
     let mut warnings : Vec<String> = parsing_warnings;
     warnings . extend ( nonmerge_plan . warnings );
+    warnings . extend (
+      dead_link_warnings ( &define_nodes, &fork_specs ) );
     warnings };
   Ok (( viewforest,
         SavePlan {
@@ -236,6 +238,45 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
           source_moves : nonmerge_plan . source_moves,
           fork_specs },
         warnings )) }
+
+/// One nonfatal warning per DEAD textlink this save writes: a
+/// '[[id:X][label]]' in a saved title or body where X is neither in
+/// the graph nor created by this same save (TODO/more.org, "Warn the
+/// user when they make dead links"). Only nodes the save actually
+/// writes are scanned -- the noop filter has already dropped
+/// unchanged ones -- so an old dead link warns again only when its
+/// carrier is edited. Skipped entirely without a process-global
+/// graph handle (some tests): no warning beats a false one.
+fn dead_link_warnings (
+  define_nodes : &[DefineNode],
+  fork_specs   : &[ForkSpec],
+) -> Vec<String> {
+  use crate::dbs::in_rust_graph::snapshot_global;
+  use crate::types::textlinks::textlinks_from_node;
+  let Some (graph) = snapshot_global () else { return Vec::new (); };
+  let saved_nodes : Vec<&NodeComplete> =
+    define_nodes . iter ()
+    . filter_map ( |dn| match dn {
+        crate::types::save::DefineNode::Save (
+          crate::types::save::SaveNode (n) ) => Some (n),
+        _ => None } )
+    . chain ( fork_specs . iter () . map ( |spec| & spec . clone . 0 ) )
+    . collect ();
+  let created_this_save : HashSet<&ID> = {
+    let mut ids : HashSet<&ID> = HashSet::new ();
+    for node in &saved_nodes {
+      ids . insert (& node . pid);
+      ids . extend ( node . extra_ids . iter () ); }
+    ids };
+  let mut warnings : Vec<String> = Vec::new ();
+  for node in &saved_nodes {
+    for link in textlinks_from_node (node) {
+      if created_this_save . contains (& link . id) { continue; }
+      if graph . pid_of (& link . id) . is_some () { continue; }
+      warnings . push ( format! (
+        "Dead link: node {} links to unknown id {} (label {:?}).",
+        node . pid . 0, link . id . 0, link . label )); }}
+  warnings }
 
 /// Build a ForkSpec for each node carrying 'ViewRequest::Fork' (the
 /// explicit 'skg-fork-node' gesture, for an OWNED node). The clone C is

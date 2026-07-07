@@ -13,7 +13,7 @@ and stating that 0 files were added
 Make a link into content. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
 ** a test case
 Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
-* Warn the user when they make dead links.
+* DONE Warn the user when they make dead links.
 * DONE If viewing an overrider-as-such, frontload the O herald.
 Identical to how other birth-rels are frontloaded.
 Skip the Oh herald.

@@ -15,6 +15,7 @@ use std::net::{TcpListener, TcpStream};
 
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle, install_or_swap_global_handle};
+use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::{
   run_with_test_db, graph_handle_from_config,
   read_all_lp_messages};
@@ -96,4 +97,35 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       assert! ( response . errors . is_empty (),
         "deleting L must not error, even with L visible in P's open view; got {:?}\ncollateral stream: {:?}",
         response . errors, msgs );
+      Ok (( )) } )) }
+
+/// TODO/more.org, "Warn the user when they make dead links": a saved
+/// title/body linking to an id that is neither in the graph nor
+/// created by the same save earns a nonfatal warning; a live link
+/// earns none. (Reuses this file's fixtures: X exists, L's title
+/// already links to it.)
+#[test]
+fn dead_links_warn_on_save
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-dead-links",
+    "tests/collateral_delete/fixtures",
+    "/tmp/tantivy-test-dead-links",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      install_or_swap_global_handle ( graph . clone () );
+      let buffer : &str =
+        "* (skg (node (id P) (source main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
+      let ( _vf, _plan, warnings ) =
+        buffer_to_validated_saveplan (
+          buffer, config, driver, None ) . await ?;
+      assert! ( warnings . iter () . any ( |w|
+          w . contains ("Dead link")
+          && w . contains ("does-not-exist") ),
+        "a link to a nonexistent id must warn: {:?}", warnings );
+      assert! ( ! warnings . iter () . any ( |w|
+          w . contains ("Dead link")
+          && w . contains ("id X") ),
+        "a live link must not warn: {:?}", warnings );
       Ok (( )) } )) }
