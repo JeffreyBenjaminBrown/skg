@@ -28,12 +28,23 @@ the IDCol, which had the identical latent bug. Regression test:
 tests/git_diff_view/aliases/view.rs,
 'test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them'
 (verified to fail without the fix).
-* goto id should work from a raw .skg file
+* DONE goto id should work from a raw .skg file
 If there's only one ID on that line,
 it should go to it even if it's not on the ID.
 If all IDs on that line are left of point we should visit the closest;
 if all are on the right, ditto.
 (If it's between two, that's ambiguous, so just say so and visit nothing.)
+** Claude : done
+'skg-nearest-id' now branches on 'skg-file-minor-mode': in a raw .skg
+buffer it collects the line's bare UUIDs and applies exactly your
+rules (on-an-ID wins; one ID needs no proximity; one-sided IDs yield
+the closest; both-sided is ambiguous -- skg-goto says "Point sits
+between IDs; move onto (or nearer to) one." and visits nothing).
+Content views / magit / search buffers keep the previous
+first-after-else-before behavior; I did NOT generalize the ambiguity
+rule to them, since e.g. point mid-title between the metadata ID and
+a link currently follows the link, and changing that seemed like its
+own decision. Tests in tests/elisp/test-skg-id-search.el.
 * The skg diff report should report what vanished nodes used to be.
 The kind of node that would give
 "Parent references unknown node."

@@ -71,26 +71,69 @@ Otherwise nil."
       (skg--point-on-skg-filename-p)) )
 
 (defun skg-nearest-id ()
-  "Return (id . label) for the nearest ID on the current line, or nil.
-First checks whether point is directly on an ID.
-If not, tries skg-id-next (only if it stays on this line),
-then skg-id-prev (only if it stays on this line).
-Point is always restored."
-  (let (( result (skg--id-at-point) ))
-    (unless result
-      (let (( start-pos (point) )
-            ( current-line (line-number-at-pos) ))
-        (save-excursion ;; Is there an ID after point on this line?
-          (skg-id-next)
-          (when (and (/= (point) start-pos)
-                     (= (line-number-at-pos) current-line))
-            (setq result (skg--id-at-point)) ))
-        (unless result
-          (save-excursion ;; There's definitely an ID before point.
-            (skg-id-prev)
-            (when (= (line-number-at-pos) current-line)
-              (setq result (skg--id-at-point)) )) )) )
-    result ))
+  "Return (id . label) for the nearest ID on the current line, or nil,
+or the symbol `ambiguous'.
+In a buffer visiting a raw .skg file (`skg-file-minor-mode'), IDs are
+the line's bare UUIDs and nearest means NEAREST (TODO/more.org):
+point on an ID wins; a single-ID line needs no proximity; when every
+ID sits on one side of point, the closest one; IDs on BOTH sides are
+`ambiguous' -- the caller should say so and visit nothing.
+Elsewhere (content views, magit, search buffers) the prior behavior
+stands: point on an ID, else the first ID after point on this line,
+else the nearest one before it. Point is always restored."
+  (if (bound-and-true-p skg-file-minor-mode)
+      (skg--nearest-uuid-on-line-by-proximity)
+    (let (( result (skg--id-at-point) ))
+      (unless result
+        (let (( start-pos (point) )
+              ( current-line (line-number-at-pos) ))
+          (save-excursion ;; Is there an ID after point on this line?
+            (skg-id-next)
+            (when (and (/= (point) start-pos)
+                       (= (line-number-at-pos) current-line))
+              (setq result (skg--id-at-point)) ))
+          (unless result
+            (save-excursion ;; There's definitely an ID before point.
+              (skg-id-prev)
+              (when (= (line-number-at-pos) current-line)
+                (setq result (skg--id-at-point)) )) )) )
+      result )))
+
+(defun skg--uuid-occurrences-on-line ()
+  "Return each v4 UUID on the current line as (ID START END), in order."
+  (let (( case-fold-search t )
+        ( line-start (line-beginning-position) )
+        ( line-end (line-end-position) )
+        ( occurrences nil ))
+    (save-excursion
+      (goto-char line-start)
+      (while (re-search-forward skg--uuid-v4-regex line-end t)
+        (push (list (match-string-no-properties 0)
+                    (match-beginning 0)
+                    (match-end 0))
+              occurrences)))
+    (nreverse occurrences)))
+
+(defun skg--nearest-uuid-on-line-by-proximity ()
+  "The `skg-nearest-id' rule for raw .skg files. Return (id . id),
+nil (no ID on the line), or `ambiguous' (IDs on both sides of point)."
+  (or (skg--id-at-point) ;; point directly on an ID always wins
+      (let* ((occurrences (skg--uuid-occurrences-on-line))
+             (pos (point))
+             (left (cl-remove-if-not
+                    (lambda (o) (<= (nth 2 o) pos)) occurrences))
+             (right (cl-remove-if-not
+                     (lambda (o) (>= (nth 1 o) pos)) occurrences))
+             (id-of (lambda (o) (cons (nth 0 o) (nth 0 o)))))
+        (cond
+         ((null occurrences) nil)
+         ((null (cdr occurrences)) ;; exactly one: proximity is moot
+          (funcall id-of (car occurrences)))
+         ((null right) ;; all left of point: the last is the closest
+          (funcall id-of (car (last left))))
+         ((null left) ;; all right of point: the first is the closest
+          (funcall id-of (car right)))
+         (t 'ambiguous)))))
 
 (defun skg--bypass-override-here-p ()
   "Whether a goto from the current buffer should bypass the
@@ -104,15 +147,19 @@ Detected by major-mode name so magit need not be loaded."
   "Open a content view for the nearest ID on the current line.
 From a magit buffer this bypasses the override-choice menu (the
 jump lands on the original raw node); elsewhere, visiting an
-overridden node offers the menu."
+overridden node offers the menu. In a raw .skg file, IDs on both
+sides of point are ambiguous: it says so and visits nothing."
   (interactive)
   (let (( result (skg-nearest-id) ))
-    (if result
-        (let (( id (car result) ))
-          (message "Visiting node: %s" id)
-          (skg-request-single-root-content-view-from-id
-           id nil (skg--bypass-override-here-p)))
-      (message "No ID found on this line")) ))
+    (cond
+     ((eq result 'ambiguous)
+      (message "Point sits between IDs; move onto (or nearer to) one."))
+     (result
+      (let (( id (car result) ))
+        (message "Visiting node: %s" id)
+        (skg-request-single-root-content-view-from-id
+         id nil (skg--bypass-override-here-p))))
+     (t (message "No ID found on this line")) )))
 
 (defun skg-goto-bypassOverride ()
   "Like `skg-goto', but always bypass the override-choice menu:
@@ -120,11 +167,14 @@ open the nearest ID itself, even if it is overridden. The escape
 hatch from the menu (and from anywhere) to the original node."
   (interactive)
   (let (( result (skg-nearest-id) ))
-    (if result
-        (let (( id (car result) ))
-          (message "Visiting node (bypassing overriders): %s" id)
-          (skg-request-single-root-content-view-from-id id nil t))
-      (message "No ID found on this line")) ))
+    (cond
+     ((eq result 'ambiguous)
+      (message "Point sits between IDs; move onto (or nearer to) one."))
+     (result
+      (let (( id (car result) ))
+        (message "Visiting node (bypassing overriders): %s" id)
+        (skg-request-single-root-content-view-from-id id nil t)))
+     (t (message "No ID found on this line")) )))
 
 (defun skg-goto-by-id (id)
   "Open a content view for ID, prompting when called interactively. (skg-goto is usually more convenient.)"
