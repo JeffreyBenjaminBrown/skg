@@ -20,7 +20,7 @@ use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNodeKind, Vognode};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// For every FOREIGN vognode in the view, the source of its nearest
 /// vognode ancestor, recorded IFF that ancestor is an OWNED Active
@@ -59,6 +59,52 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
         ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
           // An inactive vognode is a real container boundary too (and
           // never an owned source): infer nothing.
+          break,
+        _ =>
+          // A scaffold (col, etc.): skip it and keep walking rootward.
+          { current = parent; }} }}
+  map }
+
+/// A NEW node that INHERITED a foreign source (the user typed a bare
+/// headline under a foreign parent -- neither id nor source) is not a
+/// foreign-creation error: appending it modifies the foreign parent's
+/// contains, which FORKS the parent, and the new node belongs in the
+/// CLONE's source, exactly as a new node under an owned parent lands
+/// in that parent's source. This maps each such new node to the pid
+/// of the foreign node whose fork it rides: its nearest Active
+/// vognode ancestor that is not itself such a new node (a chain of
+/// new headlines climbs to the first non-new node), skipping
+/// scaffolds. No entry is recorded when the anchor is missing,
+/// Inactive, or (impossibly, since the source was inherited down the
+/// chain) owned -- the node is then still judged a foreign creation.
+/// The DefineNode rewrite driven by this map happens in
+/// 'validate_and_filter_foreign_instructions', where the ForkSpecs
+/// (hence the clones' resolved sources) exist.
+pub fn new_foreign_nodes_adopting_clone_sources (
+  viewforest : &ViewForest,
+  new_nodes_with_inherited_sources : &HashSet<ID>,
+  config     : &SkgConfig,
+) -> HashMap<ID, ID> {
+  let mut map : HashMap<ID, ID> = HashMap::new ();
+  for node in viewforest . nodes () {
+    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+      else { continue; };
+    if ! new_nodes_with_inherited_sources . contains (& t . id)
+      { continue; }
+    if config . user_owns_source (& t . source)
+      { continue; } // an owned inheritance is an ordinary creation
+    let mut current = node;
+    while let Some (parent) = current . parent () {
+      match & parent . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Active (pt)) => {
+          if new_nodes_with_inherited_sources . contains (& pt . id) {
+            // Another new headline in the same chain: keep climbing.
+            current = parent;
+            continue; }
+          if ! config . user_owns_source (& pt . source) {
+            map . insert ( t . id . clone (), pt . id . clone () ); }
+          break; }
+        ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
           break,
         _ =>
           // A scaffold (col, etc.): skip it and keep walking rootward.

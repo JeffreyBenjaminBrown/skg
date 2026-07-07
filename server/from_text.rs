@@ -23,10 +23,12 @@ use crate::types::tree::forest::{MpViewForest, ViewForest};
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
-  absent_parentIs_under_visible_parent_becomes_isContainer};
+  absent_parentIs_under_visible_parent_becomes_isContainer,
+  EnrichmentProvenance};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use fork::{
   fork_spec_from_buffer_node,
+  new_foreign_nodes_adopting_clone_sources,
   owned_ancestor_sources_for_foreign_vognodes,
   validate_fork_specs};
 use local_instruction_collection::{
@@ -90,14 +92,15 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         // parse the raw buffer
         org_to_uninterpreted_viewforest (buffer_text) }
           . map_err (SaveError::ParseError) ?;
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "add_missing_info_to_viewforest" ). entered();
-    // Metadata filling must precede maybePlaced-tree validation,
-    // because those validators compare nodes by pid,
-    // and expect sources to be inherited/resolved.
-    add_missing_info_to_viewforest (
-      & mut maybePlaced_viewforest, & config . db_name, driver )
-    . await } . map_err (SaveError::DatabaseError) ?;
+  let enrichment : EnrichmentProvenance =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "add_missing_info_to_viewforest" ). entered();
+      // Metadata filling must precede maybePlaced-tree validation,
+      // because those validators compare nodes by pid,
+      // and expect sources to be inherited/resolved.
+      add_missing_info_to_viewforest (
+        & mut maybePlaced_viewforest, & config . db_name, driver )
+      . await } . map_err (SaveError::DatabaseError) ?;
   absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
   { // If saving is impossible, don't.
@@ -136,6 +139,17 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   // it here, where the placed viewforest is live, keyed by foreign pid.
   let owned_ancestor_source : HashMap<ID, SourceName> =
     owned_ancestor_sources_for_foreign_vognodes (&viewforest, config);
+  let adopt_clone_source : HashMap<ID, ID> = {
+    // Bare new headlines under a foreign node are not foreign-creation
+    // errors; they ride that node's fork, adopting its clone's source.
+    // Ancestry is likewise only visible here, while the viewforest is
+    // live; only enrichment knew which nodes were new and sourceless.
+    let new_with_inherited_source : HashSet<ID> =
+      enrichment . new_nodes
+      . intersection (& enrichment . inherited_source_nodes)
+      . cloned () . collect ();
+    new_foreign_nodes_adopting_clone_sources (
+      &viewforest, & new_with_inherited_source, config ) };
   let default_clone_source : Option<SourceName> = {
     // The active-aware default for a fork whose source can be neither
     // user-set nor inferred: prefer the CONFIG-FIRST owned source that
@@ -163,6 +177,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         &owned_ancestor_source,
         fork_sources,
         default_clone_source . as_ref (),
+        &adopt_clone_source,
         config,
         driver )
       . await } . map_err ( |errors| SaveError::BufferValidationErrors {

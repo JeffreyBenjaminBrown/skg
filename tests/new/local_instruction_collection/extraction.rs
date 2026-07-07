@@ -911,6 +911,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
           instructions, &[], &std::collections::HashMap::new(),
           &std::collections::HashMap::new(),
           Some (& owned_default),
+          &std::collections::HashMap::new(),
           config, driver) . await
         . expect ("the subscribee-as-such edit must not error");
       assert!(

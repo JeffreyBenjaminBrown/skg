@@ -31,7 +31,7 @@ use skg::to_org::render::content_view::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::save::ForkSpec;
+use skg::types::save::{DefineNode, ForkSpec, SaveNode};
 use skg::types::views_state::OpenViews;
 use typedb_driver::TypeDBDriver;
 
@@ -53,6 +53,28 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
   * (skg (node (id N) (source foreign))) N-edited
   ** (skg (node (id N1) (source foreign) indef)) N1
   ** (skg (node (id N2) (source foreign) indef)) N2
+  "};
+
+/// Case 1 of TODO/fork-fixes.org: a BARE new headline (no metadata at
+/// all) appended under a foreign root. Enrichment mints it an id and
+/// inherits the foreign source; that must NOT be a foreign-creation
+/// error -- appending it edits N's contains, which forks N, and the
+/// new node rides that fork, adopting the clone's source.
+const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
+  * (skg (node (id N) (source foreign))) N-original
+  ** (skg (node (id N1) (source foreign) indef)) N1
+  ** (skg (node (id N2) (source foreign) indef)) N2
+  ** Can I add to this?
+  "};
+
+/// Same shape, but the new node EXPLICITLY claims the foreign source:
+/// a deliberate attempt to create a node in a read-only source, which
+/// must stay rejected.
+const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
+  * (skg (node (id N) (source foreign))) N-original
+  ** (skg (node (id N1) (source foreign) indef)) N1
+  ** (skg (node (id N2) (source foreign) indef)) N2
+  ** (skg (node (source foreign))) Can I add to this?
   "};
 
 /// The explicit 'skg-fork-node' gesture: an OWNED node (P) carries
@@ -143,6 +165,15 @@ fn all_tests
       s . reset ("fork_confirmation_gates_commit", fixtures) . await ?;
       fork_confirmation_gates_commit (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("fork_from_bare_new_child_plan", fixtures) . await ?;
+      fork_from_bare_new_child_plan (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("fork_from_bare_new_child_commits", fixtures) . await ?;
+      fork_from_bare_new_child_commits (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("explicitly_foreign_new_child_still_rejected", fixtures) . await ?;
+      explicitly_foreign_new_child_still_rejected (
+        &s . config, &s . driver ) . await ?;
       let two_owned : &str = "tests/fork/fixtures-two-owned";
       s . reset ("fork_no_owned_ancestor_defaults", two_owned) . await ?;
       fork_no_owned_ancestor_defaults (
@@ -407,6 +438,100 @@ async fn fork_confirmation_gates_commit (
     "an approved save commits and returns a normal save-result" );
   assert! ( clone_on_disk (config) . is_ok (),
     "the clone must be committed after approval" );
+  Ok (( )) }
+
+/// TODO/fork-fixes.org Case 1, at the plan level: appending a bare
+/// (metadata-less) new headline under a foreign root forks the root
+/// rather than dying with "Cannot create node in foreign source". The
+/// SavePlan must hold one ForkSpec for N, whose clone's contains end
+/// with the new node's minted id, and a kept Save instruction for the
+/// new node REWRITTEN into the clone's source.
+async fn fork_from_bare_new_child_plan (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
+    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, driver, None ) . await ?;
+  assert_eq! ( save_plan . fork_specs . len (), 1,
+    "appending a bare new child must fork N: {:?}",
+    save_plan . fork_specs );
+  let clone : &NodeComplete = & save_plan . fork_specs[0] . clone . 0;
+  assert_eq! ( save_plan . fork_specs[0] . original_id, ID::from ("N") );
+  assert_eq! ( clone . contains . len (), 3,
+    "the clone's contains must be N1, N2 and the new node: {:?}",
+    clone . contains );
+  assert_eq! ( & clone . contains [..2],
+               & [ ID::from ("N1"), ID::from ("N2") ] );
+  let new_node : &NodeComplete =
+    save_plan . define_nodes . iter ()
+    . find_map ( |dn| match dn {
+        DefineNode::Save ( SaveNode (n) )
+          if n . title == "Can I add to this?" => Some (n),
+        _ => None } )
+    . expect ("the new node must survive as a Save instruction");
+  assert_eq! ( new_node . source, clone . source,
+    "the new node must adopt the clone's source" );
+  assert_eq! ( new_node . pid, clone . contains [2],
+    "the clone's last child must be the new node" );
+  Ok (( )) }
+
+/// TODO/fork-fixes.org Case 1, committed: the approved save creates
+/// the clone AND the new node, both in the owned source; N's foreign
+/// .skg is untouched.
+async fn fork_from_bare_new_child_commits (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let response = update_from_and_rerender_buffer_with_fork_approval_test (
+    &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, driver, config, tantivy,
+    &graph, false, &Err ( String::new () ), &mut views_state,
+    /* fork_approved = */ true ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "the approved bare-new-child fork must commit: {:?}",
+    response . errors );
+  let clone : NodeComplete = clone_on_disk (config) ?;
+  let new_node : NodeComplete =
+    read_all_skg_files_from_sources (config) ?
+    . into_iter ()
+    . find ( |node| node . title == "Can I add to this?" )
+    . ok_or ("the new node must be on disk") ?;
+  assert_eq! ( new_node . source, clone . source,
+    "the new node must land in the clone's source" );
+  assert_eq! ( clone . source, SourceName::from ("owned") );
+  assert! ( clone . contains . contains (& new_node . pid),
+    "the clone must contain the new node: {:?}", clone . contains );
+  assert_eq! ( node_from_disk (config, "N") ? . contains,
+               vec! [ ID::from ("N1"), ID::from ("N2") ],
+    "N's own contains must be untouched" );
+  Ok (( )) }
+
+/// An EXPLICITLY foreign-sourced new node stays a rejection: only an
+/// inherited (guessed) foreign source rides the fork.
+async fn explicitly_foreign_new_child_still_rejected (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let result = buffer_to_validated_saveplan (
+    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, driver, None )
+    . await;
+  match result {
+    Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
+      assert! ( errors . iter () . any ( |e| matches! ( e,
+        BufferValidationError::CreatedForeignNode (..) )),
+        "expected CreatedForeignNode, got {:?}", errors ); }
+    other => panic! (
+      "expected CreatedForeignNode for an explicitly foreign new node, got {:?}",
+      other ), }
   Ok (( )) }
 
 /// Monogamy: a node may have at most one user-owned overrider. Forking

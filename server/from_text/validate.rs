@@ -36,6 +36,7 @@ pub async fn validate_and_filter_foreign_instructions(
   owned_ancestor_source : &HashMap<ID, SourceName>,
   user_set_fork_source : &HashMap<ID, SourceName>,
   default_clone_source : Option<&SourceName>,
+  adopt_clone_source : &HashMap<ID, ID>, // new node -> forked N whose clone's source it adopts (see 'new_foreign_nodes_adopting_clone_sources')
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
@@ -52,13 +53,16 @@ pub async fn validate_and_filter_foreign_instructions(
   for instruction in instructions . iter () {
     outcomes . push (
       apply_foreign_policy(
-        instruction, /* fork_eligible = */ true, config, driver
+        instruction, /* fork_eligible = */ true,
+        adopt_clone_source, config, driver
       ) . await? ); }
-  for instruction in nodeMerge_definenodes . iter () {
-    outcomes . push (
-      apply_foreign_policy(
-        instruction, /* fork_eligible = */ false, config, driver
-      ) . await? ); }
+  { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
+    for instruction in nodeMerge_definenodes . iter () {
+      outcomes . push (
+        apply_foreign_policy(
+          instruction, /* fork_eligible = */ false,
+          &no_adoptions, config, driver
+        ) . await? ); }}
   collect_foreign_policy_outcomes (&outcomes)?;
   // Build the clones from the fork candidates. A fork candidate only
   // ever arises from a regular `instructions` Save (a nodeMerge's saves
@@ -77,8 +81,10 @@ pub async fn validate_and_filter_foreign_instructions(
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }
-  Ok (( filter_unchanged_foreign_saves ( instructions, &outcomes ),
-        fork_specs )) }
+  let kept : Vec<DefineNode> =
+    finalize_foreign_policy_instructions (
+      instructions, &outcomes, &fork_specs ) ?;
+  Ok (( kept, fork_specs )) }
 
 /// PITFALL: This is applied to every node -- owned as well as foreign.
 enum ForeignPolicyOutcome {
@@ -86,12 +92,14 @@ enum ForeignPolicyOutcome {
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
   ForkCandidate(NodeComplete, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
                NodeComplete), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
+  AdoptCloneSource(ID), // A NEW node (bare headline) whose foreign source was inherited from the named forked node N: kept, but rewritten to N's clone's source once the ForkSpecs exist ('finalize_foreign_policy_instructions').
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
 async fn apply_foreign_policy(
   instr: &DefineNode,
   fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
+  adopt_clone_source: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<ForeignPolicyOutcome,
@@ -132,13 +140,19 @@ async fn apply_foreign_policy(
             // drop a non-edit to a foreign node
             Ok (ForeignPolicyOutcome::DropUnchangedForeignSave)
           }}
-        Ok (None) =>
-          // Foreign source & PID not found
-          // => trying to create a foreign node. Not allowed.
-          Ok (ForeignPolicyOutcome::Reject(
-            BufferValidationError::CreatedForeignNode(
-              node . pid . clone(),
-              node . source . clone() ))),
+        Ok (None) => {
+          // Foreign source & PID not found => trying to create a
+          // foreign node. Not allowed -- EXCEPT for a bare new
+          // headline whose foreign source was merely inherited from a
+          // forked parent: that one adopts the parent's clone's source.
+          if let Some (forked) = adopt_clone_source . get (&node . pid) {
+            Ok (ForeignPolicyOutcome::AdoptCloneSource(
+              forked . clone() ))
+          } else {
+            Ok (ForeignPolicyOutcome::Reject(
+              BufferValidationError::CreatedForeignNode(
+                node . pid . clone(),
+                node . source . clone() ))) }},
         Err (e) =>
           Err (vec![BufferValidationError::Other(
             format!("Error reading foreign node {}: {}",
@@ -156,24 +170,49 @@ fn collect_foreign_policy_outcomes(
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// Drop any DefineNode that defines a foreign node to be unchanged, and
-/// any that is a fork candidate (N's own save is never written -- N
-/// stays untouched on disk; the clone C is committed separately, gated
-/// on confirmation).
-fn filter_unchanged_foreign_saves(
+/// Drop any DefineNode that defines a foreign node to be unchanged,
+/// and any that is a fork candidate (N's own save is never written --
+/// N stays untouched on disk; the clone C is committed separately,
+/// gated on confirmation). A new node adopting a clone's source is
+/// KEPT, rewritten into that source -- its fork must exist among the
+/// specs, else it degrades to the foreign-creation rejection it would
+/// otherwise have been.
+fn finalize_foreign_policy_instructions(
   instructions: Vec<DefineNode>,
   outcomes: &[ForeignPolicyOutcome],
-) -> Vec<DefineNode> {
-  instructions . into_iter()
-    . zip (outcomes)
-    . filter_map (|(instruction, outcome)| {
-      match outcome {
-        ForeignPolicyOutcome::DropUnchangedForeignSave
-          | ForeignPolicyOutcome::ForkCandidate (..) =>
-          None,
-        _ => Some (instruction) }})
-    . collect()
-}
+  fork_specs: &[ForkSpec],
+) -> Result<Vec<DefineNode>, Vec<BufferValidationError>> {
+  let mut kept : Vec<DefineNode> = Vec::new();
+  let mut errors : Vec<BufferValidationError> = Vec::new();
+  for (instruction, outcome) in
+    instructions . into_iter() . zip (outcomes) {
+    match outcome {
+      ForeignPolicyOutcome::DropUnchangedForeignSave
+        | ForeignPolicyOutcome::ForkCandidate (..) =>
+        {},
+      ForeignPolicyOutcome::AdoptCloneSource (forked) => {
+        let clone_source : Option<&SourceName> =
+          fork_specs . iter()
+          . find ( |spec| spec . original_id == *forked )
+          . map ( |spec| & spec . clone . 0 . source );
+        match (instruction, clone_source) {
+          ( DefineNode::Save (SaveNode (mut node)),
+            Some (clone_source) ) => {
+            node . source = clone_source . clone();
+            kept . push (DefineNode::Save (SaveNode (node))); }
+          ( DefineNode::Save (SaveNode (node)), None ) =>
+            errors . push (
+              BufferValidationError::CreatedForeignNode(
+                node . pid . clone(),
+                node . source . clone() )),
+          ( DefineNode::Delete (d), _ ) =>
+            // Unreachable: only a Save earns AdoptCloneSource.
+            errors . push (
+              BufferValidationError::ModifiedForeignNode(
+                d . id . clone(),
+                d . source . clone() )), }},
+      _ => kept . push (instruction), }}
+  if errors . is_empty() { Ok (kept) } else { Err (errors) }}
 
 fn source_is_foreign(
   config: &SkgConfig,

@@ -49,6 +49,31 @@ jeff-should-weigh-in-on.org (repo root), not here.
   neutered. Unit test fork_clone_hides_children_the_edit_deleted.
   Full Rust suite: 476/476.
 
+** Case 1: bare new node under a foreign parent rides the fork
+- Enrichment ('add_missing_info_to_viewforest') now returns
+  'EnrichmentProvenance': which nodes got minted ids (new) and which
+  inherited their source. That distinction is erased by the enriched
+  tree itself, and the fix hinges on it: only an INHERITED foreign
+  source is a guess to be corrected; an explicit one stays the
+  CreatedForeignNode error.
+- 'new_foreign_nodes_adopting_clone_sources' (from_text/fork.rs) maps
+  each new-with-inherited-foreign-source node to the foreign ancestor
+  whose fork it rides (climbing chains of new headlines, skipping
+  scaffolds).
+- 'apply_foreign_policy' returns a new outcome, AdoptCloneSource;
+  'finalize_foreign_policy_instructions' (nee
+  filter_unchanged_foreign_saves) rewrites such a Save into the
+  matching ForkSpec's clone source, or degrades to the old error if no
+  spec exists (e.g. the new node was parked so as not to edit any
+  foreign contains).
+- The whole thing therefore inherits the existing confirmation gate:
+  the unapproved save shows the fork-confirmation, and the user's
+  chosen clone source (fork-sources) carries the new node with it.
+- Tests (tests/fork.rs): plan-level (spec + rewritten Save + clone
+  contains end with the minted id), commit-level (clone and new node
+  land in 'owned'; N untouched), and the explicit-foreign-source
+  rejection retained. Suite: 476/476.
+
 * Changes to the plan's envisioned order
 
 * What's imperfect about what's done

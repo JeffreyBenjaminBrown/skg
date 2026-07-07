@@ -14,9 +14,22 @@ use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
 use ego_tree::{NodeId, NodeMut};
 use std::boxed::Box;
+use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
+
+/// Which nodes enrichment INVENTED data for, as opposed to reading it
+/// from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
+/// 'inherited_source_nodes' had no source (so they inherited their
+/// parent's). Downstream policy needs the distinction the enriched
+/// tree itself has erased -- e.g. a NEW node whose INHERITED source is
+/// foreign is not a foreign-creation error but a rider on its
+/// parent's fork, whereas an explicitly foreign new node is the error.
+pub struct EnrichmentProvenance {
+  pub new_nodes              : HashSet<ID>,
+  pub inherited_source_nodes : HashSet<ID>,
+}
 
 /// PURPOSE:
 /// Just read this function definition;
@@ -30,21 +43,36 @@ pub async fn add_missing_info_to_viewforest(
   viewforest  : &mut MpViewForest,
   db_name : &str,
   driver  : &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let root_id: NodeId =
     viewforest . internal_root_id ();
   replace_ids_with_pids(
     viewforest, root_id, db_name, driver ) . await ?;
+  let mut provenance : EnrichmentProvenance =
+    EnrichmentProvenance {
+      new_nodes              : HashSet::new (),
+      inherited_source_nodes : HashSet::new (), };
   do_everywhere_in_tree_dfs(
     viewforest,
     root_id,
     true,
     &mut |mut node| {
       make_alias_if_appropriate (&mut node)?;
-      inherit_parent_source_if_possible (&mut node)?;
-      assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so that fresh UUIDs don't trigger a pointless TypeDB lookup.
+      let source_inherited : bool =
+        inherit_parent_source_if_possible (&mut node)?;
+      let id_assigned : bool =
+        assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so that fresh UUIDs don't trigger a pointless TypeDB lookup.
+      if source_inherited || id_assigned {
+        if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+          = & node . value () . kind
+        { if let Some (id) = & t . id {
+            if id_assigned {
+              provenance . new_nodes . insert (id . clone ()); }
+            if source_inherited {
+              provenance . inherited_source_nodes
+                . insert (id . clone ()); }} }}
       Ok (( )) } )?;
-  Ok (( )) }
+  Ok (provenance) }
 
 pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
   viewforest : &mut MpViewForest,
@@ -99,9 +127,10 @@ fn make_alias_if_appropriate(
 /// Inherit parent's source if both:
 /// - this is a sourceless ActiveNode
 /// - its parent is an ActiveNode with a source
+/// Returns whether it inherited one.
 fn inherit_parent_source_if_possible(
   node: &mut NodeMut<MpViewnode>
-) -> Result<(), String> {
+) -> Result<bool, String> {
   let needs_source : bool =
     match &node . value() . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
@@ -117,16 +146,19 @@ fn inherit_parent_source_if_possible(
     if let Some (source) = parent_source {
       if let MpViewnodeKind::Vognode (MpVognode::Active (t))
         = &mut node . value() . kind
-      { t . source = Some (source); }}}
-  Ok (( )) }
+      { t . source = Some (source);
+        return Ok (true); }}}
+  Ok (false) }
 
 /// Assign a new UUID to an ActiveNode if it doesn't have an ID.
+/// Returns whether it assigned one.
 fn assign_new_id_if_absent(
   node: &mut NodeMut<MpViewnode>
-) -> Result<(), String> {
+) -> Result<bool, String> {
   if let MpViewnodeKind::Vognode (MpVognode::Active (t))
     = &mut node . value() . kind {
     if t . id . is_none() {
       let new_id : String = Uuid::new_v4() . to_string();
-      t . id = Some(ID (new_id)); }}
-  Ok (( )) }
+      t . id = Some(ID (new_id));
+      return Ok (true); }}
+  Ok (false) }
