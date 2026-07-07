@@ -6,6 +6,18 @@ The request is left as-is; this file records what got done, deviations
 on *how*, and bad news. Choices Jeff might dispute live in
 jeff-should-weigh-in-on.org (repo root), not here.
 
+* Addendum: TODO/more.org (queued mid-session)
+Jeff queued TODO/more.org after the fork work began. All ten items
+are addressed; each carries an inline "Claude :" report under its
+headline there, and DONE marks were mirrored into TODO.org where the
+item also appears. Two items are not code-complete by design:
+- "Why does this search fail?" was a question; answered inline
+  (marked TODO per the file's convention).
+- The make-content-cleanup collateral complaint did not reproduce in
+  three attempted shapes; the attempt is kept as a regression test
+  (tests/collateral_delete.rs) and the item asks for the verbatim
+  message.
+
 * Plan of record (execution order)
 1. Hide-on-removal (request item "Editing a forked node is bad"):
    server rule -- an id removed from an owned subscriber F's contains

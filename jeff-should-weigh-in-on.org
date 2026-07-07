@@ -1,10 +1,60 @@
-#+title: Choices you might reasonably differ on (fork-fixes)
+#+title: Choices you might reasonably differ on (fork-fixes + more.org)
 #+startup: overview
 
-Companion to the execution of TODO/fork-fixes.org. Each entry is a
-choice I made where your request was open to interpretation, or where
-I picked among defensible designs. None blocks you; everything here is
-reversible. Ordered roughly by how likely I think you are to care.
+Companion to the execution of TODO/fork-fixes.org and TODO/more.org.
+Each entry is a choice I made where your request was open to
+interpretation, or where I picked among defensible designs. None
+blocks you; everything here is reversible. Within each half, ordered
+roughly by how likely I think you are to care. (Per-item completion
+reports live inline in TODO/more.org; this file holds only the
+judgment calls.)
+
+* From TODO/more.org
+** goto-id proximity rules apply only in raw .skg files
+Your rules (single-ID lines, closest-on-one-side, ambiguous-between)
+now govern 'skg-goto' in skg-file-minor-mode buffers. I did NOT
+extend them to content views / magit / search buffers, which keep the
+old first-after-point-else-before behavior -- in a content view,
+point mid-title between the metadata ID (left) and a link (right)
+currently follows the LINK, and your ambiguity rule would turn that
+into a refusal. If you want the rules everywhere, it is a small
+change ('skg-nearest-id' already branches).
+** The hiddenBody "B" hugs the ☮, in green
+"Add a B to that symbol": I made a new bare atom 'hiddenBody' whose
+herald is a green "B" ABUTted onto the ☮ ("☮B"), with the orange
+birth herald then hugging the B ("☮BaC"). If you want a different
+color, or the B fused into the ☮ leaf itself, it is a one-line rule
+change in server/heralds.rs.
+** Dead-link warnings fire per save of the carrier, not per link birth
+"Warn the user when they MAKE dead links": the check runs on every
+node a save actually writes, so an OLD dead link warns again whenever
+its carrier is edited -- not only at the moment the link was first
+made (distinguishing those would need link-level history). Also, a
+link whose target exists only in an INACTIVE source does not warn
+(the graph still holds the node).
+** Vanished-node investigation: first-parent walks; textlinks excluded from "dangling"
+The diff report's new vanished-nodes section defines a dangling id as
+one referenced by the four RELATION lists; a dead TEXTLINK target is
+not investigated (it degrades to label text, and the new save-time
+warning covers it). History is walked FIRST-PARENT from HEAD per
+source, so a file that only ever existed on an unmerged side branch
+reads as "never present". And the investigation runs only when the
+diff has changed paths -- the no-changes early exit still yields an
+all-empty report.
+** Diff-mode state for the C-c t a/A explanation is client-mirrored
+The client tracks the server's per-connection diff-mode by parsing
+the toggle response's first line ("Git diff mode enabled/disabled")
+and resetting on reconnect. A wire-level field would be sturdier than
+prefix-matching text; I judged it not worth a protocol change for an
+explanatory message. The explanation only fires when ZERO files were
+found AND the mirror says diff mode is off.
+** Metadata-view herald hints are overlays, computed at open time
+(C-c v m) The hints must never enter buffer text -- committing reads
+titles, and a baked-in "(☮)" would corrupt the sexp -- so they are
+overlays, and they do not refresh when you cycle a value with
+S-left/S-right. Refreshing on cycle would be a small follow-up.
+
+* From TODO/fork-fixes.org
 
 * How I read "It should not ask me if I have already specified a source in the saved metadata"
 Your Case 2 buffer specifies a source only on the NEW node ('(source
