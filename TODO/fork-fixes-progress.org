@@ -1,0 +1,56 @@
+#+title: fork-fixes: execution progress
+#+startup: overview
+
+Companion to TODO/fork-fixes.org, per coding-advice/when-to-stop.org.
+The request is left as-is; this file records what got done, deviations
+on *how*, and bad news. Choices Jeff might dispute live in
+jeff-should-weigh-in-on.org (repo root), not here.
+
+* Plan of record (execution order)
+1. Hide-on-removal (request item "Editing a forked node is bad"):
+   server rule -- an id removed from an owned subscriber F's contains
+   that is disk-content of a subscribee becomes a hide by F; re-adding
+   unhides; explicit subscribee-as-such gestures win on conflict. Plus
+   the fork-creation analogue: a clone born of an edit that deleted
+   children of N hides those children.
+2. Case 1: a NEW metadata-less node under a foreign parent no longer
+   dies with CreatedForeignNode; it adopts the fork clone's source and
+   rides the normal fork confirmation.
+3. Case 2 server: a clone source explicitly specified via the new
+   children's metadata skips the placeholder (ForkSpec.source_confirmed);
+   confirmation-buffer header moves under an org headline.
+4. Case 2 client: minibuffer prompting for each unresolved clone
+   source before the y/n; the swallowed user-error made loud.
+5. Docs.
+
+* What's done and went well
+** Hide-on-removal (request item "Editing a forked node is bad")
+- 'infer_hides_from_contains_removals'
+  (server/from_text/local_instruction_collection/
+  resolve_visibility.rs), a new pass inside visibility resolution,
+  running before the subscribee-as-such signal loop so explicit
+  subscription-view gestures win: for each owned Save intent with
+  Specified contains, ids removed relative to disk that some (post-
+  save) subscribee still contains become hides; ids added back that
+  were hidden become unhides. Members invisible under a restricted
+  source-set never count as removals (they were omitted, not
+  removed). 'resolve_visibility' gained the restricted-source-set
+  parameter; 'LoweredIntents' gained the accessor
+  'save_intents_with_specified_contains'.
+- Fork-creation analogue: 'build_fork_clone' now receives N's disk
+  contains and sets the clone's hides to the children the forking
+  edit deleted (previously always empty, so deleting a child WHILE
+  forking would have left it to reappear as unintegrated subscribed
+  content). 'ForeignPolicyOutcome::ForkCandidate' carries N's whole
+  disk node now, not just its title.
+- Tests: two new driven-save tests in tests/hidden_from_subscriptions.rs
+  (fixtures-clone-edit): removal hides only subscribee-contained
+  children; re-adding unhides. Verified to FAIL with the new pass
+  neutered. Unit test fork_clone_hides_children_the_edit_deleted.
+  Full Rust suite: 476/476.
+
+* Changes to the plan's envisioned order
+
+* What's imperfect about what's done
+
+* Choices determining the future

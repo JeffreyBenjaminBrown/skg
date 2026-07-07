@@ -102,8 +102,12 @@ To **fork** a node N is to turn it into an editable **clone** C in a
 source you own. C copies N's title, body, and child-list (the child IDs
 only — shallow), `subscribes_to` N (so N's later additions surface to C
 as unintegrated subscribed content) and `overrides_view_of` N (so
-override substitution draws C wherever N would appear). A node may have
-at most one clone you own (override monogamy).
+override substitution draws C wherever N would appear). Children of N
+that the forking edit deleted become C's
+`hides_from_its_subscriptions`, and thereafter any child removed from
+an owned subscriber's contains that some subscribee still contains is
+hidden likewise on save (re-adding it unhides). A node may have at
+most one clone you own (override monogamy).
 
 Forking spans two gestures, foreign and owned:
 

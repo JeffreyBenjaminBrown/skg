@@ -304,6 +304,16 @@ fn all_tests
       s . install_graph_handle () ?;
       test_deleting_foreign_subscribee_content_infers_hide (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_removing_subscribee_content_from_subscriber_contains_infers_hide",
+        "tests/hidden_from_subscriptions/fixtures-clone-edit") . await ?;
+      s . install_graph_handle () ?;
+      test_removing_subscribee_content_from_subscriber_contains_infers_hide (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_readding_subscribee_content_to_subscriber_contains_unhides",
+        "tests/hidden_from_subscriptions/fixtures-clone-edit") . await ?;
+      s . install_graph_handle () ?;
+      test_readding_subscribee_content_to_subscriber_contains_unhides (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_hidden_subscribee_content",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
       s . install_graph_handle () ?;
@@ -442,6 +452,73 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       &[ID::from ("e1")],
       "Expected inferred hide to be persisted in r.skg: {:?}",
       r_skg . hides_from_its_subscriptions );
+    Ok (( )) }
+
+/// The contains-removal rule (TODO/fork-fixes.org, "Editing a forked
+/// node is bad"): owned f contains [c, x] and subscribes to o, whose
+/// contains include c (but not x). Saving f WITHOUT its children must
+/// hide c (it would otherwise reappear under f as unintegrated
+/// subscribed content), and must NOT hide x (no subscribee contains
+/// it -- deleting it is an ordinary contains edit).
+async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+    let buffer : &str = indoc! {"
+      * (skg (node (id f) (source owned))) f
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      buffer, &driver, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let f_skg : NodeComplete =
+      node_from_disk (&config, "f") ?;
+    assert! ( f_skg . contains . is_empty (),
+      "f's contains must be emptied by the save: {:?}",
+      f_skg . contains );
+    assert_eq! (
+      f_skg . hides_from_its_subscriptions . or_default (),
+      &[ ID::from ("c") ],
+      "removing c (content of subscribee o) must hide it, and removing x (content of no subscribee) must not: {:?}",
+      f_skg . hides_from_its_subscriptions );
+    Ok (( )) }
+
+/// The inverse of the contains-removal rule: owned g hides c and
+/// subscribes to o (which contains c). Saving g WITH c as content
+/// must drop the now-stale hide -- c is integrated, so g should no
+/// longer appear among c's hiders.
+async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+    let graph : InRustGraphHandle =
+      install_or_swap_global_handle (
+        graph_handle_from_config (config) ?);
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+    let buffer : &str = indoc! {"
+      * (skg (node (id g) (source owned))) g
+      ** (skg (node (id c) (source foreign) indef)) c
+      "};
+    save_buffer_for_hidden_subscriptions_test (
+      buffer, &driver, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let g_skg : NodeComplete =
+      node_from_disk (&config, "g") ?;
+    assert_eq! ( g_skg . contains, vec! [ ID::from ("c") ],
+      "g's contains must now hold c: {:?}", g_skg . contains );
+    assert! (
+      g_skg . hides_from_its_subscriptions . or_default () . is_empty (),
+      "re-adding c to g's contains must drop g's stale hide of c: {:?}",
+      g_skg . hides_from_its_subscriptions );
     Ok (( )) }
 
 async fn test_collateral_view_reflects_newly_hidden_subscribee_content (

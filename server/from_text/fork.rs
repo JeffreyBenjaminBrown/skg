@@ -82,6 +82,7 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
 pub fn fork_spec_from_buffer_node (
   buffer_node           : &NodeComplete,
   disk_title            : &str, // N's original title (before the edit), for the confirmation buffer's child line.
+  disk_contains         : &[ID], // N's original contains (before the edit); children the edit deleted become the clone's hides.
   owned_ancestor_source : &HashMap<ID, SourceName>,
   user_set_source       : &HashMap<ID, SourceName>,
   default_source        : Option<&SourceName>, // the caller's active-aware default owned source
@@ -93,7 +94,8 @@ pub fn fork_spec_from_buffer_node (
     . or_else ( || default_source . cloned () )
     . ok_or_else ( || BufferValidationError::ForkSourceUnresolved (
         buffer_node . pid . clone () )) ?;
-  Ok ( build_fork_clone (buffer_node, disk_title, clone_source) ) }
+  Ok ( build_fork_clone (
+    buffer_node, disk_title, disk_contains, clone_source) ) }
 
 /// The sentinel source the confirmation buffer pre-fills for every
 /// clone-to-be. The user MUST replace it (C-c s s) with a real owned
@@ -215,15 +217,20 @@ pub fn validate_fork_specs (
 /// resolved owned source. C copies N's title/body/contains (the
 /// edited buffer values -- N is already disk-supplemented, so no disk
 /// fetch is needed, unlike nodeMerge whose acquiree is only an ID
-/// reference), subscribes_to = [N] and overrides_view_of = [N], no
-/// hides (the prerequisite display rule excludes C's own contains from
-/// its subscribee-as-such view), a fresh pid, and the owned source.
+/// reference), subscribes_to = [N] and overrides_view_of = [N], a
+/// fresh pid, and the owned source. C's hides are the children the
+/// forking edit DELETED (disk_contains minus the edited contains):
+/// the user dismissed them, so they must not reappear as
+/// unintegrated subscribed content. (Children the clone keeps need no
+/// hide -- the display rule already excludes C's own contains from
+/// its subscribee-as-such view.)
 /// contains is stored RAW (the child IDs as the buffer collected them);
 /// override substitution applies at render time.
 pub fn build_fork_clone (
-  buffer_node  : &NodeComplete,
-  disk_title   : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
-  clone_source : SourceName,
+  buffer_node   : &NodeComplete,
+  disk_title    : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
+  disk_contains : &[ID], // N's original (pre-edit) contains.
+  clone_source  : SourceName,
 ) -> ForkSpec {
   let clone : NodeComplete = NodeComplete {
     title         : buffer_node . title . clone (),
@@ -234,7 +241,11 @@ pub fn build_fork_clone (
     body          : buffer_node . body . clone (),
     contains      : buffer_node . contains . clone (),
     subscribes_to : MSV::Specified ( vec! [ buffer_node . pid . clone () ] ),
-    hides_from_its_subscriptions : MSV::Specified ( Vec::new () ),
+    hides_from_its_subscriptions : MSV::Specified (
+      // The children the forking edit deleted.
+      disk_contains . iter ()
+        . filter ( |id| ! buffer_node . contains . contains (id) )
+        . cloned () . collect () ),
     overrides_view_of : MSV::Specified ( vec! [ buffer_node . pid . clone () ] ),
     misc          : Vec::new (),
   };

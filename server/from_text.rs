@@ -245,8 +245,11 @@ fn explicit_fork_specs_from_viewforest (
             "Cannot fork node {}: {}", pid . 0, e )));
           continue; }};
     match fork_spec_from_buffer_node (
-      & snapshot, & snapshot . title, & no_inference,
-      user_set_source, default_source )
+      // The snapshot serves as both the clone template and the disk
+      // state, so the disk-contains diff is empty: an explicit fork
+      // deletes nothing, hence hides nothing.
+      & snapshot, & snapshot . title, & snapshot . contains,
+      & no_inference, user_set_source, default_source )
     { Ok (spec) => specs . push (spec),
       Err (e)   => errors . push (e), }}
   if ! errors . is_empty () { return Err (errors); }

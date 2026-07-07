@@ -101,7 +101,27 @@ fn fork_spec_n_edited () -> ForkSpec {
     pid    : ID::from ("N"),
     .. empty_node_complete () };
   build_fork_clone (
-    & buffer_node, "N-original", SourceName::from ("owned2") ) }
+    & buffer_node, "N-original", &[], SourceName::from ("owned2") ) }
+
+#[test]
+fn fork_clone_hides_children_the_edit_deleted () {
+  // N had [N1, N2] on disk; the forking edit kept only N1. The clone
+  // must hide N2, or it would reappear under the clone as
+  // unintegrated subscribed content the user just dismissed.
+  let buffer_node : NodeComplete = NodeComplete {
+    title    : "N-edited" . to_string (),
+    source   : SourceName::from ("foreign"),
+    pid      : ID::from ("N"),
+    contains : vec! [ ID::from ("N1") ],
+    .. empty_node_complete () };
+  let spec : ForkSpec = build_fork_clone (
+    & buffer_node, "N-original",
+    & [ ID::from ("N1"), ID::from ("N2") ],
+    SourceName::from ("owned2") );
+  assert_eq! (
+    spec . clone . 0 . hides_from_its_subscriptions . or_default (),
+    & [ ID::from ("N2") ],
+    "the clone must hide exactly the children the edit deleted" ); }
 
 #[test]
 fn confirmation_buffer_is_two_level_with_pO_on_the_child () {

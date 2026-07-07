@@ -68,10 +68,11 @@ pub async fn validate_and_filter_foreign_instructions(
   let mut fork_specs : Vec<ForkSpec> = Vec::new ();
   let mut fork_errors : Vec<BufferValidationError> = Vec::new ();
   for outcome in &outcomes {
-    if let ForeignPolicyOutcome::ForkCandidate (buffer_node, disk_title)
+    if let ForeignPolicyOutcome::ForkCandidate (buffer_node, disk_node)
       = outcome {
       match fork_spec_from_buffer_node (
-        buffer_node, disk_title, owned_ancestor_source,
+        buffer_node, & disk_node . title, & disk_node . contains,
+        owned_ancestor_source,
         user_set_fork_source, default_clone_source )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
@@ -84,7 +85,7 @@ enum ForeignPolicyOutcome {
   Keep, // Safe to pass through to persistence.
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
   ForkCandidate(NodeComplete, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
-               String), // N's DISK title -- the original, before the user's edit -- for the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title).
+               NodeComplete), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
@@ -120,7 +121,7 @@ async fn apply_foreign_policy(
             // a foreign node is NOT a fork and still rejects.
             if fork_eligible {
               Ok (ForeignPolicyOutcome::ForkCandidate(
-                node . clone(), disk_node . title . clone() ))
+                node . clone(), disk_node ))
             } else {
               Ok (ForeignPolicyOutcome::Reject(
                 BufferValidationError::ModifiedForeignNode(

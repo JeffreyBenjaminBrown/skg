@@ -1,0 +1,6 @@
+pid: g
+title: g
+subscribes_to:
+- o
+hides_from_its_subscriptions:
+- c
