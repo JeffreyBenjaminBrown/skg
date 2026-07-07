@@ -10,6 +10,18 @@ reports live inline in TODO/more.org; this file holds only the
 judgment calls.)
 
 * From TODO/more.org
+** Merge hides: shown-based subtraction, not a literal intersection
+Your headline said "something like the intersection"; your body
+spelled out a shown-based rule, and I implemented the body: merged
+hides = union minus everything either member SHOWED pre-merge. A
+literal intersection would additionally drop a hide by A of a node B
+never subscribed to -- nobody's view contradicted that hide, and
+dropping it could surface the node the moment the merged node
+inherits A's subscriptions. Two details: "shown" is evaluated against
+DISK state at merge time (edits to a subscribee riding the same save
+are not consulted), and ids a member showed as its OWN content were
+already safe -- contains are unioned and the pre-existing filter
+drops hides of anything the merged node contains.
 ** goto-id proximity rules apply only in raw .skg files
 Your rules (single-ID lines, closest-on-one-side, ambiguous-between)
 now govern 'skg-goto' in skg-file-minor-mode buffers. I did NOT
