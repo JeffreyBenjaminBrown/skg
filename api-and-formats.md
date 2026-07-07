@@ -379,6 +379,11 @@ node participates in the collection represented by its visible parent:
   does not alter the parent's collection on save;
 - `(parentIs absent)` is rendered for view roots.
 
+The bare atom `hiddenBody` accompanies `indef` on an indefinitive
+node whose graph node HAS a body — one the rendering hides. Herald
+"B", hugging the ☮. Display-only: the parser accepts and discards it;
+the view regenerates it.
+
 `(birth ...)` records generated-view provenance, not save intent:
 
 - omitted `birth` means `unremarkable`;

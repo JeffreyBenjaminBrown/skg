@@ -264,6 +264,9 @@ pub fn herald_rule_table () -> HeraldRule {
         // (see org_to_text.rs); we match that here. It leads so the
         // orange birth herald can hug it.
         leaf_abut (Green, "indef", "☮"),
+        // Emitted only on an indefinitive node whose graph node has a
+        // body -- one the rendering hides. ABUT so the B rides the ☮.
+        leaf_abut (Green, "hiddenBody", "B"),
         // The orange BIRTH herald: one quoted string of space-joined
         // relationship tokens, assembled in Rust (server/herald_tokens.rs)
         // and echoed verbatim. ABUT so it hugs the ☮.
@@ -402,7 +405,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "deletedScaffold",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "source",
-    "parentIs", "indef", "notInGit",
+    "parentIs", "indef", "hiddenBody", "notInGit",
     // The two assembled herald-string atoms (server/herald_tokens.rs):
     "birthHerald", "rels",
     "viewStats", "editRequest", "viewRequests",
@@ -445,6 +448,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       birth_herald : _,     // -> the node-level birthHerald atom
       rels_herald : _,      // -> the node-level rels atom
       overridesHere : _,    // keyed form (a viewStats sub-form)
+      hidden_body : _,      // -> the node-level hiddenBody atom
     } = v; }
   let _ = guard;
   vec! [ "cycle", "sourceHerald", "overridesHere" ] }

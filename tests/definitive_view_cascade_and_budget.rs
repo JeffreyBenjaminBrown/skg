@@ -211,10 +211,10 @@ async fn test_definitive_view_limit_5_or_6 (
         ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
         ** (skg (node (id 12) (source main) (birthHerald \"aC4\"))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef (birthHerald \"aC2\"))) 121
-        *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
-        *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
-        *** (skg (node (id 124) (source main) indef (birthHerald \"aC\"))) 124
+        *** (skg (node (id 121) (source main) indef hiddenBody (birthHerald \"aC2\"))) 121
+        *** (skg (node (id 122) (source main) indef hiddenBody (birthHerald \"aC1\"))) 122
+        *** (skg (node (id 123) (source main) indef hiddenBody (birthHerald \"aC\"))) 123
+        *** (skg (node (id 124) (source main) indef hiddenBody (birthHerald \"aC\"))) 124
         ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
@@ -228,11 +228,11 @@ async fn test_definitive_view_limit_5_or_6 (
         12 body
         *** (skg (node (id 121) (source main) (birthHerald \"aC2\"))) 121
         121 body
-        **** (skg (node (id 1211) (source main) indef (birthHerald \"aC\"))) 1211
-        **** (skg (node (id 1212) (source main) indef (birthHerald \"aC\"))) 1212
-        *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
-        *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
-        *** (skg (node (id 124) (source main) indef (birthHerald \"aC\"))) 124
+        **** (skg (node (id 1211) (source main) indef hiddenBody (birthHerald \"aC\"))) 1211
+        **** (skg (node (id 1212) (source main) indef hiddenBody (birthHerald \"aC\"))) 1212
+        *** (skg (node (id 122) (source main) indef hiddenBody (birthHerald \"aC1\"))) 122
+        *** (skg (node (id 123) (source main) indef hiddenBody (birthHerald \"aC\"))) 123
+        *** (skg (node (id 124) (source main) indef hiddenBody (birthHerald \"aC\"))) 124
         ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
@@ -310,10 +310,13 @@ async fn test_definitive_view_limit_1_to_4 (
       let expected_1 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
         ** (skg (node (id 11) (source main) indef (birthHerald \"aC\"))) 11
-        ** (skg (node (id 12) (source main) indef (birthHerald \"aC4\"))) 12
+        ** (skg (node (id 12) (source main) indef hiddenBody (birthHerald \"aC4\"))) 12
         ** (skg (node (id 13) (source main) indef (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
+      // hiddenBody marks only 12: the saved buffer drew 11 and 13
+      // definitive with no body text, WIPING their bodies, while
+      // indefinitive 12 kept its body -- which this render hides.
       // limit=4: expansions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
       // whole group 121..124, all indefinitive (budget spent); 13 is reached
       // after the budget is gone, so it too is indefinitive.
@@ -322,10 +325,10 @@ async fn test_definitive_view_limit_1_to_4 (
         ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
         ** (skg (node (id 12) (source main) (birthHerald \"aC4\"))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef (birthHerald \"aC2\"))) 121
-        *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
-        *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
-        *** (skg (node (id 124) (source main) indef (birthHerald \"aC\"))) 124
+        *** (skg (node (id 121) (source main) indef hiddenBody (birthHerald \"aC2\"))) 121
+        *** (skg (node (id 122) (source main) indef hiddenBody (birthHerald \"aC1\"))) 122
+        *** (skg (node (id 123) (source main) indef hiddenBody (birthHerald \"aC\"))) 123
+        *** (skg (node (id 124) (source main) indef hiddenBody (birthHerald \"aC\"))) 124
         ** (skg (node (id 13) (source main) indef (birthHerald \"aC\"))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
@@ -355,7 +358,7 @@ async fn test_definitive_view_conflicting (
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 12))) 12
-        *** (skg (node (id 122) indef)) 122
+        *** (skg (node (id 122) indef hiddenBody)) 122
         * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12 copy
       "};
 
@@ -384,7 +387,7 @@ async fn test_definitive_view_conflicting (
         // rather than [121,122,123,124].
         "* (skg (node (id 1) (source main) (parentIs absent) (rels \"C1\"))) 1
          ** (skg (node (id 12) (source main) indef (birthHerald \"aC1\"))) 12
-         *** (skg (node (id 122) (source main) indef (birthHerald \"aC1\"))) 122
+         *** (skg (node (id 122) (source main) indef hiddenBody (birthHerald \"aC1\"))) 122
          * (skg (node (id 12) (source main) (parentIs absent) (rels \"1C1\"))) 12
          ** (skg (node (id 122) (source main) (birthHerald \"aC1\"))) 122
          122 body
@@ -437,7 +440,7 @@ async fn test_definitive_view_with_cycle (
         cyc-a body
         ** (skg (node (id cyc-b) (source main) (birthHerald \"aCa\"))) cyc-b
         cyc-b body
-        *** (skg (node (id cyc-a) (source main) indef (birthHerald \"aCa\") (viewStats cycle))) cyc-a
+        *** (skg (node (id cyc-a) (source main) indef hiddenBody (birthHerald \"aCa\") (viewStats cycle))) cyc-a
       "};
 
       assert_eq!(result, expected,

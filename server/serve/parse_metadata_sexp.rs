@@ -471,6 +471,10 @@ fn parse_node_sexp (
           // and accepts only the abbreviated form (see org_to_text.rs).
           "indef" =>
             metadata . indefinitive = true,
+          "hiddenBody" =>
+            // Display-only (like rels/birthHerald): the view
+            // regenerates it, so accept and discard.
+            {},
           "notInGit" =>
             metadata . activeNode_not_in_git = true,
           _ => {

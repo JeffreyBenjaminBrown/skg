@@ -91,7 +91,16 @@ a typed/pasted ID, so it needs nothing from the buffer it is called
 in. (The nvim client binds per-buffer; I left it alone since "buffer
 type" is an Emacs concern -- say the word if you want a global nvim
 mapping too.)
-* If indefinitive, add a B to that symbol where body is hidden.
+* DONE If indefinitive, add a B to that symbol where body is hidden.
+** Claude : done
+An indefinitive node whose graph node has a body now carries the bare
+atom 'hiddenBody' right after 'indef'; the herald table renders it as
+a green "B" ABUTted onto the ☮. Computed in the viewnodestats pass
+from the in-Rust graph; display-only (the parser accepts and discards
+it, like rels/birthHerald). Updating the exact-output render tests
+turned out to double as nice pins: e.g. in the budget tests, nodes
+whose bodies an earlier save had WIPED (definitive draw, no body
+text) correctly show no B, while their body-keeping siblings do.
 * DONE when staging new files (C-c t [a|A]), explain if git diff mode off
 rather than acting like the user did it right
 and stating that 0 files were added

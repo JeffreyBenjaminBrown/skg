@@ -366,6 +366,11 @@ pub struct ViewNodeStats {
   /// (the carrier's ID must equal the visibility-ungated
   /// 'resolve_override (N).effective').
   pub overridesHere         : Option<ID>,
+  /// True iff the node is drawn INDEFINITIVE here while its graph
+  /// node has a body -- a body the rendering hides. Herald "B",
+  /// hugging the ☮ (TODO/more.org). Display-only, like the assembled
+  /// herald strings; the parser accepts and discards it.
+  pub hidden_body           : bool,
 }
 
 #[derive( Debug, Clone, Copy, PartialEq, Eq )]
@@ -815,6 +820,7 @@ impl Default for ViewNodeStats {
       birth_herald      : None,
       rels_herald       : None,
       overridesHere     : None,
+      hidden_body       : false,
     }} }
 
 //
