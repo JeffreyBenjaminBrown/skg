@@ -56,6 +56,10 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
   (interactive)
   (skg--confirm-save-despite-other-unsaved)
+  (when (org-before-first-heading-p)
+    ;; Rather than complain, save as if point were at the first headline.
+    (goto-char (point-min))
+    (outline-next-heading))
   (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
          (save-excursion
            (org-back-to-heading t)
@@ -274,11 +278,12 @@ which would trigger overlay modification-hooks if still present."
     (skg--unlock-all-save-locked)) )
 
 (defconst skg-fork-source-placeholder "PICK-A-SOURCE"
-  "Sentinel source the server pre-fills for each clone-to-be in the
-fork-confirmation buffer. The user must replace it (C-c s s) with a real
-owned source before approving; `skg-approve-fork' refuses while any clone
-still carries it. Must match FORK_SOURCE_PLACEHOLDER in
-server/from_text/fork.rs.")
+  "Sentinel source the server pre-fills for a clone-to-be whose source
+the user has not specified (in the saved metadata or a prior round).
+`skg--fork-choose-placeholder-sources' prompts for a replacement per
+carrying clone (the user can also set one with C-c s s);
+`skg-approve-fork' refuses while any remains. Must match
+FORK_SOURCE_PLACEHOLDER in server/from_text/fork.rs.")
 
 (defvar-local skg--fork-origin-buffer nil
   "In a fork-confirmation buffer, the source buffer whose save raised the
@@ -306,8 +311,9 @@ idempotent, so a redundant call after a decline is a harmless no-op."
 (defun skg--fork-confirmation-handler (save-buffer payload)
   "Handle a `fork-confirmation' LP message: the save edited foreign
 node(s) and was not pre-approved, so NOTHING was committed. Show the
-read-only confirmation buffer (which lists the nodes that would be
-forked) and, interactively, ask whether to approve.
+confirmation buffer (which lists the nodes that would be forked) and,
+interactively, prompt for any clone source not yet specified, then ask
+whether to approve.
 
 Terminal, like `skg--save-result-handler': remove the streaming handlers
 AND the unfired save-result one-shot (decrementing the pending count for
@@ -326,30 +332,85 @@ it), end the stream, and unlock."
     (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
   (skg--end-stream)
   (skg--unlock-all-save-locked)
-  (condition-case err
-      (let* ((response (read payload))
-             (content (cadr (assoc 'content response)))
-             (to-minibuffer (cadr (assoc 'to-minibuffer response)))
-             (confirm-buf (skg--show-fork-confirmation content save-buffer)))
-        (when to-minibuffer (message "%s" to-minibuffer))
-        (unless noninteractive
-          ;; In batch (tests) the caller drives skg-approve-fork /
-          ;; skg-decline-fork directly; interactively, ask now.
-          (with-current-buffer confirm-buf
-            (if (yes-or-no-p "Fork the listed node(s)? ")
-                (skg-approve-fork)
-              (skg-decline-fork)))))
-    (error (skg-log 'error 'save "fork-confirmation handler error: %S" err))))
+  (let ((confirm-buf
+         ;; The condition-case guards only response parsing/display.
+         ;; The interactive flow below runs OUTSIDE it: a refusal
+         ;; (user-error) from `skg-approve-fork' must reach the user,
+         ;; not the log -- nesting it here used to swallow the
+         ;; \"pick a source first\" refusal, so approving with a
+         ;; placeholder source silently did nothing.
+         (condition-case err
+             (let* ((response (read payload))
+                    (content (cadr (assoc 'content response)))
+                    (to-minibuffer (cadr (assoc 'to-minibuffer response)))
+                    (buf (skg--show-fork-confirmation content save-buffer)))
+               (when to-minibuffer (message "%s" to-minibuffer))
+               buf)
+           (error
+            (skg-log 'error 'save "fork-confirmation handler error: %S" err)
+            nil))))
+    (when (and confirm-buf (not noninteractive))
+      ;; In batch (tests) the caller drives skg-approve-fork /
+      ;; skg-decline-fork directly; interactively, ask now. Quitting
+      ;; (C-g) any prompt leaves the confirmation buffer open: set
+      ;; sources with C-c s s and approve with C-c C-c, or decline
+      ;; with C-c C-k.
+      (with-current-buffer confirm-buf
+        (skg--fork-choose-placeholder-sources)
+        (if (yes-or-no-p "Fork the listed node(s)? ")
+            (skg-approve-fork)
+          (skg-decline-fork))))))
+
+(defun skg--fork-suggested-source-above-point ()
+  "Return the suggested source named by the comment directly above the
+headline at point, or nil. The server writes that comment above each
+clone-to-be whose source the user has not yet specified."
+  (save-excursion
+    (forward-line -1)
+    (when (looking-at
+           "^# Suggested source for the clone below: \\(.+\\)$")
+      (string-trim (match-string 1)))))
+
+(defun skg--fork-choose-placeholder-sources ()
+  "Prompt for an owned source for each clone-to-be still carrying
+`skg-fork-source-placeholder', writing the choice into the buffer.
+The server's suggested source (the comment above the clone) is the
+default; S-left/S-right cycle through the sources you own. A no-op
+when every clone's source is already specified -- notably when the
+saved metadata itself specified it (the server then omits the
+placeholder), per TODO/fork-fixes.org: no redundant ask."
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward org-heading-regexp nil t)
+      (beginning-of-line)
+      (let ((sexp (skg--metadata-sexp-at-point-or-nil)))
+        (when (and (= (org-current-level) 1)
+                   sexp
+                   (equal (skg--node-source sexp)
+                          skg-fork-source-placeholder))
+          (let* ((title (nth 2 (skg-split-as-stars-metadata-title
+                                (skg-get-current-headline-text))))
+                 (suggested (skg--fork-suggested-source-above-point))
+                 (owned (skg--owned-sources))
+                 (default (or suggested (car owned)))
+                 (choice (skg--completing-read-with-cycle
+                          (format "Source for the clone \"%s\" (default %s): "
+                                  title default)
+                          owned nil t nil nil default nil owned)))
+            (skg--change-source-at-point
+             (if (string-empty-p choice) default choice)))))
+      (forward-line 1))))
 
 (defun skg--show-fork-confirmation (content save-buffer)
   "Show CONTENT in the *SKG Fork Confirmation* buffer, recording
 SAVE-BUFFER as its origin, and return the buffer. The buffer is a
-navigable content view (so id-push / search work). It is editable so the
-user can rotate each clone's source (C-c s s on the clone-to-be parent),
-but it is NOT an ordinary save target: skg-view-uri is left nil (tripping
-the nil-view-uri save guard) and C-x C-s is rebound to refuse, because a
-stray normal save of its id-less clone-to-be parents would create bare
-nodes. Only C-c C-c (approve) and C-c C-k (decline) act on it."
+navigable content view (so id-push / search work). It is editable so
+each clone's source can be set (the handler's minibuffer prompts write
+into it; C-c s s on a clone-to-be works too), but it is NOT an ordinary
+save target: skg-view-uri is left nil (tripping the nil-view-uri save
+guard) and C-x C-s is rebound to refuse, because a stray normal save of
+its id-less clone-to-be parents would create bare nodes. Only C-c C-c
+\(approve) and C-c C-k (decline) act on it."
   (let ((buf (get-buffer-create "*SKG Fork Confirmation*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
@@ -422,10 +483,15 @@ extract each clone's chosen source, re-save the originating buffer with
 the forks approved (carrying those sources), then kill the confirmation
 buffer.
 
-Refuses while any clone-to-be still carries the `skg-fork-source-placeholder'
-source: every clone's source must be picked deliberately (C-c s s) before
-approving. The confirmation buffer is left open so you can do so."
+Interactively, first prompts for any clone source still at
+`skg-fork-source-placeholder' (as the confirmation handler already did
+when the buffer appeared -- this catches placeholders that survived,
+e.g. after quitting those prompts). Refuses if any placeholder remains
+anyway; the confirmation buffer is left open so you can set sources by
+hand (C-c s s)."
   (interactive)
+  (unless noninteractive
+    (skg--fork-choose-placeholder-sources))
   (let ((origin skg--fork-origin-buffer)
         (fork-sources (skg--fork-sources-from-confirmation-buffer)))
     (unless (buffer-live-p origin)

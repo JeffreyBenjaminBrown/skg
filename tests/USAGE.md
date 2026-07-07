@@ -1,19 +1,18 @@
-From the root of the project,
-some ways to run the Emacs tests include
-```
-emacs -batch -l tests/emacs/test.el
-emacs -batch -l tests/emacs/test.el 2&> tests/results-emacs.txt
-```
+# Running Tests
 
-Similarly, some ways to run the Rust tests include
-```
-cargo test
-cargo test 2&> tests/results-rust.txt
-```
+There are three kinds of tests. The authoritative description lives in `coding-advice/claude-to-claude.org`, section "Running Tests".
 
-If you use the Docker container,
-the Rust tests should be run inside it,
-from `/home/ubuntu`, which is the user's home folder.
-But the Emacs tests should be run from your host system,
-because that is where Emacs is run in production
-(and the Docker container does not include Emacs).
+1. **Emacs Lisp tests**: `bash/emacs-tests.sh`
+   - Runs the ERT tests in `tests/elisp/` in Emacs batch mode
+   - Some tests require the skg server (`cargo run --bin skg`) to be running
+
+2. **Rust tests**: `cargo nextest run` (plain `cargo test` also works, but nextest gives each test its own process, avoiding a known flake)
+   - Requires `typedb server` to be running
+
+3. **Integration tests**: `bash/integration-tests.sh`
+   - End-to-end tests in `tests/integration/*/run-test.sh`
+   - Requires both `typedb server` and the skg server to be running
+
+Note that `tests/nvim/` holds the Neovim client's tests.
+
+The Docker container includes Emacs and Neovim (see `coding-advice/docker.org`), so all tests can run inside it.

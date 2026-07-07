@@ -28,6 +28,19 @@
 (require 'skg-readable-ids)
 (require 'skg-sexpr-search)   ;; skg-first-sexpr-on-line
 
+(defun skg--explain-if-blind-to-new-files (path-count)
+  "When PATH-COUNT is 0 because git diff mode is off, say so.
+New files are recognized by the `(unstaged newX)' markers that only a
+diff-mode render carries, so with diff mode off this command is blind
+-- reporting \"0 files\" as if the user did it right would mislead.
+Returns non-nil when it explained (the caller then skips its own
+report)."
+  (when (and (zerop path-count)
+             (not skg--git-diff-mode-enabled))
+    (message
+     "Git diff mode is off, so new files cannot be recognized: this command looks for the newX markers only a diff-mode view carries. Toggle diff mode (C-c v d), then retry.")
+    t))
+
 (defun skg-git-add-if-new-recursive ()
   "Run new-file git-add command that
 `skg-git-add-if-new-recursive-preview' would display.
@@ -38,9 +51,11 @@ you might not want to review the command manually.)"
   (let* ((plan (skg--git-add-new-files-recursive-plan))
          (paths (plist-get plan :paths))
          (form (plist-get plan :form)))
-    (eval form t)
-    (message "skg-git-add-if-new-recursive: ran git-add command for %d new file(s)"
-             (length paths))))
+    (if (skg--explain-if-blind-to-new-files (length paths))
+        nil
+      (eval form t)
+      (message "skg-git-add-if-new-recursive: ran git-add command for %d new file(s)"
+               (length paths)))))
 
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
@@ -50,24 +65,26 @@ the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."
   (interactive)
   (let* ((plan (skg--git-add-new-files-recursive-plan))
-         (paths (plist-get plan :paths))
-         (buffer (get-buffer-create "*skg git add new files*")))
-    (with-current-buffer buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (emacs-lisp-mode)
-        ;; The preview is meant to be evaluated later. If user/custom
-        ;; printer limits are active, `pp-to-string' can emit `...'
-        ;; inside the quoted filename list, making the buffer invalid
-        ;; as executable code.
-        (let ((print-length nil)
-              (print-level nil))
-          (insert (pp-to-string (plist-get plan :form))))
-        (goto-char (point-min))
-        (skg-readable-ids-mode 1)))
-    (pop-to-buffer buffer)
-    (message "skg-git-add-if-new-recursive-preview: %d new file(s)"
-             (length paths))))
+         (paths (plist-get plan :paths)))
+    (if (skg--explain-if-blind-to-new-files (length paths))
+        nil
+      (let ((buffer (get-buffer-create "*skg git add new files*")))
+        (with-current-buffer buffer
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (emacs-lisp-mode)
+            ;; The preview is meant to be evaluated later. If user/custom
+            ;; printer limits are active, `pp-to-string' can emit `...'
+            ;; inside the quoted filename list, making the buffer invalid
+            ;; as executable code.
+            (let ((print-length nil)
+                  (print-level nil))
+              (insert (pp-to-string (plist-get plan :form))))
+            (goto-char (point-min))
+            (skg-readable-ids-mode 1)))
+        (pop-to-buffer buffer)
+        (message "skg-git-add-if-new-recursive-preview: %d new file(s)"
+                 (length paths))))))
 
 (defun skg--git-add-new-files-recursive-plan ()
   "Return the executable git-add plan for new files in this subtree.

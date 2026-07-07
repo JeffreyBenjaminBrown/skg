@@ -1,0 +1,71 @@
+* PURPOSE
+  Wishes I found (in TODO.org, TODO/problems.org, and the .skg notes)
+  whose intent I could not pin down well enough to act on. For each I
+  say what I understood and where interpretation is needed. Please
+  respond inline.
+* from TODO.org
+** "Where to put this comment?" (headline of that name)
+   The entry contains a comment about 'skg stage moves' ("I CHECKED IT
+   a lot myself: no staged changes, move something, do this, now there
+   are staged changes and they correspond"). It literally asks where
+   the comment belongs. Candidates: the header of
+   server/git_ops/find_and_stage_moves.rs, or docs/COMMANDS.org next
+   to the skg-stage-moves command. Only you know what "it" and "do
+   this" refer to precisely enough to place it.
+** "suppressed container count rule for subscribees-as-such is wrong"
+   The entry says "It suppresses 1, should suppress 0" and then "Maybe
+   simplify the rule: always suppress 1 and nothing else." Those two
+   sentences prescribe different behaviors (suppress 0 for
+   subscribees-as-such, vs. always suppress 1 uniformly). I could not
+   tell which you settled on. The relevant code is the container-count
+   suppression discussed in problems.org, "GraphStats rendering still
+   lacks parent-kind context".
+** "IDs should not be writeable in the metadata view. And what about extra-ids?"
+   (under "easy") Two ambiguities: (a) mechanism -- should an edited ID
+   be silently ignored on save, rejected with an error, or physically
+   read-only in the buffer (text properties)? Each has precedent
+   somewhere in the codebase. (b) The extra-ids question you asked
+   yourself. Since editing an ID in the metadata view can today
+   fabricate a reference to a nonexistent node (or capture an existing
+   one), the answer matters for data safety, so I did not guess.
+** "Is it a misfeature to let config_path differ from data_root?"
+   A question, not a wish. If you decide it is a misfeature, the fix
+   is presumably to derive one from the other and warn on divergence.
+** "must (?) stage them separately, but commit all repos at once"
+   (under "usage mysteries") I could not reconstruct the observation,
+   let alone the wish.
+** "show the herald it is responsible for next to each field in the metadata"
+   (under "easy") I read this as: in the s-exp/metadata view, each
+   metadata field should display the herald glyph it produces. But I
+   was unsure whether "the metadata" means the sexp-edit view, the
+   inline (skg ...) metadata, or docs. Also unsure whether you want
+   the raw glyph, the colored token, or a legend.
+** "rewrite docs/COMMANDS.org -- Some new Claude-written passages assume too much of the reade[r]"
+   Doable, but which passages and what target audience level is your
+   call; a wholesale rewrite by me would just substitute my taste for
+   the last Claude's.
+* from the .skg notes
+** 4e84fb7c-c482-45aa-9040-05cb82116906 "Don't ask about operator syntax if there are no operator tokens."
+   I could not find what "asking about operator syntax" refers to --
+   no prompt in the elisp or server mentions operators. If this is
+   about the search-query minibuffer, please say which prompt.
+** 844a584e-d23c-4310-85b5-eb0946b75b80 "IDCol : ignore on save? So far it only shows up in the git diff."
+   Ends in a question mark. Today the IDCol is parsed on save (and a
+   staged test pins that deleting its scaffold behaves sensibly).
+   "Ignore on save" would mean treating it as display-only like the
+   read-only cols; that is a data-model decision (extra-ids would
+   become uneditable from the buffer).
+** c8eef429-88c7-4b5f-8efe-04d956704311 "the 'repeated' warning should be in a system font"
+   The note itself hedges ("I might need Emacs to generate it"). Moving
+   the warning from server-generated body text to a client-side
+   decoration is a protocol change (the server would need to emit a
+   typed atom instead of text). Plausible, but the display choice
+   (font? face? overlay?) is yours.
+** d2659d52-54b9-4940-b095-bf2910d437f2 "Ttest that all IDs are distinct in the repo. maybe in Rust, not TypeDB"
+   Not unclear -- just reporting: this already exists, in Rust.
+   'check_for_duplicate_ids_across_sources'
+   (server/dbs/filesystem/multiple_nodes.rs) runs at init, rebuild,
+   save, and nodeMerge; it covers pids and extra-ids (via 'all_ids'),
+   and writes initialization-error_duplicate-ids.org. Aliases are not
+   covered, but aliases are not IDs. If that satisfies the wish, it
+   can be marked done in your notes (which I cannot commit to).

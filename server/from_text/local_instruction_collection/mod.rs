@@ -68,7 +68,8 @@ pub async fn extract_nonmergeSavePlan_locally (
       lower_collected_intents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
-      intents, &visibility, config, driver ) . await ? };
+      intents, &visibility, config, driver,
+      restricted_source_set ) . await ? };
   let with_disk : Definenodes_with_Sourcemoves =
     build_diskSupplemented_defineNodes (
       resolved . into_ordered_intents(),

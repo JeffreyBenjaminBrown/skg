@@ -19,6 +19,7 @@ fn all_tests
       test_diff_mode_removed_subscribee_shows_removedM (s) . await ?;
       test_diff_mode_removed_subscribee_staged_shows_stagedM (s) . await ?;
       test_diff_mode_added_subscribee_shows_newM (s) . await ?;
+      test_delete_removed_node_respawns_staged (s) . await ?;
       Ok (( )) } )) }
 
 /// Deleting a 'removed' node (deleted from disk) should be a no-op.
@@ -343,6 +344,54 @@ async fn test_diff_mode_added_subscribee_shows_newM (
          *** (skg (node (id 22) (source main) (unstaged newM))) 22" );
       Ok (( )) }) }) . await
 }
+
+/// Same as 'test_delete_removed_node_respawns' but with the fixture
+/// transition staged (git add) rather than unstaged. The respawned
+/// phantom should report '(staged removedX removedM)' instead of
+/// '(unstaged removedX removedM)' -- guards phantom_axes' per-stage
+/// attribution on the save-rerender path, mirroring
+/// ids::save::test_delete_id_col_scaffold_respawns_staged.
+async fn test_delete_removed_node_respawns_staged (
+  s : &mut SharedDbSession,
+) -> Result<(), Box<dyn Error>>
+{
+  run_save_test_with_setup(
+    s,
+    "skg-test-save-del-removed-staged",
+    setup_git_repo_with_fixtures_staged,
+    |config, driver, tantivy, repo_path| { Box::pin(async move {
+      // Scenario: User deletes the gets-removed line
+      let input = without_lines_containing(
+        GIT_DIFF_VIEW_STAGED, "gets-removed");
+
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views            : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+          &mut stream,
+          &input, driver, config, tantivy, &graph, true,
+          &Err ( String::new () ), &mut views_state
+        ) . await?;
+
+      // DISK: gets-removed.skg should still not exist
+      assert!(!repo_path . join ("gets-removed.skg") . exists(),
+        "gets-removed.skg should stay deleted");
+
+      // DISK: 11.skg should still contain moves and not gets-removed
+      let node_11 = read_nodecomplete(repo_path, "11")?;
+      let contains_11 = node_11 . contains;
+      assert!(contains_11 . contains(&ID("moves" . to_string())),
+        "11.skg should still contain moves");
+      assert!(!contains_11 . contains(&ID("gets-removed" . to_string())),
+        "11.skg should not contain gets-removed");
+
+      // BUFFER: gets-removed should respawn with (diff removed), staged
+      assert_buffer_contains(&response . saved_view,
+                             GIT_DIFF_VIEW_STAGED);
+      Ok (( )) } ) } ) . await }
 
 //
 // Test runner helper

@@ -1,3 +1,90 @@
+** api-and-formats.md omitted the 'save-relax-lock' message from the save stream
+   Found while inventorying the wire protocol to plan the Neovim port
+   (TODO/vim-client/). The "Save buffer" section documented the
+   response stream as save-lock -> collateral-view* -> save-result,
+   but the implementation (server/serve/protocol.rs;
+   elisp/skg-request-save.el) also emits 'save-relax-lock' between
+   save-lock and the collateral views: the exact post-SavePlan
+   collateral set, narrowing the early over-approximate lock. A client
+   written from the doc alone would not register a handler for it.
+   RESOLVED 2026-07-03 (fable-cleans-up): documented as step 2 of the
+   save response stream, with its lock-narrowing semantics.
+** api-and-formats.md omitted the 'point-column' field of the save request
+   Found alongside the entry above. The doc listed two point fields
+   ('point-lines-below-focused-headline',
+   'point-screen-lines-below-window-start'), but the client sends and
+   the server echoes a third, 'point-column'
+   (server/serve/protocol.rs; elisp/skg-request-save.el). A
+   from-the-doc client would restore point without its column.
+   RESOLVED 2026-07-03 (fable-cleans-up): documented in both the save
+   request and the save-result.
+** tests/USAGE.md was stale
+   It pointed at 'tests/emacs/test.el' (the directory is now
+   tests/elisp/, run via bash/emacs-tests.sh), did not mention
+   bash/integration-tests.sh or cargo nextest, and said the Docker
+   container does not include Emacs, which coding-advice/docker.org
+   contradicts (the image bakes in emacs and now nvim).
+   RESOLVED 2026-07-03 (fable-cleans-up): rewritten to list the three
+   suites and defer to coding-advice/claude-to-claude.org, "Running
+   Tests".
+** 'mk_indefinitive_from_viewnode' silently drops fields
+   server/types/viewnode.rs.
+   It rebuilt a fresh viewnode via 'mk_indefinitive_viewnode_with_birth',
+   losing 'view_requests', the diff axes, 'graphStats', 'viewStats',
+   and any future fields added to ActiveNode. Any new field had to be
+   manually preserved there, which was easy to forget.
+   RESOLVED 2026-07-03 (fable-cleans-up): the Active arm now mutates in
+   place -- sets parentIs, birth, and indef_or_def (discarding body and
+   edit_request) and keeps every other field. The Phantom::Diff arm still
+   rebuilds, since a phantom carries none of the preserved fields. At its
+   sole call site (server/to_org/expand/backpath.rs,
+   'prepend_indef_indep_child') the input is a fresh
+   'mk_definitive_viewnode', so behavior is unchanged today; the fix is
+   robustness for future callers. All tests pass.
+** Test coverage: every git-diff-view test exercised only unstaged
+   tests/git_diff_view/common.rs.
+   'setup_git_repo_with_fixtures' copied fixtures, committed, then
+   overwrote the worktree without staging, so the staged code paths were
+   uncovered -- which is how phantom_axes, TextChanged, and the
+   node_changes_for_truenode merge bugs slipped through. An earlier
+   session added 'setup_git_repo_with_fixtures_staged' plus one staged
+   ids::save test; later sessions added staged tests in content::save
+   (subscribee fixture) and collateral::save.
+   RESOLVED 2026-07-03 (fable-cleans-up): added the remaining staged
+   variants -- text::save::test_delete_text_changed_scaffold_respawns_staged,
+   content::save::test_delete_removed_node_respawns_staged,
+   newhere_cycle::save::test_newhere_cycle_survives_save_staged.
+   Every git_diff_view save module now has at least one staged
+   save-rerender test. (Mixed staged+unstaged-on-one-file tests remain
+   unwritten.)
+** Override validation re-scanned the whole graph on every save (~24%)
+   'validate_override_invariants_after_save' (server/save.rs) ran
+   'validate_override_invariants', which iterated all ~60k graph nodes
+   twice per save. Disabling it cut a profiled save from 343 ms to 256 ms.
+   RESOLVED before 2026-07-03: the save path now simulates the save on a
+   snapshot and runs 'validate_touched_override_invariants' over only the
+   touched pids, as the entry proposed. (Successor problem: the simulation
+   still deep-clones the whole graph; see the open entry in problems.org.)
+** Tantivy was written and committed twice per save (~38%)
+   'update_tantivy_from_saveinstructions' (server/save.rs) indexed each
+   saved node with an empty context_origin_type; then
+   'update_context_origin_types' opened a second IndexWriter, read the
+   docs back, and re-added them with the computed type, committing again.
+   RESOLVED before 2026-07-03: the save path now computes origin types
+   first ('context_origin_types_for_saved_from_in_rust_graph',
+   server/context.rs) and passes them into the single index pass, which
+   commits once. 'update_context_origin_types' survives only for
+   init/rebuild ('compute_and_store_context_types'), where the
+   double pass is off the save's critical path.
+** Stale elisp test inputs referenced herald atoms the server no longer emits
+   tests/elisp/test-heralds-minor-mode.el and
+   tests/elisp/test-skg-sexpr-search.el fed the lens engine the old
+   pre-baked 'containsHerald' / 'linksHerald' atoms.
+   RESOLVED before 2026-07-03 (verified during fable-cleans-up): both
+   files now use the live vocabulary ('birthHerald', 'rels', 'viewStats');
+   the only remaining occurrence of the old names anywhere in tests/ is a
+   prose comment in tests/elisp/test-skg-lens.el describing INTERC
+   separator behavior, which is harmless.
 ** The fork-source integration test is stale and fails (emacs client)
    tests/integration/fork-source/test-emacs.el asserts the
    fork-confirmation buffer contains '(source owned)' -- the inferred

@@ -106,7 +106,8 @@ pub fn org_to_uninterpreted_viewforest(
 fn divide_into_viewNodeLineCols (
   input: &str
 ) -> Result<Vec<ViewNodeLineCol>, String> {
-  let lines: Vec<&str> = input . lines() . collect();
+  let lines: Vec<&str> = // Trailing whitespace is stripped from every line at save. (Titles are trimmed again downstream; this is what strips body lines.)
+    input . lines() . map ( str::trim_end ) . collect();
   let mut result: Vec<ViewNodeLineCol> = Vec::new();
   let mut i: usize = 0;
   while i < lines . len() {

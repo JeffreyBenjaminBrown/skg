@@ -905,12 +905,16 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       // Supply a default clone source (as the production caller does),
       // so the foreign grandchild e2 forks cleanly and the call returns
       // Ok -- this test is about e, not e2.
-      let owned_default : SourceName = SourceName::from ("owned");
+      let clone_source_inputs : skg::from_text::fork::CloneSourceInputs =
+        skg::from_text::fork::CloneSourceInputs {
+          user_set          : std::collections::HashMap::new(),
+          explicit_child    : std::collections::HashMap::new(),
+          inferred_ancestor : std::collections::HashMap::new(),
+          default           : Some (SourceName::from ("owned")), };
       let ( define_nodes, fork_specs ) =
         validate_and_filter_foreign_instructions (
-          instructions, &[], &std::collections::HashMap::new(),
+          instructions, &[], &clone_source_inputs,
           &std::collections::HashMap::new(),
-          Some (& owned_default),
           config, driver) . await
         . expect ("the subscribee-as-such edit must not error");
       assert!(

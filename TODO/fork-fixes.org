@@ -1,0 +1,57 @@
+* request : fix forking
+BEWARE: This is an org-formatted document,
+which quotes distinct org-documents (buffers, really).
+I have indendent by 2 spaces all passages from org documents it quotes.
+** Most ways of forking that should work are broken.
+But one works.
+*** Case 1: No metadata in the new, fork-forcing node.
+**** When I save this buffer:
+  * (skg (node (id 6972d099-7ff6-47ba-ac67-1898ef5fd549) (source jeff-public) (parentIs absent) (rels "C6 4L") (viewStats (sourceHerald ⌂:jeff-public)))) science
+  ** (skg (node (id 3120d61e-cf2c-4196-a90e-7ebe44043836) (source jeff-public) (birthHerald "aC"))) a list of [[id:c35ab968-7056-40fa-8816-ea16d5c88f6d][sciences, fields of study, schools of thought]]
+  ** (skg (node (id a3caf7b0-2257-4ac3-bb84-0b14f310980a) (source jeff-public) (birthHerald "aC"))) [[id:8fc0e120-7b65-4542-8fd5-86897d683c18][epistemic humility]]
+  ** (skg (node (id b36bd879-d310-4d59-932b-35df5d969ab4) (source jeff-public) (birthHerald "aC2"))) science , how
+  *** (skg (node (id 14b7211e-be8f-41a3-90db-3cb06e05d87a) (source jeff-public) (birthHerald "aC"))) [[id:b9c7b7e6-9849-4a24-984d-b2e2e749d81a][methods and institutions for science and research]]
+  *** (skg (node (id b6c9bf6c-ce24-4c57-aa8c-99438682c0d3) (source jeff-public) (birthHerald "aC"))) [[id:efd65f91-09ea-43d3-a894-7a23c2b7ef58][Understanding novel ideas requires imagination.]] and [[id:91dc626c-36e2-4dc6-9c4f-fdea453c838e][humility]]
+  ** (skg (node (id 50e6798a-0d5b-4b5a-94a1-ec90c43ae2ae) (source jeff-public) (birthHerald "aC1"))) problems in science
+  *** (skg (node (id 4fc23417-5617-49da-9906-139c541c5cb6) (source jeff-public) (birthHerald "aC"))) [[id:635cf3cc-8ccd-477a-b5dd-475b6230e2ab][Publication in science is too much work.]]
+  ** (skg (node (id c365c689-390b-4b6e-b606-b7e068d846a7) (source jeff-public) (birthHerald "aC"))) [[id:d779aeab-0662-4142-ae65-2ddbf3cef5c5][academia]]
+  ** (skg (node (id f748d5cd-3cb9-481b-9ba7-a36683245259) (source jeff-public) (birthHerald "aC"))) [[id:a5b5621c-70f4-44e8-9420-b732c26e2e13][scientific agent loop]]
+  ** Can I add to this?
+**** I get this error:
+  * errors
+  ** * NOTHING WAS SAVED
+
+  Validation errors found in buffer.
+
+  ** Error 1
+  Cannot create node in foreign (read-only) source:
+  - ID: 151724a0-9baf-451b-82ef-6eb0f4c13600
+  - Source: jeff-public
+  - Foreign sources can only be viewed, not modified.
+
+  ** Resolution
+  Please fix these errors and try saving again.
+**** I had appended a new node to a non-owned source.
+So the fork should have proceeded,
+first asking me to verify and choose a source.
+*** Case 2: Having chosen a source for the new node
+(but no other metadata).
+**** This time I appended instead the following.
+  ** (skg (node (source else-public))) Can I add to this?
+**** I am confronted with a choice.
+The minibuffer says 'Fork the listed node(s)?'
+Meanwhile a new real full buffer takes half the screen.
+Its comment at the header is too long;
+it should be under an org headline.
+It should not ask me if I have
+already specified a source in the saved metadata,
+and if I haven't, it ask me to choose each
+before allowing me to say 'do it'.
+
+If I simply say yes in this condition, nothing happens.
+
+If I redundantly pick a source in the buffer that was presented,
+I am then able to save, and it seems to work.
+** Editing a forked node is bad.
+If my fork F contains C and so does the original O,
+and I remove C from F, F should now hide C.

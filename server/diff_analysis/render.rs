@@ -1,6 +1,7 @@
 use crate::diff_analysis::types::{
-  DiffReport, DuplicateIDReport, ListDiffItem, NodeDiffReport,
-  RelationshipDiff, SourceForReport, TextDiffLine, ValueSetDiff};
+  CommitStamp, DiffReport, DuplicateIDReport, ListDiffItem,
+  NodeDiffReport, RelationshipDiff, SourceForReport, TextDiffLine,
+  ValueSetDiff, VanishedNodeReport};
 use crate::types::misc::{ID, SourceName};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -18,15 +19,69 @@ pub fn render_report (
   let mut any_nodes : bool =
     ! report . duplicate_ids . is_empty ();
   for bucket in &report . buckets {
+    // Empty categories are rendered too (as bare headings), so a
+    // reader can see what the categories are, and thus (e.g.)
+    // that nothing was orphaned.
+    out . push_str (&format! ("** {}\n", bucket . name));
     if bucket . nodes . is_empty () {
       continue; }
     any_nodes = true;
-    out . push_str (&format! ("** {}\n", bucket . name));
     for node in &bucket . nodes {
       render_node_report (&mut out, node, report, &abbreviations); }}
   if ! any_nodes {
     out . push_str ("** no affected nodes\n"); }
+  render_vanished_nodes (&mut out, &report . vanished);
   out
+}
+
+/// The vanished-nodes section (TODO/more.org): each id the worktree
+/// references though it exists in no source, with what git history
+/// says it used to be. Like the buckets, the (empty) heading renders
+/// even with nothing to report, so the reader knows it was checked.
+fn render_vanished_nodes (
+  out      : &mut String,
+  vanished : &[VanishedNodeReport],
+) {
+  out . push_str ("* vanished nodes (referenced, but existing in no source)\n");
+  if vanished . is_empty () {
+    out . push_str ("** none\n");
+    return; }
+  let stamp = |c : &CommitStamp| -> String {
+    format! ("{} ({}, {:?})", c . short_sha, c . date, c . summary) };
+  for report in vanished {
+    out . push_str (&format! ("** {}\n", report . id));
+    if report . sightings . is_empty () {
+      out . push_str (
+        "*** never present in the git history of any source\n");
+      continue; }
+    for sighting in & report . sightings {
+      out . push_str (&format! (
+        "*** in source {}\n", sighting . source ));
+      out . push_str (&format! (
+        "**** title when last present: {}\n", sighting . title ));
+      out . push_str (&format! (
+        "**** last present at commit {}\n",
+        stamp (& sighting . last_present) ));
+      match & sighting . vanished_at {
+        Some (c) => out . push_str (&format! (
+          "**** vanished at commit {}\n", stamp (c) )),
+        None => out . push_str (
+          "**** still present at HEAD (only the worktree lacks it)\n" ), }
+      if sighting . outbound . is_empty () {
+        out . push_str ("**** its own relationship lists then: all empty\n");
+      } else {
+        out . push_str ("**** its own relationship lists then\n");
+        for (relation, members) in & sighting . outbound {
+          out . push_str (&format! ("***** {}\n", relation));
+          for member in members {
+            out . push_str (&format! ("****** {}\n", member)); }} }
+      if sighting . inbound . is_empty () {
+        out . push_str ("**** nothing else referred to it then\n");
+      } else {
+        out . push_str ("**** referred to then by\n");
+        for (referrer, relation) in & sighting . inbound {
+          out . push_str (&format! (
+            "***** {} (via {})\n", referrer, relation )); }} }}
 }
 
 fn render_duplicate_ids (

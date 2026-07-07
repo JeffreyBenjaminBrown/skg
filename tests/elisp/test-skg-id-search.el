@@ -291,4 +291,58 @@ For that binding to work, the function must satisfy `commandp'
                       ("another-id" "another") )))
     (kill-buffer "*skg-id-stack*") ))
 
+(progn ;; skg-nearest-id in a raw .skg file (TODO/more.org): bare
+  ;; UUIDs count, and nearest means nearest, with ambiguity between.
+  (defconst test-skg--uuid-a "11111111-1111-4111-8111-111111111111")
+  (defconst test-skg--uuid-b "22222222-2222-4222-8222-222222222222")
+
+  (defun test-skg--nearest-in-file-buffer (line after &optional before)
+    "In a `skg-file-minor-mode' buffer holding LINE, put point after
+the first occurrence of AFTER (or at buffer start), then return
+`skg-nearest-id'. With BEFORE, point lands before that text instead."
+    (with-temp-buffer
+      (insert line)
+      (setq-local skg-file-minor-mode t)
+      (goto-char (point-min))
+      (cond
+       (before (search-forward before) (goto-char (match-beginning 0)))
+       (after (search-forward after)))
+      (skg-nearest-id)))
+
+  (ert-deftest test-nearest-id-in-skg-file-single-id-anywhere ()
+    "One ID on the line: found from anywhere on the line."
+    (should (equal (test-skg--nearest-in-file-buffer
+                    (concat "pid: " test-skg--uuid-a "\n") "pid:")
+                   (cons test-skg--uuid-a test-skg--uuid-a)))
+    (should (equal (test-skg--nearest-in-file-buffer
+                    (concat "pid: " test-skg--uuid-a "\n") nil)
+                   (cons test-skg--uuid-a test-skg--uuid-a))))
+
+  (ert-deftest test-nearest-id-in-skg-file-picks-closest-side ()
+    "All IDs on one side of point: the closest wins."
+    ;; Point at end of line: both IDs are left; B (the later) is closer.
+    (should (equal (test-skg--nearest-in-file-buffer
+                    (concat "x " test-skg--uuid-a " " test-skg--uuid-b " tail")
+                    "tail")
+                   (cons test-skg--uuid-b test-skg--uuid-b)))
+    ;; Point at start: both are right; A (the earlier) is closer.
+    (should (equal (test-skg--nearest-in-file-buffer
+                    (concat "x " test-skg--uuid-a " " test-skg--uuid-b " tail")
+                    nil)
+                   (cons test-skg--uuid-a test-skg--uuid-a))))
+
+  (ert-deftest test-nearest-id-in-skg-file-between-two-is-ambiguous ()
+    "Point strictly between two IDs: ambiguous, visit nothing."
+    (should (eq (test-skg--nearest-in-file-buffer
+                 (concat "x " test-skg--uuid-a " gap " test-skg--uuid-b)
+                 nil "gap")
+                'ambiguous)))
+
+  (ert-deftest test-nearest-id-in-skg-file-on-id-wins ()
+    "Point directly on an ID beats proximity and ambiguity."
+    (should (equal (test-skg--nearest-in-file-buffer
+                    (concat "x " test-skg--uuid-a " " test-skg--uuid-b)
+                    "1111-1111")
+                   (cons test-skg--uuid-a test-skg--uuid-a)))))
+
 (provide 'test-skg-id-search)

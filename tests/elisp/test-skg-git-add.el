@@ -227,4 +227,44 @@ ellipsis object to `call-process' instead of a string."
         (kill-buffer "*skg git add new files*")))
     (test-skg-git-add--teardown)))
 
+(ert-deftest test-skg-git-add-explains-when-diff-mode-off ()
+  "With git diff mode off and no newX markers in the subtree, both
+commands must explain that diff mode is required to recognize new
+files, rather than reporting 0 files as if the user did it right
+(TODO/more.org)."
+  (let ((messages nil)
+        (skg--git-diff-mode-enabled nil))
+    (with-temp-buffer
+      (insert "* (skg (node (id old) (source main))) old\n")
+      (org-mode)
+      (goto-char (point-min))
+      (cl-letf (((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (push (apply #'format fmt args) messages))))
+        (skg-git-add-if-new-recursive)
+        (skg-git-add-if-new-recursive-preview)))
+    (should (= (length messages) 2))
+    (dolist (m messages)
+      (should (string-match-p "diff mode is off" m)))
+    ;; The preview must not have popped its buffer either.
+    (should-not (get-buffer "*skg git add new files*"))))
+
+(ert-deftest test-skg-git-add-reports-zero-when-diff-mode-on ()
+  "With diff mode ON and genuinely nothing new, the old report stands."
+  (let ((messages nil)
+        (skg--git-diff-mode-enabled t))
+    (with-temp-buffer
+      (insert "* (skg (node (id old) (source main))) old\n")
+      (org-mode)
+      (goto-char (point-min))
+      (cl-letf (((symbol-function 'message)
+                 (lambda (fmt &rest args)
+                   (push (apply #'format fmt args) messages))))
+        (skg-git-add-if-new-recursive)))
+    (should (equal messages
+                   ;; Reverse-chronological: the evaluated (empty) plan
+                   ;; says nothing was found, then the command reports.
+                   '("skg-git-add-if-new-recursive: ran git-add command for 0 new file(s)"
+                     "No unstaged new skg files found in this subtree.")))))
+
 (provide 'test-skg-git-add)

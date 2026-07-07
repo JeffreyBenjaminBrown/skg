@@ -328,7 +328,10 @@ fn activeNode_metadata_to_string (
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
-      parts . push ( "indef" . to_string () ); }
+      parts . push ( "indef" . to_string () );
+      if activeNode . viewStats . hidden_body {
+        // The rendering is hiding a body (herald "B" on the ☮).
+        parts . push ( "hiddenBody" . to_string () ); }}
     if let Some (s) = birth_herald (activeNode)
     { parts . push (s); }
     if let Some (s) = rels_herald (activeNode)

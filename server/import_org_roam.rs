@@ -56,6 +56,8 @@ pub fn import_org_roam_directory (
   let mut node_map : HashMap<ID, NodeComplete> = HashMap::new();
   for entry in WalkDir::new (org_dir)
     . into_iter()
+    . filter_entry (|e| // Never descend into a repo's .git folder.
+      e . file_name() != ".git" )
     . filter_map (|e| e . ok() )
     . filter (|e| {
       e . path() . extension()

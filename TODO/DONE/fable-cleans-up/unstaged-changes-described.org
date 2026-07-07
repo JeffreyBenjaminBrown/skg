@@ -1,0 +1,154 @@
+* PURPOSE
+  A description of the working tree's unstaged changes (branch
+  fable-cleans-up, surveyed 2026-07-06), grouped by theme. Nearly all
+  of them are the fable-cleans-up session's work; its rationale and
+  test evidence live in [[./progress.org]]. The exceptions are flagged in
+  the last two sections.
+* Server behavior changes
+** Drawn overrider gets the O birth herald; the "Oh" glyph is gone
+   (TODO.org: "If viewing an overrider-as-such, frontload the O
+   herald ... Skip the Oh herald.")
+   - server/update_buffer/viewnodestats.rs: 'birth_relations' now
+     takes an overridesHere flag and, when set, prepends
+     NodeRelation::OverridesViewOf to whatever birth relations the
+     position already earns. So a node drawn in place of one it
+     overrides now leads with the orange O herald, like every other
+     birth relation.
+   - server/heralds.rs: the rule for 'overridesHere' under viewStats
+     is now vacuous -- the red "Oh" token is no longer displayed. The
+     '(overridesHere N)' atom still flows on the wire (it is
+     load-bearing save metadata); it just produces no glyph.
+   - tests/content_view.rs: two goldens updated accordingly (node 5
+     now reads '(birthHerald "O2") (rels "1L aH 2S I1")').
+   - tests/elisp/herald-rules.sexp: regenerated; same change in the
+     rule table the elisp tests consume.
+** Diff-analysis report renders empty categories
+   (TODO.org: "the diff report should include empty top-level
+   categories.") server/diff_analysis/render.rs now prints every
+   bucket heading, empty or not, so a reader can see that (e.g.)
+   nothing was orphaned. The "IDs duplicated across sources" warning
+   section is still suppressed when empty, and the "** no affected
+   nodes" summary line survives.
+** Trailing whitespace stripped from every line at save
+   (TODO.org, two entries.) 'divide_into_viewNodeLineCols'
+   (server/from_text/buffer_to_viewnodes/uninterpreted.rs) maps
+   str::trim_end over the buffer's lines. Titles were already trimmed
+   downstream; this is what strips body lines.
+** Org-roam importer no longer descends into .git
+   (skg wish 79009c04.) server/import_org_roam.rs adds a
+   'filter_entry' to its WalkDir. Progress.org notes this was the
+   only recursive scanner; all other source scanners are flat
+   read_dir calls that could never enter .git.
+** Server startup logs its binary's path and age
+   (problems.org: "Long-running SKG server can hide code/protocol
+   fixes.") server/main.rs, right after init_tracing: one
+   tracing::info! line, "Server binary exe=... binary_age=...", so a
+   stale long-running binary is obvious from the first log line. The
+   heavier alternative (a client-visible version endpoint) remains
+   open in problems.org.
+** 'mk_indefinitive_from_viewnode' no longer drops fields
+   (problems.org entry, now moved to DONE.) server/types/viewnode.rs:
+   the ActiveNode arm mutates in place -- sets parentIs, birth, and
+   indef_or_def, keeping view_requests, diff axes, graphStats,
+   viewStats, and any future field. The Phantom::Diff arm still
+   rebuilds, since phantoms carry none of those. Behavior is unchanged
+   at the sole current call site (backpath grafts feed it a fresh
+   node); the fix is robustness for future callers.
+* Emacs client changes
+** C-c C-o follows skg links
+   elisp/skg-keymaps-and-aliases.el binds C-c C-o to 'skg-goto' in
+   both skg-content-view-mode-map and skg-diff-analysis-mode-map,
+   shadowing org-open-at-point (which cannot follow skg links).
+** Rebuild-dbs completion beeps
+   elisp/skg-request-rebuild-dbs.el calls (ding) before its
+   completion message -- rebuilds take long enough to walk away from.
+** Saving with point before the first headline no longer errors
+   elisp/skg-request-save.el: 'skg-request-save-buffer' moves point to
+   the first headline instead of letting org-back-to-heading raise
+   "Before first headline". (The nvim client already no-ops there.)
+* New tests
+** Staged variants for the git-diff-view save tests
+   (problems.org coverage entry, now moved to DONE.) Previously only
+   ids::save and collateral::save had staged twins; now every
+   git_diff_view save module has one:
+   - tests/git_diff_view/text/save.rs:
+     test_delete_text_changed_scaffold_respawns_staged. The module's
+     runner was also refactored: 'run_save_test' now delegates to a
+     new 'run_save_test_with_setup' parameterized by the fixture
+     setup, with 'run_save_test_staged' as the staged instance.
+   - tests/git_diff_view/content/save.rs:
+     test_delete_removed_node_respawns_staged.
+   - tests/git_diff_view/newhere_cycle/save.rs:
+     test_newhere_cycle_survives_save_staged.
+   Mixed staged+unstaged-on-one-file tests remain unwritten (noted in
+   the DONE entry).
+** 'collect_generation_ids' effective-root tests
+   (TODO.org QA wish.) tests/types/tree.rs adds
+   test_collect_generation_ids_with_effective_root (generations
+   counted from an interior node; cousins excluded; a too-deep
+   generation is empty-not-error) and
+   test_collect_generation_ids_effective_root_not_in_tree (foreign
+   NodeId; hedged because ego_tree NodeIds are indices and a foreign
+   id can coincidentally resolve).
+* Documentation changes
+** api-and-formats.md, save-buffer section
+   (problems.org, "vim client" section.) Documents two things the
+   code already did: the 'save-relax-lock' message (now step 2 of the
+   save response stream, between save-lock and the collateral views)
+   and the 'point-column' field of the save request and save-result.
+** glossary.md
+   (problems.org: "De-novo PartnerCol rendering depends on the global
+   graph handle" -- documentation remedy taken.) New paragraph: col
+   scaffolds read 'snapshot_global', not the render environment's own
+   graph; a test harness without the handle installed sees those cols
+   silently missing. The deeper rerouting remains open in
+   problems.org.
+** tests/USAGE.md rewritten
+   It pointed at the nonexistent tests/emacs/test.el, omitted nextest
+   and the integration runner, and falsely claimed the Docker image
+   lacks Emacs. It now lists the three suites and defers to
+   coding-advice/claude-to-claude.org "Running Tests".
+* Bookkeeping in TODO/problems.org and TODO/DONE/problems.org
+  Five entries moved out of problems.org and prepended to DONE, per
+  that file's own protocol:
+  - 'mk_indefinitive_from_viewnode' silently drops fields (fixed this
+    session; see above).
+  - Test coverage: git-diff-view tests exercised only unstaged (fixed
+    this session; see above).
+  - Override validation re-scanned the whole graph per save (found
+    already fixed before the session; verified).
+  - Tantivy written and committed twice per save (likewise).
+  - Stale elisp test inputs referencing dead herald atoms (verified
+    already using the live vocabulary).
+  One NEW entry filed: "Override validation deep-clones the whole
+  in-Rust graph per save" -- successor to the fixed full-scan entry,
+  discovered while verifying that fix. Related prose (the
+  profiling-save summary and the save-degradation entry) updated to
+  point at the DONE entries.
+* Changes NOT from the fable-cleans-up session
+  TODO/problems.org also gains a section "Problems noted while
+  writing forking-and-privacy.org", with two entries:
+  - Fork deliberate-pick rule is enforced only client-side (a client
+    that re-sends an approved save without fork-sources commits
+    clones into the inferred-or-default source, exactly what
+    docs/forks.md rules out).
+  - Cosmetic: api-and-formats.md says text search filters "before
+    grouping" when the code groups first, then filters the groups
+    (behaviorally identical).
+  These belong to the forking-and-privacy report (untracked file, see
+  below), not to the cleanup arc.
+* Untracked files (not part of the diff, listed for completeness)
+  - TODO/fable-cleans-up/ -- the session's triage documents:
+    progress.org (what was done), deferring-for-verification.org
+    (feasible but had qualms; awaiting your inline replies),
+    by-jeff-for-jeff-to-interpret.org (wishes I could not pin down;
+    likewise awaiting replies), and this file.
+  - forking-and-privacy.org -- a report on how forking and privacy
+    actually work, checked against the code (source of the two new
+    problems.org entries above).
+  - git-comment -- a one-line scratch fragment ("+(defun
+    skg--change-source-recursive"), looks accidental.
+  - rust-comment-long-to-wide.el -- an interactive Emacs command that
+    collapses a selected block of Rust '//' or '///' comments into
+    one line.
+  - other-projects/ -- contains docker-typedb-rust.

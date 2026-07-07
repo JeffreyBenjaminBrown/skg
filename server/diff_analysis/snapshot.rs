@@ -624,7 +624,7 @@ fn read_source_from_index (
   Ok (nodes)
 }
 
-fn source_prefix_in_repo (
+pub(super) fn source_prefix_in_repo (
   repo        : &Repository,
   source_path : &Path,
 ) -> Result<PathBuf, String> {
@@ -636,7 +636,7 @@ fn source_prefix_in_repo (
       "Source path {:?} is not inside its git repository", source_path ))
 }
 
-fn path_is_source_skg (
+pub(super) fn path_is_source_skg (
   rel_path : &Path,
   prefix   : &Path,
 ) -> bool {
@@ -645,7 +645,7 @@ fn path_is_source_skg (
       false, |ext| ext == "skg" )
 }
 
-fn parse_blob_node (
+pub(super) fn parse_blob_node (
   bytes       : &[u8],
   source_name : &SourceName,
   rel_path    : &Path,

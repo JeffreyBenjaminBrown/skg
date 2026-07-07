@@ -107,7 +107,9 @@ and inserts [[id:ID][LABEL]] at the saved buffer:position."
   (unless skg--link-from-search-target
     (user-error "Not in a link-creation search buffer" ))
   (let ((found (skg-nearest-id)))
-    (unless found
+    (unless (consp found)
+      ;; nil, or `ambiguous' (unreachable here -- a search buffer is
+      ;; never in skg-file-minor-mode -- but never a valid pick).
       (user-error "No ID near point" ))
     (let* ((id     (car found))
            (raw    (cdr found))

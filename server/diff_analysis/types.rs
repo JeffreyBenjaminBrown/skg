@@ -39,6 +39,32 @@ pub struct DiffReport {
   pub duplicate_ids : Vec<DuplicateIDReport>,
   pub titles        : HashMap<ID, String>,
   pub buckets       : Vec<NodeBucket>,
+  /// Ids the worktree references though they exist in no source,
+  /// investigated in git history (diff_analysis/vanished.rs).
+  pub vanished      : Vec<VanishedNodeReport>,
+}
+
+#[derive(Clone, Debug)]
+pub struct VanishedNodeReport {
+  pub id        : ID,
+  pub sightings : Vec<VanishedNodeSighting>, // empty means: never in any source's git history
+}
+
+#[derive(Clone, Debug)]
+pub struct VanishedNodeSighting {
+  pub source       : SourceName,
+  pub last_present : CommitStamp,
+  pub vanished_at  : Option<CommitStamp>, // its first-parent descendant, which lacks the file
+  pub title        : String,             // the node's title when last present
+  pub outbound     : Vec<(&'static str, Vec<ID>)>, // its own nonempty relation lists then
+  pub inbound      : Vec<(ID, &'static str)>,      // who referred to it then, and how (textlinks included)
+}
+
+#[derive(Clone, Debug)]
+pub struct CommitStamp {
+  pub short_sha : String,
+  pub date      : String, // YYYY-MM-DD, UTC
+  pub summary   : String,
 }
 
 #[derive(Clone, Debug)]

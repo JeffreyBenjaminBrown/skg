@@ -1,0 +1,122 @@
+* PURPOSE
+  Wishes that look implementable, where I nonetheless had qualms of
+  the form "is this really what a user would want?" or "is the obvious
+  fix actually correct?". Each entry says what I would do and why I
+  paused. Please respond inline.
+* from the .skg notes
+** 55501953-dab2-48d3-8f51-f3eda167c6b5 "Easy speedup : send saved view before computing collateral views"
+   The wish is clear (the saved buffer's rerender should not wait for
+   collateral computation), but the fix is a wire-protocol reorder,
+   not a local change. Today the stream is
+   save-lock -> save-relax-lock -> collateral-view* -> save-result,
+   and both clients treat save-result as the terminal message: the
+   elisp handler tears down the collateral handler and unlocks
+   everything when save-result arrives (skg-request-save.el). Sending
+   save-result first would either strand later collateral-views
+   (handler deregistered) or require a new terminal message (e.g.
+   'save-done') after the collateral stream, i.e. a protocol version
+   change touching server, both clients, api-and-formats.md, and the
+   integration tests. Reasonable people could design that three ways
+   (early save-result + trailing done; a separate 'saved-view'
+   message; or keep order but compute collateral lazily). Deferred
+   for your pick.
+* from TODO.org
+** "bugfix : strip last empty line from buffer on save. Or strip pure-whitespace bodies."
+   Two findings while investigating:
+   - Pure-whitespace bodies are ALREADY stripped at the storage
+     boundary: 'normalize_body' (server/types/nodes/complete.rs) drops
+     leading/trailing whitespace-only lines and turns an all-whitespace
+     body into None, and it runs on both the in-memory save path and
+     the disk write.
+   - What still bites is PARSE-time: a blank line under a scaffold
+     headline (aliasCol etc.) becomes a Some("") body and trips
+     'Body_of_Scaffold' (server/serve/parse_metadata_sexp.rs) BEFORE
+     normalize_body runs. Dropping trailing empty lines at parse time
+     would fix that, but it would also silently accept buffers that
+     today produce a validation error -- and I could not tell whether
+     that error firing on a trailing blank line is the "bug" you meant,
+     or whether you hit something else. If you confirm the desired
+     behavior is "a whitespace-only line under any headline is as if
+     absent", the one-line change is in
+     'divide_into_viewNodeLineCols' or 'viewnode_from_metadata'.
+   Note the related wish I DID implement (see progress.org): trailing
+   whitespace is now stripped from every line at save.
+** "bug : graphnodestats are not recalculated in collateral buffers" and "making a node multicontained does not update its container count in the buffer it was copied from"
+   These two describe the same staleness family that problems.org
+   already records ("Collateral graphStats can go stale when only a
+   node's relationships change") -- and that entry calls the behavior
+   "pre-existing and arguably acceptable", because the fix requires
+   selecting collateral views by the NEIGHBORS of changed nodes, not
+   just the changed nodes. Since your own problems.org note leans
+   "acceptable" while your TODO.org calls it a bug, I did not want to
+   pick a side. If you want it fixed, the change is in
+   'find_collateral_view_uris' (server/update_buffer.rs): widen the
+   selection to views containing neighbors of changed pids, and let
+   the rerender recompute their stats.
+** "Bug ? Saving doesn't regenerate heralds if there were no changes?"
+   Question-marked, and I could not reproduce it cheaply from tests:
+   the save rerender path recomputes viewnodestats unconditionally as
+   far as I can see. Needs a live repro (save an unchanged buffer,
+   diff the heralds) before any code change; I did not want to spend
+   a dogfooding session on a "?" entry without confirmation it still
+   happens.
+** "Warn the user when they make dead links" / "warn ... contains cycle" / "warn ... root into content"
+   The skg notes (0a39762c, e54fa46b) specify the UX as "don't save,
+   explain where, let them investigate, let them override the warning
+   and save". The save pipeline today has errors (block save) and
+   warnings (attached to save-result) but NO "overridable error" --
+   implementing one is a new protocol/UX mechanism (a confirm-and-
+   resave flag like the fork flow's FORK-APPROVED, presumably). That
+   mechanism choice deserves your sign-off; with it decided, the
+   individual warnings are straightforward.
+** TypeDB relationship update is delete-all-then-recreate-all (problems.org, ~15%)
+   The fix direction is stated (diff old vs new edges, apply only the
+   delta) and I agree with it, but the implementation must respect the
+   PITFALL in 'update_typedb_from_saveinstructions' (server/save.rs):
+   the has_extra_id pass must complete before edge creation resolves
+   target IDs, and nodeMerge-induced ID remaps mean "old edge set" is
+   not always what the in-Rust snapshot says. Correctness-sensitive
+   enough that I chose not to squeeze it into this cleanup pass;
+   nothing about the direction is in doubt, only the care it needs.
+** "make save-buffer more permissive: Children where they shouldn't belong should be handed to a node more containerward"
+   Clear intent, but the reassignment rule (nearest gnode ancestor?
+   what order relative to its existing children? what about children
+   of read-only cols?) is a policy with several defensible answers,
+   and a wrong guess silently rewrites user data on save. Wants a
+   short spec from you.
+* diagnosed but deferred
+** TODO.org "BUG :: make-content cleanup -> collateral view not found"
+   Diagnosis (static, read-only; conclusive about the mechanism,
+   inconclusive about which of two trigger conditions fires):
+   - The complaint buffer is the client's save-errors popup
+     ('skg-big-nonfatal-message' via 'skg-handle-save-sexp',
+     elisp/skg-request-save.el); the TEXT is server-generated --
+     one of the "Collateral view {uri}: ..." errors in
+     server/update_buffer.rs ("no viewforest found" at ~line 212, or
+     the rerender-failure passthrough at ~line 228). The client
+     itself already silently skips a collateral-view message whose
+     buffer is gone; it is the server that turns its own stale
+     bookkeeping into a user-facing error.
+   - Mechanism: 'ViewsState' unregisters views only on close_view and
+     search re-registration -- never on delete -- and each view's
+     cached pid set refreshes only on rerender. So deleting an
+     orphaned node can name a view (the one where the make-content
+     happened) whose cache still ties it to the deleted pid, and
+     'rerender_collateral_view' reports the inconsistency instead of
+     skipping it.
+   - What a live repro would settle: whether the stale tie is the
+     old view's cached pids or the container's lingering contains
+     entry; the server logs the chosen collateral set at
+     update_buffer.rs ~174-179 under RUST_LOG=info.
+   Why deferred (the choice is yours): the candidate fixes trade off
+   differently. (a) Demote the "no viewforest found" error to a
+   debug log -- small, but it silences a class of real
+   inconsistencies too. (b) Root-cause: exclude views whose only tie
+   to the save is a pid deleted by this save, and/or prune ViewsState
+   on delete -- more correct, but changes collateral selection, which
+   several tests pin (tests/collateral_source_move.rs,
+   tests/collateral_subscribee_staleness.rs, and
+   tests/integration/save_collateral_delete_then_edit_under_it).
+   I lean (b) plus keeping the error for genuinely unexplained
+   misses, but that is exactly the kind of call you asked me to
+   surface rather than make.

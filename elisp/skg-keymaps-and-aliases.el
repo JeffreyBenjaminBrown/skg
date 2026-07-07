@@ -35,6 +35,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f RET") #'skg-search)
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
   (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
+  (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from ANY buffer: it only reads a typed/pasted ID (TODO/more.org).
   (global-set-key (kbd "C-c v l")   #'skg-limit-source-set))
 
 (with-eval-after-load 'magit ;; Magit
@@ -108,6 +109,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c f i")   #'skg-search-interactive)
     (define-key map (kbd "C-c f l")   #'skg-search-make-link))
   (progn;; goto. Capital-G variants kill the buffer they were called from.
+    (define-key map (kbd "C-c C-o")   #'skg-goto) ;; Shadows org-open-at-point, which cannot follow skg links.
     (define-key map (kbd "C-c g RET") #'skg-goto)
     (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
     (define-key map (kbd "C-c g b")   #'skg-goto-biggest-branch)
@@ -186,6 +188,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c f RET") #'skg-search)
     (define-key map (kbd "C-c f i")   #'skg-search-interactive))
   (progn;; goto. Capital-G variants kill the buffer they were called from.
+    (define-key map (kbd "C-c C-o")   #'skg-goto) ;; Shadows org-open-at-point, which cannot follow skg links.
     (define-key map (kbd "C-c g RET") #'skg-goto)
     (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
     (define-key map (kbd "C-c g i")   #'skg-goto-by-id)

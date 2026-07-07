@@ -82,7 +82,7 @@ vim.api.nvim_set_current_buf(confirm_buf)
 local confirm_text = T.buffer_text(confirm_buf)
 T.check(confirm_text:find('(id N)', 1, true),
         'confirmation buffer does not list N')
-T.check(confirm_text:find('FORK CONFIRMATION', 1, true),
+T.check(confirm_text:find('Fork confirmation', 1, true),
         'confirmation buffer lacks its header')
 print('fork-confirmation buffer lists N')
 

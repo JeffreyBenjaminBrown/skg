@@ -111,14 +111,20 @@ pub(crate) fn process_activeNode_diff (
     // reconcile_id_col_children / reconcile_alias_col_children -- the single
     // place that derives them from the per-stage diff. So we only DECIDE here
     // (cheaply: did any entry get added or removed?), and do not duplicate the
-    // per-stage merge.
+    // per-stage merge. A col the node ALREADY carries (the buffer being
+    // completed can hold one -- e.g. a prior diff render, saved back) is
+    // reused, never doubled: a second col would also reconcile to the full
+    // list, duplicating every entry in the view (TODO/more.org, "aliases
+    // should be merged, not added").
     if list_diff_has_change (
          staged_changes   . map ( |c| c . ids_diff . as_slice () ),
-         unstaged_changes . map ( |c| c . ids_diff . as_slice () ) ) {
+         unstaged_changes . map ( |c| c . ids_diff . as_slice () ) )
+      && ! has_qualcol_child ( &mut node_mut, tree_node_id, QualCol::ID ) {
       prepend_empty_diff_col ( &mut node_mut, QualCol::ID ); }
     if list_diff_has_change (
          staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
-         unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) ) {
+         unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) )
+      && ! has_qualcol_child ( &mut node_mut, tree_node_id, QualCol::Alias ) {
       prepend_empty_diff_col ( &mut node_mut, QualCol::Alias ); } }
   // Per-stage contains diff for the parent, split into position-specific
   // membership axes. A REORDERED id appears in one stage as both Removed (its
@@ -186,6 +192,18 @@ fn list_diff_has_change<T> (
       |item| matches! ( item,
         Diff_Item::New (_) | Diff_Item::Removed (_) ) )) };
   changed (staged) || changed (unstaged) }
+
+/// True iff the node already has a child QualCol of KIND.
+fn has_qualcol_child (
+  node_mut     : &mut NodeMut<ViewNode>,
+  tree_node_id : NodeId,
+  kind         : QualCol,
+) -> bool {
+  let node_ref : NodeRef<ViewNode> =
+    node_mut . tree () . get (tree_node_id) . unwrap ();
+  node_ref . children () . any ( |c| matches! (
+    & c . value () . kind,
+    ViewNodeKind::QualCol (k) if *k == kind )) }
 
 /// Prepend an EMPTY QualCol diff scaffold (an IDCol or AliasCol). Its per-entry
 /// children -- each carrying its membership axes -- are filled when the BFS

@@ -91,9 +91,9 @@ forking.\"), so the clone's saved snapshot matches what you see. Otherwise
 stamps (viewRequests fork) into the headline's own (skg (node ...)) --
 targeting the headline's OWN id, never an (overridesHere N) marker it may
 carry -- and auto-saves (unlike `skg-request-definitive-view'). The server
-returns the usual fork-confirmation buffer; approve with C-c C-c (rotate
-the clone's source first with C-c s s if you like) or decline with C-c
-C-k."
+returns the usual fork-confirmation buffer; Emacs prompts for the clone's
+source (unless already specified), then approve with C-c C-c or decline
+with C-c C-k."
   (interactive)
   (if (buffer-modified-p)
       (message "Save the buffer before forking.")

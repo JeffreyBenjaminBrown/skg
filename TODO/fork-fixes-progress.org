@@ -1,0 +1,158 @@
+#+title: fork-fixes: execution progress
+#+startup: overview
+
+Companion to TODO/fork-fixes.org, per coding-advice/when-to-stop.org.
+The request is left as-is; this file records what got done, deviations
+on *how*, and bad news. Choices Jeff might dispute live in
+jeff-should-weigh-in-on.org (repo root), not here.
+
+* Addendum: TODO/more.org (queued mid-session)
+Jeff queued TODO/more.org after the fork work began. All ten items
+are addressed; each carries an inline "Claude :" report under its
+headline there, and DONE marks were mirrored into TODO.org where the
+item also appears. Two items are not code-complete by design:
+- "Why does this search fail?" was a question; answered inline
+  (marked TODO per the file's convention).
+- The make-content-cleanup collateral complaint did not reproduce in
+  three attempted shapes; the attempt is kept as a regression test
+  (tests/collateral_delete.rs) and the item asks for the verbatim
+  message.
+
+* Plan of record (execution order)
+1. Hide-on-removal (request item "Editing a forked node is bad"):
+   server rule -- an id removed from an owned subscriber F's contains
+   that is disk-content of a subscribee becomes a hide by F; re-adding
+   unhides; explicit subscribee-as-such gestures win on conflict. Plus
+   the fork-creation analogue: a clone born of an edit that deleted
+   children of N hides those children.
+2. Case 1: a NEW metadata-less node under a foreign parent no longer
+   dies with CreatedForeignNode; it adopts the fork clone's source and
+   rides the normal fork confirmation.
+3. Case 2 server: a clone source explicitly specified via the new
+   children's metadata skips the placeholder (ForkSpec.source_confirmed);
+   confirmation-buffer header moves under an org headline.
+4. Case 2 client: minibuffer prompting for each unresolved clone
+   source before the y/n; the swallowed user-error made loud.
+5. Docs.
+
+* What's done and went well
+** Hide-on-removal (request item "Editing a forked node is bad")
+- 'infer_hides_from_contains_removals'
+  (server/from_text/local_instruction_collection/
+  resolve_visibility.rs), a new pass inside visibility resolution,
+  running before the subscribee-as-such signal loop so explicit
+  subscription-view gestures win: for each owned Save intent with
+  Specified contains, ids removed relative to disk that some (post-
+  save) subscribee still contains become hides; ids added back that
+  were hidden become unhides. Members invisible under a restricted
+  source-set never count as removals (they were omitted, not
+  removed). 'resolve_visibility' gained the restricted-source-set
+  parameter; 'LoweredIntents' gained the accessor
+  'save_intents_with_specified_contains'.
+- Fork-creation analogue: 'build_fork_clone' now receives N's disk
+  contains and sets the clone's hides to the children the forking
+  edit deleted (previously always empty, so deleting a child WHILE
+  forking would have left it to reappear as unintegrated subscribed
+  content). 'ForeignPolicyOutcome::ForkCandidate' carries N's whole
+  disk node now, not just its title.
+- Tests: two new driven-save tests in tests/hidden_from_subscriptions.rs
+  (fixtures-clone-edit): removal hides only subscribee-contained
+  children; re-adding unhides. Verified to FAIL with the new pass
+  neutered. Unit test fork_clone_hides_children_the_edit_deleted.
+  Full Rust suite: 476/476.
+
+** Case 1: bare new node under a foreign parent rides the fork
+- Enrichment ('add_missing_info_to_viewforest') now returns
+  'EnrichmentProvenance': which nodes got minted ids (new) and which
+  inherited their source. That distinction is erased by the enriched
+  tree itself, and the fix hinges on it: only an INHERITED foreign
+  source is a guess to be corrected; an explicit one stays the
+  CreatedForeignNode error.
+- 'new_foreign_nodes_adopting_clone_sources' (from_text/fork.rs) maps
+  each new-with-inherited-foreign-source node to the foreign ancestor
+  whose fork it rides (climbing chains of new headlines, skipping
+  scaffolds).
+- 'apply_foreign_policy' returns a new outcome, AdoptCloneSource;
+  'finalize_foreign_policy_instructions' (nee
+  filter_unchanged_foreign_saves) rewrites such a Save into the
+  matching ForkSpec's clone source, or degrades to the old error if no
+  spec exists (e.g. the new node was parked so as not to edit any
+  foreign contains).
+- The whole thing therefore inherits the existing confirmation gate:
+  the unapproved save shows the fork-confirmation, and the user's
+  chosen clone source (fork-sources) carries the new node with it.
+- Tests (tests/fork.rs): plan-level (spec + rewritten Save + clone
+  contains end with the minted id), commit-level (clone and new node
+  land in 'owned'; N untouched), and the explicit-foreign-source
+  rejection retained. Suite: 476/476.
+
+** Case 2, server half: specified sources are settled; foldable header
+- 'CloneSourceInputs' (from_text/fork.rs) bundles the four resolution
+  inputs in priority order: user_set (confirmation-buffer choice) >
+  explicit_child (explicit owned sources on the forked node's new
+  children -- 'explicit_new_child_sources_for_foreign_vognodes';
+  disagreeing children are ambiguous and record nothing) >
+  inferred_ancestor > default. The first two CONFIRM the source
+  (ForkSpec.source_confirmed); the last two remain suggestions.
+- 'build_fork_confirmation_buffer': the explanation now lives in the
+  BODY of a top org headline ("* Fork confirmation -- what this
+  buffer is"), so it folds; a confirmed clone renders its real source
+  with no placeholder and no suggestion comment; an unconfirmed one
+  keeps PICK-A-SOURCE with a one-line suggestion comment directly
+  above (the client parses that adjacency for its prompt default).
+- Tests: explicit child source confirms + renders settled;
+  disagreeing children leave it unconfirmed; confirmed-vs-placeholder
+  unit tests of the builder. Suite: 477/477.
+
+** Case 2, client half: prompting; the silent no-op made loud
+- The Case 2 "if I simply say yes, nothing happens" bug: answering yes
+  ran 'skg-approve-fork', whose user-error ("Pick a source for each
+  clone first...") was swallowed by the handler's surrounding
+  condition-case and written only to the skg log. The interactive flow
+  now runs OUTSIDE that condition-case (which still guards response
+  parsing), so refusals are loud.
+- New 'skg--fork-choose-placeholder-sources': when the confirmation
+  arrives (and again on C-c C-c), Emacs prompts for an owned source
+  per clone still carrying PICK-A-SOURCE -- completing-read over owned
+  sources, the server's suggestion as default, S-left/S-right cycling
+  -- and writes the choice into the buffer via the existing
+  'skg--change-source-at-point'. Specified sources (Case 2) prompt
+  nothing; only "Fork the listed node(s)?" remains.
+- The nvim client got the same treatment ('choose_placeholder_sources'
+  in nvim/lua/skg/save.lua, prompting via picker.completing_read_with_
+  cycle; the interactive flow moved outside the handler's pcall).
+- Tests: two new ert tests (prompt-with-suggestion writes the source;
+  specified clones prompt nothing); integration header assertions
+  updated. Emacs suite 254/254; fork and fork-source integration
+  tests pass end-to-end.
+
+* Changes to the plan's envisioned order
+None: the four pieces landed in the planned order (hide-on-removal,
+Case 1, Case 2 server, Case 2 client), one commit each, docs last.
+
+* What's imperfect about what's done
+- The signal-wins-over-removal conflict guard (a child removed from
+  F's contains AND shown under a subscribee-as-such in the same save
+  is not hidden) is implemented but has no dedicated test: driving it
+  needs the subscribee-expansion dance, and the guard is one set
+  filter. Conscious gap.
+- The nvim client's new prompting flow is untested beyond the
+  existing fork integration tests (which run headless and so skip
+  it); nvim is not installed in this environment, so not even a
+  syntax check ran. The code mirrors the elisp closely and reuses
+  picker/metadata helpers.
+- A pre-existing neighbor bug was found, not fixed (out of scope):
+  the subscribee-as-such signal loop can infer hides for
+  inactive-source members under a restricted source-set. Reported in
+  TODO/problems.org with a suggested one-line fix.
+
+* Choices determining the future
+- "Specified in the saved metadata" is defined as: explicit owned
+  sources on the forked node's NEW immediate children, all agreeing.
+  Inferred-ancestor sources and sources riding on moved-in existing
+  nodes deliberately do not count. See jeff-should-weigh-in-on.org.
+- The hide-on-removal rule applies to every owned subscriber, not
+  only clones, and runs before the subscribee-as-such signals so
+  explicit subscription-view gestures always win.
+- A bare new node under a foreign parent lands in the CLONE's source
+  (one pick covers both). An explicitly-foreign new node still errors.

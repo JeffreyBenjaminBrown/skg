@@ -1,0 +1,200 @@
+If any of these are questions rather than requests for code,
+please answer inline,
+marking the headline of your answer 'TODO'.
+
+If any of these were already done,
+please mark them 'DONE' in TODO.org
+(and here). Don't otherwise modify what I've written here,
+but feel free to add subheadlines anywhere, at any depth,
+somehow marking them for your voice.
+* DONE BUG : aliases should be merged, not added
+Aliases are being added rather than merged to the view.
+(Happens e.g. when saving a buffer with git diff mode on
+that already has aliases shown.)
+
+Code for merging collections is already part of
+the view update exeecution path.
+It might be called correction, or completion.
+** Claude : fixed
+Your suspicion was right that the merging code exists -- the alias
+reconciler ('reconcile_alias_col_children') dedups fine. The bug was
+upstream: in diff mode, 'process_activeNode_diff'
+(server/to_org/render/diff.rs) prepended an EMPTY AliasCol whenever
+the alias list changed in git, without checking whether the node
+already carried one (a saved diff-mode buffer always does). Both
+cols then each reconciled to the full alias list, so every alias
+appeared twice. Now the existing col is reused; same guard added for
+the IDCol, which had the identical latent bug. Regression test:
+tests/git_diff_view/aliases/view.rs,
+'test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them'
+(verified to fail without the fix).
+* DONE goto id should work from a raw .skg file
+If there's only one ID on that line,
+it should go to it even if it's not on the ID.
+If all IDs on that line are left of point we should visit the closest;
+if all are on the right, ditto.
+(If it's between two, that's ambiguous, so just say so and visit nothing.)
+** Claude : done
+'skg-nearest-id' now branches on 'skg-file-minor-mode': in a raw .skg
+buffer it collects the line's bare UUIDs and applies exactly your
+rules (on-an-ID wins; one ID needs no proximity; one-sided IDs yield
+the closest; both-sided is ambiguous -- skg-goto says "Point sits
+between IDs; move onto (or nearer to) one." and visits nothing).
+Content views / magit / search buffers keep the previous
+first-after-else-before behavior; I did NOT generalize the ambiguity
+rule to them, since e.g. point mid-title between the metadata ID and
+a link currently follows the link, and changing that seemed like its
+own decision. Tests in tests/elisp/test-skg-id-search.el.
+* DONE The skg diff report should report what vanished nodes used to be.
+The kind of node that would give
+"Parent references unknown node."
+should be investigated in the git history of all repos.
+If it's not there, say that;
+otherwise say at what commit it vanished,
+and what it was connected to (in every possible way) then.
+** Claude : done
+The diff report ends with a new top-level section, "vanished nodes
+(referenced, but existing in no source)" -- rendered even when empty,
+like the other categories. A dangling id (referenced by some
+worktree node's contains / subscribes_to / hides / overrides, present
+nowhere) is investigated by one first-parent walk per source repo
+(server/diff_analysis/vanished.rs): if never present anywhere, it
+says so; otherwise it reports the source, the last-present commit,
+the vanishing commit (the first-parent descendant lacking the file,
+each with short sha, date, summary), the node's title and its own
+relationship lists then, and everything that referred to it then --
+contains, subscribes_to, hides, overrides, and textlinks. Note the
+investigation only runs when the diff has changed paths (the
+no-changes early exit still yields an all-empty report), and dead
+TEXTLINK targets are not treated as vanished nodes (they degrade to
+text, and the new save-time dead-link warning covers them).
+* Why does this search fail?
+** Searched "rt"-style for
+"dens.* AND (mean.* OR info.* OR know.*)"
+** got this error
+Error searching index: An invalid argument was passed: 'RegexQueryError: regex parse error:
+    (mean.*
+    ^
+error: unclosed group'
+** TODO Claude : answer -- regex mode has no operator-level grouping
+In regex+operators mode ('build_regex_query',
+server/dbs/tantivy/search.rs), the query is split on WHITESPACE; the
+keywords AND / OR / NOT and the +/- prefixes are consumed as
+operators, and EVERY OTHER piece must be a valid regex on its own.
+Your "(mean.*" is such a piece: the "(" opens a regex group that
+never closes, hence Tantivy's RegexQueryError. Parentheses as
+operator-level grouping exist only on the non-regex QueryParser path
+(plain "t"-style with operators); the regex path never got a grouping
+layer.
+
+You don't need one for this query, though: regexes have alternation
+natively, so grouping can live INSIDE a single piece. This does what
+you meant:
+
+  dens.* AND (mean|info|know).*
+
+(one piece per required token; both pieces adjacent to AND become
+MUST). If you want operator-level parens in regex mode anyway --
+e.g. for mixing MUST_NOT into a group -- say so; it needs a small
+boolean-expression parser over the pieces in
+'regex_pieces_with_operators', where today's grammar is flat.
+* DONE C-c g i should work from anywhere.
+Regardless of buffer type.
+** Claude : done
+'skg-goto-by-id' is now bound globally (skg-keymaps-and-aliases.el),
+alongside the search commands that were already global. It only reads
+a typed/pasted ID, so it needs nothing from the buffer it is called
+in. (The nvim client binds per-buffer; I left it alone since "buffer
+type" is an Emacs concern -- say the word if you want a global nvim
+mapping too.)
+* DONE If indefinitive, add a B to that symbol where body is hidden.
+** Claude : done
+An indefinitive node whose graph node has a body now carries the bare
+atom 'hiddenBody' right after 'indef'; the herald table renders it as
+a green "B" ABUTted onto the ☮. Computed in the viewnodestats pass
+from the in-Rust graph; display-only (the parser accepts and discards
+it, like rels/birthHerald). Updating the exact-output render tests
+turned out to double as nice pins: e.g. in the budget tests, nodes
+whose bodies an earlier save had WIPED (definitive draw, no body
+text) correctly show no B, while their body-keeping siblings do.
+* DONE when staging new files (C-c t [a|A]), explain if git diff mode off
+rather than acting like the user did it right
+and stating that 0 files were added
+** Claude : done
+The client now mirrors the server's per-connection diff-mode state
+(new 'skg--git-diff-mode-enabled' in skg-state.el, set by the toggle
+handler, reset on reconnect). When either C-c t a/A finds zero new
+files AND diff mode is off, it explains that new files are recognized
+via the newX markers only a diff-mode view carries, and suggests
+C-c v d. With diff mode on, the old zero-count report stands.
+* BUG :: make-content cleanup -> collateral view not found
+** the bug
+Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
+** TODO Claude : could not reproduce; need the verbatim message
+I mirrored the shape (P contains linking node L, whose title is one
+big textlink to X) and tried deleting L via a save while OTHER
+registered views still held L three ways: as a child of an open view
+of P, as the ROOT of a second content view, and as the root of a
+search view. All complete with no errors or warnings; the collateral
+rerenders succeed. That attempt is kept as a regression test
+(tests/collateral_delete.rs).
+
+Two things would pin it down:
+1. The VERBATIM complaint. Candidates in the code are "Collateral
+   view <uri>: no viewforest found" and "View <uri>: no viewforest
+   found" (save vs rerender-all paths) -- but by construction both
+   look unreachable (the uri list and the forest map are the same
+   structure, read back-to-back) -- versus "Collateral view <uri>:
+   <some inner error>", which would mean a collateral RERENDER failed
+   and the interesting part is the inner error.
+2. Whether git diff mode was on at the time (my attempts ran with it
+   off), and whether the complaining buffer appeared at the save
+   itself or at a later rerender-all (diff-mode toggle / source-set
+   switch).
+If you can paste the exact message (or reproduce with
+data/logs/server.jsonl timing on), I can finish this.
+* DONE Warn the user when they make dead links.
+** Claude : done
+The save pipeline now appends a nonfatal warning per dead textlink it
+writes: a [[id:X][label]] in a saved title/body where X is neither in
+the graph nor created by the same save ("Dead link: node <pid> links
+to unknown id <X> (label ...)"). Only nodes the save actually writes
+are scanned (the noop filter already dropped unchanged ones), so an
+OLD dead link warns again exactly when its carrier is edited.
+Implemented as 'dead_link_warnings' in server/from_text.rs; test in
+tests/collateral_delete.rs.
+* DONE Show the herald it is responsible for next to each field in the metadata.
+That is, when the user uses C-c v m,
+each value that produces a herald should contain that herald,
+colored per herald rules, in (uncolored) parentheses,
+after the rest of the title.
+** Claude : done
+The C-c v m buffer now appends, per headline, the herald its label
+path produces: the path is nested back into a minimal sexp and run
+through the same lens engine the heralds view uses
+(skg-transform-sexp-flat + the served rule table), so the hint is
+colored exactly per herald rules, inside uncolored parens. The hints
+are OVERLAYS, not buffer text -- committing reads titles, and a baked-
+in hint would corrupt the sexp. Two caveats: without a server
+connection there is no rule table, so no hints; and the hints show
+open-time values (S-left/right cycling does not refresh them).
+* DONE Take something like the intersection of hides when merging.
+If either member of the merger shows it pre-merger --
+which means it is contained in *and* unhidden from one of them --
+then the merge should show it.
+** Claude : done
+The merged hides are now the union MINUS everything either member
+SHOWED pre-merge, where "showed" follows the subscribee-as-such
+display rule: contained in one of that member's subscribees, and
+neither hidden by nor contained in that member. (A literal
+intersection would over-drop: a hide by A of something B never
+subscribed to would vanish though nobody's view contradicted it.
+Your rule is exactly the intersection whenever both members could
+see the id through some subscribee.) Ids a member showed as its OWN
+content were already handled: contains are unioned and the
+pre-existing filter drops hides of anything the merged node
+contains. Implemented in 'three_nodeMerged_nodecompletes' +
+'ids_shown_through_subscriptions'
+(server/nodeMerge/nodeMergeInstructionTriple.rs); regression test
+tests/merge/merge_hides_intersection.rs (x dropped because b showed
+it; y and z survive), verified to fail without the fix.

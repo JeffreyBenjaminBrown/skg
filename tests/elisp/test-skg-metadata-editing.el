@@ -100,4 +100,38 @@
 * (skg (k v) value) 4")))
     (kill-buffer buf)))
 
+(require 'skg-sexpr-edit)
+
+(ert-deftest test-sexp-edit-herald-hints-appear-as-overlays ()
+  "The metadata view appends, per field/value headline, the herald it
+produces -- as an overlay (never buffer text), colored tokens inside
+plain parens (TODO/more.org). Fields producing no herald get none."
+  (skg-test-install-herald-rules)
+  (with-temp-buffer
+    (insert "* skg\n** node\n*** source\n**** main\n*** indef\n"
+            "*** parentIs\n**** independent\n")
+    (org-mode)
+    (skg-sexp-edit--decorate-with-heralds)
+    (let ((hint-on-line
+           (lambda (needle)
+             (goto-char (point-min))
+             (search-forward needle)
+             (let ((ov (seq-find
+                        (lambda (o)
+                          (overlay-get o 'skg-sexp-edit-herald))
+                        ;; 1+: an EMPTY overlay sitting exactly at
+                        ;; line-end is excluded by overlays-in when
+                        ;; the range stops there.
+                        (overlays-in (line-beginning-position)
+                                     (min (point-max)
+                                          (1+ (line-end-position)))))))
+               (and ov (substring-no-properties
+                        (overlay-get ov 'after-string)))))))
+      (should (equal (funcall hint-on-line "*** indef") " (\u262e)"))
+      (should (equal (funcall hint-on-line "**** independent") " (\u22a5)"))
+      (should-not (funcall hint-on-line "**** main"))
+      (should-not (funcall hint-on-line "*** source"))
+      ;; The buffer TEXT is untouched: committing must not see hints.
+      (should-not (string-match-p "(\u262e)" (buffer-string))))))
+
 (provide 'test-skg-metadata-editing)

@@ -23,10 +23,14 @@ use crate::types::tree::forest::{MpViewForest, ViewForest};
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
-  absent_parentIs_under_visible_parent_becomes_isContainer};
+  absent_parentIs_under_visible_parent_becomes_isContainer,
+  EnrichmentProvenance};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use fork::{
+  CloneSourceInputs,
+  explicit_new_child_sources_for_foreign_vognodes,
   fork_spec_from_buffer_node,
+  new_foreign_nodes_adopting_clone_sources,
   owned_ancestor_sources_for_foreign_vognodes,
   validate_fork_specs};
 use local_instruction_collection::{
@@ -90,14 +94,15 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         // parse the raw buffer
         org_to_uninterpreted_viewforest (buffer_text) }
           . map_err (SaveError::ParseError) ?;
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "add_missing_info_to_viewforest" ). entered();
-    // Metadata filling must precede maybePlaced-tree validation,
-    // because those validators compare nodes by pid,
-    // and expect sources to be inherited/resolved.
-    add_missing_info_to_viewforest (
-      & mut maybePlaced_viewforest, & config . db_name, driver )
-    . await } . map_err (SaveError::DatabaseError) ?;
+  let enrichment : EnrichmentProvenance =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "add_missing_info_to_viewforest" ). entered();
+      // Metadata filling must precede maybePlaced-tree validation,
+      // because those validators compare nodes by pid,
+      // and expect sources to be inherited/resolved.
+      add_missing_info_to_viewforest (
+        & mut maybePlaced_viewforest, & config . db_name, driver )
+      . await } . map_err (SaveError::DatabaseError) ?;
   absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
   { // If saving is impossible, don't.
@@ -136,6 +141,27 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   // it here, where the placed viewforest is live, keyed by foreign pid.
   let owned_ancestor_source : HashMap<ID, SourceName> =
     owned_ancestor_sources_for_foreign_vognodes (&viewforest, config);
+  let adopt_clone_source : HashMap<ID, ID> = {
+    // Bare new headlines under a foreign node are not foreign-creation
+    // errors; they ride that node's fork, adopting its clone's source.
+    // Ancestry is likewise only visible here, while the viewforest is
+    // live; only enrichment knew which nodes were new and sourceless.
+    let new_with_inherited_source : HashSet<ID> =
+      enrichment . new_nodes
+      . intersection (& enrichment . inherited_source_nodes)
+      . cloned () . collect ();
+    new_foreign_nodes_adopting_clone_sources (
+      &viewforest, & new_with_inherited_source, config ) };
+  let explicit_child_source : HashMap<ID, SourceName> = {
+    // A clone source the user already SPECIFIED, via explicit owned
+    // sources on the forked node's new children (fork-fixes Case 2):
+    // the confirmation flow shows it as settled instead of asking.
+    let new_with_explicit_source : HashSet<ID> =
+      enrichment . new_nodes
+      . difference (& enrichment . inherited_source_nodes)
+      . cloned () . collect ();
+    explicit_new_child_sources_for_foreign_vognodes (
+      &viewforest, & new_with_explicit_source, config ) };
   let default_clone_source : Option<SourceName> = {
     // The active-aware default for a fork whose source can be neither
     // user-set nor inferred: prefer the CONFIG-FIRST owned source that
@@ -153,6 +179,11 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         . find ( |name| active . contains_source (name) )
         . cloned () );
     active_owned . or_else ( || owned_in_order . into_iter () . next () ) };
+  let clone_source_inputs : CloneSourceInputs = CloneSourceInputs {
+    user_set          : fork_sources . clone (),
+    explicit_child    : explicit_child_source,
+    inferred_ancestor : owned_ancestor_source,
+    default           : default_clone_source, };
   let ( define_nodes, fork_specs )
     : ( Vec<DefineNode>, Vec<ForkSpec> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -160,9 +191,8 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       validate_and_filter_foreign_instructions (
         nonmerge_plan . define_nodes,
         &nodeMerge_instructions,
-        &owned_ancestor_source,
-        fork_sources,
-        default_clone_source . as_ref (),
+        &clone_source_inputs,
+        &adopt_clone_source,
         config,
         driver )
       . await } . map_err ( |errors| SaveError::BufferValidationErrors {
@@ -182,8 +212,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     let mut specs : Vec<ForkSpec> = fork_specs;
     specs . extend (
       explicit_fork_specs_from_viewforest (
-        &viewforest, config, fork_sources,
-        default_clone_source . as_ref () )
+        &viewforest, config, &clone_source_inputs )
       . map_err ( |errors| SaveError::BufferValidationErrors {
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
@@ -199,6 +228,8 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   let warnings : Vec<String> = {
     let mut warnings : Vec<String> = parsing_warnings;
     warnings . extend ( nonmerge_plan . warnings );
+    warnings . extend (
+      dead_link_warnings ( &define_nodes, &fork_specs ) );
     warnings };
   Ok (( viewforest,
         SavePlan {
@@ -208,22 +239,60 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
           fork_specs },
         warnings )) }
 
+/// One nonfatal warning per DEAD textlink this save writes: a
+/// '[[id:X][label]]' in a saved title or body where X is neither in
+/// the graph nor created by this same save (TODO/more.org, "Warn the
+/// user when they make dead links"). Only nodes the save actually
+/// writes are scanned -- the noop filter has already dropped
+/// unchanged ones -- so an old dead link warns again only when its
+/// carrier is edited. Skipped entirely without a process-global
+/// graph handle (some tests): no warning beats a false one.
+fn dead_link_warnings (
+  define_nodes : &[DefineNode],
+  fork_specs   : &[ForkSpec],
+) -> Vec<String> {
+  use crate::dbs::in_rust_graph::snapshot_global;
+  use crate::types::textlinks::textlinks_from_node;
+  let Some (graph) = snapshot_global () else { return Vec::new (); };
+  let saved_nodes : Vec<&NodeComplete> =
+    define_nodes . iter ()
+    . filter_map ( |dn| match dn {
+        crate::types::save::DefineNode::Save (
+          crate::types::save::SaveNode (n) ) => Some (n),
+        _ => None } )
+    . chain ( fork_specs . iter () . map ( |spec| & spec . clone . 0 ) )
+    . collect ();
+  let created_this_save : HashSet<&ID> = {
+    let mut ids : HashSet<&ID> = HashSet::new ();
+    for node in &saved_nodes {
+      ids . insert (& node . pid);
+      ids . extend ( node . extra_ids . iter () ); }
+    ids };
+  let mut warnings : Vec<String> = Vec::new ();
+  for node in &saved_nodes {
+    for link in textlinks_from_node (node) {
+      if created_this_save . contains (& link . id) { continue; }
+      if graph . pid_of (& link . id) . is_some () { continue; }
+      warnings . push ( format! (
+        "Dead link: node {} links to unknown id {} (label {:?}).",
+        node . pid . 0, link . id . 0, link . label )); }}
+  warnings }
+
 /// Build a ForkSpec for each node carrying 'ViewRequest::Fork' (the
 /// explicit 'skg-fork-node' gesture, for an OWNED node). The clone C is
 /// built from N's current disk/graph snapshot (not the buffer): the
 /// client refuses to fork a dirty buffer, so disk == what the user sees,
 /// and N's own owned save proceeds separately. The clone source resolves
-/// user-set-else-config-first-owned; unlike the implicit foreign fork
-/// there is NO owned-ancestor inference (an empty inference map). D2's
-/// 'validate_fork_view_requests' has already rejected an unsaved or
-/// already-forked target, so this only builds.
+/// user-set-else-config-first-owned: the shared 'CloneSourceInputs'
+/// carries the explicit-child and inferred-ancestor maps too, but both
+/// are keyed by FOREIGN pids, so an owned fork target never hits them.
+/// D2's 'validate_fork_view_requests' has already rejected an unsaved
+/// or already-forked target, so this only builds.
 fn explicit_fork_specs_from_viewforest (
-  viewforest      : &ViewForest,
-  config          : &SkgConfig,
-  user_set_source : &HashMap<ID, SourceName>,
-  default_source  : Option<&SourceName>,
+  viewforest          : &ViewForest,
+  config              : &SkgConfig,
+  clone_source_inputs : &CloneSourceInputs,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
-  let no_inference : HashMap<ID, SourceName> = HashMap::new ();
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   let mut seen   : HashSet<ID> = HashSet::new ();
@@ -245,8 +314,11 @@ fn explicit_fork_specs_from_viewforest (
             "Cannot fork node {}: {}", pid . 0, e )));
           continue; }};
     match fork_spec_from_buffer_node (
-      & snapshot, & snapshot . title, & no_inference,
-      user_set_source, default_source )
+      // The snapshot serves as both the clone template and the disk
+      // state, so the disk-contains diff is empty: an explicit fork
+      // deletes nothing, hence hides nothing.
+      & snapshot, & snapshot . title, & snapshot . contains,
+      clone_source_inputs )
     { Ok (spec) => specs . push (spec),
       Err (e)   => errors . push (e), }}
   if ! errors . is_empty () { return Err (errors); }

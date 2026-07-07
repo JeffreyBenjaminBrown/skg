@@ -282,6 +282,28 @@ impl LoweredIntents {
       . filter_map ( |pid| by_pid . remove (&pid) )
       . collect() }
 
+  /// One (pid, source, contains, subscribes_to) tuple per Save
+  /// intent whose contains is Specified -- the candidates for
+  /// inferring hides from contains removals (see
+  /// 'infer_hides_from_contains_removals'). Cloned out so the caller
+  /// can mutate self (via 'apply_hiderel_delta_to_subscriber') while
+  /// iterating.
+  pub fn save_intents_with_specified_contains (
+    &self,
+  ) -> Vec<(ID, SourceName, Vec<ID>, MSV<ID>)> {
+    self . order . iter ()
+      . filter_map ( |pid| match self . by_pid . get (pid) {
+          Some (NodeIntent::Save (intent)) =>
+            match & intent . contains {
+              MSV::Specified (contains) => Some ((
+                pid . clone (),
+                intent . source . clone (),
+                contains . clone (),
+                intent . subscribes_to . clone () )),
+              _ => None },
+          _ => None })
+      . collect () }
+
   /// This returns the subscriber's contains as it will stand after
   /// this save: from its Save intent if it has one, and otherwise
   /// from disk.

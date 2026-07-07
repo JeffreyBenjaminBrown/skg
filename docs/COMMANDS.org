@@ -193,6 +193,8 @@ reduces the view's demands on the server.
 This requires a literal v4 UUID string, like
 3861db2c-7f16-4814-b403-52b5e05d5e0a
 It can be useful going from git to skg.
+
+Bound globally, so it works from any buffer, of any type.
 *** C-c G i   : skg-goto-by-id-and-close-this
 *** C-c g m   : skg-goto-in-magit
 Opens a magit view of the changes to the file containing the
