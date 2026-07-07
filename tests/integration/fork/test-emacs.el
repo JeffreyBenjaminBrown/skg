@@ -61,7 +61,7 @@
     (with-current-buffer confirm-buf
       (unless (string-match-p "(id N)" (buffer-string))
         (test-fail "confirmation buffer does not list N:\n%s" (buffer-string)))
-      (unless (string-match-p "FORK CONFIRMATION" (buffer-string))
+      (unless (string-match-p "Fork confirmation" (buffer-string))
         (test-fail "confirmation buffer lacks its header:\n%s" (buffer-string)))
       (message "✓ fork-confirmation buffer lists N")
 

@@ -3,6 +3,7 @@
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
 (require 'ert)
+(require 'cl-lib)
 (require 'skg-request-save)
 
 (ert-deftest test-save-request-sexp-omits-fork-approved-by-default ()
@@ -113,6 +114,45 @@ skg-content-view-mode-map (which would break C-x C-s in real views)."
                       #'skg-request-save-buffer))
         (kill-buffer buf)
         (when (buffer-live-p origin) (kill-buffer origin))))))
+
+(ert-deftest test-fork-choose-placeholder-sources-prompts-with-suggestion ()
+  "skg--fork-choose-placeholder-sources prompts once per placeholder
+clone, offering the server's suggested source (the comment above the
+clone) as the default, and writes the choice into the metadata."
+  (with-temp-buffer
+    (insert "* Fork confirmation -- what this buffer is\n")
+    (insert "Some explanation.\n")
+    (insert "# Suggested source for the clone below: owned2\n")
+    (insert "* (skg (node (source PICK-A-SOURCE) (viewStats (sourceHerald ⌂:PICK-A-SOURCE)))) N-edited\n")
+    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef)) N-original\n")
+    (org-mode)
+    (let ((offered-defaults nil))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("owned" "owned2")))
+                ((symbol-function 'skg--completing-read-with-cycle)
+                 (lambda (_prompt _collection _pred _req _init _hist def
+                                  &rest _)
+                   (push def offered-defaults)
+                   def))) ;; the user accepts the default
+        (skg--fork-choose-placeholder-sources))
+      (should (equal offered-defaults '("owned2")))
+      (should (string-match-p "(source owned2)" (buffer-string)))
+      (should (string-match-p "⌂:owned2" (buffer-string)))
+      (should-not (string-match-p "(source PICK-A-SOURCE)"
+                                  (buffer-string))))))
+
+(ert-deftest test-fork-choose-placeholder-sources-skips-specified-clones ()
+  "A clone whose source is already real (the user specified it in the
+saved metadata, so the server omitted the placeholder) prompts nothing."
+  (with-temp-buffer
+    (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
+    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef)) N-original\n")
+    (org-mode)
+    (cl-letf (((symbol-function 'skg--completing-read-with-cycle)
+               (lambda (&rest _)
+                 (error "must not prompt for a specified source"))))
+      (skg--fork-choose-placeholder-sources))
+    (should (string-match-p "(source owned2)" (buffer-string)))))
 
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."

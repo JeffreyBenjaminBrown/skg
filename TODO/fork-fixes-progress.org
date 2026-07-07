@@ -92,6 +92,28 @@ jeff-should-weigh-in-on.org (repo root), not here.
   disagreeing children leave it unconfirmed; confirmed-vs-placeholder
   unit tests of the builder. Suite: 477/477.
 
+** Case 2, client half: prompting; the silent no-op made loud
+- The Case 2 "if I simply say yes, nothing happens" bug: answering yes
+  ran 'skg-approve-fork', whose user-error ("Pick a source for each
+  clone first...") was swallowed by the handler's surrounding
+  condition-case and written only to the skg log. The interactive flow
+  now runs OUTSIDE that condition-case (which still guards response
+  parsing), so refusals are loud.
+- New 'skg--fork-choose-placeholder-sources': when the confirmation
+  arrives (and again on C-c C-c), Emacs prompts for an owned source
+  per clone still carrying PICK-A-SOURCE -- completing-read over owned
+  sources, the server's suggestion as default, S-left/S-right cycling
+  -- and writes the choice into the buffer via the existing
+  'skg--change-source-at-point'. Specified sources (Case 2) prompt
+  nothing; only "Fork the listed node(s)?" remains.
+- The nvim client got the same treatment ('choose_placeholder_sources'
+  in nvim/lua/skg/save.lua, prompting via picker.completing_read_with_
+  cycle; the interactive flow moved outside the handler's pcall).
+- Tests: two new ert tests (prompt-with-suggestion writes the source;
+  specified clones prompt nothing); integration header assertions
+  updated. Emacs suite 254/254; fork and fork-source integration
+  tests pass end-to-end.
+
 * Changes to the plan's envisioned order
 
 * What's imperfect about what's done

@@ -18,9 +18,11 @@ local state = require('skg.state')
 
 local M = {}
 
----Sentinel source the server pre-fills for each clone-to-be in the
----fork-confirmation buffer. The user must replace it (<localleader>ss
----on the clone-to-be headline) before approving. Must match
+---Sentinel source the server pre-fills for a clone-to-be whose source
+---the user has not specified (in the saved metadata or a prior
+---round). 'choose_placeholder_sources' prompts for a replacement per
+---carrying clone (<localleader>ss on the headline works too);
+---'approve_fork' refuses while any remains. Must match
 ---FORK_SOURCE_PLACEHOLDER in server/from_text/fork.rs.
 M.fork_source_placeholder = 'PICK-A-SOURCE'
 
@@ -425,28 +427,78 @@ function M.fork_confirmation_handler (save_buf, response)
   end
   lock.end_stream()
   lock.unlock_all_save_locked()
+  local confirm_buf = nil
   local ok, err = pcall(function ()
+    -- The pcall guards only response parsing/display. The interactive
+    -- flow below runs OUTSIDE it: a refusal from approve_fork must
+    -- reach the user, not the log -- nesting it here used to swallow
+    -- the "pick a source first" refusal, so approving with a
+    -- placeholder source silently did nothing.
     local content = payload.field_text(response, 'content')
     local to_minibuffer = payload.field_text(response, 'to-minibuffer')
-    local confirm_buf =
-      M.show_fork_confirmation(content or '', save_buf)
+    confirm_buf = M.show_fork_confirmation(content or '', save_buf)
     if to_minibuffer then vim.notify(to_minibuffer) end
-    if #vim.api.nvim_list_uis() > 0 then
-      -- In headless runs (tests) the caller drives approve_fork /
-      -- decline_fork directly; interactively, ask now.
-      vim.api.nvim_buf_call(confirm_buf, function ()
-        if vim.fn.confirm('Fork the listed node(s)?',
-                          '&Yes\n&No', 2) == 1 then
-          M.approve_fork()
-        else
-          M.decline_fork() end
-      end)
-    end
   end)
   if not ok then
     log.log('error', 'save', 'fork-confirmation handler error: %s',
             tostring(err))
+    return
   end
+  if confirm_buf and #vim.api.nvim_list_uis() > 0 then
+    -- In headless runs (tests) the caller drives approve_fork /
+    -- decline_fork directly; interactively, prompt for any clone
+    -- source not yet specified, then ask.
+    vim.api.nvim_buf_call(confirm_buf, function ()
+      M.choose_placeholder_sources(confirm_buf)
+      if vim.fn.confirm('Fork the listed node(s)?',
+                        '&Yes\n&No', 2) == 1 then
+        M.approve_fork()
+      else
+        M.decline_fork() end
+    end)
+  end
+end
+
+---Prompt for an owned source for each clone-to-be still carrying the
+---placeholder, writing the choice into the buffer. The server's
+---suggested source (the comment directly above the clone) is the
+---default; aborting the prompt accepts it. A no-op when every clone's
+---source is already specified -- notably when the saved metadata
+---itself specified it (the server then omits the placeholder), per
+---TODO/fork-fixes.org: no redundant ask.
+---@param buf integer
+function M.choose_placeholder_sources (buf)
+  local picker = require('skg.picker')
+  local owned = require('skg.config').owned_sources() or {}
+  vim.api.nvim_buf_call(buf, function ()
+    for line = 1, vim.api.nvim_buf_line_count(buf) do
+      if metadata.outline_level(line) == 1 then
+        local sexp = metadata.metadata_sexp_at_line_or_nil(line)
+        if sexp and metadata.node_source(sexp)
+                    == M.fork_source_placeholder then
+          local suggested = nil
+          if line > 1 then
+            local above = metadata.line_text(line - 1) or ''
+            suggested = above:match(
+              '^# Suggested source for the clone below: (.+)$')
+          end
+          local default = suggested or owned[1]
+          local parts = metadata.split_as_stars_metadata_title(
+            metadata.line_text(line) or '')
+          local choice = picker.completing_read_with_cycle(
+            string.format('Source for the clone "%s" (default %s): ',
+                          (parts and parts.title) or '?',
+                          default or '?'),
+            owned,
+            { initial_input = default, cycle_values = owned,
+              require_match = true })
+          local chosen = (choice and choice ~= '') and choice or default
+          if chosen then
+            metadata.change_source_at_line(line, chosen) end
+        end
+      end
+    end
+  end)
 end
 
 ---Show CONTENT in the fork-confirmation buffer, recording SAVE_BUF as
