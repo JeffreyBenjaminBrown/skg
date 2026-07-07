@@ -1,4 +1,4 @@
-use crate::from_text::fork::fork_spec_from_buffer_node;
+use crate::from_text::fork::{CloneSourceInputs, fork_spec_from_buffer_node};
 use crate::source_sets::ActiveSourceSet;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
@@ -33,9 +33,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn validate_and_filter_foreign_instructions(
   instructions       : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
-  owned_ancestor_source : &HashMap<ID, SourceName>,
-  user_set_fork_source : &HashMap<ID, SourceName>,
-  default_clone_source : Option<&SourceName>,
+  clone_source_inputs : &CloneSourceInputs, // everything clone-source resolution can draw on, in priority order
   adopt_clone_source : &HashMap<ID, ID>, // new node -> forked N whose clone's source it adopts (see 'new_foreign_nodes_adopting_clone_sources')
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
@@ -76,8 +74,7 @@ pub async fn validate_and_filter_foreign_instructions(
       = outcome {
       match fork_spec_from_buffer_node (
         buffer_node, & disk_node . title, & disk_node . contains,
-        owned_ancestor_source,
-        user_set_fork_source, default_clone_source )
+        clone_source_inputs )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }

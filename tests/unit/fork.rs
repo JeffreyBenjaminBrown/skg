@@ -94,14 +94,17 @@ fn scaffold_ancestor_is_skipped () {
 
 /// A fork-to-be (clone) with an edited title over the original N it
 /// overrides, in N's foreign source. (original_title is N's disk title.)
-fn fork_spec_n_edited () -> ForkSpec {
+fn fork_spec_n_edited (
+  source_confirmed : bool,
+) -> ForkSpec {
   let buffer_node : NodeComplete = NodeComplete {
     title  : "N-edited" . to_string (),
     source : SourceName::from ("foreign"),
     pid    : ID::from ("N"),
     .. empty_node_complete () };
   build_fork_clone (
-    & buffer_node, "N-original", &[], SourceName::from ("owned2") ) }
+    & buffer_node, "N-original", &[], SourceName::from ("owned2"),
+    source_confirmed ) }
 
 #[test]
 fn fork_clone_hides_children_the_edit_deleted () {
@@ -117,7 +120,7 @@ fn fork_clone_hides_children_the_edit_deleted () {
   let spec : ForkSpec = build_fork_clone (
     & buffer_node, "N-original",
     & [ ID::from ("N1"), ID::from ("N2") ],
-    SourceName::from ("owned2") );
+    SourceName::from ("owned2"), false );
   assert_eq! (
     spec . clone . 0 . hides_from_its_subscriptions . or_default (),
     & [ ID::from ("N2") ],
@@ -126,8 +129,13 @@ fn fork_clone_hides_children_the_edit_deleted () {
 #[test]
 fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   let buf : String =
-    build_fork_confirmation_buffer ( & [ fork_spec_n_edited () ] );
+    build_fork_confirmation_buffer ( & [ fork_spec_n_edited (false) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
+  // The explanation lives under an org headline (foldable), not a
+  // long '#' comment block (TODO/fork-fixes.org Case 2).
+  assert! ( lines . first () . map_or ( false, |l|
+      l . starts_with ("* Fork confirmation") ),
+    "the buffer must open with the instructions headline:\n{}", buf );
   // The clone-to-be parent: a LEVEL-1 headline ("* "), edited title, and
   // the PICK-A-SOURCE placeholder source the user must replace (NO id).
   // (starts_with pins the level marker so a "* " -> "** " drift is caught
@@ -137,11 +145,14 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
         & format! ("* (skg (node (source {})", FORK_SOURCE_PLACEHOLDER) )
       && l . ends_with ("N-edited") ),
     "clone-to-be parent (level-1, edited title, placeholder source) missing:\n{}", buf );
-  // The computed source is shown only as a SUGGESTION comment.
-  assert! ( lines . iter () . any ( |l|
-      l . starts_with ("# Suggested source")
-      && l . contains ("owned2") ),
-    "the clone's suggested source must be noted:\n{}", buf );
+  // The computed source is shown only as a SUGGESTION comment,
+  // DIRECTLY above the clone-to-be (the client parses that adjacency
+  // for the prompt's default).
+  assert! ( lines . windows (2) . any ( |w|
+      w[0] . starts_with ("# Suggested source")
+      && w[0] . contains ("owned2")
+      && w[1] . starts_with ("* (skg") ),
+    "the clone's suggested source must sit directly above it:\n{}", buf );
   assert! ( ! buf . contains ("(id N) (source owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a LEVEL-2 headline ("** "), real id, foreign
@@ -153,3 +164,23 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
       && l . contains ("parentOverrides")
       && l . ends_with ("N-original") ),
     "original child (level-2, id/foreign/indef/independent/pO) missing:\n{}", buf ); }
+
+#[test]
+fn confirmation_buffer_shows_a_confirmed_source_as_settled () {
+  // When the user already specified the clone's source (explicitly in
+  // the saved metadata, or in a prior confirmation round), the buffer
+  // shows THAT source -- no placeholder, no suggestion comment.
+  let buf : String =
+    build_fork_confirmation_buffer ( & [ fork_spec_n_edited (true) ] );
+  let lines : Vec<&str> = buf . lines () . collect ();
+  assert! ( lines . iter () . any ( |l|
+      l . starts_with ("* (skg (node (source owned2)")
+      && l . ends_with ("N-edited") ),
+    "a confirmed clone must show its real source:\n{}", buf );
+  assert! ( ! buf . contains (
+      & format! ("(source {})", FORK_SOURCE_PLACEHOLDER) ),
+    // (The instructions body may MENTION the placeholder; only the
+    // metadata form matters.)
+    "no placeholder source when every source is confirmed:\n{}", buf );
+  assert! ( ! buf . contains ("# Suggested source"),
+    "no suggestion comment when every source is confirmed:\n{}", buf ); }

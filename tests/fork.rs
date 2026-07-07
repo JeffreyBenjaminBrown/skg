@@ -187,6 +187,12 @@ fn all_tests
       s . reset ("fork_user_set_source_not_owned_rejected", two_owned) . await ?;
       fork_user_set_source_not_owned_rejected (
         &s . config, &s . driver ) . await ?;
+      s . reset ("explicit_new_child_source_confirms_clone_source", two_owned) . await ?;
+      explicit_new_child_source_confirms_clone_source (
+        &s . config, &s . driver ) . await ?;
+      s . reset ("disagreeing_new_child_sources_leave_clone_source_unconfirmed", two_owned) . await ?;
+      disagreeing_new_child_sources_leave_clone_source_unconfirmed (
+        &s . config, &s . driver ) . await ?;
       s . reset ("explicit_fork_save_instruction", fixtures) . await ?;
       explicit_fork_save_instruction (
         &s . config, &s . driver ) . await ?;
@@ -399,6 +405,64 @@ async fn fork_user_set_source_overrides (
      got {:?}", c . source );
   Ok (( )) }
 
+/// TODO/fork-fixes.org Case 2: appending a new child that EXPLICITLY
+/// names an owned source specifies the clone's source. The spec must
+/// resolve to that source, CONFIRMED, and the confirmation buffer must
+/// show it as settled -- no PICK-A-SOURCE, no suggestion comment.
+async fn explicit_new_child_source_confirms_clone_source (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let buffer : &str = indoc! {"
+    * (skg (node (id N) (source foreign))) N-original
+    ** (skg (node (id N1) (source foreign) indef)) N1
+    ** (skg (node (id N2) (source foreign) indef)) N2
+    ** (skg (node (source owned2))) Can I add to this?
+    "};
+  let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
+    buffer, config, driver, None ) . await ?;
+  assert_eq! ( save_plan . fork_specs . len (), 1 );
+  let spec : &ForkSpec = & save_plan . fork_specs[0];
+  assert_eq! ( spec . clone . 0 . source, SourceName::from ("owned2"),
+    "the clone's source must be the new child's explicit source" );
+  assert! ( spec . source_confirmed,
+    "an explicitly-specified source must be confirmed" );
+  let confirmation : String =
+    skg::from_text::fork::build_fork_confirmation_buffer (
+      & save_plan . fork_specs );
+  assert! ( confirmation . contains ("(source owned2)"),
+    "the buffer must show the specified source as settled:\n{}",
+    confirmation );
+  assert! ( ! confirmation . contains ("(source PICK-A-SOURCE)"),
+    // (The instructions body may MENTION the placeholder; only the
+    // metadata form matters.)
+    "no placeholder source when the source was specified:\n{}",
+    confirmation );
+  Ok (( )) }
+
+/// New children naming DIFFERENT owned sources are ambiguous: the
+/// clone's source falls back to inference/default, UNCONFIRMED, so
+/// the flow asks.
+async fn disagreeing_new_child_sources_leave_clone_source_unconfirmed (
+  config : &SkgConfig,
+  driver : &Arc<TypeDBDriver>,
+) -> Result<(), Box<dyn Error>> {
+  let _ : InRustGraphHandle =
+    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  let buffer : &str = indoc! {"
+    * (skg (node (id N) (source foreign))) N-original
+    ** (skg (node (source owned))) New thing one
+    ** (skg (node (source owned2))) New thing two
+    "};
+  let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
+    buffer, config, driver, None ) . await ?;
+  assert_eq! ( save_plan . fork_specs . len (), 1 );
+  assert! ( ! save_plan . fork_specs[0] . source_confirmed,
+    "disagreeing explicit child sources must not confirm a clone source" );
+  Ok (( )) }
+
 /// The confirmation stage: a save that finds forks but is NOT approved
 /// returns a fork-confirmation buffer and commits NOTHING; re-issuing
 /// the save approved then commits.
@@ -420,7 +484,7 @@ async fn fork_confirmation_gates_commit (
     /* fork_approved = */ false ) . await ?;
   assert! ( response . fork_confirmation . is_some (),
     "an unapproved save with forks must return a fork-confirmation" );
-  assert! ( response . saved_view . contains ("FORK CONFIRMATION")
+  assert! ( response . saved_view . contains ("* Fork confirmation")
             && response . saved_view . contains ("(id N)"),
     "the confirmation buffer must list N:\n{}", response . saved_view );
   assert! ( clone_on_disk (config) . is_err (),

@@ -74,6 +74,24 @@ jeff-should-weigh-in-on.org (repo root), not here.
   land in 'owned'; N untouched), and the explicit-foreign-source
   rejection retained. Suite: 476/476.
 
+** Case 2, server half: specified sources are settled; foldable header
+- 'CloneSourceInputs' (from_text/fork.rs) bundles the four resolution
+  inputs in priority order: user_set (confirmation-buffer choice) >
+  explicit_child (explicit owned sources on the forked node's new
+  children -- 'explicit_new_child_sources_for_foreign_vognodes';
+  disagreeing children are ambiguous and record nothing) >
+  inferred_ancestor > default. The first two CONFIRM the source
+  (ForkSpec.source_confirmed); the last two remain suggestions.
+- 'build_fork_confirmation_buffer': the explanation now lives in the
+  BODY of a top org headline ("* Fork confirmation -- what this
+  buffer is"), so it folds; a confirmed clone renders its real source
+  with no placeholder and no suggestion comment; an unconfirmed one
+  keeps PICK-A-SOURCE with a one-line suggestion comment directly
+  above (the client parses that adjacency for its prompt default).
+- Tests: explicit child source confirms + renders settled;
+  disagreeing children leave it unconfirmed; confirmed-vs-placeholder
+  unit tests of the builder. Suite: 477/477.
+
 * Changes to the plan's envisioned order
 
 * What's imperfect about what's done

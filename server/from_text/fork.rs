@@ -111,92 +111,155 @@ pub fn new_foreign_nodes_adopting_clone_sources (
           { current = parent; }} }}
   map }
 
-/// Build the ForkSpec for a fork of the foreign buffer node N. C's owned
-/// source is resolved in priority order:
-///   1. user-set (the source the user carried back from the
-///      confirmation buffer, keyed by N's pid),
-///   2. inferred (N's nearest owned ancestor in the view -- always active),
-///   3. default ('default_source', the caller's active-aware first owned
-///      source).
-/// So every fork carries a concrete owned source unless the user owns NO
-/// source at all -- only then does 'ForkSourceUnresolved' fire. (The
-/// chosen source is validated owned + active later, in
-/// 'validate_fork_specs'; resolution here only fills it. The default is
-/// active-aware so that, under a restricted source-set with both an
-/// inactive and an active owned source, the fork still reaches the
-/// confirmation buffer rather than dead-ending on 'ForkSourceInactive'.)
+/// Everything clone-source resolution can draw on, in priority order
+/// (user_set > explicit_child > inferred_ancestor > default). The
+/// first two are user SPECIFICATIONS: a source resolved from them is
+/// 'source_confirmed', and the confirmation buffer shows it as
+/// settled. The last two are guesses: the buffer then shows the
+/// PICK-A-SOURCE placeholder plus the guess as a suggestion, and the
+/// client asks the user to choose before approving.
+pub struct CloneSourceInputs {
+  pub user_set          : HashMap<ID, SourceName>, // What the user chose in the confirmation buffer, riding back on the approve re-save's fork-sources field.
+  pub explicit_child    : HashMap<ID, SourceName>, // What the saved metadata already specified, via explicit sources on N's new children ('explicit_new_child_sources_for_foreign_vognodes').
+  pub inferred_ancestor : HashMap<ID, SourceName>, // N's nearest owned ancestor in the view ('owned_ancestor_sources_for_foreign_vognodes') -- always active.
+  pub default           : Option<SourceName>,      // The caller's active-aware config-first owned source.
+}
+
+/// Build the ForkSpec for a fork of the foreign buffer node N,
+/// resolving C's owned source per 'CloneSourceInputs'. Every fork
+/// carries a concrete owned source unless the user owns NO source at
+/// all -- only then does 'ForkSourceUnresolved' fire. (The chosen
+/// source is validated owned + active later, in
+/// 'validate_fork_specs'; resolution here only fills it. The default
+/// is active-aware so that, under a restricted source-set with both
+/// an inactive and an active owned source, the fork still reaches the
+/// confirmation buffer rather than dead-ending on
+/// 'ForkSourceInactive'.)
 pub fn fork_spec_from_buffer_node (
-  buffer_node           : &NodeComplete,
-  disk_title            : &str, // N's original title (before the edit), for the confirmation buffer's child line.
-  disk_contains         : &[ID], // N's original contains (before the edit); children the edit deleted become the clone's hides.
-  owned_ancestor_source : &HashMap<ID, SourceName>,
-  user_set_source       : &HashMap<ID, SourceName>,
-  default_source        : Option<&SourceName>, // the caller's active-aware default owned source
+  buffer_node   : &NodeComplete,
+  disk_title    : &str, // N's original title (before the edit), for the confirmation buffer's child line.
+  disk_contains : &[ID], // N's original contains (before the edit); children the edit deleted become the clone's hides.
+  sources       : &CloneSourceInputs,
 ) -> Result<ForkSpec, BufferValidationError> {
+  let specified : Option<SourceName> =
+    sources . user_set . get (& buffer_node . pid) . cloned ()
+    . or_else ( || sources . explicit_child . get (& buffer_node . pid)
+                   . cloned () );
+  let source_confirmed : bool =
+    specified . is_some ();
   let clone_source : SourceName =
-    user_set_source . get (& buffer_node . pid) . cloned ()
-    . or_else ( || owned_ancestor_source . get (& buffer_node . pid)
-                   . cloned () )
-    . or_else ( || default_source . cloned () )
+    specified
+    . or_else ( || sources . inferred_ancestor
+                   . get (& buffer_node . pid) . cloned () )
+    . or_else ( || sources . default . clone () )
     . ok_or_else ( || BufferValidationError::ForkSourceUnresolved (
         buffer_node . pid . clone () )) ?;
   Ok ( build_fork_clone (
-    buffer_node, disk_title, disk_contains, clone_source) ) }
+    buffer_node, disk_title, disk_contains, clone_source,
+    source_confirmed ) ) }
 
-/// The sentinel source the confirmation buffer pre-fills for every
-/// clone-to-be. The user MUST replace it (C-c s s) with a real owned
-/// source before approving; the client refuses to approve while any
-/// clone still carries it (and the server would reject it as an unknown
-/// source anyway). Must match 'skg-fork-source-placeholder' in
+/// The clone-source specification Case 2 of TODO/fork-fixes.org asks
+/// for: when the fork-forcing edit is the addition of NEW children
+/// whose metadata EXPLICITLY names an owned source, the user has
+/// already said where this material belongs, so the clone of the
+/// foreign parent goes there too and the confirmation flow does not
+/// ask again. Per foreign node N, this records the one owned source
+/// its new explicitly-sourced immediate Active children agree on;
+/// nothing is recorded when they disagree (ambiguous -- the flow then
+/// asks) or when there are none. 'new_nodes_with_explicit_sources' is
+/// enrichment's new-nodes set MINUS its inherited-source set: only a
+/// source the user actually typed counts as a specification.
+pub fn explicit_new_child_sources_for_foreign_vognodes (
+  viewforest : &ViewForest,
+  new_nodes_with_explicit_sources : &HashSet<ID>,
+  config     : &SkgConfig,
+) -> HashMap<ID, SourceName> {
+  let mut map : HashMap<ID, SourceName> = HashMap::new ();
+  let mut ambiguous : HashSet<ID> = HashSet::new ();
+  for node in viewforest . nodes () {
+    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+      else { continue; };
+    if config . user_owns_source (& t . source)
+      { continue; } // only a foreign node forks
+    for child in node . children () {
+      let ViewNodeKind::Vognode (Vognode::Active (ct))
+        = & child . value () . kind
+        else { continue; };
+      if ! new_nodes_with_explicit_sources . contains (& ct . id)
+        { continue; }
+      if ! config . user_owns_source (& ct . source)
+        { continue; } // an explicitly-foreign new child is an error elsewhere, not a specification
+      match map . get (& t . id) {
+        Some (prior) if prior != & ct . source =>
+          { ambiguous . insert ( t . id . clone () ); }
+        _ =>
+          { map . insert ( t . id . clone (),
+                           ct . source . clone () ); }} }}
+  for id in &ambiguous { map . remove (id); }
+  map }
+
+/// The sentinel source the confirmation buffer pre-fills for a
+/// clone-to-be whose source the user has not SPECIFIED (neither in
+/// the saved metadata nor in a prior confirmation round). It must be
+/// replaced by a real owned source before approving: the client
+/// prompts for one per placeholder-carrying clone (or the user sets
+/// it with C-c s s), and refuses to approve while any remains (the
+/// server would reject it as an unknown source anyway). Must match
+/// 'skg-fork-source-placeholder' in
 /// [[../../elisp/skg-request-save.el]].
 pub const FORK_SOURCE_PLACEHOLDER : &str = "PICK-A-SOURCE";
 
-/// Build the fork-confirmation buffer: read-only EXCEPT each clone's
-/// source, which the user MUST set. Two levels per fork, because one
-/// headline cannot honestly stand for both the original N and the
-/// (possibly re-titled) clone C:
+/// Build the fork-confirmation buffer. Its head is an org headline
+/// whose BODY holds the explanation (foldable; a long '#' comment
+/// block annoyed in practice -- TODO/fork-fixes.org Case 2). Then two
+/// levels per fork, because one headline cannot honestly stand for
+/// both the original N and the (possibly re-titled) clone C:
 ///
-///   # Suggested source for the clone below: <src> ...
-///   * <edited title>     -- the CLONE-TO-BE C: its source starts as the
-///                           PICK-A-SOURCE placeholder (the one editable
-///                           field, set with C-c s s), the user's edited
-///                           title, NO id (none yet).
+///   * <edited title>     -- the CLONE-TO-BE C: the user's edited title,
+///                           NO id (none yet). Its (source ...) is the
+///                           resolved source when source_confirmed, else
+///                           the PICK-A-SOURCE placeholder, preceded by a
+///                           one-line suggestion comment the client
+///                           offers as the prompt's default.
 ///   ** <original title>  -- the ORIGINAL N that C overrides: its real id,
 ///                           real source, indefinitive,
 ///                           parentIs=independent, marked "pO".
 ///
-/// The clone's COMPUTED source (inferred from an owned ancestor, or the
-/// config-first owned default) is shown only as a SUGGESTION comment, so
-/// the user must make a deliberate choice rather than accept a silent
-/// default. The client shows this and asks the user to approve (re-save
-/// the origin with the chosen sources) or decline (kill the buffer).
-/// Every headline carries real (skg ...) metadata so the buffer stays
-/// navigable -- the usual ID-stack-push / search commands work on it.
+/// The client shows this and asks the user to approve (re-save the
+/// origin with the chosen sources) or decline (kill the buffer),
+/// prompting first for each placeholder. Every fork headline carries
+/// real (skg ...) metadata so the buffer stays navigable -- the usual
+/// ID-stack-push / search commands work on it.
 pub fn build_fork_confirmation_buffer (
   fork_specs : &[ForkSpec],
 ) -> String {
   let mut out : String = String::new ();
-  out . push_str ( & format! (
-    "# FORK CONFIRMATION (read-only except each clone's source)\n\
-     # Forking turns a node into an editable clone in a source you own,\n\
-     # which SUBSCRIBES TO and OVERRIDES the original. Below, each TOP\n\
-     # headline is the clone-to-be; its CHILD is the original it forks\n\
-     # (real id, marked \"pO\": its visible parent overrides it).\n\
-     # YOU MUST PICK A SOURCE for each clone before approving: put point\n\
-     #   on a clone-to-be headline and set its source with C-c s s. It\n\
-     #   starts as {}; a suggested source is noted above each clone.\n\
-     # APPROVE with C-c C-c -- it re-saves the origin, committing the\n\
-     #   forks into the sources you chose. (Approving before every\n\
-     #   clone's source is set is refused.)\n\
-     # DECLINE with C-c C-k (or kill this buffer): nothing is written.\n\n",
-    FORK_SOURCE_PLACEHOLDER ) );
+  out . push_str (
+    "* Fork confirmation -- what this buffer is\n\
+     Forking turns a node into an editable clone, in a source you\n\
+     own, that subscribes to and overrides the original. Each\n\
+     top-level headline below is a clone-to-be; its child is the\n\
+     original it forks (real id, marked \"pO\": its visible parent\n\
+     overrides it).\n\
+     APPROVE with C-c C-c: the origin buffer is re-saved, committing\n\
+     each fork into the source its clone-to-be shows. A clone still\n\
+     showing PICK-A-SOURCE needs a real source first: Emacs prompts\n\
+     for each, or set one yourself with C-c s s on the clone-to-be's\n\
+     headline.\n\
+     DECLINE with C-c C-k (or kill this buffer): nothing is written.\n" );
   for spec in fork_specs {
-    out . push_str ( & format! (
-      "# Suggested source for the clone below: {} (set it with C-c s s).\n",
-      spec . clone . 0 . source ));
+    let shown_source : &str =
+      if spec . source_confirmed {
+        // The user already specified it; show it as settled.
+        spec . clone . 0 . source . 0 . as_str ()
+      } else {
+        out . push_str ( & format! (
+          "# Suggested source for the clone below: {}\n",
+          spec . clone . 0 . source ));
+        FORK_SOURCE_PLACEHOLDER };
     out . push_str ( & format! (
       "* (skg (node (source {}) (viewStats (sourceHerald ⌂:{})))) {}\n",
-      FORK_SOURCE_PLACEHOLDER, FORK_SOURCE_PLACEHOLDER,
+      shown_source, shown_source,
       spec . clone . 0 . title ));
     out . push_str ( & format! (
       "** (skg (node (id {}) (source {}) (parentIs independent) indef \
@@ -277,6 +340,7 @@ pub fn build_fork_clone (
   disk_title    : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
   disk_contains : &[ID], // N's original (pre-edit) contains.
   clone_source  : SourceName,
+  source_confirmed : bool, // whether clone_source was user-SPECIFIED (vs inferred or defaulted)
 ) -> ForkSpec {
   let clone : NodeComplete = NodeComplete {
     title         : buffer_node . title . clone (),
@@ -302,6 +366,7 @@ pub fn build_fork_clone (
     // edited title above -- the two-level confirmation buffer shows both.
     original_title  : disk_title . to_string (),
     original_source : buffer_node . source . clone (),
+    source_confirmed,
   }}
 
 #[cfg(test)]

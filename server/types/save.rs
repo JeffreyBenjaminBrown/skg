@@ -79,6 +79,13 @@ pub struct ForkSpec {
   pub original_id     : ID,
   pub original_title  : String,
   pub original_source : SourceName,
+  /// True iff the clone's source was SPECIFIED by the user (in the
+  /// confirmation buffer, or via explicit sources on N's new children
+  /// in the saved metadata), as opposed to inferred or defaulted. A
+  /// confirmed source renders as settled in the confirmation buffer;
+  /// an unconfirmed one renders as the PICK-A-SOURCE placeholder plus
+  /// a suggestion, and the client asks before approving.
+  pub source_confirmed : bool,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',

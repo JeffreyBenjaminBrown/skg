@@ -27,6 +27,8 @@ use buffer_to_viewnodes::add_missing_info::{
   EnrichmentProvenance};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use fork::{
+  CloneSourceInputs,
+  explicit_new_child_sources_for_foreign_vognodes,
   fork_spec_from_buffer_node,
   new_foreign_nodes_adopting_clone_sources,
   owned_ancestor_sources_for_foreign_vognodes,
@@ -150,6 +152,16 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       . cloned () . collect ();
     new_foreign_nodes_adopting_clone_sources (
       &viewforest, & new_with_inherited_source, config ) };
+  let explicit_child_source : HashMap<ID, SourceName> = {
+    // A clone source the user already SPECIFIED, via explicit owned
+    // sources on the forked node's new children (fork-fixes Case 2):
+    // the confirmation flow shows it as settled instead of asking.
+    let new_with_explicit_source : HashSet<ID> =
+      enrichment . new_nodes
+      . difference (& enrichment . inherited_source_nodes)
+      . cloned () . collect ();
+    explicit_new_child_sources_for_foreign_vognodes (
+      &viewforest, & new_with_explicit_source, config ) };
   let default_clone_source : Option<SourceName> = {
     // The active-aware default for a fork whose source can be neither
     // user-set nor inferred: prefer the CONFIG-FIRST owned source that
@@ -167,6 +179,11 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         . find ( |name| active . contains_source (name) )
         . cloned () );
     active_owned . or_else ( || owned_in_order . into_iter () . next () ) };
+  let clone_source_inputs : CloneSourceInputs = CloneSourceInputs {
+    user_set          : fork_sources . clone (),
+    explicit_child    : explicit_child_source,
+    inferred_ancestor : owned_ancestor_source,
+    default           : default_clone_source, };
   let ( define_nodes, fork_specs )
     : ( Vec<DefineNode>, Vec<ForkSpec> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -174,9 +191,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       validate_and_filter_foreign_instructions (
         nonmerge_plan . define_nodes,
         &nodeMerge_instructions,
-        &owned_ancestor_source,
-        fork_sources,
-        default_clone_source . as_ref (),
+        &clone_source_inputs,
         &adopt_clone_source,
         config,
         driver )
@@ -197,8 +212,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     let mut specs : Vec<ForkSpec> = fork_specs;
     specs . extend (
       explicit_fork_specs_from_viewforest (
-        &viewforest, config, fork_sources,
-        default_clone_source . as_ref () )
+        &viewforest, config, &clone_source_inputs )
       . map_err ( |errors| SaveError::BufferValidationErrors {
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
@@ -228,17 +242,16 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
 /// built from N's current disk/graph snapshot (not the buffer): the
 /// client refuses to fork a dirty buffer, so disk == what the user sees,
 /// and N's own owned save proceeds separately. The clone source resolves
-/// user-set-else-config-first-owned; unlike the implicit foreign fork
-/// there is NO owned-ancestor inference (an empty inference map). D2's
-/// 'validate_fork_view_requests' has already rejected an unsaved or
-/// already-forked target, so this only builds.
+/// user-set-else-config-first-owned: the shared 'CloneSourceInputs'
+/// carries the explicit-child and inferred-ancestor maps too, but both
+/// are keyed by FOREIGN pids, so an owned fork target never hits them.
+/// D2's 'validate_fork_view_requests' has already rejected an unsaved
+/// or already-forked target, so this only builds.
 fn explicit_fork_specs_from_viewforest (
-  viewforest      : &ViewForest,
-  config          : &SkgConfig,
-  user_set_source : &HashMap<ID, SourceName>,
-  default_source  : Option<&SourceName>,
+  viewforest          : &ViewForest,
+  config              : &SkgConfig,
+  clone_source_inputs : &CloneSourceInputs,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
-  let no_inference : HashMap<ID, SourceName> = HashMap::new ();
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   let mut seen   : HashSet<ID> = HashSet::new ();
@@ -264,7 +277,7 @@ fn explicit_fork_specs_from_viewforest (
       // state, so the disk-contains diff is empty: an explicit fork
       // deletes nothing, hence hides nothing.
       & snapshot, & snapshot . title, & snapshot . contains,
-      & no_inference, user_set_source, default_source )
+      clone_source_inputs )
     { Ok (spec) => specs . push (spec),
       Err (e)   => errors . push (e), }}
   if ! errors . is_empty () { return Err (errors); }
