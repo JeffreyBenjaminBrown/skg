@@ -17,3 +17,6 @@ mod merge_acquiree_as_independent_root;
 
 #[path = "merge/merge_preserves_acquiree_child_bodies.rs"]
 mod merge_preserves_acquiree_child_bodies;
+
+#[path = "merge/merge_hides_intersection.rs"]
+mod merge_hides_intersection;

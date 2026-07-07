@@ -1,0 +1,5 @@
+pid: a
+title: "a"
+hides_from_its_subscriptions:
+- x
+- z

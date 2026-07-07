@@ -1,0 +1,6 @@
+pid: b
+title: "b"
+subscribes_to:
+- e
+hides_from_its_subscriptions:
+- y

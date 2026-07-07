@@ -178,3 +178,23 @@ are OVERLAYS, not buffer text -- committing reads titles, and a baked-
 in hint would corrupt the sexp. Two caveats: without a server
 connection there is no rule table, so no hints; and the hints show
 open-time values (S-left/right cycling does not refresh them).
+* DONE Take something like the intersection of hides when merging.
+If either member of the merger shows it pre-merger --
+which means it is contained in *and* unhidden from one of them --
+then the merge should show it.
+** Claude : done
+The merged hides are now the union MINUS everything either member
+SHOWED pre-merge, where "showed" follows the subscribee-as-such
+display rule: contained in one of that member's subscribees, and
+neither hidden by nor contained in that member. (A literal
+intersection would over-drop: a hide by A of something B never
+subscribed to would vanish though nobody's view contradicted it.
+Your rule is exactly the intersection whenever both members could
+see the id through some subscribee.) Ids a member showed as its OWN
+content were already handled: contains are unioned and the
+pre-existing filter drops hides of anything the merged node
+contains. Implemented in 'three_nodeMerged_nodecompletes' +
+'ids_shown_through_subscriptions'
+(server/nodeMerge/nodeMergeInstructionTriple.rs); regression test
+tests/merge/merge_hides_intersection.rs (x dropped because b showed
+it; y and z survive), verified to fail without the fix.

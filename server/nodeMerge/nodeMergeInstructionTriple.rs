@@ -1,6 +1,6 @@
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes;
-use crate::dbs::node_lookup::nodeComplete_rustFIrst_by_id;
+use crate::dbs::node_lookup::{nodeComplete_rustFIrst_by_id, optNodeComplete_rustFIrst_by_id};
 use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
@@ -125,10 +125,24 @@ async fn nodeMerge_from_acquirer_and_acquiree (
       config, driver, &acquiree_id ) . await?;
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);
+  let shown_pre_merge : HashSet<ID> = {
+    // Whatever EITHER member showed as unintegrated subscribed
+    // content before the merge, the merged node must keep showing
+    // (TODO/more.org, "Take something like the intersection of hides
+    // when merging"), so these ids are dropped from the combined
+    // hides below.
+    let mut shown : HashSet<ID> =
+      ids_shown_through_subscriptions (
+        &acquirer_from_disk, config, driver ) . await ?;
+    shown . extend (
+      ids_shown_through_subscriptions (
+        &acquiree_from_disk, config, driver ) . await ? );
+    shown };
   let updated_acquirer : NodeComplete =
     three_nodeMerged_nodecompletes( &acquirer_from_disk,
                            &acquiree_from_disk,
-                           &acquiree_text_preserver)?;
+                           &acquiree_text_preserver,
+                           &shown_pre_merge)?;
   Ok(NodeMerge {
     acquiree_text_preserver :
       SaveNode (acquiree_text_preserver),
@@ -145,11 +159,14 @@ async fn nodeMerge_from_acquirer_and_acquiree (
 /// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribes_to, overrides_view_of)
-/// - Filtered hides_from_its_subscriptions (can't hide your own content)
+/// - Filtered hides_from_its_subscriptions: can't hide your own
+///   content, and can't hide what either member SHOWED pre-merge
+///   ('shown_pre_merge')
 fn three_nodeMerged_nodecompletes(
   acquirer_from_disk: &NodeComplete,
   acquiree_from_disk: &NodeComplete,
   acquiree_text_preserver: &NodeComplete,
+  shown_pre_merge: &HashSet<ID>,
 ) -> Result<NodeComplete, String> {
   let mut updated_acquirer: NodeComplete =
     acquirer_from_disk . clone();
@@ -190,8 +207,14 @@ fn three_nodeMerged_nodecompletes(
       acquiree_from_disk . subscribes_to . or_default() );
     updated_acquirer . subscribes_to =
       MSV::Specified(dedup_vector (combined)); }
-  { // Combine hides_from_its_subscriptions,
-    // filtering to hide nothing that the acquirer contains.
+  { // Combine hides_from_its_subscriptions, filtering to hide
+    // nothing that the acquirer contains, and nothing either member
+    // SHOWED through its subscriptions pre-merge: if it was
+    // contained in one member's subscribee and unhidden by (and not
+    // contained in) that member, the merge keeps showing it -- one
+    // member's hide never silences the other's view. ("Something
+    // like the intersection": exactly the intersection when both
+    // members could see the id through some subscribee.)
     let mut combined : Vec<ID> =
       acquirer_from_disk . hides_from_its_subscriptions
       . or_default() . to_vec();
@@ -205,7 +228,10 @@ fn three_nodeMerged_nodecompletes(
             setlike_vector_subtraction(
                 dedup_vector (combined),
                 &new_contains);
-          deduped_and_filtered } ); }
+          deduped_and_filtered
+            . into_iter()
+            . filter ( |id| ! shown_pre_merge . contains (id) )
+            . collect() } ); }
   { // Combine overrides_view_of
     let mut combined : Vec<ID> =
       acquirer_from_disk . overrides_view_of
@@ -216,6 +242,28 @@ fn three_nodeMerged_nodecompletes(
     updated_acquirer . overrides_view_of =
       MSV::Specified(dedup_vector (combined)); }
   Ok (updated_acquirer) }
+
+/// The ids 'node' shows as unintegrated subscribed content: contained
+/// by some node it subscribes to, and neither hidden by it nor among
+/// its own contents (the subscribee-as-such display rule,
+/// docs/sharing-model.md). A subscribee with no disk entry
+/// contributes nothing.
+async fn ids_shown_through_subscriptions (
+  node   : &NodeComplete,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<HashSet<ID>, Box<dyn Error>> {
+  let mut shown : HashSet<ID> = HashSet::new ();
+  for subscribee_id in node . subscribes_to . or_default () {
+    let Some (subscribee) = optNodeComplete_rustFIrst_by_id (
+      config, driver, subscribee_id ) . await ?
+    else { continue; };
+    for id in & subscribee . contains {
+      if ! node . hides_from_its_subscriptions
+             . or_default () . contains (id)
+        && ! node . contains . contains (id)
+      { shown . insert ( id . clone () ); }} }
+  Ok (shown) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
