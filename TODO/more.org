@@ -3,8 +3,11 @@ please answer inline,
 marking the headline of your answer 'TODO'.
 
 If any of these were already done,
-please mark them 'DONE' in TODO.org.
-* BUG : aliases should be merged, not added
+please mark them 'DONE' in TODO.org
+(and here). Don't otherwise modify what I've written here,
+but feel free to add subheadlines anywhere, at any depth,
+somehow marking them for your voice.
+* DONE BUG : aliases should be merged, not added
 Aliases are being added rather than merged to the view.
 (Happens e.g. when saving a buffer with git diff mode on
 that already has aliases shown.)
@@ -12,6 +15,19 @@ that already has aliases shown.)
 Code for merging collections is already part of
 the view update exeecution path.
 It might be called correction, or completion.
+** Claude : fixed
+Your suspicion was right that the merging code exists -- the alias
+reconciler ('reconcile_alias_col_children') dedups fine. The bug was
+upstream: in diff mode, 'process_activeNode_diff'
+(server/to_org/render/diff.rs) prepended an EMPTY AliasCol whenever
+the alias list changed in git, without checking whether the node
+already carried one (a saved diff-mode buffer always does). Both
+cols then each reconciled to the full alias list, so every alias
+appeared twice. Now the existing col is reused; same guard added for
+the IDCol, which had the identical latent bug. Regression test:
+tests/git_diff_view/aliases/view.rs,
+'test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them'
+(verified to fail without the fix).
 * goto id should work from a raw .skg file
 If there's only one ID on that line,
 it should go to it even if it's not on the ID.
@@ -45,3 +61,8 @@ Change a link relationship into an ordinary content relationship. This orphans t
 ** a test case
 Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
 * Warn the user when they make dead links.
+* Show the herald it is responsible for next to each field in the metadata.
+That is, when the user uses C-c v m,
+each value that produces a herald should contain that herald,
+colored per herald rules, in (uncolored) parentheses,
+after the rest of the title.
