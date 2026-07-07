@@ -1,0 +1,47 @@
+If any of these are questions rather than requests for code,
+please answer inline,
+marking the headline of your answer 'TODO'.
+
+If any of these were already done,
+please mark them 'DONE' in TODO.org.
+* BUG : aliases should be merged, not added
+Aliases are being added rather than merged to the view.
+(Happens e.g. when saving a buffer with git diff mode on
+that already has aliases shown.)
+
+Code for merging collections is already part of
+the view update exeecution path.
+It might be called correction, or completion.
+* goto id should work from a raw .skg file
+If there's only one ID on that line,
+it should go to it even if it's not on the ID.
+If all IDs on that line are left of point we should visit the closest;
+if all are on the right, ditto.
+(If it's between two, that's ambiguous, so just say so and visit nothing.)
+* The skg diff report should report what vanished nodes used to be.
+The kind of node that would give
+"Parent references unknown node."
+should be investigated in the git history of all repos.
+If it's not there, say that;
+otherwise say at what commit it vanished,
+and what it was connected to (in every possible way) then.
+* Why does this search fail?
+** Searched "rt"-style for
+"dens.* AND (mean.* OR info.* OR know.*)"
+** got this error
+Error searching index: An invalid argument was passed: 'RegexQueryError: regex parse error:
+    (mean.*
+    ^
+error: unclosed group'
+* C-c g i should work from anywhere.
+Regardless of buffer type.
+* If indefinitive, add a B to that symbol where body is hidden.
+* when staging new files (C-c t [a|A]), explain if git diff mode off
+rather than acting like the user did it right
+and stating that 0 files were added
+* BUG :: make-content cleanup -> collateral view not found
+** the bug
+Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
+** a test case
+Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
+* Warn the user when they make dead links.
