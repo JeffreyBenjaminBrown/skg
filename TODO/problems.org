@@ -3,6 +3,24 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noted during the fork-fixes arc (TODO/fork-fixes.org)
+** Subscribee-as-such hides may misfire under a restricted source-set
+   The signal loop in 'resolve_visibility'
+   (server/from_text/local_instruction_collection/resolve_visibility.rs)
+   infers hides as: subscribee's disk contains, minus the children the
+   buffer shows, minus the subscriber's post-save contains. Under a
+   RESTRICTED source-set, rendering omits a subscribee's
+   inactive-source members from the view, so they are absent from the
+   signal's 'visible' list for a reason other than deletion -- yet the
+   loop would infer hides for them, silently writing
+   hides_from_its_subscriptions entries for members the user never
+   saw. The new sibling pass 'infer_hides_from_contains_removals'
+   guards exactly this with 'member_is_visible'; the older signal loop
+   does not. Narrow trigger (needs a definitive subscribee-as-such
+   saved under a restricted set, with the subscribee containing
+   inactive-source members); not fixed in the fork-fixes arc because
+   it is prior, separate behavior. Suggested fix: apply the same
+   member_is_visible filter to that loop's 'inferred_hides'.
 * Problems noted while writing forking-and-privacy.org
 ** Fork deliberate-pick rule is enforced only client-side
    docs/forks.md promises "approving before you have set every

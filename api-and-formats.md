@@ -69,6 +69,12 @@ So far there are these endpoints:
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
+    - Two optional fields drive the fork-confirmation round-trip
+      (below): `(fork-approved . "true")` marks a re-issued save whose
+      forks the user approved, and
+      `(fork-sources ((N . SOURCE) ...))` pairs each forked node's id
+      N with the owned source chosen for its clone. Both are absent on
+      an ordinary save.
     - `point-lines-below-focused-headline` is global to the buffer save: the number of text lines from the focused headline to point before save.
     - `point-column` is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
     - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
@@ -85,6 +91,19 @@ So far there are these endpoints:
     4. Final save response:
        `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))`
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of failure-explaining strings. `warnings` is a list of nonfatal messages. Both lists are present and empty if none.
+  - The ALTERNATIVE terminal message: a save that detects forks
+    (edited foreign nodes, or explicit fork requests) and does NOT
+    carry `(fork-approved . "true")` commits nothing and replies, in
+    place of save-result,
+    `((response-type fork-confirmation) (content "...") (to-minibuffer "..."))`,
+    where `content` is the fork-confirmation buffer (an instructions
+    headline, then per fork the clone-to-be over the original it
+    forks; an unspecified clone source renders as the PICK-A-SOURCE
+    placeholder under a `# Suggested source ...` comment). The client
+    shows it, collects a source per placeholder, and on approval
+    re-issues the SAME save with `(fork-approved . "true")` and
+    `(fork-sources ...)`. Exactly one of save-result and
+    fork-confirmation is sent.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Text search" above)

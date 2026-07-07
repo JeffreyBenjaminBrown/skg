@@ -115,7 +115,32 @@ jeff-should-weigh-in-on.org (repo root), not here.
   tests pass end-to-end.
 
 * Changes to the plan's envisioned order
+None: the four pieces landed in the planned order (hide-on-removal,
+Case 1, Case 2 server, Case 2 client), one commit each, docs last.
 
 * What's imperfect about what's done
+- The signal-wins-over-removal conflict guard (a child removed from
+  F's contains AND shown under a subscribee-as-such in the same save
+  is not hidden) is implemented but has no dedicated test: driving it
+  needs the subscribee-expansion dance, and the guard is one set
+  filter. Conscious gap.
+- The nvim client's new prompting flow is untested beyond the
+  existing fork integration tests (which run headless and so skip
+  it); nvim is not installed in this environment, so not even a
+  syntax check ran. The code mirrors the elisp closely and reuses
+  picker/metadata helpers.
+- A pre-existing neighbor bug was found, not fixed (out of scope):
+  the subscribee-as-such signal loop can infer hides for
+  inactive-source members under a restricted source-set. Reported in
+  TODO/problems.org with a suggested one-line fix.
 
 * Choices determining the future
+- "Specified in the saved metadata" is defined as: explicit owned
+  sources on the forked node's NEW immediate children, all agreeing.
+  Inferred-ancestor sources and sources riding on moved-in existing
+  nodes deliberately do not count. See jeff-should-weigh-in-on.org.
+- The hide-on-removal rule applies to every owned subscriber, not
+  only clones, and runs before the subscribee-as-such signals so
+  explicit subscription-view gestures always win.
+- A bare new node under a foreign parent lands in the CLONE's source
+  (one pick covers both). An explicitly-foreign new node still errors.
