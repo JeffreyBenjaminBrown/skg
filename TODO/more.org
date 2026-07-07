@@ -49,6 +49,28 @@ Error searching index: An invalid argument was passed: 'RegexQueryError: regex p
     (mean.*
     ^
 error: unclosed group'
+** TODO Claude : answer -- regex mode has no operator-level grouping
+In regex+operators mode ('build_regex_query',
+server/dbs/tantivy/search.rs), the query is split on WHITESPACE; the
+keywords AND / OR / NOT and the +/- prefixes are consumed as
+operators, and EVERY OTHER piece must be a valid regex on its own.
+Your "(mean.*" is such a piece: the "(" opens a regex group that
+never closes, hence Tantivy's RegexQueryError. Parentheses as
+operator-level grouping exist only on the non-regex QueryParser path
+(plain "t"-style with operators); the regex path never got a grouping
+layer.
+
+You don't need one for this query, though: regexes have alternation
+natively, so grouping can live INSIDE a single piece. This does what
+you meant:
+
+  dens.* AND (mean|info|know).*
+
+(one piece per required token; both pieces adjacent to AND become
+MUST). If you want operator-level parens in regex mode anyway --
+e.g. for mixing MUST_NOT into a group -- say so; it needs a small
+boolean-expression parser over the pieces in
+'regex_pieces_with_operators', where today's grammar is flat.
 * C-c g i should work from anywhere.
 Regardless of buffer type.
 * If indefinitive, add a B to that symbol where body is hidden.
@@ -58,8 +80,29 @@ and stating that 0 files were added
 * BUG :: make-content cleanup -> collateral view not found
 ** the bug
 Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
-** a test case
-Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
+** TODO Claude : could not reproduce; need the verbatim message
+I mirrored the shape (P contains linking node L, whose title is one
+big textlink to X) and tried deleting L via a save while OTHER
+registered views still held L three ways: as a child of an open view
+of P, as the ROOT of a second content view, and as the root of a
+search view. All complete with no errors or warnings; the collateral
+rerenders succeed. That attempt is kept as a regression test
+(tests/collateral_delete.rs).
+
+Two things would pin it down:
+1. The VERBATIM complaint. Candidates in the code are "Collateral
+   view <uri>: no viewforest found" and "View <uri>: no viewforest
+   found" (save vs rerender-all paths) -- but by construction both
+   look unreachable (the uri list and the forest map are the same
+   structure, read back-to-back) -- versus "Collateral view <uri>:
+   <some inner error>", which would mean a collateral RERENDER failed
+   and the interesting part is the inner error.
+2. Whether git diff mode was on at the time (my attempts ran with it
+   off), and whether the complaining buffer appeared at the save
+   itself or at a later rerender-all (diff-mode toggle / source-set
+   switch).
+If you can paste the exact message (or reproduce with
+data/logs/server.jsonl timing on), I can finish this.
 * Warn the user when they make dead links.
 * Show the herald it is responsible for next to each field in the metadata.
 That is, when the user uses C-c v m,
