@@ -32,6 +32,7 @@ fn node_report (
 fn abbreviations_use_enough_id_prefix_to_disambiguate () {
   let report : DiffReport =
     DiffReport {
+      vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::new (),
       buckets: vec! [
@@ -63,6 +64,7 @@ fn unchanged_contained_diff_lines_align_with_changed_lines () {
       ListDiffItem::Added (id ("new")) ]);
   let report : DiffReport =
     DiffReport {
+      vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
         (id ("keep"), "Keep".to_string ()),
@@ -94,6 +96,7 @@ fn container_relationship_renders_existing_containers_not_gained () {
         unchanged: vec! [id ("stay")] } ];
   let report : DiffReport =
     DiffReport {
+      vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
         (id ("old"), "Old".to_string ()),
@@ -140,6 +143,7 @@ fn unchanged_container_relationship_heading_is_explicit () {
         unchanged: vec! [id ("stay")] } ];
   let report : DiffReport =
     DiffReport {
+      vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
         (id ("stay"), "Stay".to_string ()) ]),
@@ -168,6 +172,7 @@ fn non_container_backward_relationships_render_as_signed_sets () {
         unchanged: vec! [id ("stay")] } ];
   let report : DiffReport =
     DiffReport {
+      vanished: Vec::new (),
       duplicate_ids: Vec::new (),
       titles: HashMap::from ([
         (id ("old"), "Old".to_string ()),

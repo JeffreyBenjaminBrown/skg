@@ -247,6 +247,56 @@ fn diff_analysis_reports_source_move_across_repos (
   Ok (( )) }
 
 #[test]
+fn diff_analysis_reports_vanished_nodes (
+) -> Result<(), Box<dyn Error>> {
+  // TODO/more.org: a node the worktree still references, though its
+  // file exists in no source, is investigated in git history: the
+  // report names the commit it vanished at and what it was connected
+  // to when last present. A reference that NEVER existed is reported
+  // as such.
+  let fixture : DiffFixture =
+    DiffFixture::new () ?;
+  fixture . write_node (
+    "p", "Parent", "", &["v", "ghost"] ) ?;
+  fixture . write_node (
+    "v", "Vanishing", "links [[id:w][kept]]", &["w"] ) ?;
+  fixture . write_node (
+    "w", "Kept", "", &[] ) ?;
+  fixture . commit_all ("initial") ?;
+  { // Delete v's file (p still refers to it) and commit. The commit
+    // helper's add_all does not stage deletions, so stage explicitly.
+    fs::remove_file ( fixture . source . join ("v.skg") ) ?;
+    let mut index : git2::Index = fixture . repo . index () ?;
+    index . update_all (["*"].iter (), None) ?;
+    index . write () ?;
+    fixture . commit_all ("delete v") ?; }
+  fixture . write_node (
+    // An unstaged worktree change, so the diff has changed paths.
+    "w", "Kept, retitled", "", &[] ) ?;
+  let report : String =
+    diff_analysis_report (
+      &fixture . config,
+      DiffSelection {
+        include_staged: true,
+        include_unstaged: true }) ?;
+  assert! ( report . contains ("* vanished nodes"),
+    "the vanished-nodes section must render:\n{}", report );
+  assert! ( report . contains ("** v\n"),
+    "v must be reported as vanished:\n{}", report );
+  assert! ( report . contains ("title when last present: Vanishing"),
+    "v's old title must be shown:\n{}", report );
+  assert! ( report . contains ("vanished at commit")
+            && report . contains ("delete v"),
+    "the vanishing commit must be named:\n{}", report );
+  assert! ( report . contains ("***** p (via contains)"),
+    "p's old reference to v must be shown:\n{}", report );
+  assert! ( report . contains ("***** contains\n****** w"),
+    "v's own old contains must be shown:\n{}", report );
+  assert! ( report . contains ("** ghost\n*** never present"),
+    "a never-existing reference must say so:\n{}", report );
+  Ok (( )) }
+
+#[test]
 fn diff_analysis_refuses_non_git_sources (
 ) -> Result<(), Box<dyn Error>> {
   let tmp : TempDir =

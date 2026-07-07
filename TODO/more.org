@@ -45,13 +45,29 @@ first-after-else-before behavior; I did NOT generalize the ambiguity
 rule to them, since e.g. point mid-title between the metadata ID and
 a link currently follows the link, and changing that seemed like its
 own decision. Tests in tests/elisp/test-skg-id-search.el.
-* The skg diff report should report what vanished nodes used to be.
+* DONE The skg diff report should report what vanished nodes used to be.
 The kind of node that would give
 "Parent references unknown node."
 should be investigated in the git history of all repos.
 If it's not there, say that;
 otherwise say at what commit it vanished,
 and what it was connected to (in every possible way) then.
+** Claude : done
+The diff report ends with a new top-level section, "vanished nodes
+(referenced, but existing in no source)" -- rendered even when empty,
+like the other categories. A dangling id (referenced by some
+worktree node's contains / subscribes_to / hides / overrides, present
+nowhere) is investigated by one first-parent walk per source repo
+(server/diff_analysis/vanished.rs): if never present anywhere, it
+says so; otherwise it reports the source, the last-present commit,
+the vanishing commit (the first-parent descendant lacking the file,
+each with short sha, date, summary), the node's title and its own
+relationship lists then, and everything that referred to it then --
+contains, subscribes_to, hides, overrides, and textlinks. Note the
+investigation only runs when the diff has changed paths (the
+no-changes early exit still yields an all-empty report), and dead
+TEXTLINK targets are not treated as vanished nodes (they degrade to
+text, and the new save-time dead-link warning covers them).
 * Why does this search fail?
 ** Searched "rt"-style for
 "dens.* AND (mean.* OR info.* OR know.*)"

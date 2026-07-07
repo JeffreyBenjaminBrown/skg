@@ -57,7 +57,8 @@ fn diff_snapshots_with_pid_filter (
   DiffReport {
     duplicate_ids,
     titles,
-    buckets }
+    buckets,
+    vanished : Vec::new () } // filled by the caller (mod.rs), which has the config
 }
 
 fn graph_facts_for_diff (
