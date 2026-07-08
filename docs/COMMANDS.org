@@ -58,8 +58,9 @@ headline) and abandons the search.
   work; intra-word operator chars get escaped so =foo:bar=
   remains findable). In regex mode, AND / OR / NOT / +foo /
   -bar combine the per-piece RegexQueries at the document
-  level; phrase syntax does not apply there. See the regex=true
-  section below.
+  level, with conventional precedence and grouping by
+  stand-alone parens; phrase syntax does not apply there. See
+  the regex=true section below.
 **** Query syntax with default axes (phrase/operators=false, regex=false)
 Queries are literal. The query string is split on whitespace,
 and any word containing a Tantivy operator character
@@ -95,6 +96,14 @@ prefix search ('history', 'historical'), and =polit.* scien.*=
 combines two such prefix searches. Combine with body=true to
 also search body fields.
 
+The regex *flavor is Rust's* (the =regex= crate), not Emacs's.
+The inversion that bites Emacs users: bare parens =(...)= group
+and bare pipe =|= alternates, while =\(= and =\)= are LITERAL
+parens. =(cat|dog).*= is one valid piece; the Emacs-style
+=\(cat\|dog\).*= would match only tokens containing literal
+parens and pipes. A pattern must match the WHOLE token
+(anchored), and tokens are lowercase.
+
 The *=*= gotcha*: in regex =*= means "zero or more of the
 previous character", NOT "any characters" (that's =.*=). So
 =sci*= matches the tokens =sc=, =sci=, =scii=, … — not
@@ -104,18 +113,33 @@ With operators=false, pieces are OR'd (SHOULD-combined)
 like the non-regex default.
 
 With phrase/operators=true (the wire flag is still
-=operators=true=), the keywords =AND= / =OR= / =NOT= and the
-prefixes =+piece= / =-piece= combine the per-piece RegexQueries
-at the document level:
+=operators=true=), the query is parsed as a boolean expression
+over the pieces:
+- Keywords: =AND=, =OR=, =NOT= (consumed, never matched as
+  patterns). Bare adjacency between pieces means OR.
+- Precedence is conventional: =NOT= binds tightest, then =AND=,
+  then =OR=. So =poli.* AND sci.* OR fish.*= means
+  "(poli.* AND sci.*) OR fish.*".
+- *Grouping*: a paren is an operator-grouping token if and only
+  if it stands ALONE between whitespace. =( poli.* AND sci.* )
+  OR fish.*= groups; =poli.* AND ( sci.* OR fish.* )= overrides
+  precedence. A paren ATTACHED to a pattern is regex syntax
+  inside that piece, so =(cat|dog).*= still works. Groups nest.
+- =NOT piece= (or the prefix =-piece=) excludes its piece
+  within the enclosing group; =+piece= requires it even in an
+  OR group. A group holding ONLY exclusions matches nothing
+  (there is no positive clause to anchor it).
+- Malformed operator syntax — a lone unbalanced paren, a
+  dangling =AND= / =OR=, an empty query — is rejected with an
+  explanatory error rather than silently reinterpreted.
+Examples:
 - =poli.* AND sci.*= — documents whose tokens include one
   matching =poli.*= AND one matching =sci.*=.
 - =poli.* NOT bio.*= — documents matching =poli.*= and NOT
   any token matching =bio.*=.
 - =+poli.* -bio.*= — same as above, without the keywords.
-- =poli.* OR sci.*= — explicit OR, same as the default.
-Keywords are consumed rather than matched as patterns. An
-=AND= adjacent to a piece on either side promotes that piece
-to MUST.
+- =( poli.* AND sci.* ) OR fish.*= — the grouped conjunction,
+  or anything with a token matching =fish.*=.
 **** Caveats
 - Each alias is indexed as its own document, so a query can
   match on an alias even when the title doesn't mention the

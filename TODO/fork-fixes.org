@@ -194,15 +194,16 @@ decorations (existence axes, textChanged, id/alias diff cols) are
 unchanged. Pinned by 'test_no_ghosts_under_indefinitive_occurrence'
 (tests/git_diff_view/content/view.rs), verified to fail without the
 fix.
-* AWAITS : tantivy operator grouping
-** finds something : cat.* AND dog.*
-** finds nothing : \(cat.* AND dog.\)*
-** rejected : (cat.* AND dog.*)
+* DONE : tantivy operator grouping
+** initial complaint
+*** finds something : cat.* AND dog.*
+*** finds nothing : \(cat.* AND dog.\)*
+*** rejected : (cat.* AND dog.*)
 Error searching index: An invalid argument was passed: 'RegexQueryError: regex parse error:
     (cat.*
     ^
 error: unclosed group'
-** either this is a bug
+*** either this is a bug
 or I don't understand how to group operators
 *** Claude: neither, quite -- there is no operator grouping, and the regex flavor is Rust's, not Emacs's.
 How regex search works ('build_regex_query' in
@@ -225,7 +226,7 @@ piece they sit in. Hence your three cases:
   the RegexQueryError you saw.
 Grouping DOES work at the regex level within one whitespace-free
 piece: '(cat|dog).*' is a single valid piece and works today.
-*** TODO (by Claude for Jeff) do you want operator-level grouping built?
+*** DONE (was: by Claude for Jeff) do you want operator-level grouping built?
 Nested boolean queries like '( cat.* AND dog.* ) OR fish.*' are
 implementable (Tantivy's BooleanQuery nests). The syntax question
 is yours to settle: since '(' can also open a regex group inside a
@@ -235,6 +236,41 @@ A lone '(' piece is currently just an invalid-regex error, so that
 syntax would break nothing that works today. If you want it, also
 say where precedence should fall -- conventional would be
 NOT > AND > OR, with bare adjacency staying OR.
+**** DONE
+Let's go with those defaults -- conventional precedence,
+and parens are interpreted for grouping
+if and only if surrounded by whitespace.
+
+Also (mauybe this is already done,
+but it surely needs extension for these changes at the least)
+make sure that docs/COMMANDS.org explains all these weird search capabilities.
+***** Claude: built, 2026-07-08.
+- Regex-mode operator queries now parse as boolean expressions
+  ('parse_regex_operator_query' in server/dbs/tantivy/search.rs):
+  NOT binds tightest, then AND, then OR; bare adjacency is OR; and
+  a paren groups iff it stands alone between whitespace. Attached
+  parens stay regex syntax, so '(cat|dog).*' works as before.
+  Groups nest. Malformed operator syntax (a lone unbalanced paren,
+  a dangling keyword, an empty query) errors with an explanation
+  instead of the raw RegexQueryError.
+- One deliberate semantic change rides along: precedence replaces
+  the old flat rule where a piece adjacent to AND was promoted to
+  MUST. 'x y AND z' now means 'x OR (y AND z)'; before it meant
+  "y and z required, x optional". The four operator examples the
+  docs give behave exactly as before
+  ('test_search_regex_with_operators' passes unmodified).
+- New coverage: 'test_search_regex_operator_grouping'
+  (tests/tantivy.rs) pins grouping, precedence, parens overriding
+  precedence, NOT inside a group, regex-internal parens, and the
+  unbalanced-paren error.
+- docs/COMMANDS.org's search section now also explains: the
+  grammar and precedence, the stand-alone-paren rule, the
+  Rust-vs-Emacs regex flavor inversion ('\(' is LITERAL there,
+  bare '(' groups), whole-token anchoring and lowercasing, the '*'
+  gotcha (already present), and the loud-error behavior. The
+  wire-level summary in api-and-formats.md says the same. The
+  non-regex operators mode and the literal default were already
+  documented and are unchanged.
 * DONE Any new 'hiddenInSubscribee' or 'hiddenOutOfSubscribee' (I've mangled those names a little) collection should begin folded.
 ** Claude: done 2026-07-08.
 (The real names: 'hiddenInSubscribeeCol' and

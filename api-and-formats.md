@@ -16,7 +16,7 @@ So far there are these endpoints:
     - `regex`, `body`, `operators` are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
-      - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, AND / OR / NOT / +foo / -bar combine per-token regexes at the document level; phrase syntax does not apply.
+      - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, the query is parsed as a boolean expression over the per-token regexes: AND / OR / NOT / +foo / -bar, conventional precedence (NOT > AND > OR, bare adjacency = OR), and grouping via parens that stand ALONE between whitespace (a paren attached to a pattern is regex syntax within that piece). Malformed operator syntax is an error; phrase syntax does not apply. Detailed in docs/COMMANDS.org.
     - The active source-set is applied before grouping, ranking,
       alias/title selection, and display truncation. Inactive-source
       documents do not influence result order or which title/alias is

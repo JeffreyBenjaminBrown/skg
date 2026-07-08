@@ -571,6 +571,93 @@ fn test_search_regex_with_operators (
               "OR should match 'biology' (got {:?})", ids ); }
   Ok (( )) }
 
+/// Regex + operators, grouping (TODO/fork-fixes.org): parens that
+/// stand ALONE between whitespace group operator expressions;
+/// precedence is conventional (NOT > AND > OR, adjacency = OR);
+/// a paren ATTACHED to a pattern stays regex syntax; a lone
+/// unbalanced paren is a loud error.
+#[test]
+fn test_search_regex_operator_grouping (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty : NodeComplete = empty_node_complete ();
+  let mk = |pid : &str, title : &str| -> NodeComplete {
+    let mut n : NodeComplete = empty . clone ();
+    n . pid = ID::new (pid);
+    n . title = title . to_string ();
+    n };
+  let nodes : Vec<NodeComplete> = vec! [
+    mk ("polsci",  "political science"),
+    mk ("polbio",  "political biology"),
+    mk ("scibio",  "science biology"),
+    mk ("bio",     "biology"),
+    mk ("fish",    "fishing"),
+    mk ("polfish", "political fishing") ];
+  let (ti, _) : (TantivyIndex, usize) =
+    wipe_then_init_tantivy_db (
+      &nodes,
+      Path::new ("/tmp/tantivy-test-regex-grouping") ) ?;
+  let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let opts : SearchOptions =
+      SearchOptions { regex: true, operators: true,
+                      ..SearchOptions::default () };
+    let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
+    let mut ids : Vec<String> = Vec::new ();
+    for (_, addr) in &matches {
+      let doc : TantivyDocument = searcher . doc (*addr) ?;
+      ids . push (
+        doc . get_first (ti . id_field) . unwrap ()
+        . as_str () . unwrap () . to_string () ); }
+    Ok (ids) };
+  let assert_set = | label : &str, ids : &[String],
+                     inside : &[&str], outside : &[&str] | {
+    for id in inside {
+      assert! ( ids . contains (&id . to_string ()),
+                "{}: should match '{}' (got {:?})", label, id, ids ); }
+    for id in outside {
+      assert! ( ! ids . contains (&id . to_string ()),
+                "{}: should NOT match '{}' (got {:?})", label, id, ids ); }};
+  { let ids : Vec<String> =
+      gather ("( poli.* AND sci.* ) OR fish.*") ?;
+    assert_set ( "grouped AND under OR", &ids,
+                 &["polsci", "fish", "polfish"],
+                 &["polbio", "scibio", "bio"] ); }
+  { // Same expression without parens: AND binds tighter than OR.
+    let ids : Vec<String> =
+      gather ("poli.* AND sci.* OR fish.*") ?;
+    assert_set ( "precedence AND > OR", &ids,
+                 &["polsci", "fish", "polfish"],
+                 &["polbio", "scibio", "bio"] ); }
+  { // Parens override precedence.
+    let ids : Vec<String> =
+      gather ("poli.* AND ( sci.* OR fish.* )") ?;
+    assert_set ( "grouped OR under AND", &ids,
+                 &["polsci", "polfish"],
+                 &["fish", "polbio", "scibio", "bio"] ); }
+  { // NOT inside a group excludes within it.
+    let ids : Vec<String> =
+      gather ("( sci.* NOT bio.* )") ?;
+    assert_set ( "NOT inside a group", &ids,
+                 &["polsci"],
+                 &["scibio", "bio"] ); }
+  { // A paren attached to a pattern is regex syntax, not grouping.
+    let ids : Vec<String> =
+      gather ("(poli|fish).*") ?;
+    assert_set ( "regex-internal parens", &ids,
+                 &["polsci", "polbio", "fish", "polfish"],
+                 &["scibio", "bio"] ); }
+  { // A lone unbalanced paren errors loudly.
+    let opts : SearchOptions =
+      SearchOptions { regex: true, operators: true,
+                      ..SearchOptions::default () };
+    let err : String =
+      search_index (&ti, "( cat.*", &opts)
+      . err () . expect ("unclosed lone '(' should error")
+      . to_string ();
+    assert! ( err . contains ("unclosed '('"),
+              "error should explain the unclosed paren (got: {})",
+              err ); }
+  Ok (( )) }
+
 #[test]
 fn test_title_by_id_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {

@@ -10,7 +10,7 @@ use crate::types::misc::TantivyIndex;
 
 use tantivy::Searcher;
 use tantivy::collector::TopDocs;
-use tantivy::query::{QueryParser, Query};
+use tantivy::query::{BooleanQuery, Occur, Query, QueryParser, RegexQuery};
 use tantivy::schema;
 
 /// Options for `search_index`. Defaults: all false — literal search
@@ -97,105 +97,246 @@ fn build_parser_query (
 /// With operators=false, pieces are SHOULD-combined (OR) — mirroring
 /// the OR-between-words default of the parser path.
 ///
-/// With operators=true, the keywords AND / OR / NOT and the
-/// prefixes +foo / -foo combine pieces at the document level:
-/// `+foo` and a piece adjacent to `AND` become MUST; `-foo` and a
-/// piece preceded by `NOT` become MUST_NOT; everything else is
-/// SHOULD. Keywords are consumed rather than being treated as
-/// patterns.
+/// With operators=true, the pattern is parsed as a boolean
+/// expression over the pieces ('parse_regex_operator_query'):
+/// AND / OR / NOT with conventional precedence, +foo / -foo
+/// prefixes, and grouping via parens that stand ALONE between
+/// whitespace (TODO/fork-fixes.org).
 fn build_regex_query (
   tantivy_index : &TantivyIndex,
   pattern       : &str,
   body          : bool,
   operators     : bool,
 ) -> Result < Box < dyn Query >, Box < dyn std::error::Error >> {
-  use tantivy::query::{BooleanQuery, Occur, RegexQuery};
   let fields : Vec<schema::Field> =
     if body {
       vec! [ tantivy_index . title_or_alias_field,
              tantivy_index . body_field ]
     } else {
       vec! [ tantivy_index . title_or_alias_field ] };
-  let assignments : Vec<(Occur, String)> =
-    if operators { regex_pieces_with_operators (pattern) }
-    else         { regex_pieces_plain         (pattern) };
-  // Fall back to the raw pattern if parsing yielded nothing (e.g.
-  // pattern is all whitespace or all keywords). Tantivy will then
-  // surface whatever error it emits for that input.
-  let effective : Vec<(Occur, String)> =
-    if assignments . is_empty () {
-      vec! [ ( Occur::Should, pattern . to_string () ) ]
-    } else { assignments };
+  if operators {
+    let expr : RegexOpExpr =
+      parse_regex_operator_query (pattern)
+      . map_err ( |e| -> Box<dyn std::error::Error> { e . into () } ) ?;
+    return regex_op_expr_to_query (&expr, &fields); }
+  let pieces : Vec<String> =
+    pattern . split_whitespace ()
+    . map (str::to_string)
+    . collect ();
+  // Fall back to the raw pattern if splitting yielded nothing (an
+  // all-whitespace pattern). Tantivy will then surface whatever
+  // error it emits for that input.
+  let effective : Vec<String> =
+    if pieces . is_empty () { vec! [ pattern . to_string () ] }
+    else { pieces };
   let mut clauses : Vec<(Occur, Box<dyn Query>)> =
     Vec::with_capacity ( effective . len () );
-  for (occur, piece) in &effective {
-    let mut per_field : Vec<(Occur, Box<dyn Query>)> =
-      Vec::with_capacity ( fields . len () );
-    for field in &fields {
-      let rq : RegexQuery =
-        RegexQuery::from_pattern (piece, *field) ?;
-      per_field . push (
-        ( Occur::Should,
-          Box::new (rq) as Box<dyn Query> )); }
-    let piece_query : Box<dyn Query> =
-      if per_field . len () == 1 {
-        per_field . pop () . unwrap () . 1
-      } else {
-        Box::new ( BooleanQuery::new (per_field) ) };
-    clauses . push ( (*occur, piece_query) ); }
-  if clauses . len () == 1 && clauses [0] . 0 == Occur::Should {
+  for piece in &effective {
+    clauses . push (
+      ( Occur::Should,
+        regex_piece_query (piece, &fields) ? )); }
+  if clauses . len () == 1 {
     let (_, q) : (Occur, Box<dyn Query>) =
       clauses . pop () . unwrap ();
     return Ok (q); }
   Ok ( Box::new ( BooleanQuery::new (clauses) ) ) }
 
-/// Plain split: every non-empty piece becomes a SHOULD clause.
-fn regex_pieces_plain (
-  pattern : &str,
-) -> Vec < (tantivy::query::Occur, String) > {
-  pattern . split_whitespace ()
-    . map ( |w| (tantivy::query::Occur::Should, w . to_string ()) )
-    . collect () }
+/// Turn a parsed operator expression into a Tantivy query.
+/// - An Or group SHOULD-combines its positive children; an And group
+///   MUST-combines them. In either group, a Not child contributes a
+///   MUST_NOT clause and a Must child ('+piece') a MUST clause.
+/// - A group holding ONLY exclusions matches nothing (Tantivy needs
+///   a positive clause), same as the pre-grouping behavior of a
+///   lone 'NOT x'.
+fn regex_op_expr_to_query (
+  expr   : &RegexOpExpr,
+  fields : &[schema::Field],
+) -> Result < Box < dyn Query >, Box < dyn std::error::Error >> {
+  let group_clauses =
+    | children : &[RegexOpExpr], positive : Occur |
+    -> Result < Vec<(Occur, Box<dyn Query>)>,
+                Box < dyn std::error::Error >> {
+      let mut clauses : Vec<(Occur, Box<dyn Query>)> =
+        Vec::with_capacity ( children . len () );
+      for child in children {
+        clauses . push ( match child {
+          RegexOpExpr::Not (inner) =>
+            ( Occur::MustNot,
+              regex_op_expr_to_query (inner, fields) ? ),
+          RegexOpExpr::Must (inner) =>
+            ( Occur::Must,
+              regex_op_expr_to_query (inner, fields) ? ),
+          other =>
+            ( positive,
+              regex_op_expr_to_query (other, fields) ? ), } ); }
+      Ok (clauses) };
+  match expr {
+    RegexOpExpr::Piece (pat) =>
+      regex_piece_query (pat, fields),
+    RegexOpExpr::Or (children) =>
+      Ok ( Box::new ( BooleanQuery::new (
+        group_clauses (children, Occur::Should) ? ))),
+    RegexOpExpr::And (children) =>
+      Ok ( Box::new ( BooleanQuery::new (
+        group_clauses (children, Occur::Must) ? ))),
+    RegexOpExpr::Not (inner) =>
+      // Reachable only as the whole query (groups intercept their
+      // Not children above): a bare exclusion matches nothing.
+      Ok ( Box::new ( BooleanQuery::new ( vec! [
+        ( Occur::MustNot,
+          regex_op_expr_to_query (inner, fields) ? ) ] ))),
+    RegexOpExpr::Must (inner) =>
+      regex_op_expr_to_query (inner, fields), } }
 
-/// Parse a regex query with operator syntax. Keywords AND / OR /
-/// NOT are consumed; +foo and -foo force the occurrence of that
-/// piece; piece adjacent to AND becomes MUST; piece preceded by
-/// NOT becomes MUST_NOT. Empty patterns (e.g. a bare +) are
-/// dropped.
-fn regex_pieces_with_operators (
+/// One whitespace-delimited regex piece, matched against every
+/// searched field (SHOULD across fields: a hit in any field counts).
+fn regex_piece_query (
+  piece  : &str,
+  fields : &[schema::Field],
+) -> Result < Box < dyn Query >, Box < dyn std::error::Error >> {
+  let mut per_field : Vec<(Occur, Box<dyn Query>)> =
+    Vec::with_capacity ( fields . len () );
+  for field in fields {
+    let rq : RegexQuery =
+      RegexQuery::from_pattern (piece, *field) ?;
+    per_field . push (
+      ( Occur::Should,
+        Box::new (rq) as Box<dyn Query> )); }
+  Ok ( if per_field . len () == 1 {
+         per_field . pop () . unwrap () . 1
+       } else {
+         Box::new ( BooleanQuery::new (per_field) ) } ) }
+
+/// The parsed shape of a regex-mode operator query. Pieces are
+/// whitespace-delimited regex patterns. 'Must' wraps a '+piece';
+/// 'Not' wraps a NOT operand or a '-piece'.
+#[derive (Clone, Debug, PartialEq)]
+enum RegexOpExpr {
+  Or    (Vec<RegexOpExpr>),
+  And   (Vec<RegexOpExpr>),
+  Not   (Box<RegexOpExpr>),
+  Must  (Box<RegexOpExpr>),
+  Piece (String),
+}
+
+/// Parse a regex-mode operator query (TODO/fork-fixes.org). The
+/// pattern is split on whitespace; the grammar, in conventional
+/// precedence (NOT binds tightest, then AND, then OR; bare
+/// adjacency is OR):
+///
+///   or      := and ( 'OR'? and )*
+///   and     := not ( 'AND' not )*
+///   not     := 'NOT' not | primary
+///   primary := '(' or ')' | piece
+///
+/// A paren is a GROUPING token only when it stands alone between
+/// whitespace; attached to a pattern it is ordinary (Rust-flavor)
+/// regex syntax inside that piece, so '(cat|dog).*' still works.
+/// '+piece' / '-piece' force that piece to MUST / MUST_NOT within
+/// its group. Double negation cancels. Malformed operator syntax
+/// (an unbalanced lone paren, a dangling keyword, an empty query)
+/// is a loud error, never silently reinterpreted.
+fn parse_regex_operator_query (
   pattern : &str,
-) -> Vec < (tantivy::query::Occur, String) > {
-  use tantivy::query::Occur;
-  let pieces : Vec<&str> =
+) -> Result < RegexOpExpr, String > {
+  let tokens : Vec<&str> =
     pattern . split_whitespace () . collect ();
-  let is_keyword = | w : &str | -> bool {
-    w == "AND" || w == "OR" || w == "NOT" };
-  let mut result : Vec<(Occur, String)> = Vec::new ();
-  let mut i : usize = 0;
-  while i < pieces . len () {
-    let w : &str = pieces [i];
-    if is_keyword (w) { i += 1; continue; }
-    let (pat, forced) : (&str, Option<Occur>) =
-      if let Some (rest) = w . strip_prefix ('+') {
-        (rest, Some (Occur::Must))
-      } else if let Some (rest) = w . strip_prefix ('-') {
-        (rest, Some (Occur::MustNot))
+  let mut pos : usize = 0;
+  let expr : RegexOpExpr =
+    parse_or_expr (&tokens, &mut pos) ?;
+  if pos < tokens . len () {
+    // parse_or_expr only stops early at a ')' it did not open.
+    return Err ( "operator syntax: unmatched ')'. A paren alone \
+                  between spaces groups operators; to use ')' inside \
+                  a regex, attach it to its pattern." . to_string () ); }
+  Ok (expr) }
+
+fn parse_or_expr (
+  tokens : &[&str],
+  pos    : &mut usize,
+) -> Result < RegexOpExpr, String > {
+  let mut operands : Vec<RegexOpExpr> =
+    vec! [ parse_and_expr (tokens, pos) ? ];
+  loop {
+    match tokens . get (*pos) {
+      None => break,
+      Some (&")") => break, // the enclosing parse_primary consumes it
+      Some (&"OR") => {
+        *pos += 1;
+        operands . push ( parse_and_expr (tokens, pos) ? ); }
+      Some (_) => {
+        // bare adjacency is OR
+        operands . push ( parse_and_expr (tokens, pos) ? ); }} }
+  Ok ( if operands . len () == 1 { operands . pop () . unwrap () }
+       else { RegexOpExpr::Or (operands) } ) }
+
+fn parse_and_expr (
+  tokens : &[&str],
+  pos    : &mut usize,
+) -> Result < RegexOpExpr, String > {
+  let mut operands : Vec<RegexOpExpr> =
+    vec! [ parse_not_expr (tokens, pos) ? ];
+  while tokens . get (*pos) == Some (&"AND") {
+    *pos += 1;
+    operands . push ( parse_not_expr (tokens, pos) ? ); }
+  Ok ( if operands . len () == 1 { operands . pop () . unwrap () }
+       else { RegexOpExpr::And (operands) } ) }
+
+fn parse_not_expr (
+  tokens : &[&str],
+  pos    : &mut usize,
+) -> Result < RegexOpExpr, String > {
+  if tokens . get (*pos) == Some (&"NOT") {
+    *pos += 1;
+    let inner : RegexOpExpr =
+      parse_not_expr (tokens, pos) ?;
+    Ok ( match inner {
+      RegexOpExpr::Not (x) => *x, // double negation cancels
+      other => RegexOpExpr::Not ( Box::new (other) ), } )
+  } else {
+    parse_primary_expr (tokens, pos) }}
+
+fn parse_primary_expr (
+  tokens : &[&str],
+  pos    : &mut usize,
+) -> Result < RegexOpExpr, String > {
+  match tokens . get (*pos) {
+    None =>
+      Err ( "operator syntax: expected a pattern, found the end of \
+             the query." . to_string () ),
+    Some (&"(") => {
+      *pos += 1;
+      let inner : RegexOpExpr =
+        parse_or_expr (tokens, pos) ?;
+      if tokens . get (*pos) == Some (&")") {
+        *pos += 1;
+        Ok (inner)
       } else {
-        (w, None) };
-    if pat . is_empty () { i += 1; continue; }
-    let occur : Occur =
-      if let Some (f) = forced { f }
-      else {
-        let prev_not : bool =
-          i > 0 && pieces [i - 1] == "NOT";
-        let prev_and : bool =
-          i > 0 && pieces [i - 1] == "AND";
-        let next_and : bool =
-          i + 1 < pieces . len () && pieces [i + 1] == "AND";
-        if prev_not          { Occur::MustNot }
-        else if prev_and
-             || next_and      { Occur::Must }
-        else                  { Occur::Should } };
-    result . push ( (occur, pat . to_string ()) );
-    i += 1; }
-  result }
+        Err ( "operator syntax: unclosed '('. A paren alone between \
+               spaces groups operators; to use '(' inside a regex, \
+               attach it to its pattern." . to_string () ) }}
+    Some (&")") =>
+      Err ( "operator syntax: expected a pattern, found ')'."
+            . to_string () ),
+    Some (&"AND") | Some (&"OR") =>
+      Err ( format! (
+        "operator syntax: '{}' needs a pattern on each side.",
+        tokens [*pos] )),
+    Some (&tok) => {
+      *pos += 1;
+      if let Some (rest) = tok . strip_prefix ('+') {
+        if rest . is_empty () {
+          Err ( "operator syntax: '+' needs a pattern attached."
+                . to_string () )
+        } else {
+          Ok ( RegexOpExpr::Must ( Box::new (
+            RegexOpExpr::Piece ( rest . to_string () )))) }
+      } else if let Some (rest) = tok . strip_prefix ('-') {
+        if rest . is_empty () {
+          Err ( "operator syntax: '-' needs a pattern attached."
+                . to_string () )
+        } else {
+          Ok ( RegexOpExpr::Not ( Box::new (
+            RegexOpExpr::Piece ( rest . to_string () )))) }
+      } else {
+        Ok ( RegexOpExpr::Piece ( tok . to_string () )) }} }}
