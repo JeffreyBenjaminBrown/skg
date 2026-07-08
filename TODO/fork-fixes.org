@@ -169,9 +169,24 @@ foreign repo can conflict on (or quietly reintroduce) the whitespace.
 If you would rather it skip foreign sources -- or ask per source --
 say so; either is a small change in
 'strip_body_whitespace_on_disk'.
-* TODO document that new strip space command in docs/COMMANDS.org.
-* Don't insert git ghosts under indefinitive nodes.
-* BUG : tantivy operator grouping
+* DONE document that new strip space command in docs/COMMANDS.org.
+** Claude: done 2026-07-08.
+Added 'skg-strip-trailing-whitespace-from-bodies' to
+docs/COMMANDS.org, under "connection, reload, rebuild dbs", beside
+'skg-rebuild-dbs'.
+* DONE Don't insert git ghosts under indefinitive nodes.
+** Claude: done 2026-07-08.
+'process_activeNode_diff' (server/to_org/render/diff.rs) now skips
+removed-member phantom insertion when the node is drawn
+indefinitive: an indefinitive node draws none of its worktree
+children, so a ghost under it would show the node's DELETED
+children while its kept children go unshown. Its definitive
+occurrence (or a wider view) still carries them. The node's own
+decorations (existence axes, textChanged, id/alias diff cols) are
+unchanged. Pinned by 'test_no_ghosts_under_indefinitive_occurrence'
+(tests/git_diff_view/content/view.rs), verified to fail without the
+fix.
+* AWAITS : tantivy operator grouping
 ** finds something : cat.* AND dog.*
 ** finds nothing : \(cat.* AND dog.\)*
 ** rejected : (cat.* AND dog.*)
@@ -181,3 +196,51 @@ Error searching index: An invalid argument was passed: 'RegexQueryError: regex p
 error: unclosed group'
 ** either this is a bug
 or I don't understand how to group operators
+*** Claude: neither, quite -- there is no operator grouping, and the regex flavor is Rust's, not Emacs's.
+How regex search works ('build_regex_query' in
+server/dbs/tantivy/search.rs): the query is split on WHITESPACE
+into pieces; each piece becomes its own per-token RegexQuery
+(indexed tokens never contain spaces, so a regex spanning a space
+could never match anything); the keywords AND / OR / NOT between
+pieces only set each piece's occurrence (must / must-not / should)
+at the document level, with no nesting. Parentheses are never
+operator grouping -- they reach the regex engine inside whichever
+piece they sit in. Hence your three cases:
+- 'cat.* AND dog.*' is two valid regex pieces, both MUST. Works.
+- '\(cat.* AND dog.\)*' fails because Tantivy uses Rust regex
+  syntax, where '\(' is a LITERAL paren -- the inverse of the Emacs
+  convention. Piece 1 matches only tokens beginning with the
+  literal text '(cat', which exist nowhere, and an unmatched MUST
+  piece makes the whole query find nothing.
+- '(cat.* AND dog.*)' errors because whitespace-splitting yields
+  the piece '(cat.*', an unclosed group -- an invalid regex, hence
+  the RegexQueryError you saw.
+Grouping DOES work at the regex level within one whitespace-free
+piece: '(cat|dog).*' is a single valid piece and works today.
+*** TODO (by Claude for Jeff) do you want operator-level grouping built?
+Nested boolean queries like '( cat.* AND dog.* ) OR fish.*' are
+implementable (Tantivy's BooleanQuery nests). The syntax question
+is yours to settle: since '(' can also open a regex group inside a
+piece, the least ambiguous rule is to treat a paren as an
+operator-grouping token only when it stands ALONE between spaces.
+A lone '(' piece is currently just an invalid-regex error, so that
+syntax would break nothing that works today. If you want it, also
+say where precedence should fall -- conventional would be
+NOT > AND > OR, with bare adjacency staying OR.
+* DONE Any new 'hiddenInSubscribee' or 'hiddenOutOfSubscribee' (I've mangled those names a little) collection should begin folded.
+** Claude: done 2026-07-08.
+(The real names: 'hiddenInSubscribeeCol' and
+'hiddenOutsideOfSubscribeeCol'.) A newly created col of either kind
+now begins folded. The encoding is member-side, because that is the
+client's convention: a 'folded' marker on a headline means "this
+headline is hidden inside its folded parent"
+(elisp/skg-org-fold.el), so a col's collapse lives on its MEMBERS,
+and a marker left on the col itself would instead fold the col's
+parent. The three creation sites stamp the newborn col; at the
+col's own BFS visit, once its members are reconciled in,
+'fold_members_of_newborn_col' (server/update_buffer/util.rs) moves
+the stamp onto every member. A col already present in the saved
+buffer is untouched, so your manual fold state round-trips exactly
+as before. Existing view tests now pin the markers
+(tests/hidden_from_subscriptions.rs); full Rust suite 484/484 and
+emacs suite 261/261 pass.
