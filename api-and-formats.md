@@ -235,10 +235,11 @@ So far there are these endpoints:
     a per-source breakdown, or "Body whitespace strip failed: ...".
   - Behavior: Strips trailing whitespace from every line of every
     body, and trailing blank lines from each body's tail, in every
-    source in the config — foreign sources included. Rewrites exactly
-    the .skg files whose bodies changed (a clean file stays
-    byte-identical); a body that strips to nothing is dropped from
-    its file. The in-Rust graph and Tantivy are refreshed to match;
+    OWNED source in the config. Foreign sources are read-only and
+    left untouched (stripping them would make them diverge from
+    their upstreams). Rewrites exactly the .skg files whose bodies
+    changed (a clean file stays byte-identical); a body that strips
+    to nothing is dropped from its file. The in-Rust graph and Tantivy are refreshed to match;
     TypeDB needs no update (it stores no body text, and textlink
     extraction cannot see trailing whitespace). The clients suggest
     reviewing the result with `git diff --ignore-all-space`, which

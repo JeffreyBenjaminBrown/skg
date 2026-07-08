@@ -4,7 +4,8 @@
 
 (defun skg-strip-trailing-whitespace-from-bodies ()
   "Strip trailing whitespace from every line of every body,
-in every source in the config, foreign ones included.
+in every source the user owns.
+Foreign sources are read-only and left untouched.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match."
   (interactive)

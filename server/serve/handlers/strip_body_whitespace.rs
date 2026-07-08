@@ -1,8 +1,9 @@
 //! The "strip body whitespace" request (TODO/fork-fixes.org): strips
 //! trailing whitespace from every line of every body (and trailing
-//! blank lines from the body's tail), in every source named in the
-//! config -- foreign sources included, since the request asks for
-//! every repo -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
+//! blank lines from the body's tail), in every OWNED source in the
+//! config -- foreign sources are read-only, and stripping them would
+//! make them diverge from their upstreams (Jeff settled on owned
+//! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
 //! and the Tantivy index; both are refreshed here. TypeDB is
 //! untouched: it stores no body text, and the textlinks it derives
 //! from bodies cannot be changed by stripping trailing whitespace.
@@ -47,10 +48,14 @@ fn strip_body_whitespace_and_refresh_caches (
 ) -> Result<String, String> {
   let (all_nodes, changed) : (Vec<NodeComplete>, Vec<NodeComplete>) =
     strip_body_whitespace_on_disk (& env . config) ?;
+  let owned_checked : usize =
+    all_nodes . iter ()
+    . filter ( |n| env . config . user_owns_source (& n . source) )
+    . count ();
   if changed . is_empty () {
     return Ok ( format! (
-      "No body has trailing whitespace ({} files checked).",
-      all_nodes . len () )); }
+      "No body has trailing whitespace ({} files checked, in owned sources).",
+      owned_checked )); }
   env . in_rust_graph . store (
     Arc::new ( InRustGraph::from_nodecompletes (&all_nodes) ));
   { let tantivy_nodes : Vec<NodeTantivy> =
@@ -68,18 +73,20 @@ fn strip_body_whitespace_and_refresh_caches (
       . collect::<Vec<String>> ()
       . join (", ") };
   Ok ( format! (
-    "Stripped trailing whitespace from {} of {} files ({}).",
-    changed . len (), all_nodes . len (), breakdown )) }
+    "Stripped trailing whitespace from {} of {} files in owned sources ({}).",
+    changed . len (), owned_checked, breakdown )) }
 
-/// Reads every node from every source in the config -- owned and
-/// foreign alike -- strips trailing whitespace from each line of each
-/// body, and rewrites exactly the files whose bodies changed (a file
-/// with a clean body is left byte-identical). A body that strips to
-/// the empty string is dropped entirely, so the written file omits
-/// the field rather than carrying 'body: ""'. Returns every node
-/// read (post-strip, so a whole-cache rebuild sees the new bodies)
-/// and separately the changed nodes (for per-node cache updates and
-/// the report).
+/// Reads every node from every source in the config, then strips
+/// trailing whitespace from each line of each OWNED node's body,
+/// rewriting exactly the files whose bodies changed (a file with a
+/// clean body is left byte-identical). Foreign sources are read (the
+/// caller rebuilds whole-graph caches from the returned nodes) but
+/// never written: they are read-only, and local edits would make
+/// them diverge from their upstreams. A body that strips to the
+/// empty string is dropped entirely, so the written file omits the
+/// field rather than carrying 'body: ""'. Returns every node read
+/// (post-strip) and separately the changed nodes (for per-node cache
+/// updates and the report).
 pub fn strip_body_whitespace_on_disk (
   config : &SkgConfig,
 ) -> Result<(Vec<NodeComplete>, Vec<NodeComplete>), String> {
@@ -88,6 +95,7 @@ pub fn strip_body_whitespace_on_disk (
     . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
   let mut changed : Vec<NodeComplete> = Vec::new ();
   for node in all_nodes . iter_mut () {
+    if ! config . user_owns_source (& node . source) { continue; }
     let Some (body) = & node . body else { continue; };
     let stripped : String =
       strip_trailing_whitespace_from_body (body);

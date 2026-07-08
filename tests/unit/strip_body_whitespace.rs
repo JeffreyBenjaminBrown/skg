@@ -46,12 +46,14 @@ fn strips_on_disk_only_where_needed () {
               "title: bodyless\npid: bodyless\n"
             ) . unwrap ();
   fs::write ( foreign_dir . join ("theirs.skg"),
-              // Foreign sources are processed too: the request asks
-              // for every repo in the config.
+              // A foreign source is read-only: its trailing
+              // whitespace survives the strip.
               "title: theirs\npid: theirs\nbody: \"alpha \\nbeta\"\n"
             ) . unwrap ();
   let clean_bytes_before : Vec<u8> =
     fs::read ( owned_dir . join ("clean.skg") ) . unwrap ();
+  let foreign_bytes_before : Vec<u8> =
+    fs::read ( foreign_dir . join ("theirs.skg") ) . unwrap ();
   let config : SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> =
       HashMap::new ();
@@ -74,7 +76,7 @@ fn strips_on_disk_only_where_needed () {
       changed . iter ()
       . map ( |n| n . pid . as_str () ) . collect ();
     assert_eq! ( changed_pids,
-                 HashSet::from ([ "dirty", "blank", "theirs" ]) ); }
+                 HashSet::from ([ "dirty", "blank" ]) ); }
   let from_disk = |pid : &str, source : &str| -> NodeComplete {
     nodecomplete_from_pid_and_source (
       &config, ID::from (pid), & SourceName::from (source)
@@ -83,8 +85,12 @@ fn strips_on_disk_only_where_needed () {
                Some ( "one\ntwo" . to_string () ));
   assert_eq! ( // a body that strips to nothing is dropped
     from_disk ("blank", "owned") . body, None );
-  assert_eq! ( from_disk ("theirs", "foreign") . body,
-               Some ( "alpha\nbeta" . to_string () ));
+  assert_eq! ( // a foreign body keeps its whitespace, untouched
+    from_disk ("theirs", "foreign") . body,
+    Some ( "alpha \nbeta" . to_string () ));
+  assert_eq! ( // ... indeed the whole foreign file is not rewritten
+    fs::read ( foreign_dir . join ("theirs.skg") ) . unwrap (),
+    foreign_bytes_before );
   for node in &changed {
     assert_eq! ( // the returned nodes match the canonical disk form,
                  // so caches refreshed from them agree with the files

@@ -43,8 +43,9 @@ function M.rebuild_dbs ()
 end
 
 ---Strip trailing whitespace from every line of every body, in every
----source in the config, foreign ones included. Rewrites exactly the
----.skg files whose bodies change; derived caches are refreshed.
+---source the user owns (foreign sources are read-only and left
+---untouched). Rewrites exactly the .skg files whose bodies change;
+---derived caches are refreshed.
 function M.strip_body_whitespace ()
   vim.notify('Stripping trailing whitespace from bodies ...')
   state.register_response_handler('strip-body-whitespace',

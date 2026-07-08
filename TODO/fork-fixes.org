@@ -144,8 +144,11 @@ using 'git diff --ignore-all-space'.
   api-and-formats.md. After the strip, the client echoes the server's
   per-source report plus your requested suggestion to review with
   'git diff --ignore-all-space'.
-- It processes every source in the config, foreign ones included,
-  per your spec.
+- It processes every OWNED source in the config. (It originally
+  covered foreign sources too, reading "every repo" literally; per
+  your 2026-07-08 reply, foreign sources are now skipped -- they are
+  read-only, and stripping them would make them diverge from their
+  upstreams.)
 - Each line's tail is stripped, and so are the body's trailing blank
   lines, because the canonical YAML writer (strip-chomping block
   scalars) cannot represent them -- keeping one would make the
@@ -161,7 +164,7 @@ using 'git diff --ignore-all-space'.
 - Verified end to end against a throwaway server on fixture data;
   unit tests in tests/unit/strip_body_whitespace.rs; full Rust suite
   484/484 and emacs suite 261/261 pass.
-*** TODO (by Claude for Jeff) stripping foreign repos makes them diverge from their upstreams.
+*** DONE (was: by Claude for Jeff) stripping foreign repos makes them diverge from their upstreams.
 You asked for every repo in the config, so that is what it does; but
 a foreign source is normally byte-identical to whatever its author
 published, and this command breaks that: a later git pull of the
@@ -169,6 +172,11 @@ foreign repo can conflict on (or quietly reintroduce) the whitespace.
 If you would rather it skip foreign sources -- or ask per source --
 say so; either is a small change in
 'strip_body_whitespace_on_disk'.
+**** Claude: resolved 2026-07-08 -- Jeff chose owned repos only.
+Foreign sources are now skipped (they are still read, since the
+whole-graph caches rebuild from every source, but never written).
+The unit test pins that a foreign file with a whitespace-dirty body
+survives the strip byte-identical.
 * DONE document that new strip space command in docs/COMMANDS.org.
 ** Claude: done 2026-07-08.
 Added 'skg-strip-trailing-whitespace-from-bodies' to

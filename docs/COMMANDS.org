@@ -581,7 +581,8 @@ using the .skg files on disk.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,
-in every source in the config -- foreign ones included.
+in every source you own.
+Foreign sources are read-only and left untouched.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',
