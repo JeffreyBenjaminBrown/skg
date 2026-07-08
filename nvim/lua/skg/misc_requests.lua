@@ -1,7 +1,8 @@
 -- PURPOSE: The small one-shot request/response commands:
--- verify-connection and rebuild-dbs. The Lua port of
--- elisp/skg-request-verify-connection.el and
--- elisp/skg-request-rebuild-dbs.el.
+-- verify-connection, rebuild-dbs and strip-body-whitespace. The Lua
+-- port of elisp/skg-request-verify-connection.el,
+-- elisp/skg-request-rebuild-dbs.el and
+-- elisp/skg-request-strip-body-whitespace.el.
 
 local client = require('skg.client')
 local payload = require('skg.payload')
@@ -39,6 +40,23 @@ function M.rebuild_dbs ()
     end, true)
   state.lp_reset()
   client.send_string('((request . "rebuild dbs"))\n')
+end
+
+---Strip trailing whitespace from every line of every body, in every
+---source in the config, foreign ones included. Rewrites exactly the
+---.skg files whose bodies change; derived caches are refreshed.
+function M.strip_body_whitespace ()
+  vim.notify('Stripping trailing whitespace from bodies ...')
+  state.register_response_handler('strip-body-whitespace',
+    function (_payload, response)
+      local content = payload.field_text(response, 'content')
+      vim.notify((content or 'Body whitespace strip complete.')
+                 .. '\nTo verify nothing but whitespace changed,'
+                 .. " review with 'git diff --ignore-all-space'"
+                 .. ' (it should show nothing).')
+    end, true)
+  state.lp_reset()
+  client.send_string('((request . "strip body whitespace"))\n')
 end
 
 return M

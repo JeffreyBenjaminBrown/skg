@@ -27,11 +27,35 @@ in both cases.
 But make all the decisions you can on your own,
 per coding-advice/when-to-stop.org
 ** Use simpler subagents where safe.
-* ONGOING ? Most ways of forking that should work are broken.
+* DONE Most ways of forking that should work are broken.
 But one way works.
 ** Question : Maybe this item was already fixed?
 Please read the cases and see if they still do that.
 If they are fixed, please mark their parent headline DONE.
+*** Claude: yes, both cases were fixed on 2026-07-07; re-verified today (2026-07-08).
+A prior session implemented them (commits 'd5d173be' for Case 1,
+'df1ec4dc' and 'a5c228db' for Case 2; its report is
+TODO/fork-fixes-progress.org, its judgment calls are in
+jeff-should-weigh-in-on.org at the repo root). I re-checked each case
+against the current tree today:
+- Case 1: a bare new node under a foreign parent no longer dies with
+  the CreatedForeignNode error; it rides the parent's fork and lands
+  in the clone's source. Pinned by 'fork_from_bare_new_child_plan'
+  and 'fork_from_bare_new_child_commits' in tests/fork.rs. A new node
+  whose metadata EXPLICITLY names a foreign source still errors
+  ('explicitly_foreign_new_child_still_rejected').
+- Case 2: a source specified in the saved metadata (via the new
+  children) is settled: no PICK-A-SOURCE placeholder, no re-asking
+  ('explicit_new_child_source_confirms_clone_source'). Unspecified
+  sources are prompted for in the minibuffer before the y/n question,
+  and answering yes with a placeholder still present now refuses
+  loudly instead of silently doing nothing
+  ('test-fork-choose-placeholder-sources-prompts-with-suggestion' and
+  neighbors in tests/elisp/test-skg-fork-confirmation.el). The long
+  header comment is gone; the explanation folds under an org headline.
+- End to end: the integration tests fork, fork-source, fork-chain and
+  fork-owned all passed today, as did the 10 fork- and
+  hide-related Rust tests and the 11 elisp fork-confirmation tests.
 ** Case 1: No metadata in the new, fork-forcing node.
 *** When I save this buffer:
   * (skg (node (id 6972d099-7ff6-47ba-ac67-1898ef5fd549) (source jeff-public) (parentIs absent) (rels "C6 4L") (viewStats (sourceHerald ⌂:jeff-public)))) science
@@ -80,9 +104,22 @@ If I simply say yes in this condition, nothing happens.
 
 If I redundantly pick a source in the buffer that was presented,
 I am then able to save, and it seems to work.
-* Editing a forked node is bad.
+* DONE Editing a forked node is bad.
 If my fork F contains C and so does the original O,
 and I remove C from F, F should now hide C.
+** Claude: implemented 2026-07-07 (commit '438d1d11'), re-verified today.
+Removing C from an owned subscriber F's contains now records a hide
+by F of C whenever some subscribee of F still contains C on disk;
+re-adding C removes the hide. Pinned by
+'test_removing_subscribee_content_from_subscriber_contains_infers_hide'
+and 'test_readding_subscribee_content_to_subscriber_contains_unhides'
+in tests/hidden_from_subscriptions.rs, both passing today. The rule
+also fires at fork creation: children deleted by the fork-forcing
+edit are born hidden ('fork_clone_hides_children_the_edit_deleted').
+Scope choices you might care about (the rule covers every owned
+subscriber, not just clones; moving C elsewhere counts as removal; an
+explicit subscribee-as-such gesture in the same save wins) are
+recorded in jeff-should-weigh-in-on.org.
 ** in more detail
 Burying fork content should not
 resurface it in the subscribee-as-such.
@@ -92,3 +129,55 @@ Suppose C is now removed from F's children.
 It should not, as a result of that removal,
  reappear among O's children in a subscribee-as-such view of O.
 That is, a hide relationship should be made from F to C.
+* DONE Write a function to strip trailing whitespace from all bodies.
+It should be callable from the client as
+'skg-strip-trailing-whitespace-from-bodies'.
+It should process every repo in the user's config.
+It should suggest in the minibuffer that
+the user review the resulting changes
+using 'git diff --ignore-all-space'.
+** Claude: done 2026-07-08.
+- 'skg-strip-trailing-whitespace-from-bodies' (elisp; the nvim
+  command is StripBodyWhitespace) sends the new request "strip body
+  whitespace"; the server handler is
+  server/serve/handlers/strip_body_whitespace.rs, documented in
+  api-and-formats.md. After the strip, the client echoes the server's
+  per-source report plus your requested suggestion to review with
+  'git diff --ignore-all-space'.
+- It processes every source in the config, foreign ones included,
+  per your spec.
+- Each line's tail is stripped, and so are the body's trailing blank
+  lines, because the canonical YAML writer (strip-chomping block
+  scalars) cannot represent them -- keeping one would make the
+  refreshed caches disagree with the file just written.
+  A body that strips to nothing is dropped from its file.
+- Only files whose body changes are rewritten; a clean file stays
+  byte-identical. A rewritten file is re-serialized canonically, so a
+  hand-formatted file can see one-time style churn beyond whitespace
+  (the same churn any save of it would cause).
+- Caches: the in-Rust graph and Tantivy are refreshed; TypeDB is
+  untouched (it stores no body text, and textlink extraction cannot
+  see trailing whitespace).
+- Verified end to end against a throwaway server on fixture data;
+  unit tests in tests/unit/strip_body_whitespace.rs; full Rust suite
+  484/484 and emacs suite 261/261 pass.
+*** TODO (by Claude for Jeff) stripping foreign repos makes them diverge from their upstreams.
+You asked for every repo in the config, so that is what it does; but
+a foreign source is normally byte-identical to whatever its author
+published, and this command breaks that: a later git pull of the
+foreign repo can conflict on (or quietly reintroduce) the whitespace.
+If you would rather it skip foreign sources -- or ask per source --
+say so; either is a small change in
+'strip_body_whitespace_on_disk'.
+* TODO document that new strip space command in docs/COMMANDS.org.
+* Don't insert git ghosts under indefinitive nodes.
+* BUG : tantivy operator grouping
+** finds something : cat.* AND dog.*
+** finds nothing : \(cat.* AND dog.\)*
+** rejected : (cat.* AND dog.*)
+Error searching index: An invalid argument was passed: 'RegexQueryError: regex parse error:
+    (cat.*
+    ^
+error: unclosed group'
+** either this is a bug
+or I don't understand how to group operators

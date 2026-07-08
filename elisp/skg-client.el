@@ -21,6 +21,7 @@
 (require 'skg-request-save)
 (require 'skg-request-source-sets)
 (require 'skg-request-stage-moves)
+(require 'skg-request-strip-body-whitespace)
 (require 'skg-search-make-link)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-verify-connection)

@@ -228,6 +228,22 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
+## Strip body whitespace
+  - Request: ((request . "strip body whitespace"))
+  - Response: LP response-type "strip-body-whitespace" with
+    `((content "..."))`. Content reports how many files changed and
+    a per-source breakdown, or "Body whitespace strip failed: ...".
+  - Behavior: Strips trailing whitespace from every line of every
+    body, and trailing blank lines from each body's tail, in every
+    source in the config — foreign sources included. Rewrites exactly
+    the .skg files whose bodies changed (a clean file stays
+    byte-identical); a body that strips to nothing is dropped from
+    its file. The in-Rust graph and Tantivy are refreshed to match;
+    TypeDB needs no update (it stores no body text, and textlink
+    extraction cannot see trailing whitespace). The clients suggest
+    reviewing the result with `git diff --ignore-all-space`, which
+    should show nothing.
+
 ## Export to org
   - Request: ((request . "export to org") (source-set . "NAME") (output-dir . "PATH"))
     - Both fields are required; a missing or blank `output-dir` is an

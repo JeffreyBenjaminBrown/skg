@@ -26,6 +26,7 @@ use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
+use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
@@ -223,6 +224,9 @@ fn handle_emacs (
             handle_rebuild_dbs_request ( &mut stream,
                                          &mut env,
                                          &mut views_state ),
+          Ok (RequestType::StripBodyWhitespace) =>
+            handle_strip_body_whitespace_request ( &mut stream,
+                                                   &mut env ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
               &mut stream,
