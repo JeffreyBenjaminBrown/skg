@@ -141,6 +141,15 @@ pub(crate) fn process_activeNode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
     &mut node_mut, tree_node_id, &added_membership_by_id );
+  if matches! ( & node_mut . value () . kind,
+                ViewNodeKind::Vognode (Vognode::Active (t))
+                  if t . is_indefinitive () ) {
+    // TODO/fork-fixes.org: no git ghosts under an indefinitive node.
+    // It draws none of its worktree children, so a removed-member
+    // phantom under it would show the node's DELETED children while
+    // its kept children go unshown. Its definitive occurrence (or a
+    // wider view) carries the contains diff.
+    return Ok (( )); }
   // Net HEAD->worktree contains order (an LCS of the reconstructed HEAD and
   // worktree contains lists), so each removed-member phantom lands at its
   // correct HEAD position among surviving siblings -- even when contains changed
