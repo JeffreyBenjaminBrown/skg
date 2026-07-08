@@ -1,11 +1,39 @@
-* request : fix forking
-BEWARE: This is an org-formatted document,
-which quotes distinct org-documents (buffers, really).
-I have indendent by 2 spaces all passages from org documents it quotes.
-** Most ways of forking that should work are broken.
-But one works.
-*** Case 1: No metadata in the new, fork-forcing node.
-**** When I save this buffer:
+* How to read and proces this document.
+** BEWARE: It nests strangely.
+This is an org-formatted document,
+which might quote distinct org-documents (or org-buffers).
+I *should* have indended by 2 spaces
+all passages from any org documents|buffers it quotes.
+** how to edit it
+Add subheadlines, or even top-level headlines if appropriate,
+however you like. In each indicate your voice ("Claude: ...").
+Don't change what I've written, except maybe to change or add
+an all-caps token at the front  of a headline --
+likely candidates are TODO, ONGOING, AWAITS and DONE.
+** Each top-level headline is a request.
+Mark them DONE when they are, etc.
+** We will be editing it at the same time.
+I'll occasinoally add to it.
+If you see your changes get clobbered, that's probably why.
+** Be pretty autonomous.
+My time with you is brief, alas.
+If any of these need pushback, pushback inline,
+under new subheadlines -- ask for more details,
+explain why it's impossible or incorrect.
+And if you are able to execute them but find something awkward
+about the solution, report that, again as a subheadline.
+Mark the subheadline 'TODO (by Claude for Jeff) ..."
+in both cases.
+But make all the decisions you can on your own,
+per coding-advice/when-to-stop.org
+** Use simpler subagents where safe.
+* ONGOING ? Most ways of forking that should work are broken.
+But one way works.
+** Question : Maybe this item was already fixed?
+Please read the cases and see if they still do that.
+If they are fixed, please mark their parent headline DONE.
+** Case 1: No metadata in the new, fork-forcing node.
+*** When I save this buffer:
   * (skg (node (id 6972d099-7ff6-47ba-ac67-1898ef5fd549) (source jeff-public) (parentIs absent) (rels "C6 4L") (viewStats (sourceHerald ⌂:jeff-public)))) science
   ** (skg (node (id 3120d61e-cf2c-4196-a90e-7ebe44043836) (source jeff-public) (birthHerald "aC"))) a list of [[id:c35ab968-7056-40fa-8816-ea16d5c88f6d][sciences, fields of study, schools of thought]]
   ** (skg (node (id a3caf7b0-2257-4ac3-bb84-0b14f310980a) (source jeff-public) (birthHerald "aC"))) [[id:8fc0e120-7b65-4542-8fd5-86897d683c18][epistemic humility]]
@@ -17,7 +45,7 @@ But one works.
   ** (skg (node (id c365c689-390b-4b6e-b606-b7e068d846a7) (source jeff-public) (birthHerald "aC"))) [[id:d779aeab-0662-4142-ae65-2ddbf3cef5c5][academia]]
   ** (skg (node (id f748d5cd-3cb9-481b-9ba7-a36683245259) (source jeff-public) (birthHerald "aC"))) [[id:a5b5621c-70f4-44e8-9420-b732c26e2e13][scientific agent loop]]
   ** Can I add to this?
-**** I get this error:
+*** I get this error:
   * errors
   ** * NOTHING WAS SAVED
 
@@ -31,14 +59,14 @@ But one works.
 
   ** Resolution
   Please fix these errors and try saving again.
-**** I had appended a new node to a non-owned source.
+*** I had appended a new node to a non-owned source.
 So the fork should have proceeded,
 first asking me to verify and choose a source.
-*** Case 2: Having chosen a source for the new node
+** Case 2: Having chosen a source for the new node
 (but no other metadata).
-**** This time I appended instead the following.
+*** This time I appended instead the following.
   ** (skg (node (source else-public))) Can I add to this?
-**** I am confronted with a choice.
+*** I am confronted with a choice.
 The minibuffer says 'Fork the listed node(s)?'
 Meanwhile a new real full buffer takes half the screen.
 Its comment at the header is too long;
@@ -52,6 +80,15 @@ If I simply say yes in this condition, nothing happens.
 
 If I redundantly pick a source in the buffer that was presented,
 I am then able to save, and it seems to work.
-** Editing a forked node is bad.
+* Editing a forked node is bad.
 If my fork F contains C and so does the original O,
 and I remove C from F, F should now hide C.
+** in more detail
+Burying fork content should not
+resurface it in the subscribee-as-such.
+Suppose F forks original O and both contain C.
+C is hidden from O when O is viewed as a subscribee-as-such.
+Suppose C is now removed from F's children.
+It should not, as a result of that removal,
+ reappear among O's children in a subscribee-as-such view of O.
+That is, a hide relationship should be made from F to C.

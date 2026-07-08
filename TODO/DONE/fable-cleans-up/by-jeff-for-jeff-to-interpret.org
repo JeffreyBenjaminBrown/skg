@@ -28,13 +28,13 @@
    yourself. Since editing an ID in the metadata view can today
    fabricate a reference to a nonexistent node (or capture an existing
    one), the answer matters for data safety, so I did not guess.
-** "Is it a misfeature to let config_path differ from data_root?"
+** TODO "Is it a misfeature to let config_path differ from data_root?"
    A question, not a wish. If you decide it is a misfeature, the fix
    is presumably to derive one from the other and warn on divergence.
 ** "must (?) stage them separately, but commit all repos at once"
    (under "usage mysteries") I could not reconstruct the observation,
    let alone the wish.
-** "show the herald it is responsible for next to each field in the metadata"
+** ONGOING "show the herald it is responsible for next to each field in the metadata"
    (under "easy") I read this as: in the s-exp/metadata view, each
    metadata field should display the herald glyph it produces. But I
    was unsure whether "the metadata" means the sexp-edit view, the
