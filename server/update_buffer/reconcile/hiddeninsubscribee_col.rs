@@ -9,6 +9,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::reconcile::partner_col::push_repair_warnings;
+use crate::update_buffer::util::fold_members_of_newborn_col;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::viewnode::{ViewNode, PartnerCol};
 
@@ -102,6 +103,8 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscribee_pid, summary ); }
+  fold_members_of_newborn_col (tree, node)
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder
   // prune sweep (prune_self_deletable_when_empty), not self-deleted here.
   Ok(( )) }

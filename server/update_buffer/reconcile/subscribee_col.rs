@@ -8,7 +8,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::read_at_node_in_tree;
+use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, PartnerCol};
@@ -157,8 +157,16 @@ fn ensure_hiddenoutsideofsubscribeecol_is_last (
   match hidden_outside {
     Some (child) => { move_child_to_end( tree, node, child ) ?; },
     None => {
-      insert_scaffold_as_child(
-        tree, node,
-        ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee),
-        false ) ?; }}
+      let new_col : NodeId =
+        insert_scaffold_as_child(
+          tree, node,
+          ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee),
+          false ) ?;
+      with_node_mut ( tree, new_col,
+        |mut n| {
+          // TODO/fork-fixes.org: a new hidden col begins folded. The
+          // stamp moves to the members at the col's own BFS visit
+          // ('fold_members_of_newborn_col'), which reconciles them in.
+          n . value () . folded = true; } )
+        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }}
   Ok (( )) }

@@ -26,7 +26,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol};
 use crate::types::viewnode::Vognode;
-use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
+use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,
@@ -224,6 +224,13 @@ pub async fn maybe_add_subscribeeCol_branch (
         tree, subscribee_col_nid,
         ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee),
         false ) ?;
+    with_node_mut ( tree, hidden_outside_col_nid,
+      |mut n| {
+        // TODO/fork-fixes.org: a new hidden col begins folded. The
+        // stamp moves to the members at the col's own BFS visit
+        // ('fold_members_of_newborn_col').
+        n . value () . folded = true; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     let hidden_outside_ids : Vec<ID> =
       hidden_outside_content . into_iter () . collect ();
     let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
@@ -422,6 +429,13 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
       tree, subscribee_treeid,
       ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee),
       true ) ?;
+  with_node_mut ( tree, hidden_col_nid,
+    |mut n| {
+      // TODO/fork-fixes.org: a new hidden col begins folded. The
+      // stamp moves to the members at the col's own BFS visit
+      // ('fold_members_of_newborn_col').
+      n . value () . folded = true; } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &hidden_in_ids, config, driver ) . await ?;

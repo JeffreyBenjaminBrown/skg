@@ -172,8 +172,10 @@ fn assert_hides_e1_in_subscribee_col (
   buffer : &str,
 ) {
   assert! (
-    buffer . contains ("**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id e1) (source foreign) indef"),
-    "Expected e1 to be rendered under HiddenInSubscribeeCol:\n{}",
+    // 'folded': a new hidden col begins folded (TODO/fork-fixes.org),
+    // expressed as a fold marker on each member.
+    buffer . contains ("**** (skg hiddenInSubscribeeCol)\n***** (skg folded (node (id e1) (source foreign) indef"),
+    "Expected e1 to be rendered folded under HiddenInSubscribeeCol:\n{}",
     buffer );
   assert! (
     ! buffer . lines() . any ( |line|
@@ -198,7 +200,11 @@ fn move_h_from_hiddenin_col_to_visible_subscribee_content (
       if line . contains ("(skg hiddenInSubscribeeCol)") {
         None
       } else if line . contains ("(id H)") {
-        Some (line . replacen ("***** ", "**** ", 1))
+        Some (line . replacen ("***** ", "**** ", 1)
+              // A real client manages fold markers itself (they are
+              // re-derived from visibility at save), so the moved
+              // line would not carry the col's 'folded' mark.
+              . replacen ("(skg folded ", "(skg ", 1))
       } else {
         Some (line . to_string()) }})
     . collect::<Vec<_>>()
@@ -586,7 +592,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let collateral : &str = &collateral_views[0];
     assert! (
       collateral . contains (
-        "**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id e1) (source foreign) indef"),
+        "**** (skg hiddenInSubscribeeCol)\n***** (skg folded (node (id e1) (source foreign) indef"),
       "Expected e1 under HiddenInSubscribeeCol:\n{}", collateral );
     assert! (
       collateral . lines() . any ( |line|
@@ -814,7 +820,7 @@ async fn test_subscribee_and_filter_cols (
        *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
        *** (skg (node (id E2) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
+       **** (skg folded (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -849,14 +855,14 @@ async fn test_subscribee_and_filter_cols (
        ** (skg subscribeeCol)
        *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id hidden-in-E1) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E1
+       ***** (skg folded (node (id hidden-in-E1) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E1
        **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
        *** (skg (node (id E2) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id hidden-in-E2) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E2
+       ***** (skg folded (node (id hidden-in-E2) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E2
        **** (skg (node (id E21) (source main) (birthHerald \"aC\"))) E21
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
+       **** (skg folded (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(expanded, expected_expanded,
@@ -926,7 +932,7 @@ async fn test_hidden_within_but_none_without (
        ** (skg subscribeeCol)
        *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C3\"))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) indef (birthHerald \"dH bC\"))) H
+       ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH bC\"))) H
        **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
        **** (skg (node (id E12) (source main) (birthHerald \"aC\"))) E12
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
@@ -1088,7 +1094,7 @@ async fn test_deleting_from_hiddenin_col_does_not_unhide (
 
     assert! (
       rerendered . contains (
-        "**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id H)"),
+        "**** (skg hiddenInSubscribeeCol)\n***** (skg folded (node (id H)"),
       "Expected H to be regenerated under HiddenInSubscribeeCol:\n{}",
       rerendered );
     assert! (
@@ -1130,7 +1136,7 @@ async fn test_hidden_without_but_none_within (
        *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
        *** (skg (node (id E2) (source main) indef (birthHerald \"bS\"))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id H) (source main) indef (birthHerald \"cH\"))) H
+       **** (skg folded (node (id H) (source main) indef (birthHerald \"cH\"))) H
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -1165,7 +1171,7 @@ async fn test_hidden_without_but_none_within (
        ***** (skg (node (id E121) (source main) (birthHerald \"aC\"))) E121
        *** (skg (node (id E2) (source main) (birthHerald \"bS\"))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id H) (source main) indef (birthHerald \"cH\"))) H
+       **** (skg folded (node (id H) (source main) indef (birthHerald \"cH\"))) H
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(with_subscribees_expanded, expected_expanded,
@@ -1269,10 +1275,10 @@ async fn test_overlapping_hidden_within (
        ** (skg subscribeeCol)
        *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C1\"))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
+       ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
        *** (skg (node (id E2) (source main) (birthHerald \"bS\") (rels \"C1\"))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
+       ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
     assert_eq!(expanded, expected_expanded,

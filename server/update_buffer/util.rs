@@ -30,6 +30,34 @@ where
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
 
+/// TODO/fork-fixes.org: a NEW hiddenInSubscribee or
+/// hiddenOutsideOfSubscribee col begins folded. Creation sites stamp
+/// 'folded' on the newborn col; this runs at the col's own BFS visit
+/// (its members now reconciled in) and transfers the stamp: every
+/// child is marked folded and the col's own flag is cleared. That
+/// encoding is the client's (elisp/skg-org-fold.el): 'folded' on a
+/// headline means it is hidden inside its folded PARENT, so a col's
+/// collapse lives on its members -- left on the col itself it would
+/// instead fold the col's parent. A col PARSED from a buffer carries
+/// 'folded' only when it sat inside a folded ancestor; its members
+/// then already carry the mark, so the transfer changes nothing.
+pub fn fold_members_of_newborn_col (
+  tree : &mut Tree<ViewNode>,
+  col  : NodeId,
+) -> Result<(), String> {
+  let newborn : bool =
+    tree . get (col)
+    . ok_or ("fold_members_of_newborn_col: node not found") ?
+    . value () . folded;
+  if ! newborn { return Ok (( )); }
+  with_node_mut ( tree, col,
+                  |mut n| { n . value () . folded = false; } )
+    . map_err ( |e| -> String { e . into () } ) ?;
+  treat_certain_children (
+    tree, col,
+    |_vn : &ViewNode| true,
+    |vn : &mut ViewNode| { vn . folded = true; } ) }
+
 /// Classify children of a node based on a classifier function.
 /// Returns a HashMap from classification key to Vec<NodeId>.
 /// Order is preserved within each list.
