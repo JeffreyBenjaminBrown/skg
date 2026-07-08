@@ -4,6 +4,20 @@
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
 * Problems noted during the fork-fixes arc (TODO/fork-fixes.org)
+** The git_diff_view test matcher ignores bare metadata atoms
+   'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
+   each expected line by star depth, title, and PARENTHESIZED
+   metadata fragments only ('extract_metadata_fragments'). Bare
+   atoms -- 'folded', 'focused', 'indef', 'bodyFolded' -- are
+   invisible to it, in both directions: an expected atom missing
+   from the actual line, or a stray atom appearing in it, cannot
+   fail these tests. Found 2026-07-08 while adding the
+   begin-folded rule for hidden cols: a probe atom inserted into an
+   expected line still passed. Regressions in fold/focus/indef
+   marking on diff views are therefore unpinned by that suite
+   (tests elsewhere, e.g. tests/hidden_from_subscriptions.rs, use
+   exact assert_eq! and do pin them). Suggested fix: also compare
+   the bare-atom sets of the two lines in 'line_matches'.
 ** Subscribee-as-such hides may misfire under a restricted source-set
    The signal loop in 'resolve_visibility'
    (server/from_text/local_instruction_collection/resolve_visibility.rs)
