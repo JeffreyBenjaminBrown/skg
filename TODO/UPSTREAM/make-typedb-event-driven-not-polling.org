@@ -1,0 +1,177 @@
+* Make TypeDB's WAL committer event-driven instead of polling
+An upstream-appropriate change to TypeDB. Filed under TODO/UPSTREAM/
+because the *right* home for the fix is TypeDB itself, not Skg -- but
+see the correction below: "upstream's job" is a choice here, not a wall.
+You could do it in a fork today; upstreaming just spares you the carry.
+
+Background, measurements, and the full reasoning live in
+'TODO/typedb-performance-research.org' (sections dated 2026-07-09 and
+2026-07-10). This file is the standalone "what to do about it, and whose
+job it is" summary.
+
+* The one-line problem
+Each open TypeDB database runs a thread that fsyncs the WAL on a 1 ms
+timer poll (~920 wakeups/s), doing nothing when nothing is queued. With
+two DBs open ('_system' + 'skg-real') that is ~2000 pointless wakeups/s
+forever. The fix is to park on a condition variable and wake on commit.
+Zero idle cost, lower commit latency, no durability tradeoff. It is the
+standard group-commit design; the poll is the naive one.
+
+* Correction to the premise: this is NOT gated by TypeDB's maintainers
+The earlier conclusion "both approaches are gated by TypeDB's
+maintainers" is wrong, and worth correcting because it implies a
+helplessness that does not exist.
+
+Both approaches -- bumping the poll interval, or rewriting the loop to
+be event-driven -- are gated by a **source build**, not by anyone's
+permission. TypeDB 3.x is open source:
+
+- License: **Mozilla Public License 2.0** (MPL 2.0). File-level
+  copyleft, explicitly non-viral. You only have to publish modifications
+  to the MPL-covered files, and only when you *distribute* an executable
+  containing them. For running your own patched binary in your own
+  container, you owe nobody anything.
+- The full 3.x server source (Rust, ~98% of the repo) is public at
+  github.com/typedb/typedb and builds with Bazel (primary) or Cargo
+  (documented alternative).
+
+So Jeff can fork, patch, build, and run a modified TypeDB today, with no
+maintainer in the loop. What the maintainers gate is only the *upstream
+merge* -- and that only matters as a way to avoid carrying the patch
+yourself forever.
+
+* What actually gates each path -- three tiers, cheapest first
+** Tier 1 -- needs nobody, touches no TypeDB source (RECOMMENDED)
+Attack the real cost (wakeups holding the CPU out of deep C-states)
+without changing TypeDB at all:
+
+- Run TypeDB only while Skg is in use, rather than leaving it resident.
+  This removes 100% of the idle wakeups, because there is no idle
+  TypeDB. Best payoff-to-effort by a wide margin.
+- Never run more than one TypeDB server. Each server adds a '_system'
+  poll thread on top of its per-database ones. One server can hold many
+  databases. (This is the real reason behind
+  'TODO/docker-unification-strategies.org'.)
+
+This tier is why the whole issue can sit in NOT-MY-JOB without guilt:
+the version of the problem that actually costs Jeff anything (battery)
+has a free fix that needs no fork.
+
+** Tier 2 -- self-serve, needs a source build, needs no permission
+Fork TypeDB, patch it, build with Bazel/Cargo, ship that binary in
+'other-projects/docker-typedb-rust' instead of the prebuilt tarball.
+Two sub-options, and note they cost the *same* to deploy:
+
+- Cheap patch: raise 'WAL_SYNC_INTERVAL_MICROSECONDS' (compile-time
+  constant, not in 'config.yml') from 1000 to e.g. 5000. Cuts wakeups
+  ~80%. Still polls; still self-defeats a little (see research file).
+- Real patch: make the committer event-driven (design below). Zero idle
+  cost, not merely reduced.
+
+Since both require the same tarball->source switch, the constant bump is
+the strictly worse investment. If you are rebuilding anyway, do the real
+one.
+
+Cost of this tier is not permission but *maintenance*: a concurrency
+patch carried against every TypeDB release you want to upgrade to. That
+carry cost is exactly why Tier 3 exists.
+
+** Tier 3 -- upstream, needs the maintainers, but is the right long-term home
+File the event-driven change upstream so it lands once and you never
+re-port it. This is the only path that genuinely involves TypeDB's
+maintainers, and it is optional -- a convenience to shed the Tier-2
+carry cost, not a prerequisite. A ready-to-file draft is at the bottom
+of this file.
+
+* Why it is nonetheless correctly an upstream job
+Not because Jeff *can't* (Tier 2 shows he can), but because:
+
+- The free win is Tier 1, which needs no TypeDB work at all.
+- A hand-rolled group-commit is subtle to get right (lost-wakeup races,
+  leader/follower batching, crash-consistency of the WAL). Owning that
+  patch as a downstream fork, re-ported forever, is a bad trade for a
+  single-user knowledge-graph tool.
+- The change is a general good -- every TypeDB user on a laptop or a
+  packed server benefits. That is the signature of something that
+  belongs upstream, not in a private fork.
+
+So: fix the symptom for free (Tier 1), and if the polling ever offends
+enough to fix properly, spend the effort *once* by filing it upstream
+(Tier 3), not by carrying a fork (Tier 2).
+
+* The event-driven design (for whoever picks it up, here or upstream)
+Replace the fixed-interval WAL sync loop with a condition-variable
+group commit:
+
+- The committer thread parks on a condvar with NO timeout when the
+  commit queue is empty. Zero wakeups, zero CPU, indefinitely.
+- A transaction that commits appends its WAL records and signals the
+  condvar.
+- The committer wakes, drains everything queued, issues one fsync,
+  releases all waiters batched behind it, and parks again.
+
+Properties vs. the 1 kHz poll:
+
+- Idle cost: zero, not ~2000 wakeups/s.
+- Latency: fsyncs the instant a commit arrives, instead of waiting up to
+  a full poll interval for the next tick.
+- Batching under load: the batch forms naturally from whatever arrives
+  during the in-flight fsync (classic leader/follower group commit), so
+  throughput is as good or better.
+- Durability window shrinks rather than widens.
+
+If a bounded worst-case batch under sustained load is wanted, park with
+a timeout *only while work is already pending*; when idle, park forever.
+That keeps batching with still-zero idle cost. The one real hazard is
+the usual condvar discipline: check the queue predicate under the lock
+and do not lose a signal that races the park.
+
+The 50 ms statistics-updater thread is the same idea with a twist:
+statistics want debouncing, not firing per commit. Ideal is
+edge-triggered-then-debounced -- a commit arms a 50 ms one-shot if none
+is armed; it fires once, recomputes, disarms. Idle: no timer.
+
+Note: you cannot make this event-driven from *outside* TypeDB. The
+events that matter (a transaction committed) are internal; Skg cannot
+inject them. The fix has to live in TypeDB's source.
+
+* Ready-to-file upstream issue / PR description
+Title: WAL committer polls at 1 kHz per database; make it event-driven
+
+Body:
+  Each open database runs a WAL sync thread that wakes every
+  WAL_SYNC_INTERVAL_MICROSECONDS (1000us) via std::thread::sleep and
+  does nothing when the sync queue is empty. On an otherwise-idle server
+  with N databases open, this is ~1000*N timer wakeups/second doing no
+  work. On a battery-powered or C-state-sensitive host this is a
+  measurable idle tax and keeps the package out of deep idle states;
+  the CPU% it shows also swings ~10x with core clock, which makes it
+  look alarming on a downclocked idle laptop.
+
+  Proposal: replace the fixed-interval poll with a condvar-based group
+  commit. Park with no timeout when the queue is empty; have committing
+  transactions signal after enqueuing; wake, drain, single fsync,
+  release batched waiters, re-park. Optionally park with a timeout only
+  while work is pending, to bound batch latency under sustained load.
+  This gives zero idle cost, lower commit latency, and equal-or-better
+  batching. The statistics updater (STATISTICS_UPDATE_INTERVAL, 50ms)
+  could get the same treatment with debounce.
+
+  Constants referenced: WAL_SYNC_INTERVAL_MICROSECONDS,
+  STATISTICS_UPDATE_INTERVAL (resource/constants.rs, per the 2026-06
+  trace; verify against current source before filing).
+
+Before filing: confirm the constant names and the committer's current
+structure against current source -- the trace they come from is from a
+prebuilt 3.10.x binary, not a source read.
+
+* Facts and sources
+- TypeDB 3.x: full Rust rewrite, first released 2024-12-20; MPL 2.0.
+- Source + build (Bazel primary, Cargo alternative):
+  https://github.com/typedb/typedb
+- License text: https://github.com/typedb/typedb/blob/master/LICENSE
+- MPL 2.0 is file-level, non-viral; modified MPL files must be published
+  only upon distributing an executable containing them:
+  https://www.mozilla.org/en-US/MPL/2.0/FAQ/
+- Measurements, control experiments, and the clock-speed "thermometer"
+  analysis: 'TODO/typedb-performance-research.org'

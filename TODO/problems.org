@@ -823,3 +823,44 @@
    rename away from "legacy"/"compound") is decided deliberately rather than
    left as an accident. See
    [[./override-chains/1_plan.org][the plan]], Work item 4.
+* Problems noted while diagnosing TypeDB's idle CPU (2026-07-09)
+** TypeDB burns ~2000 timer wakeups/second at idle, one loop per open database
+   Each open database gets a thread that polls on a 1 ms sleep
+   ('hrtimer_nanosleep', ~920 wakes/s), doing nothing when there is
+   nothing to sync. Two databases are open in the normal Skg setup
+   ('_system' plus 'skg-real'), so an idle Skg costs ~2000 wakeups/s
+   forever. This is not a CPU problem in any meaningful sense -- a
+   no-op 'sleep(1ms)' loop reproduces the entire cost -- but on a
+   laptop it holds the package out of deep C-states and drains
+   battery. Measured and written up in
+   'TODO/typedb-performance-research.org'. Suggested fixes, in order of
+   payoff-to-risk: (a) run TypeDB only when Skg is in use; (b) never
+   run more than one TypeDB server, since each adds a '_system' poll
+   thread on top of its per-database ones -- this is the real reason
+   behind 'TODO/docker-unification-strategies.org'; (c) upstream, make
+   the WAL committer event-driven rather than a 1 kHz poll.
+
+** Idle CPU percentages in this repo's notes are not comparable across readings
+   'TODO/typedb-performance-research.org' recorded "4-5%" and a later
+   session recorded "16%" for the same unchanged TypeDB. Both were
+   correct measurements. %CPU is billed in seconds while a timer wakeup
+   costs a fixed number of cycles, so on this laptop -- unplugged, with
+   idle cores parked at 400 MHz ('min_perf_pct: 10') -- the identical
+   loop reads ~10x higher than it does with the cores warm. Any future
+   note that quotes an idle CPU percentage should also quote the CPU
+   clock, or should quote wakeups/second instead
+   ('voluntary_ctxt_switches' in '/proc/<tid>/status'), which is
+   clock-invariant. Compounding this, the host runs a PREEMPT_RT kernel
+   ('nix-jbb/config/audio-configuration.nix' sets 'kernel.realtime =
+   true' for audio), which makes each timer wakeup cost several times
+   more cycles than a stock kernel would.
+
+** 'ps %CPU' keeps being mistaken for current CPU
+   Noted as a pitfall once already in
+   'TODO/typedb-performance-research.org', and it bit again today:
+   'ps' reported 2.2% for TypeDB while 'top' reported 14.9%, because
+   'ps %CPU' is a process-lifetime average. The troubleshooting scripts
+   in 'docs/troubleshooting/typedb/' do not currently offer a
+   correct-by-construction way to sample current CPU. A small helper
+   that computes a delta from '/proc/<pid>/stat' over an interval would
+   stop this recurring.

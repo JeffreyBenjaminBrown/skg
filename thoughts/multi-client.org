@@ -1,0 +1,232 @@
+* Running Skg with a different config, and the two-person (Fred/Bob) setup
+
+Short answers up front, details below.
+
+- *Running a different config?* Yes. The server takes the config path
+  as its first positional argument, and =bash/start-servers.sh= exposes
+  that through the =SKG_CONFIG= env var.
+- *Will =start-servers.sh= do it?* Yes for one server. But it is built
+  to manage a *single* skg server (it =pkill='s every other =cargo
+  watch ... skg= and =cargo run --bin skg=), so you can't naively run
+  it twice for two servers. See [[*Caveat: start-servers.sh manages only one skg server][the caveat]].
+- *Two clients on the SAME server, with ownership flipped per person?*
+  *No.* Ownership (=user_owns_it=) is a property of the config the
+  server loads once at startup, not of the TCP connection. Every client
+  of one server sees the same folders as owned/foreign. To make
+  =data/fred= owned-to-Fred-but-foreign-to-Bob and vice-versa you need
+  *two skg servers* (two configs, two ports), one Emacs per person.
+
+* How to run Skg with a different config file
+
+The server reads its config path from =argv[1]=, defaulting to
+=data/skgconfig.toml= (=server/main.rs:77-79=). So, directly:
+
+#+begin_src bash
+  cargo run --bin skg -- path/to/other-config.toml
+#+end_src
+
+=bash/start-servers.sh= wraps that. Its first line of usage docs and
+=SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"= (line 19) mean you
+override it like this:
+
+#+begin_src bash
+  SKG_CONFIG=data/skgconfig-fred.toml ./bash/start-servers.sh
+#+end_src
+
+The directory containing the config is the *data root*; all relative
+paths in the config (source =path='s, =tantivy_folder=, =logs/=) resolve
+against it. The script also validates the config first via the
+=check-config= subcommand before touching TypeDB, so a typo fails loudly
+in red instead of crash-looping.
+
+* Why two clients on one server can't have flipped ownership
+
+Two distinct facts get conflated here; only one is per-connection.
+
+- *Ownership* (=user_owns_it= per =[[sources]]= entry) is loaded once,
+  at server startup, into =SkgConfig= (=server/types/misc.rs:65=), and
+  enforced server-side on every save via =user_owns_source=
+  (=misc.rs:397=). Foreign (=user_owns_it = false=) sources are
+  read-only; editing a foreign node is instead read as a *fork* request.
+  This is global to the server. The Emacs client even reads the same
+  flag straight from the TOML (=skg-owned-sources-from-toml= in
+  =elisp/skg-config.el=) to decide which sources it may offer as edit
+  targets.
+
+- *Active source-set* IS per TCP connection (see api-and-formats.md
+  § "Source sets": "The active source-set is per Emacs TCP
+  connection"). But a source-set only changes which sources are
+  *visible/active* in that connection. It cannot turn a foreign source
+  into an owned one. There is no per-connection ownership override
+  anywhere in the server.
+
+So if Fred and Bob both connect to one server, they share one config and
+therefore one ownership map. There is no way to make the same server tell
+Fred "you own =fred=, =bob= is foreign" while telling Bob the opposite.
+
+* The setup that works: two servers, two configs, two ports
+
+One TypeDB process (port 1729, shared) can back many skg servers, each
+with its own =db_name=. So run two skg servers that point at the *same*
+=.skg= files on disk but disagree about who owns what.
+
+** Config for Fred — =data/skgconfig-fred.toml=
+
+#+begin_src toml
+  db_name = "skg-fred"            # distinct DB per server
+  tantivy_folder = ".index.tantivy-fred"   # distinct index per server
+  port = 1730                     # Fred's client connects here
+
+  [[sources]]
+  name = "fred"
+  path = "fred"
+  user_owns_it = true             # Fred owns his folder
+
+  [[sources]]
+  name = "bob"
+  path = "bob"
+  user_owns_it = false            # ... and Bob's is foreign to him
+#+end_src
+
+** Config for Bob — =data/skgconfig-bob.toml=
+
+#+begin_src toml
+  db_name = "skg-bob"
+  tantivy_folder = ".index.tantivy-bob"
+  port = 1731                     # Bob's client connects here
+
+  [[sources]]
+  name = "fred"
+  path = "fred"
+  user_owns_it = false            # Fred's folder is foreign to Bob
+
+  [[sources]]
+  name = "bob"
+  path = "bob"
+  user_owns_it = true             # Bob owns his folder
+#+end_src
+
+What must differ between the two configs, and why:
+
+| Field            | Must differ? | Why                                                      |
+|------------------+--------------+----------------------------------------------------------|
+| =port=           | yes          | Each client connects to a different server.              |
+| =db_name=        | yes          | Two servers sharing one TypeDB DB would corrupt/race it. |
+| =tantivy_folder= | yes          | Two writers to one index dir collide.                    |
+| source =path='s  | no           | Both servers read the same =.skg= files on disk.         |
+| =user_owns_it=   | yes (flipped)| This is the whole point.                                 |
+
+Note: =data/fred= and =data/bob= don't exist yet (today =data/= holds
+=public=, =deciduous=, =personal-*=, etc.). Create each as a directory
+of =.skg= files; ideally make each a git repo so diff/fork features work.
+There's a worked example of the public/private/foreign layout in
+=example-data/= (its =Fred/= source is exactly a =user_owns_it = false=
+foreign source).
+
+* Starting the two servers
+
+** Caveat: start-servers.sh manages only one skg server
+
+=start_skg_with_restart= runs =pkill -f "cargo watch.*skg"= and the
+cleanup trap runs =pkill -f "cargo run --bin skg"=. Both are *global* —
+a second =start-servers.sh= would kill the first server's processes. So
+don't run it twice.
+
+** Recommended: one scripted server + one direct server
+
+1. Bring up TypeDB plus Fred's server, with auto-restart on code edits:
+
+   #+begin_src bash
+     SKG_CONFIG=data/skgconfig-fred.toml ./bash/start-servers.sh
+   #+end_src
+
+   (Foreground it in one terminal, or background it; it leaves a
+   =bash/stop-servers.sh= you can run to stop the group.)
+
+2. In a second terminal, start Bob's server *directly*. TypeDB is
+   already up, so skip =start-servers.sh= entirely — a plain =cargo
+   run= won't trip the global =pkill='s and won't be auto-restarted by
+   cargo-watch:
+
+   #+begin_src bash
+     cargo run --bin skg -- data/skgconfig-bob.toml
+   #+end_src
+
+   (Add => data/logs/bob-server.log 2>&1 &= to background it. It logs to
+   its own data root's =logs/=.)
+
+If you want both servers to auto-restart on code changes, give Bob his
+own cargo-watch with a distinct match string, e.g.
+=cargo watch -w server/ -x "run --bin skg -- data/skgconfig-bob.toml"=
+— but then a =start-servers.sh= =pkill= would still catch it, so prefer
+launching Fred directly too in that case, or just accept manual restarts
+for the video.
+
+* Two Emacs clients — one process per person
+
+A single Emacs process is hard-wired to one server: =skg-client-init=
+sets the global =skg-config-dir= and =skg-port= (=elisp/skg-client.el:31-36=),
+and the connection is a single global =skg-rust-tcp-proc= to
+=127.0.0.1:skg-port=. Worse, =skg-port= is bound with =defvar=, so
+*re-running =skg-client-init= in the same Emacs with a different config
+will not update the port* (recorded in =TODO/problems.org:444=). Don't
+try to host both roles in one Emacs.
+
+Instead, run two Emacs processes — which is also nicer for a video, since
+each role gets its own frame:
+
+#+begin_src bash
+  # Fred's Emacs
+  emacs &     # then, inside it:
+  #   (progn (load-file "../elisp/skg-reload.el") (skg-reload)
+  #          (skg-client-init "../data/skgconfig-fred.toml"))
+
+  # Bob's Emacs (separate process)
+  emacs &     # then, inside it:
+  #   (progn (load-file "../elisp/skg-reload.el") (skg-reload)
+  #          (skg-client-init "../data/skgconfig-bob.toml"))
+#+end_src
+
+Each =skg-client-init= reads its config's =port= and connects to the
+right server. Fred's Emacs hits 1730, Bob's hits 1731. To Fred, =fred=
+is editable and =bob= is foreign; to Bob, vice-versa. (Adjust the
+relative paths to match where you launch Emacs from; =docs/setup.org=
+launches from a sibling dir, hence the ="../..."=.)
+
+* One thing to plan around in the video: cache coherence
+
+This setup is clean on *writes*: Fred's server only ever writes =data/fred=
+(=data/bob= is read-only to it) and Bob's only ever writes =data/bob=, so
+the two servers never write the same file. No write-write conflict.
+
+But each server keeps its *own* TypeDB DB, Tantivy index, and in-Rust
+graph, all derived from disk at startup. The filesystem is the single
+source of truth, but the derived caches are not shared and are not
+cross-notified. So when Fred saves a change to =data/fred=, *Bob's
+server still holds a stale cached view of =data/fred== (which is a
+foreign source to it) until Bob's server's caches are refreshed.
+
+For sharing demos (subscribe / override / fork — where Bob reacts to
+Fred's foreign data) this matters. After one person edits, the other
+should refresh before viewing the change: run =M-x skg-rebuild-dbs= in
+the reader's Emacs (the "rebuild dbs" endpoint;
+=elisp/skg-request-rebuild-dbs.el=), which wipes and rebuilds that
+server's TypeDB + Tantivy from disk. A server restart does the same.
+Sequence the video as: Fred edits & saves → Bob runs =skg-rebuild-dbs= →
+Bob sees the update.
+
+* Summary checklist
+
+- [ ] Create =data/fred/= and =data/bob/= as folders of =.skg= files
+      (git repos recommended).
+- [ ] Write =data/skgconfig-fred.toml= and =data/skgconfig-bob.toml=
+      with distinct =port=, =db_name=, =tantivy_folder=, and flipped
+      =user_owns_it=.
+- [ ] =SKG_CONFIG=data/skgconfig-fred.toml ./bash/start-servers.sh=
+      (TypeDB + Fred's server).
+- [ ] =cargo run --bin skg -- data/skgconfig-bob.toml= in a second
+      terminal (Bob's server).
+- [ ] Two Emacs processes, each calling =skg-client-init= on its own
+      config.
+- [ ] After a cross-person edit, =M-x skg-rebuild-dbs= on the other
+      server before viewing.

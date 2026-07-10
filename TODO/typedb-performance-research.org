@@ -162,6 +162,13 @@ That limited attribution to thread names, kernel wait channels, TypeDB
 config, sockets, logs, and controlled restarts. The best next
 instrumentation would be a real profiler or TypeDB-maintainer guidance.
 
+* SUPERSEDED -- see "2026-07-09: the percentage is a thermometer" below
+The explanation in this section is correct as far as it goes (TypeDB
+polls; Skg is not the cause), but it treats the idle CPU *percentage*
+as a fixed property of TypeDB. It is not. The percentage varies by ~10x
+with CPU clock speed, which is why the reported figure has drifted from
+"4-5%" to "north of 15%" with no change to TypeDB or Skg.
+
 * Current best explanation
 Skg is not making TypeDB do hidden Skg work after initialization.
 
@@ -252,3 +259,358 @@ Skg through the existing cargo-watch process. At restoration time:
 - Skg was listening on 1730.
 - Skg had an established TCP connection to TypeDB.
 - Skg logs reported 'Server ready.'
+
+* 2026-07-09: the percentage is a thermometer, not a workload
+Jeff's question: "TypeDB used to idle around 4% CPU; now it's north of
+15%. I edit maybe one node every five minutes."
+
+** Answer, in one line
+TypeDB is doing exactly as much work as before -- which is *none*. The
+number changed because the CPU's clock speed changed. 15% of a 400 MHz
+core is less work than 4% of a 4 GHz core.
+
+** How we know TypeDB is doing no work
+Two threads account for essentially all of TypeDB's idle CPU (TID 113,
+203 in the observed process; every other thread is parked in futex or
+epoll, and the rocksdb threads are flat at 0). Both sit in
+'hrtimer_nanosleep'. There is one such thread per open database, and
+exactly two databases are open: '_system' (mandatory) and 'skg-real'.
+
+Their measured behavior:
+
+- ~920 wakeups/second each, i.e. a 1 ms sleep loop.
+- Statistically identical to each other, to three significant figures,
+  even though 'skg-real' is 91 MB and '_system' is ~1 MB. So the cost
+  is independent of database contents.
+- ~2:1 system:user time, both currently and over their whole lifetime.
+  Same code path throughout; nothing "grew".
+
+The control experiment settles it. A Python loop that does nothing but
+'time.sleep(0.001)', twice over, costs the same as TypeDB's two threads
+measured in the same window:
+
+|                       | idle CPU |
+|-----------------------+----------|
+| TypeDB's two threads  |     4.0% |
+| 2x bare 1 ms sleep    |     3.1% |
+| TypeDB's two threads  |     4.3% |
+| 2x bare 1 ms sleep    |     3.9% |
+| TypeDB's two threads  |     3.7% |
+| 2x bare 1 ms sleep    |     3.9% |
+
+A loop that sleeps and does nothing else reproduces TypeDB's entire
+idle cost. There is no TypeDB work to optimize.
+
+** Why the number moved from 4% to 15%
+Because %CPU is measured in *seconds*, while a wakeup costs a roughly
+fixed number of *cycles*. Drop the clock and the same wakeup bills more
+seconds.
+
+Measured, varying clock by loading other cores (16-core i5-13500H):
+
+| competing busy cores | avg MHz | us CPU/wake | sleep-loop CPU |
+|----------------------+---------+-------------+----------------|
+|                    0 |     966 |        28.7 |          2.64% |
+|                    1 |    1501 |        22.1 |          2.05% |
+|                    3 |    1844 |        25.2 |          2.33% |
+|                    8 |    2697 |        13.0 |          1.22% |
+
+Wake *rate* stays ~920/s in every row. Only the cost per wake moves,
+and it moves as 1/frequency. Earlier in the same session, with cores
+parked at 400 MHz, we measured 93 us/wake and 8.5% per thread -- about
+17% for the pair, which is the "north of 15%" Jeff saw.
+
+Two things put this machine at a low idle clock:
+
+- 'ADP1: 0', 'BAT0: Discharging' -- the laptop is on battery.
+- 'min_perf_pct: 10' with 'cpuinfo_min_freq 400000' -- idle cores park
+  at 400 MHz, and a 1 ms sleeper never generates enough utilization to
+  ramp them up.
+
+So: when the box is deeply idle and unplugged, TypeDB's do-nothing loops
+read as ~15%. Warm the CPU up and the identical loops read as ~1-4%.
+Counterintuitively, loading the machine makes TypeDB's *percentage* fall
+(measured: 0.7% with 12 busy cores), because wakes get cheaper and the
+loop is descheduled more.
+
+** A second, independent multiplier: the realtime kernel
+'/proc/version' reports '6.18.35 ... #1-NixOS SMP PREEMPT_RT', and
+'/proc/config.gz' confirms 'CONFIG_PREEMPT_RT=y', 'CONFIG_HZ=1000'.
+This comes from Jeff's own host config: 'nix-jbb/config/audio-configuration.nix'
+sets 'kernel.realtime = true' (musnix), for PipeWire/Reaper.
+
+Under PREEMPT_RT, hrtimer expiry runs in threaded softirq context and
+each wakeup is a full preemptible scheduling event. The cost we measure
+is ~30-40k cycles per timer wake (13 us at 2697 MHz). A stock kernel is
+nearer 5-10k. Ordinary syscalls are unaffected and remain fast here
+('getpid' 0.39 us, 'clock_gettime' 0.07 us via vDSO, 'sched_yield'
+0.35 us) -- it is specifically the timer/wakeup path that is expensive.
+
+CAVEAT: this multiplier is inferred, not A/B tested. Isolating it would
+require booting a non-RT kernel, which would cost Jeff his audio setup.
+The frequency effect above IS directly measured and is sufficient on its
+own to explain 4% -> 15%.
+
+** What the real cost is
+Not CPU. The real cost is ~2000 wakeups/second on an idle laptop, which
+holds the package out of deep C-states and drains battery. Note also
+that only ACPI C-states are exposed here ('POLL C1_ACPI C2_ACPI
+C3_ACPI'), not intel_idle's deeper C6/C8/C10 -- so the idle floor is
+already shallower than this hardware allows.
+
+Judged as energy, "15%" is a much smaller number than it looks. Judged
+as wakeups, it was always wasteful, and always was in the 4% era too.
+
+** What to do about it, cheapest first
+1. Nothing. Understand that the number is a thermometer. Compare idle
+   CPU only at comparable clock speeds, or compare wakeups/second
+   instead ('voluntary_ctxt_switches' in '/proc/<tid>/status').
+2. Plug the laptop in, if the number is bothering you. This does not
+   reduce the wakeups; it just stops the accounting from magnifying
+   them.
+3. Run TypeDB only when in use. This removes 2000 wakeups/s entirely
+   and is the only option that actually helps battery life. Best
+   payoff-to-risk of the real fixes.
+4. Do not run one TypeDB per Skg environment. Each server adds a
+   '_system' poll thread on top of its per-database ones. The existing
+   advice in 'TODO/docker-unification-strategies.org' still stands, and
+   this is the correct reason for it.
+5. Raise TypeDB's WAL sync interval and rebuild from source. Measured
+   scaling of the sleep loop, which bounds the payoff:
+
+   | sleep interval | wakes/s | CPU % of a core |
+   |----------------+---------+-----------------|
+   |            1ms |     922 |           2.33% |
+   |            2ms |     479 |           1.27% |
+   |           10ms |      99 |           0.37% |
+   |           50ms |      20 |           0.12% |
+
+   1ms -> 20ms is roughly an 8x reduction. Cost: the container images
+   are built from 'other-projects/docker-typedb-rust' (outside this
+   repo) against a prebuilt TypeDB tarball, so this means switching to
+   a source build. Also a durability tradeoff -- a longer sync interval
+   widens the window of un-fsynced commits.
+6. Upstream fix: make the WAL committer event-driven (park on a
+   condvar, woken by a commit) instead of polling at 1 kHz. This is the
+   correct fix and costs nothing at idle. github.com/typedb/typedb
+
+** Corrections to earlier notes in this file
+- "The empty server tended to show one polling thread at 1-3%; the real
+  'skg-real' store two threads at 4-5%." The thread *count* tracks the
+  number of open databases (empty server = '_system' only = 1 thread).
+  It does not track database size, and the percentages in that sentence
+  are clock-dependent, not store-dependent.
+- The pitfall note about 'ps %CPU' being a lifetime average is correct
+  and was load-bearing again today: 'ps' showed 2.2% while 'top' showed
+  14.9% for the same process, because the high-cost period was recent.
+
+** Method notes, for next time
+- 'strace', 'perf', 'gdb', 'ltrace' are all still unavailable here.
+  Everything above was obtained from '/proc', '/sys', and controlled
+  microbenchmarks in Python. That was sufficient.
+- The decisive move was building a *control*: a loop known to do no
+  work, measured in the same window as the suspect. Absolute percentages
+  in this environment are close to meaningless on their own.
+
+* 2026-07-10: would 5ms polling cut CPU 80%? and could it be event-driven?
+Jeff's follow-up, after the thermometer writeup above.
+
+** "5 ms would cut CPU by 80%" -- half right, and the other half is instructive
+Raising the WAL poll interval from 1 ms to 5 ms means ~5x fewer
+wakeups. So the *wakeup count* drops ~80%. But the *CPU percentage*
+drops only ~55%. Measured back-to-back, same conditions:
+
+| interval | wakes/s |  CPU% | us/wake |
+|----------+---------+-------+---------|
+| 1ms      |     918 | 2.48% |    27.0 |
+| 5ms      |     195 | 1.14% |    58.7 |
+
+wakeups: -79%   CPU-seconds: -54%
+
+The gap is the same thermometer effect from the section above, now
+working against us. Fewer wakeups means the core is idle more, so it
+clocks down and sleeps deeper, so each *remaining* wake costs more than
+twice as much (27 -> 59 us). The polling loop partly self-defeats: the
+lazier it gets, the more expensive each tick becomes.
+
+Which number is "real"? Wakeups. CPU% is the thermometer. And by the
+number that matters -- wakeups/second, i.e. battery and C-state
+residency -- 5 ms genuinely buys ~80%. So the change is worth it; just
+don't expect the CPU% in 'top' to fall by 80%, because that figure was
+never the honest cost.
+
+** Is 5 ms safe? Yes, and for this application almost trivially so
+The WAL committer is a group-commit design: it batches transactions and
+fsyncs them on a timer instead of fsyncing per-commit. Raising the
+interval widens the batch window. Two possible effects, depending on
+whether TypeDB blocks a commit's acknowledgement until the fsync lands
+(I have not read TypeDB's exact WAL code -- the binary is a prebuilt
+tarball -- so this is reasoning from the standard group-commit pattern,
+not from its source):
+
+- If commit blocks until fsync (synchronous durability): a commit waits
+  up to 5 ms instead of up to 1 ms. Pure latency, no loss. At "one node
+  every five minutes" this is invisible.
+- If commit returns before fsync (deferred durability): a crash could
+  lose up to ~5 ms of committed writes instead of ~1 ms.
+
+And here is the point that makes this nearly a non-question for Skg:
+**TypeDB is a derived cache; the '.skg' files on disk are the source of
+truth** (orientation, and restated in this file's first section). Even
+in the worst case -- TypeDB crashes and loses its last few ms of writes
+-- the database is rebuildable from disk. The durability window on
+TypeDB's WAL is not the durability window on Jeff's data. So 5 ms, 20
+ms, even 50 ms are all safe in the way that matters; the only real cost
+is commit latency, which is negligible at this write rate.
+
+** The catch that reframes everything: it is a compile-time constant
+'WAL_SYNC_INTERVAL_MICROSECONDS' is not in 'config.yml'. It is a
+compile-time constant in TypeDB's Rust source. So "change 1ms to 5ms"
+is NOT a config edit -- it requires patching TypeDB and rebuilding from
+source, which today means abandoning the prebuilt tarball that
+'other-projects/docker-typedb-rust' pulls.
+
+That matters because it means the cheap-looking change and the
+satisfying change cost the *same* to deploy. Once you are rebuilding
+TypeDB anyway, tuning a constant is the strictly worse investment.
+
+** The satisfying version: event-driven, not polled. Feasible, and standard.
+Jeff's instinct is right, and it is not exotic -- an idle-zero WAL
+committer is how mature databases already do group commit. The polling
+loop is arguably the naive implementation.
+
+The event-driven shape:
+
+- The committer thread parks on a condition variable with NO timeout
+  when the commit queue is empty. Zero wakeups, zero CPU, indefinitely.
+- A transaction that commits appends its records and signals the
+  condvar.
+- The committer wakes, drains everything queued, issues one fsync,
+  releases all the waiters batched behind it, and parks again.
+
+This is strictly better than the 1 kHz poll on every axis:
+
+- Idle cost: zero, not ~2000 wakeups/s.
+- Latency: it fsyncs the instant a commit arrives, instead of waiting
+  up to a full poll interval for the next tick.
+- Batching under load: the batch forms naturally from whatever arrives
+  during the in-flight fsync -- the classic leader/follower group
+  commit -- so throughput is as good or better.
+- The durability window shrinks rather than widens, so the safety
+  question above disappears entirely.
+
+If you want a bounded worst-case batch under sustained load, you park
+with a timeout *only when work is already pending*; when idle you park
+forever. That preserves batching with still-zero idle cost. The one
+piece of care required is the usual condvar discipline (check the
+predicate under the lock; don't lose a signal that races the park) --
+well-trodden, but the reason a naive poll is tempting.
+
+The 50 ms statistics updater is the same story with a twist: stats
+usually *want* debouncing, not firing on every commit. So the ideal is
+edge-triggered-then-debounced -- a commit arms a 50 ms one-shot if one
+isn't already armed; it fires once, recomputes, and disarms. Idle: no
+timer.
+
+** What this does NOT enable: an external fix
+The events these threads care about (a transaction committed) are
+internal to TypeDB. Skg cannot inject them. So there is no way to make
+TypeDB event-driven from outside -- the fix lives in TypeDB's source.
+The only external levers remain topology (run TypeDB on demand; never
+more than one server). A process-level "SIGSTOP when idle, SIGCONT on
+demand" is technically possible but fragile -- it would freeze Skg's
+long-lived driver connection -- and is not recommended.
+
+** Bottom line
+- 5 ms is safe, and safe here to the point of being uninteresting,
+  because TypeDB is a rebuildable cache. It cuts wakeups ~80% and CPU%
+  ~55%.
+- But it requires a source build, which is the same barrier as the
+  event-driven rewrite.
+- So the event-driven WAL committer is the better use of that same
+  effort: zero idle cost, lower latency, no durability tradeoff. It is
+  the standard group-commit design, and the right place to land it is
+  upstream ('github.com/typedb/typedb'), not a local fork that would
+  need re-porting against every TypeDB release.
+
+* 2026-07-10: what does restarting TypeDB on demand actually cost?
+Jeff's question, weighing the Tier-1 "run TypeDB only when in use" advice.
+
+** TypeDB's own restart is trivial: ~0.25 s
+Measured directly: launch 'typedb_server_bin' against a copy of the
+real 91 MB 'skg-real' store (admin port relocated off 1728 to avoid
+colliding with the live server) and time until it accepts a TCP
+connection on the gRPC port.
+
+| store            | time to accept connections |
+|------------------+----------------------------|
+| empty            | ~0.10 s                    |
+| 91 MB skg-real   | 0.23 / 0.25 / 0.27 s       |
+
+Reproducible across restarts. Scales only mildly with store size
+(RocksDB open + per-database load). TypeDB 3.11.5 here. So the *server*
+is essentially free to bounce.
+
+Method notes: 'setsid' is not installed (research pitfall list was
+right); launch with plain '&' inside one long-lived shell. The server
+prints a banner and "Ready!" even when it then fails to bind, so
+"Ready!" is NOT proof of serving -- confirm with an actual TCP connect.
+Our first attempts read "never served" purely because the test
+instance's Admin endpoint defaulted to 1728, which the live server
+already holds; '--server.admin.port' fixes it.
+
+** But you don't restart TypeDB alone -- and that is the whole answer
+Jeff talks to Skg, not TypeDB. Skg builds one long-lived TypeDBDriver in
+'SkgEnv' at startup ('server/dbs/init.rs'). Restarting TypeDB under a
+running Skg drops that connection, and Skg's init-once design gives no
+sign it reconnects mid-run. So in practice "restart TypeDB when I need
+it" means "restart Skg too," and the lag that matters is *Skg's*
+startup, not TypeDB's 0.25 s.
+
+Skg's startup (traced by an Explore pass over 'server/dbs/init.rs' and
+'TODO/incremental-init-might-be-broken.org'):
+
+- It REUSES the persistent TypeDB store by default ('delete_on_quit'
+  defaults false and is unset for the real config), and does an
+  *incremental* init -- re-ingesting only '.skg' files modified since
+  the last run. Good: no wipe, no schema re-define, no full re-ingest
+  in the common case.
+- BUT even the incremental path reads ALL '.skg' files every startup to
+  rebuild the in-RAM graph and ranking maps from scratch. That is the
+  floor, and it is not small: the real store is 60,688 '.skg' files,
+  ~239 MB, across the sources in 'data/skgconfig.toml'.
+
+Measured floor (from the TODO's table, ~60k nodes):
+
+| startup scenario                    | time to "Server ready" |
+|-------------------------------------+------------------------|
+| incremental, 1 file changed         | ~3.9 s (~2.7 s init)   |
+| incremental, ~15k files changed     | ~35 s                  |
+| full rebuild (schema change, etc.)  | ~44 s                  |
+
+So a typical restart with a handful of edited files is ~3-4 s TODAY, and
+it grows with total graph size (that ~2.7 s floor is a whole-corpus
+read, so it rises as the garden grows). A full rebuild -- triggered by a
+changed 'schema.tql'/'skgconfig.toml', a missing DB, an emptied Tantivy
+index, or an incremental failure -- is ~44 s.
+
+** Verdict: on-demand at SESSION granularity, never at OPERATION granularity
+- Per work session (start when you sit down, stop when you leave):
+  ~3-4 s once, amortized over hours. Trivially worth it, and it removes
+  100% of the idle wakeups while you are away.
+- Per operation ("every time I need it" = per edit, ~1 edit / 5 min):
+  ~3-4 s of Skg re-init *before each edit*, plus a Skg restart each
+  time. That defeats the point of an interactive editor and gets worse
+  as the graph grows. Not worth it.
+
+The lag is Skg reading 239 MB of '.skg' files, not TypeDB opening
+RocksDB. Bouncing TypeDB alone would be ~0.25 s, but the architecture
+does not let you bounce it alone.
+
+** Middle path worth noting
+Because TypeDB's restart is only ~0.25 s but Skg's is ~3-4 s, the cost
+lives in Skg, not TypeDB. If the goal is purely to stop the idle
+wakeups, the cheapest lever is still "don't leave it resident overnight
+/ while away," at session granularity. For within-session responsiveness
+keep both up. On a laptop the honest framing remains: the wakeups are a
+battery cost, so tie teardown to being away/unplugged, not to each edit.
