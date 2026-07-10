@@ -1,3 +1,15 @@
+** Cargo.lock was gitignored, so builds were not reproducible across clones
+   Noticed 2026-07-10 during the typedb-driver 3.12.0 bump: 'Cargo.lock'
+   was untracked and matched by .gitignore. For a binary/application
+   crate the usual practice is to commit the lockfile, so every clone
+   builds the same dependency graph. The exact '=' pin protects
+   typedb-driver specifically, but the other ~350 crates in the graph
+   float within semver on any fresh clone or 'cargo update', so "works
+   here" does not pin "works there", and a bisect across old commits
+   cannot reconstruct the dependency set that was actually built.
+   RESOLVED 2026-07-10 (bump-typedb): un-ignored and committed
+   Cargo.lock, freshly verified against TypeDB 3.12.0 and the full
+   test suite.
 ** api-and-formats.md omitted the 'save-relax-lock' message from the save stream
    Found while inventorying the wire protocol to plan the Neovim port
    (TODO/vim-client/). The "Save buffer" section documented the

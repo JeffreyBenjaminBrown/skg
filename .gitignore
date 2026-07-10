@@ -36,7 +36,6 @@
 /tests/results
 /worktree-specific
 
-Cargo.lock
 TAGS
 __pycache__
 org-roam/
