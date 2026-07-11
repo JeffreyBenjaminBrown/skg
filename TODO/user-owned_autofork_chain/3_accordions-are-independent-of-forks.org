@@ -1,0 +1,82 @@
+* Maybe they shouldn't be different nodes.
+** the idea
+The autoforks are represented via different files on disk,
+but conceptually, they are not distinct graph entities;
+they are just different places to keep information about the same node.
+Forking and automatic source separation are, I suspect,
+probably best implemented separately first,
+and only after that their interaction.
+
+Apart from forking, the automatic splitting of a node into
+distinct per-source representations needs a snappy name.
+Until I think of a better one let's call it the privacy accordion.
+*Every* user-owned node N should be represented with a privacy accordion.
+If N's content are all at least as public as N,
+then N's representation does not change.
+(I'll handle other relationships soon.)
+But if any content are more private than N,
+those content are represented with esparate nodes -- with the same ID! --
+in separate sources. No relationship needs to be drawn to connect them.
+(This will violate some property we validate; that validation will need changing.)
+Only the most-public representation uses the normal list of ids to represent its content;
+the others all use a pair of type (maybe list of ids, (anchor, maybe list of ids)),
+and each can only anchor to nodes (of the same id) more public than itself.
+
+This lets us unify the concepts of 'perceived content' and 'actual content'.
+Every file in the accordion represents literal content.
+But some of the content might be unavailable, due to its source being inactive.
+
+Once this is in place, the 'auto fork' idea might be competely unnecessary.
+You can fork someone else's node, and create what I was calling an autofork chain for free,
+assuming the mechanism for accordioning an ID is in place,
+by including some content in a node that is more private than that node.
+
+Other relationships can be represented identically.
+A public node might have a semi-private node with the same ID
+representing some subscriptions and no content,
+and a super-private node representing some content.
+
+Where I wrote
+'Only the most-public representation uses the normal list of ids to represent its content'
+I was a little sloppy, because content need not be the relationship
+that defines the most-public file representing a node.
+
+Also I was sloppy in that there might be multiple files for a given ID
+that use the ordinary list syntax, if the most-public source for one relationship
+differs from the most-public source for another.
+For instance, if S1 is most public and S5 is least,
+and my node N has content in sources S1 through S5,
+and subscriptions in sources S2 through S5,
+then the representation of N in S1 would use the ordinary list rep
+(rather than the (maybe list, list of (anchor, list) pairs) type)
+for its content, and the representation of N in S2 would use
+the more complicated representation for its content
+but the simpler list form for its subscriptions.
+
+It's not clear how the user ought to determine the source of the file
+representing such relationships, though. If public N contains private C,
+that relationship must be in a private file with N's ID.
+But if N subscribes to S, nothing yet tells skg where to put that subscription relationship.
+
+A general solution would be to:
+- By default, if the *col viewnode V describes relationships
+  from its ancestor N (maybe its parent, or maybe farther away) to its view-content,
+  keep all the relationships V defines in the same file as
+  the most public representation of N itself.
+- Permit the user to add a new kind of request,
+  by calling 'skg-obfuscate-relationship',
+  which can attach metatdata something like
+  (request-obfuscate <sourcename>) to any one child of V.
+** incomplete thought : The relationships could be explicitly ternary..
+Throughout this I'm thinking of source as a property of a relationship.
+We could strictly reify that:
+"In source <s>, node <x> bears <relationship name> relationship to source <y>".
+We would, though, still use .skg files with the above scheme to represent all that data.
+
+I don't know where to go with that.
+** my request
+In a new document, 4_discussion.org,
+please give this idea the same treatment as 2_*.org gave to 1_*.org.
+Include a discussion of whether this idea by itself
+completely covers everything I wanted in the earlier 1_*.org proposal.
+(I hope it does.)

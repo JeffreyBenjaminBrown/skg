@@ -1,0 +1,797 @@
+#+TITLE: Discussion of the privacy accordion (3_accordions-are-independent-of-forks.org)
+#+TODO: TODO ONGOING | DONE
+
+* Summary
+The accordion is a better idea than the chain. Its central move —
+one node, one ID, several per-source files, no connecting
+relationship — deletes the worst problems of the autofork design
+rather than solving them:
+
+- No carrier IDs exist, so nothing must be hidden, translated, or
+  kept stable. The chain's largest implementation risk (carrier
+  transparency across every inbound query) vanishes outright.
+- Renormalization stability is free: a part's identity is
+  (ID, source), fully deterministic, so saves cannot churn
+  generated IDs.
+- No sixth relationship, no perceived-node/carrier distinction, no
+  interaction with override monogamy, menus, or markers.
+
+And yes — [[*Does the accordion cover everything 1_vision wanted?][it covers everything 1_vision wanted]], plus one thing the
+chain could not express (per-relationship privacy falls out
+uniformly).
+
+What it costs: it breaks the foundational invariant "one ID, one
+file, one source", whose assumptions are scattered (init
+validation, TypeDB cardinality, stage-moves' move heuristic, diff
+analysis, the audit) — a bounded but grep-not-compiler kind of
+sweep. And it introduces one genuinely new problem the chain did
+not have: [[*Foreign accordions fold in an order the receiver must guess][the fold order of a foreign accordion lives in the
+receiver's config, not in the data]].
+
+The one outright error I see: [[*The proposed default for col relationships re-creates the ID leak][the proposed default for col-defined
+relationships]] ("most public representation of N") re-creates the
+private-ID leak for private targets. The fix is a uniform rule —
+and the doc's own "incomplete thought" about ternary relationships
+is, I think, [[*The ternary model is the answer to its own incomplete thought][the place that rule comes from]].
+
+* DONE Does the accordion cover everything 1_vision wanted?
+Yes — every goal, and more simply. Point by point:
+
+- *Experience all forks as one viewnode*: exceeded. The chain
+  simulated one node; the accordion IS one node (one ID). Nothing
+  needs unifying because nothing was split.
+- *Choosing which source each child is in*: covered — a private
+  child's membership lands in the same-ID file in that source, and
+  'skg-obfuscate-relationship' (plus [[*The proposed default for col relationships re-creates the ID leak][the corrected default]]) covers
+  memberships that need to be more private than their child.
+
+  DONE (Jeff speaking): In the above I think you might be conflating
+  the distinction between child and content. Children are a view property,
+  because in org there is only one relationship between parent and child.
+  Those relationships correspond to different graph relationships.
+  In the graph there are no children, only relationships.
+
+  DONE (Claude): Agreed — sloppy wording on my part. Everywhere I
+  wrote "child" above, read "the target of the relationship
+  instance that the org parent-child position represents" (usually
+  contains, sometimes a col membership). The level rule is already
+  stated per relationship instance, so it lives at the right
+  altitude; I will say "relationship instance" or "member" from
+  here on.
+- *A fork system automatically created*: obviated, which is
+  better. Within one's own data, no fork exists at all — just
+  files. At the foreign boundary the ordinary fork (clone,
+  subscribe, override) remains, unchanged, and the clone
+  accordions like any owned node. That reproduces exactly what the
+  chain's F1 + carriers would have built, with zero new relations.
+- *Without restating lots of IDs*: covered — non-base parts store
+  only additions and anchors.
+- *The public one need never mention private node IDs*: covered,
+  provided the default-level rule below; the leak-free property is
+  the same "memberships live at the child's level" idea.
+- *Concentric source order / auto-defined source-sets*: NOT
+  covered, by design — 3_*.org itself says the pieces should be
+  built separately. Note the dependency is now stronger: the
+  accordion cannot even *fold* without the privacy order (the
+  chain carried its order in its edges; the accordion reads it
+  from the config). Concentric order is a prerequisite, not a
+  sibling feature.
+- *The AFk herald*: needs a successor decision
+  ([[*What visually marks an accordioned node?][below]]) — the accordion has no salient "length".
+- *"Unify perceived and actual content"*: covered explicitly; this
+  is the accordion's cleanest conceptual win. Every file states
+  literal content; visibility is just source activity.
+
+Bonus, beyond 1_vision: per-relationship and per-alias privacy
+(a semi-private subscription, a private alias for a public node)
+falls out of the same mechanism — the chain needed "collections
+fold too" bolted on; here it is the same rule as contains.
+
+So the chain can be retired as a design. The parts of
+[[./2_discussion.org][2_discussion.org]] that survive are listed at [[*What carries over from the chain discussion][the end]].
+
+* Incorrect things
+** DONE The proposed default for col relationships re-creates the ID leak
+"By default ... keep all the relationships V defines in the same
+file as the most public representation of N itself." If N is
+public and subscribes to a *private* S, this default writes S's ID
+into a public file — exactly the leak ("the public one need not
+even mention private node IDs") this whole design exists to
+prevent. Contains avoids it only because its default is stated
+per-child.
+
+The uniform rule that fixes it (and subsumes the contains rule):
+
+  a relationship instance defaults to the level of the more
+  private of its two endpoints' homes; obfuscation may RAISE that
+  level, never lower it.
+
+For contains with a private child, that is the child's level (the
+vision's rule); for a subscription to a private S, it is S's level
+(leak avoided); for a public child of a public node, it is the
+plain public membership of today. The validator should enforce the
+"never lower" direction: a membership more public than its target
+is precisely an ID leak.
+*** DONE (Jeff speaking)
+I want to (if I read you correctly) restate this,
+to be sure we're on the same page:
+
+Suppose the sources are the values of Sj for various j values,
+with higher j = more private.
+(j need never actually be defined in the code, although that might be simplest;
+as long as the > relationship is defined, we can do it. But it's convenient here.)
+If N is in Sj, and N contains C in Sk, then
+- j > k => the relationship is recorded in Sj.
+- k < j => the rrelationship is recorded in Sk.
+
+The same is true of non-content relationships.
+
+**** DONE (Claude) Same page, with one typo
+Your two conditions are the same condition (j > k is k < j); the
+second bullet should read k > j. Both collapse to: the relationship
+is recorded in S_max(j,k) — the source of the more private
+endpoint. (When j = k, that shared source is the only candidate.)
+'skg-privatize-relationship' may then raise it above max(j,k),
+never lower it below. And yes, the same rule for non-content
+relationships — with the one exception you yourself found later in
+this doc: hides need more than the two-endpoint rule (see the
+hide-leak thread under "Fold semantics").
+
+** ONGOING The placement-type sentence is garbled (the doc later corrects itself)
+Line 22 gives the pair as "(maybe list of ids, (anchor, maybe list
+of ids))"; line 51 has the intended shape, "(maybe list, list of
+(anchor, list) pairs)". Also, carried over from the chain
+discussion: =maybe= on the prepend list buys nothing on disk
+(absent and empty mean the same thing there) — a plain
+possibly-empty list is simpler; and the pair still admits invalid
+states (duplicate anchors, out-of-order runs, empty runs), so
+normalization + validation remain necessary.
+
+*** ONGOING (Jeff speaking) Nice!
+A sufficient type is (in Haskell notation)
+(List ID, List (anchor : ID, List ID).
+For any (anchor, list) value in the right side of that pair,
+normalization should remove it if the list is empty.
+
+Strangely, an anchor list that's out of order is still perfectly reasonable.
+And they could be arrived at, if a save from a restricted view
+reorders the anchors that a private file referred to.
+If skg finds such data, I don't think it should even reorder it --
+the git diff noise would be annoying, and a user curious enough to inspect
+is probably smart enough to understand.
+
+**** ONGOING (Claude) Agreed on the type and on not reordering; three knock-on rules
+- The type (List ID, List (anchor : ID, List ID)) is exactly what I
+  hoped for, and normalization dropping empty runs, agreed.
+- Since run order is legal in any permutation, duplicate anchors
+  (two runs naming the same anchor, reachable via external edits)
+  need a deterministic fold rule; "concatenate runs sharing an
+  anchor, in file order" is the obvious one.
+  DONE jbb : agreed, let's do the obvious one
+- My earlier fallback for a DANGLING anchor ("attach the orphaned
+  run after the previous run") secretly relied on run order being
+  meaningful. Since it is not, the fallback should be
+  order-independent: append the orphaned run at the end of the
+  fold, with a warning.
+  DONE jbb : That would require expanding the type to
+  (List ID, List (anchor : ID, List ID), List ID), wouldn't it?
+  It feels more natural to append it to whichever run preceded it.
+  But definitely warn.
+
+  DONE (Claude): No type change needed — the fallback is FOLD-time
+  behavior, not storage. The orphaned run stays in the file exactly
+  as written, dangling anchor and all (eagerly rewriting it would
+  violate the no-cosmetic-rewrites rule); the fallback only decides
+  where the fold PLACES those members while the danglement lasts.
+  And your placement is better than mine: attach after whichever
+  run preceded it in the file (after the prepend list if it is the
+  first run) — more local than end-of-fold, and deterministic
+  because file order is still an order even though it is not
+  semantically canonical. Adopted, with the warning. One upgrade in
+  the plan: when the dangle is created BY a save (that save deleted
+  the anchor), the server still holds the old fold and can
+  re-anchor the run precisely, to the nearest surviving more-public
+  predecessor; the preceding-run fallback then covers only dangles
+  that arrive from outside (git pulls, hand edits).
+- Reconciling don't-reorder with the level-ungated save maintenance
+  you approved below: a save rewrites a part's file only when its
+  SEMANTICS change (a membership changed, a dangling anchor was
+  repaired) — never cosmetically, so a merely out-of-order part
+  stays byte-identical. Precedent: strip-body-whitespace's "a clean
+  file stays byte-identical" rule.
+
+** "Anchor to nodes (of the same id) more public than itself" is garbled too
+Anchors are not nodes of the same ID; they are *members* (child
+IDs) listed by more-public files *of the same accordion*. I.e.: a
+part at level k may anchor only to IDs that the fold of the
+strictly-more-public parts already contains. Worth restating
+precisely, because it is the load-bearing constraint that makes
+the fold well-defined and the visible-prefix rendering coherent.
+
+* Unmade decisions
+** DONE Which file is the node's home, and what may non-home files contain?
+Title and body are scalars — they cannot fold as lists do.
+Presumably they live in exactly one part (the most public one: the
+node's *home*), and that home's source is "the node's source" for
+every purpose that wants a single answer (Tantivy's source field,
+search filtering, endpoint gating, =has_source=). Decisions:
+- May a non-home part carry title/body? (Recommend: validation
+  error — otherwise two parts can disagree and the fold needs a
+  tie-break nobody wants to specify.)
+  Jeff: Agreed.
+- Is a home file *required* (may an accordion be all-relative,
+  with no plain rep anywhere)? A prepend-only part needs no
+  anchors, so the fold tolerates it; but a titleless node is
+  today an error. Recommend: home required.
+  Jeff: Agreed.
+- The stated sloppiness — the most-public file *per relationship*
+  varies — is fine and needs no repair, only a validator: per
+  relationship, at most one plain rep, and every relative rep
+  strictly more private than it.
+  DONE (Jeff speaking): At most one plain rep *per relation*.
+  For instance the plain rep of content might be in one source,
+  but the plain rep of the same node's subscriptions might be
+  in another. In both cases they are in the most public file
+  that mentions that relation at all.
+  Also, of course, there should be *at least* one plain rep
+  per active relation.
+
+** DONE The two-shape file format
+Each relationship field now comes in two shapes (plain list vs
+placement pair). YAML decisions: same key with a tagged value, or
+sibling keys (=contains= vs =contains_placed=)? And the
+inter-file semantics of absence changes meaning: today absent ==
+empty on disk; in an accordion, a part that omits =subscribes_to=
+has *no opinion* (other parts may still have members) — which is
+the MSV distinction surfacing on disk for the first time. Worth
+writing down deliberately, since 'NodeComplete''s PITFALL comment
+currently promises the opposite ("on disk the distinction is not
+needed").
+
+*** DONE (jbb) I think the same field name.
+Having two field names just seems like more surface for potential errors.
+But push back if you see reason to.
+
+**** DONE (Claude) Agreed — same key, discriminated by YAML shape
+No pushback. A plain rep is a YAML sequence; a placement is a YAML
+map:
+#+begin_example
+contains:
+  - id1
+  - id2
+#+end_example
+versus
+#+begin_example
+contains:
+  prepend: [id0]
+  runs:
+    - anchor: id1
+      ids: [id2]
+#+end_example
+serde reads that as an untagged enum; the only cost is worse error
+messages on malformed files, which is acceptable. One field name,
+so no drift surface.
+
+** DONE Fold semantics per relationship kind
+- Ordered relations (=contains=, =subscribes_to=): anchored
+  placement, as designed.
+- Unordered relations (=hides_from_its_subscriptions=,
+  =overrides_view_of= — the save already treats overrides as
+  order-meaningless via 'set_difference_merge'): anchors are
+  meaningless; the relative rep degenerates to "additional
+  members", folded by union. Simpler; say so rather than letting
+  anchored syntax appear there.
+
+  DONE (JBB): Nice! But I realize now there's more potential
+  privacy leakage to close. Suppose:
+  - U and C are public, and R is private.
+  - U subscribes to R which contains C
+  - U hides C
+  That hide relationship leaks information that could be used
+  to infer that N subscribes to R. In fact even if R is public,
+  if the subscription relationship is private,
+  the same problem obtains.
+  We should thus make hide relationships as private
+  as the maximum privacy of all three.
+
+  DONE (Claude): Agreed, and the creation gesture makes it
+  implementable: a hide is created from a subscribee-as-such view,
+  so the triggering subscription edge is known right there — record
+  the hide at max(level(U), level(C), level(that subscribes edge)).
+  One refinement for the multi-subscription case: what leaks is the
+  INFERENCE, and the inference is innocent if any public
+  explanation exists. So the exact requirement is max(level(U),
+  level(C), MIN over the explaining subscription edges) — the most
+  public explanation sets how public the hide may safely be. One
+  residue: a hide whose public explanation is later deleted or
+  privatized becomes retroactively telling; the renormalizer should
+  re-raise hide levels when the explaining edges change (raising
+  silently is always safe under the sticky rule proposed below;
+  lowering never happens silently).
+
+  DONE (JBB): That makes me think of something else:
+  One might want to make even a content relationship
+  between two public nodes private.
+  So skg-obfuscate-relationship should apply even to that.
+  In this case we'll need two distinct source heralds:
+  the little house can continue to represent the viewnode's source,
+  but it should be preceded by a "~" symbol
+  prepended to the name of the source of the relationship.
+
+  DONE (Claude): Agreed on both, with two refinements. (1) Emit the
+  ~SOURCE herald only when the relationship's level differs from
+  its default (the more private of the endpoints' homes) —
+  otherwise every member of every private node carries one and the
+  signal drowns; the herald then marks exactly the deliberately
+  privatized edges. (2) The herald's metadata atom must be
+  LOAD-BEARING at save, not display-only: it is what lets a
+  privatized level survive a round-trip through a buffer (see the
+  de-privatization scenario under "Renormalization bugs" below).
+  Validation on it: a hand-written level may raise an edge above
+  its default, never lower it below.
+
+- =aliases=: union, like the unordered relations — and note this
+  quietly answers the chain discussion's open question about
+  private aliases (an alias's level = the file it is written in).
+- Scalars (title, body): home-only, no fold ([[*Which file is the node's home, and what may non-home files contain?][above]]).
+- Textlinks are inferred from the body, and the body is
+  home-level — so a *private textlink from a public node* remains
+  inexpressible (private annotation of public prose is manual-fork
+  territory). Worth one sentence in the docs so nobody hunts for
+  the feature.
+
+** DONE Same-ID parts over a FOREIGN home: forbid, or embrace?
+The mechanism accidentally enables something the vision does not
+mention: an owned part whose ID's home is a *foreign* node — a
+private overlay adding content to someone else's node directly,
+with no fork, no clone, no subscription. Tempting (it is the
+lightest imaginable sharing primitive) but it changes the story:
+no update-tracking, no override, title stays theirs. The doc's own
+fork walkthrough ("You can fork someone else's node ... by
+including some content in a node that is more private") implies
+fork-first, overlay-second. Decide explicitly and make the
+validator enforce it, because nothing structural prevents the
+overlay: I recommend *forbid for now* (an owned part whose home is
+foreign is a reported violation), and note the overlay as a
+possible future feature with its own design round.
+
+*** DONE jbb : agreed
+
+** DONE Deletion of a node with invisible parts
+Deleting N from a public-level view, when N has private parts the
+session cannot see: delete all parts (silent private data loss),
+delete only visible parts (leaves a ghost accordion whose base is
+gone — dangling anchors by construction), or refuse with "N has
+parts in inactive sources" (correct, but the refusal message
+itself reveals, to a shoulder-surfer, that private parts exist —
+a smaller leak than the alternatives; the AFk suppression logic
+faces the same trade-off and should match). I lean refuse-loudly;
+in any case 'apply_delete_propagation_cleanup' must learn to
+scrub deleted IDs from placement fields across all parts, not
+just from plain lists.
+
+*** DONE jbb : agreed
+
+** DONE nodeMerge of accordioned nodes
+Merging acquiree B into acquirer A when either is accordioned:
+per-source pairwise file merges? Fold-then-merge-then-re-split?
+Anchor rewriting (B's members become A's; parts of *other* nodes
+may anchor to IDs whose placement moved)? This needs its own
+design paragraph before implementation; flagging so it is not
+discovered mid-merge. (Extra-ids at least are orthogonal: 'pid_of'
+resolution happens before any accordion logic.)
+
+*** DONE jbb
+My initial thought is this should be safe. If we merge acuireR R
+into acquireE E, and both contain node C,
+and both have private representations that anchor to C,
+well, fine -- C will be present (deduplicated) in the merge,
+so both can continue anchoring to it.
+I think the algorithm currently prepends acquiree content
+to acquirer's. The same can be done to merge each pair of
+(source, anchor, id list) triples that share the same source and anchor.
+
+I didn't understand the options you presented,
+but I believe the previous paragraph is a complete solution.
+Please push back if not.
+
+**** DONE (Claude) Essentially complete; one missed case, one simpler framing
+Your key observation — anchors are IDs, IDs survive the dedup, so
+anchors keep resolving — is the heart of it, and it is correct.
+Two additions:
+- The case the per-triple pairing misses: the two nodes' PLAIN
+  reps of one relation can live in DIFFERENT sources (say the
+  acquirer's contains-plain in S1, the acquiree's in S2). No
+  (source, anchor) pair matches them, and keeping both would
+  violate one-plain-per-relation; the acquiree's would have to be
+  converted to a placement. Rather than special-case that:
+- Both your case and that one fall out of one framing: fold both
+  accordions to their leveled ordered lists, concatenate
+  acquiree-before-acquirer (your prepend convention), dedup, and
+  unfold. Since unfold derives runs and anchors canonically from a
+  leveled list (see the Vec<(Source, ID)> thread below), the merge
+  needs no anchor-aware or source-aware special-casing at all —
+  the options I listed earlier are all subsumed by this one.
+- Anchors in OTHER nodes' parts that name the acquiree resolve
+  through 'pid_of' (extra-ids), as you say — no rewriting needed.
+
+***** DONE jbb : Elegant!
+
+** DONE What visually marks an accordioned node?
+The AFk herald loses its referent (no chain, no length). Two
+distinct needs, per the chain discussion, both still real:
+- *Audit*: per-child membership-level cues, so the user can see
+  which memberships are public without switching levels. This is
+  the safety-critical one.
+- *Awareness*: a node-level "this node has more-private parts"
+  indicator — shown only when the viewing level makes those parts
+  visible anyway (at a lower level it would be the one channel
+  leaking that private parts exist; same no-leak rule as AFk's
+  k=1 suppression).
+
+*** DONE Let's ditch that whole anchor.
+I'm not even sure why I thought it was necessary for autoforks,
+but it definitely seems unnecessary now.
+
+**** DONE (Claude) Confirming what I take this to mean
+No node-level accordion herald at all — neither AFk nor the
+"awareness" indicator I proposed. The per-member ~SOURCE herald
+you proposed under "Fold semantics" covers the audit need, which
+was the safety-critical half. If that reading is right, this
+section reduces to that herald and can be marked DONE.
+
+** DONE The obfuscation gesture's scope and name
+'skg-obfuscate-relationship' is proposed for children of *col
+viewnodes. Contains-children need the same gesture (raise a public
+child's membership to private — the "private reading list" case).
+And the name: "obfuscate" suggests hiding-by-confusion;
+'skg-privatize-membership' (or "restrict") says what it does.
+Bikeshed, but wire names harden fast here (the metadata atom
+=request-obfuscate= would outlive the rename).
+
+*** DONE Let's go with skg-privatize-relationship
+and use the same name when applied to
+both content and non-content relationships.
+It should let the user cycle through sources,
+and offer only sources more private than the more private
+of the two nodes in the relationship.
+
+**** DONE (Claude) Agreed; one addition to the cycle
+The cycle should also include the DEFAULT level itself (the more
+private of the two endpoints' homes) as its least-private stop —
+that is the only way to UNDO a privatization, since nothing else
+may lower an edge's level (the sticky rule under "Renormalization
+bugs" below). So: cycle = default, then each strictly more
+private source in order.
+
+** DONE Migration and the fate of today's validations
+- 'check_for_duplicate_ids_across_sources'
+  ([[../../server/dbs/filesystem/multiple_nodes.rs][multiple_nodes.rs]]) — the validation the vision predicts must
+  change. It should become shape-aware, not disappear: same ID
+  with two *plain* reps of one relationship (or two titles) is
+  still a conflict to report; same ID in an accordion shape is the
+  feature.
+  DONE jbb : also validate that IDs in any ID list
+  (in plain rep or in a placement pair)
+  are at least as public as the file,
+  and anchors in an anchor rep are stricly more public.
+
+  DONE (Claude): Both checks are right; one caveat about
+  enforcement STRENGTH. Cross-file invariants can be broken by
+  uncoordinated edits with no single bad save: machine 2 moves
+  node C to a more private source; machine 1's membership file,
+  already committed, names a now-too-private ID after the pull.
+  So a violation must not brick loading: load with a loud warning
+  and offer a repair (re-level the membership), reserving hard
+  refusal for single-file malformations. The warning should also
+  say the uncomfortable part plainly: in that scenario the public
+  repo's git HISTORY already contains the leaked ID, and repair
+  only stops the bleeding.
+
+- Existing data holding the documented leak (a public =contains=
+  naming a private ID): auto-rewrite into accordion parts on next
+  save? A sweep command? Decide; silent auto-rewrites of files the
+  user did not touch surprise git.
+  ONGOING jbb : We will need a config option to disable the validations
+  that would render my current data illegal,
+  and a command skg-migrate-to-accordions
+  that converts all data (refusing if the source set is restricted).
+
+  DONE (Claude): 'skg-migrate-to-accordions' agreed, including the
+  restricted-set refusal. On the config option: if these
+  validations load as WARNINGS rather than refusals (per the
+  enforcement-strength note just above), pre-migration data stays
+  loadable automatically and no disable-validations knob is needed
+  — one less config surface. Suggest warnings-first, adding the
+  knob only if the warning volume on your real data proves
+  obnoxious before you migrate.
+  DONE (jbb) : agreed, warn only unless & until decision revised
+
+- Diff analysis reports "duplicate IDs across sources" as an
+  anomaly bucket today; it needs the same shape-awareness.
+
+** DONE Which TypeDB/Tantivy representation
+Recommend: fold at load; TypeDB and Tantivy see one merged node
+per ID (effective edges, home source), since both are
+disk-rebuildable caches and no query then changes.
+=has_source ... @card(1)= in [[../../schema.tql][schema.tql]] survives under that
+choice (with source = home). The alternative — per-part entities
+in TypeDB — buys nothing visible and re-imports the split into
+every query. The per-part decomposition then lives only at the
+FS/save boundary ([[*Fold and unfold as a load/save adjoint pair][the fold/unfold pair]]).
+
+* Dangerous things
+** Foreign accordions fold in an order the receiver must guess
+The chain carried its own order in its edges; the accordion's fold
+order comes from the *config's* privacy ordering of sources. For
+your own sources, fine. For a colleague's shared source-pair, the
+order is whatever you guessed when you added them to your config —
+guess wrong and the fold runs backward: plain-vs-relative shapes
+land in the "wrong" direction and anchors dangle en masse.
+Mitigations, cheapest first: (a) the anchor direction is
+detectable — a part whose anchors resolve only in the *other*
+direction indicates an inverted order; warn and suggest the flip.
+(b) A convention for publishers to state the order (a README, or a
+tiny manifest in the source). (c) Accept degradation with loud
+warnings. Some choice is needed, because this is the accordion's
+one structural regression versus the chain.
+*** DONE jbb
+Let's have Skg automatically generate a DEPENDENCIES.toml file
+from the user's skgconfig for each of their owned sources,
+which lists all sources it depends on, in order,
+including a comment explaining that the more public are earlier.
+If it clobbers a preexisting one, that's a feature, not a bug.
+
+**** DONE (Claude) Agreed; add the receiver side
+Generating DEPENDENCIES.toml per owned source settles the
+publisher half. The receiver half: when a downloaded foreign
+source carries one, skg should READ it — suggesting the order when
+those sources are added to the receiver's config, and warning when
+the receiver's manual order contradicts the manifest. With that,
+the guess-the-order danger shrinks to foreign sources that ship no
+manifest, where the anchor-direction heuristic can still warn.
+
+** The one-ID-one-file assumption is scattered, and the compiler will not find it
+Unlike adding a =NodeRelation= variant (exhaustive matches), the
+"an ID has exactly one file/source" assumption hides in ordinary
+code: init's duplicate check, the daily audit, diff analysis's
+duplicate bucket, 'source_from_disk' and 'pid_and_source'
+(which source do they answer?), get-file-path, delete-propagation,
+and — sneakiest — *stage-moves*: its move heuristic is "an ID
+vanished from exactly one source and appeared in exactly one
+other", which is indistinguishable from an accordion
+re-levelling a membership... and both can be true at once. A
+written audit list of these sites, checked off during
+implementation, is the only protection; budget for it explicitly.
+
+*** TODO jbb : When you write the plan, flag issues in each change for me.
+
+** Renormalization bugs move memberships between privacy levels silently
+Carried over from the chain discussion, undiminished: the failure
+mode of a wrong save-side decomposition is a membership quietly
+one level more public than intended — a leak, not a crash. Same
+remedies: the normalize/fold pair as one pure module with
+property tests (fold(unfold(view)) == view; every membership's
+level == the rule's answer; idempotence), plus an
+=AccordionInvariantViolation= validator at both gates (save and
+init/rebuild) sharing one primitive, per the override-invariants
+lesson already in [[../problems.org][TODO/problems.org]].
+
+*** DONE jbb : Please explain in more detail.
+What failure mode?
+
+**** DONE (Claude) The failure mode, concretely
+The unfold step decides, for every relationship instance in a
+saved buffer, which FILE records it. Suppose a bug (or an
+ambiguous rule) computes an edge's level as the more PUBLIC of the
+two endpoints instead of the more private. Saving public N with
+private member C then writes C's UUID into N's public file.
+Nothing crashes; every view still renders exactly right (the fold
+shows C under N either way); tests that only inspect rendered
+buffers pass. You discover it, if ever, by reading the public
+.skg file or its git diff — likely after pushing, at which point
+the leak is in public git history permanently. That is what
+"silent" means here: rendering gives no signal at all.
+
+The sharpest variant needs no bug, only a lossy round-trip: you
+privatize an edge above its default with
+'skg-privatize-relationship'; later you save the same node from a
+different buffer that never carried the privatized level; the
+renormalizer re-derives the DEFAULT level and silently
+de-privatizes the edge. Hence two guards:
+- the ~SOURCE herald's metadata is load-bearing at save, so
+  buffers carry edge levels through round-trips; and
+- the STICKY RULE: renormalization may raise an edge's level (per
+  the default rule, or the hide rule) but never lowers an existing
+  edge's level; lowering happens only through the explicit
+  gesture's cycle.
+Property tests pin both, precisely because no user-visible
+behavior changes when they break.
+
+** Dangling anchors: the fold must be total and deterministic
+Carried over verbatim: a more-public part can change under a
+more-private one (another machine, a git pull, a hand edit).
+Deterministic fallback (orphaned run attaches after the previous
+run, or at START), a completion warning, self-heal on next save,
+and anchor resolution through 'pid_of' (nodeMerges rename IDs).
+'weave' in [[../../server/from_text/weave.rs][weave.rs]] remains the precedent — and see
+[[*The weave's job shrinks][the pleasant corollary below]].
+
+*** DONE jbb : Please explain in more detail.
+
+**** DONE (Claude) The scenario, concretely
+Machine A holds your public and private sources; your work
+machine B holds only the public one. On B you delete public
+member c1 from node N — an ordinary, correct edit; B cannot know
+c1 anchors anything, because the private part is not on that
+machine. You push; machine A pulls. N's private part still says
+(anchor c1, [c2]), but c1 is no longer in the public fold: the
+anchor DANGLES, and two perfectly correct saves produced it. So
+dangling anchors are a normal runtime condition, not invalid
+data, and the fold must handle them:
+- total: c2 still renders — it is real content — appended at the
+  end of N's content per the order-independent fallback above,
+  with a warning;
+- deterministic: every machine folds the same broken state the
+  same way, so views do not depend on which box you sit at;
+- self-healing: the next save of N from a view where c2 is
+  visible rewrites the private part with a live anchor;
+- and a merged (rather than deleted) anchor is a non-event: if c1
+  was nodeMerged into c9, 'pid_of' resolves the anchor and
+  nothing dangles.
+
+** Save maintenance should be level-ungated
+Also carried over: a save at a restricted level can delete or move
+an ID that some invisible more-private part anchors to. The server
+sees all files regardless of the connection's level, so it should
+re-anchor affected parts in the same save rather than letting debt
+accumulate until the user next saves at full visibility.
+
+*** DONE jbb : agreed, seems unavoidable and acceptable
+
+** Text edits land at the home level
+Carried over: title/body live in the home (most public) file, so
+editing them from a private-level view writes a public file.
+Correct but counterintuitive ("private mode ⇒ private edits").
+Decide between a minibuffer notice when a save writes more-public
+files than the viewing level, or documentation only.
+
+*** DONE jbb : I wouldn't even document it.
+It's normal behavior -- you edit a viewnode representing node N,
+you're going to change N. It's hard even to imagine an alternative.
+
+* Awkward, inelegant, or overly complex things
+** The per-relationship bookkeeping dissolves under the ternary reframing
+The doc apologizes twice for sloppiness (which file is plain, per
+relationship; where relationship instances live). Both
+awkwardnesses are artifacts of thinking in *files*. Thinking in
+*leveled edges* ([[*The ternary model is the answer to its own incomplete thought][below]]) makes the file layout a derived normal
+form, and the sloppiness disappears rather than needing apology.
+
+** The weave's job shrinks
+A pleasant simplification to note: under prefix source-sets and
+the accordion invariants, a *visible* file can only list members
+at its own level or more public — i.e. also visible. So the
+save-time preservation of invisible members ('weave',
+'set_difference_merge') stops being load-bearing for
+accordion-shaped data; it remains as a backstop for junk and for
+any non-prefix sets that survive. Worth stating in the plan so the
+weave is not extended when it could be retired toward backstop
+duty.
+
+** Two representations of "no opinion" now coexist
+A part can express "no opinion" about a relationship by omitting
+the field; MSV expresses the same thing in memory. Fine — but the
+doc comment on 'NodeComplete' explicitly says the on-disk
+distinction is unnecessary, and after this change that sentence is
+false for accordion parts. Small, but exactly the kind of stale
+comment that misleads later work; sweep it with the format change.
+
+* Missing concepts and abstractions (especially types)
+** The ternary model is the answer to its own incomplete thought
+The doc's final section ("The relationships could be explicitly
+ternary ... I don't know where to go with that") is, I think, the
+keystone rather than an aside. Take it as the *semantics*:
+
+  every relationship instance carries a level:
+  (level, node) --relationship--> target
+
+Then, uniformly:
+- an accordion part at level k is nothing but "the level-k slice
+  of N's edges", plus order info relative to more-public slices;
+- the default-level rule becomes one sentence (an edge defaults to
+  the more private of its endpoints' homes — [[*The proposed default for col relationships re-creates the ID leak][the leak fix]]);
+- obfuscation is "raise this edge's level";
+- the validator's job is "no edge more public than its target,
+  no two plain slices, anchors resolve more-publicly";
+  DONE jbb : no two plain slice for the same rel (repeating myself)
+- the fold is "concatenate slices in level order".
+Where to go with it concretely: adopt it in memory (edges
+annotated with a level/SourceName) and in the docs' vocabulary,
+while keeping .skg files exactly as proposed — the accordion IS
+the ternary model's on-disk normal form. Nothing about storage
+changes; what changes is that every rule above becomes derivable
+instead of case-by-case.
+
+** Fold and unfold as a load/save adjoint pair
+One module owning both directions: load groups same-ID files,
+orders parts by the config's privacy order, folds to an effective
+'NodeComplete' (plus retained per-level decomposition for save);
+save decomposes leveled edges back to parts, normalizing. The
+property tests live here. Precedents to imitate: 'weave' (anchored
+runs), 'resolve_override' (guarded walk totality), and the
+=source=-never-serialized pattern in
+[[../../server/types/nodes/complete.rs][complete.rs]] / [[../../server/types/nodes/fs.rs][fs.rs]] (the type system already enforces one
+in-memory-only field; the accordion extends that boundary).
+
+*** DONE jbb
+The NodeComplete and all similar types should, I suspect,
+expand every Vec<ID> to a Vec<(Source, ID)>,
+where the source encodes not the source of the ID it is paired with,
+but the source of the (file encoding the)
+relevant relation it is a member of.
+
+**** DONE (Claude) Strongly agreed, and it buys more than it looks like
+With every list a Vec<(Source, ID)> in fold order, the placement
+representation does not need to exist in memory AT ALL: unfold can
+DERIVE each part's runs and anchors canonically — a level-s run is
+a maximal streak of level-s members, anchored to the nearest
+preceding strictly-more-public member (or prepended if none
+exists). Placements become a pure file-format detail;
+'NodeComplete' and everything downstream see one ordered leveled
+list per relation. Two corollaries:
+- The derivation is stable: if the more-public members did not
+  move, the derived anchors do not change, so an unchanged part
+  stays byte-identical (the no-cosmetic-rewrites rule above).
+- The type change turns much of the one-ID-one-file grep-sweep
+  into COMPILER errors: every consumer of Vec<ID> stops compiling
+  until it decides what the source component means for it. That is
+  the strongest protection available for the scattered-assumption
+  danger, and a reason to make this type change FIRST in the plan.
+(MSV keeps wrapping the outer lists exactly as today.)
+
+** An =Accordion= value at the FS boundary
+Group-by-ID currently ends in an error report
+('check_for_duplicate_ids_across_sources'); it should end in a
+value — =Accordion { home : NodeFS, parts : Vec<(SourceName,
+NodePart)> }= or similar — that the shape validator takes and the
+fold consumes. Making "several files, one node" a type, not a
+condition, is what keeps the scattered-assumption sweep
+([[*The one-ID-one-file assumption is scattered, and the compiler will not find it][above]]) from regressing later: new code meets =Accordion=, not
+a surprising second file.
+
+** The privacy order as a first-class config value
+Unchanged from the chain discussion, but now a hard prerequisite:
+an ordered list (later possibly a tree) of owned sources in
+skgconfig.toml, foreign sources interspersed at user-chosen
+positions for visibility purposes; prefix selection replaces named
+source-sets. The fold, the defaults, the validator, and the
+selection UI all read this one value.
+
+* Efficiency notes (minor)
+- Folds are per-accordion and tiny; cache per ID, invalidate when
+  any part is written. Init's group-by-ID replaces today's
+  duplicate scan at the same cost.
+- File count grows by one per (node, level-with-parts) — the same
+  as the chain's carriers, without their IDs.
+- Collateral view selection must treat "part written" as "node
+  changed" — trivial now, since the part shares the node's ID
+  (contrast the chain, where this needed carrier translation).
+- Private git diffs stay small and quiet, as with the chain: a
+  public reorder touches no private file.
+
+* What carries over from the chain discussion
+Still applicable from [[./2_discussion.org][2_discussion.org]], restated above where they
+bite: the renormalization spec discipline; fold totality and
+dangling anchors; level-ungated save maintenance; the
+silent-level-migration danger and its property tests; the
+public-text-edit hazard; per-child membership cues; migration of
+leaky legacy memberships; the prefix reading of source-sets (the
+inversion notes on 1_vision remain worth fixing there). Dissolved
+by the accordion: carrier transparency, carrier
+stability/lifecycle, the perceived-node/carrier type, the sixth
+relationship and its exclusion validator, the AFk herald's
+mechanics, and the interaction-with-override-monogamy questions.
+The two documentation problems recorded in [[../problems.org][TODO/problems.org]]
+(glossary subscriberCol passage; schema.tql =subscribes= comment)
+are unaffected and stand.

@@ -1,0 +1,479 @@
+#+TITLE: Discussion of the user-owned auto-fork chain (UOAFC) vision
+#+TODO: TODO ONGOING | DONE
+
+(Rewritten 2026-07-11 against the expanded vision that arrived with
+the pull; the first draft critiqued the earlier, shorter vision.)
+
+* Summary
+The expanded vision settles most of what the first draft flagged as
+open, and settles it well (see [[*What the new draft settles][the next section]]). What remains:
+
+1. *Direction inversions in the text.* The publicness invariant, the
+   auto-defined source-set example, and two =F(j-i)= subscripts all
+   point the wrong way relative to the worked example and to each
+   other. Mechanical fixes, but they are the load-bearing lines of
+   the spec. See [[*Incorrect things][Incorrect things]].
+2. *One concept is missing a name and a type*: the distinction
+   between the chain's one real, user-visible node (I will call it
+   the *perceived node*) and the invisible, auto-managed *carriers*.
+   Half the open questions below dissolve once that distinction is
+   explicit. See [[*TODO Perceived node vs carrier: name it, type it][the carrier section]].
+3. *The biggest danger is silent, not crashy*: a bug or ambiguity in
+   the save-time chain renormalization moves memberships between
+   privacy levels without anyone noticing, and every inbound query
+   (ancestry, container counts, cols) will leak carrier IDs into
+   view unless carrier-transparency is systematic. See
+   [[*Dangerous things][Dangerous things]].
+4. *Two expressiveness gaps are now baked in* and should be either
+   accepted aloud or given escape hatches: a private membership of a
+   public or foreign child is inexpressible under
+   source-determines-membership, and title/body edits always land at
+   the perceived node's own (most public) level. See
+   [[*Unmade decisions][Unmade decisions]].
+5. The "extends the chain on the other side" case (inserting a child
+   more public than the base) does not hold up under analysis; I
+   recommend dropping it. See [[*TODO "Extends the chain on the other side" seems wrong; recommend capping at the base][that section]].
+
+* What the new draft settles
+Recorded so the prior draft's warnings are visibly discharged:
+
+- *(likely solved): privacy-monotone chains.* The prior draft's top
+  danger — "distinct sources" being too weak, letting a chain leak
+  private IDs into more-public files — is now addressed by the
+  concentric privacy order plus the monotonicity invariant (modulo
+  the inverted sentence, below).
+- *(likely solved): stored-relative placement.* The worked example
+  (f2's representation changes while f1's does not) pins the
+  decision the prior draft called load-bearing: the placement is the
+  stored representation, so base edits propagate automatically,
+  including edits arriving by git pull.
+- *(likely solved): visible portions are prefixes.* Concentric
+  source-sets make the visible part of a monotone chain a prefix of
+  it, which is exactly what the fold needs — the prior draft's
+  "gaps in the visible sub-chain" problem dissolves structurally
+  (given the prefix reading of source sets; see
+  [[*TODO The auto-defined source-set example contradicts its own selection UI][the inversion issue]]).
+- *(likely solved): membership attribution.* The child's source
+  decides which link records the membership. A good default; two
+  consequences flagged below.
+- *(likely solved): the placement type.* Rejecting the uniform
+  list-of-(maybe-anchor, ids) in favor of a pair is right; two small
+  nits in [[*(likely solved): the placement pair type — two nits][the type section]].
+- *(likely solved): no override machinery involved.* In the worked
+  example the buffer draws f1 — the base — with folded-in children.
+  So autofork rendering is content *augmentation* of the perceived
+  node, not override *substitution* of it. That quietly discharges a
+  whole family of the prior draft's worries (=overridesHere=
+  markers, the tamper check, collected-id round-tripping, monogamy
+  interplay) — provided the independence decision below is confirmed.
+
+* Incorrect things
+** TODO The publicness invariant is inverted
+The special-case conditions say "If i > j, then i is more public
+than j". The worked example says the opposite: F2 (index 2) lives in
+S2, "more private than S1". The example is clearly the intent
+(forkward = more private; the base is the public face). The
+invariant should read: if i > j, then Fi's source is more *private*
+than Fj's.
+
+** TODO The auto-defined source-set example contradicts its own selection UI
+The example defines suffixes of the privacy order:
+"trusted-or-more-private = (trusted, private)". But:
+- A set that *excludes* =public= is useless for the privacy
+  use-case: screen-sharing with trusted friends should show public
+  and trusted notes, not trusted and private ones.
+- The UI sentence — "ask the user to select the most private source
+  to make available" — describes a *prefix*: selecting =trusted=
+  yields {public, trusted}.
+- The chain machinery *requires* the prefix reading: a fold cannot
+  render F2 without F1, so the visible portion of a chain must be a
+  prefix, which prefix sets guarantee and suffix sets destroy.
+So the intended family is surely {S1..Sk}, "everything at most as
+private as Sk". The set names then read "X-or-more-public", or
+better, drop names entirely as the vision suggests and speak only of
+the selected level.
+
+** F(j-i) is presumably F(j-1), twice
+"Fj hides nothing from F(j-i)" and "Fj maintains the order of
+F(j-i)'s content". Either =F(j-1)= is meant (sufficient — the
+constraint propagates transitively down the chain), or "F(j-k) for
+all k > 0" (the anchors line already uses that form). Worth fixing
+because these two lines are the definition.
+
+** TODO "Extends the chain on the other side" seems wrong; recommend capping at the base
+The vision: inserting a child from a source *more public* than the
+base's "extends the chain on the other side" — a new link basewards
+of f1. I do not think this case survives analysis:
+
+- The point of putting a membership in link L is that readers at
+  L's level can see it. But the *container* is only visible from
+  f1's level upward — a reader too public to see f1 cannot see any
+  child-of-f1 relationship anyway, wherever it is stored. A
+  basewards carrier F0 would expose, to the most public audience, a
+  titleless orphan node containing the child: pure noise, no
+  function.
+- It also breaks the shape of the chain: the perceived node stops
+  being the base, so the most public representative of the node is
+  a carrier with no title — colliding with "autofork nodes are not
+  represented to the user at all".
+- A membership can never usefully be more public than the less
+  public of (container, child).
+
+Recommended rule instead: membership level = the more private of
+(base's source, child's source); a child more public than the base
+just lands in the base's own =contains=. Recording a more-public ID
+in a more-private file leaks nothing.
+
+** TODO Two conflicting rules for foreign sources
+"Foreign sources can be interspersed [in the config's privacy
+order] harmlessly if the user chooses" (source-set section) versus
+"Non-owned sources are treated as maximally public" (chain
+section). These answer different questions and should be split
+explicitly:
+- *Visibility*: which levels show a foreign source? Interspersal is
+  the right tool — the user places each foreign source at a chosen
+  position, and prefix selection includes it from that level on.
+  (The practical case for a non-top position: hiding someone's
+  edgier notes while screen-sharing.) "Maximally public" as a
+  visibility rule would force every foreign source into every
+  level, foreclosing that.
+- *Chain geometry*: where may a foreign node sit in a chain? Only
+  at the base (F1), per "F1 can be owned or not; the rest must be
+  owned" — for this purpose "foreign counts as basewards of
+  everything owned" is fine.
+Also note the vision's own hedge ("this decision might bite me
+later") is about the right thing: the bite arrives exactly when a
+foreign source is more sensitive than some owned source, which the
+interspersal reading handles and the maximally-public reading
+cannot.
+
+* Unmade decisions
+** TODO Does 'autofork' decompose into subscribes + overrides, or stand alone?
+The vocab section still defines fork as "subscribes to and
+overrides", but the sixth-relationship section never says whether an
+autofork edge *implies* those two edges, and the worked example's
+rendering (base drawn, children folded) uses neither: no
+substitution, no unintegrated-content col. Two coherent readings:
+- *Independent* (recommended): 'autofork' is its own relation; a
+  carrier neither subscribes to nor overrides its forkee. Rendering
+  is the fold; the override and subscription systems are untouched.
+  Fewer implied facts, no col/stat noise to suppress, no monogamy
+  interplay. The vocab section then needs a note that autofork is
+  a *third* thing, not a fork in the defined sense.
+- *Decomposing*: the machinery of subscriptions (subscribeeCols,
+  hides) and overrides (substitution, monogamy, cycle checks,
+  tamper check) all acquire in-chain cases that mostly need
+  suppressing. I see no benefit purchased by that cost.
+Since the vision says "my thinking on it is likely incomplete", this
+is the one place I would spend the next design hour: everything
+downstream (validators, cols, heralds, save extraction) branches on
+this answer.
+
+** TODO Perceived node vs carrier: name it, type it
+The vision calls both f1 and f2 "autofork nodes" but treats them
+utterly differently: f1 is a real node (title, body, user-visible,
+movable); f2 is invisible, unmovable, auto-created and auto-deleted.
+Making the distinction first-class answers a raft of questions
+mechanically:
+- A chain has exactly one perceived node (the base — assuming
+  [[*TODO "Extends the chain on the other side" seems wrong; recommend capping at the base][the basewards case]] is dropped); carriers hold only placements.
+- Title, body, aliases of the perceived node live in its file; a
+  carrier has none. (Format wrinkle: =title= is mandatory in .skg
+  files today — carriers need either an exemption or a generated
+  placeholder; decide which.)
+- Every enumerable surface must decide whether carriers appear:
+  Tantivy/search (surely not), 'titles by ids' (no), export-to-org
+  (fold instead), nodeMerge acquirer/acquiree (refuse), the
+  override-choice menu (never), dired-style file views (unavoidable
+  — they are files). A =CarrierNode= type (or a flag on
+  'NodeComplete') turns each of these into a compiler-visible
+  decision instead of an accident.
+- It also gives the exclusion validator its subject: a carrier with
+  a body, an explicit subscribes/overrides edge, or an inbound
+  textlink is malformed data to report.
+
+** TODO The renormalization algorithm needs a spec of its own
+The save-side is where the vision's complexity concentrates: from
+(the perceived child list, each child's membership level, the
+previous chain) compute the new chain — creating links (F1.5
+appears), destroying them ("ceases to be"), re-anchoring forkward
+placements when anchors move or change level. Requirements worth
+stating up front, because they are correctness properties, not
+implementation details:
+- *pure and unit-testable*: one module owning the transform, the
+  way 'weave' owns invisible-member preservation;
+- *deterministic and idempotent*: saving twice changes nothing;
+- *stable*: reuse existing carrier IDs and minimize placement
+  churn — otherwise every save rewrites carrier files and the
+  user's git history becomes unreadable;
+- *total*: junk input (hand-edited or foreign) degrades to warnings.
+Also two rules the algorithm needs that the vision leaves implicit:
+- *anchor selection*: when a run must re-anchor (its anchor was
+  deleted, or an intermediate link appeared — the vision's own
+  "might change the anchor points" case), which anchor is chosen?
+  "Nearest preceding member of the chainward fold" is the natural
+  rule; pin it.
+- *the same-anchor tie-break*: if two links anchor runs to the same
+  ID, fold order makes the more-private run land closer to the
+  anchor. Whatever the choice, it is user-visible order; pin it.
+
+** TODO Which level records hides, subscriptions, and aliases?
+Child-source decides =contains= membership. The other writable
+surfaces of the perceived node need their own attribution rule:
+- *subscriptions*: the invariant text says collections
+  ("esp. subscriptions") fold, so a private subscription of a
+  public node is expressible — good, that is a real want. Rule for
+  which link records a new subscription: the subscribee's source
+  level (mirroring contains) seems right.
+- *hides*: a hide references the hidden node but is also a fact
+  about your curation; where it is recorded is observable on disk.
+  The child-source rule would make hiding a public subscribee-child
+  a public act; the user might want the hide itself private. Needs
+  a decision (and it interacts with hides being per-hider, not
+  per-subscription).
+- *aliases have no source to inherit from* — they are strings, not
+  nodes, so the child-source rule cannot apply at all. Default to
+  the viewing level? Explicit metadata? This one cannot be dodged;
+  a private alias for a public node ("the client I complain about"
+  → some public company node) is exactly the kind of thing users
+  will create.
+
+** TODO Text edits always land at the base: the silent-public-edit hazard
+The perceived node's title and body live in its own file at its own
+(most public) level. So a user at the private level, editing what
+looks like a private view, writes a public file when they retitle
+the node or edit its body. That is arguably correct — it IS the
+public node — but it breaks the intuition "private mode ⇒ my edits
+are private". Options: warn in the minibuffer when a save writes a
+file more public than the viewing level; or document it and rely on
+the diff view. Related boundary to document: privately *diverging*
+text (a different private title) is precisely what autofork does
+not do — that remains the manual fork system's job.
+
+** TODO Private membership of a public or foreign child needs an escape hatch
+Under source-determined membership, a foreign child (foreign =
+maximally public) always lands basewards — so a *private reading
+list of public materials*, a core use case, is inexpressible, even
+though the data model supports it perfectly well (a placement may
+list any IDs). Recommend: keep child-source as the default, allow
+per-child metadata to *raise* the membership's privacy (never
+lower it — a membership more public than its child is the ID leak
+this whole design exists to prevent; the validator should enforce
+membershipLevel ≥ childLevel).
+
+** TODO Carrier maintenance should run source-set-ungated at save
+A save from a restricted level can delete or move a node that some
+invisible carrier uses as an anchor. The server can see every file
+regardless of the connection's active level (source-sets gate
+display, not server capability), so the save *can* re-anchor the
+affected carriers immediately. If it does not, dangling anchors
+accumulate until the user next saves at full visibility. Recommend
+maintain-always; the alternative needs a deterministic render-time
+fallback anyway (below), but there is no reason to let the debt
+build.
+
+** TODO Interaction with the manual fork system on the same node
+Both systems will touch one node: f1 carries an AF chain *and* the
+user manually forks f1 (wanting a divergent private title — the
+general case the vision explicitly leaves manual). The manual clone
+copies f1's contains at fork time: the *stored* list or the
+*perceived* (folded) one? (Perceived, presumably — the user forked
+what they saw; the restatement is fine because the clone is more
+private.) And when substitution then draws the manual clone D in
+f1's place, D's own AF chain (if any) folds into D. Probably all
+consistent; needs a paragraph in the spec and a test, not a design
+change.
+
+** TODO What replaces named source-sets, and what happens to the features gated on them
+Auto-defined levels replace manual =[[source_sets]]= config
+(no-legacy: delete the old mechanism, per
+[[../../coding-advice/for-ai.md][for-ai.md]]). Loose ends: the reserved set =all= and the features
+that require it (git diff mode, diff analysis) map naturally to
+"maximum level plus every foreign source", but
+[[../../api-and-formats.md][api-and-formats.md]] should say so; =default_source_set= becomes a
+default *level*; and the per-connection reset-on-reconnect behavior
+carries over unchanged.
+
+** TODO Migration
+Two kinds of existing data predate the feature:
+- direct cross-privacy memberships (a public node whose =contains=
+  names a private ID — the documented leak caveat in
+  [[../../docs/private-writing.md][private-writing.md]] territory): auto-convert on next save?
+  A sweep command? Leave until touched?
+- manual owned forks created while dogfooding 'skg-fork-node':
+  convertible to AF chains only when they satisfy the invariants
+  (no reorder, no hides, no text divergence); a converter should
+  check and report rather than assume.
+
+** TODO Inspectability of carriers
+"Not represented to the user at all" is right as a default and
+wrong as an absolute: when something goes wrong (a dangling anchor
+warning, a git-archaeology session, "why is this child here?"),
+the user needs *some* sanctioned window onto the chain — even if it
+is just a documented read-only debug view or a documented file
+layout. Deciding "git and the filesystem are the debug interface"
+is a legitimate answer; deciding nothing is not.
+
+** TODO Pin the AFk herald's no-leak rule and its k
+- k should count only *visible* links, and the herald should be
+  suppressed when k = 1: a visible chain of one link is
+  indistinguishable from no chain, and emitting AF1 would tell a
+  public-level onlooker that a more private layer exists — the
+  exact leak the architecture otherwise avoids (nothing in a public
+  file references the private layer; the herald must not become the
+  one channel that does).
+- Also pin whether k counts links or nodes, i.e. whether the
+  perceived node itself counts (AF2 vs AF1 for base-plus-one-fork).
+
+* Dangerous things
+** Carrier transparency must be systematic, not per-feature
+On disk, c2's container is F2, not f1. Every inbound-relation
+surface — containerward ancestry, 'contained_by' and the other
+inverse indexes, container counts in graphNodeStats, backpaths,
+inbound PartnerCols, search-result enrichment ancestry — will
+surface carrier IDs where the user expects the perceived node.
+Handling this feature-by-feature guarantees missed spots (diff
+phantoms, export, the col matrix...). The codebase already has the
+right pattern: extra-ids make many IDs present as one node, resolved
+at the accessor layer via 'pid_of'. Carriers want the same
+treatment — a resolution applied wherever 'pid_of' already is, so
+that no consumer can forget. This is the largest single piece of
+implementation risk in the feature.
+
+** Renormalization bugs move memberships between privacy levels silently
+The failure mode of a wrong chain-normalization is not a crash; it
+is a membership quietly landing one level more public than the user
+intended. That argues for:
+- property tests on the normalize/fold pair (fold(normalize(view))
+  == view; every membership's level == the rule's answer; normalize
+  is idempotent and stable);
+- a =ChainInvariantViolation= validator enforced at both gates
+  (save and init/rebuild) through one shared primitive — the
+  override-invariants lesson already recorded in
+  [[../problems.org][TODO/problems.org]] (two divergent validators nearly let bad data
+  through) applies verbatim here;
+- the invariants to check: distinct sources, privacy monotonicity,
+  autofork acyclicity, carrier well-formedness (no body, no
+  explicit sharing edges, exactly one forkee), anchor resolvability.
+
+** Dangling anchors: the fold must be total and deterministic
+The base can change while nobody is folding — another machine, a
+git pull, a hand edit. If an anchor ID has been deleted (or merged:
+anchors must resolve through 'pid_of', since nodeMerges rename
+IDs), the fold must neither error nor guess randomly: fall back
+deterministically (attach the orphaned run after the previous run,
+or at START if it is first), emit a completion warning, and let the
+next save renormalize. Same spirit as 'weave''s
+cling-to-the-nearest-surviving-anchor rule, coarsened to what a
+placement can know.
+
+** A chain is only readable if it can be folded
+Two consequences of stored-relative placement to design for
+explicitly:
+- *Foreign chains must fold.* A colleague who shares two sources
+  (their public and trusted layers) ships carrier files; rendering
+  their perceived nodes requires folding *their* chain. So the fold
+  is format-level, not an owner privilege — only chain *editing* is
+  ownership-gated. (Folding a foreign chain needs no knowledge of
+  the foreign author's config: the autofork edges themselves give
+  the order.)
+- *A missing base is a new failure mode.* A partial clone of
+  someone's sources, or a mid-pull git state, can leave a carrier
+  whose forkee file is absent — the node's effective content is
+  then uncomputable. Define the degradation (render the surviving
+  placements with a loud warning; never panic), analogous to
+  dangling =contains= refs degrading to phantoms today.
+
+** Deleting or moving the perceived node
+- Deleting f1: carriers point at it (the autofork edge lives on the
+  fork). 'apply_delete_propagation_cleanup' must decide: destroy
+  the whole chain (deleting the carriers and their memberships —
+  drastic), or refuse until the user empties it. Silently scrubbing
+  the edge and leaving orphan carriers is the one wrong answer.
+- Moving f1 to a different source recomputes the chain (the vision
+  says so); note the move can invert monotonicity against an
+  existing carrier (base moved *more private than* a carrier), so
+  the recomputation must re-derive every membership's level, not
+  just relabel the base.
+
+* Awkward, inelegant, or overly complex things
+** The chain-splitting lifecycle is the accepted complexity center — confine it
+Links appearing (F1.5), disappearing, and re-anchoring their
+forkward neighbors is inherent to the design and fine — but only if
+it lives in one pure module (the normalization above) rather than
+being smeared across the save pipeline's stages. The precedent to
+imitate is how 'weave' isolates invisible-member preservation:
+callers hand it lists; it owns the semantics.
+
+** (likely solved): the placement pair type — two nits
+Rejecting =list of (maybe anchor, ids)= for a pair — (maybe prepend,
+list of (anchor, ids)) — is the right instinct; two residues:
+- =Option= on the prepend list buys nothing: "no prepend" and
+  "empty prepend" mean the same thing in storage, so a plain
+  possibly-empty list is simpler. (The MSV-style
+  absent-vs-empty distinction earns its keep for save *intents*,
+  not for this on-disk field.)
+- Invalid states remain even in the pair: duplicate anchors, runs
+  out of chainward order, empty runs, an anchor that is also an
+  inserted ID. Normalization plus validation is still needed;
+  full unrepresentability is not reachable here.
+(Also a typo: "list of (anchor, list of tuple) pairs" — "list of
+ids" is meant.)
+
+** Prior art to reuse rather than reinvent
+- 'weave' ([[../../server/from_text/weave.rs][weave.rs]]): runs-keyed-by-anchor merging — the fold's
+  sibling, and the deterministic-fallback precedent.
+- 'resolve_override' ([[../../server/dbs/in_rust_graph/override_resolution.rs][override_resolution.rs]]): the shape of a
+  guarded walk with a cycle backstop, for the chain resolver.
+- 'pid_of' / extra-ids: the many-IDs-one-presented-node mechanism,
+  for carrier transparency.
+- The two-gate validator pattern
+  ([[../../server/dbs/in_rust_graph/override_invariants.rs][override_invariants.rs]]) with one shared primitive.
+- The =NodeRelation= enum ([[../../server/dbs/in_rust_graph/relation_accessors.rs][relation_accessors.rs]]): adding
+  =Autoforks= as a sixth variant makes the compiler enumerate every
+  place that must decide what autofork means for it — the cheapest
+  systematic-coverage tool available. (For what it is worth, the
+  earlier vision's TypeDB-rules idea is moot regardless: TypeDB 3.x
+  removed rules, and its functions must be invoked per query. A
+  sixth relation plus Rust-side folding, as now proposed, is the
+  right call; TypeDB, being a disk-rebuilt cache, can simply be fed
+  whatever derived edges prove useful.)
+
+** Minor: one word, three referents
+"Autofork" currently names the relation, the carriers, and the
+chain; the perceived node has no name at all. Suggested vocabulary
+for the docs: *autofork edge*, *carrier*, *chain*, *perceived
+node*. Cheap now, expensive to retrofit into error messages and
+tests later.
+
+** Minor: herald placement claim
+"Part of the first group of orange heralds. (The second group is
+blue.)" — cross-check against the actual rule table in
+[[../../server/heralds.rs][server/heralds.rs]] and the herald-legibility plan in
+[[../../TODO.org][TODO.org]] (which assigns yellow/blue to leading/later relations
+and orange to "unusual things") before this sentence hardens.
+
+* Efficiency notes (minor)
+- Chains are as short as the user's privacy ladder (2–4 links);
+  folds are trivial. The only care is cache invalidation: a write
+  to any chain member invalidates the folds of its forkward suffix.
+- Renormalization is O(perceived children) per save; fine.
+- Collateral rerendering must treat a carrier write as a change to
+  the perceived node (transparency again), or views of f1 at other
+  levels go stale after a private-child edit.
+- A pleasant side effect worth keeping in the pitch: placement
+  storage makes private git diffs smaller and quieter — a public
+  reorder touches no private file.
+
+* What I did not examine
+The Emacs client side in depth (how per-child membership levels
+would be displayed and edited there — though see the
+membership-cue point inside
+[[*TODO Private membership of a public or foreign child needs an escape hatch][the escape-hatch item]]: without *some* per-child cue the user
+cannot audit what each level sees without switching levels), and
+diff-mode's rendering of carrier files.
+
+The two documentation problems reported in [[../problems.org][TODO/problems.org]]
+during the first draft (the mislabeled subscriberCol passage in
+[[../../glossary.md][glossary.md]]; the overstated =subscribes= comment in
+[[../../schema.tql][schema.tql]]) are unaffected by the vision update and stand.
