@@ -19,8 +19,8 @@ Where you cannot execute without my weighing in,
 please put a (standard org-style) TODO prefix on the headline.
 
 Wrap function names in single quotes, not equals signs or tildes.
-That way I can use M-. to go to the function's definition.
-Similarly, write files as org-mode links [[../../path/to/whatever.md][like this]], so I can follow them fast.
+(That way I can use M-. to go to the function's definition.)
+Similarly, format filenames as org mode-style relative links.
 
 If, in researching this, you find any:
 - bugs or deviations from spec

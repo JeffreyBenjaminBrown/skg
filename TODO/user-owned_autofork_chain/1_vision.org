@@ -10,48 +10,145 @@ choosing which source each child is in,
 and have a fork system automatically created,
 ideally without restating lots of IDs,
 so that the public one need not even mention private node IDs.
-** It might be hard.
-What if the user wants a more-private fork to have a different order?
-What if it hides some of the nodes from the forkee?
-In either case anchoring this node's content relative to the other's
-becomes hard.
-** Easier to make a special "owned auto-fork" case.
-A chain C1 ... Cn of nodes is an autofork if:
-- For each i, Ci has a distinct source.
-- No fork hides anything from its subscriptions to its in-chain forkee.
-- Each fork relies on its forkee's content being a sublist
-  (i.e. preserving order) of its own content.
-  Indeed this should hold even for non-content relationships.
-  This only applies if both fork and forkee are in the samed owned auto-fork;
-  they can still hide things outside of the chain.
-In this case, each fork can
-define the placement of the new content it adds to the view
-(note that by "no in-chain hides" above, none subtract from the view)
-as a list of the form (mine: IDs) [(forkee: ID) (mine: IDs)] --
-that is, the IDs it prepends to the list,
-followed by a series of lists of things it inserts into the list,
-each anchored to an ID from the forkee, which they are drawn immediately after.
+** example
+Suppose I fork a node on biology from some famous biologist,
+and I have defined concentric rings of privacy in my conifg:
+my public notes are the least private (call this source 'public')
+and then my notes to people I trust ('trusted'),
+and then my notes that only I can read ('private').
+There could be more, but that's enough to convey the idea.
 
-Wait, no -- the anchor might not be from the forkee,
-but from a forkee of the forkee, or even farther down the chain.
-This is still feasible, though, because we can
-build up the target list of IDs to render from the first forkee.
-A fork later down the chain does not need to know
-which forkeeward ancestor its anchor is listed as content of.
-** to visually identify a user-owned auto-fork chain
-Give it a UFk ("yoU (auto)Fork") herald,
+Thhis should automatically define three source sets:
+public-or-more-private = (public, trusted, private)
+trusted-or-more-private = (trusted, private)
+private-or-more-private = (private)
+
+That's unnecessarily verbose naming but definitely safe
+and probably the most understandable to a user, so let's go with it for now.
+More generally, any series of sources S1, S2 ... Sn
+ordered by publicness (S1 being most and Sn least public)
+defines n such source sets.
+** This simplifies the definition of source sets.
+So far source sets are manually defined.
+With this, they are automatically defined,
+by the order of the presentation of the user-owned sources in the config.
+The most public should be first, the least last.
+Foreign sources can be interspersed harmlessly if the user chooses,
+but that it is not advised.
+
+Also, the source sets don't need separate names.
+Whatever UI elements have so far asked for a source set should, instead,
+ask for the user to select the most private source to make available.
+** The general case cannot be automated.
+What if the user wants a more-private fork to have a different order?
+What if a fork in the chain hides some of the forkeeward nodes?
+In either case anchoring this node's content relative to the other's
+requires manual attention. We won't go there.
+** The special "owned auto-fork" case.
+A chain F1 ... Fn of nodes for which each Fj forks F(j-1)
+can be an autofork chain if:
+- For each i, Fi has a distinct source.
+- If i > j, then i is more public than j.
+- For all j, Fj hides nothing from F(j-i).
+- For all j, Fj maintains the order of F(j-i)'s content,
+  and indeed all of F(j-i)'s other collections (esp. subscriptions).
+
+F1 can be owned or not; the rest must be owned.
+Non-owned sources are treated as maximally public,
+more public even than the user's most-public nodes.
+(This decision might bite me later,
+but it's the obvious first cut.)
+
+Under these conditions, each fork Fj can
+define the placement of the new content it adds to the view
+(it only adds; it never subtracts, hides or reorders)
+as a list of the form (new stuff: IDs) [(anchor: ID) (new stuff: IDs)] --
+that is, Fj's content consists of whatever it prepends,
+plus a collection of lists it appends to follow anchor nodes,
+where each anchor comes from F(j-k) for some k > 0.
+** to visually identify a viewnode representing a user-owned auto-fork chain
+Give it an AFk herald,
 where k is the length of the visible (active source) portion of the chain.
-** autofork is incompatible with (explicit) override|subscribe|hide
-I think best would be to disallow the graph from having both
-- the (formal) autofork relationship
-- ((explicit) subscribes or override relationships between two nodes in the same user-owned autofork chain
-The syntax, after all, for placing nodes
-is different (relative rather than absolute) in an autofork.
-(This is true for every fork in the chain, but not the first forkee in it,
-because the first forkee is not a fork (in that user-owned autofork chain).
-** make autofork a formal typedb rel
-It could imply override and subscribes-to.
-Can TypeDB let me define such implications via rules?
-That would be way better than having to rewrite a gazilliion queries
-to consider the new autofork case
-alongside the existing subscribe and override cases.
+It should be part of the first group of orange heralds.
+(The second group is blue.)
+** It deserves a new relationsihp.
+I think the cleanest way to implement this is
+to introduce a sixth relationship, '(user-owned) autofork'.
+This will interact with the other sharing relatinoships in complex ways.
+My thinking on it is likely incomplete but here goes:
+
+When the user forks a node they don't own,
+that goes normally -- the system asks them for a source if necessary,
+and creates a new node in that source,
+which subscribes to and overrides the forkee.
+Let's call this new node F1, and its source S1.
+
+F1's *perceived* content is unrestricted,
+but we will contrive the AF chain to avoid leaking more-private content
+from less-private containers.
+Suppose F1 *looks* like it contains C2, which is in source S2,
+where S2 is more private than S1.
+That user experience is achieved by creating a fork F2 of F1,
+such that F2 is in S2, and places C2 appopriately relative to some anchor in F1.
+
+This merits a picture.
+Suppose the user creates this in the buffer:
+
+```
+  * ID f1,  source u1 // u1 and u2 are both user-owned
+  ** ID c1, source u1
+  ** ID c2, source u2
+  ** ID c3, source u1
+```
+
+f1 might or might not be a fork,
+but it does not autofork anything.
+
+To represent that:
+```
+- node f1 contains c1 and c3, nothing else
+- node f2 autoforks f1, and its content list has one element:
+  (anchor: c1, content: [c2])
+```
+
+If the user then prepends the u2-sourced node c0 to f1's perceived content:
+```
+  * ID f1,  source u1 // u1 and u2 are both user-owned
+  ** ID c0, source u2
+  ** ID c1, source u1
+  ** ID c2, source u2
+  ** ID c3, source u1
+```
+
+f1's internal representation does not change, but f2's does:
+its content is now
+```
+  (no anchor, content: [c0])
+  (anchor: c1, content: [c2])
+```
+
+(But note that that representation suggests a data type
+that would permit invalid state. Let's not do that.
+Instead of a list of (maybe anchor, list of ids) tuples,
+we should use a pair of type:
+(maybe list of ids, list of (anchor, list of tuple) pairs)
+
+If the user inserts data from a more private source yet,
+that will append to the chain,
+and depending on where it was inserted.
+If the user inserts data from a source with privacy between u1 and u2,
+then the chain F2 -> F1 (where -> is the left autoforks right relationship)
+is replaced with a chain F2 -> F1.5 -> F1,
+and depending on where the new nodes were inserted,
+might change the anchor points for the content in F2.
+If data from a source *more* public than u1 is inserted,
+that extends the chain on the other side.
+If F1 is moved to a different source,
+the chain is similarly recomputed.
+
+Note that none of the autofork nodes can be moved!
+They are not represented to the user at all.
+If the user moves all of F1's perceived content out of a source --
+say, some of them were in u1.5, and now they have all been moved
+to u1 or u2 -- then the fork that was representing them
+(F1.5 in our example) ceases to be.
