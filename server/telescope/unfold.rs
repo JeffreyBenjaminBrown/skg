@@ -8,9 +8,9 @@
 //! (the no-cosmetic-rewrites rule).
 //!
 //! fold(unfold(x)) == x for every leveled list (pinned by the
-//! property suite in tests/unit/accordion.rs).
+//! property suite in tests/unit/telescope.rs).
 
-use crate::accordion::types::{ListItem, SectionSlices};
+use crate::telescope::types::{ListItem, SectionSlices};
 use crate::types::misc::{ID, PrivaciedMember, SourceName};
 
 use std::collections::HashMap;

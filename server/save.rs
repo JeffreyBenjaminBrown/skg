@@ -6,7 +6,7 @@ use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_sources,
   write_all_nodes_to_fs};
 use crate::dbs::init::wipe_then_init_typedb_db;
-use crate::accordion::invariants::accordion_violations_of;
+use crate::telescope::invariants::telescope_violations_of;
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
@@ -175,7 +175,7 @@ pub async fn update_graph_including_nodeMerges (
       nodeMerge_instructions,
       &config,
       graph ) } ?;
-  let touched_pids_for_accordion_gate : Vec<ID> =
+  let touched_pids_for_telescope_gate : Vec<ID> =
     // captured before update_graph consumes save_instructions;
     // checked after the update, against the post-save graph
     save_instructions . iter ()
@@ -183,7 +183,7 @@ pub async fn update_graph_including_nodeMerges (
       DefineNode::Save (s) => Some ( s . 0 . pid . clone () ),
       DefineNode::Delete (_) => None } )
     . collect ();
-  let config_for_accordion_gate : SkgConfig = config . clone ();
+  let config_for_telescope_gate : SkgConfig = config . clone ();
   let save_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_graph_minus_nodeMerges" ). entered();
@@ -200,15 +200,15 @@ pub async fn update_graph_including_nodeMerges (
         tantivy_index, driver, graph ) . await } ?;
   if let Some (new_index) = nodeMerge_replacement {
     *tantivy_index = new_index; }
-  { // The save-side accordion warning gate: same primitive as the
+  { // The save-side telescope warning gate: same primitive as the
     // init/rebuild gate, on the touched nodes only. Warnings, never
     // failures (the write has already, deliberately, happened).
     let snap = graph . load_full ();
-    for pid in &touched_pids_for_accordion_gate {
-      for v in accordion_violations_of (
-        &config_for_accordion_gate, &snap, pid ) {
+    for pid in &touched_pids_for_telescope_gate {
+      for v in telescope_violations_of (
+        &config_for_telescope_gate, &snap, pid ) {
         tracing::warn! ( pid = %pid, violation = %v,
-                         "accordion warning after save" ); }} }
+                         "telescope warning after save" ); }} }
   Ok (( )) }
 
 pub fn validate_override_invariants_after_save (
@@ -505,7 +505,7 @@ pub fn update_fs_from_saveinstructions (
     } else { 0 } };
   let _ = source_moves;
   // Source moves need no file relocation of their own anymore: the
-  // accordion write above places every section at its level and
+  // telescope write above places every section at its level and
   // sweeps owned sections whose level lost its last member. An
   // explicit old-path delete here would even be WRONG for a
   // private->public home move, where the old (more private) source

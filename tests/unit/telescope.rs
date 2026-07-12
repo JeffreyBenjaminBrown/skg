@@ -1,4 +1,4 @@
-//! Property suite for the accordion fold/unfold pair. The
+//! Property suite for the telescope fold/unfold pair. The
 //! load-bearing laws (5_plan.org, section-format-and-fold):
 //! - fold(unfold(x)) == x for every leveled list ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application

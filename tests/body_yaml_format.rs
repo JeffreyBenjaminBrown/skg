@@ -7,7 +7,7 @@
 // rendering.
 
 use skg::types::nodes::fs::NodeFS;
-use skg::accordion::types::ListItem;
+use skg::telescope::types::ListItem;
 use skg::types::misc::ID;
 
 fn node_with_body (

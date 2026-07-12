@@ -97,7 +97,7 @@ impl From<SkgfileSourceToml> for SkgfileSource {
     }}}
 
 /// A member of a node's relationship list, tagged with the
-/// relationship instance's PRIVACY LEVEL: the source whose accordion
+/// relationship instance's PRIVACY LEVEL: the source whose telescope
 /// section records this edge. The level is about the EDGE, not the
 /// member node (a public node can be a private member). Default
 /// level = the more private of the two endpoints' homes
@@ -124,7 +124,7 @@ impl<T> PrivaciedMember<T> {
 
 /// Tag every member of a list with one level. The degenerate-load
 /// helper (level := home source), and later the natural constructor
-/// for a single accordion section's slice.
+/// for a single telescope section's slice.
 pub fn privacied_all<T> (
   level   : &SourceName,
   members : Vec<T>,

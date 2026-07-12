@@ -203,7 +203,7 @@ fn preserve_invisible_members (
         MSV::Specified (privacied_all (&owner_source, merged)); }}
   supplemented }
 
-/// Deleting a node deletes its whole ACCORDION, including sections
+/// Deleting a node deletes its whole TELESCOPE, including sections
 /// the current level cannot see; refuse rather than silently
 /// destroy them. (The agreed small leak: the refusal reveals that
 /// inactive sections exist.)
@@ -218,7 +218,7 @@ pub fn refuse_delete_with_inactive_sections (
       config, &source_name, pid . clone () ) {
       if std::path::Path::new (&path) . is_file () {
         return Err ( format! (
-          "Cannot delete '{}': it has accordion sections in inactive sources. Widen the source-set (e.g. to 'all') and retry.",
+          "Cannot delete '{}': it has telescope sections in inactive sources. Widen the source-set (e.g. to 'all') and retry.",
           pid )); }} }
   Ok (( )) }
 

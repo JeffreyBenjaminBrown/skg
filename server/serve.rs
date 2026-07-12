@@ -20,7 +20,7 @@ use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_sou
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
-use crate::serve::handlers::migrate_to_accordions::handle_migrate_to_accordions_request;
+use crate::serve::handlers::migrate_to_telescopes::handle_migrate_to_telescopes_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
@@ -225,8 +225,8 @@ fn handle_emacs (
             handle_rebuild_dbs_request ( &mut stream,
                                          &mut env,
                                          &mut views_state ),
-          Ok (RequestType::MigrateToAccordions) =>
-            handle_migrate_to_accordions_request (
+          Ok (RequestType::MigrateToTelescopes) =>
+            handle_migrate_to_telescopes_request (
               &mut stream,
               &mut env,
               &mut views_state,

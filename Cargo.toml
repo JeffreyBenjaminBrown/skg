@@ -146,4 +146,4 @@ non_snake_case = "allow"
 non_camel_case_types = "allow"
 
 [dev-dependencies]
-proptest = "1"  # fold/unfold property suite; see server/accordion/
+proptest = "1"  # fold/unfold property suite; see server/telescope/

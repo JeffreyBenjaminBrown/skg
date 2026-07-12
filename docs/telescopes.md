@@ -1,11 +1,14 @@
-# Privacy accordions: one node, many privacy levels
+# Privacy telescopes: one node, many privacy levels
 
 Skg lets a single node live at several privacy levels at once. The
-mechanism is the **privacy accordion**: same-ID `.skg` files across
-your sources, each file one **accordion section** holding the slice
+mechanism is the **privacy telescope**: same-ID `.skg` files across
+your sources, each file one **telescope section** holding the slice
 of the node recorded at that source's level. There is no linking
 relationship between the sections — sharing an ID *is* being the
-same node.
+same node. (Why "telescope"? Because it extends one section at a
+time: widening your source-set to the next privacy level pulls out
+exactly one more section per node, whereas an accordion — the
+term's rejected predecessor — expands uniformly.)
 
 ## The privacy order
 
@@ -77,10 +80,10 @@ Two things are documented inexpressibles, by design:
 
 ## What leaks, and what migration fixes
 
-Before accordions, a public file could name a private node's ID (a
+Before telescopes, a public file could name a private node's ID (a
 "leak-shaped membership"). The server now warns about these
-(`accordion-warnings.org` in your data root) rather than erroring.
-`skg-migrate-to-accordions` raises every owned edge to at least its
+(`telescope-warnings.org` in your data root) rather than erroring.
+`skg-migrate-to-telescopes` raises every owned edge to at least its
 default level, moving such memberships into the right sections and
 rebuilding the databases. What no migration can fix: if a public
 repo ever *committed* a leaked ID, its git history still holds it;

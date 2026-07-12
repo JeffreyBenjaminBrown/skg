@@ -4,7 +4,7 @@ port = 0
 beep_when_server_becomes_available = false
 
 # The golden/ sibling directory holds expected-output files; it is
-# deliberately NOT a source, so accordion writes (whose stale-section
+# deliberately NOT a source, so telescope writes (whose stale-section
 # sweep deletes same-pid files in other owned sources) cannot touch
 # the goldens. owned/ holds input fixtures for the db-backed tests.
 

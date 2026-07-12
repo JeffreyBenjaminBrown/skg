@@ -1,6 +1,6 @@
-use crate::accordion::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
-use crate::accordion::types::SectionSlices;
-use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_accordion};
+use crate::telescope::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
+use crate::telescope::types::SectionSlices;
+use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_telescope};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
@@ -50,9 +50,9 @@ pub fn read_all_skg_files_from_sources (
                load_errors . len() ))); }
   fold_grouped_sections (sections_by_pid, pid_order) }
 
-/// One accordion, read fresh from disk by pid (all its sections,
+/// One telescope, read fresh from disk by pid (all its sections,
 /// folded). Errors if no section exists or no section has a title.
-pub fn nodecomplete_from_accordion_on_disk (
+pub fn nodecomplete_from_telescope_on_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<NodeComplete> {
@@ -60,12 +60,12 @@ pub fn nodecomplete_from_accordion_on_disk (
     config, pid . clone (),
     & SourceName::from ("(any)") ) }
 
-/// Fold each accordion (already grouped by pid; sections arrive in
+/// Fold each telescope (already grouped by pid; sections arrive in
 /// privacy order because the caller iterated 'ordered_sources').
 /// Anchors resolve through the extra-id map built from every
 /// section, so a nodeMerge cannot dangle an anchor. A titleless
-/// accordion (no home) is a hard load error; fold warnings are
-/// logged for now (the accordion validators, next work item,
+/// telescope (no home) is a hard load error; fold warnings are
+/// logged for now (the telescope validators, next work item,
 /// formalize their reporting).
 fn fold_grouped_sections (
   mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
@@ -87,15 +87,15 @@ fn fold_grouped_sections (
       sections_by_pid . remove (&pid)
       . expect ("pid_order tracks sections_by_pid");
     all_nodes . push (
-      fold_one_accordion ( &pid, sections, &resolve ) ? ); }
+      fold_one_telescope ( &pid, sections, &resolve ) ? ); }
   Ok (all_nodes) }
 
-/// Fold ONE accordion's sections (in privacy order) into a
+/// Fold ONE telescope's sections (in privacy order) into a
 /// NodeComplete. 'resolve' maps extra ids to pids for anchor
 /// resolution and must be built from the whole corpus, not just
-/// this accordion. A titleless accordion (no home) is a hard error;
+/// this telescope. A titleless telescope (no home) is a hard error;
 /// fold warnings are logged.
-pub fn fold_one_accordion (
+pub fn fold_one_telescope (
   pid      : &ID,
   sections : Vec<(SourceName, NodeFS)>,
   resolve  : &dyn Fn (&ID) -> ID,
@@ -125,22 +125,22 @@ pub fn fold_one_accordion (
     fold_sections ( &slices, resolve );
   for w in &warnings {
     tracing::warn! ( pid = %pid, warning = ?w,
-                     "accordion fold warning" ); }
+                     "telescope fold warning" ); }
   nodecomplete_from_fold (
     pid . clone (), extra_ids, misc, folded )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ("Accordion '{}' has no home: no section carries a title.",
+      format! ("Telescope '{}' has no home: no section carries a title.",
                pid ))) }
 
 /// Same-ID files across sources are no longer duplicates -- they
-/// are the sections of one privacy accordion, grouped and folded at
+/// are the sections of one privacy telescope, grouped and folded at
 /// load. What remains a CONFLICT is one id claimed by two DIFFERENT
 /// nodes: an id (primary or extra) appearing among the all_ids() of
 /// two nodes with distinct pids. If any exists, writes a detailed
 /// report (to stderr for ≤10, to an org file otherwise) and returns
 /// a summary error. (Callers pass post-fold nodes, one per
-/// accordion.)
+/// telescope.)
 pub fn check_for_duplicate_ids_across_sources (
   nodes     : &[NodeComplete],
   data_root : &Path,
@@ -205,9 +205,9 @@ pub fn read_skg_sections_from_folder (
       sections . push (( source_name . clone (), node_fs )); }}
   Ok (sections) }
 
-/// Like `read_all_skg_files_from_sources` but only for accordions
+/// Like `read_all_skg_files_from_sources` but only for telescopes
 /// with at least one section file whose mtime is more recent than
-/// `since`. A touched SECTION reloads its WHOLE accordion (all its
+/// `since`. A touched SECTION reloads its WHOLE telescope (all its
 /// sections, however old), since the fold needs every level.
 pub fn read_recently_modified_skgfiles_from_sources (
   config : &SkgConfig,
@@ -238,7 +238,7 @@ pub fn read_recently_modified_skgfiles_from_sources (
   let mut all_nodes : Vec<NodeComplete> = Vec::new();
   for pid in modified_pids {
     all_nodes . push (
-      nodecomplete_from_accordion_on_disk (config, &pid) ? ); }
+      nodecomplete_from_telescope_on_disk (config, &pid) ? ); }
   Ok (all_nodes) }
 
 /// Reports duplicate IDs found across sources.
@@ -326,7 +326,7 @@ fn report_load_errors(
   Ok(())
 }
 
-/// Writes all given `NodeComplete`s to disk as accordions: each
+/// Writes all given `NodeComplete`s to disk as telescopes: each
 /// node's sections land in their levels' source directories, named
 /// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
@@ -351,11 +351,11 @@ pub fn write_all_nodes_to_fs (
 
   let mut written : usize = 0;
   for node in nodes {
-    write_nodecomplete_accordion ( & node, & config ) ?;
+    write_nodecomplete_telescope ( & node, & config ) ?;
     written += 1; }
   Ok (written) }
 
-/// Deleting a node deletes its whole ACCORDION: every owned
+/// Deleting a node deletes its whole TELESCOPE: every owned
 /// section file of that pid, in whatever source. (The SourceName in
 /// each target is the caller's belief about the home; kept in the
 /// signature for its callers, but every owned level is swept.)

@@ -11,7 +11,7 @@
 // the private membership) or by appearance (inbound surfaces would
 // reveal N/S even though the content direction hides them).
 //
-// Fixture accordion (tests/leak_battery/fixtures):
+// Fixture telescope (tests/leak_battery/fixtures):
 // - C: public home only ("leak-battery-C").
 // - N: public home ("leak-battery-N"), no contains there; a private
 //   section (owned/private/N.skg, no title) holds `contains: - C`.

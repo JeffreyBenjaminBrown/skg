@@ -158,13 +158,13 @@ fn test_duplicate_id_detection_across_sources() {
     test_config (sources, temp_dir . path () . to_path_buf ()) };
 
   // Same pid in both sources: no longer a duplicate -- they are the
-  // SECTIONS of one privacy accordion, folded into one node whose
+  // SECTIONS of one privacy telescope, folded into one node whose
   // home is the more public section (alphabetical fallback order for
   // this dummy config: "main" precedes "shared"). The stray second
   // title is a fold warning, not an error. The section files are
   // written RAW: a whole-node write would (correctly) sweep the
   // pid's sections at other levels, so two sequential
-  // write_nodecomplete_to_source calls cannot build an accordion.
+  // write_nodecomplete_to_source calls cannot build a telescope.
   fs::write (
     config . sources . get (&SourceName::from ("main"))
       . unwrap () . path . join ("duplicate_id.skg"),
@@ -177,13 +177,13 @@ fn test_duplicate_id_detection_across_sources() {
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) . unwrap();
   assert_eq!( nodes . len(), 1,
-    "same-pid files across sources fold into one accordion" );
+    "same-pid files across sources fold into one telescope" );
   assert_eq!( nodes[0] . title, "Node in Main",
     "the home (most public titled section) wins the title" );
   assert_eq!( nodes[0] . source, SourceName::from ("main") );
   check_for_duplicate_ids_across_sources (
     &nodes, &config . data_root)
-    . expect ("an accordion is not an id conflict");
+    . expect ("a telescope is not an id conflict");
 
   { // What REMAINS a conflict: one id claimed by two distinct pids
     // (here via extra_ids).
@@ -384,7 +384,7 @@ fn test_many_duplicate_ids_creates_org_file() {
   let config : SkgConfig = test_config (sources, temp_dir . path () . to_path_buf ());
 
   // Create 15 GENUINE id conflicts: same-pid files across sources
-  // are accordion sections now, so a conflict means one id claimed
+  // are telescope sections now, so a conflict means one id claimed
   // by two DISTINCT pids -- here via extra_ids. In-memory nodes
   // suffice; the check takes the folded node list.
   let mut nodes : Vec<NodeComplete> = Vec::new ();

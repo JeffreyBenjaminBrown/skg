@@ -167,12 +167,12 @@ So far there are these endpoints:
     including scalar node fields, aliases, extra IDs, all five schema relations
     in both role directions, text diffs for title/body, and
     root/new/deleted/modified buckets. Nodes are compared as whole
-    accordions: each endpoint's section files are grouped by pid and
+    telescopes: each endpoint's section files are grouped by pid and
     folded, so a change to one section reports against the node's
     full fold. A separate bucket ("IDs claimed by more than one
     node") reports duplicate-ID VIOLATIONS — an id claimed by two
     distinct pids at either endpoint. An id merely present in
-    several sources is the normal accordion shape and is not
+    several sources is the normal telescope shape and is not
     reported.
   - Refuses to produce an ordinary report if any configured source is not a git
     repository, has no HEAD commit, has a selected merge-commit HEAD baseline,
@@ -185,7 +185,7 @@ So far there are these endpoints:
   - Response: LP response-type "stage-moves" with
     `((content "SHELL_SCRIPT") (errors (...)) (warnings (...)))`.
   - Behavior: Scans the git status of every configured source and
-    finds each node that "moved". Under accordions a node's sections
+    finds each node that "moved". Under telescopes a node's sections
     live in several sources at once, so the signal is TITLE
     presence, not file presence: a node moved iff its title vanished
     from EXACTLY one source (titled in that source's git HEAD,
@@ -248,16 +248,16 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
-## Migrate to accordions
-  - Request: ((request . "migrate to accordions"))
-  - Response: LP response-type "migrate-to-accordions" with
+## Migrate to telescopes
+  - Request: ((request . "migrate to telescopes"))
+  - Response: LP response-type "migrate-to-telescopes" with
     `((content "..."))` describing the outcome.
   - Behavior: For every owned node, raises each relationship edge's
     privacy level to at least its DEFAULT (the more private of the
     two endpoints' homes), never lowering anything. This lifts
     leak-shaped memberships — a public file naming a more private
-    node's ID — into their proper accordion sections. Changed
-    accordions are rewritten byte-stably; if anything changed, the
+    node's ID — into their proper telescope sections. Changed
+    telescopes are rewritten byte-stably; if anything changed, the
     databases are rebuilt as in "rebuild dbs".
   - Refusal: requires the active source-set `all` (migration must
     see and rewrite every level).
@@ -605,7 +605,7 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 Each `[[sources]]` entry defines a directory of `.skg` files.
 **Order is load-bearing**: sources must be listed in privacy order,
 most public first, most private last. That order defines the privacy
-levels of the accordion model (see `docs/accordions.md`) and the
+levels of the telescope model (see `docs/telescopes.md`) and the
 available source-sets (below).
 
 | Field          | Required | Description |
@@ -682,13 +682,13 @@ It is a specialization of YAML -- every .skg file is valid YAML,
 although not vice versa. The definitive source of truth is
 `server/types/nodes/fs.rs` (`NodeFS`).
 
-Each file is one **accordion section**: the slice of one node
-recorded at one privacy level (see `docs/accordions.md`). One node =
+Each file is one **telescope section**: the slice of one node
+recorded at one privacy level (see `docs/telescopes.md`). One node =
 one ID = same-ID `.skg` files across sources, at most one per
 source; the filename is the node's primary ID followed by `.skg` in
 every source. The most public section carrying a `title` is the
 node's **home**. A field a section omits is a field that section has
-no opinion about. Pre-accordion single-file nodes parse unchanged
+no opinion about. Pre-telescope single-file nodes parse unchanged
 (one section, title present, no anchors).
 
 Fields:

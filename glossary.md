@@ -2,22 +2,22 @@ Some terms and abbreviations used in this code.
 
 # Terms and abbreviations specific to Skg
 
-## "accordion" = privacy accordion
+## "telescope" = privacy telescope
 
-In code and comments the short form "accordion" always means the
-privacy accordion; see "privacy accordion" below.
+In code and comments the short form "telescope" always means the
+privacy telescope; see "privacy telescope" below.
 
-## privacy accordion, accordion section, home
+## privacy telescope, telescope section, home
 
 One node can be recorded at several privacy levels at once: same-ID
 `.skg` files across sources, at most one per source. That family of
-files is the node's **privacy accordion**; each file is one
-**accordion section** ("section" for short in code), holding the
+files is the node's **privacy telescope**; each file is one
+**telescope section** ("section" for short in code), holding the
 slice of the node recorded at its source's level. The most public
 section carrying a title is the **home**; it alone holds title,
 body, and extra ids. There is no linking relationship between
 sections — sharing an ID is being the same node. See
-`docs/accordions.md` and `server/types/nodes/fs.rs`.
+`docs/telescopes.md` and `server/types/nodes/fs.rs`.
 
 ## privacy level, or "level" in code
 
@@ -28,8 +28,8 @@ section records it. In code this is the `level` field of
 
 ## fold (visible vs full), unfold
 
-The **fold** of an accordion combines its sections, most public
-first, into one effective node (`server/accordion/fold.rs`). The
+The **fold** of a telescope combines its sections, most public
+first, into one effective node (`server/telescope/fold.rs`). The
 **full fold** uses every section; a **visible fold** uses only the
 sections active under the current source-set, and is what a
 restricted view renders. **Unfold** is the save-side inverse:

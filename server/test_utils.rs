@@ -603,7 +603,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
 /// member and alias to that level. Under degenerate leveling (work
 /// item leveled-lists) the invariant is levels == source, so any
 /// test that reassigns a node's source must go through this, or the
-/// accordion write would emit sections at the old level. The real
+/// telescope write would emit sections at the old level. The real
 /// source-move rule (which levels follow a home move) is owned by
 /// work item save-leveling.
 pub fn set_source_retagging_levels (

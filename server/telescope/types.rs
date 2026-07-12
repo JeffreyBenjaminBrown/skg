@@ -1,8 +1,8 @@
-//! Core values of the privacy accordion (in comments: "accordion" =
-//! privacy accordion, "section" = accordion section, "level" =
+//! Core values of the privacy telescope (in comments: "telescope" =
+//! privacy telescope, "section" = telescope section, "level" =
 //! privacy level; the short names are for code).
 //!
-//! One node = one ID = one accordion: a set of same-ID .skg files,
+//! One node = one ID = one telescope: a set of same-ID .skg files,
 //! at most one per source ("sections"). Every relationship instance
 //! is recorded in exactly one section, whose source is the edge's
 //! LEVEL. On disk each ordered relation is ONE flat sequence of

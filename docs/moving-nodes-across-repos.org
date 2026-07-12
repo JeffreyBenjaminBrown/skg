@@ -91,7 +91,7 @@ Both =public= and =private= must be sources defined in your
 =owned_folder=). A move to or from a foreign source is rejected
 (see Pitfalls below).
 
-Under privacy accordions (see =accordions.md=), what moves is the
+Under privacy telescopes (see =telescopes.md=), what moves is the
 node's HOME: its title, body and extra ids relocate to the new
 source's section. Sections of the node at other privacy levels stay
 where they are, and each relationship edge keeps its recorded level

@@ -1,4 +1,4 @@
-pub mod accordion;
+pub mod telescope;
 pub mod consts;
 pub mod context;
 pub mod dbs;

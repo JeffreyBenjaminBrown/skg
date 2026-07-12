@@ -18,8 +18,8 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
-use crate::accordion::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
-use crate::accordion::invariants::{report_accordion_violations, validate_all_accordions};
+use crate::telescope::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
+use crate::telescope::invariants::{report_telescope_violations, validate_all_telescopes};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
@@ -99,8 +99,8 @@ pub fn initialize_dbs (
                 "Override invariant validation failed: {}", e);
               std::process::exit (1); }
           { let violations =
-              validate_all_accordions (config, &graph);
-            let _ = report_accordion_violations (
+              validate_all_telescopes (config, &graph);
+            let _ = report_telescope_violations (
               &violations, &config . data_root ); }
           let (env, handoff) : (SkgEnv, InitContextHandoff) =
             env_and_handoff_from_nodes (
@@ -286,8 +286,8 @@ fn full_init (
     { tracing::error! ("Override invariant validation failed: {}", e);
       std::process::exit (1); }
   { let violations =
-      validate_all_accordions (config, &graph);
-    let _ = report_accordion_violations (
+      validate_all_telescopes (config, &graph);
+    let _ = report_telescope_violations (
       &violations, &config . data_root ); }
   { // DEPENDENCIES.toml: regenerate the publisher manifests, and
     // warn when a foreign manifest contradicts this config's order.

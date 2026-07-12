@@ -632,14 +632,14 @@ Closes the TCP connection to the Rust server.
 *** skg-rebuild-dbs
 Rebuilds TypeDB and Tantivy databases,
 using the .skg files on disk.
-*** skg-migrate-to-accordions
-One-time (idempotent) migration to the privacy-accordion model
-(see =docs/accordions.md=). Raises every owned relationship edge's
+*** skg-migrate-to-telescopes
+One-time (idempotent) migration to the privacy-telescope model
+(see =docs/telescopes.md=). Raises every owned relationship edge's
 privacy level to at least its default -- the more private of the
 two endpoints' homes -- which moves leak-shaped memberships (a
 public file naming a more private node's ID) into their proper
-accordion sections. Never lowers a level. Rewrites only the
-accordions that change, then rebuilds the databases. The server
+telescope sections. Never lowers a level. Rewrites only the
+telescopes that change, then rebuilds the databases. The server
 refuses unless the active source-set is =all=, since migration must
 see every level. What it cannot fix: a public repo's git HISTORY
 keeps any IDs it leaked before migration; repairing that is manual.

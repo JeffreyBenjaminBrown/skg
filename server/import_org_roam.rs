@@ -2,8 +2,8 @@ pub mod parse;
 
 use crate::types::misc::{
   ID, MSV, PrivaciedMember, SourceName, members_msv, privacied_msv};
-use crate::accordion::types::SectionSlices;
-use crate::accordion::unfold::{UnfoldInput, unfold_node};
+use crate::telescope::types::SectionSlices;
+use crate::telescope::unfold::{UnfoldInput, unfold_node};
 use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 

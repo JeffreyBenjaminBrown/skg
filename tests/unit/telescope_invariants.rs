@@ -1,8 +1,8 @@
-//! Unit tests for the accordion invariant validator: the leak shape
+//! Unit tests for the telescope invariant validator: the leak shape
 //! (an edge more public than its target's home) is caught; honest
 //! shapes and unknown targets are not; extra-id anchors resolve.
 
-use super::{AccordionViolation, accordion_violations_of, validate_all_accordions};
+use super::{TelescopeViolation, telescope_violations_of, validate_all_telescopes};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{
   ID, MSV, PrivaciedMember, SkgConfig, SkgfileSource, SourceName,
@@ -60,13 +60,13 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
       & [ container, private_child, public_child ] );
-  let violations : Vec<AccordionViolation> =
-    accordion_violations_of (
+  let violations : Vec<TelescopeViolation> =
+    telescope_violations_of (
       &config, &graph, &ID::new ("container") );
   assert_eq! ( violations . len (), 1, "{:?}", violations );
   assert! ( matches! (
     & violations [0],
-    AccordionViolation::LeakShapedMember { member, member_home, .. }
+    TelescopeViolation::LeakShapedMember { member, member_home, .. }
       if member . 0 == "secret" && member_home . 0 == "private" ));
 }
 
@@ -82,7 +82,7 @@ fn private_membership_of_a_public_member_is_fine (
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
       & [ container, public_child ] );
-  assert! ( accordion_violations_of (
+  assert! ( telescope_violations_of (
     &config, &graph, &ID::new ("container") ) . is_empty () );
 }
 
@@ -99,8 +99,8 @@ fn leak_check_resolves_extra_ids (
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
       & [ container, private_child ] );
-  let violations : Vec<AccordionViolation> =
-    accordion_violations_of (
+  let violations : Vec<TelescopeViolation> =
+    telescope_violations_of (
       &config, &graph, &ID::new ("container") );
   assert_eq! ( violations . len (), 1, "{:?}", violations );
 }
@@ -120,13 +120,13 @@ fn unconfigured_level_and_msv_relations_are_covered (
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ node, target ] );
-  let violations : Vec<AccordionViolation> =
-    validate_all_accordions (&config, &graph)
+  let violations : Vec<TelescopeViolation> =
+    validate_all_telescopes (&config, &graph)
     . into_iter () . map ( |(_, v)| v ) . collect ();
   assert_eq! ( violations . len (), 2, "{:?}", violations );
   assert! ( violations . iter () . any ( |v| matches! (
-    v, AccordionViolation::LeakShapedMember {
+    v, TelescopeViolation::LeakShapedMember {
       relation : "subscribes_to", .. } )));
   assert! ( violations . iter () . any ( |v| matches! (
-    v, AccordionViolation::UnconfiguredLevel { .. } )));
+    v, TelescopeViolation::UnconfiguredLevel { .. } )));
 }

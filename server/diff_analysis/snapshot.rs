@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::multiple_nodes::{
-  fold_one_accordion, read_skg_sections_from_folder};
+  fold_one_telescope, read_skg_sections_from_folder};
 use crate::diff_analysis::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
 use crate::git_ops::misc::path_relative_to_repo;
@@ -124,7 +124,7 @@ fn read_graph_snapshot (
   kind   : SnapshotKind,
 ) -> Result<GraphSnapshot, String> {
   // Sections arrive in privacy order (ordered_sources) so each
-  // accordion folds with its most public section first.
+  // telescope folds with its most public section first.
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   for source_name in config . ordered_sources () {
     let label : String =
@@ -314,17 +314,17 @@ fn overlay_changed_after_snapshot (
       . filter_map ( |rel_path| rel_path . file_stem () )
       . map ( |stem| ID::new (stem . to_string_lossy () . to_string ()) )
       . collect ();
-  // A changed SECTION re-folds its whole accordion, so read every
+  // A changed SECTION re-folds its whole telescope, so read every
   // source's section for each changed pid at the after endpoint.
   let mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>> =
     HashMap::new ();
   for pid in &changed_pids {
     sections_by_pid . insert (
       pid . clone (),
-      read_accordion_sections_at_endpoint (
+      read_telescope_sections_at_endpoint (
         config, after_kind, pid ) ? ); }
   // Anchor resolution needs the whole corpus's extra-id map:
-  // unchanged accordions contribute via their folded nodes, changed
+  // unchanged telescopes contribute via their folded nodes, changed
   // ones via their fresh sections.
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
@@ -346,14 +346,14 @@ fn overlay_changed_after_snapshot (
       . expect ("changed_pids tracks sections_by_pid");
     let before_node : Option<&NodeComplete> =
       before . nodes . get (pid);
-    remove_accordion_claims (&mut after, pid, before_node);
+    remove_telescope_claims (&mut after, pid, before_node);
     let after_node : Option<NodeComplete> =
       if sections . is_empty () { None }
       else {
         for (source_name, node_fs) in &sections {
           record_section_claims (
             &mut after . id_claims, node_fs, source_name ); }
-        Some ( fold_accordion_tolerating_homelessness (
+        Some ( fold_telescope_tolerating_homelessness (
           pid, sections, &resolve ) ? ) };
     affected_pids . extend (
       affected_pids_for_changed_node (
@@ -366,7 +366,7 @@ fn overlay_changed_after_snapshot (
 
 /// Every source's section file for this pid at the given endpoint,
 /// in privacy order. Missing files simply contribute no section.
-fn read_accordion_sections_at_endpoint (
+fn read_telescope_sections_at_endpoint (
   config : &SkgConfig,
   kind   : SnapshotKind,
   pid    : &ID,
@@ -395,7 +395,7 @@ fn read_accordion_sections_at_endpoint (
 /// Drop the claims a pid's sections contributed at the before
 /// endpoint (its claimed ids are exactly the folded node's
 /// all_ids). Claims by OTHER pids on the same ids survive.
-fn remove_accordion_claims (
+fn remove_telescope_claims (
   snapshot    : &mut GraphSnapshot,
   pid         : &ID,
   before_node : Option<&NodeComplete>,
@@ -557,7 +557,7 @@ fn profile_log (
     duration . subsec_millis ()); }
 
 /// Group sections by pid (sections must arrive in privacy order),
-/// fold each accordion, and record every section's id claims.
+/// fold each telescope, and record every section's id claims.
 fn snapshot_from_sections (
   sections : Vec<(SourceName, NodeFS)>,
 ) -> Result<GraphSnapshot, String> {
@@ -584,28 +584,28 @@ fn snapshot_from_sections (
       . unwrap_or_else ( || id . clone () ) };
   let mut by_pid : HashMap<ID, NodeComplete> =
     HashMap::new ();
-  for (pid, accordion_sections) in sections_by_pid {
+  for (pid, telescope_sections) in sections_by_pid {
     let node : NodeComplete =
-      fold_accordion_tolerating_homelessness (
-        &pid, accordion_sections, &resolve ) ?;
+      fold_telescope_tolerating_homelessness (
+        &pid, telescope_sections, &resolve ) ?;
     by_pid . insert (pid, node); }
   Ok ( GraphSnapshot { nodes: by_pid, id_claims } )
 }
 
-/// Fold one accordion, but where init would hard-error on a
-/// titleless accordion (no home), a snapshot must not: diff
+/// Fold one telescope, but where init would hard-error on a
+/// titleless telescope (no home), a snapshot must not: diff
 /// endpoints legitimately pass through ill-formed states (e.g. a
 /// home-section deletion staged before its recreation). Retry with
 /// a placeholder title on the most public section, so the report
-/// can still describe the accordion.
-fn fold_accordion_tolerating_homelessness (
+/// can still describe the telescope.
+fn fold_telescope_tolerating_homelessness (
   pid      : &ID,
   sections : Vec<(SourceName, NodeFS)>,
   resolve  : &dyn Fn (&ID) -> ID,
 ) -> Result<NodeComplete, String> {
   let retry : Vec<(SourceName, NodeFS)> =
     sections . clone ();
-  match fold_one_accordion (pid, sections, resolve) {
+  match fold_one_telescope (pid, sections, resolve) {
     Ok (node) => Ok (node),
     Err (_) => {
       let mut retry : Vec<(SourceName, NodeFS)> = retry;
@@ -614,8 +614,8 @@ fn fold_accordion_tolerating_homelessness (
           node_fs . title =
             Some ("(no titled section)" . to_string ()),
         None => return Err ( format! (
-          "Accordion '{}' has no sections to fold.", pid )), }
-      fold_one_accordion (pid, retry, resolve)
+          "Telescope '{}' has no sections to fold.", pid )), }
+      fold_one_telescope (pid, retry, resolve)
         . map_err ( |e| e . to_string () ) }}
 }
 
@@ -740,7 +740,7 @@ pub(super) fn path_is_source_skg (
 }
 
 /// One FILE's contents as a section (pid-checked against the file
-/// stem). The snapshot folds same-pid sections into one accordion.
+/// stem). The snapshot folds same-pid sections into one telescope.
 pub(super) fn parse_blob_section (
   bytes    : &[u8],
   rel_path : &Path,
@@ -764,7 +764,7 @@ pub(super) fn parse_blob_section (
 
 /// One FILE as a whole node -- the per-blob view the vanished-node
 /// history search uses (it inspects one historical blob at a time,
-/// so there is no accordion to fold).
+/// so there is no telescope to fold).
 pub(super) fn parse_blob_node (
   bytes       : &[u8],
   source_name : &SourceName,

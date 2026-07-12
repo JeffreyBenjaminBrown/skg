@@ -106,6 +106,18 @@ order; this file grows as each lands.
 ALL TWELVE WORK ITEMS ARE DONE. Suites at completion: Rust
 513/513, elisp 270/270, integration all green, nvim green.
 
+TERMINOLOGY CHANGE, post-completion (Jeff, 2026-07-12): the feature
+is now the PRIVACY TELESCOPE ("telescopes extend one section at a
+time, accordions expand uniformly"). A Sonnet agent swapped
+accordion->telescope across all living code, tests, docs, comments
+and the wire protocol ('migrate to telescopes'); server/accordion/
+became server/telescope/, docs/accordions.md became
+docs/telescopes.md, and the generated report is now
+telescope-warnings.org. This folder (TODO/) deliberately keeps the
+old word as a historical record; Jeff's notes in data/ that use
+"accordion" as ordinary English were untouched. All four suites
+green after the sweep.
+
 * what's done and went well
 ** privacy-order
 Prefix source-sets, the comparison chokepoint on 'SkgConfig'

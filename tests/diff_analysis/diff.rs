@@ -225,14 +225,14 @@ fn duplicate_ids_across_sources_are_omitted_from_node_buckets () {
 }
 
 #[test]
-fn accordion_shape_is_not_a_duplicate () {
-  // One pid claimed from two SOURCES is the normal accordion shape
+fn telescope_shape_is_not_a_duplicate () {
+  // One pid claimed from two SOURCES is the normal telescope shape
   // (sections at two privacy levels), not a duplicate-ID violation.
-  let mut accordion : NodeComplete =
+  let mut telescope : NodeComplete =
     node ("a", "A", &[]);
-  accordion . source = source ("public");
+  telescope . source = source ("public");
   let mut snap_after : GraphSnapshot =
-    snapshot (vec! [accordion]);
+    snapshot (vec! [telescope]);
   snap_after . id_claims . get_mut (&id ("a")) . unwrap ()
     . get_mut (&id ("a")) . unwrap ()
     . insert (source ("private"));
@@ -245,7 +245,7 @@ fn accordion_shape_is_not_a_duplicate () {
   assert! (
     report . buckets . iter ()
       . any ( |bucket| ! bucket . nodes . is_empty () ),
-    "the accordion should appear in the node buckets" );
+    "the telescope should appear in the node buckets" );
 }
 
 #[test]

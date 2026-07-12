@@ -1,8 +1,8 @@
-//! 'skg-migrate-to-accordions' (5_plan.org, work item migration):
+//! 'skg-migrate-to-telescopes' (5_plan.org, work item migration):
 //! re-level every owned node's edges to at least their DEFAULTS --
 //! raising leak-shaped memberships (a public file naming a
-//! more-private ID) into the right accordion sections, never
-//! lowering anything -- then rewrite the accordions (byte-stable,
+//! more-private ID) into the right telescope sections, never
+//! lowering anything -- then rewrite the telescopes (byte-stable,
 //! so already-conforming files are untouched) and rebuild the
 //! databases from the migrated files. Refused unless the active
 //! source-set is "all": migration must see and rewrite every level.
@@ -11,7 +11,7 @@
 //! git HISTORY keeps any IDs it already leaked; rewriting history
 //! is out of scope and manual.
 
-use crate::dbs::filesystem::one_node::write_nodecomplete_accordion;
+use crate::dbs::filesystem::one_node::write_nodecomplete_telescope;
 use crate::serve::ViewsState;
 use crate::serve::handlers::rebuild_dbs::rebuild_dbs_in_place;
 use crate::serve::util::send_response_with_length_prefix;
@@ -23,7 +23,7 @@ use crate::types::nodes::rust::NodeRust;
 
 use std::net::TcpStream;
 
-pub fn handle_migrate_to_accordions_request (
+pub fn handle_migrate_to_telescopes_request (
   stream      : &mut TcpStream,
   env         : &mut SkgEnv,
   views_state : &mut ViewsState,
@@ -35,7 +35,7 @@ pub fn handle_migrate_to_accordions_request (
       active . name . 0 ));
     return; }
   let (changed, raised) : (usize, usize) =
-    match migrate_all_owned_accordions (env) {
+    match migrate_all_owned_telescopes (env) {
       Ok (counts) => counts,
       Err (e) => {
         send_migrate_response ( stream, & format! (
@@ -54,9 +54,9 @@ pub fn handle_migrate_to_accordions_request (
     changed, raised )); }
 
 /// Raise every owned node's edge levels to at least their defaults
-/// (never lowering), and rewrite the accordions of the nodes that
+/// (never lowering), and rewrite the telescopes of the nodes that
 /// changed. Returns (nodes rewritten, edge levels raised).
-fn migrate_all_owned_accordions (
+fn migrate_all_owned_telescopes (
   env : &mut SkgEnv,
 ) -> Result<(usize, usize), String> {
   let config : SkgConfig = env . config . clone ();
@@ -68,7 +68,7 @@ fn migrate_all_owned_accordions (
     let (migrated, raised) : (NodeComplete, usize) =
       raise_levels_to_defaults ( &config, &snap, pid, node );
     if raised > 0 {
-      write_nodecomplete_accordion ( &migrated, &config )
+      write_nodecomplete_telescope ( &migrated, &config )
         . map_err ( |e| format! (
           "writing '{}': {}", pid, e )) ?;
       changed_nodes += 1;
@@ -135,6 +135,6 @@ fn send_migrate_response (
     . replace ('"', "\\\"")
     . replace ('\n', "\\n");
   let response : String = format! (
-    "((response-type migrate-to-accordions) (content \"{}\"))",
+    "((response-type migrate-to-telescopes) (content \"{}\"))",
     escaped );
   send_response_with_length_prefix (stream, &response); }

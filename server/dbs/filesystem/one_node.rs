@@ -1,6 +1,6 @@
-use crate::accordion::fold::{fold_sections, nodecomplete_from_fold};
-use crate::accordion::types::SectionSlices;
-use crate::accordion::unfold::{UnfoldInput, unfold_node};
+use crate::telescope::fold::{fold_sections, nodecomplete_from_fold};
+use crate::telescope::types::SectionSlices;
+use crate::telescope::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
 use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
 use crate::types::nodes::complete::NodeComplete;
@@ -29,12 +29,12 @@ pub async fn nodecomplete_from_id (
 
 
 /// Reads a NodeComplete from disk given its PID: the whole
-/// ACCORDION -- every same-pid section file across the configured
+/// TELESCOPE -- every same-pid section file across the configured
 /// sources, folded. The 'source' parameter survives only as the
 /// caller's belief about the home; the fold derives the true home
 /// (the most public titled section), so a stale belief cannot
 /// corrupt the read. Extra-id anchor resolution here is
-/// identity-only (this accordion's own extra_ids are unknown until
+/// identity-only (this telescope's own extra_ids are unknown until
 /// read; cross-node merges resolve at the graph layer).
 pub fn nodecomplete_from_pid_and_source (
   config : &SkgConfig,
@@ -42,7 +42,7 @@ pub fn nodecomplete_from_pid_and_source (
   source : &SourceName,
 ) -> io::Result<NodeComplete> {
   let sections : Vec<(SourceName, NodeFS)> =
-    read_accordion_sections (config, &pid) ?;
+    read_telescope_sections (config, &pid) ?;
   if sections . is_empty () {
     return Err ( io::Error::new (
       io::ErrorKind::NotFound,
@@ -73,16 +73,16 @@ pub fn nodecomplete_from_pid_and_source (
     fold_sections ( &slices, & |id : &ID| id . clone () );
   for w in &warnings {
     tracing::warn! ( pid = %pid, warning = ?w,
-                     "accordion fold warning (single-node read)" ); }
+                     "telescope fold warning (single-node read)" ); }
   nodecomplete_from_fold ( pid . clone (), extra_ids, misc, folded )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ("Accordion '{}' has no home: no section carries a title.",
+      format! ("Telescope '{}' has no home: no section carries a title.",
                pid ))) }
 
-/// Every section of PID's accordion, in privacy order: for each
+/// Every section of PID's telescope, in privacy order: for each
 /// configured source (most public first), pid.skg if present.
-fn read_accordion_sections (
+fn read_telescope_sections (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Vec<(SourceName, NodeFS)>> {
@@ -133,7 +133,7 @@ pub async fn fetch_aliases_from_file (
       members_msv ( & nodecomplete . aliases ) . into_vec(),
     _ => Vec::new(), }}
 
-/// Write a node as its accordion: unfold into per-level sections,
+/// Write a node as its telescope: unfold into per-level sections,
 /// write each section file only when its bytes changed
 /// (no-cosmetic-rewrites), and delete OWNED section files whose
 /// level lost its last member. Foreign sources are never written or
@@ -143,9 +143,9 @@ pub fn write_nodecomplete_to_source (
   nodecomplete : &NodeComplete,
   config  : &SkgConfig,
 ) -> io::Result<()> {
-  write_nodecomplete_accordion (nodecomplete, config) }
+  write_nodecomplete_telescope (nodecomplete, config) }
 
-pub fn write_nodecomplete_accordion (
+pub fn write_nodecomplete_telescope (
   nodecomplete : &NodeComplete,
   config       : &SkgConfig,
 ) -> io::Result<()> {

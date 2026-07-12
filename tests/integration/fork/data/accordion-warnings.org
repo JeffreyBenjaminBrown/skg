@@ -1,7 +1,0 @@
-#+title: Accordion warnings
-#+date: <generated at initialization>
-
-1 accordion warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired (see each line; skg-migrate-to-accordions repairs leak-shaped memberships wholesale).
-
-* P
-** leak-shaped contains member: edge at level 'owned' names 'N', whose home 'foreign' is more private. Re-level the membership (skg-migrate-to-accordions repairs these wholesale). The leaking file's git history already contains the ID.

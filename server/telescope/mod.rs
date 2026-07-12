@@ -5,5 +5,5 @@ pub mod types;
 pub mod unfold;
 
 #[cfg(test)]
-#[path = "../../tests/unit/accordion.rs"]
+#[path = "../../tests/unit/telescope.rs"]
 mod tests;

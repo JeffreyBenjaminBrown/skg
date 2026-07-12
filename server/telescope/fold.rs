@@ -17,7 +17,7 @@
 //! level order; a member repeated across levels keeps its most
 //! public occurrence, with a warning.
 
-use crate::accordion::types::{FoldWarning, ListItem, SectionSlices};
+use crate::telescope::types::{FoldWarning, ListItem, SectionSlices};
 use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
@@ -40,7 +40,7 @@ pub struct FoldedNode {
   pub overrides_view_of            : Option<Vec<PrivaciedMember<ID>>>,
 }
 
-/// The fold as a NodeComplete. None iff the accordion has no home
+/// The fold as a NodeComplete. None iff the telescope has no home
 /// (no section carried a title) -- the caller decides whether that
 /// is a hard load error (it is, at init) or a warning.
 pub fn nodecomplete_from_fold (

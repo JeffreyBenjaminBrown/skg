@@ -16,7 +16,7 @@
 (require 'skg-request-diff-analysis)
 (require 'skg-request-export-org)
 (require 'skg-request-git-diff-mode)
-(require 'skg-request-migrate-to-accordions)
+(require 'skg-request-migrate-to-telescopes)
 (require 'skg-request-rebuild-dbs)
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-save)

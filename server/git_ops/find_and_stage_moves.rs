@@ -4,7 +4,7 @@
 /// one), skipping any whose file is still present in the old source
 /// (so a stale entry cannot delete it).
 ///
-/// Under privacy accordions a node's sections live in several
+/// Under privacy telescopes a node's sections live in several
 /// sources at once, so file presence alone no longer signals a move.
 /// To move "the" node is to move its most public titled
 /// representation: a node has "moved" iff its TITLE vanished from

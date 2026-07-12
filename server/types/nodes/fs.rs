@@ -1,7 +1,7 @@
-//! NodeFS: the on-disk shape of one accordion SECTION.
+//! NodeFS: the on-disk shape of one telescope SECTION.
 //!
-//! One node = one ID = one privacy accordion: same-ID .skg files, at
-//! most one per source, each an "accordion section" holding the
+//! One node = one ID = one privacy telescope: same-ID .skg files, at
+//! most one per source, each an "telescope section" holding the
 //! slice of the node recorded at that privacy level. The most public
 //! section (the HOME) alone carries title and body. Ordered
 //! relations are ONE flat sequence of 'ListItem's -- members render
@@ -14,7 +14,7 @@
 //!
 //! Conversions:
 //! - 'NodeFS::into_section_slices' feeds the fold
-//!   ('server/accordion/fold.rs'), which is how NodeComplete values
+//!   ('server/telescope/fold.rs'), which is how NodeComplete values
 //!   are born; 'nodefs_from_section' is the unfold-side inverse.
 //! - 'NodeFS::into_complete_as_single_section (source)' treats ONE
 //!   section as a whole node. Used only where a single FILE is the
@@ -24,7 +24,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::accordion::types::{ListItem, SectionSlices};
+use crate::telescope::types::{ListItem, SectionSlices};
 use crate::types::misc::{ID, MSV, SourceName, privacied_all, privacied_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::complete::FileProperty;
@@ -89,10 +89,10 @@ impl NodeFS {
         nonempty_ids ( self . overrides_view_of ), }}
 
   /// Treat ONE section as a whole node: exact for single-section
-  /// accordions; the per-file git/diff paths use it as interim
+  /// telescopes; the per-file git/diff paths use it as interim
   /// behavior (see the module comment). A titleless section gets an
   /// empty title rather than erroring, since blob-parsers must be
-  /// total; the accordion validators, not this conversion, own
+  /// total; the telescope validators, not this conversion, own
   /// missing-title reporting.
   pub fn into_complete_as_single_section (
     self,
@@ -174,7 +174,7 @@ impl NodeFS {
 }
 
 /// The unfold-side inverse of 'into_section_slices': one section's
-/// on-disk shape. 'pid' names the accordion; 'is_home' decides
+/// on-disk shape. 'pid' names the telescope; 'is_home' decides
 /// whether extra_ids ride along (they live in the home only).
 pub fn nodefs_from_section (
   pid       : &ID,

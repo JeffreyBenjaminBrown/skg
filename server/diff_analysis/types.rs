@@ -30,11 +30,11 @@ pub struct ChangedSnapshotPair {
 
 #[derive(Clone, Debug, Default)]
 pub struct GraphSnapshot {
-  /// One entry per ACCORDION (keyed by pid, sections folded).
+  /// One entry per TELESCOPE (keyed by pid, sections folded).
   pub nodes     : HashMap<ID, NodeComplete>,
   /// id -> claiming pid -> sources whose section for that pid
   /// claims the id (as its pid or among its extra_ids). One pid
-  /// claiming an id from several sources is the normal accordion
+  /// claiming an id from several sources is the normal telescope
   /// shape; TWO pids claiming one id is the duplicate-ID VIOLATION
   /// the report warns about.
   pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>>,
