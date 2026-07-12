@@ -20,7 +20,7 @@ source "$TEST_DIR/../test-lib.sh"
 
 echo "=== SKG View-Magit-Phantom Integration Test ==="
 
-SKG_DATA="$TEST_DIR/data/skg-data"
+SKG_DATA="$TEST_DIR/data/owned/skg-data"
 FIXTURE_FILES="a.skg b.skg"
 
 backup_and_reset_test_data() {
@@ -82,7 +82,7 @@ check_typedb_server
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -94,7 +94,6 @@ delete_on_quit = true
 [[sources]]
 name = "main"
 path = "$SKG_DATA"
-user_owns_it = true
 EOF
 
 start_skg_server

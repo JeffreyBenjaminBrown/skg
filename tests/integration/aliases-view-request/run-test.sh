@@ -24,18 +24,18 @@ backup_and_reset_test_data() {
     echo "=== Backing up and resetting test data ==="
 
     # Create skg-data directory if it doesn't exist
-    mkdir -p "$TEST_DIR/data/skg-data"
+    mkdir -p "$TEST_DIR/data/owned/skg-data"
 
     # Backup and reset test files
     for file in test-node; do
-        if [ -f "$TEST_DIR/data/skg-data/$file.skg" ]; then
-            BACKUP_FILE="$TEST_DIR/data/skg-data/$file.skg.backup.$(date +%s)"
-            cp "$TEST_DIR/data/skg-data/$file.skg" "$BACKUP_FILE"
+        if [ -f "$TEST_DIR/data/owned/skg-data/$file.skg" ]; then
+            BACKUP_FILE="$TEST_DIR/data/owned/skg-data/$file.skg.backup.$(date +%s)"
+            cp "$TEST_DIR/data/owned/skg-data/$file.skg" "$BACKUP_FILE"
             echo "✓ Backed up $file.skg to $(basename "$BACKUP_FILE")"
         fi
 
         # Create a test node with aliases
-        cat > "$TEST_DIR/data/skg-data/$file.skg" << EOF
+        cat > "$TEST_DIR/data/owned/skg-data/$file.skg" << EOF
 title: 'Test Node'
 pid: '$file'
 aliases:
@@ -54,16 +54,16 @@ cleanup_test_data() {
 
     # Restore original files if backups exist
     for file in test-node; do
-        BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
+        BACKUP_FILE=$(find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" | head -1)
         if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
-            cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$file.skg"
+            cp "$BACKUP_FILE" "$TEST_DIR/data/owned/skg-data/$file.skg"
             echo "✓ Restored $file.skg from backup"
         else
             # If no backup, remove the test file
-            rm -f "$TEST_DIR/data/skg-data/$file.skg"
+            rm -f "$TEST_DIR/data/owned/skg-data/$file.skg"
             echo "✓ Removed test file $file.skg"
         fi
-        find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" -delete
+        find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" -delete
     done
 }
 
@@ -86,7 +86,7 @@ echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -97,8 +97,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

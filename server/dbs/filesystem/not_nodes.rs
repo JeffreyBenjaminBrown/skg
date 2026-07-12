@@ -48,13 +48,18 @@ fn source_order_from_toml (
 /// the config's privacy order (see TODO/user-owned_autofork_chain/
 /// 5_plan.org, work item privacy-order). A config still defining
 /// '[[source_sets]]' would silently mean something else than its
-/// author intended, so its presence is a hard error.
-fn reject_retired_source_sets_config (
+/// author intended, so its presence is a hard error. Likewise
+/// 'user_owns_it': ownership is now derived from the source's path
+/// (under 'owned_folder' = owned), and serde would silently IGNORE
+/// the unknown key -- a silent ownership flip -- so it too is a hard
+/// error.
+fn reject_retired_config_keys (
   contents : &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+  let parsed : Option<toml::Value> =
+    toml::from_str::<toml::Value> (contents) . ok ();
   let has_source_sets : bool =
-    toml::from_str::<toml::Value> (contents) . ok ()
-    . as_ref ()
+    parsed . as_ref ()
     . map ( |v| v . get ("source_sets") . is_some () )
     . unwrap_or (false);
   if has_source_sets {
@@ -67,7 +72,63 @@ fn reject_retired_source_sets_config (
       "privacy-order. Delete the [[source_sets]] entries and, if a ",
       "deleted set was your default_source_set, replace that with a ",
       "source name or 'all'." ) . into () ); }
+  let has_user_owns_it : bool =
+    parsed . as_ref ()
+    . and_then ( |v| v . get ("sources") )
+    . and_then ( |s| s . as_array () )
+    . map ( |arr| arr . iter ()
+            . any ( |t| t . get ("user_owns_it") . is_some () ))
+    . unwrap_or (false);
+  if has_user_owns_it {
+    return Err ( concat! (
+      "This config sets 'user_owns_it' on a source, a retired key. ",
+      "Ownership is now derived from the source's path: sources ",
+      "under the config's owned_folder (default \"owned\", intended ",
+      "layout DATA_ROOT/AUTHOR/REPO) are owned; all others are ",
+      "foreign. Move each owned source's directory under that ",
+      "folder, update its 'path', and delete the 'user_owns_it' ",
+      "lines. bash/migrate-to-author-folders.sh does this for a ",
+      "whole config at once. See ",
+      "TODO/user-owned_autofork_chain/5_plan.org, work item ",
+      "privacy-order." ) . into () ); }
   Ok (( )) }
+
+/// Fills the DERIVED parts of each source. Must run AFTER
+/// 'make_paths_absolute' (so 'data_root' and absolute paths exist),
+/// with 'raw_paths' captured from the sources BEFORE it:
+/// - 'user_owns_it': true iff the source's absolute path sits under
+///   DATA_ROOT/OWNED_FOLDER (the author-folder layout: the user's
+///   own author folder holds exactly the owned sources).
+/// - herald-label defaulting: a source whose 'name' was defaulted
+///   (== its raw path string) and which has no configured
+///   abbreviation gets one -- for an owned source, the path
+///   relative to the owned folder (e.g. "owned/notes" reads as
+///   "notes"); a foreign source keeps the full "author/repo" form,
+///   mirroring the folder layout.
+fn derive_ownership_and_labels (
+  config    : &mut SkgConfig,
+  raw_paths : &HashMap<SourceName, PathBuf>,
+) {
+  let owned_root : PathBuf =
+    config . data_root . join ( &config . owned_folder );
+  for source in config . sources . values_mut () {
+    source . user_owns_it =
+      source . path . starts_with (&owned_root);
+    let raw_path_string : Option<String> =
+      raw_paths . get ( &source . name )
+      . map ( |p| p . to_string_lossy () . into_owned () );
+    let name_was_defaulted : bool =
+      Some ( source . name . 0 . as_str () )
+      == raw_path_string . as_deref ();
+    if name_was_defaulted
+    && source . abbreviation . is_none ()
+    && source . user_owns_it {
+      let trimmed : String =
+        source . path . strip_prefix (&owned_root)
+        . map ( |p| p . to_string_lossy () . into_owned () )
+        . unwrap_or_default ();
+      if ! trimmed . is_empty () { // path == owned folder: keep full
+        source . abbreviation = Some (trimmed); }}}}
 
 pub fn load_config (
   path: &str )
@@ -78,10 +139,15 @@ pub fn load_config (
                        path)
                . into( )); }
   let contents: String = fs::read_to_string (path) ?;
-  reject_retired_source_sets_config (&contents) ?;
+  reject_retired_config_keys (&contents) ?;
+  
   let mut config: SkgConfig =
     toml::from_str (&contents) ?;
   config . source_order = source_order_from_toml (&contents);
+  let raw_paths : HashMap<SourceName, PathBuf> =
+    config . sources . iter ()
+    . map ( |(name, s)| (name . clone (), s . path . clone ()) )
+    . collect ();
   config . config_path =
     fs::canonicalize (path)
     . unwrap_or_else ( |_| PathBuf::from (path) );
@@ -99,6 +165,7 @@ pub fn load_config (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
+  derive_ownership_and_labels (&mut config, &raw_paths);
   validate_source_sets (&config)?;
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
@@ -140,10 +207,14 @@ pub fn load_config_with_overrides (
   if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}", path) . into()); }
   let contents: String = fs::read_to_string (path)?;
-  reject_retired_source_sets_config (&contents)?;
+  reject_retired_config_keys (&contents)?;
   let mut config: SkgConfig =
     toml::from_str (&contents)?;
   config . source_order = source_order_from_toml (&contents);
+  let raw_paths : HashMap<SourceName, PathBuf> =
+    config . sources . iter ()
+    . map ( |(name, s)| (name . clone (), s . path . clone ()) )
+    . collect ();
   config . config_path =
     fs::canonicalize (path)
     . unwrap_or_else ( |_| PathBuf::from (path) );
@@ -155,6 +226,7 @@ pub fn load_config_with_overrides (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
+  derive_ownership_and_labels (&mut config, &raw_paths);
   validate_source_sets (&config)?;
   if let Some (name) = db_name {
     config . db_name = name . to_string();

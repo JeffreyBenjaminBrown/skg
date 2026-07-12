@@ -49,25 +49,59 @@ function M.port_from_toml (file)
   error('No port setting found in ' .. file)
 end
 
----Name strings for sources with user_owns_it = true in FILE.
+---The `owned_folder' setting from FILE, defaulting to 'owned'.
+---Sources whose path sits under this folder are owned; all others
+---are foreign. Replaces the retired per-source 'user_owns_it' key.
+---@param file string
+---@return string
+function M.owned_folder_from_toml (file)
+  for _, line in ipairs(trimmed_lines(file)) do
+    local folder = line:match('^owned_folder[ \t]*=[ \t]*"([^"]+)"')
+    if folder then return folder end
+  end
+  return 'owned'
+end
+
+---Names of the OWNED sources in FILE, in declaration order. A source
+---is owned iff its path (resolved against FILE's directory, the data
+---root) sits under the data root's owned_folder (default 'owned') --
+---the author-folder layout, mirroring the server's rule. A source
+---with no 'name' key defaults its name to its path, also mirroring
+---the server.
 ---@param file string
 ---@return string[]
 function M.owned_sources_from_toml (file)
+  local owned_folder = M.owned_folder_from_toml(file)
+  local data_root = file:match('^(.*/)') or './'
+  local owned_root = data_root .. owned_folder .. '/'
   local sources = {}
-  local current_name = nil
+  local in_sources = false
+  local current_name, current_path = nil, nil
+  local function flush ()
+    if in_sources and current_path then
+      local abs = current_path
+      if not abs:match('^/') then abs = data_root .. abs end
+      if not abs:match('/$') then abs = abs .. '/' end
+      if abs == owned_root
+         or abs:sub(1, #owned_root) == owned_root
+      then
+        table.insert(sources, current_name or current_path) end
+    end
+    current_name, current_path = nil, nil
+  end
   for _, line in ipairs(trimmed_lines(file)) do
     if line:match('^%[%[sources%]%]') then
-      current_name = nil
-    else
+      flush(); in_sources = true
+    elseif line:match('^%[%[') then
+      flush(); in_sources = false
+    elseif in_sources then
       local name = line:match('^name[ \t]*=[ \t]*"([^"]+)"')
-      if name then
-        current_name = name
-      elseif current_name
-             and line:match('^user_owns_it[ \t]*=[ \t]*true') then
-        table.insert(sources, current_name)
-        current_name = nil end
+      local path = line:match('^path[ \t]*=[ \t]*"([^"]+)"')
+      if name then current_name = name end
+      if path then current_path = path end
     end
   end
+  flush()
   return sources
 end
 

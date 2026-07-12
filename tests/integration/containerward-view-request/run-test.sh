@@ -25,14 +25,14 @@ backup_and_reset_test_data() {
 
     # Backup and reset each of the 6 files
     for file in 0 1 11 12 121 13; do
-        if [ -f "$TEST_DIR/data/skg-data/$file.skg" ]; then
-            BACKUP_FILE="$TEST_DIR/data/skg-data/$file.skg.backup.$(date +%s)"
-            cp "$TEST_DIR/data/skg-data/$file.skg" "$BACKUP_FILE"
+        if [ -f "$TEST_DIR/data/owned/skg-data/$file.skg" ]; then
+            BACKUP_FILE="$TEST_DIR/data/owned/skg-data/$file.skg.backup.$(date +%s)"
+            cp "$TEST_DIR/data/owned/skg-data/$file.skg" "$BACKUP_FILE"
             echo "✓ Backed up $file.skg to $(basename "$BACKUP_FILE")"
         fi
 
         # Reset to clean state (no containment)
-        cat > "$TEST_DIR/data/skg-data/$file.skg" << EOF
+        cat > "$TEST_DIR/data/owned/skg-data/$file.skg" << EOF
 title: '$file'
 pid: '$file'
 contains: []
@@ -49,13 +49,13 @@ cleanup_test_data() {
 
     # Restore original files if backups exist
     for file in 0 1 11 12 121 13; do
-        BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
+        BACKUP_FILE=$(find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" | head -1)
         if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
-            cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$file.skg"
+            cp "$BACKUP_FILE" "$TEST_DIR/data/owned/skg-data/$file.skg"
             echo "✓ Restored $file.skg from backup"
         fi
         # Remove all backups for this file (including stale ones from prior runs)
-        find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" -delete
+        find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" -delete
     done
 }
 
@@ -78,7 +78,7 @@ echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -89,8 +89,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

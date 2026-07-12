@@ -4,7 +4,7 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
 rm -rf "$HOST_DATA_ROOT"
-mkdir -p "$HOST_DATA_ROOT/public" "$HOST_DATA_ROOT/private"
+mkdir -p "$HOST_DATA_ROOT/owned/public" "$HOST_DATA_ROOT/owned/private"
 git -C "$HOST_DATA_ROOT/public" init
 git -C "$HOST_DATA_ROOT/private" init
 
@@ -16,13 +16,11 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "public"
-path = "public"
-user_owns_it = true
+path = "owned/public"
 
 [[sources]]
 name = "private"
-path = "private"
-user_owns_it = true
+path = "owned/private"
 EOF
 
 echo "Prepared $HOST_DATA_ROOT for port $SKG_TEST_PORT"

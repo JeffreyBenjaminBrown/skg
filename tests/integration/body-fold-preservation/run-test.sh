@@ -17,7 +17,7 @@ echo "=== SKG Body-Fold-Preservation Integration Test ==="
 cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
 cleanup_test_data() {
-    find "$TEST_DIR/data/skg-data" -name "*.skg" -delete 2>/dev/null || true
+    find "$TEST_DIR/data/owned/skg-data" -name "*.skg" -delete 2>/dev/null || true
     cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 }
 
@@ -30,7 +30,7 @@ AVAILABLE_PORT=$(find_available_port)
 echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -41,8 +41,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

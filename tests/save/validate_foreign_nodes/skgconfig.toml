@@ -5,10 +5,8 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "main"
-path = "fixtures/main"
-user_owns_it = true
+path = "owned/fixtures/main"
 
 [[sources]]
 name = "foreign"
 path = "fixtures/foreign"
-user_owns_it = false

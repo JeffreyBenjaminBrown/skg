@@ -109,8 +109,8 @@ function Validate-Existing-DataRoot($DataRoot) {
 }
 
 function Initialize-DataRoot($DataRoot) {
-  $public = Join-Path $DataRoot "public"
-  $private = Join-Path $DataRoot "private"
+  $public = Join-Path $DataRoot "owned/public"
+  $private = Join-Path $DataRoot "owned/private"
   foreach ($repo in @($public, $private)) {
     if (!(Is-Directory-Empty-Or-GitOnly $repo)) {
       throw "Refusing to initialize because this folder is nonempty: $repo"
@@ -130,13 +130,11 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "public"
-path = "public"
-user_owns_it = true
+path = "owned/public"
 
 [[sources]]
 name = "private"
-path = "private"
-user_owns_it = true
+path = "owned/private"
 "@ | Set-Content -Path (Join-Path $DataRoot "skgconfig.toml") -Encoding UTF8
   @"
 public

@@ -5,10 +5,8 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "fixtures"
-path = "."
-user_owns_it = true
+path = "owned"
 
 [[sources]]
 name = "output"
-path = "/tmp/placeholder"  # overridden by tests
-user_owns_it = true
+path = "owned/output"  # overridden by tests

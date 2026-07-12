@@ -27,8 +27,8 @@ restore_chain_fixtures() {
     "tests/integration/fork-chain/data/public" \
     "tests/integration/fork-chain/data/foreign" 2>/dev/null || true
   # Remove any clones the test wrote into the owned sources.
-  find "$TEST_DIR/data/public" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
-  find "$TEST_DIR/data/private" -name '*.skg' -delete 2>/dev/null || true
+  find "$TEST_DIR/data/owned/public" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
+  find "$TEST_DIR/data/owned/private" -name '*.skg' -delete 2>/dev/null || true
 }
 trap 'cleanup; restore_chain_fixtures' EXIT
 restore_chain_fixtures
@@ -38,7 +38,7 @@ check_typedb_server
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -49,18 +49,15 @@ delete_on_quit = true
 
 [[sources]]
 name = "public"
-path = "$TEST_DIR/data/public"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/public"
 
 [[sources]]
 name = "private"
-path = "$TEST_DIR/data/private"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/private"
 
 [[sources]]
 name = "foreign"
 path = "$TEST_DIR/data/foreign"
-user_owns_it = false
 EOF
 
 start_skg_server
@@ -70,8 +67,8 @@ run_client_test
 # Disk verification (step 5): the public clone C overrides the foreign N
 # and names NO private id; the private clone D overrides C.
 echo "Verifying clone .skg files on disk..."
-PUB_CLONE=$(find "$TEST_DIR/data/public" -name '*.skg' ! -name 'P.skg' | head -1)
-PRIV_CLONE=$(find "$TEST_DIR/data/private" -name '*.skg' | head -1)
+PUB_CLONE=$(find "$TEST_DIR/data/owned/public" -name '*.skg' ! -name 'P.skg' | head -1)
+PRIV_CLONE=$(find "$TEST_DIR/data/owned/private" -name '*.skg' | head -1)
 if [ -z "$PUB_CLONE" ] || [ -z "$PRIV_CLONE" ]; then
   echo "✗ FAIL: expected one clone in public and one in private"
   echo "  public: $PUB_CLONE   private: $PRIV_CLONE"

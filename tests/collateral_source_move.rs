@@ -153,8 +153,8 @@ async fn setup_test_dbs (
       fixtures_root . join ("skgconfig.toml")
         . to_str() . unwrap(),
       Some (db_name),
-      &[ ("public",  fixtures_root . join ("public")),
-         ("private", fixtures_root . join ("private")),
+      &[ ("public",  fixtures_root . join ("owned/public")),
+         ("private", fixtures_root . join ("owned/private")),
          ("foreign", fixtures_root . join ("foreign")) ] )?;
   let config : SkgConfig =
     SkgConfig {

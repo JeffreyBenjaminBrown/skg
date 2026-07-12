@@ -24,7 +24,7 @@ FIXTURES="bwt-root"
 backup_and_reset_test_data() {
     echo "=== Backing up test data ==="
     for f in $FIXTURES; do
-        local src="$TEST_DIR/data/skg-data/$f.skg"
+        local src="$TEST_DIR/data/owned/skg-data/$f.skg"
         if [ -f "$src" ]; then
             cp "$src" "$src.backup.$(date +%s)"
             echo "✓ Backed up $f.skg"
@@ -37,12 +37,12 @@ cleanup_test_data() {
     cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
     for f in $FIXTURES; do
         local bak
-        bak=$(find "$TEST_DIR/data/skg-data" -name "$f.skg.backup.*" 2>/dev/null | head -1)
+        bak=$(find "$TEST_DIR/data/owned/skg-data" -name "$f.skg.backup.*" 2>/dev/null | head -1)
         if [ -n "$bak" ] && [ -f "$bak" ]; then
-            cp "$bak" "$TEST_DIR/data/skg-data/$f.skg"
+            cp "$bak" "$TEST_DIR/data/owned/skg-data/$f.skg"
             echo "✓ Restored $f.skg"
         fi
-        find "$TEST_DIR/data/skg-data" -name "$f.skg.backup.*" -delete 2>/dev/null || true
+        find "$TEST_DIR/data/owned/skg-data" -name "$f.skg.backup.*" -delete 2>/dev/null || true
     done
 }
 
@@ -56,7 +56,7 @@ AVAILABLE_PORT=$(find_available_port)
 echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -67,8 +67,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

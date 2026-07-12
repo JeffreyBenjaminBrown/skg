@@ -21,7 +21,7 @@ backup_and_reset_test_data() {
     echo "=== Backing up and preparing test data ==="
 
     for file in "${SKG_FILES[@]}"; do
-        local path="$TEST_DIR/data/skg-data/$file.skg"
+        local path="$TEST_DIR/data/owned/skg-data/$file.skg"
         if [ -f "$path" ]; then
             local backup="$path.backup.$(date +%s)"
             cp "$path" "$backup"
@@ -29,7 +29,7 @@ backup_and_reset_test_data() {
         fi
     done
 
-    cat > "$TEST_DIR/data/skg-data/1.skg" <<'DATA'
+    cat > "$TEST_DIR/data/owned/skg-data/1.skg" <<'DATA'
 title: '1'
 pid: '1'
 contains:
@@ -37,19 +37,19 @@ contains:
 - '12'
 DATA
 
-    cat > "$TEST_DIR/data/skg-data/11.skg" <<'DATA'
+    cat > "$TEST_DIR/data/owned/skg-data/11.skg" <<'DATA'
 title: '11'
 pid: '11'
 contains: []
 DATA
 
-    cat > "$TEST_DIR/data/skg-data/12.skg" <<'DATA'
+    cat > "$TEST_DIR/data/owned/skg-data/12.skg" <<'DATA'
 title: '12'
 pid: '12'
 contains: []
 DATA
 
-    cat > "$TEST_DIR/data/skg-data/l-11.skg" <<'DATA'
+    cat > "$TEST_DIR/data/owned/skg-data/l-11.skg" <<'DATA'
 title: '[[id:11][a link to 11]]'
 pid: 'l-11'
 contains: []
@@ -64,12 +64,12 @@ cleanup_test_data() {
     cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
     for file in "${SKG_FILES[@]}"; do
-        local backup=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
+        local backup=$(find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" | head -1)
         if [ -n "$backup" ] && [ -f "$backup" ]; then
-            cp "$backup" "$TEST_DIR/data/skg-data/$file.skg"
+            cp "$backup" "$TEST_DIR/data/owned/skg-data/$file.skg"
             echo "✓ Restored $file.skg from backup"
         fi
-        find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" -delete
+        find "$TEST_DIR/data/owned/skg-data" -name "$file.skg.backup.*" -delete
     done
 }
 
@@ -88,7 +88,7 @@ AVAILABLE_PORT=$(find_available_port)
 echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" <<EOF
 db_name = "$DB_NAME"
@@ -99,8 +99,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

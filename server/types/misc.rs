@@ -56,14 +56,45 @@ pub enum MSV<T> {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ID ( pub String );
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Clone, PartialEq, Eq, Hash)]
 pub struct SkgfileSource {
   pub name         : SourceName,
-  #[serde(default)]
   pub abbreviation : Option<String>,
   pub path         : PathBuf,
+  // DERIVED at config load, never written in TOML (a raw
+  // 'user_owns_it' key is rejected): true iff the source's
+  // as-written path sits under the config's 'owned_folder' (its
+  // first component equals it). See 'derive_ownership_and_labels'
+  // in server/dbs/filesystem/not_nodes.rs. Rust constructors (tests)
+  // may still set it directly.
   pub user_owns_it : bool,
 }
+
+/// The TOML shape of a '[[sources]]' entry: 'name' is optional,
+/// defaulting to the path as written (e.g. "eggman/eggs"), which the
+/// herald-label defaulting then abbreviates for owned sources.
+#[derive(Deserialize)]
+struct SkgfileSourceToml {
+  name         : Option<SourceName>,
+  #[serde(default)]
+  abbreviation : Option<String>,
+  path         : PathBuf,
+}
+
+impl From<SkgfileSourceToml> for SkgfileSource {
+  fn from (
+    raw : SkgfileSourceToml
+  ) -> SkgfileSource {
+    let name : SourceName =
+      raw . name . unwrap_or_else (
+        || SourceName (
+          raw . path . to_string_lossy () . into_owned () ));
+    SkgfileSource {
+      name,
+      abbreviation : raw . abbreviation,
+      path         : raw . path,
+      user_owns_it : false, // derived later; see the field's comment
+    }}}
 
 /// Identifies a source-set CHOICE. Source-sets are no longer defined
 /// by hand: they are the PREFIXES of the config's source order (most
@@ -103,6 +134,14 @@ pub struct SkgConfig {
 
   #[serde(default = "default_source_set_name")]
   pub default_source_set : SourceSetName,
+
+  // The directory (as a first path component under the data root)
+  // whose sources the user OWNS; every other source is foreign
+  // (read-only). Replaces the retired per-source 'user_owns_it'
+  // TOML key. The intended layout is data/AUTHOR/REPO, with this
+  // field naming the user's own author folder.
+  #[serde(default = "default_owned_folder")]
+  pub owned_folder : String,
 
   pub db_name        : String,
   pub tantivy_folder : PathBuf,
@@ -181,19 +220,26 @@ fn deserialize_sources<'de, D> (
 where
   D : Deserializer<'de>
 {
-  let sources_vec : Vec<SkgfileSource> =
+  let sources_vec : Vec<SkgfileSourceToml> =
     Vec::deserialize (deserializer) ?;
   let mut map : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();
-  for source in sources_vec {
-    map . insert (
-      source . name . clone (),
-      source ); }
+  for raw in sources_vec {
+    let source : SkgfileSource =
+      SkgfileSource::from (raw);
+    if map . insert (
+         source . name . clone (),
+         source . clone () ) . is_some () {
+      return Err (serde::de::Error::custom (
+        format! ("Duplicate source name '{}'", source . name))); }}
   Ok (map)
 }
 
 fn default_source_set_name () -> SourceSetName {
   SourceSetName::from ("all") }
+
+fn default_owned_folder () -> String {
+  "owned" . to_string () }
 
 fn default_port() -> u16 {
   DEFAULT_PORT }
@@ -347,6 +393,7 @@ impl SkgConfig {
       sources,
       source_order       : Vec::new (),
       default_source_set : SourceSetName::from ("all"),
+      owned_folder       : "owned" . to_string (),
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
@@ -370,6 +417,7 @@ impl SkgConfig {
       sources,
       source_order       : Vec::new (),
       default_source_set : SourceSetName::from ("all"),
+      owned_folder       : "owned" . to_string (),
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,

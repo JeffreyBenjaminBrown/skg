@@ -5,10 +5,8 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "home"
-path = "home"
-user_owns_it = true
+path = "owned/home"
 
 [[sources]]
 name = "away"
 path = "away"
-user_owns_it = false

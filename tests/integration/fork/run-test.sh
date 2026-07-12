@@ -26,7 +26,7 @@ restore_fork_fixtures() {
     "tests/integration/fork/data/owned" \
     "tests/integration/fork/data/foreign" 2>/dev/null || true
   # Remove any clone .skg the test wrote into the owned source.
-  find "$TEST_DIR/data/owned" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
+  find "$TEST_DIR/data/owned/owned" -name '*.skg' ! -name 'P.skg' -delete 2>/dev/null || true
 }
 trap 'cleanup; restore_fork_fixtures' EXIT
 restore_fork_fixtures
@@ -36,7 +36,7 @@ check_typedb_server
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -47,13 +47,11 @@ delete_on_quit = true
 
 [[sources]]
 name = "owned"
-path = "$TEST_DIR/data/owned"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/owned"
 
 [[sources]]
 name = "foreign"
 path = "$TEST_DIR/data/foreign"
-user_owns_it = false
 EOF
 
 start_skg_server

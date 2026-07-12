@@ -61,7 +61,7 @@
       (setq integration-test-phase "checking-disk")
       (let* ((skg-file
               (expand-file-name
-               "data/skg-data/bwt-root.skg"
+               "data/owned/skg-data/bwt-root.skg"
                (file-name-directory load-file-name)))
              (disk-contents
               (with-temp-buffer

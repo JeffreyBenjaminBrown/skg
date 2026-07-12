@@ -124,9 +124,9 @@ async fn test_move_node_to_another_owned_source (
 
     { // FS: old file should be gone, new file should exist
       let old_path : PathBuf =
-        temp_fixtures . join ("public/b.skg");
+        temp_fixtures . join ("owned/public/b.skg");
       let new_path : PathBuf =
-        temp_fixtures . join ("private/b.skg");
+        temp_fixtures . join ("owned/private/b.skg");
       assert!( ! old_path . exists(),
                "b.skg should be deleted from public/");
       assert!( new_path . exists(),
@@ -217,9 +217,9 @@ async fn test_move_node_referenced_by_extra_id (
 
     { // FS: old file gone, new file present
       let old_path : PathBuf =
-        temp_fixtures . join ("public/b.skg");
+        temp_fixtures . join ("owned/public/b.skg");
       let new_path : PathBuf =
-        temp_fixtures . join ("private/b.skg");
+        temp_fixtures . join ("owned/private/b.skg");
       assert!( ! old_path . exists(),
                "b.skg should be deleted from public/");
       assert!( new_path . exists(),
@@ -284,12 +284,12 @@ async fn test_move_multiple_nodes (
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS
-      assert!( ! temp_fixtures . join ("public/b.skg") . exists() );
-      assert!( ! temp_fixtures . join ("public/c.skg") . exists() );
-      assert!( temp_fixtures . join ("private/b.skg") . exists() );
-      assert!( temp_fixtures . join ("private/c.skg") . exists() );
+      assert!( ! temp_fixtures . join ("owned/public/b.skg") . exists() );
+      assert!( ! temp_fixtures . join ("owned/public/c.skg") . exists() );
+      assert!( temp_fixtures . join ("owned/private/b.skg") . exists() );
+      assert!( temp_fixtures . join ("owned/private/c.skg") . exists() );
       // a stays in public
-      assert!( temp_fixtures . join ("public/a.skg") . exists() ); }
+      assert!( temp_fixtures . join ("owned/public/a.skg") . exists() ); }
 
     { // TypeDB
       let (_, source_b) =
@@ -336,7 +336,7 @@ async fn test_move_to_foreign_source_rejected (
     }
 
     { // FS: nothing should have changed
-      assert!( temp_fixtures . join ("public/b.skg") . exists(),
+      assert!( temp_fixtures . join ("owned/public/b.skg") . exists(),
                "b.skg should still be in public/"); }
 
     Ok (()) }
@@ -470,9 +470,9 @@ async fn test_source_only_change_with_populated_pool (
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
-      assert!( ! temp_fixtures . join ("public/b.skg") . exists(),
+      assert!( ! temp_fixtures . join ("owned/public/b.skg") . exists(),
                "b.skg should be deleted from public/");
-      assert!( temp_fixtures . join ("private/b.skg") . exists(),
+      assert!( temp_fixtures . join ("owned/private/b.skg") . exists(),
                "b.skg should exist in private/"); }
 
     { // TypeDB: source updated

@@ -5,10 +5,8 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "owned"
-path = "owned"
-user_owns_it = true
+path = "owned/owned"
 
 [[sources]]
 name = "foreign"
 path = "foreign"
-user_owns_it = false

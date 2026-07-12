@@ -5,5 +5,4 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "test"
-path = "."
-user_owns_it = true
+path = "owned"

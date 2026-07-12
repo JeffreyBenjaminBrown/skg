@@ -19,15 +19,15 @@ echo "Project root: $PROJECT_ROOT"
 prepare_data_dirs() {
   echo "=== Preparing data directories ==="
   rm -rf "$TEST_DIR/data"
-  mkdir -p "$TEST_DIR/data/skg"
+  mkdir -p "$TEST_DIR/data/owned/skg"
   mkdir -p "$TEST_DIR/data/.index.tantivy"
   echo "✓ Created empty data directories"
 }
 
 cleanup_test_data() {
   echo "=== Cleaning up test data ==="
-  if [ -d "$TEST_DIR/data/skg" ]; then
-    rm -f "$TEST_DIR/data/skg/"*
+  if [ -d "$TEST_DIR/data/owned/skg" ]; then
+    rm -f "$TEST_DIR/data/owned/skg/"*
     echo "✓ Emptied skg data directory"
   fi
   cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
@@ -48,7 +48,7 @@ AVAILABLE_PORT=$(find_available_port)
 echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -59,8 +59,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg"
 EOF
 
 start_skg_server

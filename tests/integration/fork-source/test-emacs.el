@@ -92,18 +92,18 @@ the clone landed in the rotated source."
   ;; 6. The clone must land in owned2 (rotated), NOT owned (inferred).
   (let ((committed (skg-test-wait-for
                     (lambda ()
-                      (let ((clones (fork-source-test--skg-files "data/owned2")))
+                      (let ((clones (fork-source-test--skg-files "data/owned/owned2")))
                         (and clones (= (length clones) 1))))
                     10)))
     (unless committed
       (test-fail "no clone appeared in owned2; owned2=%S owned=%S"
-                 (fork-source-test--skg-files "data/owned2")
-                 (fork-source-test--skg-files "data/owned")))
-    (let ((owned-files (fork-source-test--skg-files "data/owned")))
+                 (fork-source-test--skg-files "data/owned/owned2")
+                 (fork-source-test--skg-files "data/owned/owned")))
+    (let ((owned-files (fork-source-test--skg-files "data/owned/owned")))
       (unless (equal owned-files '("P.skg"))
         (test-fail "owned should still hold only P.skg (the clone went to owned2), got %S"
                    owned-files)))
-    (let* ((clone-file (car (directory-files "data/owned2" t "\\.skg\\'")))
+    (let* ((clone-file (car (directory-files "data/owned/owned2" t "\\.skg\\'")))
            (content (with-temp-buffer
                       (insert-file-contents clone-file)
                       (buffer-string))))

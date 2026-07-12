@@ -108,7 +108,7 @@
           (file-truename
            (directory-file-name
             (expand-file-name
-             "data/skg-data"
+             "data/owned/skg-data"
              (file-name-directory load-file-name))))))
     ;; In batch mode, magit-status-setup-buffer creates the buffer
     ;; but doesn't make it current; switch explicitly.

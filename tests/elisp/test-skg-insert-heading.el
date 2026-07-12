@@ -29,13 +29,12 @@ skg-config-dir is set and skg--owned-sources works."
 (defvar test--config-two-owned-sources
   (concat "[[sources]]\n"
           "name = \"public\"\n"
-          "path = \"/tmp\"\n"
-          "user_owns_it = true\n\n"
+          "path = \"owned/public\"\n\n"
           "[[sources]]\n"
           "name = \"private\"\n"
-          "path = \"/tmp\"\n"
-          "user_owns_it = true\n")
-  "Config text with two owned sources.")
+          "path = \"owned/private\"\n"
+          "")
+  "Config text with two owned sources (paths under owned/ = owned).")
 
 (ert-deftest test-insert-heading-at-root ()
   "C-return on a root headline prompts for source in the minibuffer

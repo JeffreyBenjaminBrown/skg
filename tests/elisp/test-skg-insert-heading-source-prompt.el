@@ -17,16 +17,12 @@
 (defvar test--config-public-and-private
   (concat "[[sources]]\n"
           "name = \"public\"\n"
-          "path = \"" (expand-file-name
-                       "test-skg-insert-heading-source-prompt/public"
-                       (file-name-directory load-file-name)) "\"\n"
-          "user_owns_it = true\n\n"
+          "path = \"owned/public\"\n"
+          "\n"
           "[[sources]]\n"
           "name = \"private\"\n"
-          "path = \"" (expand-file-name
-                       "test-skg-insert-heading-source-prompt/private"
-                       (file-name-directory load-file-name)) "\"\n"
-          "user_owns_it = true\n")
+          "path = \"owned/private\"\n"
+          "")
   "Config text with two owned sources: public and private.")
 
 (defvar test--config-with-foreign-source
@@ -36,7 +32,7 @@
           "path = \"" (expand-file-name
                        "test-skg-insert-heading-source-prompt/foreign"
                        (file-name-directory load-file-name)) "\"\n"
-          "user_owns_it = false\n")
+          "")
   "Config text with two owned sources and one foreign source.")
 
 (defvar test--config-with-interleaved-source-sets
@@ -45,19 +41,15 @@
           "sources = [\"public\"]\n\n"
           "[[sources]]\n"
           "name = \"public\"\n"
-          "path = \"" (expand-file-name
-                       "test-skg-insert-heading-source-prompt/public"
-                       (file-name-directory load-file-name)) "\"\n"
-          "user_owns_it = true\n\n"
+          "path = \"owned/public\"\n"
+          "\n"
           "[[source_sets]]\n"
           "name = \"private-set\"\n"
           "sources = [\"private\"]\n\n"
           "[[sources]]\n"
           "name = \"private\"\n"
-          "path = \"" (expand-file-name
-                       "test-skg-insert-heading-source-prompt/private"
-                       (file-name-directory load-file-name)) "\"\n"
-          "user_owns_it = true\n")
+          "path = \"owned/private\"\n"
+          "")
   "Config text with [[sources]] interleaved among other array\ntables. The [[source_sets]] tables are RETIRED config the server\nwould reject; they remain here to pin that the elisp readers skip\ntables they do not care about.")
 
 (defun test--with-skg-content-view (org-text config-text body-fn)
@@ -128,8 +120,8 @@ without prompting."
   (let ((one-source-config
          (concat "[[sources]]\n"
                  "name = \"only\"\n"
-                 "path = \"/tmp\"\n"
-                 "user_owns_it = true\n")))
+                 "path = \"owned/only\"\n"
+                 "")))
     (test--with-skg-content-view
      "* (skg (node (id x) (source only))) x\n"
      one-source-config
@@ -312,8 +304,8 @@ the sources in privacy order, then \"all\"."
 (defvar test--config-one-source
   (concat "[[sources]]\n"
           "name = \"only\"\n"
-          "path = \"/tmp\"\n"
-          "user_owns_it = true\n")
+          "path = \"owned/only\"\n"
+          "")
   "Config text with a single owned source, so no source prompt fires.")
 
 (defun test--skg-edit-buffer ()

@@ -12,15 +12,12 @@ default_source_set = "public"
 
 [[sources]]
 name = "public"
-path = "public"
-user_owns_it = true
+path = "owned/public"
 
 [[sources]]
 name = "private"
-path = "private"
-user_owns_it = true
+path = "owned/private"
 
 [[sources]]
 name = "Fred"
 path = "Fred"
-user_owns_it = false

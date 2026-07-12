@@ -12,8 +12,7 @@ local interleaved_config = table.concat({
   '',
   '[[sources]]',
   'name = "public"',
-  'path = "public-dir"',
-  'user_owns_it = true',
+  'path = "owned/public-dir"',
   '',
   '[[source_sets]]',
   'name = "private-set"',
@@ -21,13 +20,11 @@ local interleaved_config = table.concat({
   '',
   '[[sources]]',
   'name = "private"',
-  'path = "/absolute/private"',
-  'user_owns_it = true',
+  'path = "owned/private-dir"',
   '',
   '[[sources]]',
   'name = "foreign"',
   'path = "foreign-dir"',
-  'user_owns_it = false',
   '',
   'port = 1741',
 }, '\n')
@@ -75,14 +72,14 @@ describe('skg.config', function ()
 
   it('resolves relative source paths against the config dir',
      function ()
-    assert.are.equal(config_dir .. '/public-dir',
+    assert.are.equal(config_dir .. '/owned/public-dir',
                      config.source_dir('public'))
-    assert.are.equal('/absolute/private',
+    assert.are.equal(config_dir .. '/owned/private-dir',
                      config.source_dir('private'))
   end)
 
   it('computes .skg paths from id and source', function ()
-    assert.are.equal(config_dir .. '/public-dir/abc123.skg',
+    assert.are.equal(config_dir .. '/owned/public-dir/abc123.skg',
                      config.abs_path_for_id_and_source(
                        'abc123', 'public'))
     assert.is_nil(config.abs_path_for_id_and_source(

@@ -33,7 +33,7 @@ source "$TEST_DIR/../test-lib.sh"
 
 echo "=== SKG View-Magit-Phantom-Deleted-File Integration Test ==="
 
-SKG_DATA="$TEST_DIR/data/skg-data"
+SKG_DATA="$TEST_DIR/data/owned/skg-data"
 FIXTURE_FILES="a.skg b.skg"
 TEMP_CONFIG="$TEST_DIR/data/skgconfig.toml.test"
 
@@ -112,8 +112,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "skg-data"
-user_owns_it = true
+path = "owned/skg-data"
 EOF
 
 echo ""

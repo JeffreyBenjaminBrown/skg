@@ -24,16 +24,30 @@ SKG_DATA_DIR="$SKG_LIB_DIR/.."
 SKG_CONFIG="${SKG_CONFIG:-$SKG_DATA_DIR/skgconfig.toml}"
 
 # Print the `path` of each [[sources]] block in skgconfig.toml.
-# $1 = "all" (every source) or "owned" (only user_owns_it = true).
+# $1 = "all" (every source) or "owned". A source is owned iff its
+# path sits under the config's owned_folder (default "owned") --
+# the author-folder layout; the per-source user_owns_it key is
+# retired.
 _skg_sources() {
   if [ ! -f "$SKG_CONFIG" ]; then
     echo "lib.sh: config not found: $SKG_CONFIG" >&2
     return 1
   fi
-  awk -v mode="$1" '
+  local owned_folder
+  owned_folder="$(awk '
+    /^[[:space:]]*owned_folder[[:space:]]*=/ {
+      if (match($0, /"[^"]*"/)) {
+        print substr($0, RSTART + 1, RLENGTH - 2); exit } }
+  ' "$SKG_CONFIG")"
+  owned_folder="${owned_folder:-owned}"
+  awk -v mode="$1" -v owned_folder="$owned_folder" '
     function flush() {
-      if (have && path != "" && (mode == "all" || owns)) print path
-      have = 0; path = ""; owns = 0
+      if (have && path != "") {
+        owns = (path == owned_folder \
+                || index(path, owned_folder "/") == 1)
+        if (mode == "all" || owns) print path
+      }
+      have = 0; path = ""
     }
     # A [[sources]] header opens a new block...
     /^[[:space:]]*\[\[sources\]\][[:space:]]*$/ { flush(); have = 1; next }
@@ -41,9 +55,6 @@ _skg_sources() {
     /^[[:space:]]*\[/                           { flush(); next }
     have && /^[[:space:]]*path[[:space:]]*=/ {
       if (match($0, /"[^"]*"/)) path = substr($0, RSTART + 1, RLENGTH - 2)
-    }
-    have && /^[[:space:]]*user_owns_it[[:space:]]*=/ {
-      owns = ($0 ~ /=[[:space:]]*true/) ? 1 : 0
     }
     END { flush() }
   ' "$SKG_CONFIG"

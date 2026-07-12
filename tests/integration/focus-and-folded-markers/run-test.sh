@@ -26,14 +26,14 @@ backup_and_reset_test_data() {
 
     # Backup and reset each of the 6 files
     for i in 1 2 3 4 5 6; do
-        if [ -f "$TEST_DIR/data/skg-data/$i.skg" ]; then
-            BACKUP_FILE="$TEST_DIR/data/skg-data/$i.skg.backup.$(date +%s)"
-            cp "$TEST_DIR/data/skg-data/$i.skg" "$BACKUP_FILE"
+        if [ -f "$TEST_DIR/data/owned/skg-data/$i.skg" ]; then
+            BACKUP_FILE="$TEST_DIR/data/owned/skg-data/$i.skg.backup.$(date +%s)"
+            cp "$TEST_DIR/data/owned/skg-data/$i.skg" "$BACKUP_FILE"
             echo "✓ Backed up $i.skg to $(basename "$BACKUP_FILE")"
         fi
 
         # Reset to clean state
-        cat > "$TEST_DIR/data/skg-data/$i.skg" << EOF
+        cat > "$TEST_DIR/data/owned/skg-data/$i.skg" << EOF
 title: "$i"
 pid: "$i"
 contains: []
@@ -50,12 +50,12 @@ cleanup_test_data() {
 
     # Restore original files if backups exist
     for i in 1 2 3 4 5 6; do
-        BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "$i.skg.backup.*" | head -1)
+        BACKUP_FILE=$(find "$TEST_DIR/data/owned/skg-data" -name "$i.skg.backup.*" | head -1)
         if [ -n "$BACKUP_FILE" ] && [ -f "$BACKUP_FILE" ]; then
-            cp "$BACKUP_FILE" "$TEST_DIR/data/skg-data/$i.skg"
+            cp "$BACKUP_FILE" "$TEST_DIR/data/owned/skg-data/$i.skg"
             echo "✓ Restored $i.skg from backup"
         fi
-        find "$TEST_DIR/data/skg-data" -name "$i.skg.backup.*" -delete
+        find "$TEST_DIR/data/owned/skg-data" -name "$i.skg.backup.*" -delete
     done
 }
 
@@ -78,7 +78,7 @@ echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -89,8 +89,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

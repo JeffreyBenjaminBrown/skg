@@ -3,15 +3,12 @@ tantivy_folder = "/tmp/placeholder"
 
 [[sources]]
 name = "main"
-path = "main"
-user_owns_it = true
+path = "owned/main"
 
 [[sources]]
 name = "other"
-path = "other"
-user_owns_it = true
+path = "owned/other"
 
 [[sources]]
 name = "foreign"
 path = "foreign"
-user_owns_it = false

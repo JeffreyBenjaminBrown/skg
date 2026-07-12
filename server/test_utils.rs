@@ -614,6 +614,17 @@ pub async fn audit_inrustgraph_or_panic (
     panic! ("audit failed:\n{}", format_mismatches (&mismatches)); }
   Ok (( )) }
 
+/// A converted fixture (author-folder layout) keeps its .skg files
+/// under owned/; a flat fixture keeps them at the root. The
+/// test-config synthesizers point their single "main" source at
+/// whichever the fixture uses.
+pub fn prefer_owned_subdir (
+  root : &Path,
+) -> PathBuf {
+  let owned : PathBuf = root . join ("owned");
+  if owned . is_dir () { owned }
+  else { root . to_path_buf () }}
+
 /// A helper function for tests.
 pub async fn populate_test_db_from_fixtures (
   data_folder: &str,
@@ -621,6 +632,10 @@ pub async fn populate_test_db_from_fixtures (
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
   let config : SkgConfig = {
+    let source_path : PathBuf =
+      // A converted fixture keeps its .skg files under owned/ (the
+      // author-folder layout); a flat fixture keeps them at the root.
+      prefer_owned_subdir ( Path::new (data_folder) );
     let mut sources: HashMap<SourceName, SkgfileSource> =
       HashMap::new();
     sources . insert(
@@ -628,7 +643,7 @@ pub async fn populate_test_db_from_fixtures (
       SkgfileSource {
         name: SourceName::from ("main"),
         abbreviation: None,
-        path: PathBuf::from (data_folder),
+        path: source_path,
         user_owns_it: true, } );
     SkgConfig::dummyFromSources (sources) };
   overwrite_new_empty_typedb_db (
@@ -663,7 +678,8 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
       SkgfileSource {
         name         : SourceName::from ("main"),
         abbreviation : None,
-        path         : PathBuf::from (fixtures_folder),
+        path         : prefer_owned_subdir (
+          Path::new (fixtures_folder) ), // see populate_test_db_from_fixtures
         user_owns_it : true, });
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };

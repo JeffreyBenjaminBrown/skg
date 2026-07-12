@@ -49,8 +49,8 @@ fn test_node_io() {
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
 
-  let expected_example_path : &str = "tests/file_io/fixtures/example.skg";
-  let expected_reversed_path : &str = "tests/file_io/fixtures/reversed.skg";
+  let expected_example_path : &str = "tests/file_io/fixtures/owned/example.skg";
+  let expected_reversed_path : &str = "tests/file_io/fixtures/owned/reversed.skg";
 
   let generated_example : String =
     fs::read_to_string (out_filename) . unwrap();
@@ -105,7 +105,7 @@ fn verify_body_not_needed() {
   let expected_yaml: serde_yaml::Value =
     serde_yaml::from_str (
       &fs::read_to_string (
-        "tests/file_io/fixtures/no_unindexed.skg"
+        "tests/file_io/fixtures/owned/no_unindexed.skg"
       ) . unwrap () ) . unwrap ();
   assert_eq!(
     generated_yaml,

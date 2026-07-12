@@ -4,8 +4,7 @@ default_source_set = "public"
 
 [[sources]]
 name = "public"
-path = "public"
-user_owns_it = true
+path = "owned/public"
 
 [[source_sets]]
 name = "all"

@@ -5,15 +5,12 @@ beep_when_server_becomes_available = false
 
 [[sources]]
 name = "public"
-path = "public"
-user_owns_it = true
+path = "owned/public"
 
 [[sources]]
 name = "private"
-path = "private"
-user_owns_it = true
+path = "owned/private"
 
 [[sources]]
 name = "foreign"
 path = "foreign"
-user_owns_it = false

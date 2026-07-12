@@ -53,7 +53,7 @@ Returns the absolute data-root path."
               "[[sources]]\n"
               "name = \"main\"\n"
               "path = \"main\"\n"
-              "user_owns_it = true\n"))
+              ""))
     (setq test-skg-git-add--data-root root)
     (setq skg-config-dir (file-name-as-directory root))
     root))

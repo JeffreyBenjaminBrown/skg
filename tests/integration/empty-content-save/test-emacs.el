@@ -1,6 +1,6 @@
 ;;; If we open an empty skg buffer,
 ;;; enter the line '* (skg (node (id 1))) 1', and save,
-;;; the result should be saved to 'data/skg/1.skg'.
+;;; the result should be saved to 'data/owned/skg/1.skg'.
 
 (load-file "../../../elisp/skg-init.el")
 
@@ -31,7 +31,7 @@
     (skg-request-save-buffer))
 
   ;; Wait for the file to be written by the server
-  (let* ((skg-dir (expand-file-name "data/skg" default-directory))
+  (let* ((skg-dir (expand-file-name "data/owned/skg" default-directory))
          (target-file (expand-file-name "1.skg" skg-dir))
          (attempts 0))
     (while (and (< attempts 40)
@@ -46,7 +46,7 @@
 
   (setq integration-test-phase "verify-file")
   (let ((file-contents (with-temp-buffer
-                         (insert-file-contents (expand-file-name "data/skg/1.skg" default-directory))
+                         (insert-file-contents (expand-file-name "data/owned/skg/1.skg" default-directory))
                          (buffer-string))))
     (unless (string-match-p "title:[[:space:]]*['\"]1['\"]" file-contents)
       (message "File contents:\n%s" file-contents)

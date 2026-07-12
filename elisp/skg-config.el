@@ -148,33 +148,70 @@ privacy order) plus the reserved \"all\"."
         (string-to-number (match-string 1))
       (error "No port setting found in %s" file)) ))
 
-(defun skg-owned-sources-from-toml (file)
-  "Return a list of name strings for sources with user_owns_it = true in FILE."
+(defun skg-owned-folder-from-toml (file)
+  "Return the `owned_folder' setting from FILE, defaulting to \"owned\".
+Sources whose path sits under this folder are owned; all others are
+foreign. Replaces the retired per-source `user_owns_it' key."
   (with-temp-buffer
     (insert-file-contents file)
     (goto-char (point-min))
-    (let ((sources '())
-          (current-name nil))
-      (while (not (eobp))
-        (let ((line (string-trim
-                     (buffer-substring-no-properties
-                      (line-beginning-position)
-                      (line-end-position)))))
-          (cond
-           ((string-match "^\\[\\[sources\\]\\]" line)
-            (setq current-name nil))
-           ((string-match
-             "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\""
-             line)
-            (setq current-name (match-string 1 line)))
-           ((and current-name
-                 (string-match
-                  "^user_owns_it[ \t]*=[ \t]*true"
-                  line))
-            (push current-name sources)
-            (setq current-name nil))))
-        (forward-line 1))
-      (nreverse sources))))
+    (if (re-search-forward
+         "^[ \t]*owned_folder[ \t]*=[ \t]*\"\\([^\"]+\\)\""
+         nil t)
+        (match-string 1)
+      "owned")))
+
+(defun skg-owned-sources-from-toml (file)
+  "Return the names of the OWNED sources in FILE, in declaration order.
+A source is owned iff its path (resolved against FILE's directory,
+the data root) sits under the data root's `owned_folder' (default
+\"owned\") -- the author-folder layout, mirroring the server's
+`derive_ownership_and_labels'. A source with no `name' key defaults
+its name to its path, also mirroring the server."
+  (let* ((owned-folder (skg-owned-folder-from-toml file))
+         (data-root (file-name-directory file))
+         (owned-root (file-name-as-directory
+                      (expand-file-name owned-folder data-root))))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (goto-char (point-min))
+      (let ((sources '())
+            (in-sources nil)
+            (current-name nil)
+            (current-path nil)
+            (flush nil))
+        (setq flush
+              (lambda ()
+                (when (and in-sources current-path)
+                  (let ((abs (file-name-as-directory
+                              (expand-file-name current-path data-root))))
+                    (when (or (equal abs owned-root)
+                              (string-prefix-p owned-root abs))
+                      (push (or current-name current-path) sources))))
+                (setq current-name nil current-path nil)))
+        (while (not (eobp))
+          (let ((line (string-trim
+                       (buffer-substring-no-properties
+                        (line-beginning-position)
+                        (line-end-position)))))
+            (cond
+             ((string-match "^\\[\\[sources\\]\\]" line)
+              (funcall flush)
+              (setq in-sources t))
+             ((string-match "^\\[\\[" line) ;; a different array table
+              (funcall flush)
+              (setq in-sources nil))
+             ((and in-sources
+                   (string-match
+                    "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+              (setq current-name (match-string 1 line)))
+             ((and in-sources
+                   (string-match
+                    "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+              (setq current-path (match-string 1 line)))))
+          (forward-line 1))
+        (funcall flush)
+        (nreverse sources)))))
 
 (defun skg--toml-array-table-line-name (line)
   "Return the array-table name from LINE, or nil if LINE is not one."

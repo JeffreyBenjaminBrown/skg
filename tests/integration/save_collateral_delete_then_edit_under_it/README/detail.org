@@ -109,7 +109,7 @@ degradation path in =complete_viewtree=.
 
 * Fixtures
 
-Five =.skg= files under =data/skg-data/=:
+Five =.skg= files under =data/owned/skg-data/=:
 
 ** =1.skg=
 
@@ -445,11 +445,11 @@ All under =tests/integration/save_collateral_delete_then_edit_under_it/=.
 | =README.org=                       | This document                 |
 | =run-test.sh=                      | Shell orchestrator            |
 | =test-emacs.el=                    | ELisp test logic              |
-| =data/skg-data/1.skg=             | Fixture: node 1               |
-| =data/skg-data/11.skg=            | Fixture: node 11              |
-| =data/skg-data/subee.skg=         | Fixture: node subee           |
-| =data/skg-data/subee-1.skg=       | Fixture: node subee-1         |
-| =data/skg-data/also-hidden.skg=   | Fixture: node also-hidden     |
+| =data/owned/skg-data/1.skg=             | Fixture: node 1               |
+| =data/owned/skg-data/11.skg=            | Fixture: node 11              |
+| =data/owned/skg-data/subee.skg=         | Fixture: node subee           |
+| =data/owned/skg-data/subee-1.skg=       | Fixture: node subee-1         |
+| =data/owned/skg-data/also-hidden.skg=   | Fixture: node also-hidden     |
 | =data/.index.tantivy/.gitkeep=     | Empty Tantivy index directory |
 
 =run-test.sh= follows existing pattern. Differences:

@@ -287,7 +287,7 @@ pub fn prepare_git_diff_fixture (
   fixture_root : &Path,
 ) -> Result<(), Box<dyn Error>> {
   let public_source : PathBuf =
-    fixture_root . join ("public");
+    fixture_root . join ("owned/public");
   let diff_root : PathBuf =
     public_source . join ("diff-root.skg");
   if ! diff_root . exists () {

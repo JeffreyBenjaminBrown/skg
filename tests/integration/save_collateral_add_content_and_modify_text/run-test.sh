@@ -26,25 +26,25 @@ backup_and_reset_test_data() {
     echo "=== Backing up and resetting test data ==="
 
     # Clean up any UUID files from previous test runs
-    find "$TEST_DIR/data/skg-data" -name "*.skg" ! -name "a.skg" ! -name "b.skg" -delete 2>/dev/null || true
+    find "$TEST_DIR/data/owned/skg-data" -name "*.skg" ! -name "a.skg" ! -name "b.skg" -delete 2>/dev/null || true
     echo "✓ Cleaned up existing UUID files"
 
     # Backup original a.skg
-    if [ -f "$TEST_DIR/data/skg-data/a.skg" ]; then
-        BACKUP_A="$TEST_DIR/data/skg-data/a.skg.backup.$(date +%s)"
-        cp "$TEST_DIR/data/skg-data/a.skg" "$BACKUP_A"
+    if [ -f "$TEST_DIR/data/owned/skg-data/a.skg" ]; then
+        BACKUP_A="$TEST_DIR/data/owned/skg-data/a.skg.backup.$(date +%s)"
+        cp "$TEST_DIR/data/owned/skg-data/a.skg" "$BACKUP_A"
         echo "✓ Backed up a.skg to $(basename "$BACKUP_A")"
     fi
 
     # Backup original b.skg
-    if [ -f "$TEST_DIR/data/skg-data/b.skg" ]; then
-        BACKUP_B="$TEST_DIR/data/skg-data/b.skg.backup.$(date +%s)"
-        cp "$TEST_DIR/data/skg-data/b.skg" "$BACKUP_B"
+    if [ -f "$TEST_DIR/data/owned/skg-data/b.skg" ]; then
+        BACKUP_B="$TEST_DIR/data/owned/skg-data/b.skg.backup.$(date +%s)"
+        cp "$TEST_DIR/data/owned/skg-data/b.skg" "$BACKUP_B"
         echo "✓ Backed up b.skg to $(basename "$BACKUP_B")"
     fi
 
     # Reset a.skg to clean state
-    cat > "$TEST_DIR/data/skg-data/a.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/a.skg" << 'EOF'
 title: a
 pid: a
 contains:
@@ -53,7 +53,7 @@ EOF
     echo "✓ Reset a.skg to clean state"
 
     # Reset b.skg to clean state
-    cat > "$TEST_DIR/data/skg-data/b.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/b.skg" << 'EOF'
 title: b
 pid: b
 contains:
@@ -66,7 +66,7 @@ cleanup_test_data() {
     echo "=== Cleaning up test data ==="
 
     # Clean up any UUID files created during test
-    UUID_FILES=$(find "$TEST_DIR/data/skg-data" -name "*.skg" ! -name "a.skg" ! -name "b.skg" 2>/dev/null || true)
+    UUID_FILES=$(find "$TEST_DIR/data/owned/skg-data" -name "*.skg" ! -name "a.skg" ! -name "b.skg" 2>/dev/null || true)
     if [ -n "$UUID_FILES" ]; then
         echo "$UUID_FILES" | while read -r file; do
             rm -f "$file"
@@ -78,20 +78,20 @@ cleanup_test_data() {
     cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
     # Restore original a.skg if backup exists
-    BACKUP_A=$(find "$TEST_DIR/data/skg-data" -name "a.skg.backup.*" | head -1)
+    BACKUP_A=$(find "$TEST_DIR/data/owned/skg-data" -name "a.skg.backup.*" | head -1)
     if [ -n "$BACKUP_A" ] && [ -f "$BACKUP_A" ]; then
-        cp "$BACKUP_A" "$TEST_DIR/data/skg-data/a.skg"
+        cp "$BACKUP_A" "$TEST_DIR/data/owned/skg-data/a.skg"
         echo "✓ Restored a.skg from backup"
     fi
-    find "$TEST_DIR/data/skg-data" -name "a.skg.backup.*" -delete
+    find "$TEST_DIR/data/owned/skg-data" -name "a.skg.backup.*" -delete
 
     # Restore original b.skg if backup exists
-    BACKUP_B=$(find "$TEST_DIR/data/skg-data" -name "b.skg.backup.*" | head -1)
+    BACKUP_B=$(find "$TEST_DIR/data/owned/skg-data" -name "b.skg.backup.*" | head -1)
     if [ -n "$BACKUP_B" ] && [ -f "$BACKUP_B" ]; then
-        cp "$BACKUP_B" "$TEST_DIR/data/skg-data/b.skg"
+        cp "$BACKUP_B" "$TEST_DIR/data/owned/skg-data/b.skg"
         echo "✓ Restored b.skg from backup"
     fi
-    find "$TEST_DIR/data/skg-data" -name "b.skg.backup.*" -delete
+    find "$TEST_DIR/data/owned/skg-data" -name "b.skg.backup.*" -delete
 }
 
 # Enhanced cleanup function
@@ -113,7 +113,7 @@ echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -124,8 +124,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

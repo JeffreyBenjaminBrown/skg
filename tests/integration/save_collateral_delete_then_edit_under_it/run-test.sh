@@ -31,7 +31,7 @@ backup_and_reset_test_data() {
     for f in "${FIXTURE_FILES[@]}"; do
         true  # fixture files are handled below
     done
-    find "$TEST_DIR/data/skg-data" -name "*.skg" \
+    find "$TEST_DIR/data/owned/skg-data" -name "*.skg" \
         ! -name "1.skg" \
         ! -name "11.skg" \
         ! -name "subee.skg" \
@@ -42,15 +42,15 @@ backup_and_reset_test_data() {
 
     # Backup and reset each fixture file
     for f in "${FIXTURE_FILES[@]}"; do
-        if [ -f "$TEST_DIR/data/skg-data/$f.skg" ]; then
-            cp "$TEST_DIR/data/skg-data/$f.skg" \
-               "$TEST_DIR/data/skg-data/$f.skg.backup.$(date +%s)"
+        if [ -f "$TEST_DIR/data/owned/skg-data/$f.skg" ]; then
+            cp "$TEST_DIR/data/owned/skg-data/$f.skg" \
+               "$TEST_DIR/data/owned/skg-data/$f.skg.backup.$(date +%s)"
             echo "✓ Backed up $f.skg"
         fi
     done
 
     # Reset 1.skg
-    cat > "$TEST_DIR/data/skg-data/1.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/1.skg" << 'EOF'
 title: "1"
 pid: "1"
 contains:
@@ -58,7 +58,7 @@ contains:
 EOF
 
     # Reset 11.skg
-    cat > "$TEST_DIR/data/skg-data/11.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/11.skg" << 'EOF'
 title: "11"
 pid: "11"
 aliases:
@@ -71,7 +71,7 @@ hides_from_its_subscriptions:
 EOF
 
     # Reset subee.skg
-    cat > "$TEST_DIR/data/skg-data/subee.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/subee.skg" << 'EOF'
 title: subee
 pid: subee
 contains:
@@ -79,13 +79,13 @@ contains:
 EOF
 
     # Reset subee-1.skg
-    cat > "$TEST_DIR/data/skg-data/subee-1.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/subee-1.skg" << 'EOF'
 title: subee-1
 pid: subee-1
 EOF
 
     # Reset also-hidden.skg
-    cat > "$TEST_DIR/data/skg-data/also-hidden.skg" << 'EOF'
+    cat > "$TEST_DIR/data/owned/skg-data/also-hidden.skg" << 'EOF'
 title: also-hidden
 pid: also-hidden
 EOF
@@ -97,7 +97,7 @@ cleanup_test_data() {
     echo "=== Cleaning up test data ==="
 
     # Clean up any UUID files created during test
-    UUID_FILES=$(find "$TEST_DIR/data/skg-data" -name "*.skg" \
+    UUID_FILES=$(find "$TEST_DIR/data/owned/skg-data" -name "*.skg" \
         ! -name "1.skg" \
         ! -name "11.skg" \
         ! -name "subee.skg" \
@@ -117,12 +117,12 @@ cleanup_test_data() {
 
     # Restore each fixture file from backup
     for f in "${FIXTURE_FILES[@]}"; do
-        BACKUP=$(find "$TEST_DIR/data/skg-data" -name "$f.skg.backup.*" | head -1)
+        BACKUP=$(find "$TEST_DIR/data/owned/skg-data" -name "$f.skg.backup.*" | head -1)
         if [ -n "$BACKUP" ] && [ -f "$BACKUP" ]; then
-            cp "$BACKUP" "$TEST_DIR/data/skg-data/$f.skg"
+            cp "$BACKUP" "$TEST_DIR/data/owned/skg-data/$f.skg"
             echo "✓ Restored $f.skg from backup"
         fi
-        find "$TEST_DIR/data/skg-data" -name "$f.skg.backup.*" -delete
+        find "$TEST_DIR/data/owned/skg-data" -name "$f.skg.backup.*" -delete
     done
 }
 
@@ -145,7 +145,7 @@ echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
-TEMP_CONFIG=$(mktemp)
+TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
@@ -156,8 +156,7 @@ delete_on_quit = true
 
 [[sources]]
 name = "main"
-path = "$TEST_DIR/data/skg-data"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/skg-data"
 EOF
 
 start_skg_server

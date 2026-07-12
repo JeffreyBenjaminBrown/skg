@@ -39,23 +39,19 @@ delete_on_quit = true
 
 [[sources]]
 name = "public"
-path = "$TEST_DIR/data/public"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/public"
 
 [[sources]]
 name = "personal"
-path = "$TEST_DIR/data/personal"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/personal"
 
 [[sources]]
 name = "private"
-path = "$TEST_DIR/data/private"
-user_owns_it = true
+path = "$TEST_DIR/data/owned/private"
 
 [[sources]]
 name = "foreign"
 path = "$TEST_DIR/data/foreign"
-user_owns_it = false
 EOF
 
 start_skg_server
