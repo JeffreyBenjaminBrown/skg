@@ -1,6 +1,10 @@
 use super::*;
+use crate::source_sets::SourceSetName;
 use crate::types::git::NodeChanges;
+use crate::types::misc::MSV;
+use crate::types::nodes::complete::empty_node_complete;
 use crate::types::nodes::fs::NodeFS;
+use std::collections::BTreeSet;
 
 fn id (s : &str) -> ID { ID ( s . to_string () ) }
 fn src (s : &str) -> SourceName { SourceName ( s . to_string () ) }
@@ -83,7 +87,7 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_col (
-      &owner, NodeRelation::OverridesViewOf, &diffs );
+      &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert_eq! ( scan . len (), 3, "{:?}", scan );
   assert_eq! ( scan [ &id ("edge-r") ],
     MembershipAxes { staged : Some (Sign::Minus), unstaged : None } );
@@ -106,7 +110,7 @@ fn owner_absent_from_every_diff_yields_nothing () {
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_col (
-      &id ("N"), NodeRelation::OverridesViewOf, &diffs );
+      &id ("N"), NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( scan . is_empty (), "{:?}", scan );
 }
 
@@ -130,10 +134,10 @@ fn each_relation_is_read_separately () {
   let diffs : Option<HashMap<SourceName, SourceDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   assert! ( inverse_scan_for_inbound_col (
-      &owner, NodeRelation::OverridesViewOf, &diffs )
+      &owner, NodeRelation::OverridesViewOf, &diffs, None )
     . is_empty () );
   assert_eq! ( inverse_scan_for_inbound_col (
-      &owner, NodeRelation::Subscribes, &diffs ) [ &id ("m") ],
+      &owner, NodeRelation::Subscribes, &diffs, None ) [ &id ("m") ],
     MembershipAxes { staged : None, unstaged : Some (Sign::Minus) } );
 }
 
@@ -157,7 +161,45 @@ fn cross_source_move_yields_no_membership_change () {
       ( src ("b"), sd_b ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_col (
-      &owner, NodeRelation::OverridesViewOf, &diffs );
+      &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( scan . is_empty (),
     "a move must not fabricate a membership change: {:?}", scan );
+}
+
+#[test]
+fn edge_level_gates_deleted_stage_signs () {
+  // del-r's file was Deleted; its before_node's override of N was
+  // recorded at the PRIVATE level (a PrivaciedMember whose level
+  // differs from del-r's own -- public -- home). A public-only
+  // active set must not see the resulting phantom sign; ungated
+  // (None) still does.
+  let owner : ID = id ("N");
+  let mut before : NodeComplete = empty_node_complete ();
+  before . pid = id ("del-r");
+  before . title = "del-r" . to_string ();
+  before . source = src ("public");
+  before . overrides_view_of = MSV::Specified ( vec! [
+    PrivaciedMember::at ( src ("private"), owner . clone () ) ] );
+  let mut sd : SourceDiff = empty_source_diff ();
+  sd . unstaged . insert (
+    PathBuf::from ("del-r.skg"),
+    deleted_entry ( before ) );
+  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+    Some ( HashMap::from ([ ( src ("public"), sd ) ]) );
+  let public_only : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName::from ("public"),
+    sources : BTreeSet::from ([ src ("public") ]) };
+  let gated : HashMap<ID, MembershipAxes> =
+    inverse_scan_for_inbound_col (
+      &owner, NodeRelation::OverridesViewOf, &diffs,
+      Some (&public_only) );
+  assert! ( gated . is_empty (),
+    "a Deleted-stage sign recorded at an inactive level must not \
+     surface: {:?}", gated );
+  let ungated : HashMap<ID, MembershipAxes> =
+    inverse_scan_for_inbound_col (
+      &owner, NodeRelation::OverridesViewOf, &diffs, None );
+  assert! ( ! ungated . is_empty (),
+    "ungated (None) scan should still see the Deleted-stage sign: {:?}",
+    ungated );
 }

@@ -624,6 +624,16 @@ fn parse_viewstats_sexp (
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
             stats . overridesHere = Some ( ID::from (value)); },
+          "relSource" => {
+            // LOAD-BEARING (see ViewNodeStats::rel_source): the
+            // buffer's explicit privacy level for this position's
+            // binding edge, round-tripped from
+            // skg-privatize-relationship into save extraction, which
+            // feeds save-leveling's sticky-else-default resolution
+            // above its floor.
+            let value : String =
+              atom_to_string ( &kv_pair[1] ) ?;
+            stats . rel_source = Some ( SourceName::from (value)); },
           _ => { return Err ( format! (
             "Unknown viewStats key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in viewStats"

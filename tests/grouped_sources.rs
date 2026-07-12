@@ -5,6 +5,9 @@
 #[path = "diff_mode_refusals.rs"]
 mod diff_mode_refusals;
 
+#[path = "leak_battery.rs"]
+mod leak_battery;
+
 #[path = "move_source.rs"]
 mod move_source;
 

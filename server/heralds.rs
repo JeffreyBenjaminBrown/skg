@@ -279,6 +279,13 @@ pub fn herald_rule_table () -> HeraldRule {
           // (frontloaded in viewnodestats.rs), not here. The atom's
           // ID payload is load-bearing save metadata, never displayed.
           vac ("overridesHere"),
+          // relSource is ALSO load-bearing (see ViewNodeStats::rel_source),
+          // but unlike overridesHere it echoes its own value directly:
+          // "~" + the level name, red, immediately before the ⌂
+          // sourceHerald below (table ORDER is presentation order,
+          // per the module doc, so placing this rule first guarantees
+          // that regardless of the atoms' order in the raw sexp).
+          crule (Red, "relSource", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
           crule (Green, "sourceHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
           leaf (Red, "delete", "delete"),
@@ -449,9 +456,10 @@ fn viewstats_atoms () -> Vec<&'static str> {
       rels_herald : _,      // -> the node-level rels atom
       overridesHere : _,    // keyed form (a viewStats sub-form)
       hidden_body : _,      // -> the node-level hiddenBody atom
+      rel_source : _,       // -> the relSource atom (keyed, load-bearing AND its own herald)
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "sourceHerald", "overridesHere" ] }
+  vec! [ "cycle", "sourceHerald", "overridesHere", "relSource" ] }
 
 /// ParentIs values the serializer can emit (Affected stays implicit).
 fn parentIs_emitted_atoms () -> Vec<&'static str> {

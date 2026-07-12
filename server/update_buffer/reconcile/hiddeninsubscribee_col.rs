@@ -3,7 +3,7 @@ use crate::types::env::SkgEnv;
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, SourceName, members_of};
+use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -52,7 +52,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : HiddenInContext =
-    read_hiddenin_context (tree, node, kind, env) ?;
+    read_hiddenin_context (tree, node, kind, env, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddeninsubscribee_col (
@@ -110,10 +110,11 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   Ok(( )) }
 
 fn read_hiddenin_context (
-  tree : &Tree<ViewNode>,
-  node : NodeId,
-  kind : PartnerCol,
-  env  : &SkgEnv,
+  tree               : &Tree<ViewNode>,
+  node               : NodeId,
+  kind               : PartnerCol,
+  env                : &SkgEnv,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
   // index 2 (the full [Normal, SubscribeeCol, Normal] chain), read through the
@@ -124,17 +125,34 @@ fn read_hiddenin_context (
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
       tree, node, 2, kind . caller_label () ) ?;
+  // Edge-level gating (render-and-gating, 5_plan.org): these are the
+  // subscribee's and subscriber's own outbound lists (contains,
+  // hides_from_its_subscriptions), read here to compute a DERIVED
+  // membership for a third node (the HiddenInSubscribeeCol) -- like
+  // 'content_goal_list's grandparent subtrahends. A membership
+  // recorded at an inactive level must not participate, in either
+  // direction, or a private containment/hide would leak by omission
+  // or by appearance.
+  let level_active = |level : &SourceName| match active_source_set {
+    None      => true,
+    Some (a)  => a . is_all () || a . contains_source (level) };
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscribee_pid, &subscribee_source ) ?;
-    members_of (& subscribee_nodecomplete . contains) };
+    subscribee_nodecomplete . contains . iter ()
+      . filter ( |m| level_active (& m . level) )
+      . map ( |m| m . member . clone () )
+      . collect () };
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
-    members_of ( subscriber_nodecomplete . hides_from_its_subscriptions
-      . or_default() ) };
+    subscriber_nodecomplete . hides_from_its_subscriptions
+      . or_default () . iter ()
+      . filter ( |m| level_active (& m . level) )
+      . map ( |m| m . member . clone () )
+      . collect () };
   Ok (HiddenInContext {
     subscriber_pid,
     subscriber_source,

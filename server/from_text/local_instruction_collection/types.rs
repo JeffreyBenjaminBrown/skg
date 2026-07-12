@@ -51,16 +51,25 @@ pub struct DefiningColOwner {
 /// 'SetTitleAndBody' and 'Delete' carry the emitting node's source.
 /// They are the self-emissions, and lowering a map entry to a
 /// DefineNode needs to know which source's file it concerns.
+/// .
+/// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
+/// member with an Option<SourceName>: Some when the position's
+/// headline carried an explicit '(relSource NAME)' atom (the
+/// 'skg-privatize-relationship' gesture -- see
+/// 'ViewNodeStats::rel_source'), None meaning "derive" (the usual
+/// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
+/// validates the explicit levels against each edge's sticky/default
+/// floor at save time (render-and-gating, 5_plan.org).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum NodeIntent_Local {
   SetTitleAndBody { source : SourceName,
                     title  : String,
                     body   : Option<String>, },
-  SetContains     (Vec<ID>),
+  SetContains     (Vec<(ID, Option<SourceName>)>),
   SetAliases      (Vec<String>),
-  SetSubscribesTo (Vec<ID>),
-  SetOverrides    (Vec<ID>),
+  SetSubscribesTo (Vec<(ID, Option<SourceName>)>),
+  SetOverrides    (Vec<(ID, Option<SourceName>)>),
   Delete          { source : SourceName },
   NodeMerge       { acquiree : ID },
   // The remaining kinds are combineable.
@@ -99,10 +108,10 @@ pub struct SubscribeeTextClaim {
 pub struct IntentsForOneId {
   pub source         : Option<SourceName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
   pub title_and_body : Option<(String, Option<String>)>,
-  pub contains       : Option<Vec<ID>>,
+  pub contains       : Option<Vec<(ID, Option<SourceName>)>>,
   pub aliases        : Option<Vec<String>>,
-  pub subscribes_to  : Option<Vec<ID>>,
-  pub overrides      : Option<Vec<ID>>,
+  pub subscribes_to  : Option<Vec<(ID, Option<SourceName>)>>,
+  pub overrides      : Option<Vec<(ID, Option<SourceName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub visibility     : Vec<SubscribeeVisibility>,  // This slot is combineable.

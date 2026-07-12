@@ -69,7 +69,8 @@ pub fn reconcile_partnerCol_children (
     // outside diff mode and for outbound cols.
     if ! outbound && source_diffs . is_some () {
       inverse_scan_for_inbound_col (
-        &owner_pid, member_role . relation, source_diffs )
+        &owner_pid, member_role . relation, source_diffs,
+        active_source_set )
     } else { HashMap::new () };
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) = {
     let graph_members : Vec<ID> =

@@ -37,6 +37,7 @@ pub fn set_viewnodestats_in_viewforest (
     root_treeid,
     multi_source,
     graph . as_deref (),
+    config,
     &mut ancestor_ids,
     container_to_contents,
     content_to_containers ); }
@@ -46,6 +47,7 @@ fn set_viewnodestats_recursive (
   treeid                : NodeId,
   multi_source          : bool,
   graph                 : Option<&InRustGraph>,
+  config                : &SkgConfig,
   ancestor_ids          : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -62,6 +64,7 @@ fn set_viewnodestats_recursive (
         tree, treeid, &node_pid, graph,
         container_to_contents, content_to_containers );
       set_hidden_body (tree, treeid, &node_pid, graph);
+      set_rel_source (tree, treeid, graph, config);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -77,6 +80,7 @@ fn set_viewnodestats_recursive (
       child_treeid,
       multi_source,
       graph,
+      config,
       ancestor_ids,
       container_to_contents,
       content_to_containers ); }
@@ -286,6 +290,78 @@ fn set_hidden_body (
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . hidden_body = hidden_body; }}
+
+/// Sets rel_source on the active vognode at treeid (render-and-gating,
+/// 5_plan.org; see 'ViewNodeStats::rel_source' for the full contract).
+/// Computes the (owner, relation, target) triple that identifies the
+/// binding edge this position represents -- contains for an ordinary
+/// Gnode-parent content child; the col's relation for a simple
+/// PartnerCol member, oriented by which side owns the outbound edge
+/// (see 'RelationRole::is_first_role') -- then compares the edge's
+/// actual level ('InRustGraph::edge_level') against its default (the
+/// more private of the two endpoints' homes). None on any of: no
+/// graph handle; parentIs != Affected or a backpath graft (not a
+/// genuine member here); a compound filter col
+/// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
+/// 'relation_member_role'); no recorded edge; unresolvable homes;
+/// or the level equalling the default.
+fn set_rel_source (
+  tree   : &mut Tree<ViewNode>,
+  treeid : NodeId,
+  graph  : Option<&InRustGraph>,
+  config : &SkgConfig,
+) {
+  let rel_source : Option<SourceName> = 'compute : {
+    let graph : &InRustGraph = match graph {
+      Some (g) => g, None => break 'compute None, };
+    let (node_pid, parentIs, birth) : (ID, ParentIs, Birth) = {
+      let ViewNodeKind::Vognode (Vognode::Active (t)) =
+        & tree . get (treeid) . unwrap () . value () . kind
+      else { break 'compute None; };
+      ( t . collected_id (), t . parentIs, t . birth ) };
+    if parentIs != ParentIs::Affected
+      || birth != Birth::Unremarkable {
+      // Not a genuine member of the collection at this position (a
+      // self-writer parked under a col, or a backpath graft): there
+      // is no binding edge here to have a level at all.
+      break 'compute None; }
+    let (owner_pid, relation, target_pid) : (ID, NodeRelation, ID) =
+      match parent_kind_of (tree, treeid) {
+        ParentKind::Gnode (parent_pid) =>
+          (parent_pid, NodeRelation::Contains, node_pid),
+        ParentKind::Col (col, col_treeid) => {
+          let Some (role) = col . relation_member_role ()
+          else { break 'compute None; }; // compound filter cols
+          let Some (anchor_pid) =
+            tree . get (col_treeid) . unwrap () . parent ()
+            . and_then ( |p| active_vognode_pid (tree, p . id ()) )
+          else { break 'compute None; };
+          if role . is_first_role () {
+            // This position's own node OWNS the outbound edge (e.g.
+            // a subscriberCol member, which itself subscribes to
+            // the col's anchor).
+            (node_pid . clone (), role . relation, anchor_pid)
+          } else {
+            // The col's anchor owns the outbound edge (e.g. a
+            // subscribeeCol member, which the anchor subscribes to).
+            (anchor_pid, role . relation, node_pid . clone ())
+          }},
+        ParentKind::Other => break 'compute None, };
+    let level : SourceName =
+      match graph . edge_level (&owner_pid, relation, &target_pid) {
+        Some (l) => l, None => break 'compute None, };
+    let default : SourceName = {
+      let owner_home : Option<SourceName> =
+        graph . pid_and_source (&owner_pid) . map ( |(_, s)| s );
+      let target_home : Option<SourceName> =
+        graph . pid_and_source (&target_pid) . map ( |(_, s)| s );
+      match (owner_home, target_home) {
+        (Some (a), Some (b)) => config . more_private_of (a, b),
+        _ => break 'compute None, }};
+    if level == default { None } else { Some (level) } };
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+    &mut tree . get_mut (treeid) . unwrap () . value () . kind
+  { t . viewStats . rel_source = rel_source; }}
 
 /// Sets sourceAtBoundary on the active vognode at treeid.
 /// True if no active vognode ancestor exists (i.e. a root),

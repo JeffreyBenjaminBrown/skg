@@ -40,6 +40,7 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
   node   : NodeId,
   config : &SkgConfig,
   driver : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   let is_subscribee : bool =
@@ -55,7 +56,8 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_indefinitive { return Ok (( )); }
   maybe_add_hiddenInSubscribeeCol_branch (
-    tree, node, config, driver, source_diffs ) . await }
+    tree, node, config, driver,
+    active_source_set, source_diffs ) . await }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles

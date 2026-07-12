@@ -268,6 +268,9 @@ fn activeNode_metadata_to_string (
         activeNode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
+      if let Some (ref level) =
+        activeNode . viewStats . rel_source {
+        parts . push ( format! ("(relSource {})", level )); }
       if activeNode . viewStats . sourceAtBoundary {
         if let Some (src_config)
         = config . sources . get ( &activeNode . source )

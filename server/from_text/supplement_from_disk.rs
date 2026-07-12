@@ -10,15 +10,16 @@
 
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::{
-  NodeIntent, NodeSaveIntent };
+  ExplicitLevels, NodeIntent, NodeSaveIntent };
 use crate::from_text::weave::{member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, members_of, privacied_all};
 use crate::types::phantom::source_from_disk;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
+use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -101,17 +102,35 @@ async fn supplement_saveintent_from_disk (
     optNodeComplete_rustFIrst_by_id (
       config, driver, &pid) . await ?;
   match from_disk {
-    None =>
+    None => {
+      // A brand-new node has no sticky levels (no disk edges to be
+      // sticky about), but an explicit '(relSource ...)' atom must
+      // still be validated against the DEFAULT floor -- an empty
+      // disk stand-in reuses 'apply_sticky_levels' unchanged (its
+      // sticky lookups simply find nothing, falling through to
+      // default every time).
+      let explicit_levels : ExplicitLevels =
+        from_buffer . explicit_levels ();
+      let supplemented : NodeComplete =
+        from_buffer . into_nodecomplete ();
+      let empty_disk : NodeComplete = NodeComplete {
+        pid    : supplemented . pid    . clone (),
+        source : supplemented . source . clone (),
+        .. empty_node_complete () };
+      let supplemented : NodeComplete =
+        apply_sticky_levels (
+          supplemented, &empty_disk, &explicit_levels, config )
+        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
-        instruction :
-          NodeIntent::Save (from_buffer) . into_define_node()
-          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-        source_move : None, } ),
+        instruction : DefineNode::Save (SaveNode (supplemented)),
+        source_move : None, } ) },
     Some (disk_node) => {
       let disk_node : NodeComplete = disk_node;
       let mut from_buffer : NodeSaveIntent = from_buffer;
       from_buffer . fill_unspecified_contains (
         &members_of (&disk_node . contains));
+      let explicit_levels : ExplicitLevels =
+        from_buffer . explicit_levels ();
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
@@ -129,7 +148,9 @@ async fn supplement_saveintent_from_disk (
             None => supplemented,
             Some (active) => preserve_invisible_members (
               supplemented, &disk_node, config, active ) };
-        apply_sticky_levels (supplemented, &disk_node, config) };
+        apply_sticky_levels (
+          supplemented, &disk_node, &explicit_levels, config )
+          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
         source_move : maybe_move,
@@ -202,31 +223,40 @@ pub fn refuse_delete_with_inactive_sections (
   Ok (( )) }
 
 /// THE STICKY-ELSE-DEFAULT RULE (5_plan.org, work item
-/// save-leveling). The lowering stages tag every edge with the
+/// save-leveling), extended by an EXPLICIT third path (work item
+/// render-and-gating). The lowering stages tag every edge with the
 /// node's own source (a placeholder); this pass resolves the real
 /// levels:
-/// - STICKY: an edge that already exists on disk (same relation,
+/// - EXPLICIT: a member named in 'explicit' (the buffer headline's
+///   '(relSource NAME)' atom, threaded in as a side-channel because
+///   NodeComplete's 'PrivaciedMember::level' carries no "was this
+///   explicit" flag) wins outright, PROVIDED it is at or above (at
+///   least as private as) the STICKY-OR-DEFAULT floor below;
+///   otherwise the save fails with a validation error naming the
+///   member, the offered level, and the floor.
+/// - STICKY: absent an explicit level (or with one at the floor
+///   exactly), an edge that already exists on disk (same relation,
 ///   same endpoints, through 'pid_of') keeps its DISK level.
 ///   Renormalization never lowers a level silently -- lowering
 ///   happens only through the explicit gesture's cycle
 ///   ('skg-privatize-relationship', whose least-private stop is the
-///   default).
-/// - DEFAULT: a new edge gets the more private of its two
-///   endpoints' homes.
+///   default, which REMOVES the atom).
+/// - DEFAULT: a new edge (no explicit level, no disk level) gets the
+///   more private of its two endpoints' homes.
 /// - HIDES additionally floor at the most public EXPLAINING
 ///   subscription (see 'hide_level'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
-///   inference that a private subscription exists.
-/// (The explicit (relSource ...) atom, arriving with work item
-/// render-and-gating, will feed user-raised levels in above the
-/// floor; absent that, every edge is sticky-else-default.)
+///   inference that a private subscription exists. Hides carry no
+///   explicit-level path: the col that displays them is read-only
+///   (the privatize gesture refuses there).
 pub(crate) fn apply_sticky_levels (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
+  explicit         : &ExplicitLevels,
   config           : &SkgConfig,
-) -> NodeComplete {
-  let owner_home : SourceName =
-    supplemented . source . clone ();
+) -> Result<NodeComplete, String> {
+  let owner_pid  : ID         = supplemented . pid    . clone ();
+  let owner_home : SourceName = supplemented . source . clone ();
   let resolve = |id : &ID| -> ID {
     snapshot_global ()
       . and_then ( |snap| snap . pid_of (id) )
@@ -236,8 +266,11 @@ pub(crate) fn apply_sticky_levels (
       . and_then ( |snap| snap . pid_and_source (id)
                    . map ( |(_pid, src)| src ))
       . or_else ( || source_from_disk (id, config) ) };
-  let level_for = |disk_list : &[PrivaciedMember<ID>],
-                   member    : &ID|
+  // The sticky-or-default FLOOR for one member -- unchanged from
+  // before this item, just factored out of 'level_for' so EXPLICIT
+  // can validate against it.
+  let floor_for = |disk_list : &[PrivaciedMember<ID>],
+                    member    : &ID|
   -> SourceName {
     let key : ID = resolve (member);
     let unclamped : SourceName = 'unclamped : {
@@ -255,19 +288,42 @@ pub(crate) fn apply_sticky_levels (
     // converse move leaves old, more-private levels in place:
     // publicizing memberships takes the explicit gesture.)
     config . more_private_of (unclamped, owner_home . clone ()) };
+  // EXPLICIT wins at-or-above the floor; else the floor itself.
+  let resolve_level = |disk_list      : &[PrivaciedMember<ID>],
+                        member         : &ID,
+                        explicit_here  : &HashMap<ID, SourceName>,
+                        relation_label : &str|
+  -> Result<SourceName, String> {
+    let floor : SourceName = floor_for (disk_list, member);
+    match explicit_here . get (member) {
+      Some (level) =>
+        if config . is_strictly_more_public (level, &floor) {
+          Err ( format! (
+            "Cannot save {} (relation '{}'): member '{}' requested \
+             level '{}', but the sticky/default floor for this edge \
+             is '{}'. Levels never lower silently -- \
+             skg-privatize-relationship's cycle stops at the default.",
+            owner_pid, relation_label, member, level, floor ))
+        } else { Ok ( level . clone () ) },
+      None => Ok (floor), }};
   { let disk : &[PrivaciedMember<ID>] = &disk_node . contains;
     for m in supplemented . contains . iter_mut () {
-      m . level = level_for (disk, &m . member); }}
+      m . level = resolve_level (
+        disk, &m . member, &explicit . contains, "contains") ?; }}
   { let disk : &[PrivaciedMember<ID>] =
       disk_node . subscribes_to . or_default ();
     if let MSV::Specified (v) = &mut supplemented . subscribes_to {
       for m in v . iter_mut () {
-        m . level = level_for (disk, &m . member); }} }
+        m . level = resolve_level (
+          disk, &m . member, &explicit . subscribes_to,
+          "subscribes_to") ?; }} }
   { let disk : &[PrivaciedMember<ID>] =
       disk_node . overrides_view_of . or_default ();
     if let MSV::Specified (v) = &mut supplemented . overrides_view_of {
       for m in v . iter_mut () {
-        m . level = level_for (disk, &m . member); }} }
+        m . level = resolve_level (
+          disk, &m . member, &explicit . overrides_view_of,
+          "overrides_view_of") ?; }} }
   { let disk : &[PrivaciedMember<ID>] =
       disk_node . hides_from_its_subscriptions . or_default ();
     let subscribes : Vec<PrivaciedMember<ID>> =
@@ -288,8 +344,9 @@ pub(crate) fn apply_sticky_levels (
         m . level = config . more_private_of (
           unclamped, owner_home . clone () ); }} }
   { // Aliases have no target to inherit a level from; sticky by
-    // alias text, else the owner's home. (The privatize gesture,
-    // later, is how an alias rises above that.)
+    // alias text, else the owner's home. No explicit-level path:
+    // the atom names an EDGE (contains / subscribes_to /
+    // overrides_view_of), not an alias.
     let disk : &[PrivaciedMember<String>] =
       disk_node . aliases . or_default ();
     if let MSV::Specified (v) = &mut supplemented . aliases {
@@ -300,7 +357,7 @@ pub(crate) fn apply_sticky_levels (
           . unwrap_or_else ( || owner_home . clone () );
         m . level = config . more_private_of (
           unclamped, owner_home . clone () ); }} }
-  supplemented }
+  Ok (supplemented) }
 
 /// A NEW hide's level: at least the more private of the endpoints'
 /// homes, and at least the most PUBLIC subscription of the hider

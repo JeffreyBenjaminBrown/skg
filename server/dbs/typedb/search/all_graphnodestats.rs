@@ -15,8 +15,9 @@
 /// without heralds.
 
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, members_of};
+use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::{replace_each_link_with_its_label,
                               textlinks_from_text};
@@ -93,6 +94,16 @@ pub async fn fetch_all_graphnodestats_with_source_set (
 
 /// In-Rust-graph implementation. Every field is computed from NodeRust
 /// and the inverse indexes -- no TypeDB round-trips.
+///
+/// Edge-level gating (render-and-gating, 5_plan.org): counts and the
+/// container/content maps use the gated accessors
+/// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
+/// not the raw NodeRust lists / inverse indexes -- a membership
+/// recorded at a level outside 'active' must not inflate a count or
+/// appear in these maps, in either direction, even when the member
+/// NODE itself is active (still checked separately via
+/// 'pid_source_is_active', matching every other render surface's
+/// two-part gate).
 fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
@@ -105,66 +116,54 @@ fn fetch_all_graphnodestats_in_rust (
   let mut content_to_containers
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   for pid in pids {
-    let node_opt = graph . nodes . get (pid);
-    // Inbound counts: size of an inverse index, source-filtered.
-    let inbound_count = | index : &im::HashMap<ID, im::HashSet<ID>> | -> usize {
-      index . get (pid)
-      . map ( |s| s . iter ()
-        . filter ( |p| pid_source_is_active (graph, active, p) )
-        . count () )
-      . unwrap_or (0) };
-    // Outbound counts: length of an outbound list, mapped to pids and
-    // source-filtered.
-    let outbound_count = | ids : &[ID] | -> usize {
-      ids . iter ()
-      . filter_map ( |id| graph . pid_of (id) )
+    // Inbound counts: gated partners, further source-filtered.
+    let inbound_count = | relation : NodeRelation | -> usize {
+      graph . inbound_pids_for_relation_gated (pid, relation, active)
+      . iter ()
       . filter ( |p| pid_source_is_active (graph, active, p) )
       . count () };
-    let containers : usize = inbound_count (& graph . contained_by);
-    let contents : usize =
-      node_opt . map ( |n| outbound_count (& members_of (& n . contains)) )
-      . unwrap_or (0);
-    let hiders : usize = inbound_count (& graph . hiders_of);
+    // Outbound counts: gated partners, further source-filtered.
+    let outbound_count = | relation : NodeRelation | -> usize {
+      graph . outbound_pids_for_relation_gated (pid, relation, active)
+      . iter ()
+      . filter ( |p| pid_source_is_active (graph, active, p) )
+      . count () };
+    let containers : usize = inbound_count (NodeRelation::Contains);
+    let contents : usize = outbound_count (NodeRelation::Contains);
+    let hiders : usize =
+      inbound_count (NodeRelation::HidesFromItsSubscriptions);
     let hides : usize =
-      node_opt . map ( |n| outbound_count (
-        & members_of ( n . hides_from_its_subscriptions . or_default () ) ) )
-      . unwrap_or (0);
-    let subscribers : usize = inbound_count (& graph . subscribers_of);
-    let subscribees : usize =
-      node_opt . map ( |n| outbound_count (
-        & members_of ( n . subscribes_to . or_default () ) ) )
-      . unwrap_or (0);
-    let overriders : usize = inbound_count (& graph . overriders_of);
+      outbound_count (NodeRelation::HidesFromItsSubscriptions);
+    let subscribers : usize = inbound_count (NodeRelation::Subscribes);
+    let subscribees : usize = outbound_count (NodeRelation::Subscribes);
+    let overriders : usize = inbound_count (NodeRelation::OverridesViewOf);
     let overrides_out : usize =
-      node_opt . map ( |n| outbound_count (
-        & members_of ( n . overrides_view_of . or_default () ) ) )
-      . unwrap_or (0);
+      outbound_count (NodeRelation::OverridesViewOf);
     let (link_total, link_surprising, link_with_content) : (usize, usize, usize) =
       link_split (graph, active, pid);
     counts . insert ( pid . clone (), RelationCounts {
       containers, contents, hiders, hides,
       subscribers, subscribees, overriders, overrides_out,
       link_total, link_surprising, link_with_content } );
-    // container_to_contents[pid] = (pid's contents) ∩ pid_set.
-    // n.contains carries raw IDs; map each to its pid before testing.
-    if let Some (n) = node_opt {
-      let intersected : HashSet<ID> =
-        members_of (& n . contains) . iter ()
-        . map ( |cid| graph . pid_of (cid)
-                 . unwrap_or_else ( || cid . clone () ) )
+    // container_to_contents[pid] = (pid's gated contents) ∩ pid_set.
+    { let intersected : HashSet<ID> =
+        graph . outbound_pids_for_relation_gated (
+          pid, NodeRelation::Contains, active )
+        . into_iter ()
         . filter ( |p| pid_set . contains (p) )
         . filter ( |p| pid_source_is_active (graph, active, p) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
                                          intersected ); }}
-    // content_to_containers[pid] = (pid's containers) ∩ pid_set.
-    if let Some (containers_set) = graph . contained_by . get (pid) {
-      let intersected : HashSet<ID> =
-        containers_set . iter ()
-        . filter ( |cid| pid_set . contains (*cid) )
-        . filter ( |cid| pid_source_is_active (graph, active, cid) )
-        . cloned () . collect ();
+    // content_to_containers[pid] = (pid's gated containers) ∩ pid_set.
+    { let intersected : HashSet<ID> =
+        graph . inbound_pids_for_relation_gated (
+          pid, NodeRelation::Contains, active )
+        . into_iter ()
+        . filter ( |p| pid_set . contains (p) )
+        . filter ( |p| pid_source_is_active (graph, active, p) )
+        . collect ();
       if ! intersected . is_empty () {
         content_to_containers . insert ( pid . clone (),
                                          intersected ); }}}

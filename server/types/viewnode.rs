@@ -371,6 +371,30 @@ pub struct ViewNodeStats {
   /// hugging the ☮ (TODO/more.org). Display-only, like the assembled
   /// herald strings; the parser accepts and discards it.
   pub hidden_body           : bool,
+  /// Some(NAME) when the relationship instance this position's
+  /// binding edge to its org-parent represents (=contains= for an
+  /// ordinary content child; the col's relation for a simple
+  /// PartnerCol member -- see 'PartnerCol::relation_member_role')
+  /// is recorded at a level that DIFFERS from that edge's DEFAULT
+  /// (the more private of the two endpoints' homes -- see
+  /// 'SkgConfig::more_private_of'). None when equal to the default:
+  /// the suppression is deliberate (render-and-gating,
+  /// TODO/user-owned_autofork_chain/5_plan.org) -- the herald marks
+  /// exactly the deliberately privatized edges. Also None: without a
+  /// graph handle; for a node that is not genuinely a member here
+  /// (parentIs != Affected, or a backpath graft); and for the two
+  /// compound filter cols (HiddenInSubscribee /
+  /// HiddenOutsideOfSubscribee), which have no single
+  /// 'relation_member_role' to read a level from.
+  /// LOAD-BEARING, unlike the other view stats (like
+  /// 'overridesHere'): 'skg-privatize-relationship' cycles this
+  /// value client-side, and save extraction reads it back as the
+  /// user's explicit level, feeding save-leveling's
+  /// sticky-else-default resolution above its floor
+  /// ('server/from_text/supplement_from_disk.rs' 'apply_sticky_levels').
+  /// Herald: red "~NAME" immediately before the ⌂ sourceHerald
+  /// (server/heralds.rs).
+  pub rel_source            : Option<SourceName>,
 }
 
 #[derive( Debug, Clone, Copy, PartialEq, Eq )]
@@ -821,6 +845,7 @@ impl Default for ViewNodeStats {
       rels_herald       : None,
       overridesHere     : None,
       hidden_body       : false,
+      rel_source        : None,
     }} }
 
 //

@@ -2,7 +2,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::viewnode::{mk_inactive_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
@@ -236,7 +236,7 @@ fn reconcile_content_children (
   // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
     content_goal_list( tree, node, &content_ids, is_sub, config,
-                       graph_snap ) ?;
+                       graph_snap, active_source_set ) ?;
   let apparent_content_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: rendering omits every
     // inactive member from the goal (the weave preserves them at save).
@@ -409,12 +409,13 @@ fn is_subscribee (
 /// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
 /// worktree view.
 fn content_goal_list (
-  tree          : &Tree<ViewNode>,
-  node          : NodeId,
-  content_ids   : &[ID],
-  is_subscribee : bool,
-  config        : &SkgConfig,
-  graph_snap    : &Arc<InRustGraph>,
+  tree               : &Tree<ViewNode>,
+  node               : NodeId,
+  content_ids        : &[ID],
+  is_subscribee      : bool,
+  config             : &SkgConfig,
+  graph_snap         : &Arc<InRustGraph>,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   if !is_subscribee {
     Ok ( content_ids . to_vec () )
@@ -435,12 +436,30 @@ fn content_goal_list (
       ids . into_iter ()
         . map ( |id| graph_snap . pid_of (&id) . unwrap_or (id) )
         . collect () };
+    // Edge-level gating (render-and-gating, 5_plan.org): a member
+    // the grandparent-subscriber HIDES or CONTAINS only at a level
+    // outside the active set must not subtract the subscribee's
+    // content here -- else a privately-contained/-hidden member
+    // would vanish from a public view even though no ACTIVE edge
+    // explains its absence (leak by omission). Mirrors the
+    // 'reconcile_content_children' gate on 'nodecomplete.contains'
+    // just above.
+    let level_active = |level : &SourceName| match active_source_set {
+      None      => true,
+      Some (a)  => a . is_all () || a . contains_source (level) };
     let worktree_hidden : Vec<ID> =
       resolve_pids (
-        members_of ( grandparent_nodecomplete . hides_from_its_subscriptions
-        . or_default() ) );
+        grandparent_nodecomplete . hides_from_its_subscriptions
+        . or_default () . iter ()
+        . filter ( |m| level_active (& m . level) )
+        . map ( |m| m . member . clone () )
+        . collect () );
     let subscriber_contains : Vec<ID> =
-      resolve_pids ( members_of (& grandparent_nodecomplete . contains) );
+      resolve_pids (
+        grandparent_nodecomplete . contains . iter ()
+        . filter ( |m| level_active (& m . level) )
+        . map ( |m| m . member . clone () )
+        . collect () );
     Ok ( setlike_vector_subtraction (
            setlike_vector_subtraction (
              content_ids . to_vec(), &worktree_hidden ),

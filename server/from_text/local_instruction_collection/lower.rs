@@ -20,7 +20,8 @@
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, IntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
-  ID, MSV, SourceName, members_msv, members_of, privacied_all, privacied_msv };
+  ID, MSV, PrivaciedMember, SourceName, members_msv, members_of,
+  privacied_all, privacied_msv };
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -40,14 +41,67 @@ pub struct NodeSaveIntent {
   pub source            : SourceName,
   pub title             : String,
   pub body              : Option<String>,
-  pub contains          : MSV<ID>,
+  // contains / subscribes_to / overrides_view_of pair each member
+  // with an Option<SourceName>: Some when the buffer's headline
+  // carried an explicit '(relSource NAME)' atom (see
+  // 'ViewNodeStats::rel_source', 'NodeIntent_Local'); None means
+  // "derive" (sticky-else-default). 'explicit_levels' extracts the
+  // Some entries into a side-channel BEFORE 'into_nodecomplete'
+  // discards them, for 'apply_sticky_levels' to validate against
+  // each edge's floor.
+  pub contains          : MSV<(ID, Option<SourceName>)>,
   pub extra_ids         : Vec<ID>,
   pub aliases           : MSV<String>,
-  pub subscribes_to     : MSV<ID>,
+  pub subscribes_to     : MSV<(ID, Option<SourceName>)>,
   pub hides_from_its_subscriptions : MSV<ID>,
-  pub overrides_view_of : MSV<ID>,
+  pub overrides_view_of : MSV<(ID, Option<SourceName>)>,
   pub misc              : Vec<FileProperty>,
 }
+
+/// Levels the buffer explicitly requested via '(relSource NAME)'
+/// (server/heralds.rs; 'ViewNodeStats::rel_source'), keyed by member
+/// ID, one map per relation that carries per-member levels (hides is
+/// absent: it is inferred, and the col that shows it is read-only --
+/// the privatize gesture refuses there). Threaded separately from
+/// NodeComplete because NodeComplete's 'PrivaciedMember::level' is a
+/// plain SourceName with no "was this explicit" flag, and gets
+/// unconditionally resolved by 'apply_sticky_levels' -- this is the
+/// side-channel that tells that pass which members carry a real,
+/// user-requested level to validate against the sticky/default
+/// floor, rather than deriving normally (render-and-gating,
+/// TODO/user-owned_autofork_chain/5_plan.org).
+#[derive(Clone, Debug, Default)]
+pub struct ExplicitLevels {
+  pub contains          : HashMap<ID, SourceName>,
+  pub subscribes_to     : HashMap<ID, SourceName>,
+  pub overrides_view_of : HashMap<ID, SourceName>,
+}
+
+/// Strip the per-member explicit-level payload down to plain IDs, by
+/// reference (read-only consumers, e.g.
+/// 'save_intents_with_specified_contains').
+fn ids_only_msv_ref (
+  msv : &MSV<(ID, Option<SourceName>)>,
+) -> MSV<ID> {
+  match msv {
+    MSV::Unspecified   => MSV::Unspecified,
+    MSV::Specified (v) => MSV::Specified (
+      v . iter () . map ( |(id, _)| id . clone () ) . collect () ), }}
+
+/// As 'ids_only_msv_ref', consuming.
+fn ids_only_msv (
+  msv : MSV<(ID, Option<SourceName>)>,
+) -> MSV<ID> {
+  match msv {
+    MSV::Unspecified   => MSV::Unspecified,
+    MSV::Specified (v) => MSV::Specified (
+      v . into_iter () . map ( |(id, _)| id ) . collect () ), }}
+
+/// As above, for the non-MSV 'contains' slice.
+fn ids_only (
+  list : &[(ID, Option<SourceName>)],
+) -> Vec<ID> {
+  list . iter () . map ( |(id, _)| id . clone () ) . collect () }
 
 impl NodeIntent {
   pub fn pid (
@@ -72,19 +126,32 @@ impl NodeIntent {
   pub fn graph_save_from_nodecomplete (
     node : NodeComplete,
   ) -> NodeIntent {
+    // No explicit levels: this seeds an intent straight from disk
+    // (a definitive rebuild for hide-delta application), not from a
+    // buffer headline that could carry a '(relSource ...)' atom.
+    // Preserves the MSV Unspecified/Specified distinction, unlike a
+    // plain 'or_default()' round-trip.
+    fn no_explicit_msv (
+      msv : &MSV<PrivaciedMember<ID>>,
+    ) -> MSV<(ID, Option<SourceName>)> {
+      match msv {
+        MSV::Unspecified   => MSV::Unspecified,
+        MSV::Specified (v) => MSV::Specified (
+          v . iter () . map ( |m| (m . member . clone (), None) ) . collect () ), }}
     NodeIntent::Save (NodeSaveIntent {
       pid                          : node . pid,
       source                       : node . source,
       title                        : node . title,
       body                         : node . body,
       contains                     : MSV::Specified (
-        members_of (&node . contains) ),
+        node . contains . iter ()
+        . map ( |m| (m . member . clone (), None) ) . collect () ),
       extra_ids                    : node . extra_ids,
       aliases                      : members_msv (&node . aliases),
-      subscribes_to                : members_msv (&node . subscribes_to),
+      subscribes_to                : no_explicit_msv (&node . subscribes_to),
       hides_from_its_subscriptions :
         members_msv (&node . hides_from_its_subscriptions),
-      overrides_view_of            : members_msv (&node . overrides_view_of),
+      overrides_view_of            : no_explicit_msv (&node . overrides_view_of),
       misc                         : node . misc,
     }) }
 
@@ -115,8 +182,30 @@ impl NodeSaveIntent {
     contains : &[ID],
   ) {
     if self . contains . is_unspecified() {
+      // Disk-derived filler: no per-member explicit level (that only
+      // ever comes from a buffer headline's own '(relSource ...)').
       self . contains =
-        MSV::Specified (contains . to_vec()); }}
+        MSV::Specified ( contains . iter () . cloned ()
+                          . map ( |id| (id, None) ) . collect () ); }}
+
+  /// The levels the buffer explicitly requested (its headlines'
+  /// '(relSource NAME)' atoms), read out BEFORE 'into_nodecomplete'
+  /// discards the Option<SourceName> payload. See 'ExplicitLevels'.
+  pub fn explicit_levels (
+    &self,
+  ) -> ExplicitLevels {
+    fn collect (
+      list : &[(ID, Option<SourceName>)],
+    ) -> HashMap<ID, SourceName> {
+      list . iter ()
+        . filter_map ( |(id, lvl)| lvl . clone ()
+                       . map ( |l| (id . clone (), l) ) )
+        . collect () }
+    ExplicitLevels {
+      contains          : collect (self . contains . or_default ()),
+      subscribes_to     : collect (self . subscribes_to . or_default ()),
+      overrides_view_of : collect (self . overrides_view_of . or_default ()),
+    }}
 
   pub fn into_nodecomplete (
     self,
@@ -133,13 +222,13 @@ impl NodeSaveIntent {
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
         privacied_all (
-          &source, self . contains . or_default() . to_vec() ),
+          &source, ids_only (self . contains . or_default ()) ),
       subscribes_to                :
-        privacied_msv (&source, self . subscribes_to),
+        privacied_msv (&source, ids_only_msv (self . subscribes_to)),
       hides_from_its_subscriptions :
         privacied_msv (&source, self . hides_from_its_subscriptions),
       overrides_view_of            :
-        privacied_msv (&source, self . overrides_view_of),
+        privacied_msv (&source, ids_only_msv (self . overrides_view_of)),
       misc                         : self . misc,
     }}
 
@@ -305,8 +394,8 @@ impl LoweredIntents {
               MSV::Specified (contains) => Some ((
                 pid . clone (),
                 intent . source . clone (),
-                contains . clone (),
-                intent . subscribes_to . clone () )),
+                ids_only (contains),
+                ids_only_msv_ref (&intent . subscribes_to) )),
               _ => None },
           _ => None })
       . collect () }
@@ -320,7 +409,8 @@ impl LoweredIntents {
   ) -> HashSet<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent)) =>
-        intent . contains . or_default() . iter() . cloned() . collect(),
+        intent . contains . or_default () . iter ()
+        . map ( |(id, _)| id . clone () ) . collect (),
       _ =>
         members_of (&subscriber_from_disk . contains)
         . into_iter() . collect(),

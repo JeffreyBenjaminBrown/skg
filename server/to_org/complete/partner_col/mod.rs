@@ -175,17 +175,37 @@ pub async fn maybe_add_subscribeeCol_branch (
       return Ok (( )); }}
 
   let hidden_outside_content : HashSet < ID > = {
-    // hidden IDs that are outside all subscribee content
+    // hidden IDs that are outside all subscribee content. Read
+    // edge-level-GATED from the in-Rust graph when the global
+    // handle is present (production always; render-and-gating,
+    // 5_plan.org): hides and memberships recorded above the active
+    // prefix must not shape this derived col. TypeDB fallback is
+    // ungated (it stores no levels; harness-only).
     let r_hides : HashSet < ID > =
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "what_node_hides" ). entered();
-        what_node_hides (
-          &config . db_name, driver, & subscriber_pid ) . await } ?;
+      match snapshot_global () {
+        Some (snap) =>
+          snap . outbound_pids_for_relation_gated (
+            & subscriber_pid,
+            NodeRelation::HidesFromItsSubscriptions,
+            active_source_set )
+          . into_iter () . collect (),
+        None =>
+          { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+              "what_node_hides" ). entered();
+            what_node_hides (
+              &config . db_name, driver, & subscriber_pid ) . await } ? };
     let all_subscribee_content : HashSet < ID > =
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "what_nodes_contain" ). entered();
-        what_nodes_contain (
-          &config . db_name, driver, & subscribee_ids ) . await } ?;
+      match snapshot_global () {
+        Some (snap) =>
+          subscribee_ids . iter ()
+          . flat_map ( |id| snap . outbound_pids_for_relation_gated (
+            id, NodeRelation::Contains, active_source_set ))
+          . collect (),
+        None =>
+          { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+              "what_nodes_contain" ). entered();
+            what_nodes_contain (
+              &config . db_name, driver, & subscribee_ids ) . await } ? };
     r_hides . iter ()
       . filter ( | id | ! all_subscribee_content . contains (id) )
       . cloned () . collect () };
@@ -344,7 +364,8 @@ pub async fn maybe_add_one_partnerCol (
                source_diffs, &member_ids ) . 0 . is_empty ()
          } else { // inbound: the inverse scan
            inverse_scan_for_inbound_col (
-             &owner_pid, member_role . relation, source_diffs )
+             &owner_pid, member_role . relation, source_diffs,
+             active_source_set )
            . values ()
            . any ( |axes| ! axes . net_is_present () ) };
     if ! head_side_occupied && ! force_create_when_empty {
@@ -369,6 +390,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   subscribee_treeid : NodeId,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
   source_diffs      : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   if ! type_and_parent_type_consistent_with_subscribee (
@@ -385,9 +407,34 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
       tree, subscribee_treeid, config ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
-    = partition_subscribee_content_for_subscriber (
-        & config . db_name, driver,
-        & subscriber_pid, & subscribee_pid ) . await ?;
+    = match snapshot_global () {
+      // Edge-level-GATED when the global handle is present
+      // (production always; render-and-gating, 5_plan.org): hides
+      // and memberships above the active prefix must not shape
+      // this derived col. TypeDB fallback is ungated (no levels;
+      // harness-only).
+      Some (snap) => {
+        let subscriber_hides : HashSet<ID> =
+          snap . outbound_pids_for_relation_gated (
+            & subscriber_pid,
+            NodeRelation::HidesFromItsSubscriptions,
+            active_source_set )
+          . into_iter () . collect ();
+        let subscribee_content : HashSet<ID> =
+          snap . outbound_pids_for_relation_gated (
+            & subscribee_pid, NodeRelation::Contains,
+            active_source_set )
+          . into_iter () . collect ();
+        ( subscribee_content . iter ()
+            . filter ( |id| ! subscriber_hides . contains (id) )
+            . cloned () . collect (),
+          subscribee_content . iter ()
+            . filter ( |id| subscriber_hides . contains (id) )
+            . cloned () . collect () ) }
+      None =>
+        partition_subscribee_content_for_subscriber (
+          & config . db_name, driver,
+          & subscriber_pid, & subscribee_pid ) . await ? };
   if hidden_in_content . is_empty () {
     // Skip because it would be empty -- unless, in diff mode, the
     // HEAD-side DERIVED membership is non-empty: a hidden-in

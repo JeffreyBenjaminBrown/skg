@@ -288,6 +288,7 @@ async fn visit_normal_node (
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver,
+    context . active_source_set,
     context . source_diffs ) . await ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a

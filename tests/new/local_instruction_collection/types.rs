@@ -36,7 +36,7 @@ fn exclusive_slot_rules () {
   // Different variants for one ID coexist.
   acc . instructionMerge_intent (
     ID::from ("a"),
-    NodeIntent_Local::SetContains (vec![ID::from ("c")]) ) . unwrap();
+    NodeIntent_Local::SetContains (vec![(ID::from ("c"), None)]) ) . unwrap();
   acc . instructionMerge_intent (
     ID::from ("a"),
     NodeIntent_Local::SetAliases (vec!["x" . to_string()]) ) . unwrap();
@@ -47,7 +47,7 @@ fn exclusive_slot_rules () {
     acc . by_pid . get (&ID::from ("a")) . unwrap();
   assert_eq!( entry . title_and_body,
               Some (("t" . to_string(), None)) );
-  assert_eq!( entry . contains, Some (vec![ID::from ("c")]) );
+  assert_eq!( entry . contains, Some (vec![(ID::from ("c"), None)]) );
   assert_eq!( entry . node_merge, Some (ID::from ("b")) ); }
 
 #[test]

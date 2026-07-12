@@ -3,7 +3,7 @@ use crate::types::env::SkgEnv;
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, SourceName, members_of};
+use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -53,7 +53,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   // subscriber through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 1 validates the
   // [SubscribeeCol, Normal] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
-    read_hiddenoutside_context (tree, node, kind, env) ?;
+    read_hiddenoutside_context (tree, node, kind, env, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddenoutsideof_subscribeecol (
@@ -109,10 +109,11 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   Ok(( )) }
 
 fn read_hiddenoutside_context (
-  tree : &Tree<ViewNode>,
-  node : NodeId,
-  kind : PartnerCol,
-  env  : &SkgEnv,
+  tree               : &Tree<ViewNode>,
+  node               : NodeId,
+  kind               : PartnerCol,
+  env                : &SkgEnv,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeCol, Normal] chain).
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
@@ -121,12 +122,25 @@ fn read_hiddenoutside_context (
   let wt_subscriber_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &subscriber_pid, &subscriber_source ) ?;
+  // Edge-level gating (render-and-gating, 5_plan.org): both are the
+  // subscriber's own outbound lists (hides_from_its_subscriptions,
+  // subscribes_to); a membership recorded at an inactive level must
+  // not feed this derived col.
+  let level_active = |level : &SourceName| match active_source_set {
+    None      => true,
+    Some (a)  => a . is_all () || a . contains_source (level) };
   let wt_subscriber_hides : Vec<ID> =
-    members_of ( wt_subscriber_nodecomplete . hides_from_its_subscriptions
-      . or_default() );
+    wt_subscriber_nodecomplete . hides_from_its_subscriptions
+    . or_default () . iter ()
+    . filter ( |m| level_active (& m . level) )
+    . map ( |m| m . member . clone () )
+    . collect ();
   let wt_subscribees : Vec<ID> =
-    members_of ( wt_subscriber_nodecomplete . subscribes_to
-      . or_default() );
+    wt_subscriber_nodecomplete . subscribes_to
+    . or_default () . iter ()
+    . filter ( |m| level_active (& m . level) )
+    . map ( |m| m . member . clone () )
+    . collect ();
   Ok (HiddenOutsideContext {
     subscriber_pid,
     subscriber_source,

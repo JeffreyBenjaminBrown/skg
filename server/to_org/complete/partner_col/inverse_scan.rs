@@ -24,9 +24,10 @@
 /// move story instead.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SourceName, members_of};
+use crate::types::misc::{ID, PrivaciedMember, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashMap;
@@ -39,10 +40,21 @@ use std::path::PathBuf;
 /// ('MembershipAxes::net_is_present' = false) belongs in the col's
 /// goal list as a phantom; a present member's Plus signs become its
 /// 'newM' marks.
+///
+/// 'active': edge-level gating (render-and-gating, 5_plan.org). A
+/// Deleted/Added file's before/after NodeComplete carries full
+/// PrivaciedMember levels, so those two stages gate on the specific
+/// edge's level -- a phantom "used to link here" must not surface
+/// from a membership recorded outside the active set. The Modified
+/// stage cannot: 'NodeChanges' diff lists are level-stripped
+/// (leveled-lists work item deferred this; still true here), so a
+/// Modified-file sign is emitted regardless of level. None = ungated
+/// (every stage counts), matching every other gated accessor here.
 pub fn inverse_scan_for_inbound_col (
   owner        : &ID,
   relation     : NodeRelation,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  active       : Option<&ActiveSourceSet>,
 ) -> HashMap<ID, MembershipAxes> {
   let Some (diffs) = source_diffs else {
     return HashMap::new (); };
@@ -53,7 +65,7 @@ pub fn inverse_scan_for_inbound_col (
       [ (0, & sd . staged), (1, & sd . unstaged) ]
     { for (path, ncd) in stage_map {
         if let Some ((member, sign)) =
-          member_and_sign_for_owner (owner, relation, path, ncd)
+          member_and_sign_for_owner (owner, relation, path, ncd, active)
         { signs . entry (member)
             . or_insert_with ( || [ Vec::new (), Vec::new () ] )
             [stage_index] . push (sign); }}}}
@@ -66,6 +78,15 @@ pub fn inverse_scan_for_inbound_col (
     . filter ( |(_, axes)| ! axes . is_empty () )
     . collect () }
 
+/// Whether 'level' is visible under 'active' (None = ungated).
+fn level_is_active (
+  active : Option<&ActiveSourceSet>,
+  level  : &SourceName,
+) -> bool {
+  match active {
+    None     => true,
+    Some (a) => a . is_all () || a . contains_source (level) } }
+
 /// What one changed file says about its 'relation' edge to 'owner'
 /// in one stage, if anything.  The changed FILE is the member; the
 /// owner appears (or not) in its outbound relation list.
@@ -74,6 +95,7 @@ fn member_and_sign_for_owner (
   relation : NodeRelation,
   path     : &PathBuf,
   ncd      : &NodeCompleteDiff,
+  active   : Option<&ActiveSourceSet>,
 ) -> Option<(ID, Sign)> {
   match ncd . status {
     GitDiffStatus::Modified => {
@@ -90,16 +112,43 @@ fn member_and_sign_for_owner (
       Some ((member, sign)) },
     GitDiffStatus::Deleted => {
       let before : &NodeComplete = ncd . before_node . as_ref () ?;
-      if outbound_ids_of_nodecomplete (before, relation)
-         . contains (owner)
-      { Some (( before . pid . clone (), Sign::Minus )) }
-      else { None } },
+      match outbound_member_level_of_nodecomplete (before, relation, owner) {
+        Some (level) if level_is_active (active, &level) =>
+          Some (( before . pid . clone (), Sign::Minus )),
+        _ => None } },
     GitDiffStatus::Added => {
       let after : &NodeComplete = ncd . after_node . as_ref () ?;
-      if outbound_ids_of_nodecomplete (after, relation)
-         . contains (owner)
-      { Some (( after . pid . clone (), Sign::Plus )) }
-      else { None } } } }
+      match outbound_member_level_of_nodecomplete (after, relation, owner) {
+        Some (level) if level_is_active (active, &level) =>
+          Some (( after . pid . clone (), Sign::Plus )),
+        _ => None } } } }
+
+/// The LEVEL of nc's outbound 'relation' edge to 'target', if nc's
+/// list names it. Sibling of 'outbound_ids_of_nodecomplete' below,
+/// but keeps the PrivaciedMember's level instead of dropping it, so
+/// Deleted/Added-stage signs can be edge-level gated.
+fn outbound_member_level_of_nodecomplete (
+  nc       : &NodeComplete,
+  relation : NodeRelation,
+  target   : &ID,
+) -> Option<SourceName> {
+  let leveled : &[PrivaciedMember<ID>] = match relation {
+    NodeRelation::Contains =>
+      & nc . contains,
+    NodeRelation::Subscribes =>
+      nc . subscribes_to . or_default (),
+    NodeRelation::HidesFromItsSubscriptions =>
+      nc . hides_from_its_subscriptions . or_default (),
+    NodeRelation::OverridesViewOf =>
+      nc . overrides_view_of . or_default (),
+    NodeRelation::TextlinksTo =>
+      // Textlinks are inferred from body text, not stored as a list
+      // (see 'outbound_ids_of_nodecomplete'); this scan never fires
+      // for them from a Deleted/Added stage.
+      return None, };
+  leveled . iter ()
+    . find ( |m| & m . member == target )
+    . map ( |m| m . level . clone () ) }
 
 /// Plus-only -> Plus; Minus-only -> Minus; both -> None (the
 /// cross-source-move cancellation); no signs -> None.
@@ -112,30 +161,6 @@ fn resolve_one_stage (
     (true,  false) => Some (Sign::Plus),
     (false, true)  => Some (Sign::Minus),
     _              => None } }
-
-/// The outbound list a NodeComplete holds for a relation, levels
-/// dropped.  Sibling of 'outbound_ids_from_node' (relation_accessors.rs),
-/// which reads a NodeRust instead.  Textlinks are inferred from node
-/// text, not stored as a list, so they contribute nothing.
-/// NOTE: was '&'a [ID]' before the leveled-list change; a borrow can
-/// no longer be returned once the levels must be stripped, so this
-/// now returns an owned 'Vec<ID>' (both call sites only call
-/// '.contains (owner)' on the result, which works the same on a Vec).
-fn outbound_ids_of_nodecomplete (
-  nc       : &NodeComplete,
-  relation : NodeRelation,
-) -> Vec<ID> {
-  match relation {
-    NodeRelation::Contains =>
-      members_of ( & nc . contains ),
-    NodeRelation::Subscribes =>
-      members_of ( nc . subscribes_to . or_default () ),
-    NodeRelation::HidesFromItsSubscriptions =>
-      members_of ( nc . hides_from_its_subscriptions . or_default () ),
-    NodeRelation::OverridesViewOf =>
-      members_of ( nc . overrides_view_of . or_default () ),
-    NodeRelation::TextlinksTo =>
-      Vec::new (), } }
 
 #[cfg(test)]
 #[path = "../../../../tests/unit/inverse_scan.rs"]

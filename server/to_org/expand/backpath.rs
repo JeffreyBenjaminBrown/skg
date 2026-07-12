@@ -9,6 +9,7 @@
 
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::paths::{ paths_to_first_nonlinearities, PathToFirstNonlinearity};
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_id, remove_completed_view_request};
 
@@ -477,9 +478,52 @@ pub async fn prepend_indef_indep_child_with_source_set (
         find_source_with_optional_tantivy (
           child_skgid, &deleted_since_head_pid_src_map, None, config )
       { if ! active . contains_source (&source)
-        { return Ok (None); }} }}
+        { return Ok (None); }} }
+    // Edge-level gating (render-and-gating, 5_plan.org): the partner
+    // NODE's source (above) is not enough -- the EDGE grafting it
+    // here can be recorded at a more private level than either
+    // endpoint's home (a private reading-list membership between two
+    // public nodes). 'birth' names the role the partner plays toward
+    // whatever sits at 'parent_treeid' (the origin, for the first
+    // hop; a previously-grafted partner, for a later hop or an
+    // ancestry step), so the edge and its owner are derivable.
+    // Requires the in-Rust graph snapshot (the only place edge
+    // levels live); TypeDB-only callers have no level data yet
+    // (deferred to dbs-and-search), so this is skipped when no
+    // snapshot is installed -- a graceful no-op, not a leak, since
+    // that is also when 'edge_level' would be unavailable everywhere
+    // else in the render path.
+    if let Birth::Backpath (role) = birth {
+      if let Some (graph) = snapshot_global () {
+        if let Ok (parent_pid) = get_id_from_treenode (tree, parent_treeid) {
+          let level_active : bool =
+            backpath_edge_level (&graph, &parent_pid, child_skgid, role)
+            . map ( |level| active . contains_source (&level) )
+            . unwrap_or (false);
+          if ! level_active { return Ok (None); }}}}}
   let new_child_treeid : NodeId =
     prepend_indef_indep_child (
       tree, parent_treeid, child_skgid, config, driver, birth )
     . await ?;
   Ok (Some (new_child_treeid)) }
+
+/// The level of the edge grafting 'partner' at backpath role 'role'
+/// toward 'origin' (the node the partner is being attached under).
+/// 'role' names the role the PARTNER plays (per RelationRole's doc:
+/// "output_role is THIS (partner) role") -- the inverse of
+/// 'other_member_pids_gated's convention, where the role belongs to
+/// the node asking the question. When the partner plays the relation's
+/// FIRST position (e.g. CONTAINER), the partner owns the edge (an
+/// inbound partner of origin, in the "someone else's outbound list
+/// names me" sense); otherwise origin owns it.
+fn backpath_edge_level (
+  graph   : &InRustGraph,
+  origin  : &ID,
+  partner : &ID,
+  role    : RelationRole,
+) -> Option<SourceName> {
+  if role . is_first_role () {
+    graph . edge_level ( partner, role . relation, origin )
+  } else {
+    graph . edge_level ( origin, role . relation, partner )
+  } }

@@ -61,11 +61,11 @@ fn ordinary_definitive_emissions () {
     assert_eq!( root . title_and_body,
                 Some (( "root" . to_string(),
                         Some ("Root body" . to_string()) )) );
-    assert_eq!( root . contains, Some (vec![ID::from ("child")]) );
+    assert_eq!( root . contains, Some (vec![(ID::from ("child"), None)]) );
     assert_eq!( root . aliases,
                 Some (vec!["nickname" . to_string()]) );
-    assert_eq!( root . subscribes_to, Some (vec![ID::from ("s")]) );
-    assert_eq!( root . overrides, Some (vec![ID::from ("o")]) );
+    assert_eq!( root . subscribes_to, Some (vec![(ID::from ("s"), None)]) );
+    assert_eq!( root . overrides, Some (vec![(ID::from ("o"), None)]) );
     assert!( ! root . delete ); }
   { let child : &IntentsForOneId = entry (&collected, "child");
     // A definitive leaf's contains is Specified and empty;
@@ -112,7 +112,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
         subscribee : ID::from ("e"),
         visible    : vec![ID::from ("visible")] } ]);
     assert_eq!( subscriber . subscribes_to,
-                Some (vec![ID::from ("e")]) ); }
+                Some (vec![(ID::from ("e"), None)]) ); }
   { // Ordinary definitive children of a subscribee-as-such still
     // emit their own instructions, but form no one's contains.
     let visible : &IntentsForOneId = entry (&collected, "visible");
@@ -169,7 +169,7 @@ fn definitive_member_of_readonly_col_emits_for_itself_only () {
                 Some (( "intruder" . to_string(),
                         Some ("Intruder body" . to_string()) )) );
     assert_eq!( intruder . contains,
-                Some (vec![ID::from ("intruder-child")]) ); }
+                Some (vec![(ID::from ("intruder-child"), None)]) ); }
   { // The col's owner is unaffected by the col's membership.
     let owner : &IntentsForOneId = entry (&collected, "owner");
     assert_eq!( owner . contains, Some (vec![]) );
@@ -300,6 +300,6 @@ fn duplicate_defining_col_members_dedup_preserving_order () {
   assert_eq!( owner . aliases,
               Some (vec!["echo" . to_string(), "other" . to_string()]) );
   assert_eq!( owner . subscribes_to,
-              Some (vec![ID::from ("s1"), ID::from ("s2")]) );
+              Some (vec![(ID::from ("s1"), None), (ID::from ("s2"), None)]) );
   assert_eq!( owner . overrides,
-              Some (vec![ID::from ("o1"), ID::from ("o2")]) ); }
+              Some (vec![(ID::from ("o1"), None), (ID::from ("o2"), None)]) ); }

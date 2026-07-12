@@ -1,4 +1,6 @@
 use crate::dbs::tantivy::title_and_source_by_id;
+use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -40,7 +42,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
           // Insert in reverse so the first child in
           // the ancestry ends up first among siblings.
           insert_containerward_ancestry_tree (
-            child, *node_nid,
+            child, node_id, *node_nid,
             viewforest, tantivy_index, config, active ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
@@ -48,12 +50,26 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
 /// under the given parent. Ancestry nodes are prepended.
 fn insert_containerward_ancestry_tree(
   node          : &AncestryTree,
+  contained_id  : &ID, // the node this ancestry step CONTAINS
   parent_nid    : NodeId,
   viewforest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
   active        : &ActiveSourceSet,
 ) {
+  if ! active . is_all () {
+    // Edge-level gating (render-and-gating, 5_plan.org): a private
+    // MEMBERSHIP must not surface through enrichment ancestry even
+    // when both nodes are public. The edge's owner is the
+    // container (this ancestry step).
+    let edge_visible : bool =
+      snapshot_global ()
+      . and_then ( |snap| snap . edge_level (
+        node . id (), NodeRelation::Contains, contained_id ))
+      . map ( |level| active . contains_source (&level) )
+      . unwrap_or (true); // unknown edge: fall through to the
+                          // node-source gate below, as before
+    if ! edge_visible { return; }}
   let child_nid : NodeId = match
     prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
@@ -63,7 +79,7 @@ fn insert_containerward_ancestry_tree(
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       insert_containerward_ancestry_tree (
-        child, child_nid,
+        child, node . id (), child_nid,
         viewforest, tantivy_index, config, active ); } } }
 
 /// Looks up a node's title and source from Tantivy,

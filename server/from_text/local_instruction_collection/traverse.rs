@@ -47,7 +47,7 @@ use crate::from_text::local_instruction_collection::predicates::{
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, DefiningColOwner, LocalContext, NodeIntent_Local,
   SubscribeeTextClaim, SubscribeeVisibility };
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -322,46 +322,70 @@ fn visit_overriddencol (
     &LocalContext::UnderVognode { parent_if_writeable : None },
     collected) }
 
+/// As 'dedup_vector', but dedups leveled members by ID ALONE (first
+/// occurrence wins) rather than by the full (ID, level) pair: a
+/// duplicate ID with a DIFFERENT '(relSource ...)' atom must still
+/// be silently dropped, matching the existing defining-col dedup
+/// policy ("duplicate defining-col members are silently deduped").
+fn dedup_members_by_id (
+  members : Vec<(ID, Option<SourceName>)>,
+) -> Vec<(ID, Option<SourceName>)> {
+  let mut seen   : std::collections::HashSet<ID> = std::collections::HashSet::new();
+  let mut result : Vec<(ID, Option<SourceName>)> = Vec::new();
+  for (id, level) in members {
+    if seen . insert (id . clone()) {
+      result . push ((id, level)); }}
+  result }
+
 /// This returns the members of an OverriddenCol: its Active
 /// children that pass the PartnerCol membership predicate, silently
-/// deduplicated, preserving first-occurrence order.  (Inactive
+/// deduplicated (by ID; see 'dedup_members_by_id'), preserving
+/// first-occurrence order. Each member is paired with its headline's
+/// explicit '(relSource NAME)' level, if any (see
+/// 'ViewNodeStats::rel_source' and 'NodeIntent_Local').  (Inactive
 /// children are NOT members here: the overriddenCol omits inactive
 /// members from display, and the set-difference merge preserves
 /// them at save.  TODO/full-schema/9-2_source-set-safety.org.)
 fn partnerCol_members (
   node_ref : NodeRef<ViewNode>,
-) -> Vec<ID> {
-  let mut members : Vec<ID> = Vec::new();
+) -> Vec<(ID, Option<SourceName>)> {
+  let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &child . value() . kind
     { if member_counts_for_partnerCol (t) {
-        members . push (t . id . clone()); }}}
-  dedup_vector (members) }
+        members . push (
+          (t . id . clone(), t . viewStats . rel_source . clone()) ); }}}
+  dedup_members_by_id (members) }
 
 /// This returns the members of a SubscribeeCol: its Active children
-/// that pass the PartnerCol membership predicate, deduplicated. Like
-/// 'content_members' (and for the same reason), inactive children
-/// contribute nothing: 'subscribes_to' is order-meaningful, but the
-/// disk merge ('weave') already restores invisible subscribees at
-/// their disk position, so a buffer-present inactive placeholder must
-/// not feed this list.
+/// that pass the PartnerCol membership predicate, deduplicated (by
+/// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
+/// the same reason), inactive children contribute nothing:
+/// 'subscribes_to' is order-meaningful, but the disk merge ('weave')
+/// already restores invisible subscribees at their disk position, so
+/// a buffer-present inactive placeholder must not feed this list.
+/// Each member is paired with its headline's explicit
+/// '(relSource NAME)' level, if any.
 #[allow(non_snake_case)]
 fn subscribeeCol_members (
   node_ref : NodeRef<ViewNode>,
-) -> Vec<ID> {
-  let mut members : Vec<ID> = Vec::new();
+) -> Vec<(ID, Option<SourceName>)> {
+  let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &child . value() . kind
     { if member_counts_for_partnerCol (t) {
-        members . push (t . id . clone()); }}}
-  dedup_vector (members) }
+        members . push (
+          (t . id . clone(), t . viewStats . rel_source . clone()) ); }}}
+  dedup_members_by_id (members) }
 
 /// This returns the content of a definitive vognode: its Active
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
-/// already guarantees distinctness.
+/// already guarantees distinctness. Each member is paired with its
+/// headline's explicit '(relSource NAME)' level, if any (see
+/// 'ViewNodeStats::rel_source' and 'NodeIntent_Local').
 ///
 /// Inactive children contribute NOTHING here: an inactive node emits
 /// no save intention for its container. Its membership in the
@@ -375,16 +399,17 @@ fn subscribeeCol_members (
 /// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<ViewNode>,
-) -> Vec<ID> {
-  let mut contents : Vec<ID> = Vec::new();
+) -> Vec<(ID, Option<SourceName>)> {
+  let mut contents : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &child . value() . kind
     { if active_child_counts_as_content (t) {
-        contents . push (
+        contents . push ((
           // collected_id, not id: a drawn overrider stands for
           // the original member it was drawn in place of.
-          t . collected_id ()); }}}
+          t . collected_id (),
+          t . viewStats . rel_source . clone() )); }}}
   contents }
 
 /// This returns the children that the buffer presents as visible

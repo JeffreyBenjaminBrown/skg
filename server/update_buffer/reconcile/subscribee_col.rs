@@ -7,7 +7,7 @@ use crate::to_org::complete::partner_col::goal_list::{goal_list_for_outbound_col
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SourceName, members_of};
+use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
@@ -47,7 +47,7 @@ pub async fn reconcile_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
-    read_subscribee_col_context (tree, node, env) ?;
+    read_subscribee_col_context (tree, node, env, active_source_set) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_outbound_col (
       &context . parent_pid, &context . parent_source,
@@ -114,9 +114,10 @@ pub async fn reconcile_subscribee_col_children (
   Ok(( )) }
 
 fn read_subscribee_col_context (
-  tree : &Tree<ViewNode>,
-  node : NodeId,
-  env  : &SkgEnv,
+  tree               : &Tree<ViewNode>,
+  node               : NodeId,
+  env                : &SkgEnv,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Active vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), rather than at a hard-coded generation.
@@ -136,10 +137,21 @@ fn read_subscribee_col_context (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not an ActiveNode") ?;
   let worktree_subscribees : Vec<ID> =
+    // Edge-level gating (render-and-gating, 5_plan.org): this is the
+    // OWNER's own outbound list (like 'contains' in
+    // reconcile/content.rs), so a subscription recorded at an
+    // inactive level must not appear here even though the
+    // subscribee node itself may be active.
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &parent_pid, &parent_source )
       . ok ()
-      . map ( |skg| members_of ( skg . subscribes_to . or_default () ) )
+      . map ( |skg| skg . subscribes_to . or_default () . iter ()
+              . filter ( |m| match active_source_set {
+                  None      => true,
+                  Some (a)  => a . is_all ()
+                    || a . contains_source (& m . level) } )
+              . map ( |m| m . member . clone () )
+              . collect () )
       . unwrap_or_default ();
   Ok (SubscribeeColContext {
     parent_pid,

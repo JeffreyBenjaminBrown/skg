@@ -77,15 +77,22 @@ fn test_subscribee_col_appears_for_subscribers(
     // Nodes 11 and 12 subscribe to something, so they get SubscribeeCol children.
     // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
+    // The 11/12 -> *-sees edges are recorded in the (public) "home"
+    // section even though their target lives in the (private) "away"
+    // section -- older fixture data predating the privacy-accordion
+    // levels, which the accordion-validators leak warning already
+    // flags but tolerates. Since that recorded level ("home") differs
+    // from the edge's DEFAULT (more_private_of(home, away) = "away"),
+    // render-and-gating's herald surfaces it: (relSource home).
     let expected = indoc! {
       "* (skg (node (id 1) (source home) (parentIs absent) (rels \"C4\") (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (birthHerald \"aC1\") (rels \"S1\"))) 11
       *** (skg subscribeeCol)
-      **** (skg (node (id 11-sees) (source away) indef (birthHerald \"bS\") (viewStats (sourceHerald ⌂:away)))) 11-sees
+      **** (skg (node (id 11-sees) (source away) indef (birthHerald \"bS\") (viewStats (relSource home) (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home) (birthHerald \"aC\"))) 111
       ** (skg (node (id 12) (source home) (birthHerald \"aC\") (rels \"S1\"))) 12
       *** (skg subscribeeCol)
-      **** (skg (node (id 12-sees) (source away) indef (birthHerald \"bS\") (viewStats (sourceHerald ⌂:away)))) 12-sees
+      **** (skg (node (id 12-sees) (source away) indef (birthHerald \"bS\") (viewStats (relSource home) (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home) (birthHerald \"aC\"))) 13
       ** (skg (node (id 14) (source home) (birthHerald \"aC1\"))) 14
       *** (skg (node (id 141) (source home) (birthHerald \"aC\"))) 141
