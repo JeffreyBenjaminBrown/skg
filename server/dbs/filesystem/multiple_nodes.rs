@@ -1,8 +1,9 @@
-use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete};
+use crate::accordion::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
+use crate::accordion::types::SectionSlices;
+use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_accordion};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
-use crate::util::path_from_pid_and_source;
 
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -16,15 +17,25 @@ use std::fs::{self, DirEntry, ReadDir};
 pub fn read_all_skg_files_from_sources (
   config: &SkgConfig
 ) -> io::Result<Vec<NodeComplete>> {
-  let mut all_nodes: Vec<NodeComplete> = Vec::new();
+  let mut sections_by_pid
+    : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
+  let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
   let mut load_errors: Vec<(String, // source name
                             String, // filename
                             String)> // error message
     = Vec::new();
-  for (source_name, source) in config . sources . iter() {
-    match read_skg_files_from_folder (source_name, config) {
-      Ok (mut nodes) => {
-        all_nodes . append (&mut nodes); }
+  for source_name in config . ordered_sources () {
+    let Some (source) : Option<&SkgfileSource> =
+      config . sources . get (&source_name) else { continue; };
+    match read_skg_sections_from_folder (&source_name, config) {
+      Ok (sections) => {
+        for (level, node_fs) in sections {
+          let pid : ID = node_fs . pid . clone ();
+          if ! sections_by_pid . contains_key (&pid) {
+            pid_order . push ( pid . clone () ); }
+          sections_by_pid . entry (pid)
+            . or_insert_with (Vec::new)
+            . push ((level, node_fs)); }}
       Err (e) => {
         load_errors . push ((
           source_name . to_string(),
@@ -37,27 +48,109 @@ pub fn read_all_skg_files_from_sources (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
                load_errors . len() ))); }
+  fold_grouped_sections (sections_by_pid, pid_order) }
+
+/// One accordion, read fresh from disk by pid (all its sections,
+/// folded). Errors if no section exists or no section has a title.
+pub fn nodecomplete_from_accordion_on_disk (
+  config : &SkgConfig,
+  pid    : &ID,
+) -> io::Result<NodeComplete> {
+  crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_source (
+    config, pid . clone (),
+    & SourceName::from ("(any)") ) }
+
+/// Fold each accordion (already grouped by pid; sections arrive in
+/// privacy order because the caller iterated 'ordered_sources').
+/// Anchors resolve through the extra-id map built from every
+/// section, so a nodeMerge cannot dangle an anchor. A titleless
+/// accordion (no home) is a hard load error; fold warnings are
+/// logged for now (the accordion validators, next work item,
+/// formalize their reporting).
+fn fold_grouped_sections (
+  mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
+  pid_order           : Vec<ID>,
+) -> io::Result<Vec<NodeComplete>> {
+  let pid_of : HashMap<ID, ID> = {
+    let mut m : HashMap<ID, ID> = HashMap::new ();
+    for (pid, sections) in sections_by_pid . iter () {
+      for (_, node_fs) in sections {
+        for extra in &node_fs . extra_ids {
+          m . insert ( extra . clone (), pid . clone () ); }} }
+    m };
+  let resolve = |id : &ID| -> ID {
+    pid_of . get (id) . cloned ()
+      . unwrap_or_else ( || id . clone () ) };
+  let mut all_nodes : Vec<NodeComplete> = Vec::new ();
+  for pid in pid_order {
+    let sections : Vec<(SourceName, NodeFS)> =
+      sections_by_pid . remove (&pid)
+      . expect ("pid_order tracks sections_by_pid");
+    let extra_ids : Vec<ID> = {
+      let mut extra_ids : Vec<ID> = Vec::new ();
+      for (_, node_fs) in &sections {
+        for e in &node_fs . extra_ids {
+          if ! extra_ids . contains (e) {
+            extra_ids . push ( e . clone () ); }} }
+      extra_ids };
+    let misc : Vec<crate::types::nodes::complete::FileProperty> = {
+      // home-section data, like extra_ids; unioned defensively
+      let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
+        Vec::new ();
+      for (_, node_fs) in &sections {
+        for m in &node_fs . misc {
+          if ! misc . contains (m) {
+            misc . push ( m . clone () ); }} }
+      misc };
+    let slices : Vec<(SourceName, SectionSlices)> =
+      sections . into_iter ()
+      . map ( |(level, node_fs)|
+              (level, node_fs . into_section_slices ()) )
+      . collect ();
+    let (folded, warnings) : (FoldedNode, _) =
+      fold_sections ( &slices, &resolve );
+    for w in &warnings {
+      tracing::warn! ( pid = %pid, warning = ?w,
+                       "accordion fold warning" ); }
+    match nodecomplete_from_fold (
+      pid . clone (), extra_ids, misc, folded ) {
+      Some (nodecomplete) => all_nodes . push (nodecomplete),
+      None => {
+        return Err (io::Error::new (
+          io::ErrorKind::InvalidData,
+          format! ("Accordion '{}' has no home: no section carries a title.",
+                   pid ))); }} }
   Ok (all_nodes) }
 
-/// Examines each node's source and all_ids(); if any ID appears
-/// in more than one source, writes a detailed report (to stderr
-/// for ≤10 duplicates, to an org file otherwise) and returns a
-/// summary error. Otherwise returns Ok.
+/// Same-ID files across sources are no longer duplicates -- they
+/// are the sections of one privacy accordion, grouped and folded at
+/// load. What remains a CONFLICT is one id claimed by two DIFFERENT
+/// nodes: an id (primary or extra) appearing among the all_ids() of
+/// two nodes with distinct pids. If any exists, writes a detailed
+/// report (to stderr for ≤10, to an org file otherwise) and returns
+/// a summary error. (Callers pass post-fold nodes, one per
+/// accordion.)
 pub fn check_for_duplicate_ids_across_sources (
   nodes     : &[NodeComplete],
   data_root : &Path,
 ) -> io::Result<()> {
-  let mut seen_ids: HashMap < ID, Vec<SourceName> > =
-    // Maps each ID to all sources containing it
+  let mut claimants: HashMap < ID, Vec<(ID, SourceName)> > =
+    // Maps each ID to the (pid, home) of every node claiming it
     HashMap::new();
   for node in nodes {
     for id in node . all_ids() {
-      seen_ids . entry (id . clone())
+      claimants . entry (id . clone())
         . or_insert_with (Vec::new)
-        . push (node . source . clone()); }}
+        . push ((node . pid . clone(), node . source . clone())); }}
   let duplicate_ids: HashMap<ID, Vec<SourceName>> =
-    seen_ids . into_iter()
-    . filter ( |(_, sources)| sources . len() > 1 )
+    claimants . into_iter()
+    . filter ( |(_, owners)| {
+      let distinct_pids : HashSet<&ID> =
+        owners . iter() . map ( |(pid, _)| pid ) . collect();
+      distinct_pids . len() > 1 } )
+    . map ( |(id, owners)|
+            (id, owners . into_iter()
+                 . map ( |(_, src)| src ) . collect()) )
     . collect();
   if duplicate_ids . is_empty() {
     return Ok (( )); }
@@ -76,16 +169,30 @@ pub fn check_for_duplicate_ids_across_sources (
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
 
-pub fn read_skg_files_from_folder (
+/// INTERIM (see NodeFS's module comment): each FILE of a source as
+/// a whole node -- the per-file view the diff/git paths still use.
+/// Exact for single-section accordions; the interactions work item
+/// teaches those paths real accordions.
+pub fn read_single_sections_from_folder (
   source_name : &SourceName,
   config      : &SkgConfig,
 ) -> io::Result < Vec<NodeComplete> > {
+  Ok ( read_skg_sections_from_folder (source_name, config) ?
+       . into_iter ()
+       . map ( |(level, node_fs)|
+               node_fs . into_complete_as_single_section (level) )
+       . collect () ) }
+
+pub fn read_skg_sections_from_folder (
+  source_name : &SourceName,
+  config      : &SkgConfig,
+) -> io::Result < Vec<(SourceName, NodeFS)> > {
   let source : &SkgfileSource =
     config . sources . get (source_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
       format!("Source '{}' not found in config", source_name)))?;
-  let mut nodes : Vec<NodeComplete> = Vec::new ();
+  let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   let entries : ReadDir = // an iterator
     fs::read_dir (&source . path) ?;
   for entry in entries {
@@ -98,20 +205,20 @@ pub fn read_skg_files_from_folder (
       let node_fs : NodeFS =
         read_nodecomplete (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
-      let nodecomplete : NodeComplete =
-        node_fs . into_complete ( source_name . clone ());
-      nodes . push (nodecomplete); }}
-  Ok (nodes) }
+      sections . push (( source_name . clone (), node_fs )); }}
+  Ok (sections) }
 
-/// Like `read_all_skg_files_from_sources` but only reads files
-/// whose mtime is more recent than `since`.
+/// Like `read_all_skg_files_from_sources` but only for accordions
+/// with at least one section file whose mtime is more recent than
+/// `since`. A touched SECTION reloads its WHOLE accordion (all its
+/// sections, however old), since the fold needs every level.
 pub fn read_recently_modified_skgfiles_from_sources (
   config : &SkgConfig,
   since  : std::time::SystemTime,
 ) -> io::Result<Vec<NodeComplete>> {
-  let mut all_nodes : Vec<NodeComplete> = Vec::new();
-  let mut seen_ids  : HashSet<ID> = HashSet::new();
-  for (source_name, source) in config . sources . iter() {
+  let mut modified_pids : Vec<ID> = Vec::new();
+  let mut seen_ids      : HashSet<ID> = HashSet::new();
+  for (_source_name, source) in config . sources . iter() {
     let entries : ReadDir =
       fs::read_dir (&source . path) ?;
     for entry in entries {
@@ -129,14 +236,12 @@ pub fn read_recently_modified_skgfiles_from_sources (
       validate_pid_matches_filename (&node_fs, &path) ?;
       let pid : ID =
         node_fs . pid . clone();
-      if ! seen_ids . insert (pid . clone()) {
-        return Err ( io::Error::new (
-          io::ErrorKind::InvalidData,
-          format! ("Duplicate primary ID '{}' within batch",
-                   pid )) ); }
-      let nodecomplete : NodeComplete =
-        node_fs . into_complete ( source_name . clone ());
-      all_nodes . push (nodecomplete); }}
+      if seen_ids . insert (pid . clone()) {
+        modified_pids . push (pid); }} }
+  let mut all_nodes : Vec<NodeComplete> = Vec::new();
+  for pid in modified_pids {
+    all_nodes . push (
+      nodecomplete_from_accordion_on_disk (config, &pid) ? ); }
   Ok (all_nodes) }
 
 /// Reports duplicate IDs found across sources.
@@ -224,12 +329,13 @@ fn report_load_errors(
   Ok(())
 }
 
-/// Writes all given `NodeComplete`s to disk, at `config.skg_folder`,
-/// using the primary ID as the filename, followed by `.skg`.
+/// Writes all given `NodeComplete`s to disk as accordions: each
+/// node's sections land in their levels' source directories, named
+/// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
   nodes  : Vec<NodeComplete>,
   config : SkgConfig,
-) -> io  ::Result<usize> { // number of files written
+) -> io  ::Result<usize> { // number of nodes written
 
   // Collect unique source directories and ensure they exist
   for source_name in {
@@ -248,37 +354,39 @@ pub fn write_all_nodes_to_fs (
 
   let mut written : usize = 0;
   for node in nodes {
-    let pid : ID = node . pid . clone ();
-    let path : String =
-      path_from_pid_and_source (
-        & config, & node . source, pid )
-      . map_err ( |e| io::Error::new (
-        io::ErrorKind::NotFound, e) ) ?;
-    write_nodecomplete ( & node, & Path::new ( &path )) ?;
+    write_nodecomplete_accordion ( & node, & config ) ?;
     written += 1; }
   Ok (written) }
 
+/// Deleting a node deletes its whole ACCORDION: every owned
+/// section file of that pid, in whatever source. (The SourceName in
+/// each target is the caller's belief about the home; kept in the
+/// signature for its callers, but every owned level is swept.)
 pub fn delete_all_nodes_from_fs (
   delete_targets : Vec<(ID, SourceName)>,
   config         : SkgConfig,
-) -> io::Result<usize> { // number of files deleted
+) -> io::Result<usize> { // number of nodes deleted
 
   let mut deleted : usize = 0;
-  for (pid, source) in delete_targets {
-    let path : String =
-      path_from_pid_and_source (
-        & config, & source, pid )
-      . map_err ( |e| io::Error::new (
-        io::ErrorKind::NotFound, e) ) ?;
-    match fs::remove_file ( &path )
-    {
-      Ok ( () ) => {
-        deleted += 1; },
-      Err (e) if e . kind () == io::ErrorKind::NotFound => {
-        // File doesn't exist, which is fine.
-        // The user created something and deleted it in the same pass.
-      },
-      Err (e) => {
-        // TODO : Should return a list of IDs not found.
-        return Err (e); }} }
+  for (pid, _source) in delete_targets {
+    let mut any_removed : bool = false;
+    for source_name in config . ordered_sources () {
+      if ! config . user_owns_source (&source_name) { continue; }
+      let path : String =
+        match crate::util::path_from_pid_and_source (
+          & config, & source_name, pid . clone () ) {
+          Ok (p) => p,
+          Err (_) => continue, };
+      match fs::remove_file ( &path )
+      {
+        Ok ( () ) => {
+          any_removed = true; },
+        Err (e) if e . kind () == io::ErrorKind::NotFound => {
+          // No section at this level, which is fine.
+        },
+        Err (e) => {
+          // TODO : Should return a list of IDs not found.
+          return Err (e); }} }
+    if any_removed {
+      deleted += 1; }}
   Ok (deleted) }

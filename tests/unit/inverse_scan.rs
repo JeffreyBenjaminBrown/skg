@@ -19,7 +19,7 @@ fn nodecomplete (
         overrides . iter ()
           . map ( |o| format! ("  - \"{}\"\n", o) )
           . collect::<String> () ) } )) . unwrap ();
-  node_fs . into_complete ( src ("main") ) }
+  node_fs . into_complete_as_single_section ( src ("main") ) }
 
 fn modified_entry (
   overrides_diff : Vec<Diff_Item<ID>>,

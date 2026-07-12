@@ -39,7 +39,7 @@ pub fn nodecomplete_from_index_or_head (
     let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
       |e| format! ( "Failed to parse NodeComplete for {} from index: {}",
                     pid . 0, e )) ?;
-    return Ok ( node_fs . into_complete ( src . clone ())); }
+    return Ok ( node_fs . into_complete_as_single_section ( src . clone ())); }
   // HEAD fallback.
   let content : String = get_file_content_at_head (&repo, &rel_path) ?
     . ok_or_else ( || format! (
@@ -47,7 +47,7 @@ pub fn nodecomplete_from_index_or_head (
   let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
     |e| format! ( "Failed to parse NodeComplete for {} from HEAD: {}",
                   pid . 0, e )) ?;
-  Ok ( node_fs . into_complete ( src . clone ())) }
+  Ok ( node_fs . into_complete_as_single_section ( src . clone ())) }
 
 /// Get the list of staged changes: files whose contents in the index
 /// differ from HEAD.

@@ -58,11 +58,13 @@ fn folded_from_lists (
     title                        : Some ("t" . to_string ()),
     body                         : None,
     home                         : Some ( home . clone () ),
-    aliases                      : Vec::new (),
+    aliases                      : None,
     contains,
-    subscribes_to                : subs,
-    hides_from_its_subscriptions : hides,
-    overrides_view_of            : Vec::new (), }}
+    subscribes_to                :
+      if subs . is_empty () { None } else { Some (subs) },
+    hides_from_its_subscriptions :
+      if hides . is_empty () { None } else { Some (hides) },
+    overrides_view_of            : None, }}
 
 fn unfold_then_fold (
   folded : &FoldedNode,
@@ -75,12 +77,17 @@ fn unfold_then_fold (
         title    : folded . title . as_deref (),
         body     : folded . body . as_deref (),
         home     : &home,
-        aliases  : &folded . aliases,
+        aliases  : folded . aliases . as_deref ()
+                   . unwrap_or (&[]),
         contains : &folded . contains,
-        subscribes_to : &folded . subscribes_to,
+        subscribes_to :
+          folded . subscribes_to . as_deref () . unwrap_or (&[]),
         hides_from_its_subscriptions :
-          &folded . hides_from_its_subscriptions,
-        overrides_view_of : &folded . overrides_view_of, },
+          folded . hides_from_its_subscriptions . as_deref ()
+          . unwrap_or (&[]),
+        overrides_view_of :
+          folded . overrides_view_of . as_deref ()
+          . unwrap_or (&[]), },
       &position_of );
   fold_sections ( &sections, &identity_resolve ) }
 
@@ -118,14 +125,15 @@ proptest! {
       // which unordered relations deliberately lack, so the fold's
       // output order is CANONICAL (level-major). The law is
       // set-equality with levels intact.
-      let sort = |v : &[PrivaciedMember<ID>]|
+      let sort = |v : Option<&Vec<PrivaciedMember<ID>>>|
       -> Vec<PrivaciedMember<ID>> {
-        let mut v : Vec<PrivaciedMember<ID>> = v . to_vec ();
+        let mut v : Vec<PrivaciedMember<ID>> =
+          v . cloned () . unwrap_or_default ();
         v . sort_by ( |a, b| a . member . cmp ( &b . member ));
         v };
       prop_assert_eq! (
-        sort ( &refolded . hides_from_its_subscriptions ),
-        sort ( &folded . hides_from_its_subscriptions )); }
+        sort ( refolded . hides_from_its_subscriptions . as_ref () ),
+        sort ( folded . hides_from_its_subscriptions . as_ref () )); }
     prop_assert_eq! ( refolded . title . as_deref (), Some ("t") );
     prop_assert_eq! ( refolded . home, Some (home) );
     prop_assert! ( warnings . is_empty (),

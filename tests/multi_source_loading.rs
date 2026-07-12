@@ -9,6 +9,7 @@ use tempfile::{tempdir, TempDir};
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
+use skg::test_utils::set_source_retagging_levels;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -46,7 +47,7 @@ fn test_load_from_single_source() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
-  node . source = SourceName::from ("main");
+  set_source_retagging_levels ( &mut node, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -92,20 +93,20 @@ fn test_load_from_multiple_sources() {
   let mut node1 : NodeComplete = empty_node_complete();
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
-  node1 . source = SourceName::from ("main");
+  set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
-  node2 . source = SourceName::from ("main");
+  set_source_retagging_levels ( &mut node2, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   // Create nodes in shared source
   let mut node3 : NodeComplete = empty_node_complete();
   node3 . pid = ID::new ("shared1");
   node3 . title = "Shared Node 1" . to_string();
-  node3 . source = SourceName::from ("shared");
+  set_source_retagging_levels ( &mut node3, &SourceName::from ("shared") );
   write_nodecomplete_to_source(&node3, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -156,31 +157,55 @@ fn test_duplicate_id_detection_across_sources() {
         user_owns_it: false, } );
     test_config (sources, temp_dir . path () . to_path_buf ()) };
 
-  // Create node with same ID in both sources
-  let mut node1 : NodeComplete = empty_node_complete();
-  node1 . pid = ID::new ("duplicate_id");
-  node1 . title = "Node in Main" . to_string();
-  node1 . source = SourceName::from ("main");
-  write_nodecomplete_to_source(&node1, &config) . unwrap();
-
-  let mut node2 : NodeComplete = empty_node_complete();
-  node2 . pid = ID::new ("duplicate_id");
-  node2 . title = "Node in Shared" . to_string();
-  node2 . source = SourceName::from ("shared");
-  write_nodecomplete_to_source(&node2, &config) . unwrap();
+  // Same pid in both sources: no longer a duplicate -- they are the
+  // SECTIONS of one privacy accordion, folded into one node whose
+  // home is the more public section (alphabetical fallback order for
+  // this dummy config: "main" precedes "shared"). The stray second
+  // title is a fold warning, not an error. The section files are
+  // written RAW: a whole-node write would (correctly) sweep the
+  // pid's sections at other levels, so two sequential
+  // write_nodecomplete_to_source calls cannot build an accordion.
+  fs::write (
+    config . sources . get (&SourceName::from ("main"))
+      . unwrap () . path . join ("duplicate_id.skg"),
+    "pid: duplicate_id\ntitle: Node in Main\n" ) . unwrap ();
+  fs::write (
+    config . sources . get (&SourceName::from ("shared"))
+      . unwrap () . path . join ("duplicate_id.skg"),
+    "pid: duplicate_id\ntitle: Node in Shared\n" ) . unwrap ();
 
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) . unwrap();
-  let result : IoResult<()> =
-    check_for_duplicate_ids_across_sources (
-      &nodes, &config . data_root);
-  assert!(result . is_err(), "Should fail due to duplicate ID");
+  assert_eq!( nodes . len(), 1,
+    "same-pid files across sources fold into one accordion" );
+  assert_eq!( nodes[0] . title, "Node in Main",
+    "the home (most public titled section) wins the title" );
+  assert_eq!( nodes[0] . source, SourceName::from ("main") );
+  check_for_duplicate_ids_across_sources (
+    &nodes, &config . data_root)
+    . expect ("an accordion is not an id conflict");
 
-  let err : IoError = result . unwrap_err();
-  assert_eq!(err . kind(), IoErrorKind::InvalidData);
-  let err_msg = err . to_string();
-  assert!(err_msg . contains ("Duplicate ID"), "Error should mention duplicate ID");
-  assert!(err_msg . contains ("duplicate_id"), "Error should include the ID");
+  { // What REMAINS a conflict: one id claimed by two distinct pids
+    // (here via extra_ids).
+    let mut node_a : NodeComplete = empty_node_complete();
+    node_a . pid = ID::new ("pid-a");
+    node_a . title = "A" . to_string();
+    node_a . extra_ids = vec! [ ID::new ("contested") ];
+    set_source_retagging_levels ( &mut node_a, &SourceName::from ("main") );
+    let mut node_b : NodeComplete = empty_node_complete();
+    node_b . pid = ID::new ("pid-b");
+    node_b . title = "B" . to_string();
+    node_b . extra_ids = vec! [ ID::new ("contested") ];
+    set_source_retagging_levels ( &mut node_b, &SourceName::from ("shared") );
+    let result : IoResult<()> =
+      check_for_duplicate_ids_across_sources (
+        & [ node_a, node_b ], &config . data_root);
+    assert!(result . is_err(), "Should fail: two pids claim one id");
+    let err : IoError = result . unwrap_err();
+    assert_eq!(err . kind(), IoErrorKind::InvalidData);
+    let err_msg = err . to_string();
+    assert!(err_msg . contains ("Duplicate ID"), "Error should mention duplicate ID");
+    assert!(err_msg . contains ("contested"), "Error should include the ID"); }
 }
 
 #[test]
@@ -217,7 +242,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   node1 . pid = ID::new ("id1");
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
-  node1 . source = SourceName::from ("main");
+  set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID
@@ -225,7 +250,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   node2 . pid = ID::new ("id2");
   node2 . extra_ids = vec![ID::new ("id3")];
   node2 . title = "Another Node" . to_string();
-  node2 . source = SourceName::from ("shared");
+  set_source_retagging_levels ( &mut node2, &SourceName::from ("shared") );
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   let nodes : Vec<NodeComplete> =
@@ -299,13 +324,13 @@ fn test_source_field_set_correctly() {
   let mut node_a : NodeComplete = empty_node_complete();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
-  node_a . source = SourceName::from ("source_a");
+  set_source_retagging_levels ( &mut node_a, &SourceName::from ("source_a") );
   write_nodecomplete_to_source(&node_a, &config) . unwrap();
 
   let mut node_b : NodeComplete = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
-  node_b . source = SourceName::from ("source_b");
+  set_source_retagging_levels ( &mut node_b, &SourceName::from ("source_b") );
   write_nodecomplete_to_source(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -358,22 +383,26 @@ fn test_many_duplicate_ids_creates_org_file() {
   );
   let config : SkgConfig = test_config (sources, temp_dir . path () . to_path_buf ());
 
-  // Create 15 nodes with duplicate IDs
+  // Create 15 GENUINE id conflicts: same-pid files across sources
+  // are accordion sections now, so a conflict means one id claimed
+  // by two DISTINCT pids -- here via extra_ids. In-memory nodes
+  // suffice; the check takes the folded node list.
+  let mut nodes : Vec<NodeComplete> = Vec::new ();
   for i in 1..=15 {
     let id : String = format!("dup_id_{}", i);
     let mut node_a : NodeComplete = empty_node_complete();
     let mut node_b : NodeComplete = empty_node_complete();
-    node_a . pid = ID::new (&id);
-    node_b . pid = ID::new (&id);
+    node_a . pid = ID::new (&format!("pid_a_{}", i));
+    node_b . pid = ID::new (&format!("pid_b_{}", i));
+    node_a . extra_ids = vec![ID::new (&id)];
+    node_b . extra_ids = vec![ID::new (&id)];
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
-    node_a . source = SourceName::from ("source_a");
-    node_b . source = SourceName::from ("source_b");
-    write_nodecomplete_to_source(&node_a, &config) . unwrap();
-    write_nodecomplete_to_source(&node_b, &config) . unwrap(); }
+    set_source_retagging_levels ( &mut node_a, &SourceName::from ("source_a") );
+    set_source_retagging_levels ( &mut node_b, &SourceName::from ("source_b") );
+    nodes . push (node_a);
+    nodes . push (node_b); }
 
-  let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config) . unwrap();
   let result : IoResult<()> =
     check_for_duplicate_ids_across_sources (
       &nodes, &config . data_root);
@@ -444,7 +473,7 @@ fn test_unreadable_files_creates_org_file() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
-  node . source = SourceName::from ("source_good");
+  set_source_retagging_levels ( &mut node, &SourceName::from ("source_good") );
   write_nodecomplete_to_source(&node, &write_config) . unwrap();
 
   // Create config with both sources for reading (including the bad one)

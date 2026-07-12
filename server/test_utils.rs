@@ -17,7 +17,7 @@ use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, privacied_all, privacied_msv};
+use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, privacied_all, privacied_msv, PrivaciedMember};
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
@@ -598,6 +598,31 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
     None,
     fork_approved,
     fork_sources ) . await }
+
+/// Move NODE to LEVEL: set its source AND retag every relationship
+/// member and alias to that level. Under degenerate leveling (work
+/// item leveled-lists) the invariant is levels == source, so any
+/// test that reassigns a node's source must go through this, or the
+/// accordion write would emit sections at the old level. The real
+/// source-move rule (which levels follow a home move) is owned by
+/// work item save-leveling.
+pub fn set_source_retagging_levels (
+  node  : &mut NodeComplete,
+  level : &SourceName,
+) {
+  node . source = level . clone ();
+  for m in node . contains . iter_mut () {
+    m . level = level . clone (); }
+  let retag_msv = |msv : &mut MSV<PrivaciedMember<ID>>| {
+    if let MSV::Specified (v) = msv {
+      for m in v . iter_mut () {
+        m . level = level . clone (); }} };
+  retag_msv ( &mut node . subscribes_to );
+  retag_msv ( &mut node . hides_from_its_subscriptions );
+  retag_msv ( &mut node . overrides_view_of );
+  if let MSV::Specified (v) = &mut node . aliases {
+    for m in v . iter_mut () {
+      m . level = level . clone (); }} }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture

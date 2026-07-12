@@ -1,80 +1,135 @@
-//! NodeFS: the on-disk shape of a node.
+//! NodeFS: the on-disk shape of one accordion SECTION.
 //!
-//! What the YAML on disk literally holds. Bit-exact with today's
-//! NodeComplete on-disk serialization — does NOT include 'source'
-//! (which is inferred from file location, not stored in YAML).
+//! One node = one ID = one privacy accordion: same-ID .skg files, at
+//! most one per source, each an "accordion section" holding the
+//! slice of the node recorded at that privacy level. The most public
+//! section (the HOME) alone carries title and body. Ordered
+//! relations are ONE flat sequence of 'ListItem's -- members render
+//! as bare "- ID" lines in every section and anchors as
+//! "- anchor: ID" lines, so a membership moving between sections
+//! diffs as a clean one-line delete/add pair. Unordered relations
+//! and aliases are plain lists. A field a section omits is a field
+//! that section has no opinion about. Today's single-section files
+//! parse unchanged (title present, no anchors).
 //!
 //! Conversions:
-//! - 'NodeFS::into_complete(source)' produces a NodeComplete.
-//! - 'From<&NodeComplete> for NodeFS' drops source for writing.
+//! - 'NodeFS::into_section_slices' feeds the fold
+//!   ('server/accordion/fold.rs'), which is how NodeComplete values
+//!   are born; 'nodefs_from_section' is the unfold-side inverse.
+//! - 'NodeFS::into_complete_as_single_section (source)' treats ONE
+//!   section as a whole node -- exact for single-section accordions
+//!   (all pre-accordion data), and the interim behavior of the
+//!   per-file git/diff paths until they learn accordions
+//!   (TODO/user-owned_autofork_chain/5_plan.org, work item
+//!   interactions).
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, MSV, SourceName, members_msv, members_of, privacied_all, privacied_msv};
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::accordion::types::{ListItem, SectionSlices};
+use crate::types::misc::{ID, MSV, SourceName, privacied_all, privacied_msv};
+use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::FileProperty;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct NodeFS {
-  // Field order and serde attributes mirror 'NodeComplete' exactly, so YAML output is bit-exact. When anything here changes, update the matching field in 'NodeComplete' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
+  // Field order fixes YAML output order. When anything here changes,
+  // update 'NodeComplete' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
 
-  pub title: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub title: Option<String>, // Some in the home section only.
 
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub aliases: MSV<String>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub aliases: Vec<String>,
 
   pub pid: ID,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub extra_ids: Vec<ID>,
+  pub extra_ids: Vec<ID>, // home section only, by convention
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub body: Option<String>,
+  pub body: Option<String>, // home section only, like title
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub contains: Vec<ID>,
+  pub contains: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub subscribes_to: MSV<ID>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub subscribes_to: Vec<ListItem>,
 
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub hides_from_its_subscriptions: MSV<ID>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub hides_from_its_subscriptions: Vec<ID>,
 
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub overrides_view_of: MSV<ID>,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub overrides_view_of: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub misc: Vec<FileProperty>,
 }
 
 impl NodeFS {
-  /// Attach a source to produce a NodeComplete.
-  pub fn into_complete (
+  /// This section's contribution to the fold.
+  pub fn into_section_slices (
+    self,
+  ) -> SectionSlices {
+    let nonempty_items = |v : Vec<ListItem>| -> Option<Vec<ListItem>> {
+      if v . is_empty () { None } else { Some (v) }};
+    let nonempty_ids = |v : Vec<ID>| -> Option<Vec<ID>> {
+      if v . is_empty () { None } else { Some (v) }};
+    SectionSlices {
+      title                        : self . title,
+      body                         : self . body,
+      aliases                      :
+        if self . aliases . is_empty () { None }
+        else { Some ( self . aliases ) },
+      contains                     :
+        nonempty_items ( self . contains ),
+      subscribes_to                :
+        nonempty_items ( self . subscribes_to ),
+      hides_from_its_subscriptions :
+        nonempty_ids ( self . hides_from_its_subscriptions ),
+      overrides_view_of            :
+        nonempty_ids ( self . overrides_view_of ), }}
+
+  /// Treat ONE section as a whole node: exact for single-section
+  /// accordions; the per-file git/diff paths use it as interim
+  /// behavior (see the module comment). A titleless section gets an
+  /// empty title rather than erroring, since blob-parsers must be
+  /// total; the accordion validators, not this conversion, own
+  /// missing-title reporting.
+  pub fn into_complete_as_single_section (
     self,
     source : SourceName,
   ) -> NodeComplete {
+    let members_only = |items : Vec<ListItem>| -> Vec<ID> {
+      items . into_iter ()
+        . filter_map ( |i| match i {
+          ListItem::Member (id) => Some (id),
+          ListItem::Anchor { .. } => None } )
+        . collect () };
+    let msv_ids = |ids : Vec<ID>| -> MSV<ID> {
+      if ids . is_empty () { MSV::Unspecified }
+      else { MSV::Specified (ids) }};
     NodeComplete {
-      title                        : self . title,
-      // DEGENERATE leveling (work item leveled-lists): every edge and
-      // alias is tagged with the node's own source. The fold (work
-      // item section-format-and-fold) will replace this with real
-      // per-section levels.
-      aliases                      :
-        privacied_msv (&source, self . aliases),
+      title                        :
+        self . title . unwrap_or_default (),
+      aliases                      : privacied_msv (
+        &source,
+        if self . aliases . is_empty () { MSV::Unspecified }
+        else { MSV::Specified ( self . aliases ) } ),
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         : self . body,
-      contains                     :
-        privacied_all (&source, self . contains),
-      subscribes_to                :
-        privacied_msv (&source, self . subscribes_to),
-      hides_from_its_subscriptions :
-        privacied_msv (&source, self . hides_from_its_subscriptions),
-      overrides_view_of            :
-        privacied_msv (&source, self . overrides_view_of),
+      contains                     : privacied_all (
+        &source, members_only ( self . contains ) ),
+      subscribes_to                : privacied_msv (
+        &source, msv_ids ( members_only ( self . subscribes_to ) ) ),
+      hides_from_its_subscriptions : privacied_msv (
+        &source,
+        msv_ids ( self . hides_from_its_subscriptions ) ),
+      overrides_view_of            : privacied_msv (
+        &source, msv_ids ( self . overrides_view_of ) ),
       misc                         : self . misc,
       source,
-    }
-  }
+    }}
 
   /// Serialize to YAML, emitting the 'body' field as a block literal
   /// (`body: |2-` / `body: |2`) so multi-line bodies are readable in
@@ -119,6 +174,37 @@ impl NodeFS {
     Ok (out) }
 }
 
+/// The unfold-side inverse of 'into_section_slices': one section's
+/// on-disk shape. 'pid' names the accordion; 'is_home' decides
+/// whether extra_ids ride along (they live in the home only).
+pub fn nodefs_from_section (
+  pid       : &ID,
+  extra_ids : &[ID],
+  misc      : &[FileProperty],
+  is_home   : bool,
+  slices    : SectionSlices,
+) -> NodeFS {
+  NodeFS {
+    title                        : slices . title,
+    aliases                      :
+      slices . aliases . unwrap_or_default (),
+    pid                          : pid . clone (),
+    extra_ids                    :
+      if is_home { extra_ids . to_vec () } else { Vec::new () },
+    body                         :
+      crate::types::nodes::complete::normalize_body (
+        slices . body ),
+    contains                     :
+      slices . contains . unwrap_or_default (),
+    subscribes_to                :
+      slices . subscribes_to . unwrap_or_default (),
+    hides_from_its_subscriptions :
+      slices . hides_from_its_subscriptions . unwrap_or_default (),
+    overrides_view_of            :
+      slices . overrides_view_of . unwrap_or_default (),
+    misc                         :
+      if is_home { misc . to_vec () } else { Vec::new () }, }}
+
 /// Render BODY as a YAML block-literal key-value of the form
 /// `body: |2…\n  line\n  line\n`. Returns Some only when the result
 /// round-trips exactly through `serde_yaml::from_str`; otherwise None,
@@ -132,7 +218,7 @@ fn block_scalar_for_body (
     if ends_nl { & body [.. body . len() - 1] }
     else       { body };
   let chomp : &str = if ends_nl { "" } else { "-" };
-  // Indentation indicator first, then chomping indicator — matches
+  // Indentation indicator first, then chomping indicator -- matches
   // serde_yaml's own emitter style (e.g. `|2-`).
   let mut out : String =
     format! ("body: |2{}\n", chomp);
@@ -153,26 +239,3 @@ fn block_scalar_for_body (
       if got == Some (body) { Some (out) }
       else { None } }
     Err (_) => None, } }
-
-impl From<&NodeComplete> for NodeFS {
-  /// Drop 'source'. Everything else is cloned.
-  fn from (c: &NodeComplete) -> Self {
-    NodeFS {
-      title                        : c . title . clone (),
-      // Levels are DROPPED at the FS boundary for now; the unfold
-      // (work item section-format-and-fold) will instead split
-      // members into per-level accordion sections.
-      aliases                      : members_msv (&c . aliases),
-      pid                          : c . pid . clone (),
-      extra_ids                    : c . extra_ids . clone (),
-      body                         :
-        crate::types::nodes::complete::normalize_body (
-          c . body . clone () ),
-      contains                     : members_of (&c . contains),
-      subscribes_to                : members_msv (&c . subscribes_to),
-      hides_from_its_subscriptions : members_msv (&c . hides_from_its_subscriptions),
-      overrides_view_of            : members_msv (&c . overrides_view_of),
-      misc                         : c . misc . clone (),
-    }
-  }
-}

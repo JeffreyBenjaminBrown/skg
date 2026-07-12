@@ -11,6 +11,7 @@ use skg::dbs::filesystem::one_node::{
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, privacied_msv};
+use skg::test_utils::set_source_retagging_levels;
 use skg::test_utils::{run_with_test_db, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -32,7 +33,7 @@ fn test_node_io() {
 
   // Write the example node to a file
   let mut example : NodeComplete = nodecomplete_example();
-  example . source = SourceName::from ("output");
+  set_source_retagging_levels ( &mut example, &SourceName::from ("output") );
   write_nodecomplete_to_source ( &example, &config )
     . unwrap ();
 
@@ -40,7 +41,7 @@ fn test_node_io() {
   let read_node : NodeComplete = nodecomplete_from_pid_and_source (
     &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
-  reversed . source = SourceName::from ("output");
+  set_source_retagging_levels ( &mut reversed, &SourceName::from ("output") );
   reversed . pid = ID::new ("reversed");
 
   write_nodecomplete_to_source(&reversed, &config) . unwrap();
@@ -49,8 +50,8 @@ fn test_node_io() {
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
 
-  let expected_example_path : &str = "tests/file_io/fixtures/owned/example.skg";
-  let expected_reversed_path : &str = "tests/file_io/fixtures/owned/reversed.skg";
+  let expected_example_path : &str = "tests/file_io/fixtures/golden/example.skg";
+  let expected_reversed_path : &str = "tests/file_io/fixtures/golden/reversed.skg";
 
   let generated_example : String =
     fs::read_to_string (out_filename) . unwrap();
@@ -89,9 +90,12 @@ fn verify_body_not_needed() {
     &[("output", PathBuf::from ("/tmp/file_io_test"))],
   ) . unwrap();
 
+  fs::copy ( // seed the output source with the golden example
+    "tests/file_io/fixtures/golden/example.skg",
+    "/tmp/file_io_test/example.skg" ) . unwrap();
   let mut node = nodecomplete_from_pid_and_source (
-    &config, ID::new ("example"), &SourceName::from ("fixtures") ) . unwrap();
-  node . source = SourceName::from ("output");
+    &config, ID::new ("example"), &SourceName::from ("output") ) . unwrap();
+  set_source_retagging_levels ( &mut node, &SourceName::from ("output") );
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
   write_nodecomplete_to_source(
@@ -105,7 +109,7 @@ fn verify_body_not_needed() {
   let expected_yaml: serde_yaml::Value =
     serde_yaml::from_str (
       &fs::read_to_string (
-        "tests/file_io/fixtures/owned/no_unindexed.skg"
+        "tests/file_io/fixtures/golden/no_unindexed.skg"
       ) . unwrap () ) . unwrap ();
   assert_eq!(
     generated_yaml,

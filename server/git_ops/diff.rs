@@ -112,7 +112,7 @@ fn nodefs_as_nodecomplete_with_default_source (
 ) -> Option<NodeComplete> {
   match serde_yaml::from_str::<NodeFS> (yaml) {
     Ok (node_fs) =>
-      Some ( node_fs . into_complete ( SourceName::default ())),
+      Some ( node_fs . into_complete_as_single_section ( SourceName::default ())),
     Err (e) => {
       tracing::warn! (
         origin, path = %context . display (), error = %e,

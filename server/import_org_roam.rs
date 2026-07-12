@@ -2,7 +2,9 @@ pub mod parse;
 
 use crate::types::misc::{
   ID, MSV, PrivaciedMember, SourceName, members_msv, privacied_msv};
-use crate::types::nodes::fs::NodeFS;
+use crate::accordion::types::SectionSlices;
+use crate::accordion::unfold::{UnfoldInput, unfold_node};
+use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
@@ -154,7 +156,33 @@ fn write_nodecomplete_to_dir (
     format! ("{}.skg", &pid . 0);
   let path : std::path::PathBuf =
     output_dir . join (&filename);
-  let node_fs : NodeFS = NodeFS::from (node);
+  let node_fs : NodeFS = {
+    // An imported node is single-section by construction (every
+    // level == its source), so the unfold yields exactly one
+    // section; a trivial position function suffices because the
+    // import target directory is not governed by any config.
+    let sections : Vec<(SourceName, SectionSlices)> =
+      unfold_node (
+        & UnfoldInput {
+          title    : Some ( & node . title ),
+          body     : node . body . as_deref (),
+          home     : & node . source,
+          aliases  : node . aliases . or_default (),
+          contains : & node . contains,
+          subscribes_to :
+            node . subscribes_to . or_default (),
+          hides_from_its_subscriptions :
+            node . hides_from_its_subscriptions . or_default (),
+          overrides_view_of :
+            node . overrides_view_of . or_default (), },
+        & |_ : &SourceName| Some (0) );
+    let (_, slices) : (SourceName, SectionSlices) =
+      sections . into_iter () . next ()
+      . expect ("an imported node has a home section");
+    nodefs_from_section (
+      & node . pid, & node . extra_ids, & node . misc,
+      true, // the one section is the home
+      slices ) };
   let yaml    : String = node_fs . to_yaml ()?;
   fs::write (&path, &yaml)?;
   Ok (( )) }

@@ -18,7 +18,8 @@
 //! public occurrence, with a warning.
 
 use crate::accordion::types::{FoldWarning, ListItem, SectionSlices};
-use crate::types::misc::{ID, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
 
@@ -29,12 +30,46 @@ pub struct FoldedNode {
   pub title                        : Option<String>,
   pub body                         : Option<String>,
   pub home                         : Option<SourceName>,
-  pub aliases                      : Vec<PrivaciedMember<String>>,
+  // None = NO section mentioned the field (lowers to
+  // MSV::Unspecified); contains has no such distinction, like
+  // NodeComplete's.
+  pub aliases                      : Option<Vec<PrivaciedMember<String>>>,
   pub contains                     : Vec<PrivaciedMember<ID>>,
-  pub subscribes_to                : Vec<PrivaciedMember<ID>>,
-  pub hides_from_its_subscriptions : Vec<PrivaciedMember<ID>>,
-  pub overrides_view_of            : Vec<PrivaciedMember<ID>>,
+  pub subscribes_to                : Option<Vec<PrivaciedMember<ID>>>,
+  pub hides_from_its_subscriptions : Option<Vec<PrivaciedMember<ID>>>,
+  pub overrides_view_of            : Option<Vec<PrivaciedMember<ID>>>,
 }
+
+/// The fold as a NodeComplete. None iff the accordion has no home
+/// (no section carried a title) -- the caller decides whether that
+/// is a hard load error (it is, at init) or a warning.
+pub fn nodecomplete_from_fold (
+  pid       : ID,
+  extra_ids : Vec<ID>,
+  misc      : Vec<FileProperty>,
+  folded    : FoldedNode,
+) -> Option<NodeComplete> {
+  let home : SourceName = folded . home ?;
+  let msv = |o : Option<Vec<PrivaciedMember<ID>>>|
+  -> MSV<PrivaciedMember<ID>> {
+    match o {
+      None     => MSV::Unspecified,
+      Some (v) => MSV::Specified (v), }};
+  Some ( NodeComplete {
+    title                        : folded . title ?,
+    aliases                      : match folded . aliases {
+      None     => MSV::Unspecified,
+      Some (v) => MSV::Specified (v), },
+    source                       : home,
+    pid,
+    extra_ids,
+    body                         : folded . body,
+    contains                     : folded . contains,
+    subscribes_to                : msv ( folded . subscribes_to ),
+    hides_from_its_subscriptions :
+      msv ( folded . hides_from_its_subscriptions ),
+    overrides_view_of            : msv ( folded . overrides_view_of ),
+    misc, } ) }
 
 /// Fold SECTIONS (already sorted most public first -- the caller
 /// orders them via 'SkgConfig::ordered_sources') into effective
@@ -72,32 +107,46 @@ pub fn fold_sections (
   folded . contains = fold_ordered (
     sections, |s| s . contains . as_deref (),
     resolve, &mut warnings );
-  folded . subscribes_to = fold_ordered (
-    sections, |s| s . subscribes_to . as_deref (),
-    resolve, &mut warnings );
-  folded . hides_from_its_subscriptions = fold_unordered (
-    sections, |s| s . hides_from_its_subscriptions . as_deref (),
-    resolve, &mut warnings );
-  folded . overrides_view_of = fold_unordered (
-    sections, |s| s . overrides_view_of . as_deref (),
-    resolve, &mut warnings );
-  folded . aliases = { // aliases: union like the unordered relations,
-    // but members are strings, deduped verbatim.
-    let mut seen : std::collections::HashSet<String> =
-      std::collections::HashSet::new ();
-    let mut out : Vec<PrivaciedMember<String>> = Vec::new ();
-    for (level, s) in sections {
-      if let Some (aliases) = &s . aliases {
-        for a in aliases {
-          if seen . insert ( a . clone () ) {
-            out . push ( PrivaciedMember::at (
-              level . clone (), a . clone () )); }
-          else {
-            // No per-alias id to report; reuse DuplicateMember with
-            // a synthetic ID carrying the alias text.
-            warnings . push ( FoldWarning::DuplicateMember {
-              member : ID ( a . clone () ) } ); }}}}
-    out };
+  let mentioned = |proj : &dyn Fn (&SectionSlices) -> bool| -> bool {
+    sections . iter () . any ( |(_, s)| proj (s) ) };
+  folded . subscribes_to =
+    if mentioned ( &|s| s . subscribes_to . is_some () ) {
+      Some ( fold_ordered (
+        sections, |s| s . subscribes_to . as_deref (),
+        resolve, &mut warnings ) ) }
+    else { None };
+  folded . hides_from_its_subscriptions =
+    if mentioned ( &|s| s . hides_from_its_subscriptions . is_some () ) {
+      Some ( fold_unordered (
+        sections, |s| s . hides_from_its_subscriptions . as_deref (),
+        resolve, &mut warnings ) ) }
+    else { None };
+  folded . overrides_view_of =
+    if mentioned ( &|s| s . overrides_view_of . is_some () ) {
+      Some ( fold_unordered (
+        sections, |s| s . overrides_view_of . as_deref (),
+        resolve, &mut warnings ) ) }
+    else { None };
+  folded . aliases = {
+    if ! sections . iter () . any ( |(_, s)| s . aliases . is_some () ) {
+      None }
+    else { // aliases: union like the unordered relations,
+      // but members are strings, deduped verbatim.
+      let mut seen : std::collections::HashSet<String> =
+        std::collections::HashSet::new ();
+      let mut out : Vec<PrivaciedMember<String>> = Vec::new ();
+      for (level, s) in sections {
+        if let Some (aliases) = &s . aliases {
+          for a in aliases {
+            if seen . insert ( a . clone () ) {
+              out . push ( PrivaciedMember::at (
+                level . clone (), a . clone () )); }
+            else {
+              // No per-alias id to report; reuse DuplicateMember with
+              // a synthetic ID carrying the alias text.
+              warnings . push ( FoldWarning::DuplicateMember {
+                member : ID ( a . clone () ) } ); }}}}
+      Some (out) }};
   (folded, warnings) }
 
 /// One ordered relation's fold. 'slice_of' projects a section's

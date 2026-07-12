@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::multiple_nodes::read_skg_files_from_folder;
+use crate::dbs::filesystem::multiple_nodes::read_single_sections_from_folder;
 use crate::diff_analysis::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
 use crate::git_ops::misc::path_relative_to_repo;
@@ -133,7 +133,7 @@ fn read_graph_snapshot (
         SnapshotKind::Index =>
           read_source_from_index (config, source_name),
         SnapshotKind::Worktree =>
-          read_skg_files_from_folder (source_name, config)
+          read_single_sections_from_folder (source_name, config)
             . map_err ( |e| format! (
               "Reading worktree source '{}': {}", source_name, e )), }) ?;
     nodes . append (&mut source_nodes); }
@@ -668,5 +668,5 @@ pub(super) fn parse_blob_node (
   if node_fs . pid . 0 != stem {
     return Err ( format! (
       "Path {:?} has pid {}, expected {}", rel_path, node_fs . pid, stem )); }
-  Ok ( node_fs . into_complete (source_name . clone ()) )
+  Ok ( node_fs . into_complete_as_single_section (source_name . clone ()) )
 }

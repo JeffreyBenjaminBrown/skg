@@ -29,7 +29,7 @@ use crate::types::misc::ID;
 /// as a clean one-line delete/add pair, and anchors look visibly
 /// different. Serde: untagged, so a plain string parses as Member
 /// and the map as Anchor.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum ListItem {
   Member (ID),
@@ -42,6 +42,44 @@ pub enum ListItem {
     anchor : ID,
   },
 }
+
+impl<'de> Deserialize<'de> for ListItem {
+  /// Manual rather than derive(untagged): untagged deserialization
+  /// buffers into a self-describing form in which a plain YAML
+  /// scalar like `11` is an INTEGER, so `Member(ID)` (a String
+  /// newtype) would reject numeric-looking IDs that the old direct
+  /// Vec<ID> path accepted. Any scalar is a member; a one-key
+  /// {anchor: ...} map is an anchor.
+  fn deserialize<D> (
+    deserializer : D,
+  ) -> Result<ListItem, D::Error>
+  where D : serde::Deserializer<'de> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Scalar {
+      S (String),
+      I (i64),
+      F (f64),
+      B (bool),
+    }
+    impl Scalar {
+      fn into_id (self) -> ID {
+        match self {
+          Scalar::S (s) => ID (s),
+          Scalar::I (i) => ID ( i . to_string () ),
+          Scalar::F (f) => ID ( f . to_string () ),
+          Scalar::B (b) => ID ( b . to_string () ), }}}
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Raw {
+      Anchor { anchor : Scalar },
+      Member (Scalar),
+    }
+    Ok ( match Raw::deserialize (deserializer) ? {
+      Raw::Anchor { anchor } =>
+        ListItem::Anchor { anchor : anchor . into_id () },
+      Raw::Member (s) =>
+        ListItem::Member ( s . into_id () ), } ) }}
 
 /// What one section contributes to its node, in section-local form.
 /// This is the PARSED shape of a section file's list fields; the

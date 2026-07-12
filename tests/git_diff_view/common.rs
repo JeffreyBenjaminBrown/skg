@@ -151,7 +151,7 @@ pub fn read_nodecomplete(repo_path: &Path, id: &str) -> Result<NodeComplete, Box
   let path = repo_path . join(format!("{}.skg", id));
   let content = fs::read_to_string (&path)?;
   let node_fs: NodeFS = serde_yaml::from_str (&content)?;
-  Ok ( node_fs . into_complete ( SourceName::from ("main") ))
+  Ok ( node_fs . into_complete_as_single_section ( SourceName::from ("main") ))
 }
 
 //

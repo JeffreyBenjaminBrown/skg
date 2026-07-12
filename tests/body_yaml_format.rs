@@ -7,21 +7,22 @@
 // rendering.
 
 use skg::types::nodes::fs::NodeFS;
-use skg::types::misc::{ID, MSV};
+use skg::accordion::types::ListItem;
+use skg::types::misc::ID;
 
 fn node_with_body (
   body : &str,
 ) -> NodeFS {
   NodeFS {
-    title                        : "t" . to_string (),
-    aliases                      : MSV::<String>::Unspecified,
+    title                        : Some ("t" . to_string ()),
+    aliases                      : vec! [],
     pid                          : ID::new ("p"),
     extra_ids                    : vec! [],
     body                         : Some (body . to_string ()),
     contains                     : vec! [],
-    subscribes_to                : MSV::<ID>::Unspecified,
-    hides_from_its_subscriptions : MSV::<ID>::Unspecified,
-    overrides_view_of            : MSV::<ID>::Unspecified,
+    subscribes_to                : vec! [],
+    hides_from_its_subscriptions : vec! [],
+    overrides_view_of            : vec! [],
     misc                         : vec! [],
   } }
 
@@ -85,17 +86,18 @@ fn field_order_places_body_between_extra_ids_and_contains () {
   // to_yaml helper must preserve that ordering even though it takes
   // a custom path for 'body'.
   let node : NodeFS = NodeFS {
-    title                        : "t" . to_string (),
-    aliases                      : MSV::<String>::Unspecified,
+    title                        : Some ("t" . to_string ()),
+    aliases                      : vec! [],
     pid                          : ID::new ("p"),
     extra_ids                    : vec! [ ID::new ("x1"),
                                           ID::new ("x2") ],
     body                         : Some (
       "multi\nline\n\tbody" . to_string ()),
-    contains                     : vec! [ ID::new ("c1") ],
-    subscribes_to                : MSV::<ID>::Unspecified,
-    hides_from_its_subscriptions : MSV::<ID>::Unspecified,
-    overrides_view_of            : MSV::<ID>::Unspecified,
+    contains                     : vec! [
+      ListItem::Member ( ID::new ("c1") ) ],
+    subscribes_to                : vec! [],
+    hides_from_its_subscriptions : vec! [],
+    overrides_view_of            : vec! [],
     misc                         : vec! [],
   };
   let yaml : String = node . to_yaml () . unwrap ();
