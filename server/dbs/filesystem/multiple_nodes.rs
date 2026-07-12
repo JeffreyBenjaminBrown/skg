@@ -180,20 +180,6 @@ pub fn check_for_duplicate_ids_across_sources (
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
 
-/// INTERIM (see NodeFS's module comment): each FILE of a source as
-/// a whole node -- the per-file view the diff/git paths still use.
-/// Exact for single-section accordions; the interactions work item
-/// teaches those paths real accordions.
-pub fn read_single_sections_from_folder (
-  source_name : &SourceName,
-  config      : &SkgConfig,
-) -> io::Result < Vec<NodeComplete> > {
-  Ok ( read_skg_sections_from_folder (source_name, config) ?
-       . into_iter ()
-       . map ( |(level, node_fs)|
-               node_fs . into_complete_as_single_section (level) )
-       . collect () ) }
-
 pub fn read_skg_sections_from_folder (
   source_name : &SourceName,
   config      : &SkgConfig,

@@ -82,15 +82,29 @@ order; this file grows as each lands.
   re-derives each new edge as more-private-of(clone home, target
   home) -- exactly the plan's clone defaults. nodeMerge leveling
   had already landed with dependencies-manifest.
-- STARTED EARLY (parallel, no file overlap):
-  section-format-and-fold's pure core -- server/accordion/
-  ('fold_sections', 'unfold_node', 'SectionSlices', 'ListItem',
-  'FoldWarning') plus the proptest suite (tests/unit/accordion.rs;
-  proptest added as a dev-dependency per Jeff's DONE). Round-trip,
-  canonicality, level-preservation (the silent-leak guard),
-  dangling/duplicate-anchor fallbacks, and pid_of-resolution are
-  pinned there. NodeFS wiring, Accordion grouping, and the write
-  layer remain.
+- DONE docs: api-and-formats.md (section format with anchor
+  grammar, relSource viewStats atom, prefix source-sets in both the
+  API and config sections, migrate + reshaped stage-moves + fold-
+  aware diff-analysis endpoint docs, DEPENDENCIES.toml); NEW
+  docs/accordions.md (the user story: the ladder, fold, sticky
+  rule, privatize gesture, the two inexpressibles, migration);
+  glossary.md (accordion cluster, with short code terms referring
+  to the long entries per Jeff's instruction); sharing-model.md and
+  moving-nodes-across-repos.org de-staled (ownership by folder;
+  home-move semantics); schema.tql (has_source = home; unleveled
+  projection; derived ownership); the NodeComplete PITFALL comment
+  (absent-vs-empty is now meaningful on disk too);
+  COMMANDS.org (privatize-relationship, migrate command, and
+  skg-limit-source-set reworded as the most-private-source
+  chooser). The 1_vision.org inversion typos were already fixed in
+  an earlier round. Also deleted the now-unused interim per-file
+  reader 'read_single_sections_from_folder'.
+- (Historical note: section-format-and-fold's pure core --
+  server/accordion/ and the proptest suite -- was built EARLY, in
+  parallel with privacy-order, then landed with ad578a25.)
+
+ALL TWELVE WORK ITEMS ARE DONE. Suites at completion: Rust
+513/513, elisp 270/270, integration all green, nvim green.
 
 * what's done and went well
 ** privacy-order
@@ -124,16 +138,29 @@ sources moved under data/owned/); the accordion-level
 'skg-migrate-to-accordions' remains at its planned position.
 
 * what's imperfect about what's done
-** Two degenerate-stage sites will need rework at save-leveling.
-Recorded so they are not mistaken for finished:
-- 'preserve_invisible_members' (supplement_from_disk.rs) currently
-  weaves plain IDs and re-tags the merged list with the node's own
-  source. Identical under degeneracy (disk levels == node source),
-  but once real levels exist this site must PRESERVE disk levels —
-  it is a sticky-rule surface. Rewritten in work item save-leveling.
-- 'into_nodecomplete' (lower.rs) tags every field with the intent's
-  source; save-leveling replaces this with sticky-else-default
-  resolution.
+** (RESOLVED at save-leveling) The two degenerate-stage sites.
+'preserve_invisible_members' and 'into_nodecomplete' were rewritten
+by the save-leveling work item as planned; kept here so the earlier
+entry is not misread as still pending.
+** Known residual leak surfaces, deliberate and small.
+- The H/S/O ANCESTOR-relation flags in viewnodestats.rs (hider/
+  subscriber/overrider heralds on ancestors) have no active set in
+  scope, so they are computed unleveled. A privatized hide/
+  subscription/override edge can thus still tint an ancestor herald
+  at public level. Noted by the render-sweep agent; fixing it means
+  threading the active set into stats computation.
+- Diff MODE's per-file NodeChanges lists are level-stripped
+  (goal_list.rs reconstructs HEAD membership ungated). Harmless
+  today because diff mode requires active set 'all' (the plan's
+  approved interlock), but load-bearing on that interlock.
+** Old Tantivy indexes and per-alias levels.
+The index schema did not change, only the VALUES in alias
+documents' source_field. Every real adoption path forces a full
+rebuild (the author-folders script edits the config, which
+invalidates incremental init; the migrate endpoint rebuilds
+outright), and pre-accordion data has aliases only in home
+sections, where old and new values coincide -- so no forced
+rebuild was added.
 ** Import parse-time placeholder levels.
 'nodecomplete_from_section_tree' tags lists with a placeholder
 source; the caller re-tags on assignment now (import_org_roam.rs),

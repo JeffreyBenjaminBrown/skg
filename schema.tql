@@ -6,7 +6,9 @@ define
   # The nickname (from the SkgConfig) of a source entity.
   attribute source_name, value string;
 
-  # Whether a configured source is writable by the user.
+  # Whether a configured source is writable by the user. Derived
+  # from location, not declared: true iff the source's path lies
+  # under the config's owned_folder (default "owned/").
   attribute user_owns_it, value boolean;
 
   # Like the relationship
@@ -74,7 +76,12 @@ define
     relates overrider,
     relates overridden;
 
-  # This connects each node to the configured source it came from.
+  # This connects each node to its HOME: the most public source
+  # holding a titled section of its privacy accordion. A node's
+  # other sections are not represented here, and relationship edges
+  # are stored UNLEVELED (their per-edge privacy levels live only in
+  # the .skg files and the in-Rust graph; TypeDB sees the full
+  # fold's projection).
   relation has_source,
     relates node,
     relates source;

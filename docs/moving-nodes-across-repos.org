@@ -29,7 +29,7 @@ and the source change will now be visible.
 ** pitfalls
 
 *** Foreign sources are rejected on either end
-=user_owns_it = false= sources (foreign repos forked in via
+Foreign sources (repos outside your =owned/= folder, forked in via
 subscriptions) are read-only. Trying to move a node *into* or *out
 of* a foreign source produces
 =BufferValidationError::CannotMoveToOrFromForeignSource=
@@ -59,7 +59,7 @@ Don't expect anything related to graph topology to change.
 
 *** Foreign-source files are never written by skg
 This is more general but bears repeating in the move context: skg
-will never write to a source dir whose =user_owns_it = false=. If
+will never write to a foreign source dir (one outside =owned/=). If
 you accidentally try to move a foreign node *out* by editing it
 locally, the save fails before any FS change. The original foreign
 file stays put.
@@ -87,8 +87,15 @@ applies it. (See =server/from_text/supplement_from_disk.rs:23=,
 =supplement_none_fields_from_disk_if_save=.)
 
 Both =public= and =private= must be sources defined in your
-=skgconfig.toml=, and both must have =user_owns_it = true=. A move
-to or from a foreign source is rejected (see Pitfalls below).
+=skgconfig.toml=, and both must be owned (under the config's
+=owned_folder=). A move to or from a foreign source is rejected
+(see Pitfalls below).
+
+Under privacy accordions (see =accordions.md=), what moves is the
+node's HOME: its title, body and extra ids relocate to the new
+source's section. Sections of the node at other privacy levels stay
+where they are, and each relationship edge keeps its recorded level
+(edges are clamped to be at least as private as the new home).
 
 The buffer can reference a node by any of its IDs — primary or
 extra — and the move still works correctly. The source-move's =pid=

@@ -2,6 +2,60 @@ Some terms and abbreviations used in this code.
 
 # Terms and abbreviations specific to Skg
 
+## "accordion" = privacy accordion
+
+In code and comments the short form "accordion" always means the
+privacy accordion; see "privacy accordion" below.
+
+## privacy accordion, accordion section, home
+
+One node can be recorded at several privacy levels at once: same-ID
+`.skg` files across sources, at most one per source. That family of
+files is the node's **privacy accordion**; each file is one
+**accordion section** ("section" for short in code), holding the
+slice of the node recorded at its source's level. The most public
+section carrying a title is the **home**; it alone holds title,
+body, and extra ids. There is no linking relationship between
+sections — sharing an ID is being the same node. See
+`docs/accordions.md` and `server/types/nodes/fs.rs`.
+
+## privacy level, or "level" in code
+
+The position of a source in the config's privacy order (most public
+first). Every relationship edge carries a level: the source whose
+section records it. In code this is the `level` field of
+`PrivaciedMember`. "More private" = later in the order.
+
+## fold (visible vs full), unfold
+
+The **fold** of an accordion combines its sections, most public
+first, into one effective node (`server/accordion/fold.rs`). The
+**full fold** uses every section; a **visible fold** uses only the
+sections active under the current source-set, and is what a
+restricted view renders. **Unfold** is the save-side inverse:
+splitting the effective node back into sections, byte-stably.
+
+## placement, anchor
+
+How a more private section orders its members into a more public
+list without the public file recording anything: in the section's
+stored sequence, a `- anchor: ID` entry names a more public member,
+and the members after it insert immediately after that ID; members
+before the first anchor prepend. Placements exist only on disk —
+anchors are derived at save from the in-memory order, so they can
+never go stale in memory.
+
+## sticky rule (sticky-else-default)
+
+Where a relationship edge's privacy level comes from at save time:
+an edge already on disk keeps its level (**sticky**); a new edge
+defaults to the more private of its two endpoints' homes; and every
+level is clamped to at least the owner's home. Hides floor higher
+(at least the most public subscription explaining them). A
+`(relSource NAME)` atom (the `skg-privatize-relationship` gesture)
+raises a level above its default; below-default is a save error.
+See `server/from_text/supplement_from_disk.rs`.
+
 ## "buffer", or sometimes "forest"
 
 Buffer is a term from Emacs.

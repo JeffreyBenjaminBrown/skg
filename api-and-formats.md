@@ -165,8 +165,15 @@ So far there are these endpoints:
   - Response: LP response-type "diff-analysis" with `((content "ORG") (errors ("..." ...)) (warnings ("..." ...)))`.
   - Behavior: Builds a semantic org report of affected nodes across all sources,
     including scalar node fields, aliases, extra IDs, all five schema relations
-    in both role directions, text diffs for title/body, duplicate IDs across
-    sources, and root/new/deleted/modified buckets.
+    in both role directions, text diffs for title/body, and
+    root/new/deleted/modified buckets. Nodes are compared as whole
+    accordions: each endpoint's section files are grouped by pid and
+    folded, so a change to one section reports against the node's
+    full fold. A separate bucket ("IDs claimed by more than one
+    node") reports duplicate-ID VIOLATIONS — an id claimed by two
+    distinct pids at either endpoint. An id merely present in
+    several sources is the normal accordion shape and is not
+    reported.
   - Refuses to produce an ordinary report if any configured source is not a git
     repository, has no HEAD commit, has a selected merge-commit HEAD baseline,
     or contains an unreadable `.skg` blob in the selected snapshots.
@@ -178,13 +185,26 @@ So far there are these endpoints:
   - Response: LP response-type "stage-moves" with
     `((content "SHELL_SCRIPT") (errors (...)) (warnings (...)))`.
   - Behavior: Scans the git status of every configured source and
-    finds each node ID whose `.skg` file "moved" -- vanished from
-    EXACTLY one source (present in that source's git HEAD, gone from
-    its worktree) and appeared in EXACTLY one other source (present in
-    that source's worktree, absent from its HEAD). An ID that vanished
-    from, or appeared in, more than one source has more than one
-    candidate (old, new) pair and is skipped. The script is a bash
-    move-list plus one loop over it:
+    finds each node that "moved". Under accordions a node's sections
+    live in several sources at once, so the signal is TITLE
+    presence, not file presence: a node moved iff its title vanished
+    from EXACTLY one source (titled in that source's git HEAD,
+    absent or titleless in its worktree) and appeared in EXACTLY one
+    other (titled in the worktree, absent or titleless in HEAD).
+    Titleless section creations and deletions are re-levelings of
+    individual relationships, not moves, and stage as ordinary
+    edits. An ID whose title vanished from, or appeared in, more
+    than one source has more than one candidate (old, new) pair and
+    is skipped.
+
+    Only PURE moves — the old source's file gone from its worktree,
+    the new source's file absent from its HEAD — are auto-staged. A
+    move mixed into pre-existing section files (the destination
+    already recorded relationships for the node, or the old source
+    keeps a titleless section) is REPORTED in a comment block
+    (`# MOVES DETECTED BUT NOT STAGED: ...`) and never staged, since
+    staging those files whole could stage more than the move. The
+    script is a bash move-list plus one loop over it:
     ```
     moves=(
       "<uuid> <old-source-dir> <new-source-dir>"
@@ -227,6 +247,22 @@ So far there are these endpoints:
     Content is "Databases rebuilt successfully." on success,
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
+
+## Migrate to accordions
+  - Request: ((request . "migrate to accordions"))
+  - Response: LP response-type "migrate-to-accordions" with
+    `((content "..."))` describing the outcome.
+  - Behavior: For every owned node, raises each relationship edge's
+    privacy level to at least its DEFAULT (the more private of the
+    two endpoints' homes), never lowering anything. This lifts
+    leak-shaped memberships — a public file naming a more private
+    node's ID — into their proper accordion sections. Changed
+    accordions are rewritten byte-stably; if anything changed, the
+    databases are rebuilt as in "rebuild dbs".
+  - Refusal: requires the active source-set `all` (migration must
+    see and rewrite every level).
+  - What it cannot fix: a public repo's git HISTORY keeps any IDs it
+    leaked before migration; repairing that is manual.
 
 ## Strip body whitespace
   - Request: ((request . "strip body whitespace"))
@@ -301,9 +337,15 @@ So far there are these endpoints:
     git diff mode to refresh all views without requiring a save.
 
 ## Source sets
+  - Source-sets are the prefixes of the config's privacy order (see
+    "skgconfig.toml > Source sets" below): each source name denotes
+    itself plus everything more public, and `all` means every source.
   - Request: ((request . "list source sets"))
   - Response: LP response-type "source-sets" with
-    `((active "NAME") (sets ("NAME1" "NAME2" ...)))`.
+    `((active "NAME") (sets ("NAME1" "NAME2" ...)))`. The sets are
+    the source names in privacy order (most public first) followed
+    by `all`; order is meaningful (it is the privacy ladder), so
+    clients should preserve it.
   - Request: ((request . "active source set"))
   - Response: LP response-type "active-source-set" with
     `((active "NAME"))`.
@@ -487,6 +529,15 @@ different parents):
   `hides_from_its_subscriptions` edge), or the inverse. Plain binary
   edge heralds; the "hidden from which subscription" context lives in
   the hide cols, not here.
+- `(relSource NAME)` — herald red "~NAME", drawn immediately before
+  the ⌂ source herald; the privacy level of the RELATIONSHIP this
+  headline represents (the `contains` edge to a content child, or
+  the col's relation for a PartnerCol member), when that level was
+  deliberately raised above the edge's default. Emitted by render;
+  written by `skg-privatize-relationship` (C-c s r); consumed at
+  save, where the server enforces the floor (an offered level less
+  private than the edge's default is a save error). Absent means
+  the edge sits at its default level.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 
@@ -551,49 +602,69 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 
 ## Sources
 
-Each `[[sources]]` entry defines a directory of `.skg` files:
+Each `[[sources]]` entry defines a directory of `.skg` files.
+**Order is load-bearing**: sources must be listed in privacy order,
+most public first, most private last. That order defines the privacy
+levels of the accordion model (see `docs/accordions.md`) and the
+available source-sets (below).
 
 | Field          | Required | Description |
 |----------------|----------|-------------|
-| `name`         | yes      | Unique name for this source (used in metadata, provenance). |
 | `path`         | yes      | Directory containing `.skg` files. Relative to data root. |
-| `user_owns_it` | yes      | `true` if the user can create/edit nodes here; `false` for foreign (read-only) sources. |
+| `name`         | no       | Unique name for this source (used in metadata, provenance). Defaults to `path`. |
+| `abbreviation` | no       | Short label for heralds. Owned sources with defaulted names abbreviate to the path minus the owned folder. |
 
 The source name `all` is reserved and rejected.
 
+**Ownership is by location, not declaration**: a source is owned
+(writable) iff its path lies under `<data_root>/<owned_folder>`,
+where `owned_folder` is a top-level config field defaulting to
+`"owned"`. Everything else is foreign (read-only). The old
+`user_owns_it` field is retired and rejected with an error naming
+the migration script (`bash/migrate-to-author-folders.sh`).
+
 ## Source sets
 
-Each `[[source_sets]]` entry defines a named list of source names:
-
-| Field     | Required | Description |
-|-----------|----------|-------------|
-| `name`    | yes      | Source-set name. Must be unique and must not be `all`. |
-| `sources` | yes      | Non-empty list of existing source names. |
-
-The source-set name `all` is predefined and means every configured
-source. Users must not define their own `[[source_sets]]` entry named
-`all`. Source names and source-set names may otherwise collide; this
-allows singleton sets to be named after the source they contain.
+Source-sets are no longer declared; the retired `[[source_sets]]`
+table is rejected with an error. The sets are exactly the
+**prefixes of the privacy order**: each source's name denotes the
+set consisting of itself and every more-public source, and the
+reserved name `all` means every source. Choosing a set is choosing
+"the most private source to make available." `default_source_set`
+(top-level field) names the set active when a client connects.
 
 Example:
 
 ```toml
 default_source_set = "public"
 
+# Privacy order: most public first.
 [[sources]]
 name = "public"
-path = "public"
-user_owns_it = true
+path = "owned/public"   # under owned/ => writable
 
 [[sources]]
 name = "private"
-path = "private"
-user_owns_it = true
+path = "owned/private"
 
-[[source_sets]]
-name = "public"
-sources = ["public"]
+[[sources]]
+name = "Fred"
+path = "Fred"           # foreign => read-only
 ```
+
+Here the available source-sets are `public` = {public},
+`private` = {public, private}, `Fred` = `all` = {public, private,
+Fred}.
+
+## DEPENDENCIES.toml
+
+At init (and after config changes) the server writes a
+`DEPENDENCIES.toml` manifest into each OWNED source directory,
+listing the sources that source may reference (itself and everything
+more public, in order). It is generated output — hand edits are
+clobbered — and lets someone who receives one of your repos see
+what it depends on. When a FOREIGN source's manifest orders two
+sources differently than this config does, the server warns at init.
 
 ## Log files
 
@@ -607,17 +678,49 @@ See `example-data/skgconfig.toml`.
 
 # The .skg file format
 
-It is a specialization of YAML -- that is, every .skg file is valid YAML, although not vice-versa. The fields might change; the definitive source of truth is in `server/types.rs`. But for the moment they are:
+It is a specialization of YAML -- every .skg file is valid YAML,
+although not vice versa. The definitive source of truth is
+`server/types/nodes/fs.rs` (`NodeFS`).
 
-- title: A string, with no newlines. Must be present.
-- ids: A list of UUIDs. The first one is the primary id, which is equal to the filename minus the `.skg` extension. Must be non-empty. There can be more than one because nodes might be merged.
-- body: An optional string, perhaps including newlines.
-- contains: A list of UUIDs. These appear as the node's "children" in an org-view.
-- subscribes_to: A list of UUIDs. Can be omitted if empty.
-- hides_from_its_subscriptions: A list of UUIDs. Can be omitted if empty.
-- overrides_view_of: A list of UUIDs. Can be omitted if empty.
+Each file is one **accordion section**: the slice of one node
+recorded at one privacy level (see `docs/accordions.md`). One node =
+one ID = same-ID `.skg` files across sources, at most one per
+source; the filename is the node's primary ID followed by `.skg` in
+every source. The most public section carrying a `title` is the
+node's **home**. A field a section omits is a field that section has
+no opinion about. Pre-accordion single-file nodes parse unchanged
+(one section, title present, no anchors).
 
-Each node's filename is just its primary ID followed by ".skg".
+Fields:
+
+- `title`: A string, no newlines. Present in the home section only.
+- `pid`: The node's primary ID. Must equal the filename stem. Present
+  in every section.
+- `extra_ids`: Optional list of additional IDs (from node merges).
+  Home section only, by convention.
+- `body`: An optional string, perhaps with newlines. Home only.
+- `aliases`: Optional list of strings. Each section may contribute
+  aliases; an alias's privacy level is its section's.
+- `contains`, `subscribes_to`: Ordered relations. ONE flat YAML
+  sequence per relation, one entry per line:
+  - `- ID` — a member recorded at this section's level. Identical
+    syntax in every section, so a membership moving between levels
+    diffs as a clean one-line delete/add pair.
+  - `- anchor: ID` — a placement anchor: the members after it (until
+    the next anchor) insert immediately after the anchored ID, which
+    lives in a MORE PUBLIC section. Members before the first anchor
+    prepend to the front of the more public list. Anchors are derived
+    on save from the in-memory order; hand-written anchors are
+    honored on load (a dangling anchor's run falls back with a
+    warning, and duplicate anchors concatenate in file order).
+- `hides_from_its_subscriptions`, `overrides_view_of`: Unordered
+  relations; plain lists of IDs. The effective list is the union
+  across sections; each entry's privacy level is its section's.
+
+The FOLD of all same-pid sections (most public first) yields the
+node; saving UNFOLDS the node back into sections, byte-stably, so
+untouched sections do not change on disk. An owned section emptied
+by a save is deleted; foreign sections are never touched.
 
 # The metadata headers
 

@@ -17,11 +17,10 @@
 //!   ('server/accordion/fold.rs'), which is how NodeComplete values
 //!   are born; 'nodefs_from_section' is the unfold-side inverse.
 //! - 'NodeFS::into_complete_as_single_section (source)' treats ONE
-//!   section as a whole node -- exact for single-section accordions
-//!   (all pre-accordion data), and the interim behavior of the
-//!   per-file git/diff paths until they learn accordions
-//!   (TODO/user-owned_autofork_chain/5_plan.org, work item
-//!   interactions).
+//!   section as a whole node. Used only where a single FILE is the
+//!   honest unit: historical blobs (the vanished-node search) and
+//!   diff MODE's per-file reads (safe because diff mode requires
+//!   the active source-set "all", so no fold is hidden).
 
 use serde::{Serialize, Deserialize};
 
