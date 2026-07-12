@@ -143,12 +143,17 @@ sources moved under data/owned/); the accordion-level
 by the save-leveling work item as planned; kept here so the earlier
 entry is not misread as still pending.
 ** Known residual leak surfaces, deliberate and small.
-- The H/S/O ANCESTOR-relation flags in viewnodestats.rs (hider/
-  subscriber/overrider heralds on ancestors) have no active set in
-  scope, so they are computed unleveled. A privatized hide/
-  subscription/override edge can thus still tint an ancestor herald
-  at public level. Noted by the render-sweep agent; fixing it means
-  threading the active set into stats computation.
+- (FIXED post-completion, at Jeff's request.) The H/S/O
+  ANCESTOR-relation flags in viewnodestats.rs were computed
+  unleveled. Fixed by threading the active set through the
+  viewnodestats pass (all three callers already held it) and gating
+  every flag by EDGE level: the four graph relations via a new
+  'relation_membership_is_visible' on InRustGraph
+  ('relation_membership_is_real' is now its None case), and the
+  contains flags via 'edge_level' layered over the containment maps
+  (the maps carry no levels; graph-less test paths degrade to
+  ungated, and they never restrict). Pinned in the leak battery:
+  'ancestor_heralds_gate_privately_recorded_relations'.
 - Diff MODE's per-file NodeChanges lists are level-stripped
   (goal_list.rs reconstructs HEAD membership ungated). Harmless
   today because diff mode requires active set 'all' (the plan's

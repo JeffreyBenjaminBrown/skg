@@ -341,7 +341,8 @@ fn handle_snapshot_response (
     &mut viewforest,
     & payload . graphnodestats . container_to_contents,
     & payload . graphnodestats . content_to_containers,
-    & env . config );
+    & env . config,
+    Some (active_source_set) );
   apply_source_set_to_viewforest (
     &mut viewforest,
     active_source_set );

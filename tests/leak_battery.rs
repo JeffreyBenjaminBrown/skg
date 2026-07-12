@@ -34,7 +34,10 @@ use skg::to_org::render::content_view::multi_root_view_with_source_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::viewnode::{Phantom, ViewNode, ViewNodeKind, Vognode};
+use skg::types::viewnode::{Phantom, RelationCounts, ViewNode, ViewNodeKind, Vognode};
+use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
+
+use std::collections::HashMap;
 
 fn viewforest_from_org (
   input : &str,
@@ -209,4 +212,65 @@ fn subscriberCol_style_inbound_gates_privately_recorded_subscription (
         subscribers_all . contains (&ID::from ("S")),
         "under 'all' S's subscription to C is visible: {:?}",
         subscribers_all );
+      Ok (( )) } )) }
+
+#[test]
+fn ancestor_heralds_gate_privately_recorded_relations (
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-leak-battery-heralds",
+    "tests/leak_battery/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-leak-battery-heralds",
+    |config, _driver, _tantivy| Box::pin ( async move {
+      let public : ActiveSourceSet =
+        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
+      let all : ActiveSourceSet =
+        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+      install_or_swap_global_handle (
+        graph_handle_from_config (config)? );
+      // Buffer: C with child S. S subscribes to C, but that edge is
+      // recorded only in S's PRIVATE section, so the ancestor-flag
+      // pass must not tint S's herald with the 'S' token at public.
+      // (Both nodes are individually public; the EDGE is what gates.)
+      let herald_of_S = | active : &ActiveSourceSet |
+      -> Result<Option<String>, Box<dyn Error>> {
+        let mut viewforest : Tree<ViewNode> =
+          viewforest_from_org (
+            "* (skg (node (id C) (source public))) leak-battery-C\n\
+             ** (skg (node (id S) (source public))) leak-battery-S\n" )?;
+        for value in viewforest . values_mut () {
+          // Give every node counts so the herald pass does not
+          // early-return before the ancestor flags (its "no stats ->
+          // no heralds" guard). Zero counts render no tokens of
+          // their own, so any token present comes from a flag.
+          if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+            &mut value . kind {
+            t . graphStats . rels =
+              Some ( RelationCounts::default () ); }}
+        set_viewnodestats_in_viewforest (
+          &mut viewforest,
+          & HashMap::new (),
+          & HashMap::new (),
+          config,
+          Some (active) );
+        let c_treeid : NodeId = first_child_id (&viewforest);
+        let s_ref = viewforest . get (c_treeid) . unwrap ()
+          . first_child () . unwrap ();
+        let ViewNodeKind::Vognode (Vognode::Active (t)) =
+          & s_ref . value () . kind
+        else { return Err ("S is not an Active vognode" . into ()); };
+        Ok ( [ t . viewStats . birth_herald . clone (),
+               t . viewStats . rels_herald . clone () ]
+             . into_iter () . flatten ()
+             . reduce ( |a, b| format! ("{} {}", a, b) ) ) };
+      let at_public : Option<String> = herald_of_S (&public) ?;
+      assert! (
+        ! at_public . as_deref () . unwrap_or ("")
+          . contains ('S'),
+        "S's privately-recorded subscription to its buffer-parent C \
+         must not tint an ancestor herald at public: {:?}", at_public );
+      let at_all : Option<String> = herald_of_S (&all) ?;
+      assert! (
+        at_all . as_deref () . unwrap_or ("") . contains ('S'),
+        "under 'all' the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }

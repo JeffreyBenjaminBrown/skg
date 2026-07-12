@@ -446,7 +446,8 @@ pub async fn finish_viewforest (
           viewforest, config, driver ) . await,
     } ?;
   set_viewnodestats_in_viewforest (
-    viewforest, &container_to_contents, &content_to_containers, config );
+    viewforest, &container_to_contents, &content_to_containers, config,
+    active_source_set );
   if let Some (active) = active_source_set {
     apply_source_set_to_viewforest ( viewforest, active ); }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(

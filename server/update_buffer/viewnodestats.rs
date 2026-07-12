@@ -2,6 +2,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, assemble_active, HeraldStrings};
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{
   Birth, GraphNodeStats, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
@@ -23,6 +24,7 @@ pub fn set_viewnodestats_in_viewforest (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
+  active                : Option<&ActiveSourceSet>,
 ) {
   let multi_source : bool = config . sources . len () > 1;
   let graph : Option<Arc<InRustGraph>> =
@@ -38,6 +40,7 @@ pub fn set_viewnodestats_in_viewforest (
     multi_source,
     graph . as_deref (),
     config,
+    active,
     &mut ancestor_ids,
     container_to_contents,
     content_to_containers ); }
@@ -48,6 +51,7 @@ fn set_viewnodestats_recursive (
   multi_source          : bool,
   graph                 : Option<&InRustGraph>,
   config                : &SkgConfig,
+  active                : Option<&ActiveSourceSet>,
   ancestor_ids          : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -61,7 +65,7 @@ fn set_viewnodestats_recursive (
       if multi_source {
         set_source_at_boundary (tree, treeid); }
       set_herald_strings_in_viewnode (
-        tree, treeid, &node_pid, graph,
+        tree, treeid, &node_pid, graph, active,
         container_to_contents, content_to_containers );
       set_hidden_body (tree, treeid, &node_pid, graph);
       set_rel_source (tree, treeid, graph, config);
@@ -81,6 +85,7 @@ fn set_viewnodestats_recursive (
       multi_source,
       graph,
       config,
+      active,
       ancestor_ids,
       container_to_contents,
       content_to_containers ); }
@@ -106,6 +111,7 @@ fn set_herald_strings_in_viewnode (
   treeid                : NodeId,
   node_pid              : &ID,
   graph                 : Option<&InRustGraph>,
+  active                : Option<&ActiveSourceSet>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
@@ -125,7 +131,8 @@ fn set_herald_strings_in_viewnode (
   for (anc_pid, generation) in
     tracked_ancestors (tree, &parent_kind) {
     flag_ancestor_relations (
-      &mut flags, graph, container_to_contents, content_to_containers,
+      &mut flags, graph, active,
+      container_to_contents, content_to_containers,
       node_pid, &anc_pid, generation ); }
   let birth_rels : Vec<NodeRelation> =
     birth_relations (&parent_kind, parentIs, birth, &flags,
@@ -184,36 +191,51 @@ fn active_vognode_pid (
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
 /// relation it is a member of on each side relative to 'node_pid'.
-/// Contains is read from the source-filtered containment maps; the other
-/// four relations from the in-Rust graph.
+/// Contains membership is read from the source-filtered containment
+/// maps; the other four relations from the in-Rust graph. Every flag
+/// is EDGE-LEVEL gated: an edge recorded above the active prefix
+/// must not tint an ancestor herald at a more public level (it would
+/// reveal the very relationship the user privatized). The contains
+/// gate needs the graph (the maps carry no levels); without one
+/// (some test paths, which never restrict) it degrades to ungated.
 fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
   graph                 : Option<&InRustGraph>,
+  active                : Option<&ActiveSourceSet>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   node_pid              : &ID,
   anc_pid               : &ID,
   generation            : usize,
 ) {
+  let contains_edge_visible = |owner : &ID, target : &ID| -> bool {
+    match (graph, active) {
+      (Some (g), Some (a)) if ! a . is_all () =>
+        g . edge_level (owner, NodeRelation::Contains, target)
+          . map ( |level| a . contains_source (&level) )
+          . unwrap_or (false),
+      _ => true }};
   // Contains, via the maps. inbound: ancestor contains node.
   if content_to_containers . get (node_pid)
-    . map_or (false, |s| s . contains (anc_pid)) {
+    . map_or (false, |s| s . contains (anc_pid))
+    && contains_edge_visible (anc_pid, node_pid) {
     flags . record (NodeRelation::Contains, true, generation); }
   // outbound: node contains ancestor.
   if container_to_contents . get (node_pid)
-    . map_or (false, |s| s . contains (anc_pid)) {
+    . map_or (false, |s| s . contains (anc_pid))
+    && contains_edge_visible (node_pid, anc_pid) {
     flags . record (NodeRelation::Contains, false, generation); }
   let graph = match graph { Some (g) => g, None => return, };
   for rel in GRAPH_RELATIONS {
     // inbound: ancestor R's node (ancestor plays the first role).
-    if graph . relation_membership_is_real (
+    if graph . relation_membership_is_visible (
       node_pid, anc_pid,
-      RelationRole::new (rel, BinaryRolePosition::First) ) {
+      RelationRole::new (rel, BinaryRolePosition::First), active ) {
       flags . record (rel, true, generation); }
     // outbound: node R's ancestor (ancestor plays the second role).
-    if graph . relation_membership_is_real (
+    if graph . relation_membership_is_visible (
       node_pid, anc_pid,
-      RelationRole::new (rel, BinaryRolePosition::Second) ) {
+      RelationRole::new (rel, BinaryRolePosition::Second), active ) {
       flags . record (rel, false, generation); } } }
 
 /// The birth relation(s) -- which relation token(s) lead in orange,

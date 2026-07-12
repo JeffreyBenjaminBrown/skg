@@ -59,7 +59,8 @@ fn source_inheritance_across_non_content_same_source () {
     &mut viewforest,
     &container_to_contents,
     &content_to_containers,
-    &config );
+    &config,
+    None );
   // B has same source as A, so sourceAtBoundary should be false,
   // even though B has parentIs != Affected.
   let b_ref =
@@ -99,7 +100,8 @@ fn source_inheritance_across_non_content_different_source () {
     &mut viewforest,
     &container_to_contents,
     &content_to_containers,
-    &config );
+    &config,
+    None );
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();

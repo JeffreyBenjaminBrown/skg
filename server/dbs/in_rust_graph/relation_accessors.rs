@@ -346,8 +346,23 @@ impl InRustGraph {
     member_pid : &ID,
     member_role : RelationRole,
   ) -> bool {
+    self . relation_membership_is_visible (
+      owner_pid, member_pid, member_role, None ) }
+
+  /// 'relation_membership_is_real' with edge-level gating: an edge
+  /// whose recorded level is above the active prefix does not count
+  /// as a membership (see 'edge_level'). Pass None to ask about the
+  /// full fold.
+  pub fn relation_membership_is_visible (
+    &self,
+    owner_pid   : &ID,
+    member_pid  : &ID,
+    member_role : RelationRole,
+    active      : Option<&crate::source_sets::ActiveSourceSet>,
+  ) -> bool {
     let members : Vec<ID> =
-      self . other_member_pids (owner_pid, member_role . opposite_role ());
+      self . other_member_pids_gated (
+        owner_pid, member_role . opposite_role (), active );
     members . contains (member_pid) }
 }
 

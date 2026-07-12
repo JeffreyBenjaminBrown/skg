@@ -90,7 +90,8 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     &mut viewforest,
     & HashMap::new (),
     & HashMap::new (),
-    config );
+    config,
+    Some (active) );
   Ok ( viewforest_to_string ( &viewforest, config )? ) }
 
 /// Structured enrichment data passed through the slot,
