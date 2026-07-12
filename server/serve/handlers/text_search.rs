@@ -159,7 +159,8 @@ pub fn handle_text_search_request (
               searcher,
               &env . tantivy_index,
               &search_terms,
-              &search_opts ),
+              &search_opts,
+              Some (active) ),
               active );
           if matches_by_id . is_empty () {
             send_response_with_length_prefix (
@@ -358,6 +359,7 @@ pub fn group_matches_by_id (
   tantivy_index : &TantivyIndex,
   search_terms  : &str,
   search_opts   : &SearchOptions,
+  active        : Option<&ActiveSourceSet>,
 ) -> MatchGroups {
   let matcher : CoverageMatcher = // pre-build once
     build_coverage_matcher (search_terms, search_opts);
@@ -402,6 +404,16 @@ pub fn group_matches_by_id (
               . get_first ( tantivy_index . source_field )
               . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
+        if let Some (a) = active {
+          // Per-DOCUMENT source filtering, BEFORE grouping: an
+          // alias document carries the ALIAS's privacy level as
+          // its source, so a restricted search must drop it here
+          // -- a private alias of a public node must neither match
+          // nor shift ranking (dbs-and-search, 5_plan.org). The
+          // group-level filter below survives as a backstop.
+          if ! a . is_all ()
+          && ! a . contains_source (&source) {
+            continue; }}
         let origin_type : Option < ContextOriginType > =
           retrieved_doc
             . get_first ( tantivy_index . context_origin_type_field )

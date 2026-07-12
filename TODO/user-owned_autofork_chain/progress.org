@@ -8,12 +8,56 @@ what's done; choices determining the future.
 Execution began 2026-07-12. Work items proceed in the plan's
 order; this file grows as each lands.
 - DONE privacy-order (commits 9785a514, 1225acb0).
-- ONGOING leveled-lists: 'PrivaciedMember' landed in types +
-  FS boundary (degenerate: level := home source at load, dropped
-  at write). The ~160 mechanical call-site fixes are delegated to
-  three parallel Sonnet agents (per Jeff's cost note), each owning
-  a disjoint file set with an explicit read-vs-construct rulebook;
-  Fable reviews the diff and the "choose" sites afterward.
+- DONE leveled-lists (commit 661daa66): 'PrivaciedMember'
+  everywhere; ~200 mechanical call-site fixes delegated to five
+  Sonnet agents; degenerate semantics, zero behavior change.
+- DONE section-format-and-fold (commit ad578a25): NodeFS is the
+  section format; load groups + folds accordions; save unfolds with
+  byte-stable writes and stale-section sweeps; duplicate-id
+  validation narrowed to genuine conflicts; misc/extra_ids ride the
+  home. The fold's write-sweep DELETED two golden fixture files
+  during a test run (correct semantics, wrong fixture layout) --
+  goldens now live outside any source; noted as a pattern to watch
+  in other repos' fixtures.
+- DONE accordion-validators (commit 795d0bc9): the leak-shape
+  warning gate at init/rebuild/save via one shared primitive;
+  aggregated accordion-warnings.org report.
+- DONE save-leveling (commit fdd207af): sticky-else-default,
+  hide floors (most public explaining subscription), home clamp,
+  restricted-set delete refusal; the SourceMove file-relocation
+  loop removed (the accordion write subsumes it, and it would have
+  destroyed retained private sections on privatize->publicize
+  moves). PRECISE RE-ANCHORING CAME FREE: unfold derives anchors
+  from in-memory leveled lists at every write, so no stored anchor
+  survives to go stale.
+- DONE dependencies-manifest + nodeMerge leveling (commit
+  a05e3360): publisher manifests + receiver order warnings; merge
+  preserves levels (more-private-wins, clamped at acquirer home).
+- DONE migration, server half (commit cec35ec9): the
+  'migrate to accordions' endpoint (raise-to-defaults + rebuild);
+  Emacs command pends the gesture agent's elisp files.
+- DONE render-and-gating + privatize-gesture (commit eaf7a6db):
+  'edge_level' + gated accessors on every render surface (content,
+  ancestry, backpaths, inbound cols, stats), the leak battery
+  (tests/leak_battery.rs), the (relSource NAME) atom + red ~NAME
+  herald + 'skg-privatize-relationship' on C-c s r. The gesture
+  agent was killed mid-verification by Jeff's usage limit; its work
+  was audited end-to-end (grep relSource through parse -> traverse
+  -> lower -> save; all suites) and found complete.
+- DONE dbs-and-search: Emacs 'skg-migrate-to-accordions' command
+  (completing the migration work item); Tantivy alias documents now
+  carry the ALIAS's level in source_field (title docs keep the
+  home), 'NodeTantivy.aliases' became leveled; search filtering
+  moved from per-ID-group to per-DOCUMENT -- 'group_matches_by_id'
+  drops inactive-source docs BEFORE grouping, so a private alias of
+  a public node neither matches nor shifts ranking in a restricted
+  search (pinned by a new test). Verified with no changes needed:
+  the TypeDB audit already compares level-stripped sets on both
+  sides, and stale Tantivy indexes are a non-issue -- every real
+  adoption path (author-folder script edits the config; migrate
+  endpoint rebuilds dbs) forces a full index rebuild, and
+  pre-accordion data has aliases only in home sections where old
+  and new source values coincide.
 - STARTED EARLY (parallel, no file overlap):
   section-format-and-fold's pure core -- server/accordion/
   ('fold_sections', 'unfold_node', 'SectionSlices', 'ListItem',

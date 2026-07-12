@@ -5,7 +5,7 @@
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
-use crate::types::misc::{ID, TantivyIndex};
+use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::textlinks::replace_each_link_with_its_label;
@@ -104,11 +104,18 @@ fn create_documents_from_node (
       |b| replace_each_link_with_its_label (b) );
   let mut documents: Vec<TantivyDocument> =
     Vec::new();
-  let mut titles_and_aliases: Vec<String> =
-    vec![node . title . clone()];
-  titles_and_aliases . extend_from_slice (
-    node . aliases . or_default () );
-  for (i, title_or_alias) in
+  let mut titles_and_aliases: Vec<(String, SourceName)> =
+    // Each entry with the SOURCE its document will carry: the home
+    // for the title, the alias's own privacy LEVEL for an alias --
+    // so restricted search filtering excludes private aliases of
+    // public nodes (dbs-and-search, 5_plan.org).
+    vec![ ( node . title . clone(),
+            node . source . clone() ) ];
+  titles_and_aliases . extend (
+    node . aliases . or_default () . iter ()
+    . map ( |a| ( a . member . clone (),
+                  a . level . clone () )));
+  for (i, (title_or_alias, doc_source)) in
     titles_and_aliases . iter() . enumerate()
   { let is_title : bool = i == 0;
     let is_title_str : &str =
@@ -129,7 +136,7 @@ fn create_documents_from_node (
         tantivy_index . raw_title_field =>
           raw_title_for_this_doc,
         tantivy_index . source_field =>
-          node . source . as_str(),
+          doc_source . as_str(),
         tantivy_index . context_origin_type_field =>
           context_origin_type,
         tantivy_index . is_title_field =>

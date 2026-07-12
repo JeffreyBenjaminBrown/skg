@@ -3,7 +3,8 @@
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, privacied_msv};
+use skg::source_sets::ActiveSourceSet;
+use skg::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, SourceSetName, TantivyIndex, privacied_msv};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
@@ -72,7 +73,7 @@ fn test_text_search_org_format (
       let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index,
-          search_terms, &SearchOptions::default () );
+          search_terms, &SearchOptions::default (), None );
       let (viewforest, _search_results) =
         build_search_viewforest (
           search_terms,
@@ -200,7 +201,7 @@ fn test_search_results_preserve_textlinks_in_title (
                        &SearchOptions::default () ) ?;
       let matches_by_id = group_matches_by_id (
         best_matches, searcher, &tantivy_index,
-        "science", &SearchOptions::default () );
+        "science", &SearchOptions::default (), None );
       let (viewforest, _ids) = build_search_viewforest (
         "science", &matches_by_id );
       let dummy_config : SkgConfig =
@@ -283,7 +284,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let matches_by_id = group_matches_by_id (
         best_matches, searcher, &tantivy_index,
         "axiom thesis lemma",
-        &SearchOptions::default () );
+        &SearchOptions::default (), None );
       // Both should be in the result set.
       assert! ( matches_by_id . contains_key (&ID::new ("few")),
                 "few should appear among results" );
@@ -316,7 +317,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
                        &regex_opts ) ?;
       let matches_re = group_matches_by_id (
         best_matches_re, searcher_re, &tantivy_index,
-        "axiom thesis lemma", &regex_opts );
+        "axiom thesis lemma", &regex_opts, None );
       assert! ( matches_re . contains_key (&ID::new ("few")),
                 "few should appear among regex results" );
       assert! ( matches_re . contains_key (&ID::new ("many")),
@@ -343,3 +344,66 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
     Err (e) => {
       println! ( "Test failed. Preserving index directory at {} for debugging.", index_dir );
       Err (e) }} }
+
+#[test]
+fn private_alias_documents_are_filtered_before_grouping (
+) -> Result < (), Box < dyn std::error::Error >> {
+  // A node's home is "main" but one alias lives at level
+  // "private". A search restricted to "main" must drop the
+  // alias DOCUMENT itself (per-document source filtering, before
+  // group_matches_by_id groups by ID) -- not merely drop whole
+  // ID-groups whose home is inactive.
+  let index_dir : &str =
+    "tests/serve_text_search_test/temp_index_alias_levels";
+  let test_result
+    : Result < (), Box < dyn std::error::Error >>
+    = ( || {
+      let mut node : NodeComplete = empty_node_complete ();
+      node . pid = ID::new ("id_leveled");
+      node . title = "public title" . to_string ();
+      node . aliases = MSV::Specified ( vec! [
+        PrivaciedMember::at (
+          SourceName::from ("private"),
+          "secret zanzibar" . to_string () ) ] );
+      let nodes : Vec<NodeComplete> = vec! [ node ];
+      let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
+        wipe_then_init_tantivy_db (
+          &nodes, Path::new (index_dir) ) ?;
+      let public_only : ActiveSourceSet = ActiveSourceSet {
+        name    : SourceSetName::from ("main"),
+        sources : [ SourceName::from ("main") ]
+          . into_iter () . collect (), };
+      { // Restricted search: the private alias doc must not match.
+        let ( best_matches, searcher ) =
+          search_index ( &tantivy_index, "zanzibar",
+                         &SearchOptions::default () ) ?;
+        let matches_by_id = group_matches_by_id (
+          best_matches, searcher, &tantivy_index,
+          "zanzibar", &SearchOptions::default (),
+          Some (&public_only) );
+        assert! ( ! matches_by_id . contains_key (
+                    &ID::new ("id_leveled")),
+                  "private alias doc leaked into a main-only search" ); }
+      { // Unrestricted (None): the alias matches.
+        let ( best_matches, searcher ) =
+          search_index ( &tantivy_index, "zanzibar",
+                         &SearchOptions::default () ) ?;
+        let matches_by_id = group_matches_by_id (
+          best_matches, searcher, &tantivy_index,
+          "zanzibar", &SearchOptions::default (), None );
+        assert! ( matches_by_id . contains_key (
+                    &ID::new ("id_leveled")) ); }
+      { // The title doc still matches under the restricted set.
+        let ( best_matches, searcher ) =
+          search_index ( &tantivy_index, "public title",
+                         &SearchOptions::default () ) ?;
+        let matches_by_id = group_matches_by_id (
+          best_matches, searcher, &tantivy_index,
+          "public title", &SearchOptions::default (),
+          Some (&public_only) );
+        assert! ( matches_by_id . contains_key (
+                    &ID::new ("id_leveled")) ); }
+      Ok (( )) } ) ();
+  if Path::new (index_dir) . exists () {
+    fs::remove_dir_all (index_dir) ?; }
+  test_result }

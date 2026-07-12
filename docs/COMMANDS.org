@@ -378,6 +378,35 @@ and edits the acquirer's metadata to request a merge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
+*** C-c s r : skg-privatize-relationship
+Cycles the privacy level of the relationship instance the headline
+at point represents -- =contains= for a content child, the col's
+relation for a PartnerCol member.
+
+The cycle is [no atom (the edge's default level), then each source
+in =skgconfig.toml=, in config order]. The client cannot compute
+which sources are actually more private than the edge's default (it
+would need both endpoints' homes, which live only on the server), so
+it simply cycles through every configured source. The server
+enforces the sticky/default floor at save time: an offered level
+that is not at least as private as that floor is rejected with a
+clear error naming the member, the offered level, and the floor.
+Landing on such a value is therefore a save-time error, not a silent
+no-op.
+
+Reaching the first stop (no atom) removes the =(relSource ...)= atom
+entirely -- the only way to undo a privatization back to the edge's
+default level. A deliberately privatized edge is marked with a red
+=~NAME= herald immediately before the ⌂ source herald.
+
+Refuses with an error when point is on a member of a read-only col
+(subscriberCol, overriderCol, hiderCol, hiddenCol,
+hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the relationship
+belongs to the other end there, so cycling its level from this side
+would be meaningless.
+
+The command only edits the node's metadata in the current buffer.
+Save the view afterward to apply the change.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
