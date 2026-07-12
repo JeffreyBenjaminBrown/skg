@@ -18,6 +18,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
+use crate::accordion::invariants::{report_accordion_violations, validate_all_accordions};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
@@ -96,6 +97,10 @@ pub fn initialize_dbs (
             { tracing::error! (
                 "Override invariant validation failed: {}", e);
               std::process::exit (1); }
+          { let violations =
+              validate_all_accordions (config, &graph);
+            let _ = report_accordion_violations (
+              &violations, &config . data_root ); }
           let (env, handoff) : (SkgEnv, InitContextHandoff) =
             env_and_handoff_from_nodes (
               config, &nodes, Arc::new (driver), tantivy_index );
@@ -279,6 +284,10 @@ fn full_init (
     = error_unless_override_invariants_hold (config, &graph)
     { tracing::error! ("Override invariant validation failed: {}", e);
       std::process::exit (1); }
+  { let violations =
+      validate_all_accordions (config, &graph);
+    let _ = report_accordion_violations (
+      &violations, &config . data_root ); }
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");

@@ -7,6 +7,7 @@ use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sourc
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
+use crate::accordion::invariants::{report_accordion_violations, validate_all_accordions};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   override_invariants::error_unless_override_invariants_hold,
@@ -50,6 +51,10 @@ pub fn handle_rebuild_dbs_request (
         &fresh_config, &fresh_graph )
       . map_err ( |e| format! (
         "Override invariant validation failed: {}", e) ) ?;
+    { let violations =
+        validate_all_accordions (&fresh_config, &fresh_graph);
+      let _ = report_accordion_violations (
+        &violations, &fresh_config . data_root ); }
     block_on ( wipe_then_init_typedb_db (
       &fresh_config, &env . driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
