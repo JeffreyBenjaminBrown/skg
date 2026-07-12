@@ -324,7 +324,8 @@ pub async fn maybe_add_one_partnerCol (
     // are omitted, so a col whose members are all inactive is not
     // created at all (de novo creation has no retained members).
     omit_inactive_members (
-      graph . other_member_pids (&owner_pid, owner_role),
+      graph . other_member_pids_gated (
+        &owner_pid, owner_role, active_source_set ),
       active_source_set,
       |id : &ID| graph . pid_and_source (id)
                  . map ( |(_pid, src)| src )

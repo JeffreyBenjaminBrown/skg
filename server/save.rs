@@ -35,7 +35,6 @@ use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
-use crate::util::path_from_pid_and_source;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;

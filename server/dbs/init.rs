@@ -18,6 +18,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
+use crate::accordion::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
 use crate::accordion::invariants::{report_accordion_violations, validate_all_accordions};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
@@ -288,6 +289,13 @@ fn full_init (
       validate_all_accordions (config, &graph);
     let _ = report_accordion_violations (
       &violations, &config . data_root ); }
+  { // DEPENDENCIES.toml: regenerate the publisher manifests, and
+    // warn when a foreign manifest contradicts this config's order.
+    if let Err (e) = write_dependencies_manifests (config) {
+      tracing::warn! ( error = %e,
+        "could not write DEPENDENCIES.toml manifests" ); }
+    for w in foreign_manifest_order_warnings (config) {
+      tracing::warn! ( "{}", w ); }}
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");

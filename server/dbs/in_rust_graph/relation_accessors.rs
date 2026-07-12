@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, members_of};
+use crate::types::misc::{ID, PrivaciedMember, SourceName, members_of};
 use crate::types::nodes::rust::NodeRust;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -198,6 +198,88 @@ pub const PARTNER_ROLE_VOCAB
 ];
 
 impl InRustGraph {
+  /// The LEVEL of the edge from OWNER to TARGET under RELATION, read
+  /// from the owner's outbound list (where every edge's level
+  /// lives). None when no such edge exists. This is how INBOUND
+  /// surfaces gate: an inbound partner P of X is visible at the
+  /// active set iff edge_level(P, R, X) is active -- private
+  /// memberships must not surface through ancestry, backpaths, or
+  /// inbound cols when the content direction hides them
+  /// (render-and-gating, 5_plan.org).
+  pub fn edge_level (
+    &self,
+    owner    : &ID,
+    relation : NodeRelation,
+    target   : &ID,
+  ) -> Option<SourceName> {
+    let target_key : ID = self . pid_of (target) ? ;
+    let node : &NodeRust = self . nodes . get (owner) ? ;
+    let leveled : Vec<PrivaciedMember<ID>> = match relation {
+      NodeRelation::Contains =>
+        node . contains . clone (),
+      NodeRelation::Subscribes =>
+        node . subscribes_to . or_default () . to_vec (),
+      NodeRelation::HidesFromItsSubscriptions =>
+        node . hides_from_its_subscriptions . or_default () . to_vec (),
+      NodeRelation::OverridesViewOf =>
+        node . overrides_view_of . or_default () . to_vec (),
+      NodeRelation::TextlinksTo =>
+        // textlinks derive from the body, which is home-only, so
+        // their level is the owner's home by construction.
+        return self . nodes . get (owner)
+          . map ( |n| n . source . clone () ), };
+    leveled . iter ()
+      . find ( |m| self . pid_of ( &m . member )
+               . as_ref () == Some (&target_key) )
+      . map ( |m| m . level . clone () ) }
+
+  /// Outbound members whose EDGE level is in the active set: the
+  /// visible fold of one relation. Pass None for the full fold.
+  pub fn outbound_pids_for_relation_gated (
+    &self,
+    pid      : &ID,
+    relation : NodeRelation,
+    active   : Option<&crate::source_sets::ActiveSourceSet>,
+  ) -> Vec<ID> {
+    let Some (node) = self . nodes . get (pid) else {
+      return Vec::new (); };
+    let leveled : Vec<PrivaciedMember<ID>> = match relation {
+      NodeRelation::Contains =>
+        node . contains . clone (),
+      NodeRelation::Subscribes =>
+        node . subscribes_to . or_default () . to_vec (),
+      NodeRelation::HidesFromItsSubscriptions =>
+        node . hides_from_its_subscriptions . or_default () . to_vec (),
+      NodeRelation::OverridesViewOf =>
+        node . overrides_view_of . or_default () . to_vec (),
+      NodeRelation::TextlinksTo =>
+        return self . outbound_pids_for_relation (pid, relation), };
+    leveled . iter ()
+      . filter ( |m| match active {
+        None => true,
+        Some (a) => a . is_all ()
+          || a . contains_source ( &m . level ) } )
+      . filter_map ( |m| self . pid_of ( &m . member ) )
+      . collect () }
+
+  /// Inbound partners whose EDGES to this node are visible at the
+  /// active set (see 'edge_level'). Pass None for all of them.
+  pub fn inbound_pids_for_relation_gated (
+    &self,
+    pid      : &ID,
+    relation : NodeRelation,
+    active   : Option<&crate::source_sets::ActiveSourceSet>,
+  ) -> Vec<ID> {
+    self . inbound_pids_for_relation (pid, relation)
+      . into_iter ()
+      . filter ( |partner| match active {
+        None => true,
+        Some (a) => a . is_all ()
+          || self . edge_level (partner, relation, pid)
+             . map ( |level| a . contains_source (&level) )
+             . unwrap_or (false) } )
+      . collect () }
+
   pub fn outbound_ids_for_relation (
     &self,
     pid      : &ID,
@@ -240,10 +322,23 @@ impl InRustGraph {
     pid  : &ID,
     role : RelationRole,
   ) -> Vec<ID> {
+    self . other_member_pids_gated (pid, role, None) }
+
+  /// 'other_member_pids' with edge-level gating: partners whose
+  /// EDGE is above the active prefix are omitted, in both
+  /// directions (see 'edge_level').
+  pub fn other_member_pids_gated (
+    &self,
+    pid    : &ID,
+    role   : RelationRole,
+    active : Option<&crate::source_sets::ActiveSourceSet>,
+  ) -> Vec<ID> {
     if role . is_first_role () {
-      self . outbound_pids_for_relation (pid, role . relation)
+      self . outbound_pids_for_relation_gated (
+        pid, role . relation, active )
     } else {
-      self . inbound_pids_for_relation (pid, role . relation) } }
+      self . inbound_pids_for_relation_gated (
+        pid, role . relation, active ) } }
 
   pub fn relation_membership_is_real (
     &self,

@@ -215,9 +215,18 @@ fn reconcile_content_children (
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_source_from_id'; this makes the rerender consistent.)
   let content_ids : Vec<ID> =
-    members_of (& nodecomplete . contains) . iter ()
-    . map ( |id| graph_snap . pid_of (id)
-                 . unwrap_or_else ( || id . clone () ))
+    nodecomplete . contains . iter ()
+    . filter ( |m| match active_source_set {
+      // Edge-level gating (render-and-gating, 5_plan.org): a
+      // membership whose LEVEL is inactive is invisible here even
+      // when the member node itself is active -- the private
+      // reading-list case. Node-source omission still happens
+      // below, in omit_inactive_members.
+      None => true,
+      Some (a) => a . is_all ()
+        || a . contains_source ( &m . level ) } )
+    . map ( |m| graph_snap . pid_of ( &m . member )
+                 . unwrap_or_else ( || m . member . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.1: a definitive subscribee-as-such regenerates its content as

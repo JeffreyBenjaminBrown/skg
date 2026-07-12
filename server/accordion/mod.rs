@@ -1,3 +1,4 @@
+pub mod dependencies_manifest;
 pub mod fold;
 pub mod invariants;
 pub mod types;

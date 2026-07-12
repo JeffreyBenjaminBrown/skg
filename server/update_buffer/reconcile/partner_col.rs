@@ -77,7 +77,8 @@ pub fn reconcile_partnerCol_children (
       // inactive members, with no retention (a stale InactiveNode
       // child gets the reconciler's delete-leaf / deaden-branch rule).
       omit_inactive_members (
-        graph_snap . other_member_pids (&owner_pid, owner_role),
+        graph_snap . other_member_pids_gated (
+          &owner_pid, owner_role, active_source_set ),
         active_source_set,
         source_resolver );
     if outbound && source_diffs . is_some () {

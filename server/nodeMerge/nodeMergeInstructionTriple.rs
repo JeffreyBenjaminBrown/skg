@@ -5,11 +5,10 @@ use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, SkgConfig, ID, members_of, privacied_all};
+use crate::types::misc::{MSV, PrivaciedMember, SkgConfig, SourceName, ID, members_of, privacied_all};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
-use crate::util::setlike_vector_subtraction;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -139,7 +138,8 @@ async fn nodeMerge_from_acquirer_and_acquiree (
         &acquiree_from_disk, config, driver ) . await ? );
     shown };
   let updated_acquirer : NodeComplete =
-    three_nodeMerged_nodecompletes( &acquirer_from_disk,
+    three_nodeMerged_nodecompletes( config,
+                           &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver,
                            &shown_pre_merge)?;
@@ -163,6 +163,7 @@ async fn nodeMerge_from_acquirer_and_acquiree (
 ///   content, and can't hide what either member SHOWED pre-merge
 ///   ('shown_pre_merge')
 fn three_nodeMerged_nodecompletes(
+  config: &SkgConfig,
   acquirer_from_disk: &NodeComplete,
   acquiree_from_disk: &NodeComplete,
   acquiree_text_preserver: &NodeComplete,
@@ -179,6 +180,29 @@ fn three_nodeMerged_nodecompletes(
       acquiree_from_disk . extra_ids . clone() );
     updated_acquirer . extra_ids =
       dedup_vector (combined_extra_ids); }
+  // Combining LEVELED lists (5_plan.org, work item interactions;
+  // "fold both, concatenate acquiree-after-acquirer, dedup,
+  // unfold"): levels are PRESERVED, so a merge cannot silently
+  // de-privatize an edge. On a member both sides carry, the more
+  // PRIVATE level wins (the safe tie-break); every level clamps at
+  // the acquirer's home, since no section may be more public than
+  // its home.
+  let combine_leveled =
+    |lists : &[&[PrivaciedMember<ID>]]| -> Vec<PrivaciedMember<ID>> {
+      let home : &SourceName = & updated_acquirer . source;
+      let mut out : Vec<PrivaciedMember<ID>> = Vec::new ();
+      for list in lists {
+        for m in *list {
+          let level : SourceName = config . more_private_of (
+            m . level . clone (), home . clone () );
+          match out . iter_mut ()
+            . find ( |o| o . member == m . member ) {
+            Some (existing) => {
+              existing . level = config . more_private_of (
+                existing . level . clone (), level ); }
+            None => out . push ( PrivaciedMember::at (
+              level, m . member . clone () )), }} }
+      out };
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
@@ -188,29 +212,40 @@ fn three_nodeMerged_nodecompletes(
     combined . extend (
       members_of (& acquiree_from_disk . contains) );
     dedup_vector (combined) };
-  updated_acquirer . contains =
-    privacied_all (
-      & updated_acquirer . source,
-      setlike_vector_subtraction ( // prevent acquirer from containing itself
-        new_contains . clone(),
-        &updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>() ));
+  updated_acquirer . contains = {
+    let mut combined : Vec<PrivaciedMember<ID>> = combine_leveled (
+      & [ & privacied_all ( & updated_acquirer . source,
+                            vec! [ acquiree_text_preserver . pid . clone() ] ),
+          & acquirer_from_disk . contains,
+          & acquiree_from_disk . contains ] );
+    let own_ids : Vec<ID> =
+      updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>();
+    combined . retain ( // prevent acquirer from containing itself
+      |m| ! own_ids . contains ( &m . member ));
+    combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
-    let mut combined : Vec<String> =
-      members_of ( acquirer_from_disk . aliases . or_default() );
-    combined . extend (
-      members_of ( acquiree_from_disk . aliases . or_default() ) );
+    let mut combined : Vec<PrivaciedMember<String>> = Vec::new ();
+    for list in [ acquirer_from_disk . aliases . or_default (),
+                  acquiree_from_disk . aliases . or_default () ] {
+      for m in list {
+        let level : SourceName = config . more_private_of (
+          m . level . clone (),
+          updated_acquirer . source . clone () );
+        match combined . iter_mut ()
+          . find ( |o| o . member == m . member ) {
+          Some (existing) => {
+            existing . level = config . more_private_of (
+              existing . level . clone (), level ); }
+          None => combined . push ( PrivaciedMember::at (
+            level, m . member . clone () )), }} }
     updated_acquirer . aliases =
-      MSV::Specified( privacied_all (
-        & updated_acquirer . source, dedup_vector (combined) )); }
+      MSV::Specified (combined); }
   { // Combine subscribes_to
-    let mut combined : Vec<ID> =
-      members_of ( acquirer_from_disk . subscribes_to . or_default() );
-    combined . extend (
-      members_of ( acquiree_from_disk . subscribes_to . or_default() ) );
     updated_acquirer . subscribes_to =
-      MSV::Specified( privacied_all (
-        & updated_acquirer . source, dedup_vector (combined) )); }
+      MSV::Specified ( combine_leveled (
+        & [ acquirer_from_disk . subscribes_to . or_default (),
+            acquiree_from_disk . subscribes_to . or_default () ] )); }
   { // Combine hides_from_its_subscriptions, filtering to hide
     // nothing that the acquirer contains, and nothing either member
     // SHOWED through its subscriptions pre-merge: if it was
@@ -219,34 +254,22 @@ fn three_nodeMerged_nodecompletes(
     // member's hide never silences the other's view. ("Something
     // like the intersection": exactly the intersection when both
     // members could see the id through some subscribee.)
-    let mut combined : Vec<ID> =
-      members_of (
-        acquirer_from_disk . hides_from_its_subscriptions . or_default() );
-    combined . extend (
-      members_of (
-        acquiree_from_disk . hides_from_its_subscriptions . or_default() ) );
+    let mut combined : Vec<PrivaciedMember<ID>> = combine_leveled (
+      & [ acquirer_from_disk . hides_from_its_subscriptions
+            . or_default (),
+          acquiree_from_disk . hides_from_its_subscriptions
+            . or_default () ] );
+    combined . retain ( // if it's in 'new_contains', then it's not here
+      |m| ! new_contains . contains ( &m . member ));
+    combined . retain (
+      |m| ! shown_pre_merge . contains ( &m . member ));
     updated_acquirer . hides_from_its_subscriptions =
-      MSV::Specified( privacied_all (
-        & updated_acquirer . source,
-        { let deduped_and_filtered : Vec<ID> =
-            // if it's in 'new_contains', then it's not here
-            setlike_vector_subtraction(
-                dedup_vector (combined),
-                &new_contains);
-          deduped_and_filtered
-            . into_iter()
-            . filter ( |id| ! shown_pre_merge . contains (id) )
-            . collect() } )); }
+      MSV::Specified (combined); }
   { // Combine overrides_view_of
-    let mut combined : Vec<ID> =
-      members_of (
-        acquirer_from_disk . overrides_view_of . or_default() );
-    combined . extend (
-      members_of (
-        acquiree_from_disk . overrides_view_of . or_default() ) );
     updated_acquirer . overrides_view_of =
-      MSV::Specified( privacied_all (
-        & updated_acquirer . source, dedup_vector (combined) )); }
+      MSV::Specified ( combine_leveled (
+        & [ acquirer_from_disk . overrides_view_of . or_default (),
+            acquiree_from_disk . overrides_view_of . or_default () ] )); }
   Ok (updated_acquirer) }
 
 /// The ids 'node' shows as unintegrated subscribed content: contained
