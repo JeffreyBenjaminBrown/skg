@@ -118,7 +118,7 @@ function M.prompt_for_source_set ()
     vim.notify('No skg source-sets found')
     return nil end
   return M.completing_read_with_cycle(
-    'Source-set (S-left/right cycle): ', source_sets, {
+    'Most private source to make available (S-left/right cycle): ', source_sets, {
       require_match = true, cycle_values = source_sets,
       initial_input = 'all' })
 end

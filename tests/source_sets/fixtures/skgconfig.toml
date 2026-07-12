@@ -11,11 +11,3 @@ user_owns_it = true
 name = "private"
 path = "private"
 user_owns_it = true
-
-[[source_sets]]
-name = "public"
-sources = ["public"]
-
-[[source_sets]]
-name = "private"
-sources = ["private"]

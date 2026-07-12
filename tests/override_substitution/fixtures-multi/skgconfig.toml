@@ -15,7 +15,3 @@ user_owns_it = true
 name = "foreign"
 path = "foreign"
 user_owns_it = false
-
-[[source_sets]]
-name = "main"
-sources = ["main"]

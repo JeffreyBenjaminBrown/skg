@@ -80,12 +80,15 @@ name directly."
        (local-set-key (kbd "C-?") #'skg-view-source-list)))))
 
 (defun skg--prompt-for-source-set ()
-  "Prompt for a source-set name, with completion and S-left/S-right cycling."
+  "Prompt for a source-set choice, with completion and S-left/S-right cycling.
+A source-set is a prefix of the config's privacy order: choosing a
+source makes it and everything more public available; \"all\" makes
+everything available."
   (let ((source-sets (skg--source-set-names)))
     (unless source-sets
-      (user-error "No skg source-sets found"))
+      (user-error "No skg sources found"))
     (skg--completing-read-with-cycle
-     "Source-set (S-left/right cycle): "
+     "Most private source to make available (S-left/right cycle): "
      source-sets nil t nil nil "all" nil source-sets)))
 
 (defun skg--source-paths ()
@@ -101,10 +104,14 @@ name directly."
       (skg-source-names-from-toml config-file))))
 
 (defun skg--source-set-names ()
-  "Return configured source-set names from skgconfig.toml, including all."
+  "Return the source-set choices, in privacy order, ending with \"all\".
+The choices are the configured source names (each meaning that
+source and everything more public -- a prefix of the config's
+privacy order) plus the reserved \"all\"."
   (let ((config-file (skg-config-file)))
     (when config-file
-      (cons "all" (skg-source-set-names-from-toml config-file)))))
+      (append (skg-source-names-from-toml config-file)
+              (list "all")))))
 
 (defun skg-view-source-list ()
   "Display an org buffer listing configured sources and their paths."
@@ -239,12 +246,6 @@ config-load time."
         (forward-line 1))
       (funcall flush)
       (nreverse result))))
-
-(defun skg-source-set-names-from-toml (file)
-  "Return configured source-set names from FILE.
-The reserved source-set `all' is intentionally not included here;
-callers that offer source-set choices should add it explicitly."
-  (skg-table-names-from-toml file "source_sets"))
 
 (defun skg--source-dir (source-name)
   "Return absolute directory for SOURCE-NAME per skgconfig.toml, or nil."

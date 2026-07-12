@@ -27,8 +27,9 @@ pub fn validate_source_paths_creating_owned_ones_if_needed (
 /// The source names in TOML declaration order, read from the raw
 /// '[[sources]]' array. The parsed 'SkgConfig.sources' is a HashMap and
 /// loses order, so the loaders re-extract it here to fill
-/// 'SkgConfig.source_order' (used by the config-first fork default).
-/// Empty when the TOML has no parseable sources array.
+/// 'SkgConfig.source_order'. LOAD-BEARING: declaration order is the
+/// privacy order, most public first (see the chokepoint methods on
+/// 'SkgConfig'). Empty when the TOML has no parseable sources array.
 fn source_order_from_toml (
   contents : &str,
 ) -> Vec<SourceName> {
@@ -43,6 +44,31 @@ fn source_order_from_toml (
             . collect () )
     . unwrap_or_default () }
 
+/// Named source-sets are retired: source-sets are now the prefixes of
+/// the config's privacy order (see TODO/user-owned_autofork_chain/
+/// 5_plan.org, work item privacy-order). A config still defining
+/// '[[source_sets]]' would silently mean something else than its
+/// author intended, so its presence is a hard error.
+fn reject_retired_source_sets_config (
+  contents : &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+  let has_source_sets : bool =
+    toml::from_str::<toml::Value> (contents) . ok ()
+    . as_ref ()
+    . map ( |v| v . get ("source_sets") . is_some () )
+    . unwrap_or (false);
+  if has_source_sets {
+    return Err ( concat! (
+      "This config defines [[source_sets]], a retired mechanism. ",
+      "Source-sets are now the PREFIXES of the [[sources]] order: ",
+      "list your sources most-public-first, and select a set by ",
+      "naming the most private source to make available (or 'all'). ",
+      "See TODO/user-owned_autofork_chain/5_plan.org, work item ",
+      "privacy-order. Delete the [[source_sets]] entries and, if a ",
+      "deleted set was your default_source_set, replace that with a ",
+      "source name or 'all'." ) . into () ); }
+  Ok (( )) }
+
 pub fn load_config (
   path: &str )
   -> Result <SkgConfig,
@@ -52,6 +78,7 @@ pub fn load_config (
                        path)
                . into( )); }
   let contents: String = fs::read_to_string (path) ?;
+  reject_retired_source_sets_config (&contents) ?;
   let mut config: SkgConfig =
     toml::from_str (&contents) ?;
   config . source_order = source_order_from_toml (&contents);
@@ -113,6 +140,7 @@ pub fn load_config_with_overrides (
   if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}", path) . into()); }
   let contents: String = fs::read_to_string (path)?;
+  reject_retired_source_sets_config (&contents)?;
   let mut config: SkgConfig =
     toml::from_str (&contents)?;
   config . source_order = source_order_from_toml (&contents);
@@ -148,23 +176,11 @@ fn validate_source_sets (
 ) -> Result<(), Box<dyn std::error::Error>> {
   if config . sources . contains_key (&SourceName::from ("all")) {
     return Err ("Configured source may not be named 'all'" . into ()); }
-  for (name, source_set) in &config . source_sets {
-    if name . 0 == "all" {
-      return Err ("User-defined source-set may not be named 'all'" . into ()); }
-    if source_set . sources . is_empty () {
-      return Err (format! (
-        "Source-set '{}' must contain at least one source", name
-      ) . into ()); }
-    for source in &source_set . sources {
-      if ! config . sources . contains_key (source) {
-        return Err (format! (
-          "Source-set '{}' references unknown source '{}'",
-          name, source
-        ) . into ()); }}}
   if config . default_source_set . 0 != "all"
-  && ! config . source_sets . contains_key (&config . default_source_set) {
+  && ! config . sources . contains_key (
+       &SourceName::from ( config . default_source_set . 0 . as_str () )) {
     return Err (format! (
-      "Default source-set '{}' not found in config",
+      "default_source_set '{}' names no configured source. It must be 'all' or the name of the most private source to make available.",
       config . default_source_set
     ) . into ()); }
   Ok (()) }

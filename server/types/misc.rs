@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -65,14 +65,13 @@ pub struct SkgfileSource {
   pub user_owns_it : bool,
 }
 
+/// Identifies a source-set CHOICE. Source-sets are no longer defined
+/// by hand: they are the PREFIXES of the config's source order (most
+/// public first), so a choice is either "all" (every source) or the
+/// name of a configured source -- meaning "that source and everything
+/// more public", i.e. the most private source to make available.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SourceSetName ( pub String );
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
-pub struct SourceSet {
-  pub name    : SourceSetName,
-  pub sources : Vec<SourceName>,
-}
 
 impl SkgfileSource {
   pub fn herald_label (&self) -> &str {
@@ -93,12 +92,14 @@ pub struct SkgConfig {
   // The source names in TOML declaration order ('sources' is a HashMap,
   // which loses it). Filled at parse time by the config loaders; empty
   // for dummy/test configs, where the config-order helpers fall back to
-  // alphabetical. Used for the "config-first owned source" fork default.
+  // alphabetical. LOAD-BEARING: declaration order is the privacy order
+  // (most public first); the fold, the edge-level defaults, the
+  // validators, and prefix source-sets all read it, through the
+  // comparison chokepoint methods below ('ordered_sources',
+  // 'source_position', 'is_strictly_more_public', 'more_private_of',
+  // 'prefix_through'). No other code may compare source positions.
   #[serde (skip)]
   pub source_order   : Vec<SourceName>,
-
-  #[serde(default, deserialize_with = "deserialize_source_sets")]
-  pub source_sets    : HashMap<SourceSetName, SourceSet>,
 
   #[serde(default = "default_source_set_name")]
   pub default_source_set : SourceSetName,
@@ -188,28 +189,6 @@ where
     map . insert (
       source . name . clone (),
       source ); }
-  Ok (map)
-}
-
-fn deserialize_source_sets<'de, D> (
-  deserializer : D
-) -> Result <HashMap<SourceSetName, SourceSet>, D::Error>
-where
-  D : Deserializer<'de>
-{
-  let sets_vec : Vec<SourceSet> =
-    Vec::deserialize (deserializer) ?;
-  let mut map : HashMap<SourceSetName, SourceSet> =
-    HashMap::new ();
-  let mut seen : HashSet<SourceSetName> =
-    HashSet::new ();
-  for set in sets_vec {
-    if ! seen . insert (set . name . clone ()) {
-      return Err (serde::de::Error::custom (
-        format! ("Duplicate source-set name '{}'", set . name))); }
-    map . insert (
-      set . name . clone (),
-      set ); }
   Ok (map)
 }
 
@@ -367,7 +346,6 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       sources,
       source_order       : Vec::new (),
-      source_sets        : HashMap::new (),
       default_source_set : SourceSetName::from ("all"),
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
@@ -391,7 +369,6 @@ impl SkgConfig {
       data_root          : PathBuf::from ("."),
       sources,
       source_order       : Vec::new (),
-      source_sets        : HashMap::new (),
       default_source_set : SourceSetName::from ("all"),
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
@@ -412,22 +389,11 @@ impl SkgConfig {
       . unwrap_or (false)
   }
 
-  /// The owned source names in TOML declaration order (config-first).
-  /// Falls back to alphabetical order when declaration order is
-  /// unavailable (a dummy/test config, whose 'source_order' is empty),
-  /// so the result is always deterministic.
+  /// The owned source names in privacy order (see 'ordered_sources').
   pub fn owned_sources_in_config_order (
     &self,
   ) -> Vec<SourceName> {
-    let ordered : Vec<SourceName> =
-      if self . source_order . is_empty () {
-        // No declaration order recorded: alphabetical, for determinism.
-        let mut names : Vec<SourceName> =
-          self . sources . keys () . cloned () . collect ();
-        names . sort ();
-        names
-      } else { self . source_order . clone () };
-    ordered . into_iter ()
+    self . ordered_sources () . into_iter ()
       . filter ( |name| self . user_owns_source (name) )
       . collect () }
 
@@ -453,15 +419,85 @@ impl SkgConfig {
   ) -> &SourceSetName {
     &self . default_source_set }
 
+  /// THE COMPARISON CHOKEPOINT, with the methods below it. Every
+  /// source name, in privacy order: most public first, most private
+  /// last (TOML declaration order). Falls back to alphabetical when
+  /// declaration order is unavailable (a dummy/test config, whose
+  /// 'source_order' is empty), so the result is always deterministic.
+  /// No code outside these methods may compare source positions.
+  pub fn ordered_sources (
+    &self,
+  ) -> Vec<SourceName> {
+    if self . source_order . is_empty () {
+      // No declaration order recorded: alphabetical, for determinism.
+      let mut names : Vec<SourceName> =
+        self . sources . keys () . cloned () . collect ();
+      names . sort ();
+      names
+    } else { self . source_order . clone () }}
+
+  /// Position in the privacy order: 0 = most public.
+  /// None for a source absent from the config.
+  pub fn source_position (
+    &self,
+    source : &SourceName,
+  ) -> Option<usize> {
+    self . ordered_sources () . iter ()
+      . position ( |s| s == source ) }
+
+  /// True iff 'a' is STRICTLY more public than 'b' (earlier in the
+  /// privacy order). A source absent from the config counts as
+  /// maximally private, so nothing is less public than it.
+  pub fn is_strictly_more_public (
+    &self,
+    a : &SourceName,
+    b : &SourceName,
+  ) -> bool {
+    match ( self . source_position (a),
+            self . source_position (b) ) {
+      (Some (pa), Some (pb)) => pa < pb,
+      (Some (_),  None     ) => true,
+      _                      => false, }}
+
+  /// The more private of the two (the later in the privacy order);
+  /// 'b' on a tie. This is the edge-level default rule's core: a
+  /// relationship instance defaults to the level of the more private
+  /// of its two endpoints' homes.
+  pub fn more_private_of (
+    &self,
+    a : SourceName,
+    b : SourceName,
+  ) -> SourceName {
+    if self . is_strictly_more_public (&b, &a) { a } else { b }}
+
+  /// The prefix of the privacy order through 'source', inclusive:
+  /// that source and everything more public. Errors if the source is
+  /// not configured.
+  pub fn prefix_through (
+    &self,
+    source : &SourceName,
+  ) -> Result<Vec<SourceName>, String> {
+    let ordered : Vec<SourceName> =
+      self . ordered_sources ();
+    let position : usize =
+      ordered . iter () . position ( |s| s == source )
+      . ok_or_else ( || format! (
+        "Source '{}' not found in config", source )) ?;
+    Ok ( ordered [..= position] . to_vec () ) }
+
+  /// The sources a source-set choice makes available: everything for
+  /// "all"; for a source name, the prefix of the privacy order
+  /// through it (that source and everything more public).
   pub fn source_set_sources (
     &self,
     name : &SourceSetName,
   ) -> Result<BTreeSet<SourceName>, String> {
     if name . 0 == "all" {
       return Ok ( self . sources . keys () . cloned () . collect () ); }
-    let source_set : &SourceSet =
-      self . source_sets . get (name)
-      . ok_or_else ( || format! (
-        "Source-set '{}' not found in config", name )) ?;
-    Ok ( source_set . sources . iter () . cloned () . collect () ) }
+    Ok ( self
+         . prefix_through ( &SourceName::from ( name . 0 . as_str () ))
+         . map_err ( |_| format! (
+           "Source-set '{}' names no configured source. A source-set is 'all' or the name of the most private source to make available.",
+           name )) ?
+         . into_iter () . collect () ) }
 }

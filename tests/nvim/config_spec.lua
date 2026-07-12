@@ -61,7 +61,7 @@ describe('skg.config', function ()
   it('does not confuse [[sources]] and [[source_sets]]', function ()
     assert.are.same({ 'public', 'private', 'foreign' },
                     config.source_names())
-    assert.are.same({ 'all', 'public-set', 'private-set' },
+    assert.are.same({ 'public', 'private', 'foreign', 'all' },
                     config.source_set_names())
     local path_names = {}
     for _, entry in ipairs(config.source_paths()) do

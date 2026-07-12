@@ -10,7 +10,3 @@ user_owns_it = true
 name = "other"
 path = "other"
 user_owns_it = true
-
-[[source_sets]]
-name = "main"
-sources = ["main"]

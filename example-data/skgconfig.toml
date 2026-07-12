@@ -3,10 +3,12 @@ tantivy_folder = ".index.tantivy"
 port = 1730 # TCP port for Rust-Emacs API communication.
 default_source_set = "public"
 
-[[sources]]
-name = "private"
-path = "private"
-user_owns_it = true
+# Sources are listed in PRIVACY ORDER: most public first, most
+# private last. That order defines the available source-sets: each
+# source names the set consisting of itself and everything more
+# public (a prefix of this list), and the reserved name "all" means
+# every source. default_source_set above names the set active when a
+# client connects: here, just the "public" source.
 
 [[sources]]
 name = "public"
@@ -14,14 +16,11 @@ path = "public"
 user_owns_it = true
 
 [[sources]]
+name = "private"
+path = "private"
+user_owns_it = true
+
+[[sources]]
 name = "Fred"
 path = "Fred"
 user_owns_it = false
-
-# The reserved source-set name "all" is already defined by skg and
-# means every configured source, so you do not need to list it here.
-[[source_sets]]
-# Source names and source-set names are different namespaces, so it is
-# okay for this source-set to have the same name as the "public" source.
-name = "public"
-sources = ["public"]

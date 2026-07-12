@@ -58,7 +58,7 @@
                        "test-skg-insert-heading-source-prompt/private"
                        (file-name-directory load-file-name)) "\"\n"
           "user_owns_it = true\n")
-  "Config text with interleaved sources and source-sets.")
+  "Config text with [[sources]] interleaved among other array\ntables. The [[source_sets]] tables are RETIRED config the server\nwould reject; they remain here to pin that the elisp readers skip\ntables they do not care about.")
 
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
@@ -272,7 +272,8 @@ open the sexp-edit buffer (not prompt in minibuffer)."
                       "private"))))))
 
 (ert-deftest test-source-set-prompt-completes-configured-source-sets ()
-  "skg--prompt-for-source-set should complete all configured source-sets."
+  "skg--prompt-for-source-set completes the prefix source-set choices:
+the sources in privacy order, then \"all\"."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public))) x\n"
    test--config-with-interleaved-source-sets
@@ -281,18 +282,18 @@ open the sexp-edit buffer (not prompt in minibuffer)."
                 (lambda (prompt collection predicate require-match
                          initial-input &optional hist def
                          inherit-input-method)
-                  (should (string-match-p "Source-set" prompt))
+                  (should (string-match-p "Most private source" prompt))
                   (should (equal collection
-                                 '("all" "public-set" "private-set")))
+                                 '("public" "private" "all")))
                   (should (null predicate))
                   (should require-match)
                   (should (null initial-input))
                   (should (null hist))
                   (should (equal def "all"))
                   (should (null inherit-input-method))
-                  "private-set")))
+                  "private")))
        (should (equal (skg--prompt-for-source-set)
-                      "private-set"))))))
+                      "private"))))))
 
 (ert-deftest test-config-readers-handle-interleaved-source-tables ()
   "Elisp config readers should not confuse [[sources]] and [[source_sets]]."
@@ -302,7 +303,7 @@ open the sexp-edit buffer (not prompt in minibuffer)."
    (lambda ()
      (should (equal (skg--source-names) '("public" "private")))
      (should (equal (skg--source-set-names)
-                    '("all" "public-set" "private-set")))
+                    '("public" "private" "all")))
      (should (equal (mapcar #'car (skg--source-paths))
                     '("public" "private"))))))
 

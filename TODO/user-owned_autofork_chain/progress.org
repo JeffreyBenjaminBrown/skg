@@ -1,0 +1,21 @@
+#+TITLE: Progress: the privacy accordion (executing 5_plan.org)
+
+Report format per [[../../coding-advice/when-to-stop.org][when-to-stop.org]]: what's done and went well;
+changes to the plan's envisioned order; what's imperfect about
+what's done; choices determining the future.
+
+* status
+Execution began 2026-07-12. Work items proceed in the plan's
+order; this file grows as each lands.
+
+* what's done and went well
+(nothing yet)
+
+* changes to the plan's envisioned order
+(none yet)
+
+* what's imperfect about what's done
+(nothing yet)
+
+* choices determining the future
+(none yet)

@@ -137,14 +137,6 @@ function M.source_paths_from_toml (file)
   return result
 end
 
----Configured source-set names from FILE. The reserved source-set
----'all' is intentionally not included here; callers that offer
----source-set choices should add it explicitly.
----@param file string
----@return string[]
-function M.source_set_names_from_toml (file)
-  return M.table_names_from_toml(file, 'source_sets')
-end
 
 -- ── wrappers over the active config ────────────────────────────────
 
@@ -160,13 +152,16 @@ function M.source_names ()
   return file and M.source_names_from_toml(file) or nil
 end
 
----@return string[]|nil source-set names, 'all' first, or nil
+---The source-set choices, in privacy order, ending with 'all'.
+---A source-set is a prefix of the config's privacy order: each
+---source names the set of itself and everything more public;
+---'all' means every source.
+---@return string[]|nil source-set choices, 'all' last, or nil
 function M.source_set_names ()
   local file = M.config_file()
   if not file then return nil end
-  local names = { 'all' }
-  for _, name in ipairs(M.source_set_names_from_toml(file)) do
-    table.insert(names, name) end
+  local names = M.source_names_from_toml(file)
+  table.insert(names, 'all')
   return names
 end
 

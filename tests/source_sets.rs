@@ -278,8 +278,11 @@ fn connected_tcp_stream_pair (
   Ok ((server, client)) }
 
 #[test]
-fn config_loads_default_source_set_and_named_source_sets (
+fn config_loads_default_source_set_and_prefix_source_sets (
 ) -> Result<(), Box<dyn Error>> {
+  // Source-sets are the prefixes of the privacy order: naming a
+  // source selects it and everything more public. The fixture lists
+  // public before private, so "public" selects only itself.
   let config =
     load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
   assert_eq! (
@@ -307,7 +310,7 @@ fn config_rejects_reserved_all_source_and_source_set_names (
     load_config ("tests/source_sets/fixtures-invalid/source-set-all/skgconfig.toml");
   assert! (
     source_set_all . is_err (),
-	    "user-defined source-set named all must be rejected" );
+	    "a config still defining the retired [[source_sets]] must be rejected" );
 }
 
 async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (

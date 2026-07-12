@@ -108,13 +108,15 @@ fn send_source_sets_response (
   config      : &SkgConfig,
   active      : &ActiveSourceSet,
 ) {
+  // Source-sets are the prefixes of the privacy order, so the
+  // choices are the sources themselves, in that order (each meaning
+  // "this source and everything more public"), plus "all" last (the
+  // longest prefix). Order is meaningful; do not sort.
   let mut names : Vec<String> =
-    config . source_sets . keys ()
+    config . ordered_sources () . iter ()
     . map ( |name| name . 0 . clone () )
     . collect ();
   names . push ("all" . to_string ());
-  names . sort ();
-  names . dedup ();
   let names_sexp : String =
     names . iter ()
     . map ( |name| format! ("\"{}\"", escape_string (name)) )
