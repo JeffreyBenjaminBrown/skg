@@ -14,7 +14,7 @@ use crate::from_text::local_instruction_collection::lower::{
 use crate::from_text::weave::{member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, privacied_all};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::error::Error;
@@ -105,7 +105,7 @@ async fn supplement_saveintent_from_disk (
       let disk_node : NodeComplete = disk_node;
       let mut from_buffer : NodeSaveIntent = from_buffer;
       from_buffer . fill_unspecified_contains (
-        &disk_node . contains);
+        &members_of (&disk_node . contains));
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
@@ -144,20 +144,34 @@ fn preserve_invisible_members (
 ) -> NodeComplete {
   let is_visible = |id : &ID| -> bool {
     member_is_visible (id, config, active) };
-  { let merged : Vec<ID> = weave (
-      &disk_node . contains, &is_visible,
-      &supplemented . contains );
-    supplemented . contains = merged; }
-  { let merged : Vec<ID> = weave (
-      disk_node . subscribes_to . or_default (), &is_visible,
-      supplemented . subscribes_to . or_default () );
-    if merged != supplemented . subscribes_to . or_default () {
-      supplemented . subscribes_to = MSV::Specified (merged); }}
-  { let merged : Vec<ID> = set_difference_merge (
-      disk_node . overrides_view_of . or_default (), &is_visible,
-      supplemented . overrides_view_of . or_default () );
-    if merged != supplemented . overrides_view_of . or_default () {
-      supplemented . overrides_view_of = MSV::Specified (merged); }}
+  let owner_source : SourceName = supplemented . source . clone ();
+  { let disk_contains : Vec<ID> = members_of (&disk_node . contains);
+    let buffer_contains : Vec<ID> = members_of (&supplemented . contains);
+    let merged : Vec<ID> = weave (
+      &disk_contains, &is_visible,
+      &buffer_contains );
+    supplemented . contains =
+      privacied_all (&owner_source, merged); }
+  { let disk_subscribes : Vec<ID> =
+      members_of (disk_node . subscribes_to . or_default ());
+    let buffer_subscribes : Vec<ID> =
+      members_of (supplemented . subscribes_to . or_default ());
+    let merged : Vec<ID> = weave (
+      &disk_subscribes, &is_visible,
+      &buffer_subscribes );
+    if merged != buffer_subscribes {
+      supplemented . subscribes_to =
+        MSV::Specified (privacied_all (&owner_source, merged)); }}
+  { let disk_overrides : Vec<ID> =
+      members_of (disk_node . overrides_view_of . or_default ());
+    let buffer_overrides : Vec<ID> =
+      members_of (supplemented . overrides_view_of . or_default ());
+    let merged : Vec<ID> = set_difference_merge (
+      &disk_overrides, &is_visible,
+      &buffer_overrides );
+    if merged != buffer_overrides {
+      supplemented . overrides_view_of =
+        MSV::Specified (privacied_all (&owner_source, merged)); }}
   supplemented }
 
 /// Replace buffer's (singleton) ids with disk's (possibly multiple) ids.

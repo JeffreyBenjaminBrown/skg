@@ -191,16 +191,16 @@ fn verify_filesystem_after_merge_2_into_1(
 
   let acquiree_text_preserver_id: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
-  assert_eq!(&node_1 . contains[0], acquiree_text_preserver_id,
+  assert_eq!(&node_1 . contains[0] . member, acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
-  assert_eq!(&node_1 . contains[1], &ID::from ("11"));
-  assert_eq!(&node_1 . contains[2], &ID::from ("12"));
-  assert_eq!(&node_1 . contains[3], &ID::from ("overlap"),
+  assert_eq!(&node_1 . contains[1] . member, &ID::from ("11"));
+  assert_eq!(&node_1 . contains[2] . member, &ID::from ("12"));
+  assert_eq!(&node_1 . contains[3] . member, &ID::from ("overlap"),
              "overlap should appear in position 3 (from acquirer's original contents)");
-  assert_eq!(&node_1 . contains[4], &ID::from ("21"));
-  assert_eq!(&node_1 . contains[5], &ID::from ("22"));
+  assert_eq!(&node_1 . contains[4] . member, &ID::from ("21"));
+  assert_eq!(&node_1 . contains[5] . member, &ID::from ("22"));
   assert_eq!(
-    &node_1 . contains[6],
+    &node_1 . contains[6] . member,
     &ID::from(
       "hidden-from-subscriptions-of-1-but-in-content-of-2"));
   // Note that the second 'overlap' was stripped.
@@ -208,7 +208,7 @@ fn verify_filesystem_after_merge_2_into_1(
   // Verify overlap appears only once (not duplicated)
   let overlap_count: usize = node_1 . contains
     . iter()
-    . filter(|id| *id == &ID::from ("overlap"))
+    . filter(|m| m . member == ID::from ("overlap"))
     . count();
   assert_eq!(overlap_count, 1,
              "overlap should appear exactly once (deduplicated), not twice");
@@ -217,7 +217,7 @@ fn verify_filesystem_after_merge_2_into_1(
   // (node 2 had no relationships to transfer)
   assert_eq!(node_1 . subscribes_to . or_default() . len(), 1,
              "Node 1 should keep its subscribes_to");
-  assert_eq!(&node_1 . subscribes_to . or_default()[0],
+  assert_eq!(&node_1 . subscribes_to . or_default()[0] . member,
              &ID::from ("1-subscribes-to"));
 
   // Note: node 1 originally hid both "hidden-from-1s-subscriptions"
@@ -226,12 +226,12 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!(node_1 . hides_from_its_subscriptions . or_default() . len(),
              1,
              "Node 1 should have 1 hides relationship");
-  assert_eq!(&node_1 . hides_from_its_subscriptions . or_default()[0],
+  assert_eq!(&node_1 . hides_from_its_subscriptions . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"));
 
   assert_eq!(node_1 . overrides_view_of . or_default() . len(), 1,
              "Node 1 should keep its overrides_view_of");
-  assert_eq!(&node_1 . overrides_view_of . or_default()[0],
+  assert_eq!(&node_1 . overrides_view_of . or_default()[0] . member,
              &ID::from ("overridden-by-1"));
 
   let acquiree_text_preserver_path: String =
@@ -515,21 +515,21 @@ fn verify_filesystem_after_merge_1_into_2(
               "Node 2 should contain 7 items (with overlap deduplicated)");
   let acquiree_text_preserver_id: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
-  assert_eq!(&node_2 . contains[0], acquiree_text_preserver_id,
+  assert_eq!(&node_2 . contains[0] . member, acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
-  assert_eq!(&node_2 . contains[1], &ID::from ("21"));
-  assert_eq!(&node_2 . contains[2], &ID::from ("22"));
-  assert_eq!(&node_2 . contains[3], &ID::from(
+  assert_eq!(&node_2 . contains[1] . member, &ID::from ("21"));
+  assert_eq!(&node_2 . contains[2] . member, &ID::from ("22"));
+  assert_eq!(&node_2 . contains[3] . member, &ID::from(
     "hidden-from-subscriptions-of-1-but-in-content-of-2"));
-  assert_eq!(&node_2 . contains[4], &ID::from ("overlap"),
+  assert_eq!(&node_2 . contains[4] . member, &ID::from ("overlap"),
              "overlap should appear in position 4 (from acquirer's original contents)");
-  assert_eq!(&node_2 . contains[5], &ID::from ("11"));
-  assert_eq!(&node_2 . contains[6], &ID::from ("12"));
+  assert_eq!(&node_2 . contains[5] . member, &ID::from ("11"));
+  assert_eq!(&node_2 . contains[6] . member, &ID::from ("12"));
 
   // Verify overlap appears only once (not duplicated)
   let overlap_count: usize = node_2 . contains
     . iter()
-    . filter(|id| *id == &ID::from ("overlap"))
+    . filter(|m| m . member == ID::from ("overlap"))
     . count();
   assert_eq!(overlap_count, 1,
              "overlap should appear exactly once (deduplicated), not twice");
@@ -537,7 +537,7 @@ fn verify_filesystem_after_merge_1_into_2(
   // Verify subscribes_to: should have node 1's subscribes_to transferred
   assert_eq!(node_2 . subscribes_to . or_default() . len(), 1,
              "Node 2 should have 1 subscribes_to relationship");
-  assert_eq!(&node_2 . subscribes_to . or_default()[0],
+  assert_eq!(&node_2 . subscribes_to . or_default()[0] . member,
              &ID::from ("1-subscribes-to"),
              "Node 2 should subscribe to 1-subscribes-to");
 
@@ -547,14 +547,14 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(node_2 . hides_from_its_subscriptions . or_default() . len(),
              1,
              "Node 2 should have 1 hides_from_its_subscriptions relationship");
-  assert_eq!(&node_2 . hides_from_its_subscriptions . or_default()[0],
+  assert_eq!(&node_2 . hides_from_its_subscriptions . or_default()[0] . member,
              &ID::from ("hidden-from-1s-subscriptions"),
              "Node 2 should hide hidden-from-1s-subscriptions");
 
   // Verify overrides_view_of: should have node 1's overrides_view_of transferred
   assert_eq!(node_2 . overrides_view_of . or_default() . len(), 1,
              "Node 2 should have 1 overrides_view_of relationship");
-  assert_eq!(&node_2 . overrides_view_of . or_default()[0],
+  assert_eq!(&node_2 . overrides_view_of . or_default()[0] . member,
              &ID::from ("overridden-by-1"),
              "Node 2 should override view of overridden-by-1");
 

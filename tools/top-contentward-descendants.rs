@@ -14,7 +14,7 @@
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::misc::{ID, SkgConfig, members_of};
 use skg::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -35,9 +35,9 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   check_for_duplicate_ids_across_sources (
     &nodes, &config . data_root) ?;
   // Adjacency: pid -> list of pids it contains.
-  let adj : HashMap<ID, &[ID]> =
+  let adj : HashMap<ID, Vec<ID>> =
     nodes . iter ()
-    . map ( |n| (n . pid . clone (), n . contains . as_slice ()) )
+    . map ( |n| (n . pid . clone (), members_of ( &n . contains )) )
     . collect ();
   // Map titles for display.
   let title_of : HashMap<ID, &str> =
@@ -64,7 +64,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
 /// BFS from `origin` over `contains`, counting every reachable
 /// descendant exactly once (not including the origin itself).
 fn bfs_descendants_count (
-  adj    : &HashMap<ID, &[ID]>,
+  adj    : &HashMap<ID, Vec<ID>>,
   origin : &ID,
 ) -> usize {
   let mut visited : HashSet<ID> = HashSet::new ();
@@ -73,7 +73,7 @@ fn bfs_descendants_count (
   visited . insert ( origin . clone () );
   while let Some (curr) = queue . pop_front () {
     if let Some (children) = adj . get (&curr) {
-      for child in *children {
+      for child in children {
         if visited . insert ( child . clone () ) {
           queue . push_back ( child . clone () ); } } } }
   // Subtract 1 for the origin itself.

@@ -23,7 +23,7 @@ use skg::types::maybe_placed_viewnode::{
   MpViewnode,
   maybePlaced_to_placed_tree,
   maybePlaced_to_placed_viewforest };
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
@@ -153,14 +153,14 @@ async fn pipeline_basic_mixed_tree (
           saved_node_by_id (&plan . define_nodes, "root");
         assert_eq!( root . body,
                     Some ("Root body" . to_string()) );
-        assert_eq!( root . contains, vec![ID::from ("child")] );
-        assert_eq!( root . aliases,
+        assert_eq!( members_of (&root . contains), vec![ID::from ("child")] );
+        assert_eq!( members_msv (&root . aliases),
                     MSV::Specified (vec![
                       "first alias" . to_string(),
                       "second alias" . to_string()]) );
-        assert_eq!( root . subscribes_to,
+        assert_eq!( members_msv (&root . subscribes_to),
                     MSV::Specified (vec![ID::from ("s1")]) );
-        assert_eq!( root . overrides_view_of,
+        assert_eq!( members_msv (&root . overrides_view_of),
                     MSV::Specified (vec![ID::from ("o1")]) ); }
       { let explicit : &NodeComplete =
           saved_node_by_id (&plan . define_nodes, "explicit");
@@ -193,8 +193,8 @@ async fn pipeline_subscribee_hiderels (
         extract_nonmergeSavePlan_locally (
           &forest, config, driver, None) . await?;
       assert_eq!(
-        saved_node_by_id (&plan . define_nodes, "r")
-          . hides_from_its_subscriptions,
+        members_msv (&saved_node_by_id (&plan . define_nodes, "r")
+          . hides_from_its_subscriptions),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_ids (&plan . define_nodes)
@@ -226,10 +226,10 @@ async fn pipeline_readonly_col_member_edits (
         vec![ ID::from ("owner"), ID::from ("intruder"),
               ID::from ("intruder-child"), ID::from ("lurker") ]);
       assert_eq!(
-        saved_node_by_id (&plan . define_nodes, "owner") . contains,
+        members_of (&saved_node_by_id (&plan . define_nodes, "owner") . contains),
         Vec::<ID>::new() );
       assert_eq!(
-        saved_node_by_id (&plan . define_nodes, "intruder") . contains,
+        members_of (&saved_node_by_id (&plan . define_nodes, "intruder") . contains),
         vec![ID::from ("intruder-child")] );
       Ok (( )) }
 
@@ -252,7 +252,7 @@ async fn pipeline_inactive_subtree (
         // stowaway is on the new recursion surface.
         vec![ ID::from ("root"), ID::from ("stowaway") ]);
       assert_eq!(
-        saved_node_by_id (&plan . define_nodes, "root") . contains,
+        members_of (&saved_node_by_id (&plan . define_nodes, "root") . contains),
         Vec::<ID>::new(),
         "the inactive node emits no contains membership; under a \
          restricted set the weave restores it from disk (see \
@@ -299,7 +299,7 @@ async fn pipeline_phantom_subtree (
         // itself emits nothing and is not content of its parent.
         vec![ ID::from ("root"), ID::from ("survivor") ]);
       assert_eq!(
-        saved_node_by_id (&plan . define_nodes, "root") . contains,
+        members_of (&saved_node_by_id (&plan . define_nodes, "root") . contains),
         Vec::<ID>::new() );
       Ok (( )) }
 

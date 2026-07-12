@@ -35,7 +35,8 @@
 ///    `SectionTree` into a flat `NodeComplete` whose `contains` field lists
 ///    its children by ID.
 
-use crate::types::misc::{ID, MSV, SourceName};
+use crate::types::misc::{
+  ID, MSV, PrivaciedMember, SourceName, privacied_all, privacied_msv};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::path::Path;
@@ -297,18 +298,27 @@ fn nodecomplete_from_section_tree (
   let body : Option<String> =
     tree . section . override_body . clone()
       . or_else (|| collect_body (lines, tree . section . body_start, body_end));
-  let aliases : MSV<String> =
+  // The real source is not known here; the caller (import_org_roam.rs)
+  // overwrites 'source' after parsing. Tag members with this
+  // placeholder source, matching the node's own source at
+  // construction time -- degenerate, and dropped at the FS boundary.
+  let source : SourceName = SourceName::default();
+  let aliases_msv : MSV<String> =
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,
       Some(v) => MSV::Specified(v) };
+  let aliases : MSV<PrivaciedMember<String>> =
+    privacied_msv (&source, aliases_msv);
+  let contains : Vec<PrivaciedMember<ID>> =
+    privacied_all (&source, contained_ids);
   NodeComplete {
     title    : tree . section . headline . clone(),
     aliases,
-    source   : SourceName::default(),
+    source,
     pid      : ID::new (id_str),
     extra_ids: vec![],
     body,
-    contains : contained_ids,
+    contains,
     subscribes_to                : MSV::Unspecified,
     hides_from_its_subscriptions : MSV::Unspecified,
     overrides_view_of            : MSV::Unspecified,

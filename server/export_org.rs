@@ -245,6 +245,7 @@ fn discover_roots (
   for parent in &sorted {
     let marker_children : Vec<String> =
       parent . contains . iter ()
+      . map ( |m| &m . member )
       . filter_map ( |cid|
         marker_target . get (
           &resolve_pid (cid, alias_to_pid)) . cloned () )
@@ -373,7 +374,7 @@ fn collect_events (
     // Collect valid children in order, then push reversed so they
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
-    for child_id in &node . contains {
+    for child_id in node . contains . iter () . map ( |m| &m . member ) {
       let cpid : ID = resolve_pid (child_id, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
       let child : &NodeComplete = match by_pid . get (&cpid) {

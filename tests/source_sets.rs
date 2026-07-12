@@ -34,7 +34,7 @@ use skg::to_org::expand::backpath::{
 use skg::to_org::render::content_view::multi_root_view_with_source_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, privacied_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
@@ -214,7 +214,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
           DefineNode::Save (SaveNode (n))
             if n . pid == ID::from ("ovr-sub-container") => Some (n),
           _ => None } ) {
-        assert_eq! ( c . contains,
+        assert_eq! ( members_of (& c . contains),
           vec![ ID::from ("ovr-sub-original") ],
           "the container keeps the original in contains, not R" ); }
       assert! (
@@ -505,7 +505,7 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
             reordered, config, driver, Some (&active) ) . await?
           . 1 . define_nodes;
         assert_eq! (
-          saved_node_by_id (&instructions, "root") . contains,
+          members_of (& saved_node_by_id (&instructions, "root") . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
           "reordering a read-only placeholder must not move its disk \
@@ -527,7 +527,7 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
             stale, config, driver, Some (&active) ) . await?
           . 1 . define_nodes;
         let contains : Vec<ID> =
-          saved_node_by_id (&instructions, "root") . contains . clone ();
+          members_of (& saved_node_by_id (&instructions, "root") . contains);
         assert_eq! (
           contains,
           vec![ ID::from ("active-a"), ID::from ("private-a"),
@@ -597,7 +597,7 @@ async fn restricted_source_search_and_save_work_together_end_to_end (
           edited_buffer, config, driver, Some (&active) ) . await?
         . 1 . define_nodes;
       assert_eq! (
-        saved_node_by_id (&instructions, "root") . contains,
+        members_of (& saved_node_by_id (&instructions, "root") . contains),
         vec![ ID::from ("active-a"), ID::from ("private-a"),
               ID::from ("active-b") ],
         "restricted save should preserve the omitted inactive member \
@@ -773,8 +773,9 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   result_node . pid = ID::from ("active-search-hit");
   result_node . title = "active search hit" . to_string ();
   result_node . source = SourceName::from ("public");
-  result_node . aliases =
-    MSV::Specified (vec!["search term" . to_string ()]);
+  result_node . aliases = privacied_msv (
+    & result_node . source,
+    MSV::Specified (vec!["search term" . to_string ()]) );
   let mut active_container : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   active_container . pid = ID::from ("active-container");
@@ -912,9 +913,10 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
           buffer, config, driver, Some (&active) ) . await ?
         . 1 . define_nodes;
       assert_eq! (
-        saved_node_by_id (&instructions, "root")
-          . subscribes_to . or_default (),
-        &[ ID::from ("active-b") ],
+        members_of (
+          saved_node_by_id (&instructions, "root")
+            . subscribes_to . or_default () ),
+        vec! [ ID::from ("active-b") ],
         "the inactive placeholder must not be a subscribee member" );
       Ok (( )) }
 
@@ -942,7 +944,7 @@ async fn weave_preserves_omitted_inactive_content_members (
             buffer, config, driver, Some (&active) ) . await ?
           . 1 . define_nodes;
         assert_eq! (
-          saved_node_by_id (&instructions, "root") . contains,
+          members_of (& saved_node_by_id (&instructions, "root") . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
           "omitted inactive member must survive, anchored" ); }
@@ -958,7 +960,7 @@ async fn weave_preserves_omitted_inactive_content_members (
             buffer, config, driver, Some (&active) ) . await ?
           . 1 . define_nodes;
         assert_eq! (
-          saved_node_by_id (&instructions, "root") . contains,
+          members_of (& saved_node_by_id (&instructions, "root") . contains),
           vec![ ID::from ("active-b"), ID::from ("active-a"),
                 ID::from ("private-a") ],
           "the invisible member follows its anchor" ); }
@@ -973,7 +975,7 @@ async fn weave_preserves_omitted_inactive_content_members (
             buffer, config, driver, Some (&active) ) . await ?
           . 1 . define_nodes;
         assert_eq! (
-          saved_node_by_id (&instructions, "root") . contains,
+          members_of (& saved_node_by_id (&instructions, "root") . contains),
           vec![ ID::from ("private-a"), ID::from ("active-b") ],
           "visible deletion lands; invisible member survives" ); }
       Ok (( )) }
@@ -996,7 +998,7 @@ async fn restricted_save_preserves_invisible_override_targets (
       let override_set = |node : &NodeComplete| -> Vec<ID> {
         match &node . overrides_view_of {
           MSV::Specified (ids) => {
-            let mut v : Vec<ID> = ids . clone (); v . sort (); v }
+            let mut v : Vec<ID> = members_of (ids); v . sort (); v }
           MSV::Unspecified => Vec::new (), } };
       { // Unmodified restricted save: the invisible target is preserved.
         // (If the merge reproduces disk exactly the owner is a no-op and

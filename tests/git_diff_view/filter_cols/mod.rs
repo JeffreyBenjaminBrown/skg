@@ -25,6 +25,7 @@
 use super::common::*;
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::types::misc::members_msv;
 
 fn setup_filter_fixtures (
   repo_path : &Path,
@@ -123,7 +124,7 @@ async fn run_filter_col_test (
       assert_buffer_contains (&second . saved_view, expected);
       let s : NodeComplete = read_nodecomplete (repo_path, "S")?;
       assert_eq! (
-        s . hides_from_its_subscriptions . or_default () . to_vec (),
+        members_msv (&s . hides_from_its_subscriptions) . or_default () . to_vec (),
         vec! [ ID::from ("h1"), ID::from ("h2"),
                ID::from ("h3"), ID::from ("h5") ],
         "filter-col phantoms must not edit the hides list" ); }

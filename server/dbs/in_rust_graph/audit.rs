@@ -26,7 +26,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes_for_one_primary_pid_in_tx;
 use crate::dbs::typedb::sources::source_name_for_one_node_id_in_tx;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::rust::NodeRust;
 
 /// A disagreement between the TypeDB and InRustGraph dbs.
@@ -174,10 +174,10 @@ fn outbound_second_members_from_in_rust_graph (
   relation : &str,
 ) -> HashSet<ID> {
   match relation {
-    "contains"                     => node . contains . iter () . cloned () . collect (),
-    "subscribes"                   => node . subscribes_to . or_default () . iter () . cloned () . collect (),
-    "hides_from_its_subscriptions" => node . hides_from_its_subscriptions . or_default () . iter () . cloned () . collect (),
-    "overrides_view_of"            => node . overrides_view_of . or_default () . iter () . cloned () . collect (),
+    "contains"                     => members_of ( &node . contains ) . into_iter () . collect (),
+    "subscribes"                   => members_of ( node . subscribes_to . or_default () ) . into_iter () . collect (),
+    "hides_from_its_subscriptions" => members_of ( node . hides_from_its_subscriptions . or_default () ) . into_iter () . collect (),
+    "overrides_view_of"            => members_of ( node . overrides_view_of . or_default () ) . into_iter () . collect (),
     "textlinks_to"                 => node . textlinks_to . iter () . cloned () . collect (),
     _ => HashSet::new (),
   } }

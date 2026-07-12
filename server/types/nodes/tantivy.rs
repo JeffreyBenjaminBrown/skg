@@ -4,7 +4,7 @@
 //! Includes 'misc' because 'Had_ID_Before_Import' feeds the
 //! context-ranking score multiplier (see [[../../../server/context.rs][context.rs]]).
 
-use crate::types::misc::{ID, MSV, SourceName};
+use crate::types::misc::{ID, MSV, SourceName, members_msv};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -25,7 +25,7 @@ impl From<&NodeComplete> for NodeTantivy {
       pid     : c . pid . clone (),
       source  : c . source . clone (),
       title   : c . title . clone (),
-      aliases : c . aliases . clone (),
+      aliases : members_msv (&c . aliases),
       body    : c . body . clone (),
       misc    : c . misc . clone (),
     }

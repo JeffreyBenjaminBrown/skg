@@ -4,7 +4,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   NodeRelation,
   RelationRole,
 };
-use skg::types::misc::{ID, MSV, SourceName};
+use skg::types::misc::{ID, MSV, SourceName, privacied_all};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 fn node (
@@ -23,16 +23,19 @@ fn node (
     extra_ids . iter () . map ( |id| ID::from (*id) ) . collect ();
   node . subscribes_to =
     if subscribes . is_empty () { MSV::Unspecified }
-    else { MSV::Specified (
-      subscribes . iter () . map ( |id| ID::from (*id) ) . collect ()) };
+    else { MSV::Specified ( privacied_all (
+      &node . source,
+      subscribes . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node . hides_from_its_subscriptions =
     if hides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified (
-      hides . iter () . map ( |id| ID::from (*id) ) . collect ()) };
+    else { MSV::Specified ( privacied_all (
+      &node . source,
+      hides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node . overrides_view_of =
     if overrides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified (
-      overrides . iter () . map ( |id| ID::from (*id) ) . collect ()) };
+    else { MSV::Specified ( privacied_all (
+      &node . source,
+      overrides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node }
 
 #[test]

@@ -14,7 +14,7 @@ use skg::test_utils::{
   run_with_shared_test_db,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::to_org::render::content_view::single_root_view;
-use skg::types::misc::{SkgConfig, ID, TantivyIndex};
+use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use std::sync::Arc;
 
@@ -454,8 +454,8 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
     let r_skg : NodeComplete =
       node_from_disk (&config, "r")?;
     assert_eq!(
-      r_skg . hides_from_its_subscriptions . or_default(),
-      &[ID::from ("e1")],
+      members_of ( r_skg . hides_from_its_subscriptions . or_default() ),
+      vec! [ID::from ("e1")],
       "Expected inferred hide to be persisted in r.skg: {:?}",
       r_skg . hides_from_its_subscriptions );
     Ok (( )) }
@@ -489,8 +489,8 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
       "f's contains must be emptied by the save: {:?}",
       f_skg . contains );
     assert_eq! (
-      f_skg . hides_from_its_subscriptions . or_default (),
-      &[ ID::from ("c") ],
+      members_of ( f_skg . hides_from_its_subscriptions . or_default () ),
+      vec! [ ID::from ("c") ],
       "removing c (content of subscribee o) must hide it, and removing x (content of no subscribee) must not: {:?}",
       f_skg . hides_from_its_subscriptions );
     Ok (( )) }
@@ -519,7 +519,7 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
     ) . await ?;
     let g_skg : NodeComplete =
       node_from_disk (&config, "g") ?;
-    assert_eq! ( g_skg . contains, vec! [ ID::from ("c") ],
+    assert_eq! ( members_of (& g_skg . contains), vec! [ ID::from ("c") ],
       "g's contains must now hold c: {:?}", g_skg . contains );
     assert! (
       g_skg . hides_from_its_subscriptions . or_default () . is_empty (),
@@ -731,7 +731,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
     let e_skg : NodeComplete =
       node_from_disk (&config, "e")?;
     assert!(
-      ! e_skg . contains . contains (&ID::from ("a")),
+      ! e_skg . contains . iter () . any ( |m| m . member == ID::from ("a") ),
       "Extra view-child should not become graph-content of e: {:?}",
       e_skg . contains );
 
@@ -777,7 +777,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
     let r_skg : NodeComplete =
       node_from_disk (&config, "r")?;
     assert!(
-      ! r_skg . contains . contains (&ID::from ("e")),
+      ! r_skg . contains . iter () . any ( |m| m . member == ID::from ("e") ),
       "Extra view-child should not become graph-content of r: {:?}",
       r_skg . contains );
 
@@ -986,8 +986,8 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
       node_from_disk (&config, "R")?;
     assert!(
       ! r_skg . hides_from_its_subscriptions
-        . or_default()
-        . contains (&ID::from ("H")),
+        . or_default() . iter ()
+        . any ( |m| m . member == ID::from ("H") ),
       "Expected inferred unhide to be persisted in R.skg: {:?}",
       r_skg . hides_from_its_subscriptions );
 

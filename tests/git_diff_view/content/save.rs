@@ -4,6 +4,7 @@
 use super::common::*;
 use std::sync::Arc;
 use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::types::misc::members_of;
 
 #[test]
 fn all_tests
@@ -52,7 +53,7 @@ async fn test_delete_removed_node_respawns (
 
       // DISK: 11.skg should still contain moves and not gets-removed
       let node_11 = read_nodecomplete(repo_path, "11")?;
-      let contains_11 = node_11 . contains;
+      let contains_11 = members_of (&node_11 . contains);
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
       assert!(!contains_11 . contains(&ID("gets-removed" . to_string())),
@@ -89,7 +90,7 @@ async fn test_delete_removed_here_node_respawns (
 
       // DISK: 12.skg should still have empty contains
       let node_12 = read_nodecomplete(repo_path, "12")?;
-      let contains_12 = node_12 . contains;
+      let contains_12 = members_of (&node_12 . contains);
       assert!(!contains_12 . contains(&ID("moves" . to_string())),
         "12.skg should not contain moves");
 
@@ -128,7 +129,7 @@ async fn test_delete_new_here_updates_disk (
 
       // DISK: 11.skg should no longer contain moves
       let node_11 = read_nodecomplete(repo_path, "11")?;
-      let contains_11 = node_11 . contains;
+      let contains_11 = members_of (&node_11 . contains);
       assert!(!contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should no longer contain moves");
 
@@ -182,7 +183,7 @@ async fn test_add_new_child_creates_on_disk (
 
       // DISK: 12.skg should contain newer
       let node_12 = read_nodecomplete(repo_path, "12")?;
-      let contains_12 = node_12 . contains;
+      let contains_12 = members_of (&node_12 . contains);
       assert!(contains_12 . contains(&ID("newer" . to_string())),
         "12.skg should contain newer");
 
@@ -382,7 +383,7 @@ async fn test_delete_removed_node_respawns_staged (
 
       // DISK: 11.skg should still contain moves and not gets-removed
       let node_11 = read_nodecomplete(repo_path, "11")?;
-      let contains_11 = node_11 . contains;
+      let contains_11 = members_of (&node_11 . contains);
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
       assert!(!contains_11 . contains(&ID("gets-removed" . to_string())),

@@ -10,7 +10,7 @@ use skg::dbs::filesystem::one_node::{
   nodecomplete_from_pid_and_source, write_nodecomplete_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName};
+use skg::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, privacied_msv};
 use skg::test_utils::{run_with_test_db, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -121,7 +121,7 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
   // to show reading from and writing to disk work;
   // there's no other reason anyone would want to do this.
   let reversed_contains = {
-    let mut v : Vec<ID> = node . contains . clone();
+    let mut v : Vec<PrivaciedMember<ID>> = node . contains . clone();
     v . reverse();
     v };
   let reversed_subscribes_to = match node . subscribes_to . clone() {
@@ -167,10 +167,12 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   let mut test_node : NodeComplete = empty_node_complete ();
   { test_node . title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
       . to_string();
-    test_node . aliases = MSV::Specified(vec![ "alias 1" . to_string(),
-                                    "alias 2" . to_string() ]);
-    test_node . pid = ID::new ("test123");
     test_node . source = SourceName::from ("temp");
+    test_node . aliases = privacied_msv (
+      &test_node . source,
+      MSV::Specified(vec![ "alias 1" . to_string(),
+                           "alias 2" . to_string() ]));
+    test_node . pid = ID::new ("test123");
     test_node . body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]" . to_string()); }
 
   { // Write to a file and read it back.

@@ -12,7 +12,7 @@ use skg::dbs::tantivy::title_and_source_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
-use skg::types::misc::{ID, MSV, SourceName, TantivyIndex};
+use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, privacied_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -182,17 +182,17 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
-    apple . aliases  = MSV::Specified(vec![    "munch apple" . to_string(),
-                                    "chomp apple" . to_string() ]); }
+    apple . aliases  = privacied_msv ( & apple . source, MSV::Specified(vec![    "munch apple" . to_string(),
+                                    "chomp apple" . to_string() ])); }
   let mut banana = empty_node . clone();
   { banana . pid     = ID::new ("banana");
     banana . title   =               "eat banana" . to_string();
-    banana . aliases = MSV::Specified(vec![    "chomp banana" . to_string(),
-                                    "throw banana" . to_string()]); }
+    banana . aliases = privacied_msv ( & banana . source, MSV::Specified(vec![    "chomp banana" . to_string(),
+                                    "throw banana" . to_string()])); }
   let mut kiwi   = empty_node . clone();
   { kiwi . pid       = ID::new ("kiwi");
     kiwi . title     =               "eat kiwi" . to_string();
-    kiwi . aliases   = MSV::Specified(vec![    "munch kiwi" . to_string()]); }
+    kiwi . aliases   = privacied_msv ( & kiwi . source, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
@@ -665,8 +665,8 @@ fn test_title_by_id_returns_title_not_alias (
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
-    node . aliases = MSV::Specified (vec![   "Alias One" . to_string (),
-                                   "Alias Two" . to_string () ]); }
+    node . aliases = privacied_msv ( & node . source, MSV::Specified (vec![   "Alias One" . to_string (),
+                                   "Alias Two" . to_string () ])); }
   let nodes : Vec<NodeComplete> = vec![node];
   let index_dir : &str =
     "/tmp/tantivy-test-title-by-id";

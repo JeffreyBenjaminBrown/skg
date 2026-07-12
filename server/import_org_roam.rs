@@ -1,6 +1,7 @@
 pub mod parse;
 
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{
+  ID, MSV, PrivaciedMember, SourceName, members_msv, privacied_msv};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
@@ -68,6 +69,13 @@ pub fn import_org_roam_directory (
       parse::parse_org_file (path);
     for mut node in nodes {
       node . source = source . clone();
+      { // Re-tag the parse-time placeholder levels with the real
+        // source, so the levels are honest even before the FS
+        // boundary drops them (see PrivaciedMember's INTERIM note).
+        for m in node . contains . iter_mut () {
+          m . level = source . clone (); }
+        node . aliases = privacied_msv (
+          &source, members_msv ( &node . aliases )); }
       { let pid : ID = node . pid . clone();
         if let Some (existing) = node_map . get_mut (&pid) {
           merge_into_existing (existing, &node);
@@ -100,10 +108,14 @@ fn merge_into_existing (
 ) {
   if ! existing . misc . contains (&FileProperty::Was_Overloaded) {
     existing . misc . push (FileProperty::Was_Overloaded); }
-  { // Merge contents.
+  { // Merge contents. New members are tagged with the owning
+    // (existing) node's source; DEGENERATE (see PrivaciedMember).
     for child in &newcomer . contains {
-      if ! existing . contains . contains (child) {
-        existing . contains . push (child . clone()); }} }
+      let child_id : &ID = & child . member;
+      if ! existing . contains . iter ()
+           . any ( |m| &m . member == child_id ) {
+        existing . contains . push ( PrivaciedMember::at (
+          existing . source . clone (), child_id . clone () )); }} }
   { // Append the newcomer's title and body into the existing body,
     // separated by an informative marker.
     let separator : &str =
@@ -116,14 +128,18 @@ fn merge_into_existing (
     let body : &mut String =
       existing . body . get_or_insert_with (String::new);
     body . push_str (&appendage); }
-  { // Merge aliases.
-    let new_aliases : &[String] = newcomer . aliases . or_default();
+  { // Merge aliases. New members are tagged with the owning
+    // (existing) node's source; DEGENERATE (see PrivaciedMember).
+    let newcomer_aliases : MSV<String> = members_msv (&newcomer . aliases);
+    let new_aliases : &[String] = newcomer_aliases . or_default();
     if ! new_aliases . is_empty() {
-      let merged : &mut Vec<String> =
+      let source : SourceName = existing . source . clone();
+      let merged : &mut Vec<PrivaciedMember<String>> =
         existing . aliases . ensure_specified();
       for alias in new_aliases {
-        if ! merged . contains (alias) {
-          merged . push (alias . clone()); }} } }
+        if ! merged . iter () . any ( |m| &m . member == alias ) {
+          merged . push ( PrivaciedMember::at (
+            source . clone (), alias . clone () )); }} } }
   if newcomer . misc . contains (&FileProperty::Had_ID_Before_Import)
     && ! existing . misc . contains (&FileProperty::Had_ID_Before_Import)
     { // Preserve Had_ID_Before_Import from either side.

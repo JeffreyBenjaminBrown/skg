@@ -37,7 +37,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::{
   multi_root_view, multi_root_view_with_source_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::views_state::OpenViews;
@@ -234,9 +234,9 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id M) (source main) indef)) M
         "};
         assert_eq! (
-          saved_node_by_id (
+          members_of ( & saved_node_by_id (
             & define_nodes_from (buffer, config, driver) . await ?,
-            "P" ) . contains,
+            "P" ) . contains ),
           vec![ ID::from ("M") ] ); }
       { // Reordering the drawn child positions the original.
         let buffer = indoc! {"
@@ -245,9 +245,9 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
         "};
         assert_eq! (
-          saved_node_by_id (
+          members_of ( & saved_node_by_id (
             & define_nodes_from (buffer, config, driver) . await ?,
-            "P" ) . contains,
+            "P" ) . contains ),
           vec![ ID::from ("M"), ID::from ("N") ] ); }
       { // Moving the drawn child to another parent moves the original.
         let buffer = indoc! {"
@@ -260,10 +260,10 @@ async fn extraction_honors_the_marker (
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config, driver) . await ?;
         assert_eq! (
-          saved_node_by_id (&instructions, "P") . contains,
+          members_of ( & saved_node_by_id (&instructions, "P") . contains ),
           vec![ ID::from ("M") ] );
         assert_eq! (
-          saved_node_by_id (&instructions, "P2") . contains,
+          members_of ( & saved_node_by_id (&instructions, "P2") . contains ),
           vec![ ID::from ("N") ] ); }
       { // Edits to the drawn R save to R; N is untouched.
         let buffer = indoc! {"
@@ -320,7 +320,7 @@ async fn extraction_honors_the_marker (
         if let Some (s_node) = opt_saved_node_by_id (&instructions, "S") {
           assert! (
             ! s_node . hides_from_its_subscriptions . or_default ()
-              . contains ( &ID::from ("N") ),
+              . iter () . any ( |m| &m . member == &ID::from ("N") ),
             "S must not hide N: the drawn R stands for N" ); }}
       Ok (( )) }
 

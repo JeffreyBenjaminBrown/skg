@@ -7,7 +7,7 @@ use crate::consts::{
   TYPEDB_TRANSACTION_TIMEOUT_SECS,
 };
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
-use crate::types::misc::ID;
+use crate::types::misc::{ID, members_of};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::typedb::NodeTypedb;
 
@@ -224,11 +224,11 @@ fn old_targets (
   relation : &str,
 ) -> Vec<ID> {
   match relation {
-    "contains"                     => node . contains . clone (),
+    "contains"                     => members_of ( &node . contains ),
     "textlinks_to"                 => node . textlinks_to . clone (),
-    "subscribes"                   => node . subscribes_to . or_default () . to_vec (),
-    "hides_from_its_subscriptions" => node . hides_from_its_subscriptions . or_default () . to_vec (),
-    "overrides_view_of"            => node . overrides_view_of . or_default () . to_vec (),
+    "subscribes"                   => members_of ( node . subscribes_to . or_default () ),
+    "hides_from_its_subscriptions" => members_of ( node . hides_from_its_subscriptions . or_default () ),
+    "overrides_view_of"            => members_of ( node . overrides_view_of . or_default () ),
     _ => Vec::new (), } }
 
 /// Delete one specific outbound edge ('from_id' --relation--> 'to_id'),

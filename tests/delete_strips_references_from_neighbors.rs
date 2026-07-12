@@ -35,7 +35,7 @@ use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::util::path_from_pid_and_source;
@@ -110,11 +110,11 @@ async fn delete_strips_references_impl (
   let container : NodeComplete =
     nodecomplete_from_pid_and_source (
       config, ID::from ("container"), &main ) ?;
-  if container . contains . contains (&ID::from ("victim")) {
+  if members_of ( &container . contains ) . contains (&ID::from ("victim")) {
     failures . push ( format! (
       "container.contains still has victim: {:?}",
       container . contains )); }
-  if ! container . contains . contains (&ID::from ("sibling")) {
+  if ! members_of ( &container . contains ) . contains (&ID::from ("sibling")) {
     failures . push ( format! (
       "container.contains lost sibling: {:?}",
       container . contains )); }
@@ -124,7 +124,7 @@ async fn delete_strips_references_impl (
     nodecomplete_from_pid_and_source (
       config, ID::from ("subscriber"), &main ) ?;
   let sub_vec : Vec<ID> =
-    subscriber . subscribes_to . or_default () . to_vec ();
+    members_msv ( &subscriber . subscribes_to ) . into_vec ();
   if sub_vec . contains (&ID::from ("victim")) {
     failures . push ( format! (
       "subscriber.subscribes_to still has victim: {:?}",
@@ -181,7 +181,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   // DeleteNode for victim.
   let container_nc : NodeComplete =
     load_nc ( config, ID::from ("container"), &main ) ?;
-  assert! ( container_nc . contains . contains (&ID::from ("victim")),
+  assert! ( members_of ( &container_nc . contains ) . contains (&ID::from ("victim")),
             "fixture precondition: container should reference victim" );
   let node_defs : Vec<DefineNode> = vec! [
     DefineNode::Save ( SaveNode (container_nc) ),
@@ -195,7 +195,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   ) . await ?;
   let container : NodeComplete =
     load_nc ( config, ID::from ("container"), &main ) ?;
-  if container . contains . contains (&ID::from ("victim")) {
+  if members_of ( &container . contains ) . contains (&ID::from ("victim")) {
     panic! ("container.contains still has victim after strip pass: {:?}",
             container . contains ); }
   let victim_path : String =
@@ -253,11 +253,11 @@ async fn strip_pass_handles_extra_ids_impl (
   let referencer : NodeComplete =
     nodecomplete_from_pid_and_source (
       config, ID::from ("referencer"), &main ) ?;
-  if referencer . contains . contains (&ID::from ("aliased_alt")) {
+  if members_of ( &referencer . contains ) . contains (&ID::from ("aliased_alt")) {
     panic! ("referencer.contains still has aliased_alt (an extra_id of \
              the deleted node) after strip pass: {:?}",
             referencer . contains ); }
-  if referencer . contains . contains (&ID::from ("aliased")) {
+  if members_of ( &referencer . contains ) . contains (&ID::from ("aliased")) {
     panic! ("referencer.contains has aliased (primary pid of deleted node)"); }
   let aliased_path : String =
     path_from_pid_and_source (

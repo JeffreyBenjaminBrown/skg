@@ -29,7 +29,7 @@ use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_sources_test;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, ForkSpec, SaveNode};
 use skg::types::views_state::OpenViews;
@@ -98,8 +98,8 @@ fn clone_overriding_on_disk (
 ) -> Result<NodeComplete, Box<dyn Error>> {
   read_all_skg_files_from_sources (config) ?
     . into_iter ()
-    . find ( |node| node . overrides_view_of . or_default ()
-             . contains (& ID::from (target)) )
+    . find ( |node| node . overrides_view_of . or_default () . iter ()
+             . any ( |m| m . member == ID::from (target) ) )
     . ok_or_else ( || format! (
         "no clone (overrides_view_of [{}]) on disk", target ) . into () ) }
 
@@ -136,8 +136,8 @@ fn clone_on_disk (
   read_all_skg_files_from_sources (config) ?
     . into_iter ()
     . find ( |node|
-      node . overrides_view_of . or_default ()
-        . contains (& ID::from ("N")) )
+      node . overrides_view_of . or_default () . iter ()
+        . any ( |m| m . member == ID::from ("N") ) )
     . ok_or_else ( || "no clone (overrides_view_of [N]) on disk" . into () ) }
 
 #[test]
@@ -224,11 +224,11 @@ async fn explicit_fork_save_instruction (
   let c : &NodeComplete = &spec . clone . 0;
   assert_eq! ( c . title, "P-container",
     "clone copies P's disk title (not a buffer edit)" );
-  assert_eq! ( c . contains, vec! [ ID::from ("N") ],
+  assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N") ],
     "clone copies P's disk contains (shallow)" );
-  assert_eq! ( c . subscribes_to . or_default (), &[ ID::from ("P") ],
+  assert_eq! ( members_of ( c . subscribes_to . or_default () ), vec! [ ID::from ("P") ],
     "clone subscribes to P" );
-  assert_eq! ( c . overrides_view_of . or_default (), &[ ID::from ("P") ],
+  assert_eq! ( members_of ( c . overrides_view_of . or_default () ), vec! [ ID::from ("P") ],
     "clone overrides P" );
   assert_eq! ( c . source, SourceName::from ("owned"),
     "clone defaults to the config-first owned source; got {:?}",
@@ -277,12 +277,12 @@ async fn explicit_fork_round_trip_and_monogamy (
   assert! ( response . errors . is_empty (),
     "the approved explicit fork must commit: {:?}", response . errors );
   let clone : NodeComplete = clone_overriding_on_disk (config, "P") ?;
-  assert_eq! ( clone . subscribes_to . or_default (), &[ ID::from ("P") ],
+  assert_eq! ( members_of ( clone . subscribes_to . or_default () ), vec! [ ID::from ("P") ],
     "the clone subscribes to P" );
   assert! ( config . user_owns_source (& clone . source),
     "the clone lives in an owned source" );
   // P is untouched (still owns its container role).
-  assert_eq! ( node_from_disk (config, "P") ? . contains,
+  assert_eq! ( members_of (& node_from_disk (config, "P") ? . contains),
                vec! [ ID::from ("N") ],
     "P keeps its own contains; the explicit fork does not rewrite it" );
 
@@ -526,8 +526,8 @@ async fn fork_from_bare_new_child_plan (
   assert_eq! ( clone . contains . len (), 3,
     "the clone's contains must be N1, N2 and the new node: {:?}",
     clone . contains );
-  assert_eq! ( & clone . contains [..2],
-               & [ ID::from ("N1"), ID::from ("N2") ] );
+  assert_eq! ( members_of (& clone . contains [..2]),
+               vec! [ ID::from ("N1"), ID::from ("N2") ] );
   let new_node : &NodeComplete =
     save_plan . define_nodes . iter ()
     . find_map ( |dn| match dn {
@@ -537,7 +537,7 @@ async fn fork_from_bare_new_child_plan (
     . expect ("the new node must survive as a Save instruction");
   assert_eq! ( new_node . source, clone . source,
     "the new node must adopt the clone's source" );
-  assert_eq! ( new_node . pid, clone . contains [2],
+  assert_eq! ( new_node . pid, clone . contains [2] . member,
     "the clone's last child must be the new node" );
   Ok (( )) }
 
@@ -570,9 +570,9 @@ async fn fork_from_bare_new_child_commits (
   assert_eq! ( new_node . source, clone . source,
     "the new node must land in the clone's source" );
   assert_eq! ( clone . source, SourceName::from ("owned") );
-  assert! ( clone . contains . contains (& new_node . pid),
+  assert! ( clone . contains . iter () . any ( |m| m . member == new_node . pid ),
     "the clone must contain the new node: {:?}", clone . contains );
-  assert_eq! ( node_from_disk (config, "N") ? . contains,
+  assert_eq! ( members_of (& node_from_disk (config, "N") ? . contains),
                vec! [ ID::from ("N1"), ID::from ("N2") ],
     "N's own contains must be untouched" );
   Ok (( )) }
@@ -679,11 +679,11 @@ async fn fork_save_instruction (
   let c : &NodeComplete = &spec . clone . 0;
   assert_eq! ( c . title, "N-edited",
     "clone copies the edited title" );
-  assert_eq! ( c . contains, vec! [ ID::from ("N1"), ID::from ("N2") ],
+  assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ],
     "clone copies N's child IDs shallow (not descendants)" );
-  assert_eq! ( c . subscribes_to . or_default (), &[ ID::from ("N") ],
+  assert_eq! ( members_of ( c . subscribes_to . or_default () ), vec! [ ID::from ("N") ],
     "clone subscribes to N" );
-  assert_eq! ( c . overrides_view_of . or_default (), &[ ID::from ("N") ],
+  assert_eq! ( members_of ( c . overrides_view_of . or_default () ), vec! [ ID::from ("N") ],
     "clone overrides N" );
   assert! ( c . hides_from_its_subscriptions . or_default () . is_empty (),
     "clone records no hides" );
@@ -725,8 +725,8 @@ async fn fork_fixture_files (
 
   let c : NodeComplete = clone_on_disk (config) ?;
   assert_eq! ( c . title, "N-edited" );
-  assert_eq! ( c . contains, vec! [ ID::from ("N1"), ID::from ("N2") ] );
-  assert_eq! ( c . subscribes_to . or_default (), &[ ID::from ("N") ] );
+  assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ] );
+  assert_eq! ( members_of ( c . subscribes_to . or_default () ), vec! [ ID::from ("N") ] );
   assert_eq! ( c . source, SourceName::from ("owned") );
 
   let n_after : String = std::fs::read_to_string (&n_path) ?;
@@ -779,6 +779,6 @@ async fn fork_round_trip (
   // The load-bearing round-trip: P's stored contains was NOT rewritten
   // to the clone; it still lists N (the marker collected N, not C).
   let p_disk : NodeComplete = node_from_disk (config, "P") ?;
-  assert_eq! ( p_disk . contains, vec! [ ID::from ("N") ],
+  assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],
     "P's contains must still point at N, not the clone {}", clone_id . 0 );
   Ok (( )) }

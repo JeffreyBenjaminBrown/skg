@@ -5,7 +5,8 @@ use crate::git_ops::misc::path_relative_to_repo;
 use crate::git_ops::read_repo::{
   get_staged_changed_skg_files, get_unstaged_changed_skg_files,
   head_is_merge_commit, open_repo};
-use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use crate::types::misc::{
+  ID, SkgConfig, SkgfileSource, SourceName, members_msv, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::fs::NodeFS;
 use crate::types::textlinks::textlinks_from_node;
@@ -346,11 +347,14 @@ fn affected_pids_for_changed_node (
     BTreeSet::new ();
   for node in before_node . into_iter () . chain (after_node) {
     pids . insert (node . pid . clone ());
-    pids . extend (node . contains . iter () . cloned ());
-    pids . extend (node . subscribes_to . or_default () . iter () . cloned ());
+    pids . extend (members_of (&node . contains));
     pids . extend (
-      node . hides_from_its_subscriptions . or_default () . iter () . cloned ());
-    pids . extend (node . overrides_view_of . or_default () . iter () . cloned ());
+      members_msv (&node . subscribes_to) . or_default () . iter () . cloned ());
+    pids . extend (
+      members_msv (&node . hides_from_its_subscriptions)
+        . or_default () . iter () . cloned ());
+    pids . extend (
+      members_msv (&node . overrides_view_of) . or_default () . iter () . cloned ());
     pids . extend (
       textlinks_from_node (node)
         . into_iter ()

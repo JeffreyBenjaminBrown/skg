@@ -5,7 +5,7 @@ use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_saveinstructions;
 use skg::save::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 
 
@@ -67,7 +67,7 @@ fn test_birth_and_indefinitive(
               config, driver, &ID("2" . to_string() ))
             . await?;
         assert_eq!(
-          node2 . contains,
+          members_of (&node2 . contains),
           vec![ ID("3" . to_string()) ],
           "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
 

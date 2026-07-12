@@ -7,7 +7,7 @@ use crate::to_org::complete::partner_col::goal_list::{goal_list_for_outbound_col
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
@@ -139,7 +139,7 @@ fn read_subscribee_col_context (
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &parent_pid, &parent_source )
       . ok ()
-      . map ( |skg| skg . subscribes_to . or_default () . to_vec () )
+      . map ( |skg| members_of ( skg . subscribes_to . or_default () ) )
       . unwrap_or_default ();
   Ok (SubscribeeColContext {
     parent_pid,

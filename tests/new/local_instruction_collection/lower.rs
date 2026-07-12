@@ -12,7 +12,7 @@ use skg::from_text::local_instruction_collection::traverse::collect_instructions
 use skg::from_text::local_instruction_collection::types::CollectedIntents;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, maybePlaced_to_placed_tree };
-use skg::types::misc::{ID, MSV};
+use skg::types::misc::{ID, MSV, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::tree::forest::ViewForest;
@@ -63,10 +63,10 @@ fn lowering_produces_ordered_definenodes_and_signals () {
     assert_eq!( root . pid, ID::from ("root") );
     assert_eq!( root . title, "root" );
     assert_eq!( root . body, Some ("Root body" . to_string()) );
-    assert_eq!( root . contains, vec![ID::from ("child")] );
-    assert_eq!( root . aliases,
+    assert_eq!( members_of (&root . contains), vec![ID::from ("child")] );
+    assert_eq!( members_msv (&root . aliases),
                 MSV::Specified (vec!["nickname" . to_string()]) );
-    assert_eq!( root . subscribes_to,
+    assert_eq!( members_msv (&root . subscribes_to),
                 MSV::Specified (vec![ID::from ("e")]) );
     // Unmentioned fields lower to Unspecified; hides is never
     // emitted by collection (resolution sets it later).

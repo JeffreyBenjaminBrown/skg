@@ -26,7 +26,7 @@
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashMap;
@@ -113,25 +113,29 @@ fn resolve_one_stage (
     (false, true)  => Some (Sign::Minus),
     _              => None } }
 
-/// The outbound list a NodeComplete holds for a relation.  Sibling
-/// of 'outbound_ids_from_node' (relation_accessors.rs), which reads
-/// a NodeRust instead.  Textlinks are inferred from node text, not
-/// stored as a list, so they contribute nothing.
-fn outbound_ids_of_nodecomplete<'a> (
-  nc       : &'a NodeComplete,
+/// The outbound list a NodeComplete holds for a relation, levels
+/// dropped.  Sibling of 'outbound_ids_from_node' (relation_accessors.rs),
+/// which reads a NodeRust instead.  Textlinks are inferred from node
+/// text, not stored as a list, so they contribute nothing.
+/// NOTE: was '&'a [ID]' before the leveled-list change; a borrow can
+/// no longer be returned once the levels must be stripped, so this
+/// now returns an owned 'Vec<ID>' (both call sites only call
+/// '.contains (owner)' on the result, which works the same on a Vec).
+fn outbound_ids_of_nodecomplete (
+  nc       : &NodeComplete,
   relation : NodeRelation,
-) -> &'a [ID] {
+) -> Vec<ID> {
   match relation {
     NodeRelation::Contains =>
-      & nc . contains,
+      members_of ( & nc . contains ),
     NodeRelation::Subscribes =>
-      nc . subscribes_to . or_default (),
+      members_of ( nc . subscribes_to . or_default () ),
     NodeRelation::HidesFromItsSubscriptions =>
-      nc . hides_from_its_subscriptions . or_default (),
+      members_of ( nc . hides_from_its_subscriptions . or_default () ),
     NodeRelation::OverridesViewOf =>
-      nc . overrides_view_of . or_default (),
+      members_of ( nc . overrides_view_of . or_default () ),
     NodeRelation::TextlinksTo =>
-      &[], } }
+      Vec::new (), } }
 
 #[cfg(test)]
 #[path = "../../../../tests/unit/inverse_scan.rs"]

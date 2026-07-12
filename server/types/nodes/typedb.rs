@@ -8,7 +8,7 @@
 //! alongside a &NodeComplete so the caller explicitly supplies
 //! the parsed result.
 
-use crate::types::misc::{ID, MSV, SourceName};
+use crate::types::misc::{ID, MSV, SourceName, members_msv, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::textlinks_from_node;
 
@@ -39,10 +39,10 @@ impl NodeTypedb {
       pid                          : complete . pid . clone (),
       source                       : complete . source . clone (),
       extra_ids                    : complete . extra_ids . clone (),
-      contains                     : complete . contains . clone (),
-      subscribes_to                : complete . subscribes_to . clone (),
-      hides_from_its_subscriptions : complete . hides_from_its_subscriptions . clone (),
-      overrides_view_of            : complete . overrides_view_of . clone (),
+      contains                     : members_of (&complete . contains),
+      subscribes_to                : members_msv (&complete . subscribes_to),
+      hides_from_its_subscriptions : members_msv (&complete . hides_from_its_subscriptions),
+      overrides_view_of            : members_msv (&complete . overrides_view_of),
       textlinks_to                 : textlinks,
     }
   }

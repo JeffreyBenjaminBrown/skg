@@ -16,7 +16,7 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::{replace_each_link_with_its_label,
                               textlinks_from_text};
@@ -122,22 +122,22 @@ fn fetch_all_graphnodestats_in_rust (
       . count () };
     let containers : usize = inbound_count (& graph . contained_by);
     let contents : usize =
-      node_opt . map ( |n| outbound_count (& n . contains) )
+      node_opt . map ( |n| outbound_count (& members_of (& n . contains)) )
       . unwrap_or (0);
     let hiders : usize = inbound_count (& graph . hiders_of);
     let hides : usize =
       node_opt . map ( |n| outbound_count (
-        n . hides_from_its_subscriptions . or_default () ) )
+        & members_of ( n . hides_from_its_subscriptions . or_default () ) ) )
       . unwrap_or (0);
     let subscribers : usize = inbound_count (& graph . subscribers_of);
     let subscribees : usize =
       node_opt . map ( |n| outbound_count (
-        n . subscribes_to . or_default () ) )
+        & members_of ( n . subscribes_to . or_default () ) ) )
       . unwrap_or (0);
     let overriders : usize = inbound_count (& graph . overriders_of);
     let overrides_out : usize =
       node_opt . map ( |n| outbound_count (
-        n . overrides_view_of . or_default () ) )
+        & members_of ( n . overrides_view_of . or_default () ) ) )
       . unwrap_or (0);
     let (link_total, link_surprising, link_with_content) : (usize, usize, usize) =
       link_split (graph, active, pid);
@@ -149,7 +149,7 @@ fn fetch_all_graphnodestats_in_rust (
     // n.contains carries raw IDs; map each to its pid before testing.
     if let Some (n) = node_opt {
       let intersected : HashSet<ID> =
-        n . contains . iter ()
+        members_of (& n . contains) . iter ()
         . map ( |cid| graph . pid_of (cid)
                  . unwrap_or_else ( || cid . clone () ) )
         . filter ( |p| pid_set . contains (p) )

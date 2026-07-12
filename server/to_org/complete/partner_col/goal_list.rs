@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::source_from_disk;
 
@@ -114,8 +114,7 @@ pub fn three_snapshots_of_relation_list (
               . collect () },
         GitDiffStatus::Deleted =>
           ncd . before_node . as_ref ()
-          . map ( |nc| relation_list_of_nodecomplete (nc, relation)
-                       . to_vec () )
+          . map ( |nc| relation_list_of_nodecomplete (nc, relation) )
           . unwrap_or_default (),
         GitDiffStatus::Added =>
           Vec::new (), } } };
@@ -129,24 +128,28 @@ pub fn three_snapshots_of_relation_list (
       &index );
   [ head, index, worktree_list . to_vec () ] }
 
-/// The outbound list a NodeComplete holds for a relation.  (The
-/// inverse scan has a private sibling; this one serves the
-/// three-snapshot reconstruction.)
-fn relation_list_of_nodecomplete<'a> (
-  nc       : &'a NodeComplete,
+/// The outbound list a NodeComplete holds for a relation, levels
+/// dropped.  (The inverse scan has a private sibling; this one serves
+/// the three-snapshot reconstruction.)
+/// NOTE: was '&'a [ID]' before the leveled-list change; a borrow can
+/// no longer be returned once the levels must be stripped, so this
+/// now returns an owned 'Vec<ID>' (its one caller already called
+/// '.to_vec()' on the result, so nothing downstream changed).
+fn relation_list_of_nodecomplete (
+  nc       : &NodeComplete,
   relation : NodeRelation,
-) -> &'a [ID] {
+) -> Vec<ID> {
   match relation {
     NodeRelation::Contains =>
-      & nc . contains,
+      members_of ( & nc . contains ),
     NodeRelation::Subscribes =>
-      nc . subscribes_to . or_default (),
+      members_of ( nc . subscribes_to . or_default () ),
     NodeRelation::HidesFromItsSubscriptions =>
-      nc . hides_from_its_subscriptions . or_default (),
+      members_of ( nc . hides_from_its_subscriptions . or_default () ),
     NodeRelation::OverridesViewOf =>
-      nc . overrides_view_of . or_default (),
+      members_of ( nc . overrides_view_of . or_default () ),
     NodeRelation::TextlinksTo =>
-      &[], } }
+      Vec::new (), } }
 
 /// Exact per-stage membership axes from three derived-membership
 /// snapshots: the staged signs are the HEAD-to-index changes and the
@@ -256,7 +259,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
       Some (src) =>
         nodecomplete_rustFirst_by_pid_and_source ( config, pid, &src )
           . ok ()
-          . map ( |skg| skg . contains )
+          . map ( |skg| members_of (& skg . contains) )
           . unwrap_or_default (),
       None => Vec::new () } };
   if source_diffs . is_none () {

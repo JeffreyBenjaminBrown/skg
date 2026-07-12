@@ -17,7 +17,7 @@ pub mod scheduled_audit;
 use arc_swap::ArcSwap;
 use std::sync::{Arc, OnceLock};
 
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -186,17 +186,17 @@ pub(crate) fn add_to_inverse_indexes (
   let pid : &ID = &node . pid;
   for extra in &node . extra_ids {
     g . extra_id_to_pid . insert ( extra . clone (), pid . clone () ); }
-  for second_member in &node . contains {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( &node . contains ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     add_to_inverse_map (&mut g . contained_by, &corresponding_pid, pid); }
-  for second_member in node . subscribes_to . or_default () {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( node . subscribes_to . or_default () ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     add_to_inverse_map (&mut g . subscribers_of, &corresponding_pid, pid); }
-  for second_member in node . hides_from_its_subscriptions . or_default () {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( node . hides_from_its_subscriptions . or_default () ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     add_to_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
-  for second_member in node . overrides_view_of . or_default () {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( node . overrides_view_of . or_default () ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     add_to_inverse_map (&mut g . overriders_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
     let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
@@ -215,17 +215,17 @@ pub(crate) fn add_to_inverse_indexes (
 /// under is still reachable through the same lookup now.
 fn remove_from_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
-  for second_member in &node . contains {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( &node . contains ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     remove_from_inverse_map (&mut g . contained_by, &corresponding_pid, pid); }
-  for second_member in node . subscribes_to . or_default () {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( node . subscribes_to . or_default () ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     remove_from_inverse_map (&mut g . subscribers_of, &corresponding_pid, pid); }
-  for second_member in node . hides_from_its_subscriptions . or_default () {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( node . hides_from_its_subscriptions . or_default () ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     remove_from_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
-  for second_member in node . overrides_view_of . or_default () {
-    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
+  for second_member in members_of ( node . overrides_view_of . or_default () ) {
+    let corresponding_pid : ID = id_to_pid_if_found (g, &second_member);
     remove_from_inverse_map (&mut g . overriders_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
     let corresponding_pid : ID = id_to_pid_if_found (g, second_member);

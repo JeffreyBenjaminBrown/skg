@@ -18,7 +18,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 
 /// Fast container lookup by primary ID.
 /// Assumes the input is a primary ID (not an extra ID).
@@ -123,18 +123,18 @@ pub fn find_related_nodes_from_in_rust_graph (
       // Forward lookups: read the field on the node.
       ("contains",                     "container",   "contained")  =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . contains . iter () . map (&pid_or_self) ); },
+          out . extend ( members_of (& n . contains) . iter () . map (&pid_or_self) ); },
       ("subscribes",                   "subscriber",  "subscribee") =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . subscribes_to . or_default ()
+          out . extend ( members_of ( n . subscribes_to . or_default () )
                          . iter () . map (&pid_or_self) ); },
       ("hides_from_its_subscriptions", "hider",       "hidden")     =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . hides_from_its_subscriptions . or_default ()
+          out . extend ( members_of ( n . hides_from_its_subscriptions . or_default () )
                          . iter () . map (&pid_or_self) ); },
       ("overrides_view_of",            "overrider",   "overridden") =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . overrides_view_of . or_default ()
+          out . extend ( members_of ( n . overrides_view_of . or_default () )
                          . iter () . map (&pid_or_self) ); },
       ("textlinks_to",                 "source",      "dest")       =>
         if let Some (n) = graph . nodes . get (&pid) {

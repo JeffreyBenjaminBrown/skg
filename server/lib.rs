@@ -1,3 +1,4 @@
+pub mod accordion;
 pub mod consts;
 pub mod context;
 pub mod dbs;

@@ -20,6 +20,7 @@ use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
 use skg::to_org::render::content_view::multi_root_view_via_env;
 use skg::types::env::SkgEnv;
+use skg::types::misc::members_msv;
 
 fn setup_overrides_fixtures (
   repo_path : &Path,
@@ -222,12 +223,12 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
         &second . saved_view, EXPECTED_UNSTAGED );
       let r : NodeComplete = read_nodecomplete (repo_path, "R")?;
       assert_eq! (
-        r . overrides_view_of . or_default () . to_vec (),
+        members_msv (&r . overrides_view_of) . or_default () . to_vec (),
         vec! [ ID::from ("Z"), ID::from ("O") ],
         "a phantom under a writable col is never collected: W must \
          not return to R's overrides_view_of" );
       assert_eq! (
-        r . hides_from_its_subscriptions . or_default () . to_vec (),
+        members_msv (&r . hides_from_its_subscriptions) . or_default () . to_vec (),
         vec! [ ID::from ("ha"), ID::from ("hc") ],
         "hb must not return to R's hides list" ); }
     Ok (( )) }

@@ -4,7 +4,7 @@ use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
@@ -392,7 +392,7 @@ fn child_contained_by_parent (
     match graph . get (parent_id) {
       Some (n) => n,
       None     => return false };
-  parent_node . contains . iter () . any ( |x|
+  members_of (& parent_node . contains) . iter () . any ( |x|
     graph . pid_of (x) . unwrap_or_else ( || x . clone () )
       == child_pid ) }
 

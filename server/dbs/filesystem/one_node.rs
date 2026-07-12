@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::typedb::search::pid_and_source_from_id;
@@ -71,7 +71,7 @@ pub async fn fetch_aliases_from_file (
     config, driver, &skgid
   ) . await {
     Ok ( Some (nodecomplete)) =>
-      nodecomplete . aliases . into_vec(),
+      members_msv ( & nodecomplete . aliases ) . into_vec(),
     _ => Vec::new(), }}
 
 pub fn write_nodecomplete_to_source (

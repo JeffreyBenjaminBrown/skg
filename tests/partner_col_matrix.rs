@@ -39,7 +39,7 @@ use skg::to_org::render::content_view::{
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::OpenViews;
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -543,7 +543,7 @@ async fn writable_subscribeeCol (
     let nodes : Vec<DefineNode> =
       saveplan_nodes (&reordered, config, driver, None) . await ?;
     match saved_node_by_id (&nodes, "wSub-owner") {
-      Some (n) => if n . subscribes_to != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
         fails . record (s, format! (
           "reordered subscribes_to wrong: {:?}", n . subscribes_to)); },
@@ -556,7 +556,7 @@ async fn writable_subscribeeCol (
     let nodes : Vec<DefineNode> =
       saveplan_nodes (&edited, config, driver, None) . await ?;
     match saved_node_by_id (&nodes, "wSub-owner") {
-      Some (n) => if n . subscribes_to != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
         fails . record (s, format! (
           "after delete, subscribes_to wrong: {:?}", n . subscribes_to)); },
@@ -570,7 +570,7 @@ async fn writable_subscribeeCol (
     let nodes : Vec<DefineNode> =
       saveplan_nodes (&edited, config, driver, None) . await ?;
     match saved_node_by_id (&nodes, "wSub-owner") {
-      Some (n) => if n . subscribes_to != MSV::Specified (vec![
+      Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
           ID::from ("wSub-c"), ID::from ("wSub-d")]) {
         fails . record (s, format! (
@@ -580,7 +580,7 @@ async fn writable_subscribeeCol (
 
 fn override_set ( n : &NodeComplete ) -> Vec<ID> {
   match &n . overrides_view_of {
-    MSV::Specified (ids) => { let mut v = ids . clone (); v . sort (); v }
+    MSV::Specified (ids) => { let mut v = members_of (ids); v . sort (); v }
     MSV::Unspecified => Vec::new (), } }
 
 async fn writable_overriddenCol (
@@ -649,7 +649,7 @@ async fn hiddenCol_delete_does_not_unhide (
   // still hides roHidden-a; in no case is roHidden-a unhidden.
   if let Some (n) = saved_node_by_id (&nodes, "roHidden-owner") {
     let hides : Vec<ID> = match &n . hides_from_its_subscriptions {
-      MSV::Specified (ids) => ids . clone (),
+      MSV::Specified (ids) => members_of (ids),
       MSV::Unspecified => Vec::new (), };
     if ! hides . is_empty () && ! hides . contains (&ID::from ("roHidden-a")) {
       fails . record (s, format! (
@@ -697,7 +697,7 @@ async fn omission_scenarios (
       saveplan_nodes (&edited, config, driver, Some (&active)) . await ?;
     match saved_node_by_id (&nodes, "omWsub-owner") {
       Some (n) => { let subs : Vec<ID> = match &n . subscribes_to {
-          MSV::Specified (ids) => ids . clone (),
+          MSV::Specified (ids) => members_of (ids),
           MSV::Unspecified => Vec::new (), };
         if ! subs . contains (&ID::from ("omWsub-inactive")) {
           fails . record (s, format! (

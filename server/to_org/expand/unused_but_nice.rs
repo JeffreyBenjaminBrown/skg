@@ -31,7 +31,7 @@ use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::partner_col::type_and_parent_type_consistent_with_subscribee;
 use crate::to_org::util::{ DefinitiveMap, Finalizable };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::viewnode::{ ViewNode, IndefOrDef, mk_phantom_viewnode };
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -73,9 +73,9 @@ fn get_hidden_ids_if_subscribee (
       nodecomplete_rustFirst_by_pid_and_source (
         config, &subscriber_id, &subscriber_source ) ?;
     let hidden_ids : HashSet < ID > =
-      nodecomplete . hides_from_its_subscriptions
-        . or_default ()
-        . iter () . cloned () . collect ();
+      members_of ( nodecomplete . hides_from_its_subscriptions
+        . or_default () )
+        . into_iter () . collect ();
     Ok (hidden_ids) }}
 
 fn activeNode_file_absent_from_worktree (
@@ -140,7 +140,7 @@ pub async fn extendDefinitiveSubtree_fromGit (
     { let nodecomplete : NodeComplete =
         nodecomplete_from_index_or_head ( &pid, &src, config ) ?;
       let contents : Vec<ID> =
-        nodecomplete . contains;
+        members_of (& nodecomplete . contains);
       let not_hidden : BTreeSet<String> =
         contents . iter()
         . filter ( |id| ! hidden_ids . contains (id) )

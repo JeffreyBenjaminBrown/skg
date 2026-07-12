@@ -17,7 +17,7 @@ use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
+use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, privacied_all, privacied_msv};
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
@@ -992,20 +992,23 @@ pub fn strip_org_comments(s: &str) -> String {
 
 /// Example NodeComplete for use in tests.
 pub fn nodecomplete_example () -> NodeComplete {
+  let source : SourceName = SourceName::from ("main");
   NodeComplete {
     title: "This text gets indexed." . to_string(),
     aliases: MSV::Unspecified,
-    source: SourceName::from ("main"),
+    source: source . clone (),
     pid: ID::new ("example"),
     extra_ids: vec![],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: vec![ ID::new ("1"),
-                    ID::new ("2"),
-                    ID::new ("3")],
-    subscribes_to: MSV::Specified(vec![ID::new ("11"),
+    contains: privacied_all ( &source,
+                    vec![ ID::new ("1"),
+                          ID::new ("2"),
+                          ID::new ("3")] ),
+    subscribes_to: privacied_msv ( &source,
+                    MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
-                             ID::new ("13")]),
+                             ID::new ("13")])),
     hides_from_its_subscriptions: MSV::Unspecified,
     overrides_view_of: MSV::Unspecified,
     misc: Vec::new (), }}

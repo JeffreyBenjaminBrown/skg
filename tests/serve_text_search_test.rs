@@ -3,7 +3,7 @@
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, privacied_msv};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
@@ -39,10 +39,10 @@ fn test_text_search_org_format (
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
-        MSV::Specified ( vec! [
+        privacied_msv ( & node1 . source, MSV::Specified ( vec! [
           "bear cheese" . to_string (),
           "the cheese" . to_string ()
-        ] );
+        ] ) );
 
       let mut node2 : NodeComplete = // matches, but less well
         empty_node_complete ();

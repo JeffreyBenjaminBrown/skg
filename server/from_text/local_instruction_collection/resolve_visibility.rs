@@ -27,7 +27,7 @@ use crate::from_text::local_instruction_collection::types::SubscribeeVisibility;
 use crate::from_text::weave::member_is_visible;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig};
+use crate::types::misc::{ID, MSV, SkgConfig, members_of};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet};
@@ -66,17 +66,22 @@ pub async fn resolve_visibility (
         &subscriber_from_disk );
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
+    let subscribee_contains : Vec<ID> =
+      members_of (&subscribee_from_disk . contains);
+    let subscriber_hides : Vec<ID> =
+      members_of (
+        subscriber_from_disk . hides_from_its_subscriptions
+        . or_default() );
     let inferred_hides : Vec<ID> =
-      subscribee_from_disk . contains . iter()
+      subscribee_contains . iter()
       . filter ( |id| ! visible_content . contains (*id) )
       . filter ( |id| ! subscriber_contains . contains (*id) )
       . cloned()
       . collect();
     let inferred_unhides : Vec<ID> =
-      subscribee_from_disk . contains . iter()
+      subscribee_contains . iter()
       . filter ( |id| visible_content . contains (*id) )
-      . filter ( |id| subscriber_from_disk . hides_from_its_subscriptions
-                      . or_default() . contains (*id) )
+      . filter ( |id| subscriber_hides . contains (*id) )
       . cloned() . collect();
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
@@ -115,6 +120,8 @@ async fn infer_hides_from_contains_removals (
       optNodeComplete_rustFIrst_by_id (
         config, driver, &subscriber_pid ) . await ?
     else { continue; };
+    let subscriber_contains : Vec<ID> =
+      members_of (&subscriber_from_disk . contains);
     let removed : Vec<ID> = {
       let new_contains_set : HashSet<&ID> =
         new_contains . iter () . collect ();
@@ -123,7 +130,7 @@ async fn infer_hides_from_contains_removals (
         . filter ( |(pid, _)| *pid == subscriber_pid )
         . flat_map ( |(_, signal)| signal . visible . iter () )
         . collect ();
-      subscriber_from_disk . contains . iter ()
+      subscriber_contains . iter ()
         . filter ( |id| ! new_contains_set . contains (id) )
         . filter ( |id| ! signal_visible . contains (id) )
         . filter ( |id| restricted_source_set . map_or (
@@ -131,10 +138,11 @@ async fn infer_hides_from_contains_removals (
         . cloned () . collect () };
     let inferred_unhides : Vec<ID> = {
       let disk_contains : HashSet<&ID> =
-        subscriber_from_disk . contains . iter () . collect ();
-      let disk_hides : &[ID] =
-        subscriber_from_disk . hides_from_its_subscriptions
-        . or_default ();
+        subscriber_contains . iter () . collect ();
+      let disk_hides : Vec<ID> =
+        members_of (
+          subscriber_from_disk . hides_from_its_subscriptions
+          . or_default () );
       new_contains . iter ()
         . filter ( |id| ! disk_contains . contains (id) )
         . filter ( |id| disk_hides . contains (id) )
@@ -148,16 +156,15 @@ async fn infer_hides_from_contains_removals (
             // the same save also stops hides being inferred from it.
             MSV::Specified (subs) => subs . clone (),
             MSV::Unspecified =>
-              subscriber_from_disk . subscribes_to
-              . or_default () . to_vec (), };
+              members_of (
+                subscriber_from_disk . subscribes_to . or_default () ), };
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =
               optNodeComplete_rustFIrst_by_id (
                 config, driver, subscribee ) . await ?
             { content . extend (
-                subscribee_from_disk . contains
-                . iter () . cloned () ); }}
+                members_of (& subscribee_from_disk . contains) ); }}
           content };
         removed . into_iter ()
           . filter ( |id| subscribee_content . contains (id) )
@@ -189,7 +196,7 @@ async fn validate_no_overlapping_subscribee_hiderel_conflicts (
         None                        => continue, };
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
-    for content_id in subscribee_from_disk . contains {
+    for content_id in members_of (&subscribee_from_disk . contains) {
       let content_id : ID = content_id;
       let key : (ID, ID) =
         (subscriber . clone(), content_id . clone());

@@ -96,6 +96,72 @@ impl From<SkgfileSourceToml> for SkgfileSource {
       user_owns_it : false, // derived later; see the field's comment
     }}}
 
+/// A member of a node's relationship list, tagged with the
+/// relationship instance's PRIVACY LEVEL: the source whose accordion
+/// section records this edge. The level is about the EDGE, not the
+/// member node (a public node can be a private member). Default
+/// level = the more private of the two endpoints' homes
+/// ('SkgConfig::more_private_of'); 'skg-privatize-relationship' may
+/// raise it; renormalization never lowers it (the sticky rule). See
+/// TODO/user-owned_autofork_chain/5_plan.org.
+///
+/// INTERIM (work item leveled-lists): every consumer currently runs
+/// DEGENERATE semantics -- level := the owning node's (home) source
+/// at load, levels dropped at the FS boundary -- so behavior is
+/// unchanged until the fold lands (work item section-format-and-fold).
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PrivaciedMember<T> {
+  pub level  : SourceName,
+  pub member : T,
+}
+
+impl<T> PrivaciedMember<T> {
+  pub fn at (
+    level  : SourceName,
+    member : T,
+  ) -> PrivaciedMember<T> {
+    PrivaciedMember { level, member }}}
+
+/// Tag every member of a list with one level. The degenerate-load
+/// helper (level := home source), and later the natural constructor
+/// for a single accordion section's slice.
+pub fn privacied_all<T> (
+  level   : &SourceName,
+  members : Vec<T>,
+) -> Vec<PrivaciedMember<T>> {
+  members . into_iter ()
+    . map ( |m| PrivaciedMember::at ( level . clone (), m ) )
+    . collect () }
+
+/// The members of a leveled list, levels dropped. The FS-boundary
+/// projection, and the adapter for consumers that only care WHO is
+/// related, not at what level.
+pub fn members_of<T : Clone> (
+  list : &[PrivaciedMember<T>],
+) -> Vec<T> {
+  list . iter ()
+    . map ( |m| m . member . clone () )
+    . collect () }
+
+/// 'privacied_all' lifted over MSV.
+pub fn privacied_msv<T> (
+  level : &SourceName,
+  msv   : MSV<T>,
+) -> MSV<PrivaciedMember<T>> {
+  match msv {
+    MSV::Unspecified     => MSV::Unspecified,
+    MSV::Specified (v)   =>
+      MSV::Specified ( privacied_all (level, v) ), }}
+
+/// 'members_of' lifted over MSV.
+pub fn members_msv<T : Clone> (
+  msv : &MSV<PrivaciedMember<T>>,
+) -> MSV<T> {
+  match msv {
+    MSV::Unspecified     => MSV::Unspecified,
+    MSV::Specified (v)   =>
+      MSV::Specified ( members_of (v) ), }}
+
 /// Identifies a source-set CHOICE. Source-sets are no longer defined
 /// by hand: they are the PREFIXES of the config's source order (most
 /// public first), so a choice is either "all" (every source) or the

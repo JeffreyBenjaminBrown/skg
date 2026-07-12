@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::resolve_override;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 
 use std::collections::{HashMap, HashSet};
 
@@ -55,10 +55,10 @@ pub fn validate_override_invariants (
       config, pid, &node . source, &mut violations )
     else { continue; };
     if ! user_owns_node { continue; }
-    for target in node . overrides_view_of . or_default () {
+    for target in members_of ( node . overrides_view_of . or_default () ) {
       // Override targets can be written as primary IDs or extra IDs. Validate against the effective primary PID, matching how the in-Rust graph and TypeDB relationship creation resolve edges.
       let overridden : ID =
-        graph . pid_of (target)
+        graph . pid_of (&target)
         . unwrap_or_else ( || target . clone () );
       user_owned_overriders_by_overridden
         . entry (overridden)
@@ -150,7 +150,7 @@ pub fn validate_touched_override_invariants (
       else { continue; };
     if ! user_owns_pid { continue; }
     let targets : Vec<ID> = // T's override targets, resolved to pids
-      node . overrides_view_of . or_default () . iter ()
+      members_of ( node . overrides_view_of . or_default () ) . iter ()
       . map ( |t| graph . pid_of (t)
               . unwrap_or_else ( || t . clone () ) )
       . collect ();

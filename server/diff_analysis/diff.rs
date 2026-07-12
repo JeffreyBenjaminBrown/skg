@@ -3,7 +3,8 @@ use crate::diff_analysis::types::{
   NodeDiffReport, RelationshipDiff, SnapshotPair, SourceForReport,
   TextDiffLine, ValueSetDiff};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
-use crate::types::misc::{ID, MSV, SourceName};
+use crate::types::misc::{
+  ID, MSV, PrivaciedMember, SourceName, members_of, members_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::textlinks_from_node;
 
@@ -248,9 +249,9 @@ fn value_set_diffs (
 }
 
 fn strings_from_msv (
-  msv : Option<&MSV<String>>,
+  msv : Option<&MSV<PrivaciedMember<String>>>,
 ) -> Vec<String> {
-  msv . map ( |m| m . or_default () . to_vec () )
+  msv . map ( |m| members_msv (m) . or_default () . to_vec () )
     . unwrap_or_default ()
 }
 
@@ -476,27 +477,29 @@ impl GraphFacts {
         node . extra_ids . iter ()
           . filter ( |id| ! ambiguous_pids . contains (*id) )
           . cloned () );
+      let contains_ids : Vec<ID> =
+        members_of (&node . contains);
       facts . contained_order . insert (
         node . pid . clone (),
-        node . contains . iter ()
+        contains_ids . iter ()
           . filter ( |id| ! ambiguous_pids . contains (*id) )
           . cloned () . collect () );
-      for contained in &node . contains {
+      for contained in &contains_ids {
         if ambiguous_pids . contains (contained) {
           continue; }
         facts . add_edge ("contained", &node . pid, contained);
         facts . add_edge ("container", contained, &node . pid); }
-      for subscribee in node . subscribes_to . or_default () {
+      for subscribee in members_msv (&node . subscribes_to) . or_default () {
         if ambiguous_pids . contains (subscribee) {
           continue; }
         facts . add_edge ("subscriber", &node . pid, subscribee);
         facts . add_edge ("subscribee", subscribee, &node . pid); }
-      for hidden in node . hides_from_its_subscriptions . or_default () {
+      for hidden in members_msv (&node . hides_from_its_subscriptions) . or_default () {
         if ambiguous_pids . contains (hidden) {
           continue; }
         facts . add_edge ("hider", &node . pid, hidden);
         facts . add_edge ("hidden", hidden, &node . pid); }
-      for overridden in node . overrides_view_of . or_default () {
+      for overridden in members_msv (&node . overrides_view_of) . or_default () {
         if ambiguous_pids . contains (overridden) {
           continue; }
         facts . add_edge ("overrider", &node . pid, overridden);
@@ -531,6 +534,8 @@ impl GraphFacts {
         continue; }
       let track_outbound : bool =
         tracked_pids . contains (&node . pid);
+      let contains_ids : Vec<ID> =
+        members_of (&node . contains);
       if track_outbound {
         facts . extra_ids . extend (
           node . extra_ids . iter ()
@@ -538,35 +543,35 @@ impl GraphFacts {
             . cloned () );
         facts . contained_order . insert (
           node . pid . clone (),
-          node . contains . iter ()
+          contains_ids . iter ()
             . filter ( |id| ! ambiguous_pids . contains (*id) )
             . cloned () . collect () ); }
       facts . extra_ids . extend (
         node . extra_ids . iter ()
           . filter ( |id| tracked_pids . contains (*id) )
           . cloned () );
-      for contained in &node . contains {
+      for contained in &contains_ids {
         if ambiguous_pids . contains (contained) {
           continue; }
         if track_outbound {
           facts . add_edge ("contained", &node . pid, contained); }
         if tracked_pids . contains (contained) {
           facts . add_edge ("container", contained, &node . pid); }}
-      for subscribee in node . subscribes_to . or_default () {
+      for subscribee in members_msv (&node . subscribes_to) . or_default () {
         if ambiguous_pids . contains (subscribee) {
           continue; }
         if track_outbound {
           facts . add_edge ("subscriber", &node . pid, subscribee); }
         if tracked_pids . contains (subscribee) {
           facts . add_edge ("subscribee", subscribee, &node . pid); }}
-      for hidden in node . hides_from_its_subscriptions . or_default () {
+      for hidden in members_msv (&node . hides_from_its_subscriptions) . or_default () {
         if ambiguous_pids . contains (hidden) {
           continue; }
         if track_outbound {
           facts . add_edge ("hider", &node . pid, hidden); }
         if tracked_pids . contains (hidden) {
           facts . add_edge ("hidden", hidden, &node . pid); }}
-      for overridden in node . overrides_view_of . or_default () {
+      for overridden in members_msv (&node . overrides_view_of) . or_default () {
         if ambiguous_pids . contains (overridden) {
           continue; }
         if track_outbound {

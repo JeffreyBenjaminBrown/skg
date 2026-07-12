@@ -3,7 +3,7 @@ use crate::types::env::SkgEnv;
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -122,11 +122,11 @@ fn read_hiddenoutside_context (
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &subscriber_pid, &subscriber_source ) ?;
   let wt_subscriber_hides : Vec<ID> =
-    wt_subscriber_nodecomplete . hides_from_its_subscriptions
-      . or_default() . to_vec();
+    members_of ( wt_subscriber_nodecomplete . hides_from_its_subscriptions
+      . or_default() );
   let wt_subscribees : Vec<ID> =
-    wt_subscriber_nodecomplete . subscribes_to
-      . or_default() . to_vec();
+    members_of ( wt_subscriber_nodecomplete . subscribes_to
+      . or_default() );
   Ok (HiddenOutsideContext {
     subscriber_pid,
     subscriber_source,

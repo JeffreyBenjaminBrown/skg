@@ -3,7 +3,7 @@ use crate::types::env::SkgEnv;
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -128,13 +128,13 @@ fn read_hiddenin_context (
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscribee_pid, &subscribee_source ) ?;
-    subscribee_nodecomplete . contains . clone() };
+    members_of (& subscribee_nodecomplete . contains) };
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
-    subscriber_nodecomplete . hides_from_its_subscriptions
-      . or_default() . to_vec() };
+    members_of ( subscriber_nodecomplete . hides_from_its_subscriptions
+      . or_default() ) };
   Ok (HiddenInContext {
     subscriber_pid,
     subscriber_source,

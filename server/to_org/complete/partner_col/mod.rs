@@ -22,7 +22,7 @@ use crate::to_org::complete::partner_col::goal_list::{
 use crate::to_org::complete::partner_col::inverse_scan::inverse_scan_for_inbound_col;
 use crate::to_org::util::nodecomplete_and_viewnode_from_id;
 use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol};
 use crate::types::viewnode::Vognode;
@@ -209,8 +209,8 @@ pub async fn maybe_add_subscribeeCol_branch (
            nodecomplete_rustFirst_by_pid_and_source (
              config, &subscriber_pid, &subscriber_source )
            . ok ()
-           . map ( |skg| skg . hides_from_its_subscriptions
-                         . or_default () . to_vec () )
+           . map ( |skg| members_of (
+                       skg . hides_from_its_subscriptions . or_default () ) )
            . unwrap_or_default ();
          ! goal_list_for_hiddenoutsideof_subscribeecol (
              &subscriber_pid, &subscriber_source,
@@ -407,14 +407,14 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
            let subscribee_contains : Vec<ID> =
              nodecomplete_rustFirst_by_pid_and_source (
                config, &subscribee_pid, &subscribee_source )
-             . ok () . map ( |skg| skg . contains )
+             . ok () . map ( |skg| members_of (& skg . contains) )
              . unwrap_or_default ();
            let subscriber_hides : Vec<ID> =
              nodecomplete_rustFirst_by_pid_and_source (
                config, &subscriber_pid, &subscriber_source )
              . ok ()
-             . map ( |skg| skg . hides_from_its_subscriptions
-                           . or_default () . to_vec () )
+             . map ( |skg| members_of (
+                         skg . hides_from_its_subscriptions . or_default () ) )
              . unwrap_or_default ();
            ! goal_list_for_hiddeninsubscribee_col (
                &subscribee_pid, &subscribee_source,

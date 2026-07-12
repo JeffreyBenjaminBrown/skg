@@ -11,7 +11,7 @@ use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
-use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::DefineNode;
 use std::error::Error;
@@ -168,12 +168,12 @@ async fn test_move_node_to_another_owned_source (
       let node_a : NodeComplete =
         nodecomplete_from_id (&config, &driver, &ID::new ("a"))
         . await?;
-      assert!(node_a . contains . contains (&ID::new ("b")),
+      assert!(members_of ( &node_a . contains ) . contains (&ID::new ("b")),
               "a should still contain b after move");
       let node_b : NodeComplete =
         nodecomplete_from_id (&config, &driver, &ID::new ("b"))
         . await?;
-      assert!(node_b . contains . contains (&ID::new ("c")),
+      assert!(members_of ( &node_b . contains ) . contains (&ID::new ("c")),
               "b should still contain c after move"); }
 
     Ok (()) }

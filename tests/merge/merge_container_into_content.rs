@@ -95,13 +95,13 @@ async fn merge_container_into_content_impl (
   if !aa_nodecomplete . extra_ids . contains (&ID::from ("a")) {
     failures . push (
       "aa should have 'a' as an extra_id" . to_string() ); }
-  if !aa_nodecomplete . contains . contains (&ID::from ("x")) {
+  if !aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("x") ) {
     failures . push (
       "aa should still contain x" . to_string() ); }
-  if !aa_nodecomplete . contains . contains (&ID::from ("b")) {
+  if !aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("b") ) {
     failures . push (
       "aa should now contain b (adopted from a)" . to_string() ); }
-  if !aa_nodecomplete . contains . contains (&ID::from ("c")) {
+  if !aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("c") ) {
     failures . push (
       "aa should now contain c (adopted from a)" . to_string() ); }
 
@@ -111,7 +111,8 @@ async fn merge_container_into_content_impl (
   let known_ids : Vec<&str> = vec!["x", "b", "c", "aa"];
   let preserver_candidates : Vec<&ID> =
     aa_nodecomplete . contains . iter()
-    . filter ( |id| !known_ids . contains (& id . 0 . as_str()) )
+    . filter ( |m| !known_ids . contains (& m . member . 0 . as_str()) )
+    . map ( |m| & m . member )
     . collect();
   if preserver_candidates . len() != 1 {
     failures . push ( format!(
@@ -141,7 +142,7 @@ async fn merge_container_into_content_impl (
         preserver_nodecomplete . extra_ids )); } }
 
   // aa must not contain itself in the filesystem.
-  if aa_nodecomplete . contains . contains (&ID::from ("aa")) {
+  if aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("aa") ) {
     failures . push (
       "aa contains itself on filesystem (self-containment after merge)"
       . to_string() ); }

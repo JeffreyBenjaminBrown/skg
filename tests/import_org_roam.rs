@@ -5,7 +5,7 @@ use skg::import_org_roam::parse::{
   headline_level,
   headline_title,
 };
-use skg::types::misc::ID;
+use skg::types::misc::{ID, members_of, members_msv};
 use skg::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
@@ -86,8 +86,8 @@ fn test_nested_id_headlines () {
   // File-level node
   assert_eq! (nodes[0] . title, "Parent");
   assert_eq! (nodes[0] . pid, ID::new ("file-id"));
-  let contained : &[ID] =
-    &nodes[0] . contains;
+  let contained : Vec<ID> =
+    members_of ( &nodes[0] . contains );
   assert_eq! (contained . len(), 2);
   assert_eq! (contained[0], ID::new ("child-1"));
   assert_eq! (contained[1], ID::new ("child-2"));
@@ -120,16 +120,16 @@ fn test_non_id_headline_becomes_node () {
   assert_eq! (nodes . len(), 3);
   assert_eq! (nodes[0] . title, "Parent");
   assert_eq! (nodes[0] . pid, ID::new ("file-id"));
-  let contained : &[ID] =
-    &nodes[0] . contains;
+  let contained : Vec<ID> =
+    members_of ( &nodes[0] . contains );
   assert_eq! (contained . len(), 1);
   assert! (nodes[0] . body . is_none());
   // Headline node (generated ID)
   assert_eq! (nodes[1] . title, "just a regular headline");
   assert_eq! (nodes[1] . body . as_deref(),
               Some ("Some text under it.") );
-  let hl_contained : &[ID] =
-    &nodes[1] . contains;
+  let hl_contained : Vec<ID> =
+    members_of ( &nodes[1] . contains );
   assert_eq! (hl_contained . len(), 1);
   // Sub-headline node
   assert_eq! (nodes[2] . title, "sub-headline");
@@ -158,14 +158,14 @@ fn test_id_headline_under_non_id_headline () {
   // 3 nodes: file, intermediary, deep-child
   assert_eq! (nodes . len(), 3);
   // Root contains intermediary (generated ID)
-  let root_contained : &[ID] =
-    &nodes[0] . contains;
+  let root_contained : Vec<ID> =
+    members_of ( &nodes[0] . contains );
   assert_eq! (root_contained . len(), 1);
   assert! (nodes[0] . body . is_none());
   // Intermediary contains deep-child
   assert_eq! (nodes[1] . title, "intermediary (no ID)");
-  let mid_contained : &[ID] =
-    &nodes[1] . contains;
+  let mid_contained : Vec<ID> =
+    members_of ( &nodes[1] . contains );
   assert_eq! (mid_contained . len(), 1);
   assert_eq! (mid_contained[0], ID::new ("deep-child"));
   // Deep child
@@ -188,9 +188,9 @@ fn test_roam_aliases () {
   let nodes : Vec<NodeComplete> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
-  let aliases : &[String] =
-    nodes[0] . aliases . or_default();
-  assert_eq! (aliases, &vec![
+  let aliases : Vec<String> =
+    members_msv ( &nodes[0] . aliases ) . into_vec ();
+  assert_eq! (aliases, vec![
     "machine learning", "energy", "dark matter" ]); }
 
 #[test]
@@ -293,10 +293,10 @@ fn test_power_org_structure () {
   assert_eq! (nodes . len(), 6);
   // File-level node
   assert_eq! (nodes[0] . title, "energy");
-  assert_eq! (nodes[0] . aliases . or_default(),
-              &vec!["energy", "power", "force", "work", "strength"]);
-  let file_contained : &[ID] =
-    &nodes[0] . contains;
+  assert_eq! (members_msv ( &nodes[0] . aliases ) . into_vec (),
+              vec!["energy", "power", "force", "work", "strength"]);
+  let file_contained : Vec<ID> =
+    members_of ( &nodes[0] . contains );
   assert_eq! (file_contained . len(), 3);
   // The :ID: child's contained ID is known
   assert_eq! (file_contained[1],
@@ -311,8 +311,8 @@ fn test_power_org_structure () {
   assert_eq! (nodes[2] . title, "the feeling of forcing it");
   assert_eq! (nodes[2] . pid,
               ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90"));
-  let forcing_contained : &[ID] =
-    &nodes[2] . contains;
+  let forcing_contained : Vec<ID> =
+    members_of ( &nodes[2] . contains );
   assert_eq! (forcing_contained . len(), 2);
   assert! (nodes[2] . body . is_none());
   // Sub-headlines of "the feeling of forcing it"
@@ -347,8 +347,8 @@ fn test_music_and_consciousness () {
   assert_eq! (nodes[0] . pid, ID::new ("01104862"));
   assert_eq! (nodes[0] . body . as_deref(),
               Some ("= things about consciousness that music highlights") );
-  let contained : &[ID] =
-    &nodes[0] . contains;
+  let contained : Vec<ID> =
+    members_of ( &nodes[0] . contains );
   assert_eq! (contained . len(), 2);
   // Headline nodes — titles preserve the [[id:...][...]] links
   assert_eq! (nodes[1] . title,
@@ -484,7 +484,7 @@ fn render_node_recursive (
     out . push_str (body);
     out . push ('\n'); }
   for child_id in &node . contains {
-    if let Some (child) = by_id . get (child_id) {
+    if let Some (child) = by_id . get (&child_id . member) {
       render_node_recursive (by_id, child, level + 1, out); } } }
 
 #[test]

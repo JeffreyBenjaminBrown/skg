@@ -1,6 +1,6 @@
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, NodeCompleteDiff, NodeChanges };
 use crate::types::list::{compute_interleaved_diff, Diff_Item};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, MSV, SourceName, members_msv, members_of};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 
@@ -184,32 +184,44 @@ fn compare_nodecompletes (
   let text_changed : bool =
     old . title != new . title ||
     old . body  != new . body;
+  let old_aliases : MSV<String> = members_msv (& old . aliases);
+  let new_aliases : MSV<String> = members_msv (& new . aliases);
   let aliases_diff : Vec<Diff_Item<String>> =
     compute_interleaved_diff (
-      old . aliases . or_default(),
-      new . aliases . or_default() );
+      old_aliases . or_default(),
+      new_aliases . or_default() );
   let ids_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
       & old . all_ids() . cloned() . collect::<Vec<ID>>(),
       & new . all_ids() . cloned() . collect::<Vec<ID>>() );
+  let old_contains : Vec<ID> = members_of (& old . contains);
+  let new_contains : Vec<ID> = members_of (& new . contains);
   let contains_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      &old . contains,
-      &new . contains );
+      &old_contains,
+      &new_contains );
   // §C: per-stage diffs of the sharing relations, so a removed
   // subscribee / hidden-outside member gets a per-stage membership axis.
+  let old_subscribes_to : MSV<ID> = members_msv (& old . subscribes_to);
+  let new_subscribes_to : MSV<ID> = members_msv (& new . subscribes_to);
   let subscribes_to_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      old . subscribes_to . or_default (),
-      new . subscribes_to . or_default () );
+      old_subscribes_to . or_default (),
+      new_subscribes_to . or_default () );
+  let old_hides : MSV<ID> = members_msv (
+    & old . hides_from_its_subscriptions);
+  let new_hides : MSV<ID> = members_msv (
+    & new . hides_from_its_subscriptions);
   let hides_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      old . hides_from_its_subscriptions . or_default (),
-      new . hides_from_its_subscriptions . or_default () );
+      old_hides . or_default (),
+      new_hides . or_default () );
+  let old_overrides_view_of : MSV<ID> = members_msv (& old . overrides_view_of);
+  let new_overrides_view_of : MSV<ID> = members_msv (& new . overrides_view_of);
   let overrides_view_of_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      old . overrides_view_of . or_default (),
-      new . overrides_view_of . or_default () );
+      old_overrides_view_of . or_default (),
+      new_overrides_view_of . or_default () );
   NodeChanges {
     text_changed,
     aliases_diff,

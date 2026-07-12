@@ -383,7 +383,7 @@ pub fn content_maps_from_nodes (
   let mut to_containers : MapToContainers = HashMap::new ();
   for node in nodes {
     { let pid : &ID = &node . pid;
-      for child_id in &node . contains {
+      for child_id in node . contains . iter () . map ( |m| &m . member ) {
         to_content . entry (pid . clone ())
           . or_insert_with (Vec::new)
           . push (child_id . clone ());

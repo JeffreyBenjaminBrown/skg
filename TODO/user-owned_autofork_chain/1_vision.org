@@ -18,10 +18,13 @@ and then my notes to people I trust ('trusted'),
 and then my notes that only I can read ('private').
 There could be more, but that's enough to convey the idea.
 
-Thhis should automatically define three source sets:
-public-or-more-private = (public, trusted, private)
-trusted-or-more-private = (trusted, private)
-private-or-more-private = (private)
+This should automatically define three source sets
+(fixed per 2_discussion.org: PREFIXES of the publicness order,
+so each set is "that source and everything more public",
+which is what the selection UI and the accordion fold need):
+up-to-public  = (public)
+up-to-trusted = (public, trusted)
+up-to-private = (public, trusted, private)
 
 That's unnecessarily verbose naming but definitely safe
 and probably the most understandable to a user, so let's go with it for now.
@@ -48,10 +51,10 @@ requires manual attention. We won't go there.
 A chain F1 ... Fn of nodes for which each Fj forks F(j-1)
 can be an autofork chain if:
 - For each i, Fi has a distinct source.
-- If i > j, then i is more public than j.
-- For all j, Fj hides nothing from F(j-i).
-- For all j, Fj maintains the order of F(j-i)'s content,
-  and indeed all of F(j-i)'s other collections (esp. subscriptions).
+- If i > j, then i is more private than j. (Fixed per 2_discussion.org: the worked example makes higher indices more private.)
+- For all j, Fj hides nothing from F(j-1).
+- For all j, Fj maintains the order of F(j-1)'s content,
+  and indeed all of F(j-1)'s other collections (esp. subscriptions).
 
 F1 can be owned or not; the rest must be owned.
 Non-owned sources are treated as maximally public,

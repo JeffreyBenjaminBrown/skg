@@ -18,7 +18,7 @@ use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
-use skg::types::misc::ID;
+use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 
@@ -74,7 +74,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
             "Inactive nodes present in saved buffer remain unchanged in graph")),
           "suppression must warn: {:?}", warnings );
         assert_eq! (
-          saved_node_by_id (&plan . define_nodes, "root") . contains,
+          members_of (&saved_node_by_id (&plan . define_nodes, "root") . contains),
           vec![ ID::from ("active-b"), ID::from ("private-a") ],
           "the active parent keeps containing the inactive child" ); }
       { // The same stale node UNTOUCHED: the noop filter drops its

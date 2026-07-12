@@ -13,7 +13,7 @@ use crate::diff_analysis::snapshot::{
 use crate::diff_analysis::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
 use crate::git_ops::read_repo::open_repo;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_msv, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::textlinks_from_node;
 
@@ -37,12 +37,16 @@ pub fn dangling_ids_in_snapshot (
     ids };
   let mut dangling : BTreeSet<ID> = BTreeSet::new ();
   for node in snapshot . nodes . values () {
+    let contains_ids   : Vec<ID> = members_of (& node . contains);
+    let subscribes_ids : MSV<ID> = members_msv (& node . subscribes_to);
+    let hides_ids       : MSV<ID> = members_msv (
+      & node . hides_from_its_subscriptions);
+    let overrides_ids   : MSV<ID> = members_msv (& node . overrides_view_of);
     let referenced =
-      node . contains . iter ()
-      . chain ( node . subscribes_to . or_default () . iter () )
-      . chain ( node . hides_from_its_subscriptions
-                . or_default () . iter () )
-      . chain ( node . overrides_view_of . or_default () . iter () );
+      contains_ids . iter ()
+      . chain ( subscribes_ids . or_default () . iter () )
+      . chain ( hides_ids . or_default () . iter () )
+      . chain ( overrides_ids . or_default () . iter () );
     for id in referenced {
       if ! resolvable . contains (id) {
         dangling . insert ( id . clone () ); }} }
@@ -147,10 +151,15 @@ fn sighting_at_commit (
     let mut keep = |name : &'static str, members : &[ID]| {
       if ! members . is_empty () {
         outbound . push ( (name, members . to_vec ()) ); }};
-    keep ("contains",                     & own . contains);
-    keep ("subscribes_to",                own . subscribes_to . or_default ());
-    keep ("hides_from_its_subscriptions", own . hides_from_its_subscriptions . or_default ());
-    keep ("overrides_view_of",            own . overrides_view_of . or_default ());
+    let contains_ids   : Vec<ID> = members_of (& own . contains);
+    let subscribes_ids : MSV<ID> = members_msv (& own . subscribes_to);
+    let hides_ids       : MSV<ID> = members_msv (
+      & own . hides_from_its_subscriptions);
+    let overrides_ids   : MSV<ID> = members_msv (& own . overrides_view_of);
+    keep ("contains",                     & contains_ids);
+    keep ("subscribes_to",                subscribes_ids . or_default ());
+    keep ("hides_from_its_subscriptions", hides_ids . or_default ());
+    keep ("overrides_view_of",            overrides_ids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
     inbound_references_in_tree (repo, prefix, source_name, id, &tree);
@@ -191,14 +200,16 @@ fn inbound_references_in_tree (
     let mut note = |name : &'static str, hit : bool| {
       if hit { inbound . push ( (node . pid . clone (), name) ); }};
     note ("contains",
-          node . contains . contains (id));
+          node . contains . iter () . any ( |m| &m . member == id ));
     note ("subscribes_to",
-          node . subscribes_to . or_default () . contains (id));
+          node . subscribes_to . or_default () . iter ()
+            . any ( |m| &m . member == id ));
     note ("hides_from_its_subscriptions",
-          node . hides_from_its_subscriptions . or_default ()
-            . contains (id));
+          node . hides_from_its_subscriptions . or_default () . iter ()
+            . any ( |m| &m . member == id ));
     note ("overrides_view_of",
-          node . overrides_view_of . or_default () . contains (id));
+          node . overrides_view_of . or_default () . iter ()
+            . any ( |m| &m . member == id ));
     note ("textlink",
           textlinks_from_node (&node) . iter ()
             . any ( |l| l . id == *id ));

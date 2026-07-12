@@ -9,7 +9,7 @@
 // one.
 
 use super::*;
-use crate::types::misc::SkgfileSource;
+use crate::types::misc::{SkgfileSource, members_of, privacied_all};
 use crate::types::nodes::complete::empty_node_complete;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol,
@@ -115,15 +115,18 @@ fn fork_clone_hides_children_the_edit_deleted () {
     title    : "N-edited" . to_string (),
     source   : SourceName::from ("foreign"),
     pid      : ID::from ("N"),
-    contains : vec! [ ID::from ("N1") ],
+    contains : privacied_all (
+      & SourceName::from ("foreign"),
+      vec! [ ID::from ("N1") ] ),
     .. empty_node_complete () };
   let spec : ForkSpec = build_fork_clone (
     & buffer_node, "N-original",
     & [ ID::from ("N1"), ID::from ("N2") ],
     SourceName::from ("owned2"), false );
   assert_eq! (
-    spec . clone . 0 . hides_from_its_subscriptions . or_default (),
-    & [ ID::from ("N2") ],
+    members_of (
+      spec . clone . 0 . hides_from_its_subscriptions . or_default () ),
+    vec! [ ID::from ("N2") ],
     "the clone must hide exactly the children the edit deleted" ); }
 
 #[test]

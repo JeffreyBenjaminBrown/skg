@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::{
 };
 use skg::save::validate_override_invariants_after_save;
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, privacied_all};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge};
 
@@ -37,9 +37,11 @@ fn node (
       MSV::Unspecified
     } else {
       MSV::Specified (
-        overrides . iter ()
-        . map ( |id| ID::from (*id) )
-        . collect () )
+        privacied_all (
+          & node . source,
+          overrides . iter ()
+          . map ( |id| ID::from (*id) )
+          . collect () ) )
     };
   node }
 

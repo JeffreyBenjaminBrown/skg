@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::source_sets::{ActiveSourceSet, SourceSetName};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, privacied_all};
 use crate::types::nodes::complete::empty_node_complete;
 
 use std::collections::BTreeSet;
@@ -22,8 +22,10 @@ fn node (
   n . pid      = ID::from (pid);
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
-  n . contains = contains . iter () . map ( |c| ID::from (*c) ) . collect ();
   n . source   = SourceName::from ("main");
+  n . contains = privacied_all (
+    & n . source,
+    contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
 
 fn active_all () -> ActiveSourceSet {

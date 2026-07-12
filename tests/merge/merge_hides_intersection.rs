@@ -14,7 +14,7 @@
 
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::run_with_shared_test_db;
-use skg::types::misc::ID;
+use skg::types::misc::{ID, PrivaciedMember};
 use skg::types::save::NodeMerge;
 
 use std::error::Error;
@@ -32,16 +32,16 @@ fn all_tests
           & [ ( ID::from ("a"), ID::from ("b") ) ],
           &s . config, &s . driver ) . await ?;
       assert_eq! ( merges . len (), 1 );
-      let hides : &[ID] =
+      let hides : &[PrivaciedMember<ID>] =
         merges[0] . updated_acquirer . 0
         . hides_from_its_subscriptions . or_default ();
-      assert! ( ! hides . contains (& ID::from ("x")),
+      assert! ( ! hides . iter () . any (|m| m . member == ID::from ("x")),
         "b showed x through e pre-merge, so the merge must not hide it: {:?}",
         hides );
-      assert! ( hides . contains (& ID::from ("y")),
+      assert! ( hides . iter () . any (|m| m . member == ID::from ("y")),
         "nobody showed y (b hid it; a could not see it), so its hide survives: {:?}",
         hides );
-      assert! ( hides . contains (& ID::from ("z")),
+      assert! ( hides . iter () . any (|m| m . member == ID::from ("z")),
         "nobody showed z (no subscribee contains it), so its hide survives: {:?}",
         hides );
       Ok (( )) } )) }

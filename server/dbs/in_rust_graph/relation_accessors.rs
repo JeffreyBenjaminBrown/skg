@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, members_of};
 use crate::types::nodes::rust::NodeRust;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -262,15 +262,15 @@ fn outbound_ids_from_node (
 ) -> Vec<ID> {
   match relation {
     NodeRelation::Contains =>
-      node . contains . clone (),
+      members_of ( &node . contains ),
     NodeRelation::TextlinksTo =>
       node . textlinks_to . clone (),
     NodeRelation::Subscribes =>
-      node . subscribes_to . or_default () . to_vec (),
+      members_of ( node . subscribes_to . or_default () ),
     NodeRelation::HidesFromItsSubscriptions =>
-      node . hides_from_its_subscriptions . or_default () . to_vec (),
+      members_of ( node . hides_from_its_subscriptions . or_default () ),
     NodeRelation::OverridesViewOf =>
-      node . overrides_view_of . or_default () . to_vec (),
+      members_of ( node . overrides_view_of . or_default () ),
   } }
 
 fn inbound_pid_set (

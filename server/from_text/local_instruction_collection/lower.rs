@@ -19,7 +19,8 @@
 
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, IntentsForOneId, SubscribeeVisibility };
-use crate::types::misc::{ID, MSV, SourceName};
+use crate::types::misc::{
+  ID, MSV, SourceName, members_msv, members_of, privacied_all, privacied_msv };
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -76,13 +77,14 @@ impl NodeIntent {
       source                       : node . source,
       title                        : node . title,
       body                         : node . body,
-      contains                     : MSV::Specified (node . contains),
+      contains                     : MSV::Specified (
+        members_of (&node . contains) ),
       extra_ids                    : node . extra_ids,
-      aliases                      : node . aliases,
-      subscribes_to                : node . subscribes_to,
+      aliases                      : members_msv (&node . aliases),
+      subscribes_to                : members_msv (&node . subscribes_to),
       hides_from_its_subscriptions :
-        node . hides_from_its_subscriptions,
-      overrides_view_of            : node . overrides_view_of,
+        members_msv (&node . hides_from_its_subscriptions),
+      overrides_view_of            : members_msv (&node . overrides_view_of),
       misc                         : node . misc,
     }) }
 
@@ -119,20 +121,25 @@ impl NodeSaveIntent {
   pub fn into_nodecomplete (
     self,
   ) -> NodeComplete {
+    let source : SourceName = self . source . clone();
     NodeComplete {
       title                        : self . title,
-      aliases                      : self . aliases,
+      aliases                      :
+        privacied_msv (&source, self . aliases),
       source                       : self . source,
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         :
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
-        self . contains . or_default() . to_vec(),
-      subscribes_to                : self . subscribes_to,
+        privacied_all (
+          &source, self . contains . or_default() . to_vec() ),
+      subscribes_to                :
+        privacied_msv (&source, self . subscribes_to),
       hides_from_its_subscriptions :
-        self . hides_from_its_subscriptions,
-      overrides_view_of            : self . overrides_view_of,
+        privacied_msv (&source, self . hides_from_its_subscriptions),
+      overrides_view_of            :
+        privacied_msv (&source, self . overrides_view_of),
       misc                         : self . misc,
     }}
 
@@ -315,7 +322,8 @@ impl LoweredIntents {
       Some (NodeIntent::Save (intent)) =>
         intent . contains . or_default() . iter() . cloned() . collect(),
       _ =>
-        subscriber_from_disk . contains . iter() . cloned() . collect(),
+        members_of (&subscriber_from_disk . contains)
+        . into_iter() . collect(),
     }}
 
   /// This applies inferred hides/unhides to the subscriber's
@@ -327,10 +335,12 @@ impl LoweredIntents {
     inferred_hides   : &[ID],
     inferred_unhides : &[ID],
   ) {
+    let base_hides : MSV<ID> =
+      members_msv (&subscriber . hides_from_its_subscriptions);
     if let Some (intent) =
       self . by_pid . get_mut (&subscriber . pid)
     { intent . apply_hiderel_delta (
-        &subscriber . hides_from_its_subscriptions,
+        &base_hides,
         inferred_hides,
         inferred_unhides);
       return; }
@@ -338,7 +348,7 @@ impl LoweredIntents {
       NodeIntent::graph_save_from_nodecomplete (
         subscriber . clone());
     intent . apply_hiderel_delta (
-      &subscriber . hides_from_its_subscriptions,
+      &base_hides,
       inferred_hides,
       inferred_unhides);
     let pid : ID =

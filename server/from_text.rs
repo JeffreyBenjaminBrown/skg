@@ -15,7 +15,7 @@ pub mod validate;
 use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::{BufferValidationError, SaveError};
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::save::{NodeMerge, DefineNode, SavePlan};
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
@@ -317,7 +317,8 @@ fn explicit_fork_specs_from_viewforest (
       // The snapshot serves as both the clone template and the disk
       // state, so the disk-contains diff is empty: an explicit fork
       // deletes nothing, hence hides nothing.
-      & snapshot, & snapshot . title, & snapshot . contains,
+      & snapshot, & snapshot . title,
+      & members_of ( & snapshot . contains ),
       clone_source_inputs )
     { Ok (spec) => specs . push (spec),
       Err (e)   => errors . push (e), }}

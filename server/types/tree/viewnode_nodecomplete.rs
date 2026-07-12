@@ -2,7 +2,7 @@
 
 use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{members_of, ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, ActiveNode, ParentIs };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, PartnerCol};
@@ -106,7 +106,7 @@ pub fn pids_for_subscriber_and_its_subscribees (
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &source ) ?;
   Ok (( nodecomplete . pid . clone (),
-        nodecomplete . subscribes_to . or_default() . to_vec() )) }
+        members_of ( nodecomplete . subscribes_to . or_default() ) )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)

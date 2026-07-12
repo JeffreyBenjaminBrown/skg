@@ -1,6 +1,6 @@
 use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
 use crate::types::viewnode::{Vognode, QualCol, Qual};
@@ -58,7 +58,7 @@ pub fn reconcile_alias_col_children (
     : (Vec<String>, HashMap<String, MembershipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {
       let goals : Vec<String> =
-        parent_nodecomplete . aliases . or_default() . to_vec();
+        members_of ( parent_nodecomplete . aliases . or_default() );
       ( goals, HashMap::new() )
     } else {
       let merged : Vec<(String, MembershipAxes)> =

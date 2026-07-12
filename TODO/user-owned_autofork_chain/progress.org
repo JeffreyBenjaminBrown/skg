@@ -7,15 +7,91 @@ what's done; choices determining the future.
 * status
 Execution began 2026-07-12. Work items proceed in the plan's
 order; this file grows as each lands.
+- DONE privacy-order (commits 9785a514, 1225acb0).
+- ONGOING leveled-lists: 'PrivaciedMember' landed in types +
+  FS boundary (degenerate: level := home source at load, dropped
+  at write). The ~160 mechanical call-site fixes are delegated to
+  three parallel Sonnet agents (per Jeff's cost note), each owning
+  a disjoint file set with an explicit read-vs-construct rulebook;
+  Fable reviews the diff and the "choose" sites afterward.
+- STARTED EARLY (parallel, no file overlap):
+  section-format-and-fold's pure core -- server/accordion/
+  ('fold_sections', 'unfold_node', 'SectionSlices', 'ListItem',
+  'FoldWarning') plus the proptest suite (tests/unit/accordion.rs;
+  proptest added as a dev-dependency per Jeff's DONE). Round-trip,
+  canonicality, level-preservation (the silent-leak guard),
+  dangling/duplicate-anchor fallbacks, and pid_of-resolution are
+  pinned there. NodeFS wiring, Accordion grouping, and the write
+  layer remain.
 
 * what's done and went well
-(nothing yet)
+** privacy-order
+Prefix source-sets, the comparison chokepoint on 'SkgConfig'
+('ordered_sources', 'source_position', 'is_strictly_more_public',
+'more_private_of', 'prefix_through'), retirement of
+=[[source_sets]]= and =user_owns_it= (both hard errors naming the
+plan), author folders with 'owned_folder' (default "owned"),
+optional source names defaulting to paths, herald-label
+abbreviation for owned defaulted-name sources, and
+'bash/migrate-to-author-folders.sh'. All three clients (elisp,
+nvim, and the server-side prompts) updated. Every fixture (unit,
+elisp, nvim, 34 integration harnesses), example-data, the windows
+bundle scripts, data/bash/lib.sh, and Jeff's live data/ tree were
+converted. All four suites green.
 
 * changes to the plan's envisioned order
-(none yet)
+** Ownership derives from the RESOLVED path, not the raw first component.
+The plan sketched "first path component == owned_folder". The
+integration harnesses generate configs whose sources use absolute
+paths, so the shipped rule is the more truthful "absolute path
+sits under DATA_ROOT/OWNED_FOLDER" (after 'make_paths_absolute'),
+which subsumes the relative case. Consequence: a config file must
+live in the data root for its owned/ folder to be recognized —
+the integration harnesses now write their generated configs into
+each test's data/ directory instead of /tmp.
+** The author-folder rearrangement script was written now, not at =migration=.
+The hard error would otherwise have bricked Jeff's dev server the
+moment this commit landed. The script ran on data/ (all eight
+sources moved under data/owned/); the accordion-level
+'skg-migrate-to-accordions' remains at its planned position.
 
 * what's imperfect about what's done
-(nothing yet)
+** Two degenerate-stage sites will need rework at save-leveling.
+Recorded so they are not mistaken for finished:
+- 'preserve_invisible_members' (supplement_from_disk.rs) currently
+  weaves plain IDs and re-tags the merged list with the node's own
+  source. Identical under degeneracy (disk levels == node source),
+  but once real levels exist this site must PRESERVE disk levels —
+  it is a sticky-rule surface. Rewritten in work item save-leveling.
+- 'into_nodecomplete' (lower.rs) tags every field with the intent's
+  source; save-leveling replaces this with sticky-else-default
+  resolution.
+** Import parse-time placeholder levels.
+'nodecomplete_from_section_tree' tags lists with a placeholder
+source; the caller re-tags on assignment now (import_org_roam.rs),
+so levels are honest, but the parse-time placeholder remains a
+wart until importers construct via the fold.
+** data/skgconfig.toml's privacy ladder needs Jeff's ordering.
+I moved ofiscal directly after public so the old named set
+{public, ofiscal} survives as the prefix through ofiscal, but the
+relative privacy of pers-i/pers-m/pers-p/pers-deprecated/decid/
+mincit is a judgment only Jeff can make. A NOTE comment in the
+config says so. Until reordered, prefix sets other than
+public/ofiscal may not mean what he wants.
+** The interleaved-tables elisp/nvim test fixtures still carry [[source_sets]].
+Kept deliberately: those fixtures pin that the CLIENT config
+readers skip array tables they do not care about; the server would
+reject the same file. Comment says so in the fixture docstring.
+** 'skg_owned_repos' in data/bash/lib.sh now equals 'skg_all_repos'
+for Jeff's current data (everything owned). Correct, but scripts
+distinguishing them only matter once a foreign source exists.
 
 * choices determining the future
-(none yet)
+** SourceSetName survives as a type.
+Prefix sets are "named by their most private source", so the
+wire/type vocabulary ("source-set") stays honest and the endpoint
+shapes are unchanged; only 'SourceSet' (the struct) died.
+** The owned/ dir name collides gracefully.
+A source whose path IS the owned folder ("owned") is legal (the
+fork fixtures use it); its defaulted herald label falls back to
+the full name rather than an empty string.

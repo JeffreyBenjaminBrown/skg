@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_override
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, privacied_all};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
@@ -342,22 +342,28 @@ pub fn build_fork_clone (
   clone_source  : SourceName,
   source_confirmed : bool, // whether clone_source was user-SPECIFIED (vs inferred or defaulted)
 ) -> ForkSpec {
+  let buffer_contains_ids : Vec<ID> =
+    members_of (& buffer_node . contains);
   let clone : NodeComplete = NodeComplete {
     title         : buffer_node . title . clone (),
     aliases       : MSV::Unspecified,
-    source        : clone_source,
     pid           : ID ( uuid::Uuid::new_v4 () . to_string () ),
     extra_ids     : Vec::new (),
     body          : buffer_node . body . clone (),
-    contains      : buffer_node . contains . clone (),
-    subscribes_to : MSV::Specified ( vec! [ buffer_node . pid . clone () ] ),
-    hides_from_its_subscriptions : MSV::Specified (
+    contains      : privacied_all (
+      &clone_source, buffer_contains_ids . clone () ),
+    subscribes_to : MSV::Specified ( privacied_all (
+      &clone_source, vec! [ buffer_node . pid . clone () ] )),
+    hides_from_its_subscriptions : MSV::Specified ( privacied_all (
+      &clone_source,
       // The children the forking edit deleted.
       disk_contains . iter ()
-        . filter ( |id| ! buffer_node . contains . contains (id) )
-        . cloned () . collect () ),
-    overrides_view_of : MSV::Specified ( vec! [ buffer_node . pid . clone () ] ),
+        . filter ( |id| ! buffer_contains_ids . contains (id) )
+        . cloned () . collect () )),
+    overrides_view_of : MSV::Specified ( privacied_all (
+      &clone_source, vec! [ buffer_node . pid . clone () ] )),
     misc          : Vec::new (),
+    source        : clone_source,
   };
   ForkSpec {
     clone           : SaveNode (clone),

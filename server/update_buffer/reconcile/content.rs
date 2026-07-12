@@ -2,7 +2,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::viewnode::{mk_inactive_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
@@ -215,7 +215,7 @@ fn reconcile_content_children (
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_source_from_id'; this makes the rerender consistent.)
   let content_ids : Vec<ID> =
-    nodecomplete . contains . iter ()
+    members_of (& nodecomplete . contains) . iter ()
     . map ( |id| graph_snap . pid_of (id)
                  . unwrap_or_else ( || id . clone () ))
     . collect ();
@@ -428,10 +428,10 @@ fn content_goal_list (
         . collect () };
     let worktree_hidden : Vec<ID> =
       resolve_pids (
-        grandparent_nodecomplete . hides_from_its_subscriptions
-        . or_default() . to_vec() );
+        members_of ( grandparent_nodecomplete . hides_from_its_subscriptions
+        . or_default() ) );
     let subscriber_contains : Vec<ID> =
-      resolve_pids ( grandparent_nodecomplete . contains . clone () );
+      resolve_pids ( members_of (& grandparent_nodecomplete . contains) );
     Ok ( setlike_vector_subtraction (
            setlike_vector_subtraction (
              content_ids . to_vec(), &worktree_hidden ),

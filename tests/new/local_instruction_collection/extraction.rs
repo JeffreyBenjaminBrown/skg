@@ -19,7 +19,7 @@ use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::test_utils::run_with_shared_test_db;
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
@@ -181,7 +181,7 @@ fn test_extract_nonmergeSavePlan_basic() {
   assert_eq!(root1_skg . title, "root node 1");
   assert_eq!(root1_skg . body, Some("Root body content" . to_string()));
   assert_eq!(root1_skg . pid, ID::from ("root1"));
-  assert_eq!(root1_skg . contains, vec![ID::from ("child1")]);
+  assert_eq!(members_of (&root1_skg . contains), vec![ID::from ("child1")]);
   assert!(matches!(&instructions[0],
                    DefineNode::Save (_)));
 
@@ -235,10 +235,10 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(main_skg . title, "main node");
   assert_eq!(main_skg . pid, ID::from ("main"));
-  assert_eq!(main_skg . contains, vec![ID::from ("content_child")]);
+  assert_eq!(members_of (&main_skg . contains), vec![ID::from ("content_child")]);
 
   // Test aliases collection
-  assert_eq!(main_skg . aliases, MSV::Specified(vec!["first alias" . to_string(), "second alias" . to_string()]));
+  assert_eq!(members_msv (&main_skg . aliases), MSV::Specified(vec!["first alias" . to_string(), "second alias" . to_string()]));
 
   // Test content child
   let content_skg : &NodeComplete = match &instructions[1] {
@@ -272,7 +272,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(node1_skg . aliases, MSV::Unspecified, "Should have no aliases");
-  assert_eq!(node1_skg . contains, vec![ID::from ("child1")]);
+  assert_eq!(members_of (&node1_skg . contains), vec![ID::from ("child1")]);
 }
 
 #[test]
@@ -300,7 +300,7 @@ fn inactive_placeholders_emit_neither_savenode_nor_contains () {
     vec![ID::from ("root"), ID::from ("active-a"), ID::from ("active-b")],
     "inactive placeholders should not produce SaveNodes");
   assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
+    members_of (&saved_node_by_id (&instructions, "root") . contains),
     vec![ID::from ("active-a"), ID::from ("active-b")],
     "an inactive placeholder is not an extracted content member");
 }
@@ -360,8 +360,8 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root_skg . title, "root node");
-  assert_eq!(root_skg . aliases, MSV::Specified(vec!["my alias" . to_string()]));
-  assert_eq!(root_skg . contains, vec![ID::from ("content1"), ID::from ("content2")]); // Only Content relations
+  assert_eq!(members_msv (&root_skg . aliases), MSV::Specified(vec!["my alias" . to_string()]));
+  assert_eq!(members_of (&root_skg . contains), vec![ID::from ("content1"), ID::from ("content2")]); // Only Content relations
 }
 
 #[test]
@@ -385,7 +385,7 @@ fn extraction_preserves_content_and_independent_children (
     save_ids (&instructions),
     vec![ID::from ("root"), ID::from ("ordinary"), ID::from ("independent")]);
   assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
+    members_of (&saved_node_by_id (&instructions, "root") . contains),
     vec![ID::from ("ordinary")]); }
 
 #[test]
@@ -412,10 +412,10 @@ fn extraction_skips_alias_and_id_display_nodes (
     save_ids (&instructions),
     vec![ID::from ("root"), ID::from ("child")]);
   assert_eq!(
-    saved_node_by_id (&instructions, "root") . aliases,
+    members_msv (&saved_node_by_id (&instructions, "root") . aliases),
     MSV::Specified (vec!["alias text" . to_string()]));
   assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
+    members_of (&saved_node_by_id (&instructions, "root") . contains),
     vec![ID::from ("child")]); }
 
 #[test]
@@ -451,7 +451,7 @@ fn extraction_collects_subscribees_without_hidden_branches (
       ID::from ("subscribee-content"),
       ID::from ("hidden-outside")]);
   assert_eq!(
-    saved_node_by_id (&instructions, "subscriber") . subscribes_to,
+    members_msv (&saved_node_by_id (&instructions, "subscriber") . subscribes_to),
     MSV::Specified (vec![ID::from ("subscribee")]));
   assert_eq!(
     saved_node_by_id (&instructions, "subscriber") . contains,
@@ -486,7 +486,7 @@ fn extraction_collects_overridden_col (
          ID::from ("overridden-a"),
          ID::from ("overridden-b")]);
   assert_eq!(
-    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    members_msv (&saved_node_by_id (&instructions, "overrider") . overrides_view_of),
     MSV::Specified (vec![
       ID::from ("overridden-a"),
       ID::from ("overridden-b")])); }
@@ -544,7 +544,7 @@ fn read_only_col_members_save_themselves_but_not_their_owner (
          ID::from ("hider"),
          ID::from ("hidden")]);
   assert_eq!(
-    saved_node_by_id (&instructions, "owner") . contains,
+    members_of (&saved_node_by_id (&instructions, "owner") . contains),
     Vec::<ID>::new()); }
 
 #[test]
@@ -732,10 +732,10 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
     saved_node_by_id (&instructions, "root");
   assert_eq!(root . title, "root");
   assert_eq!(root . body, Some ("Root body" . to_string()));
-  assert_eq!(root . aliases, MSV::Specified (vec![
+  assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
-  assert_eq!(root . contains, vec![ID::from ("child")]);
-  assert_eq!(root . subscribes_to, MSV::Specified (vec![
+  assert_eq!(members_of (&root . contains), vec![ID::from ("child")]);
+  assert_eq!(members_msv (&root . subscribes_to), MSV::Specified (vec![
     ID::from ("subscribee")]));
   assert!(matches!(
     instructions . last(),
@@ -777,10 +777,10 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
     saved_node_by_id (&instructions, "root");
   assert_eq!(root . title, "root");
   assert_eq!(root . body, Some ("Root body" . to_string()));
-  assert_eq!(root . contains, vec![ID::from ("content")]);
-  assert_eq!(root . aliases, MSV::Specified (vec![
+  assert_eq!(members_of (&root . contains), vec![ID::from ("content")]);
+  assert_eq!(members_msv (&root . aliases), MSV::Specified (vec![
     "root alias" . to_string()]));
-  assert_eq!(root . subscribes_to, MSV::Specified (vec![
+  assert_eq!(members_msv (&root . subscribes_to), MSV::Specified (vec![
     ID::from ("subscribee")]));
   assert_eq!(
     saved_node_by_id (&instructions, "independent") . contains,
@@ -940,8 +940,8 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
       assert_eq!(
-        saved_node_by_id (&instructions, "r")
-          . hides_from_its_subscriptions,
+        members_msv (&saved_node_by_id (&instructions, "r")
+          . hides_from_its_subscriptions),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
         ! save_ids (&instructions) . contains (&ID::from ("e")),
@@ -969,7 +969,7 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
           . hides_from_its_subscriptions,
         MSV::Unspecified);
       assert_eq!(
-        saved_node_by_id (&instructions, "r") . contains,
+        members_of (&saved_node_by_id (&instructions, "r") . contains),
         vec![ID::from ("e1")]);
       Ok (()) }
 
@@ -1017,8 +1017,8 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
       assert_eq!(
-        saved_node_by_id (&instructions, "R")
-          . hides_from_its_subscriptions,
+        members_msv (&saved_node_by_id (&instructions, "R")
+          . hides_from_its_subscriptions),
         MSV::Specified (
           vec![ID::from ("hidden-in-E2"),
                ID::from ("hidden-for-no-reason")]));
@@ -1066,7 +1066,7 @@ async fn ordinary_owned_child_list_edit_still_changes_contains (
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
       assert_eq!(
-        saved_node_by_id (&instructions, "r") . contains,
+        members_of (&saved_node_by_id (&instructions, "r") . contains),
         vec![ID::from ("r1")]);
       Ok (()) }
 
@@ -1087,11 +1087,11 @@ async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
       assert_eq!(
-        saved_node_by_id (&instructions, "e") . contains,
+        members_of (&saved_node_by_id (&instructions, "e") . contains),
         vec![ID::from ("e1")]);
       assert_eq!(
-        saved_node_by_id (&instructions, "r")
-          . hides_from_its_subscriptions,
+        members_msv (&saved_node_by_id (&instructions, "r")
+          . hides_from_its_subscriptions),
         MSV::Specified (vec![ID::from ("e1")]));
       Ok (()) }
 
@@ -1119,7 +1119,7 @@ fn idcol_resident_activeNode_saves_itself_but_is_not_content (
          ID::from ("display-child"),
          ID::from ("real-child")]);
   assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
+    members_of (&saved_node_by_id (&instructions, "root") . contains),
     vec![ID::from ("real-child")]); }
 
 async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
@@ -1141,7 +1141,7 @@ async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
         "subscribee-as-such should not produce a SaveNode: {:?}",
         instructions);
       assert_eq!(
-        saved_node_by_id (&instructions, "e2") . contains,
+        members_of (&saved_node_by_id (&instructions, "e2") . contains),
         Vec::<ID>::new());
       Ok (()) }
 
@@ -1259,15 +1259,15 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
   // Check contains relationships
   let level1_skg : &NodeComplete =
     extract_nodecomplete_if_save_else_error(&instructions[0]);
-  assert_eq!(level1_skg . contains, vec![ID::from ("level2a"), ID::from ("level2b")]);
+  assert_eq!(members_of (&level1_skg . contains), vec![ID::from ("level2a"), ID::from ("level2b")]);
 
   let level2a_skg : &NodeComplete =
     extract_nodecomplete_if_save_else_error(&instructions[1]);
-  assert_eq!(level2a_skg . contains, vec![ID::from ("level3a")]);
+  assert_eq!(members_of (&level2a_skg . contains), vec![ID::from ("level3a")]);
 
   let level3a_skg : &NodeComplete =
     extract_nodecomplete_if_save_else_error(&instructions[2]);
-  assert_eq!(level3a_skg . contains, vec![ID::from ("level4")]);
+  assert_eq!(members_of (&level3a_skg . contains), vec![ID::from ("level4")]);
 
   let level4_skg : &NodeComplete =
     extract_nodecomplete_if_save_else_error(&instructions[3]);
@@ -1329,7 +1329,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
   let main_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
-  assert_eq!(main_skg . aliases, MSV::Specified(vec!["alias one" . to_string(), "alias two" . to_string()]));
+  assert_eq!(members_msv (&main_skg . aliases), MSV::Specified(vec!["alias one" . to_string(), "alias two" . to_string()]));
   assert_eq!(main_skg . contains, vec![]); // No content children
 }
 
@@ -1364,10 +1364,10 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(doc1_skg . title, "Document 1");
-  assert_eq!(doc1_skg . aliases,
+  assert_eq!(members_msv (&doc1_skg . aliases),
              MSV::Specified(vec!["First Document" . to_string(),
                        "Primary Doc" . to_string()]));
-  assert_eq!(doc1_skg . contains,
+  assert_eq!(members_of (&doc1_skg . contains),
              vec![ID::from ("section1"),
                        ID::from ("section3")]);
   assert!(matches!(&instructions[0],
@@ -1386,7 +1386,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
   let section1_skg : &NodeComplete = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
-  assert_eq!(section1_skg . contains, vec![ID::from ("subsection1a")]);
+  assert_eq!(members_of (&section1_skg . contains), vec![ID::from ("subsection1a")]);
 }
 
 // The next several tests pin the membership-predicate wiring of
@@ -1409,7 +1409,7 @@ fn would_be_diff_phantom_child_is_excluded_from_contains (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "root") . contains,
+    members_of (&saved_node_by_id (&instructions, "root") . contains),
     vec![ID::from ("a")]); }
 
 #[test]
@@ -1427,7 +1427,7 @@ fn toDelete_member_is_excluded_from_subscribees (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "subscriber") . subscribes_to,
+    members_msv (&saved_node_by_id (&instructions, "subscriber") . subscribes_to),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1446,7 +1446,7 @@ fn would_be_diff_phantom_member_is_excluded_from_subscribees (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "subscriber") . subscribes_to,
+    members_msv (&saved_node_by_id (&instructions, "subscriber") . subscribes_to),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1464,7 +1464,7 @@ fn toDelete_member_is_excluded_from_overriddens (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    members_msv (&saved_node_by_id (&instructions, "overrider") . overrides_view_of),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1482,7 +1482,7 @@ fn independent_member_is_excluded_from_overriddens (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    members_msv (&saved_node_by_id (&instructions, "overrider") . overrides_view_of),
     MSV::Specified (vec![ID::from ("keep")])); }
 
 #[test]
@@ -1542,14 +1542,14 @@ fn duplicate_members_of_defining_cols_are_silently_deduplicated (
   let owner : &NodeComplete =
     saved_node_by_id (&instructions, "owner");
   assert_eq!(
-    owner . aliases,
+    members_msv (&owner . aliases),
     MSV::Specified (vec![
       "echo" . to_string(), "other" . to_string()]));
   assert_eq!(
-    owner . subscribes_to,
+    members_msv (&owner . subscribes_to),
     MSV::Specified (vec![ID::from ("s1"), ID::from ("s2")]));
   assert_eq!(
-    owner . overrides_view_of,
+    members_msv (&owner . overrides_view_of),
     MSV::Specified (vec![ID::from ("o1"), ID::from ("o2")])); }
 
 // The next four tests pin the writable-col membership semantics that
@@ -1578,7 +1578,7 @@ fn reordering_subscribees_reorders_subscribes_to (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "owner") . subscribes_to,
+    members_msv (&saved_node_by_id (&instructions, "owner") . subscribes_to),
     MSV::Specified (vec![
       ID::from ("c"), ID::from ("a"), ID::from ("b")])); }
 
@@ -1599,7 +1599,7 @@ fn removing_one_subscribee_keeps_the_rest (
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
-    saved_node_by_id (&instructions, "owner") . subscribes_to,
+    members_msv (&saved_node_by_id (&instructions, "owner") . subscribes_to),
     MSV::Specified (vec![ID::from ("a"), ID::from ("c")])); }
 
 #[test]
@@ -1621,14 +1621,14 @@ fn reordering_overridden_col_is_harmless (
     definenodes_from_tree (viewforest) . unwrap ();
   let owner : &NodeComplete =
     saved_node_by_id (&instructions, "owner");
-  let overridden : &Vec<ID> = match &owner . overrides_view_of {
-    MSV::Specified (ids) => ids,
+  let overridden : Vec<ID> = match &owner . overrides_view_of {
+    MSV::Specified (ids) => members_of (ids),
     other => panic! (
       "expected Specified override set, got {:?}", other), };
   assert_eq!(overridden . len(), 2);
   assert!(overridden . contains (&ID::from ("a")));
   assert!(overridden . contains (&ID::from ("b")));
-  assert_eq!(owner . contains, Vec::<ID>::new());
+  assert_eq!(members_of (&owner . contains), Vec::<ID>::new());
   assert_eq!(owner . subscribes_to, MSV::Unspecified);
   assert_eq!(owner . hides_from_its_subscriptions, MSV::Unspecified); }
 

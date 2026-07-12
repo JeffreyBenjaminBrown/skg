@@ -4,7 +4,7 @@ use skg::serve::handlers::titles_by_ids::{
   handle_titles_by_ids_request};
 use skg::test_utils::read_lp_message;
 use skg::types::git::SourceDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, TantivyIndex};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, TantivyIndex, privacied_msv};
 use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 
 use std::collections::HashMap;
@@ -23,10 +23,10 @@ fn titles_by_ids_handler_sends_parseable_titles (
     ID::new ("11111111-1111-4111-8111-111111111111");
   node . title =
     "?" . to_string ();
-  node . aliases =
-    MSV::Specified (vec!["Alias One" . to_string ()]);
   node . source =
     SourceName::from ("main");
+  node . aliases =
+    privacied_msv ( & node . source, MSV::Specified (vec!["Alias One" . to_string ()]) );
   let mut spaced_title_node : NodeComplete =
     empty_node_complete ();
   spaced_title_node . pid =

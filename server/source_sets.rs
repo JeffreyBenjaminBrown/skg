@@ -187,7 +187,7 @@ pub fn search_ids_for_source_set_for_test (
     . filter ( |n| {
       n . title . contains (terms)
       || n . aliases . or_default () . iter () . any ( |a|
-           a . contains (terms)) })
+           a . member . contains (terms)) })
     . map ( |n| n . pid )
     . collect ();
   hits . sort ();

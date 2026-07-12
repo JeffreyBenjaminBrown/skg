@@ -10,7 +10,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, MSV, SourceName};
+use crate::types::misc::{ID, MSV, SourceName, members_msv, members_of, privacied_all, privacied_msv};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -54,16 +54,25 @@ impl NodeFS {
   ) -> NodeComplete {
     NodeComplete {
       title                        : self . title,
-      aliases                      : self . aliases,
-      source,
+      // DEGENERATE leveling (work item leveled-lists): every edge and
+      // alias is tagged with the node's own source. The fold (work
+      // item section-format-and-fold) will replace this with real
+      // per-section levels.
+      aliases                      :
+        privacied_msv (&source, self . aliases),
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         : self . body,
-      contains                     : self . contains,
-      subscribes_to                : self . subscribes_to,
-      hides_from_its_subscriptions : self . hides_from_its_subscriptions,
-      overrides_view_of            : self . overrides_view_of,
+      contains                     :
+        privacied_all (&source, self . contains),
+      subscribes_to                :
+        privacied_msv (&source, self . subscribes_to),
+      hides_from_its_subscriptions :
+        privacied_msv (&source, self . hides_from_its_subscriptions),
+      overrides_view_of            :
+        privacied_msv (&source, self . overrides_view_of),
       misc                         : self . misc,
+      source,
     }
   }
 
@@ -150,16 +159,19 @@ impl From<&NodeComplete> for NodeFS {
   fn from (c: &NodeComplete) -> Self {
     NodeFS {
       title                        : c . title . clone (),
-      aliases                      : c . aliases . clone (),
+      // Levels are DROPPED at the FS boundary for now; the unfold
+      // (work item section-format-and-fold) will instead split
+      // members into per-level accordion sections.
+      aliases                      : members_msv (&c . aliases),
       pid                          : c . pid . clone (),
       extra_ids                    : c . extra_ids . clone (),
       body                         :
         crate::types::nodes::complete::normalize_body (
           c . body . clone () ),
-      contains                     : c . contains . clone (),
-      subscribes_to                : c . subscribes_to . clone (),
-      hides_from_its_subscriptions : c . hides_from_its_subscriptions . clone (),
-      overrides_view_of            : c . overrides_view_of . clone (),
+      contains                     : members_of (&c . contains),
+      subscribes_to                : members_msv (&c . subscribes_to),
+      hides_from_its_subscriptions : members_msv (&c . hides_from_its_subscriptions),
+      overrides_view_of            : members_msv (&c . overrides_view_of),
       misc                         : c . misc . clone (),
     }
   }

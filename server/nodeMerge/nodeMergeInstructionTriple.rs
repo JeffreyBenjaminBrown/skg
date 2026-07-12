@@ -5,7 +5,7 @@ use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, SkgConfig, ID};
+use crate::types::misc::{MSV, SkgConfig, ID, members_of, privacied_all};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
@@ -183,30 +183,34 @@ fn three_nodeMerged_nodecompletes(
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
       vec![ acquiree_text_preserver . pid . clone() ];
-    combined . extend_from_slice(
-      &acquirer_from_disk . contains );
-    combined . extend_from_slice(
-      &acquiree_from_disk . contains );
+    combined . extend (
+      members_of (& acquirer_from_disk . contains) );
+    combined . extend (
+      members_of (& acquiree_from_disk . contains) );
     dedup_vector (combined) };
   updated_acquirer . contains =
-    setlike_vector_subtraction ( // prevent acquirer from containing itself
-      new_contains . clone(),
-      &updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>() );
+    privacied_all (
+      & updated_acquirer . source,
+      setlike_vector_subtraction ( // prevent acquirer from containing itself
+        new_contains . clone(),
+        &updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>() ));
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
     let mut combined : Vec<String> =
-      acquirer_from_disk . aliases . or_default() . to_vec();
-    combined . extend_from_slice(
-      acquiree_from_disk . aliases . or_default() );
+      members_of ( acquirer_from_disk . aliases . or_default() );
+    combined . extend (
+      members_of ( acquiree_from_disk . aliases . or_default() ) );
     updated_acquirer . aliases =
-      MSV::Specified(dedup_vector (combined)); }
+      MSV::Specified( privacied_all (
+        & updated_acquirer . source, dedup_vector (combined) )); }
   { // Combine subscribes_to
     let mut combined : Vec<ID> =
-      acquirer_from_disk . subscribes_to . or_default() . to_vec();
-    combined . extend_from_slice(
-      acquiree_from_disk . subscribes_to . or_default() );
+      members_of ( acquirer_from_disk . subscribes_to . or_default() );
+    combined . extend (
+      members_of ( acquiree_from_disk . subscribes_to . or_default() ) );
     updated_acquirer . subscribes_to =
-      MSV::Specified(dedup_vector (combined)); }
+      MSV::Specified( privacied_all (
+        & updated_acquirer . source, dedup_vector (combined) )); }
   { // Combine hides_from_its_subscriptions, filtering to hide
     // nothing that the acquirer contains, and nothing either member
     // SHOWED through its subscriptions pre-merge: if it was
@@ -216,13 +220,14 @@ fn three_nodeMerged_nodecompletes(
     // like the intersection": exactly the intersection when both
     // members could see the id through some subscribee.)
     let mut combined : Vec<ID> =
-      acquirer_from_disk . hides_from_its_subscriptions
-      . or_default() . to_vec();
-    combined . extend_from_slice(
-      acquiree_from_disk . hides_from_its_subscriptions
-        . or_default() );
+      members_of (
+        acquirer_from_disk . hides_from_its_subscriptions . or_default() );
+    combined . extend (
+      members_of (
+        acquiree_from_disk . hides_from_its_subscriptions . or_default() ) );
     updated_acquirer . hides_from_its_subscriptions =
-      MSV::Specified(
+      MSV::Specified( privacied_all (
+        & updated_acquirer . source,
         { let deduped_and_filtered : Vec<ID> =
             // if it's in 'new_contains', then it's not here
             setlike_vector_subtraction(
@@ -231,16 +236,17 @@ fn three_nodeMerged_nodecompletes(
           deduped_and_filtered
             . into_iter()
             . filter ( |id| ! shown_pre_merge . contains (id) )
-            . collect() } ); }
+            . collect() } )); }
   { // Combine overrides_view_of
     let mut combined : Vec<ID> =
-      acquirer_from_disk . overrides_view_of
-      . or_default() . to_vec();
-    combined . extend_from_slice(
-      acquiree_from_disk . overrides_view_of
-        . or_default() );
+      members_of (
+        acquirer_from_disk . overrides_view_of . or_default() );
+    combined . extend (
+      members_of (
+        acquiree_from_disk . overrides_view_of . or_default() ) );
     updated_acquirer . overrides_view_of =
-      MSV::Specified(dedup_vector (combined)); }
+      MSV::Specified( privacied_all (
+        & updated_acquirer . source, dedup_vector (combined) )); }
   Ok (updated_acquirer) }
 
 /// The ids 'node' shows as unintegrated subscribed content: contained
@@ -254,15 +260,18 @@ async fn ids_shown_through_subscriptions (
   driver : &TypeDBDriver,
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
   let mut shown : HashSet<ID> = HashSet::new ();
-  for subscribee_id in node . subscribes_to . or_default () {
+  let hides : Vec<ID> =
+    members_of ( node . hides_from_its_subscriptions . or_default () );
+  let contains : Vec<ID> =
+    members_of ( & node . contains );
+  for subscribee_id in members_of ( node . subscribes_to . or_default () ) {
     let Some (subscribee) = optNodeComplete_rustFIrst_by_id (
-      config, driver, subscribee_id ) . await ?
+      config, driver, &subscribee_id ) . await ?
     else { continue; };
-    for id in & subscribee . contains {
-      if ! node . hides_from_its_subscriptions
-             . or_default () . contains (id)
-        && ! node . contains . contains (id)
-      { shown . insert ( id . clone () ); }} }
+    for id in members_of ( & subscribee . contains ) {
+      if ! hides . contains (&id)
+        && ! contains . contains (&id)
+      { shown . insert ( id ); }} }
   Ok (shown) }
 
 /// Create an acquiree_text_preserver from the acquiree's data

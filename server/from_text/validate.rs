@@ -2,7 +2,7 @@ use crate::from_text::fork::{CloneSourceInputs, fork_spec_from_buffer_node};
 use crate::source_sets::ActiveSourceSet;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 
@@ -73,7 +73,8 @@ pub async fn validate_and_filter_foreign_instructions(
     if let ForeignPolicyOutcome::ForkCandidate (buffer_node, disk_node)
       = outcome {
       match fork_spec_from_buffer_node (
-        buffer_node, & disk_node . title, & disk_node . contains,
+        buffer_node, & disk_node . title,
+        & members_of (& disk_node . contains),
         clone_source_inputs )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}

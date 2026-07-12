@@ -3,7 +3,7 @@ use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_view
 use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
-use skg::types::misc::{ID, MSV, SourceName};
+use skg::types::misc::{ID, MSV, SourceName, members_msv};
 use skg::types::save::SaveNode;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use std::error::Error;
@@ -84,7 +84,8 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
         // Aliases are unioned on merge (parallel to extra_ids), so the
         // merged node stays findable by the acquiree's old aliases.
-        let node1_aliases : &[String] = node1 . aliases . or_default();
+        let node1_aliases : Vec<String> =
+          members_msv (&node1 . aliases) . into_vec ();
         assert!(
           node1_aliases . contains(&"one-alias" . to_string()),
           "Node 1 should keep its own alias 'one-alias', got {:?}",
@@ -107,7 +108,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
           "Node 1 should contain exactly the acquiree_text_preserver"
         );
         assert_eq!(
-          &node1 . contains[0], acquiree_text_preserver_id,
+          &node1 . contains[0] . member, acquiree_text_preserver_id,
           "Node 1's first content should be the acquiree_text_preserver"
         );
 
