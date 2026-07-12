@@ -504,16 +504,15 @@ pub fn update_fs_from_saveinstructions (
       write_all_nodes_to_fs (
         nodes_to_write, config . clone() ) ?
     } else { 0 } };
-  for sm in source_moves {
-    // Write first, then delete: the new file is already written above.
-    let old_path : String =
-      path_from_pid_and_source (
-        &config, &sm . old_source, sm . pid . clone() )
-      . map_err (|e| io::Error::new (io::ErrorKind::Other, e)) ?;
-    match std::fs::remove_file (&old_path) {
-      Ok (()) => {},
-      Err (e) if e . kind() == io::ErrorKind::NotFound => {},
-      Err (e) => return Err (e) }; }
+  let _ = source_moves;
+  // Source moves need no file relocation of their own anymore: the
+  // accordion write above places every section at its level and
+  // sweeps owned sections whose level lost its last member. An
+  // explicit old-path delete here would even be WRONG for a
+  // private->public home move, where the old (more private) source
+  // legitimately retains a section holding the node's private
+  // memberships. (source_moves still matter to TypeDB/Tantivy,
+  // handled elsewhere.)
   Ok ( (deleted, written) ) }
 
 
