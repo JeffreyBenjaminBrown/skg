@@ -28,6 +28,24 @@ pub fn handle_rebuild_dbs_request (
   env        : &mut SkgEnv,
   views_state : &mut ViewsState,
 ) {
+  let result : Result<(), String> =
+    rebuild_dbs_in_place (env, views_state);
+  let msg : String = match result {
+    Ok (()) => "Databases rebuilt successfully." . to_string (),
+    Err (e) => {
+      tracing::error!("Rebuild failed: {}", e);
+      format! ("Rebuild failed: {}", e) } };
+  send_response_with_length_prefix (
+    stream,
+    & tag_text_response (
+      TcpToClient::RebuildDbs, &msg )); }
+
+/// The rebuild itself, streamless, so other handlers (the
+/// accordion migration) can rebuild after rewriting files.
+pub fn rebuild_dbs_in_place (
+  env         : &mut SkgEnv,
+  views_state : &mut ViewsState,
+) -> Result<(), String> {
   tracing::info!("Rebuilding databases from disk...");
   // Let any in-flight background save-index writes finish before we wipe
   // and rebuild the index out from under them.
@@ -83,14 +101,6 @@ pub fn handle_rebuild_dbs_request (
       tracing::info!("In-Rust graph rebuilt."); }
     Ok (())
   })();
-  let msg : String = match result {
-    Ok (()) => {
-      views_state . open_views . clear ();
-      "Databases rebuilt successfully." . to_string () },
-    Err (e) => {
-      tracing::error!("Rebuild failed: {}", e);
-      format! ("Rebuild failed: {}", e) } };
-  send_response_with_length_prefix (
-    stream,
-    & tag_text_response (
-      TcpToClient::RebuildDbs, &msg )); }
+  if result . is_ok () {
+    views_state . open_views . clear (); }
+  result }
