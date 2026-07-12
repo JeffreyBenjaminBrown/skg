@@ -41,11 +41,11 @@ fn main (
   println! (
     "before nodes: {}, before ids: {}",
     pair . before . nodes . len (),
-    pair . before . id_sources . len ());
+    pair . before . id_claims . len ());
   println! (
     "after nodes: {}, after ids: {}",
     pair . after . nodes . len (),
-    pair . after . id_sources . len ());
+    pair . after . id_claims . len ());
   let report : DiffReport =
     timed ("diff snapshots", || Ok::<DiffReport, String> (
       diff_snapshots (&pair))) ?;

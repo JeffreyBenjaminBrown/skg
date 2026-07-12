@@ -210,6 +210,60 @@ fn test_stage_moves_skips_ambiguous_and_reports_none() {
             "script:\n{}", script ); }
 
 #[test]
+fn test_stage_moves_title_presence_semantics() {
+  let root : TempDir =
+    TempDir::new() . unwrap();
+  let alpha : PathBuf = root . path() . join ("alpha");
+  let beta  : PathBuf = root . path() . join ("beta");
+  fs::create_dir (&alpha) . unwrap();
+  fs::create_dir (&beta)  . unwrap();
+  let alpha_repo : Repository =
+    init_repo_with_user (&alpha);
+  let beta_repo : Repository =
+    init_repo_with_user (&beta);
+  { // 'releveled' lost its ALPHA FILE, but that file was titleless
+    // (a mere relationship record): a re-leveling, not a move.
+    commit_file (&alpha_repo, &alpha, "releveled.skg",
+                 "pid: releveled\ncontains:\n- x\n");
+    fs::remove_file ( alpha . join ("releveled.skg") ) . unwrap(); }
+  { // 'mixed' has a titled section moving alpha -> beta, but beta
+    // ALREADY held a titleless section for it: report, don't stage.
+    commit_file (&alpha_repo, &alpha, "mixed.skg",
+                 "title: Mixed\npid: mixed\n");
+    commit_file (&beta_repo, &beta, "mixed.skg",
+                 "pid: mixed\ncontains:\n- y\n");
+    fs::remove_file ( alpha . join ("mixed.skg") ) . unwrap();
+    fs::write ( beta . join ("mixed.skg"),
+                "title: Mixed\npid: mixed\ncontains:\n- y\n" )
+      . unwrap(); }
+  { // 'titlemove' kept its alpha file but the TITLE left it for a
+    // brand-new beta file: a home move, but the alpha side is a
+    // file modification, so report rather than stage.
+    commit_file (&alpha_repo, &alpha, "titlemove.skg",
+                 "title: TM\npid: titlemove\ncontains:\n- z\n");
+    fs::write ( alpha . join ("titlemove.skg"),
+                "pid: titlemove\ncontains:\n- z\n" ) . unwrap();
+    fs::write ( beta . join ("titlemove.skg"),
+                "title: TM\npid: titlemove\n" ) . unwrap(); }
+  let config : SkgConfig =
+    config_from_subdirs ( root . path(), &["alpha", "beta"] );
+  let script : String =
+    stage_moves_script (&config) . unwrap();
+  assert! ( ! script . contains ("releveled"),
+            "titleless deletion is a re-leveling, not a move:\n{}",
+            script );
+  assert! ( script . contains ("#   mixed : alpha -> beta"),
+            "mixed-destination move should be reported:\n{}", script );
+  assert! ( ! script . contains ("\"mixed alpha beta\""),
+            "mixed-destination move must not be staged:\n{}", script );
+  assert! ( script . contains ("#   titlemove : alpha -> beta"),
+            "title-only move should be reported:\n{}", script );
+  assert! ( ! script . contains ("\"titlemove alpha beta\""),
+            "title-only move must not be auto-staged:\n{}", script );
+  assert! ( script . contains ("No cleanly stageable moves"),
+            "script:\n{}", script ); }
+
+#[test]
 fn test_interleaved_diff_no_changes() {
   let old : Vec<&str> =
     vec!["a", "b", "c"];

@@ -1,7 +1,7 @@
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SnapshotKind {
@@ -30,8 +30,26 @@ pub struct ChangedSnapshotPair {
 
 #[derive(Clone, Debug, Default)]
 pub struct GraphSnapshot {
-  pub nodes      : HashMap<ID, NodeComplete>,
-  pub id_sources : HashMap<ID, BTreeSet<SourceName>>,
+  /// One entry per ACCORDION (keyed by pid, sections folded).
+  pub nodes     : HashMap<ID, NodeComplete>,
+  /// id -> claiming pid -> sources whose section for that pid
+  /// claims the id (as its pid or among its extra_ids). One pid
+  /// claiming an id from several sources is the normal accordion
+  /// shape; TWO pids claiming one id is the duplicate-ID VIOLATION
+  /// the report warns about.
+  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>>,
+}
+
+impl GraphSnapshot {
+  /// Sources holding any claim on this id, across claiming pids.
+  pub fn sources_claiming_id (
+    &self,
+    id : &ID,
+  ) -> BTreeSet<SourceName> {
+    self . id_claims . get (id)
+      . map ( |by_pid| by_pid . values () . flatten ()
+              . cloned () . collect () )
+      . unwrap_or_default () }
 }
 
 #[derive(Clone, Debug, Default)]

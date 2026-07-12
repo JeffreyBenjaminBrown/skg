@@ -91,7 +91,7 @@ fn render_duplicate_ids (
 ) {
   if duplicates . is_empty () {
     return; }
-  out . push_str ("** IDs duplicated across sources\n");
+  out . push_str ("** IDs claimed by more than one node\n");
   for duplicate in duplicates {
     out . push_str (&format! (
       "*** {}\n",

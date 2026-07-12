@@ -1,4 +1,5 @@
-use crate::dbs::filesystem::multiple_nodes::read_single_sections_from_folder;
+use crate::dbs::filesystem::multiple_nodes::{
+  fold_one_accordion, read_skg_sections_from_folder};
 use crate::diff_analysis::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
 use crate::git_ops::misc::path_relative_to_repo;
@@ -12,7 +13,7 @@ use crate::types::nodes::fs::NodeFS;
 use crate::types::textlinks::textlinks_from_node;
 
 use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -122,23 +123,25 @@ fn read_graph_snapshot (
   config : &SkgConfig,
   kind   : SnapshotKind,
 ) -> Result<GraphSnapshot, String> {
-  let mut nodes : Vec<NodeComplete> = Vec::new ();
-  for source_name in config . sources . keys () {
+  // Sections arrive in privacy order (ordered_sources) so each
+  // accordion folds with its most public section first.
+  let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
+  for source_name in config . ordered_sources () {
     let label : String =
       format! ("read source '{}' from {:?}", source_name, kind);
-    let mut source_nodes : Vec<NodeComplete> =
+    let mut source_sections : Vec<(SourceName, NodeFS)> =
       profile_step_result (&label, || match kind {
         SnapshotKind::Head =>
-          read_source_from_head (config, source_name),
+          read_source_from_head (config, &source_name),
         SnapshotKind::Index =>
-          read_source_from_index (config, source_name),
+          read_source_from_index (config, &source_name),
         SnapshotKind::Worktree =>
-          read_single_sections_from_folder (source_name, config)
+          read_skg_sections_from_folder (&source_name, config)
             . map_err ( |e| format! (
               "Reading worktree source '{}': {}", source_name, e )), }) ?;
-    nodes . append (&mut source_nodes); }
-  Ok (profile_step ("snapshot_from_nodes", || {
-    snapshot_from_nodes (nodes) }))
+    sections . append (&mut source_sections); }
+  profile_step ("snapshot_from_sections", || {
+    snapshot_from_sections (sections) })
 }
 
 fn read_graph_snapshot_maybe_cached (
@@ -306,37 +309,103 @@ fn overlay_changed_after_snapshot (
     before . clone ();
   let mut affected_pids : BTreeSet<ID> =
     BTreeSet::new ();
-  for (source_name, paths) in changed_paths {
+  let changed_pids : BTreeSet<ID> =
+    changed_paths . values () . flatten ()
+      . filter_map ( |rel_path| rel_path . file_stem () )
+      . map ( |stem| ID::new (stem . to_string_lossy () . to_string ()) )
+      . collect ();
+  // A changed SECTION re-folds its whole accordion, so read every
+  // source's section for each changed pid at the after endpoint.
+  let mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>> =
+    HashMap::new ();
+  for pid in &changed_pids {
+    sections_by_pid . insert (
+      pid . clone (),
+      read_accordion_sections_at_endpoint (
+        config, after_kind, pid ) ? ); }
+  // Anchor resolution needs the whole corpus's extra-id map:
+  // unchanged accordions contribute via their folded nodes, changed
+  // ones via their fresh sections.
+  let pid_of : HashMap<ID, ID> = {
+    let mut m : HashMap<ID, ID> = HashMap::new ();
+    for (pid, node) in after . nodes . iter () {
+      if changed_pids . contains (pid) { continue; }
+      for extra in &node . extra_ids {
+        m . insert ( extra . clone (), pid . clone () ); }}
+    for (pid, sections) in sections_by_pid . iter () {
+      for (_, node_fs) in sections {
+        for extra in &node_fs . extra_ids {
+          m . insert ( extra . clone (), pid . clone () ); }} }
+    m };
+  let resolve = |id : &ID| -> ID {
+    pid_of . get (id) . cloned ()
+      . unwrap_or_else ( || id . clone () ) };
+  for pid in &changed_pids {
+    let sections : Vec<(SourceName, NodeFS)> =
+      sections_by_pid . remove (pid)
+      . expect ("changed_pids tracks sections_by_pid");
+    let before_node : Option<&NodeComplete> =
+      before . nodes . get (pid);
+    remove_accordion_claims (&mut after, pid, before_node);
+    let after_node : Option<NodeComplete> =
+      if sections . is_empty () { None }
+      else {
+        for (source_name, node_fs) in &sections {
+          record_section_claims (
+            &mut after . id_claims, node_fs, source_name ); }
+        Some ( fold_accordion_tolerating_homelessness (
+          pid, sections, &resolve ) ? ) };
+    affected_pids . extend (
+      affected_pids_for_changed_node (
+        before_node, after_node . as_ref () ));
+    match after_node {
+      Some (node) => { after . nodes . insert (pid . clone (), node); }
+      None        => { after . nodes . remove (pid); }} }
+  Ok ((after, affected_pids))
+}
+
+/// Every source's section file for this pid at the given endpoint,
+/// in privacy order. Missing files simply contribute no section.
+fn read_accordion_sections_at_endpoint (
+  config : &SkgConfig,
+  kind   : SnapshotKind,
+  pid    : &ID,
+) -> Result<Vec<(SourceName, NodeFS)>, String> {
+  let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
+  for source_name in config . ordered_sources () {
     let source : &SkgfileSource =
-      config . sources . get (source_name) . ok_or_else ( || format! (
+      config . sources . get (&source_name) . ok_or_else ( || format! (
         "Source '{}' not found in config", source_name )) ?;
     let source_path : &Path =
       Path::new (&source . path);
     let repo : Repository =
       open_repo (source_path) . ok_or_else ( || format! (
         "Could not open git repo for source '{}'", source_name )) ?;
-    for rel_path in paths {
-      let before_pid : Option<ID> =
-        rel_path . file_stem ()
-          . map ( |stem| ID::new (stem . to_string_lossy () . to_string ()) );
-      let before_node : Option<NodeComplete> =
-        before_pid . as_ref ()
-          . and_then ( |pid| before . nodes . get (pid) )
-          . filter ( |node| &node . source == source_name )
-          . cloned ();
-      let after_node : Option<NodeComplete> =
-        read_node_at_endpoint (
-          after_kind, &repo, source_path, source_name, rel_path) ?;
-      affected_pids . extend (
-        affected_pids_for_changed_node (
-          before_node . as_ref (), after_node . as_ref () ));
-      if let Some (node) = &before_node {
-        remove_node_ids_from_snapshot (&mut after, node); }
-      if let Some (pid) = before_pid {
-        remove_node_from_snapshot (&mut after, &pid, source_name); }
-      if let Some (node) = after_node {
-        insert_node_into_snapshot (&mut after, node); }}}
-  Ok ((after, affected_pids))
+    let prefix : PathBuf =
+      source_prefix_in_repo (&repo, source_path) ?;
+    let rel_path : PathBuf =
+      prefix . join ( format! ("{}.skg", pid) );
+    if let Some (node_fs) =
+      read_section_at_endpoint (
+        kind, &repo, &source_name, &rel_path ) ? {
+      sections . push (( source_name, node_fs )); }}
+  Ok (sections)
+}
+
+/// Drop the claims a pid's sections contributed at the before
+/// endpoint (its claimed ids are exactly the folded node's
+/// all_ids). Claims by OTHER pids on the same ids survive.
+fn remove_accordion_claims (
+  snapshot    : &mut GraphSnapshot,
+  pid         : &ID,
+  before_node : Option<&NodeComplete>,
+) {
+  let Some (node) = before_node else { return; };
+  for id in node . all_ids () {
+    if let Some (by_pid) = snapshot . id_claims . get_mut (id) {
+      by_pid . remove (pid);
+      if by_pid . is_empty () {
+        snapshot . id_claims . remove (id); }} }
 }
 
 fn affected_pids_for_changed_node (
@@ -362,27 +431,26 @@ fn affected_pids_for_changed_node (
   pids
 }
 
-fn read_node_at_endpoint (
+fn read_section_at_endpoint (
   kind        : SnapshotKind,
   repo        : &Repository,
-  source_path : &Path,
   source_name : &SourceName,
   rel_path    : &Path,
-) -> Result<Option<NodeComplete>, String> {
+) -> Result<Option<NodeFS>, String> {
   match kind {
     SnapshotKind::Head =>
-      read_node_from_head (repo, source_name, rel_path),
+      read_section_from_head (repo, source_name, rel_path),
     SnapshotKind::Index =>
-      read_node_from_index (repo, source_name, rel_path),
+      read_section_from_index (repo, source_name, rel_path),
     SnapshotKind::Worktree =>
-      read_node_from_worktree (repo, source_path, source_name, rel_path), }
+      read_section_from_worktree (repo, source_name, rel_path), }
 }
 
-fn read_node_from_head (
+fn read_section_from_head (
   repo        : &Repository,
   source_name : &SourceName,
   rel_path    : &Path,
-) -> Result<Option<NodeComplete>, String> {
+) -> Result<Option<NodeFS>, String> {
   let tree : git2::Tree =
     repo . head ()
       . and_then ( |h| h . peel_to_tree () )
@@ -402,15 +470,15 @@ fn read_node_from_head (
     repo . find_blob (entry . id ()) . map_err ( |e| format! (
       "Reading HEAD blob {:?} for source '{}': {}",
       rel_path, source_name, e )) ?;
-  parse_blob_node (blob . content (), source_name, rel_path)
+  parse_blob_section (blob . content (), rel_path)
     . map (Some)
 }
 
-fn read_node_from_index (
+fn read_section_from_index (
   repo        : &Repository,
   source_name : &SourceName,
   rel_path    : &Path,
-) -> Result<Option<NodeComplete>, String> {
+) -> Result<Option<NodeFS>, String> {
   let index : git2::Index =
     repo . index () . map_err ( |e| format! (
       "Reading index for source '{}': {}", source_name, e )) ?;
@@ -422,16 +490,15 @@ fn read_node_from_index (
     repo . find_blob (id) . map_err ( |e| format! (
       "Reading index blob {:?} for source '{}': {}",
       rel_path, source_name, e )) ?;
-  parse_blob_node (blob . content (), source_name, rel_path)
+  parse_blob_section (blob . content (), rel_path)
     . map (Some)
 }
 
-fn read_node_from_worktree (
+fn read_section_from_worktree (
   repo        : &Repository,
-  _source_path : &Path,
   source_name : &SourceName,
   rel_path    : &Path,
-) -> Result<Option<NodeComplete>, String> {
+) -> Result<Option<NodeFS>, String> {
   let workdir : &Path =
     repo . workdir () . ok_or_else ( || format! (
       "Repository for source '{}' has no workdir", source_name )) ?;
@@ -443,48 +510,8 @@ fn read_node_from_worktree (
     fs::read (&abs_path) . map_err ( |e| format! (
       "Reading worktree path {:?} for source '{}': {}",
       abs_path, source_name, e )) ?;
-  parse_blob_node (&bytes, source_name, rel_path)
+  parse_blob_section (&bytes, rel_path)
     . map (Some)
-}
-
-fn remove_node_from_snapshot (
-  snapshot : &mut GraphSnapshot,
-  pid      : &ID,
-  source   : &SourceName,
-) {
-  let should_remove : bool =
-    snapshot . nodes . get (pid)
-      . map ( |node| &node . source == source )
-      . unwrap_or (false);
-  if ! should_remove {
-    return; }
-  if let Some (node) = snapshot . nodes . remove (pid) {
-    for id in node . all_ids () {
-      if let Some (sources) = snapshot . id_sources . get_mut (id) {
-        sources . remove (&node . source);
-        if sources . is_empty () {
-          snapshot . id_sources . remove (id); }}}}
-}
-
-fn remove_node_ids_from_snapshot (
-  snapshot : &mut GraphSnapshot,
-  node     : &NodeComplete,
-) {
-  for id in node . all_ids () {
-    if let Some (sources) = snapshot . id_sources . get_mut (id) {
-      sources . remove (&node . source);
-      if sources . is_empty () {
-        snapshot . id_sources . remove (id); }}}}
-
-fn insert_node_into_snapshot (
-  snapshot : &mut GraphSnapshot,
-  node     : NodeComplete,
-) {
-  for id in node . all_ids () {
-    snapshot . id_sources . entry (id . clone ())
-      . or_insert_with (BTreeSet::new)
-      . insert (node . source . clone ()); }
-  snapshot . nodes . insert (node . pid . clone (), node);
 }
 
 fn profile_step<T, F> (
@@ -529,26 +556,88 @@ fn profile_log (
     duration . as_secs (),
     duration . subsec_millis ()); }
 
-fn snapshot_from_nodes (
-  nodes : Vec<NodeComplete>,
-) -> GraphSnapshot {
+/// Group sections by pid (sections must arrive in privacy order),
+/// fold each accordion, and record every section's id claims.
+fn snapshot_from_sections (
+  sections : Vec<(SourceName, NodeFS)>,
+) -> Result<GraphSnapshot, String> {
+  let mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>> =
+    HashMap::new ();
+  let mut id_claims
+    : HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>> =
+    HashMap::new ();
+  for (source_name, node_fs) in sections {
+    record_section_claims (
+      &mut id_claims, &node_fs, &source_name );
+    sections_by_pid . entry (node_fs . pid . clone ())
+      . or_insert_with (Vec::new)
+      . push (( source_name, node_fs )); }
+  let pid_of : HashMap<ID, ID> = {
+    let mut m : HashMap<ID, ID> = HashMap::new ();
+    for (pid, sections) in sections_by_pid . iter () {
+      for (_, node_fs) in sections {
+        for extra in &node_fs . extra_ids {
+          m . insert ( extra . clone (), pid . clone () ); }} }
+    m };
+  let resolve = |id : &ID| -> ID {
+    pid_of . get (id) . cloned ()
+      . unwrap_or_else ( || id . clone () ) };
   let mut by_pid : HashMap<ID, NodeComplete> =
     HashMap::new ();
-  let mut id_sources : HashMap<ID, BTreeSet<SourceName>> =
-    HashMap::new ();
-  for node in nodes {
-    for id in node . all_ids () {
-      id_sources . entry (id . clone ())
-        . or_insert_with (BTreeSet::new)
-        . insert (node . source . clone ()); }
-    by_pid . insert (node . pid . clone (), node); }
-  GraphSnapshot { nodes: by_pid, id_sources }
+  for (pid, accordion_sections) in sections_by_pid {
+    let node : NodeComplete =
+      fold_accordion_tolerating_homelessness (
+        &pid, accordion_sections, &resolve ) ?;
+    by_pid . insert (pid, node); }
+  Ok ( GraphSnapshot { nodes: by_pid, id_claims } )
 }
+
+/// Fold one accordion, but where init would hard-error on a
+/// titleless accordion (no home), a snapshot must not: diff
+/// endpoints legitimately pass through ill-formed states (e.g. a
+/// home-section deletion staged before its recreation). Retry with
+/// a placeholder title on the most public section, so the report
+/// can still describe the accordion.
+fn fold_accordion_tolerating_homelessness (
+  pid      : &ID,
+  sections : Vec<(SourceName, NodeFS)>,
+  resolve  : &dyn Fn (&ID) -> ID,
+) -> Result<NodeComplete, String> {
+  let retry : Vec<(SourceName, NodeFS)> =
+    sections . clone ();
+  match fold_one_accordion (pid, sections, resolve) {
+    Ok (node) => Ok (node),
+    Err (_) => {
+      let mut retry : Vec<(SourceName, NodeFS)> = retry;
+      match retry . first_mut () {
+        Some ((_, node_fs)) =>
+          node_fs . title =
+            Some ("(no titled section)" . to_string ()),
+        None => return Err ( format! (
+          "Accordion '{}' has no sections to fold.", pid )), }
+      fold_one_accordion (pid, retry, resolve)
+        . map_err ( |e| e . to_string () ) }}
+}
+
+/// Record one section's id claims: it claims its pid and every
+/// extra id it lists, all attributed to (pid, source).
+fn record_section_claims (
+  id_claims : &mut HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>>,
+  node_fs   : &NodeFS,
+  source    : &SourceName,
+) {
+  for id in std::iter::once (&node_fs . pid)
+    . chain (node_fs . extra_ids . iter ()) {
+    id_claims . entry (id . clone ())
+      . or_insert_with (BTreeMap::new)
+      . entry (node_fs . pid . clone ())
+      . or_insert_with (BTreeSet::new)
+      . insert (source . clone ()); }}
 
 fn read_source_from_head (
   config      : &SkgConfig,
   source_name : &SourceName,
-) -> Result<Vec<NodeComplete>, String> {
+) -> Result<Vec<(SourceName, NodeFS)>, String> {
   let source : &SkgfileSource =
     config . sources . get (source_name) . ok_or_else ( || format! (
       "Source '{}' not found in config", source_name )) ?;
@@ -564,7 +653,7 @@ fn read_source_from_head (
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
         "Reading HEAD tree for source '{}': {}", source_name, e )) ?;
-  let mut nodes : Vec<NodeComplete> = Vec::new ();
+  let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   let mut parse_error : Option<String> = None;
   let walk_result : Result<(), git2::Error> =
     tree . walk (TreeWalkMode::PreOrder, |root, entry| {
@@ -579,9 +668,10 @@ fn read_source_from_head (
     let oid : git2::Oid = entry . id ();
     match repo . find_blob (oid)
       . map_err ( |e| e . to_string () )
-      . and_then ( |blob| parse_blob_node (
-        blob . content (), source_name, &rel_path ) ) {
-      Ok (node) => nodes . push (node),
+      . and_then ( |blob| parse_blob_section (
+        blob . content (), &rel_path ) ) {
+      Ok (node_fs) =>
+        sections . push (( source_name . clone (), node_fs )),
       Err (e) => {
         parse_error = Some (e);
         return TreeWalkResult::Abort; } }
@@ -591,13 +681,13 @@ fn read_source_from_head (
     return Err (error); }
   walk_result . map_err ( |e| format! (
     "Walking HEAD tree for source '{}': {}", source_name, e )) ?;
-  Ok (nodes)
+  Ok (sections)
 }
 
 fn read_source_from_index (
   config      : &SkgConfig,
   source_name : &SourceName,
-) -> Result<Vec<NodeComplete>, String> {
+) -> Result<Vec<(SourceName, NodeFS)>, String> {
   let source : &SkgfileSource =
     config . sources . get (source_name) . ok_or_else ( || format! (
       "Source '{}' not found in config", source_name )) ?;
@@ -611,7 +701,7 @@ fn read_source_from_index (
   let index : git2::Index =
     repo . index () . map_err ( |e| format! (
       "Reading index for source '{}': {}", source_name, e )) ?;
-  let mut nodes : Vec<NodeComplete> =
+  let mut sections : Vec<(SourceName, NodeFS)> =
     Vec::new ();
   for entry in index . iter () {
     let rel_path : PathBuf =
@@ -622,10 +712,10 @@ fn read_source_from_index (
       repo . find_blob (entry . id) . map_err ( |e| format! (
         "Reading index blob {:?} for source '{}': {}",
         rel_path, source_name, e )) ?;
-    let node : NodeComplete =
-      parse_blob_node (blob . content (), source_name, &rel_path) ?;
-    nodes . push (node); }
-  Ok (nodes)
+    let node_fs : NodeFS =
+      parse_blob_section (blob . content (), &rel_path) ?;
+    sections . push (( source_name . clone (), node_fs )); }
+  Ok (sections)
 }
 
 pub(super) fn source_prefix_in_repo (
@@ -649,11 +739,12 @@ pub(super) fn path_is_source_skg (
       false, |ext| ext == "skg" )
 }
 
-pub(super) fn parse_blob_node (
-  bytes       : &[u8],
-  source_name : &SourceName,
-  rel_path    : &Path,
-) -> Result<NodeComplete, String> {
+/// One FILE's contents as a section (pid-checked against the file
+/// stem). The snapshot folds same-pid sections into one accordion.
+pub(super) fn parse_blob_section (
+  bytes    : &[u8],
+  rel_path : &Path,
+) -> Result<NodeFS, String> {
   let yaml : &str =
     from_utf8 (bytes) . map_err ( |e| format! (
       "Blob {:?} is not UTF-8: {}", rel_path, e )) ?;
@@ -668,5 +759,19 @@ pub(super) fn parse_blob_node (
   if node_fs . pid . 0 != stem {
     return Err ( format! (
       "Path {:?} has pid {}, expected {}", rel_path, node_fs . pid, stem )); }
-  Ok ( node_fs . into_complete_as_single_section (source_name . clone ()) )
+  Ok (node_fs)
+}
+
+/// One FILE as a whole node -- the per-blob view the vanished-node
+/// history search uses (it inspects one historical blob at a time,
+/// so there is no accordion to fold).
+pub(super) fn parse_blob_node (
+  bytes       : &[u8],
+  source_name : &SourceName,
+  rel_path    : &Path,
+) -> Result<NodeComplete, String> {
+  parse_blob_section (bytes, rel_path)
+    . map ( |node_fs|
+            node_fs . into_complete_as_single_section (
+              source_name . clone () ) )
 }

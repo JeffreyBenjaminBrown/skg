@@ -241,3 +241,45 @@ fn marker_child_is_excluded_from_content () {
   // "how" is the marker child's label; it must not appear as content.
   assert! (! a . contains ("how"), "marker leaked into a.org:\n{}", a);
 }
+
+//
+// Edge-level gating (visible fold)
+//
+
+#[test]
+fn private_leveled_edge_is_omitted_from_restricted_export () {
+  // Root and both children live in "main", but the edge to "priv"
+  // is RECORDED at level "private". A main-only export renders the
+  // visible fold: "pub" appears, "priv" does not -- even though
+  // priv's home is active.
+  let mut root : NodeComplete =
+    node ("r", "Root", None, &["ma"]);
+  root . contains . push ( PrivaciedMember::at (
+    SourceName::from ("main"), ID::from ("pub") ));
+  root . contains . push ( PrivaciedMember::at (
+    SourceName::from ("private"), ID::from ("priv") ));
+  let nodes : Vec<NodeComplete> = vec! [
+    root,
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = r"), &[]),
+    node ("pub",  "Public child",  None, &[]),
+    node ("priv", "Private child", None, &[]),
+  ];
+  let main_only : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName::from ("main"),
+    sources : [ SourceName::from ("main") ]
+      . into_iter () . collect () };
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  export_to_org (&main_only, &nodes, dir . path ()) . unwrap ();
+  let content : String =
+    fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
+  assert! ( content . contains ("Public child"), "{}", content );
+  assert! ( ! content . contains ("Private child"),
+            "a private-leveled edge leaked into a main-only export:\n{}",
+            content );
+  { // Under "all", both children render.
+    let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+    let content : String =
+      fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
+    assert! ( content . contains ("Private child"), "{}", content ); }}

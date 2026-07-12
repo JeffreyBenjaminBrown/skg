@@ -1,16 +1,27 @@
-/// Detects nodes whose '.skg' file moved from one source's git repo
-/// to another, and renders a bash script -- a move list plus one loop
-/// over it -- that stages each move ('git rm' in the old repo,
-/// 'git add' in the new one), skipping any whose file is still
-/// present in the old source (so a stale entry cannot delete it).
+/// Detects nodes that moved from one source to another, and renders
+/// a bash script -- a move list plus one loop over it -- that stages
+/// each clean move ('git rm' in the old repo, 'git add' in the new
+/// one), skipping any whose file is still present in the old source
+/// (so a stale entry cannot delete it).
 ///
-/// A node has "moved" iff, across all configured sources, its file
-/// vanished from EXACTLY one source (present in that source's git
-/// HEAD, gone from its worktree) and appeared in EXACTLY one other
-/// source (present in that source's worktree, absent from its HEAD).
-/// If it vanished from two sources, or appeared in two, there is more
-/// than one candidate (old, new) pair, so it is not an unambiguous
-/// move and is skipped.
+/// Under privacy accordions a node's sections live in several
+/// sources at once, so file presence alone no longer signals a move.
+/// To move "the" node is to move its most public titled
+/// representation: a node has "moved" iff its TITLE vanished from
+/// EXACTLY one source (titled in that source's git HEAD, absent or
+/// titleless in its worktree) and appeared in EXACTLY one other
+/// (titled in the worktree, absent or titleless in HEAD). Titleless
+/// section creations and deletions are re-levelings of individual
+/// relationships, not moves, and stage as ordinary edits.
+///
+/// A move is AUTO-STAGED only when it is a pure delete/create pair:
+/// the old source's file is gone from its worktree and the new
+/// source's file is absent from its HEAD. If instead either side
+/// mixes the move into a pre-existing section file (the destination
+/// already recorded relationships for the node, or the old source
+/// keeps a titleless section), staging the file would drag those
+/// relationship changes along -- so the pair is REPORTED for the
+/// user to stage by hand, and never auto-staged.
 
 use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
@@ -18,17 +29,21 @@ use super::misc::path_relative_to_repo;
 use super::read_repo::open_repo;
 
 use git2::{ErrorCode, Object, ObjectType, Repository, Tree};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error as StdError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// A node whose file vanished from exactly one source and appeared in
-/// exactly one (necessarily different) source.
+/// A node whose title vanished from exactly one source and appeared
+/// in exactly one (necessarily different) source.
 struct NodeMove {
   id   : ID,
   from : SourceName,
   to   : SourceName,
+  /// True iff the move is a pure delete/create pair, safe to stage
+  /// mechanically; false means it is mixed into pre-existing
+  /// section files and is only reported.
+  clean : bool,
 }
 
 /// Top-level entry: the staging script for every detected move.
@@ -39,87 +54,142 @@ pub fn stage_moves_script (
     detect_moves (config) ?;
   Ok ( render_moves_script (config, &moves) ) }
 
-/// Scan every source, then keep only IDs with exactly one vanished
-/// source and exactly one appeared source. The two sources differ by
-/// construction: a file cannot both vanish from and appear in the
-/// same directory (it is either on disk there, or not).
+/// One source's view of one node's section file at one endpoint:
+/// absent, or present with(out) a title.
+#[derive(Clone, Copy, PartialEq)]
+enum SectionSight {
+  Absent,
+  Titleless,
+  Titled,
+}
+
+/// What one source holds for one id, in HEAD and on disk.
+#[derive(Clone, Copy)]
+struct SourceSight {
+  head : SectionSight,
+  disk : SectionSight,
+}
+
+/// Scan every source, then keep only IDs whose TITLE vanished from
+/// exactly one source and appeared in exactly one. The two sources
+/// differ by construction: vanishing requires the worktree title
+/// absent, appearing requires it present.
 fn detect_moves (
   config : &SkgConfig,
 ) -> Result<Vec<NodeMove>, String> {
-  let mut vanished_in : BTreeMap<ID, Vec<SourceName>> =
-    BTreeMap::new ();
-  let mut appeared_in : BTreeMap<ID, Vec<SourceName>> =
-    BTreeMap::new ();
+  let mut sights : BTreeMap<ID, HashMap<SourceName, SourceSight>> =
+    BTreeMap::new (); // BTreeMap: deterministic output order.
   for (source_name, source) in &config . sources {
-    let (vanished, appeared) : (HashSet<ID>, HashSet<ID>) =
-      vanished_and_appeared_in_source (source)
+    for (id, sight) in
+      sights_in_source (source)
       . map_err ( |e| format! (
         "Could not read git status for source '{}': {}",
-        source_name, e )) ?;
-    for id in vanished {
-      vanished_in . entry (id) . or_default ()
-        . push ( source_name . clone () ); }
-    for id in appeared {
-      appeared_in . entry (id) . or_default ()
-        . push ( source_name . clone () ); } }
-  let mut moves : Vec<NodeMove> = // BTreeMap iteration is by sorted ID,
-    Vec::new ();                  // so the output is deterministic.
-  for (id, froms) in &vanished_in {
-    if froms . len () != 1 { continue; }
-    if let Some (tos) = appeared_in . get (id) {
-      if tos . len () != 1 { continue; }
-      moves . push ( NodeMove {
-        id   : id . clone (),
-        from : froms [0] . clone (),
-        to   : tos   [0] . clone () } ); } }
+        source_name, e )) ? {
+      sights . entry (id) . or_default ()
+        . insert ( source_name . clone (), sight ); }}
+  let mut moves : Vec<NodeMove> =
+    Vec::new ();
+  for (id, by_source) in &sights {
+    let froms : Vec<&SourceName> = // title vanished here
+      by_source . iter ()
+      . filter ( |(_, s)| s . head == SectionSight::Titled
+                 && s . disk != SectionSight::Titled )
+      . map ( |(name, _)| name ) . collect ();
+    let tos : Vec<&SourceName> = // title appeared here
+      by_source . iter ()
+      . filter ( |(_, s)| s . disk == SectionSight::Titled
+                 && s . head != SectionSight::Titled )
+      . map ( |(name, _)| name ) . collect ();
+    if froms . len () != 1 || tos . len () != 1 { continue; }
+    let (from, to) : (&SourceName, &SourceName) =
+      (froms [0], tos [0]);
+    let clean : bool = // a pure delete/create pair
+      by_source [from] . disk == SectionSight::Absent
+      && by_source [to] . head == SectionSight::Absent;
+    moves . push ( NodeMove {
+      id    : id . clone (),
+      from  : from . clone (),
+      to    : to . clone (),
+      clean } ); }
   Ok (moves) }
 
-/// For one source: the IDs whose file vanished (in HEAD, gone from
-/// the worktree) and the IDs whose file appeared (in the worktree,
-/// absent from HEAD). A source that is not a git repo participates in
-/// no move -- nothing there is committed, and 'git add'/'git rm'
-/// would be meaningless -- so it contributes empty sets.
-fn vanished_and_appeared_in_source (
+/// For one source: every id present in HEAD or on disk, with title
+/// presence at both endpoints. A source that is not a git repo
+/// participates in no move -- nothing there is committed, and
+/// 'git add'/'git rm' would be meaningless -- so it contributes
+/// nothing.
+fn sights_in_source (
   source : &SkgfileSource,
-) -> Result<(HashSet<ID>, HashSet<ID>), Box<dyn StdError>> {
+) -> Result<HashMap<ID, SourceSight>, Box<dyn StdError>> {
   let source_path : &Path =
     source . path . as_path ();
   let repo : Repository = match open_repo (source_path) {
     Some (r) => r,
-    None     => return Ok (( HashSet::new (), HashSet::new () )), };
-  let disk : HashSet<ID> =
-    disk_skg_ids (source_path) ?;
-  let head : HashSet<ID> =
-    head_skg_ids (&repo, source_path) ?;
-  let vanished : HashSet<ID> =
-    head . difference (&disk) . cloned () . collect ();
-  let appeared : HashSet<ID> =
-    disk . difference (&head) . cloned () . collect ();
-  Ok (( vanished, appeared )) }
+    None     => return Ok ( HashMap::new () ), };
+  let disk : HashMap<ID, SectionSight> =
+    disk_skg_sights (source_path) ?;
+  let head : HashMap<ID, SectionSight> =
+    head_skg_sights (&repo, source_path) ?;
+  let mut sights : HashMap<ID, SourceSight> =
+    HashMap::new ();
+  for id in disk . keys () . chain ( head . keys () ) {
+    sights . entry ( id . clone () )
+      . or_insert ( SourceSight {
+        head : head . get (id) . copied ()
+          . unwrap_or (SectionSight::Absent),
+        disk : disk . get (id) . copied ()
+          . unwrap_or (SectionSight::Absent) } ); }
+  Ok (sights) }
 
-/// The IDs of '.skg' files currently on disk in a source directory.
-fn disk_skg_ids (
+/// Title presence, parsed leniently: any YAML mapping with a
+/// non-null, non-empty 'title' counts as titled. Unparseable
+/// content counts as titleless -- a gesture over mid-edit files
+/// must not fail outright, and a file we cannot read is certainly
+/// not a node's most public titled representation.
+fn sight_of_content (
+  content : &[u8],
+) -> SectionSight {
+  let titled : bool =
+    std::str::from_utf8 (content) . ok ()
+    . and_then ( |s|
+        serde_yaml::from_str::<serde_yaml::Value> (s) . ok () )
+    . as_ref ()
+    . and_then ( |v| v . get ("title") )
+    . map ( |t| match t {
+        serde_yaml::Value::Null => false,
+        serde_yaml::Value::String (s) => ! s . is_empty (),
+        _ => true } )
+    . unwrap_or (false);
+  if titled { SectionSight::Titled }
+  else      { SectionSight::Titleless }}
+
+/// The '.skg' files currently on disk in a source directory, with
+/// title presence.
+fn disk_skg_sights (
   source_path : &Path,
-) -> Result<HashSet<ID>, Box<dyn StdError>> {
-  let mut ids : HashSet<ID> =
-    HashSet::new ();
+) -> Result<HashMap<ID, SectionSight>, Box<dyn StdError>> {
+  let mut sights : HashMap<ID, SectionSight> =
+    HashMap::new ();
   for entry in fs::read_dir (source_path) ? {
     let entry : fs::DirEntry = entry ?;
     if let Some (id) = skg_id_from_filename ( &entry . path () ) {
-      ids . insert (id); } }
-  Ok (ids) }
+      let content : Vec<u8> =
+        fs::read ( entry . path () ) ?;
+      sights . insert ( id, sight_of_content (&content) ); } }
+  Ok (sights) }
 
-/// The IDs of '.skg' files committed (in HEAD) within a source
-/// directory. The repo may span several sources, so we scope to this
-/// source's subtree rather than the whole HEAD tree. A repo with no
-/// HEAD yet (no commits) has nothing committed, hence an empty set.
-fn head_skg_ids (
+/// The '.skg' files committed (in HEAD) within a source directory,
+/// with title presence. The repo may span several sources, so we
+/// scope to this source's subtree rather than the whole HEAD tree. A
+/// repo with no HEAD yet (no commits) has nothing committed, hence an
+/// empty map.
+fn head_skg_sights (
   repo        : &Repository,
   source_path : &Path,
-) -> Result<HashSet<ID>, Box<dyn StdError>> {
+) -> Result<HashMap<ID, SectionSight>, Box<dyn StdError>> {
   let head_tree : Tree = match repo . head () {
     Ok (head) => head . peel_to_tree () ?,
-    Err (_)   => return Ok ( HashSet::new () ), };
+    Err (_)   => return Ok ( HashMap::new () ), };
   let source_tree : Option<Tree> = {
     // The source directory relative to the repo worktree. An empty
     // relative path means the source IS the repo root, so we scan the
@@ -131,15 +201,18 @@ fn head_skg_ids (
         Some ( head_tree ),
       Some (rel) =>
         subtree_at (repo, &head_tree, &rel) ?, } };
-  let mut ids : HashSet<ID> =
-    HashSet::new ();
+  let mut sights : HashMap<ID, SectionSight> =
+    HashMap::new ();
   if let Some (tree) = source_tree {
     for entry in tree . iter () {
       if entry . kind () != Some (ObjectType::Blob) { continue; }
       if let Some (id) = entry . name ()
         . and_then ( |name| skg_id_from_filename ( Path::new (name) )) {
-          ids . insert (id); } } }
-  Ok (ids) }
+          let blob : git2::Blob =
+            repo . find_blob ( entry . id () ) ?;
+          sights . insert (
+            id, sight_of_content ( blob . content () ) ); } } }
+  Ok (sights) }
 
 /// The subtree of 'root' at relative path 'rel', or None if 'rel' is
 /// absent from the tree or names a non-tree.
@@ -170,22 +243,37 @@ fn skg_id_from_filename (
     . and_then ( |stem| stem . to_str () )
     . map ( |stem| ID ( stem . to_string () )) }
 
-/// Render the whole script: a header comment, the move list, and one
-/// bash loop that stages each move. Empty (just a comment) when there
-/// are no moves. The list and the loop are kept separate so a human
-/// can read the data before running it, and the same text reads
-/// cleanly in the shell afterward.
+/// Render the whole script: a header comment, the clean-move list,
+/// one bash loop that stages each clean move, and a comment block
+/// reporting MIXED moves (those entangled with pre-existing section
+/// files), which are never auto-staged. Empty (just a comment) when
+/// there are no moves. The list and the loop are kept separate so a
+/// human can read the data before running it, and the same text
+/// reads cleanly in the shell afterward.
 fn render_moves_script (
   config : &SkgConfig,
   moves  : &[NodeMove],
 ) -> String {
   let mut out : String =
     String::from (STAGE_MOVES_HEADER);
-  if moves . is_empty () {
+  let (clean, mixed) : (Vec<&NodeMove>, Vec<&NodeMove>) =
+    moves . iter () . partition ( |m| m . clean );
+  if clean . is_empty () && mixed . is_empty () {
     out . push_str ("# No moves detected.\n");
     return out; }
+  if ! mixed . is_empty () {
+    out . push_str (MIXED_MOVES_HEADER);
+    for node_move in &mixed {
+      out . push_str ( &format! (
+        "#   {id} : {from} -> {to}\n",
+        id   = node_move . id . 0,
+        from = source_dir_relative_to_data_root (config, &node_move . from),
+        to   = source_dir_relative_to_data_root (config, &node_move . to) )); }}
+  if clean . is_empty () {
+    out . push_str ("# No cleanly stageable moves detected.\n");
+    return out; }
   out . push_str ("moves=(\n");
-  for node_move in moves {
+  for node_move in &clean {
     out . push_str ( &format! (
       "  \"{id} {from} {to}\"\n",
       id   = node_move . id . 0,
@@ -194,6 +282,16 @@ fn render_moves_script (
   out . push_str (")\n");
   out . push_str (STAGE_MOVES_LOOP);
   out }
+
+/// Reported, never staged: staging either side's FILE would drag
+/// unrelated relationship-record changes along with the move.
+const MIXED_MOVES_HEADER : &str =
+"# MOVES DETECTED BUT NOT STAGED: each node below moved (its title\n\
+ # left one source and arrived in another), but the move is mixed\n\
+ # into section files that already existed -- the destination file\n\
+ # already recorded relationships for the node, or the old source\n\
+ # keeps a titleless section. Staging those files whole could stage\n\
+ # more than the move. Review and stage these by hand:\n";
 
 /// The header comment, explaining how to run the script and why the
 /// existence check precedes 'git rm'.

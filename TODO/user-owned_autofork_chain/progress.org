@@ -58,6 +58,30 @@ order; this file grows as each lands.
   endpoint rebuilds dbs) forces a full index rebuild, and
   pre-accordion data has aliases only in home sections where old
   and new source values coincide.
+- DONE interactions: diff-analysis snapshots are now FOLD-AWARE
+  (sections group by pid and fold, in both the full-read and the
+  incremental-overlay paths, so per-section file diffs aggregate
+  per node); the duplicate-IDs bucket became shape-aware via an
+  id->pid->sources claims map (violation = two pids claiming one
+  id; multi-source single-pid is just an accordion) and its report
+  heading now says "IDs claimed by more than one node"; a homeless
+  accordion (legal mid-edit, e.g. a staged home deletion) folds
+  with a placeholder title instead of failing the report.
+  Stage-moves redefined to title presence (a node moves iff its
+  most public titled representation moves); only pure
+  delete/create pairs are auto-staged, while moves mixed into
+  pre-existing section files (destination already held a section,
+  or the old source keeps a titleless one) are REPORTED in a
+  comment block and never staged, per Jeff's approved note.
+  Export-to-org gained edge-level gating ('edge_active'): a
+  restricted export renders the visible fold, omitting edges whose
+  recorded level is inactive even when the child's home is active;
+  root discovery gates its marker scan the same way. Fork verified
+  with NO change needed: 'build_fork_clone' seeds clone-home
+  levels, and the save pipeline's sticky-else-default pass
+  re-derives each new edge as more-private-of(clone home, target
+  home) -- exactly the plan's clone defaults. nodeMerge leveling
+  had already landed with dependencies-manifest.
 - STARTED EARLY (parallel, no file overlap):
   section-format-and-fold's pure core -- server/accordion/
   ('fold_sections', 'unfold_node', 'SectionSlices', 'ListItem',

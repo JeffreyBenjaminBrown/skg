@@ -43,7 +43,9 @@ fn snapshot (
     GraphSnapshot::default ();
   for node in nodes {
     for id in node . all_ids () {
-      snapshot . id_sources . entry (id . clone ())
+      snapshot . id_claims . entry (id . clone ())
+        . or_insert_with (std::collections::BTreeMap::new)
+        . entry (node . pid . clone ())
         . or_insert_with (BTreeSet::new)
         . insert (node . source . clone ()); }
     snapshot . nodes . insert (node . pid . clone (), node); }
@@ -220,6 +222,30 @@ fn duplicate_ids_across_sources_are_omitted_from_node_buckets () {
   assert! (
     report . buckets . iter ()
       . all ( |bucket| bucket . nodes . is_empty () ));
+}
+
+#[test]
+fn accordion_shape_is_not_a_duplicate () {
+  // One pid claimed from two SOURCES is the normal accordion shape
+  // (sections at two privacy levels), not a duplicate-ID violation.
+  let mut accordion : NodeComplete =
+    node ("a", "A", &[]);
+  accordion . source = source ("public");
+  let mut snap_after : GraphSnapshot =
+    snapshot (vec! [accordion]);
+  snap_after . id_claims . get_mut (&id ("a")) . unwrap ()
+    . get_mut (&id ("a")) . unwrap ()
+    . insert (source ("private"));
+  let report : DiffReport =
+    diff_snapshots (&SnapshotPair {
+      before: snapshot (vec! []),
+      after: snap_after });
+  assert! (report . duplicate_ids . is_empty (),
+           "multi-source single-pid claims flagged as duplicates");
+  assert! (
+    report . buckets . iter ()
+      . any ( |bucket| ! bucket . nodes . is_empty () ),
+    "the accordion should appear in the node buckets" );
 }
 
 #[test]

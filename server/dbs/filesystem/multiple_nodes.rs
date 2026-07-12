@@ -86,41 +86,52 @@ fn fold_grouped_sections (
     let sections : Vec<(SourceName, NodeFS)> =
       sections_by_pid . remove (&pid)
       . expect ("pid_order tracks sections_by_pid");
-    let extra_ids : Vec<ID> = {
-      let mut extra_ids : Vec<ID> = Vec::new ();
-      for (_, node_fs) in &sections {
-        for e in &node_fs . extra_ids {
-          if ! extra_ids . contains (e) {
-            extra_ids . push ( e . clone () ); }} }
-      extra_ids };
-    let misc : Vec<crate::types::nodes::complete::FileProperty> = {
-      // home-section data, like extra_ids; unioned defensively
-      let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
-        Vec::new ();
-      for (_, node_fs) in &sections {
-        for m in &node_fs . misc {
-          if ! misc . contains (m) {
-            misc . push ( m . clone () ); }} }
-      misc };
-    let slices : Vec<(SourceName, SectionSlices)> =
-      sections . into_iter ()
-      . map ( |(level, node_fs)|
-              (level, node_fs . into_section_slices ()) )
-      . collect ();
-    let (folded, warnings) : (FoldedNode, _) =
-      fold_sections ( &slices, &resolve );
-    for w in &warnings {
-      tracing::warn! ( pid = %pid, warning = ?w,
-                       "accordion fold warning" ); }
-    match nodecomplete_from_fold (
-      pid . clone (), extra_ids, misc, folded ) {
-      Some (nodecomplete) => all_nodes . push (nodecomplete),
-      None => {
-        return Err (io::Error::new (
-          io::ErrorKind::InvalidData,
-          format! ("Accordion '{}' has no home: no section carries a title.",
-                   pid ))); }} }
+    all_nodes . push (
+      fold_one_accordion ( &pid, sections, &resolve ) ? ); }
   Ok (all_nodes) }
+
+/// Fold ONE accordion's sections (in privacy order) into a
+/// NodeComplete. 'resolve' maps extra ids to pids for anchor
+/// resolution and must be built from the whole corpus, not just
+/// this accordion. A titleless accordion (no home) is a hard error;
+/// fold warnings are logged.
+pub fn fold_one_accordion (
+  pid      : &ID,
+  sections : Vec<(SourceName, NodeFS)>,
+  resolve  : &dyn Fn (&ID) -> ID,
+) -> io::Result<NodeComplete> {
+  let extra_ids : Vec<ID> = {
+    let mut extra_ids : Vec<ID> = Vec::new ();
+    for (_, node_fs) in &sections {
+      for e in &node_fs . extra_ids {
+        if ! extra_ids . contains (e) {
+          extra_ids . push ( e . clone () ); }} }
+    extra_ids };
+  let misc : Vec<crate::types::nodes::complete::FileProperty> = {
+    // home-section data, like extra_ids; unioned defensively
+    let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
+      Vec::new ();
+    for (_, node_fs) in &sections {
+      for m in &node_fs . misc {
+        if ! misc . contains (m) {
+          misc . push ( m . clone () ); }} }
+    misc };
+  let slices : Vec<(SourceName, SectionSlices)> =
+    sections . into_iter ()
+    . map ( |(level, node_fs)|
+            (level, node_fs . into_section_slices ()) )
+    . collect ();
+  let (folded, warnings) : (FoldedNode, _) =
+    fold_sections ( &slices, resolve );
+  for w in &warnings {
+    tracing::warn! ( pid = %pid, warning = ?w,
+                     "accordion fold warning" ); }
+  nodecomplete_from_fold (
+    pid . clone (), extra_ids, misc, folded )
+    . ok_or_else ( || io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! ("Accordion '{}' has no home: no section carries a title.",
+               pid ))) }
 
 /// Same-ID files across sources are no longer duplicates -- they
 /// are the sections of one privacy accordion, grouped and folded at

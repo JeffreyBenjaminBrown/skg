@@ -111,27 +111,34 @@ fn profile_log (
     duration . as_secs (),
     duration . subsec_millis ()); }
 
+/// Shape-aware: an id present in several SOURCES is the normal
+/// accordion shape (one pid, sections at several levels), not a
+/// duplicate. The VIOLATION is one id claimed by two distinct pids
+/// at either endpoint.
 fn duplicate_id_reports (
   before : &GraphSnapshot,
   after  : &GraphSnapshot,
 ) -> Vec<DuplicateIDReport> {
   let ids : BTreeSet<ID> =
-    before . id_sources . keys () . cloned ()
-      . chain (after . id_sources . keys () . cloned ())
+    before . id_claims . keys () . cloned ()
+      . chain (after . id_claims . keys () . cloned ())
       . collect ();
   let mut reports : Vec<DuplicateIDReport> =
     Vec::new ();
   for id in ids {
-    let before_sources : BTreeSet<SourceName> =
-      before . id_sources . get (&id) . cloned () . unwrap_or_default ();
-    let after_sources : BTreeSet<SourceName> =
-      after . id_sources . get (&id) . cloned () . unwrap_or_default ();
-    if before_sources . len () <= 1 && after_sources . len () <= 1 {
+    let claiming_pids = |snapshot : &GraphSnapshot| -> usize {
+      snapshot . id_claims . get (&id)
+        . map ( |by_pid| by_pid . len () )
+        . unwrap_or (0) };
+    if claiming_pids (before) <= 1 && claiming_pids (after) <= 1 {
       continue; }
     let title : String =
       title_for_id (&id, before, after);
     reports . push ( DuplicateIDReport {
-      id, before_sources, after_sources, title }); }
+      id : id . clone (),
+      before_sources : before . sources_claiming_id (&id),
+      after_sources  : after . sources_claiming_id (&id),
+      title }); }
   reports . sort_by_key ( |r| r . id . clone () );
   reports
 }
