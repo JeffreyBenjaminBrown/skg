@@ -28,6 +28,8 @@ it depends on why the node was drawn.
 * Warn the user if they changed an indefinitive source.
 Don't other kinds of edits to indefinitive nodes
 already bork the save?
+* TODO/command-name-echo.org
+a config option, for recording videos
 * When staging a change in magit, should update any view with that node.
 Might be hard in the containment direction but at least
 when updating the file corresponding to that node.

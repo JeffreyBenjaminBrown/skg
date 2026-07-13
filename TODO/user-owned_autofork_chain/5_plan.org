@@ -1,0 +1,776 @@
+#+TITLE: Plan: the privacy accordion
+#+TODO: TODO ONGOING | DONE
+
+Sources of truth: [[./3_accordions-are-independent-of-forks.org][the vision]] and [[./4_discussion.org][the discussion]] (every decision
+cited below is settled there unless flagged). Per your request,
+each work item ends with *Flags*: the issues that change embeds,
+for you to veto or amend. New problems that surfaced only while
+writing this plan are gathered in [[*Problems surfaced while writing this plan][their own section]] and also
+flagged inline where they bite.
+
+* The design in one page (digest, so this file stands alone)
+*** One node = one ID = one *privacy accordion*: a set of same-ID
+  .skg files (each is a "*section*" in code; in prose,
+  accordion section), at most one per source.
+  The most public section is the *home*; it
+  alone carries title and body. No relationship connects sections;
+  grouping is by ID. (The short names — accordion, section, level —
+  are for code; comments and docs use the long forms, per the
+  terminology note below.)
+*** Sources are totally ordered by publicness in the config, most
+  public first. A session's active set is a *prefix* of that order
+  ("select the most private source to make available"); named
+  source-sets are retired.
+*** Every relationship instance ("edge") carries a *privacy level*
+  ("level" in code and hereafter): the
+  source of the file that records it. Default level = the more
+  private of the two endpoints' homes; 'skg-privatize-relationship'
+  may raise it; nothing ever lowers it silently (the *sticky
+  rule*). Hides take max(hider, hidden, min over explaining
+  subscription edges).
+*** On disk, per relation: every section stores ONE YAML sequence,
+  one entry per line — a bare ID (a member) or =anchor: ID= (a
+  one-key map). The most public section mentioning the relation
+  carries no anchors: its sequence IS the base list, in order. In
+  a more private section, entries before the first anchor are the
+  prepend, and each anchor starts a run inserted after that member
+  of the strictly-more-public fold (anchors resolve via 'pid_of').
+  Members render identically in every section, so a membership
+  moving between sections diffs as a clean one-line delete/add
+  pair (the readability requirement from the stage-moves thread).
+  The semantic type is still
+  =(prepend : List ID, runs : List (anchor : ID, List ID))=.
+  Unordered relations (hides, overrides, aliases) never carry
+  anchor entries; for them, fold = union.
+*** In memory, placements do not exist: every list is a single
+  ordered *leveled list* (=Vec<(SourceName, ID)>= in spirit). The
+  *fold* (load) and *unfold* (save) convert; unfold DERIVES runs
+  and anchors canonically (a level-s run anchors to the nearest
+  preceding strictly-more-public member, else joins the prepend).
+*** Two folds exist and must never be confused: the *full fold*
+  (every section; what the save path and TypeDB see) and the
+  *visible fold* (sections within the active prefix; what
+  rendering sees). They are distinct Rust types, so confusing them
+  cannot compile.
+*** Files are rewritten only when their semantics change; a section
+  whose content is unchanged stays byte-identical.
+*** Cross-file invariant violations load as WARNINGS with repair
+  offers; only single-file malformations hard-error.
+*** Explicitly out of scope: same-ID overlays on foreign homes
+  (validator rejects), node-level accordion heralds (none), private
+  textlinks (body is home-only), source trees (later), any change
+  to the manual fork system.
+
+** DONE terminology
+The following names are good in code (to keep it short),
+but in comments, let's use more self-explanatory names:
+*** accordion -> privacy accordion
+*** level -> privacy level
+*** part -> accordion section
+*** DONE (Claude) Applied throughout this plan
+Including to the code names that appear here ("section" replaces
+"part" in type and work-item names, e.g.
+=section-format-and-fold=); prose introduces each term with its
+long form. Code keeps the short names per your rule.
+
+* Work items, in order
+** privacy-order: the ordered-source config and prefix source-sets
+The prerequisite everything reads: one total order on sources.
+
+Work:
+*** 'SkgConfig' gains the config-order list of ALL sources (owned and
+  foreign interleaved), most public first. The override-chains arc
+  already added TOML-order awareness for the default owned source
+  ('first_owned_source_in_config_order'); verify and extend it to a
+  full =source_order : Vec<SourceName>= if that landed narrower.
+*** Define the comparison ("A is more public than B" = earlier in
+  =source_order=) in ONE place — a small module or methods on
+  'SkgConfig' — that the fold, the defaults, the validators, and
+  the UI all call. No other code compares source positions
+  directly.
+*** Retire =[[source_sets]]=: delete parsing, validation
+  ('validate_source_sets'), and the named-set arm of
+  'ActiveSourceSet'. The new active-set value is a prefix,
+  identified by its most private source, plus =all=.
+  =default_source_set= becomes a source name (the default level);
+  =all= keeps meaning everything.
+*** Endpoints ([[../../api-and-formats.md][api-and-formats.md]] "Source sets"): "list source sets"
+  returns the sources in order (the client renders them as
+  selectable levels); "set active source set" takes a source name
+  or =all=. The diff-mode interlock (requires =all=) is unchanged.
+*** Emacs: the source-set chooser becomes "pick the most private
+  source to make available".
+*** Author folders (adopted from your note under
+  =dependencies-manifest=): every source lives at
+  =data/AUTHOR/REPO=; ownership = residing under the configured
+  owned folder (=owned_folder=, default "owned"), retiring
+  =user_owns_it=; source =name= becomes optional, defaulting to
+  the path ("AUTHOR/REPO"); heralds show the configured name when
+  given, else the path with the owned author omitted ("REPO" for
+  owned sources, "AUTHOR/REPO" for foreign). Sub-decisions are
+  TODO-flagged in that thread.
+
+Files: [[../../server/types/misc.rs][server/types/misc.rs]] ('SkgConfig'),
+[[../../server/dbs/filesystem/not_nodes.rs][not_nodes.rs]] (config validation), [[../../server/source_sets.rs][server/source_sets.rs]],
+the source-set handlers under [[../../server/serve/handlers/][serve/handlers/]],
+[[../../elisp/][elisp/]] (chooser), [[../../tests/source_sets.rs][tests/source_sets.rs]] and the fixture configs.
+
+*** Flags:
+**** DONE BREAKING for your live config: =data/skgconfig.toml='s
+  =[[source_sets]]= entries stop parsing (I would hard-error on
+  their presence with a message naming this plan, rather than
+  silently ignoring). You will need to reorder =[[sources]]= so
+  publicness decreases downward. Say if you want a gentler
+  transition.
+***** DONE jbb : perfect
+**** Several test fixtures define named sets
+  (tests/source_sets.rs, inactive_suppression, partner_col_matrix,
+  the integration suites); they all need rewriting to prefix
+  selections. Budget: mechanical but wide.
+**** Non-prefix sets become inexpressible. The one use I could
+  imagine losing — a foreign-sources-only view — dies; per
+  no-legacy I assume that is fine.
+**** The reserved name =all= stays; a SOURCE named "all" stays
+  rejected.
+
+** leveled-lists: the type change, with degenerate semantics
+The compiler-driven sweep, done before any behavior changes.
+
+Work:
+*** New type (one home, used everywhere):
+  =PrivaciedMember<T> { level : SourceName, member : T }=.
+  'NodeComplete' and
+  'NodeRust': =contains= becomes leveled; =subscribes_to=,
+  =hides_from_its_subscriptions=, =overrides_view_of=, =aliases=
+  become =MSV= of leveled members. MSV itself is untouched.
+  DONE jbb: rename LeveledMember -> PrivaciedMember
+  DONE (Claude): Applied. One nit, then I defer: "privacied" is a
+  coined word; =MemberAtLevel= or =PrivacyLeveledMember= would be
+  real-word alternatives. Keeping yours unless you say otherwise.
+*** Every consumer updated under DEGENERATE semantics: on load,
+  every edge's level := the node's (home) source; on save, levels
+  are dropped at the FS boundary (files unchanged). Behavior is
+  byte-identical; the whole suite must stay green.
+*** Consumers that must *choose* what to do with the level even now
+  (choose "ignore, revisit in later items" explicitly, with a
+  comment): TypeDB edge writes (drop), Tantivy documents (drop for
+  now; revisited in =dbs-and-search=), diff analysis's
+  'NodeChanges' lists, the weave, reconcilers' goal lists, save
+  intents, fork clone construction, inverse indexes
+  ('contained_by' and friends — keep values as plain pids for now;
+  revisited in =render-and-gating=).
+
+Files: [[../../server/types/nodes/complete.rs][types/nodes/complete.rs]], [[../../server/types/nodes/][types/nodes/]] (rust.rs),
+[[../../server/dbs/in_rust_graph/relation_accessors.rs][relation_accessors.rs]], and every file the compiler then names.
+
+*** Flags:
+**** This is the largest single diff of the plan, deliberately free
+  of behavior change. Review will be tedious; I suggest reviewing
+  the type definitions and the few "choose" sites carefully and
+  skimming the mechanical rest.
+**** Doing it FIRST is the point: every later item then finds its
+  work sites by compiler error instead of grep (the
+  one-ID-one-file danger from the discussion).
+
+** section-format-and-fold: the .skg section format, the Accordion value, fold/unfold
+The heart. One module owning both directions plus the grouping.
+
+Work:
+*** 'NodeFS' becomes the SECTION format: =title : Option<String>=
+  (home only), =body= likewise. Every list field is ONE YAML
+  sequence whose entries are either a bare ID or =anchor: ID= (an
+  untagged two-variant ITEM enum in serde) — the diff-readable
+  serialization your stage-moves note asked for: members render as
+  identical "- ID" lines in every section, anchors look visibly
+  different, entries before the first anchor are the prepend, and
+  the base list is simply the anchor-free sequence in the most
+  public mentioning section. Unordered relations never carry
+  anchor entries. Today's files parse unchanged as single-section
+  accordions (no anchors, title present).
+  DONE jbb : rename part -> section (repeating myself).
+  (Claude: applied throughout; this item and its cross-references
+  are now =section-format-and-fold=.)
+*** =Accordion=: the group of same-ID sections, sorted by
+  =source_order=. Init's group-by-ID produces Accordions;
+  'check_for_duplicate_ids_across_sources' is subsumed by the
+  shape validator (next item) — same-ID-different-source stops
+  being an error and starts being the feature.
+*** 'fold_accordion': Accordion -> leveled 'NodeComplete'. Ordered
+  relations: start from the base list (the most public mentioning
+  section's); apply each more-private section's placement in level
+  order — runs insert after their anchors
+  (anchor resolution through 'pid_of'; duplicate anchors:
+  concatenate runs in file order; dangling anchor: the run
+  attaches after the run that precedes it in the file, or after
+  the prepend if first, and emits a warning). Unordered: union,
+  level-tagged, deterministic order (level, then file order).
+  Title/body from home; a non-home title is a warning and the
+  most public one wins. TOTAL: no input panics; junk degrades to
+  warnings.
+*** 'unfold_node': leveled 'NodeComplete' -> sections. Per
+  relation: members grouped by level; the most public mentioning
+  level gets the anchor-free base in its order; each more private
+  level gets derived runs (maximal same-level streaks anchored to
+  the nearest preceding strictly-more-public member, else
+  prepend). Sections with no fields left are deleted (file
+  removal); the home file persists while the node exists.
+*** The two folds as two TYPES: 'fold_accordion' produces
+  =FullFold= (every section) and, given the active prefix,
+  =VisibleFold= — distinct wrapper types. Render-side functions
+  accept only =VisibleFold=; the save path, TypeDB writer, and
+  audit accept only =FullFold=. Confusing the folds is then a
+  compile error, not a discipline. (Added while answering the
+  two-folds question at the bottom.)
+*** Byte-stability: the writer diffs serialized section content
+  against disk and skips identical files (precedent:
+  strip-body-whitespace).
+*** Property tests, in this module: fold(unfold(x)) == x for
+  arbitrary leveled lists; unfold(fold(files)) is idempotent from
+  the second application; every member's level survives both
+  directions; dangling/duplicate-anchor inputs fold totally and
+  deterministically; byte-stability on no-op saves.
+
+Files: [[../../server/types/nodes/fs.rs][types/nodes/fs.rs]], new module (suggest
+=server/accordion/= with =fold.rs=, =unfold.rs=, =types.rs=),
+[[../../server/dbs/filesystem/multiple_nodes.rs][dbs/filesystem/multiple_nodes.rs]] (grouping, load), the FS write
+layer in [[../../server/save.rs][save.rs]].
+
+*** Flags:
+**** Property-test dependency: decided — the =proptest= crate
+  (dev-dependency), for its shrinking.
+  DONE jbb : Yes, let's use proptest.
+**** Serde's untagged-enum vagueness ("did not match any variant")
+  now applies only at the ITEM level (bare ID vs =anchor: ID=),
+  where little can go wrong; parse errors are wrapped with file
+  path and field name regardless.
+**** A subtle case the fold must pin: ANCHOR entries in the most
+  public mentioning section (junk under the uniform serialization
+  — there is no more-public fold to anchor into). The
+  dangling-anchor fallback already covers it: each such run
+  attaches after its preceding run, with a warning. Test it.
+
+** accordion-validators: the shape and leak table, at both gates
+Work:
+*** =AccordionInvariantViolation=, produced by ONE shared primitive
+  called from both gates (init/rebuild and save), per the
+  override-invariants lesson. The table:
+  - hard errors (single-file): unparseable YAML; anchor entries in
+    an unordered relation; filename/ID mismatch (unchanged rule).
+  - warnings + repair offers (cross-file): a member more private
+    than its file (THE leak shape); an anchor not strictly more
+    public than its file, or unresolvable (including anchors in
+    the most public mentioning section); title/body in a non-home
+    section; two titles; missing home or title; an owned section
+    whose home is foreign (the forbidden overlay); the sticky-rule
+    violation surface at save (an instruction lowering an existing
+    edge's level without the gesture). The uniform serialization
+    made the old "two plain reps" and "no plain rep" shapes
+    unrepresentable — a list's role follows from which section
+    holds it — so those need no validation at all.
+*** Repairs: each warning names the fix the next full-visibility
+  save (or the migration command) would apply — re-level the
+  membership, drop the duplicate plain, etc. The leak warning
+  states plainly that git history already contains the leaked ID.
+
+Files: new =server/accordion/invariants.rs=; call sites in
+[[../../server/dbs/init.rs][dbs/init.rs]], [[../../server/serve/handlers/rebuild_dbs.rs][rebuild_dbs.rs]], [[../../server/save.rs][save.rs]].
+
+*** Flags:
+**** Until =migration= runs, your real data will emit the leak
+  warning for every public-contains-private membership it
+  currently holds. Warnings are the agreed behavior ("warn only
+  unless & until decision revised"), but the volume on first boot
+  may be large; the init report should aggregate (one line per
+  node, count summary), not one line per edge.
+
+** save-leveling: defaults, sticky rule, hide levels, precise re-anchoring
+The pipeline learns levels; this is where the silent-leak dangers
+are closed.
+
+Work:
+*** Extraction (local instruction collection): intents carry
+  =Option<SourceName>= per member — =Some= from the load-bearing
+  metadata atom (see =render-and-gating=), =None= meaning derive.
+*** Lowering resolves =None=: existing edge (same relation, same
+  endpoints, from the graph snapshot) keeps its level (STICKY);
+  new edge gets the default, max(home(N), home(target)).
+  A =Some= below the sticky/default floor is a save error naming
+  the rule; a =Some= at-or-above is honored.
+*** Hide inference ('resolve_visibility',
+  'infer_hides_from_contains_removals'): new hides level at
+  max(hider home, hidden home, level of the triggering
+  subscription edge); the renormalizer re-raises existing hides
+  when their most public explanation vanishes or rises
+  (min-over-explanations rule; raising only).
+*** Level-ungated maintenance: the save computes with FULL folds
+  regardless of the connection's prefix. Members above the active
+  level pass through from disk untouched — structurally free,
+  since they live in untouched sections — EXCEPT precise
+  re-anchoring: when this save deletes or moves a member that a
+  more-private run anchors to, the server (holding the old fold)
+  rewrites that run's anchor to the nearest surviving more-public
+  predecessor. Only semantically-changed sections are rewritten.
+*** Deletion refusal: deleting a node whose accordion has sections
+  above the active level is refused with "N has accordion sections
+  in inactive sources" (the agreed small leak). 'apply_delete_propagation_cleanup'
+  learns to scrub a deleted ID from leveled lists (which unfolds
+  into scrubbing base lists, runs, prepends, and anchors — an
+  anchor scrub re-anchors the run as above).
+*** The weave: not extended. Under accordion invariants a visible
+  file cannot list an invisible member, so 'weave' /
+  'set_difference_merge' remain only as backstops for junk data;
+  comment them as such.
+
+Files: [[../../server/from_text/local_instruction_collection/][local_instruction_collection/]] (traverse, lower,
+resolve_visibility), [[../../server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]], [[../../server/save.rs][save.rs]],
+[[../../server/from_text/weave.rs][weave.rs]] (comments only).
+
+*** Flags:
+**** The sticky floor makes one gesture impossible by design: moving
+  an edge to a MORE public level without the privatize gesture's
+  cycle (whose least-private stop is the default). If you ever
+  want "publicize below default" (e.g. after moving a node's home
+  privater, wanting old edges to follow down), that needs its own
+  gesture; none is planned.
+**** Precise re-anchoring writes private files during a
+  restricted-level session (approved as unavoidable); note it also
+  means a public-session git commit can show private-source
+  changes. Your workflow commits sources separately, so I believe
+  this is only a mild surprise, but it is the one visible
+  consequence of level-ungated maintenance.
+**** Save collateral selection needs no carrier translation (same
+  ID), but a save that rewrites only a PRIVATE section must still
+  rerender views of the node open at higher levels — the existing
+  changed-PID mechanism covers it since the pid is the node's.
+  Verified in tests.
+
+** render-and-gating: the visible fold, inbound edge gating, the herald
+The leak-closing sweep on the display side, and the one new
+metadata atom.
+
+Work:
+*** All rendering derivations switch from node-source gating alone
+  to node-source AND edge-level gating, computed from the VISIBLE
+  fold (the active prefix): content expansion, PartnerCol goal
+  lists, subscribee-as-such subtraction ('content_goal_list' uses
+  the subscriber's visible-fold contains and hides), backpaths,
+  containerward ancestry, search-enrichment ancestry, and
+  graphNodeStats counts (count edges at visible levels only).
+*** Inverse indexes ('contained_by', 'subscribers_of', 'hiders_of',
+  'overriders_of', 'textlinks_in') carry the edge level, so every
+  inbound surface can filter mechanically.
+*** The metadata atom: =(relSource NAME)= inside a =(node ...)= form
+  (name pending your veto — see Flags), meaning "the relationship
+  instance binding this position to its org-parent is recorded at
+  level NAME". Emitted ONLY when the level differs from the
+  edge's default; parsed as LOAD-BEARING save intent (feeds
+  =save-leveling='s =Some= path). Herald: red-family "~NAME"
+  immediately before the ⌂ sourceHerald, per your spec; rule added
+  to [[../../server/heralds.rs][server/heralds.rs]] (the vocabulary-coverage test
+  'herald_rules_cover_the_emittable_vocabulary' pins it).
+*** Renders never emit, and titles-by-ids never serves, anything
+  about sections above the active level (they are simply not
+  folded in). "Get file path" already takes (id, source): a
+  section in an
+  inactive source is refused by the existing rule.
+
+Files: [[../../server/update_buffer/reconcile/content.rs][reconcile/content.rs]] and siblings, [[../../server/update_buffer/viewnodestats.rs][viewnodestats.rs]],
+[[../../server/dbs/in_rust_graph/][in_rust_graph/]] (indexes), [[../../server/serve/parse_metadata_sexp.rs][parse_metadata_sexp.rs]],
+[[../../server/heralds.rs][heralds.rs]], [[../../server/to_org/][to_org/]].
+
+*** Flags:
+**** Wire-name decision (hardens fast): =(relSource NAME)= is my
+  proposal; alternatives =(membershipSource ...)=, =(relLevel ...)=.
+  Veto now if you prefer another.
+**** The inbound-gating sweep is a NEW leak surface found while
+  planning (see [[*Problems surfaced while writing this plan][problems]]): without it, a private membership
+  surfaces at public level through ancestry, backlinks,
+  subscriberCols, and container counts even though the content
+  view is clean. The sweep is enumerable because the indexes are
+  the chokepoint, but each render surface gets a test.
+**** Suppressing the ~herald at default-level edges means a level
+  identical to the default is invisible in the buffer. That is
+  by design (signal = deliberate privatization), but it also
+  means the metadata round-trip for DEFAULT edges relies wholly
+  on stickiness, never on the buffer. Stated here so it is a
+  known property, not an accident.
+
+** privatize-gesture: 'skg-privatize-relationship'
+Work:
+*** Emacs command 'skg-privatize-relationship' (suggest =C-c s r=;
+  no binding collision found — confirm): on a headline
+  representing a member (content child or col member), cycles the
+  =(relSource ...)= value through [default, then each strictly
+  more private source in config order]; display updates in place;
+  the SAVE applies it (through the load-bearing atom). At the
+  default stop the atom is removed rather than written.
+*** Server side needs nothing beyond =save-leveling= (the atom is
+  already intent); validation rejects a below-floor value with a
+  clear message.
+
+Files: [[../../elisp/][elisp/]] (new command + keybinding),
+[[../../docs/COMMANDS.org][docs/COMMANDS.org]].
+
+*** Flags:
+**** Cycling metadata client-side means the buffer is modified
+  without a save (like other metadata edits); consistent with
+  existing gestures, noting it.
+**** Applying it to a member of a READ-ONLY col (e.g. subscriberCol)
+  is meaningless (the edge belongs to the other end); the command
+  should refuse there with an explanation, mirroring read-only-set
+  semantics.
+
+** dbs-and-search: TypeDB projection, Tantivy alias levels, the audit
+Work:
+*** TypeDB: unchanged schema; nodes and edges are the FULL fold's
+  unleveled projection; =has_source= = home. (TypeDB remains a
+  rebuilt cache; no query rewrites.)
+*** Tantivy: title documents carry the home source (as today); ALIAS
+  documents carry the alias's own level as their source field, so
+  restricted-search filtering excludes private aliases of public
+  nodes. Index schema change => rebuild on first boot (cheap,
+  automatic — it is a rebuildable cache).
+*** The daily audit compares the in-Rust FULL fold's unleveled
+  projection against TypeDB — one projection function shared with
+  the TypeDB writer so they cannot drift.
+
+Files: [[../../server/dbs/typedb/][dbs/typedb/]], [[../../server/dbs/tantivy/][dbs/tantivy/]],
+[[../../server/dbs/in_rust_graph/audit.rs][in_rust_graph/audit.rs]].
+
+*** Flags:
+**** Search-result GROUPING groups matches by ID before source
+  filtering; with per-alias levels the filter becomes per-DOCUMENT
+  (title vs each alias) rather than per-ID. The existing
+  problems.org wording nit about filter ordering becomes real
+  code here; the fix is to filter documents before grouping.
+**** TypeDB seeing the FULL fold means a restricted session's
+  TypeDB-fallback stats could count private edges. The running
+  server uses the in-Rust path (which gates), and the fallback is
+  already flagged in problems.org as not source-set-aware; this
+  plan leaves the fallback as-is and notes it there.
+
+** interactions: merge, diff analysis, stage-moves, export, fork
+Work:
+*** nodeMerge: fold both accordions, concatenate acquiree-first,
+  dedup by pid, unfold (the framing you approved). Title/body:
+  acquirer's home wins, as today. Extra-ids unchanged.
+*** Diff analysis: 'NodeChanges' lists are leveled; per-section
+  file diffs aggregate per node for the report; the "duplicate IDs
+  across sources" bucket becomes shape-aware (reports only
+  VIOLATIONS, not accordion shapes).
+*** stage-moves: redefined per your note below. A node "moves" iff
+  its HOME moves: detect delete/create pairs where BOTH sides
+  carry a title. If the destination source already held a section
+  for that ID, synthesize no staging — REPORT the pair and let the
+  user stage by hand (the arrival is mixed into pre-existing
+  relationship records; untangling that automatically is not worth
+  the risk). Titleless section creations and deletions are
+  re-levelings, not moves, and stage as ordinary edits.
+
+**** DONE (jbb): Maybe it can be simpler. To move "the" node
+  is to move its most-public represntation.
+  Any other move that might look like that would be a change,
+  not to where "it is", but to where some of its relationships
+  are recorded. So just look for delete-create pairs
+  where both have a title.
+  The snafu is that the new source might be one where
+  some other relationships were already recorded.
+  In this case we would only want to stage everything in the
+  destination that came from the original,
+  without staging any other changes. That seems complex.
+  Better to simply report pairs like that and let the user
+  stage however they want.
+
+  Oh! And we want the diff in such cases to be readable!
+  That is, imagine we had public file U and private file R
+  both representing aspects of node N, with U having the title.
+  If the data from U is merged into R,
+  we want the two formats (the rendering of the simple list
+  and the rendering of the new Placement type)
+  to both put list members on a single line,
+  formatted the same way
+   -- and anchors should look different somehow.
+  That makes the diff readable.
+
+***** DONE (Claude) Adopted, both halves
+- The heuristic: yours is simpler and more correct; the work
+  bullet above now reads title-presence as the move signal, and
+  mixed destinations are reported, never auto-staged.
+- The readable diff: acted on by REDESIGNING the on-disk
+  serialization (see =section-format-and-fold= and the digest).
+  Instead of "sequence for plain, map for placement", every
+  section stores one sequence, one entry per line: members as bare
+  "- ID" lines, identical in every section; anchors as
+  "- anchor: ID" lines, visibly different. Your U-into-R example
+  then diffs as pure one-line moves plus distinct anchor lines.
+  This SUPERSEDES the sequence-vs-map detail you approved in
+  4_discussion — the same-field-name decision survives, but shape
+  discrimination is no longer needed at all, because a list's role
+  (base vs placement) follows from WHICH section holds it. Bonus:
+  the "two plain reps" and "missing plain rep" violations became
+  unrepresentable, so the validator table shrank.
+
+*** Export-to-org: reads files fresh; teach it the fold (visible
+  fold of the requested prefix). Its no-TypeDB property is
+  preserved (fold needs only files + config order).
+*** Fork of a foreign node: the clone's copied edges all get the
+  clone's default levels (max(clone home, target home)).
+  'build_fork_clone' constructs leveled lists accordingly.
+
+Files: [[../../server/nodeMerge.rs][nodeMerge.rs]], [[../../server/diff_analysis/][diff_analysis/]],
+[[../../server/git_ops/find_and_stage_moves.rs][find_and_stage_moves.rs]], [[../../server/export_org.rs][export_org.rs]],
+[[../../server/from_text/fork.rs][from_text/fork.rs]].
+
+*** Flags:
+**** Diff MODE (the in-buffer git decorations) currently requires
+  active set =all=, which conveniently sidesteps
+  visible-fold-vs-HEAD questions; keep that interlock, so diff
+  mode always decorates the full fold. No new work, but worth
+  stating as a load-bearing reuse of an old rule.
+**** Merge order detail: dedup keeps the FIRST occurrence
+  (acquiree's position, matching prepend semantics) and the more
+  private level when the same edge exists at two levels — "more
+  private wins" is the safe tie-break; flagging because it is a
+  judgment call.
+
+** dependencies-manifest: DEPENDENCIES.toml
+Work:
+*** At init (and after config changes), for each OWNED source, write
+  =DEPENDENCIES.toml= into the source directory: the sources it
+  may reference (everything more public, in order), with the
+  explanatory comment; clobbering is intended. Skip writing when
+  content is already identical (byte-stability).
+*** When a FOREIGN source contains one, read it: at config
+  validation, warn when the receiver's order contradicts the
+  manifest's relative order; the warning suggests the fix. No
+  automatic reordering.
+
+Files: new =server/accordion/dependencies_manifest.rs= (or under
+git_ops/), config validation in [[../../server/dbs/filesystem/not_nodes.rs][not_nodes.rs]].
+
+*** Flags
+**** The manifest lists source NAMES; names are receiver-local
+  today (a publisher's "private" may collide with the receiver's
+  "private"). For the manifest to help a receiver, publishers and
+  receivers must agree on names, i.e. the manifest names are the
+  publisher's directory names. I will match on directory names,
+  which is what a receiver actually downloads. If that feels
+  fragile, the alternative is source UUIDs — bigger design, not
+  planned. (Largely superseded by the author-folders adoption
+  below: manifest entries become author-namespaced paths.)
+***** ONGOING lets use folders
+Currently I've got every repo placed at data/repo-name.
+This would be easier if the structure were
+data/author/repo-name.
+This also sidesteps the need to list a 'user owns it' bool
+for each repo; instead, the user keeps a data/owned/ folder,
+or optionally some other name in the config.
+The heralds should omit the author name if it is the user,
+and otherwise print 'author/repo-name',
+exactly mirroring the folder layout.
+
+This also lets us make 'name' an optional field in the config.
+(If I'm using someone else's data, I'm likely to want
+to shorten the name, but the names I chose for my data
+are already exactly what I want.)
+
+****** DONE (Claude) Adopted; folded into =privacy-order=; three sub-decisions
+Now in the plan (see the "Author folders" bullet under
+=privacy-order=): sources live at =data/AUTHOR/REPO=; ownership =
+residing under the configured owned folder (=owned_folder=,
+default "owned"), retiring =user_owns_it=; =name= optional,
+defaulting to the path; DEPENDENCIES.toml entries become those
+author-namespaced paths, which mostly dissolves the
+name-collision flag above. Three sub-decisions for you:
+1. When a foreign source has a configured short =name=, do
+   heralds show the short name (my assumption — that is what the
+   name is for) or always the path?
+   jbb : right, the short one
+2. Your existing =data/= tree needs a one-time rearrangement
+   (data/REPO -> data/owned/REPO etc.) plus config rewrite —
+   scripted as part of =migration=, or by hand?
+   jbb : scripted
+3. Defaulted names contain "/" (e.g. "eggman/eggs") and flow into
+   TypeDB, Tantivy, and =(source ...)= metadata atoms as today's
+   names do. I see no conflict, but flagging since names appear
+   in wire metadata.
+** migration: 'skg-migrate-to-accordions'
+Work:
+*** New endpoint + Emacs command. Refuses unless the active set is
+  =all=. For every owned node: re-level every edge to
+  max(existing level, its default) — raising leaky memberships
+  into the right sections, never lowering — then unfold and
+  rewrite
+  (byte-stable, so already-conforming files are untouched).
+  Reports files changed and leaks fixed, and reminds that public
+  git HISTORY still holds any leaked IDs.
+*** Runs the accordion validator before and after; after a clean
+  migration the leak warnings disappear.
+
+Files: new handler under [[../../server/serve/handlers/][serve/handlers/]], command in [[../../elisp/][elisp/]],
+reusing =section-format-and-fold= and =accordion-validators=
+wholesale.
+
+*** Flags:
+**** Migration cannot fix the past: your public repos' histories
+  keep the private IDs they already recorded. The report says so;
+  rewriting git history is out of scope and manual.
+**** Order of adoption for your real data: run the server on a COPY
+  first (your dogfood/develop separation already supports this),
+  eyeball the migration diff, then do it live.
+
+** docs: the format, the model, the commands
+Work:
+*** [[../../api-and-formats.md][api-and-formats.md]]: the .skg section format (uniform sequence
+  serialization with anchor entries, optional title), the
+  =(relSource ...)= atom, the reshaped source-set endpoints,
+  migration endpoint.
+*** [[../../glossary.md][glossary.md]]: privacy accordion, accordion section, home,
+  privacy level, fold (visible vs full), placement, the sticky
+  rule — long forms per the terminology note.
+**** DONE jbb
+Also, everything that has a short term in code
+and a longer term in comments
+should have an entry for the shorter one
+that merely refers to the entry for the longer one.
+*** [[../../docs/sharing-model.md][sharing-model.md]] + a new =docs/accordions.md=: the user story
+  (mixed-privacy nodes, privatize gesture, what leaks and what
+  cannot), including the two documented inexpressibles (private
+  textlinks; publicize-below-default).
+*** [[../../schema.tql][schema.tql]] comments (has_source = home), the 'NodeComplete'
+  PITFALL comment (absent-vs-empty now meaningful on disk),
+  [[../../docs/COMMANDS.org][COMMANDS.org]].
+*** [[../../docs/COMMANDS.org][docs/COMMANDS.org]]: 'skg-privatize-relationship', the new
+  level chooser (most-private-source-to-make-available),
+  'skg-migrate-to-accordions'.
+*** Optional, cheap, recommended: fix the two inversion typos in
+  [[./1_vision.org][1_vision.org]] flagged in [[./2_discussion.org][2_discussion.org]] so future readers of
+  this folder are not misled.
+*** DONE also docs/COMMANDS.org
+(Claude: given its own bullet above; it had been folded into the
+schema.tql bullet.)
+* Problems surfaced while writing this plan
+Each is folded into a work item above; gathered here per your
+standing request.
+*** *Inbound edges are a second leak surface.* Gating only the
+  content fold is not enough: ancestry, backpaths, inbound
+  PartnerCols, and stats counts would reveal a private membership
+  at public level. Hence the index-level edge tagging and the
+  render sweep in =render-and-gating=.
+**** DONE Please explain the problem in more detail.
+And also whether you consider it already solved, and why.
+In particular I don't know what you mean by gating.
+
+***** DONE (Claude) Explanation
+"Gating" = filtering by the active source-set: X is gated on Y
+when X may render only if Y is inside the active prefix. Today
+all gating is per NODE ("is this node's source active?"). The
+accordion adds per-EDGE levels, and every edge is reachable from
+BOTH ends. The outbound end is safe by construction: rendering
+N's content uses the visible fold, so a privatized membership
+stays out of N's child list at public level. The INBOUND end is
+not: containerward ancestry, backpaths, inbound PartnerCols, and
+the container-count heralds all read the inverse indexes
+('contained_by', 'subscribers_of', ...), which today record only
+"N contains C" — no level. Concrete leak: you privatize public
+C's membership under public N (the reading-list case); at public
+level, visiting C would still show N in its ancestry and count N
+among its containers, revealing exactly the relationship you
+privatized. Is it solved? In the PLAN, yes — =render-and-gating=
+stores each edge's level in the inverse indexes and filters every
+inbound surface by it, and the leak battery pins each surface
+with a test. In CODE, nothing exists yet. I flagged it because
+the discussion's design had only covered the outbound direction;
+without this item the feature would have shipped leaking.
+
+*** *Private aliases need per-document search gating.* Tantivy
+  filtering by node source would let a restricted search match a
+  private alias of a public node. Hence per-alias levels in
+  =dbs-and-search=, and a schema-forced index rebuild.
+**** DONE Please explain the problem in more detail.
+And also whether you consider it already solved, and why.
+In particular I don't know what you mean by gating.
+
+***** DONE (Claude) Explanation
+Same sense of gating as above: text search must not display
+matches the active prefix forbids. Tantivy stores one document
+per title/alias, mapping its text to an ID, each document
+carrying a source field; search drops results whose source field
+is not active. Today that field is always THE NODE's source —
+correct while a node was one file. With per-alias levels it goes
+wrong: give public node "Acme Corp" a private alias "the client I
+keep complaining about". The alias document would carry the
+node's (public) source, so a PUBLIC-level search for "complain"
+would match and display the private alias text, leaking both the
+alias and its association with Acme. Solved? In the PLAN, yes —
+=dbs-and-search= gives each ALIAS document the alias's own level
+as its source field, so restricted search filters it out; title
+documents keep the home source; the index schema change forces
+one automatic rebuild (Tantivy is a rebuildable cache). In CODE,
+no. Flagged for the same reason as the inbound-edge item: the
+discussion decided aliases fold by level, and this is the
+search-side consequence nobody had stated.
+
+*** *Two folds, named.* Save-side logic must use the full fold,
+  render-side the visible fold; several bugs live in confusing
+  them (e.g. subscribee-as-such subtraction using the full fold
+  would leak by omission). The plan names them and the fold module
+  exposes them as distinct functions.
+**** DONE Do you consider this solved?
+
+***** DONE (Claude) Answer: no open decision remains, and it is now compiler-enforced
+"Solved" in the design sense, yes: the rule is settled (save
+path, TypeDB, and audit read the full fold; rendering reads the
+visible fold). What remained was the RISK of someone — me —
+passing the wrong fold somewhere during implementation. While
+answering this question I strengthened the plan to close that:
+'fold_accordion' now returns the two folds as DISTINCT Rust types
+(=FullFold= vs =VisibleFold=), render-side functions accept only
+the latter, so confusing them is a compile error rather than a
+discipline (added to =section-format-and-fold=). Pinned further
+by the leak battery in the test matrix.
+
+*** DONE *Your live config and a swath of test fixtures break* at
+  =privacy-order= (named source-sets retired). Flagged there;
+  needs your go-ahead on the hard-error-with-message approach.
+*** *Wire names to approve now*: =(relSource NAME)= (metadata atom),
+  =DEPENDENCIES.toml= (manifest), 'skg-privatize-relationship'
+  (already decided), =C-c s r= (proposed binding).
+**** DONE all good
+*** *The dangling-anchor fallback thread concluded* (answered inline
+  in 4_discussion): no storage-type change; fold-time
+  previous-run attachment per your preference; plus save-time
+  PRECISE re-anchoring when the save itself creates the dangle
+  (=save-leveling=), which your fallback then only backstops.
+*** *stage-moves survives mostly by accident*; its counting needs a
+  per-file restatement and tests (=interactions=), not a redesign.
+
+* Test matrix (beyond the per-item tests named above)
+*** fold/unfold property suite (=section-format-and-fold=) — the
+  load-bearing one.
+*** Leak regression battery, one test per surface: content view,
+  subscribeeCol, subscriberCol/inbound cols, ancestry, backpaths,
+  search (title, alias, body), titles-by-ids, stats counts,
+  export, diff report — each asserting a private edge/section is
+  invisible at public level and visible at private level.
+*** Sticky-rule round-trips: privatize, save from another view,
+  level survives; attempt to lower without gesture is rejected.
+*** Restricted-level save: public edit preserves private sections
+  byte-identically except precise re-anchoring; deletion refusal.
+*** Hide-level rule incl. the min-over-explanations case and
+  re-raising.
+*** Migration on a fixture reproducing your leak shape.
+*** Concurrency note: suite runs serialized per the existing TypeDB
+  constraint; nothing new.
+
+* Suggested commit sequencing
+In order, each leaving the suite green: =privacy-order= →
+=leveled-lists= (degenerate) → =section-format-and-fold= (module +
+tests; loading still degenerate until wired) → wire fold into
+init/load → =accordion-validators= → =save-leveling= →
+=render-and-gating= → =privatize-gesture= → =dbs-and-search= →
+=interactions= → =dependencies-manifest= → =migration= → =docs=.
+The first user-visible behavior change arrives only at
+=save-leveling=; everything before it is scaffolding under
+unchanged behavior, which keeps each review small and the
+dogfood data safe until you choose to migrate.

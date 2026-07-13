@@ -864,3 +864,29 @@
    correct-by-construction way to sample current CPU. A small helper
    that computes a delta from '/proc/<pid>/stat' over an interval would
    stop this recurring.
+* Problems noted while writing the autofork discussion (2026-07-11)
+  Found while researching TODO/user-owned_autofork_chain/2_discussion.org.
+  Both are documentation defects, not code bugs.
+** glossary.md's read-only-set example mislabels the subscriberCol
+   In the "read-only set" entry, the example view shows R and T (the
+   subscribers of N) under a =subscriberCol=, but the prose then says
+   'The subscriberCol ("collection of subscribees") is a read-only
+   set' -- it is a collection of SUBSCRIBERS -- and continues "the
+   user could flip the order of R and T in the subscribeeCol", naming
+   the wrong col. Two-word fix ("subscribers", "subscriberCol").
+   Adjacent cosmetic typos in the same region: "if nodes R and T
+   subscribe to nodes N" (should be "node N"), and "subsribee1" /
+   "subsribee2" in the earlier "subscribee as such" diagram.
+** schema.tql's 'subscribes' comment overstates: subscribing is not always forking
+   The comment on the =subscribes= relation opens "A subscriber forks
+   a subscribee: it clones the subscribee's content and stays
+   subscribed". That describes the fork gesture, which CREATES a
+   subscription, but a subscription need not come from a fork: the
+   writable subscribeeCol lets a user add a =subscribes= edge with no
+   clone and no override ('visit_subscribeecol' lowers membership
+   edits to =SetSubscribesTo= directly). glossary.md gets it right
+   ("a fork is just subscribe + override" -- forks are a subset of
+   subscribers). Suggested rewording: describe subscription on its
+   own (subscribee's unintegrated additions surface under the
+   subscriber), then note the fork gesture creates this edge together
+   with =overrides_view_of=.
