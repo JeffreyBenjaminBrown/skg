@@ -1,3 +1,33 @@
+* Backpaths should be foldable to their endpoints.
+=> they should be reversed.
+That way they could be folded and their ends easily read.
+Maybe group them under a collector.
+* Option to make backlinks more public than the active source set.
+alternatives
+** in skg : [[id:7212b375-3f7e-4371-80f9-7d7dd7ded7d9][Why build a note on my ex?]]
+** Advantage: I could exclude links from my note on my ex.
+* The parent-independent herald should be purple.
+* In magit, discarding changes should reload that node.
+At least if they are text or outlink chnages.
+* The 'unknown node' scaffold can't always say 'parent references'.
+If it was arrived at by followiing a link,
+it should say 'link source targets unknown node'.
+Etc. for the other relationships --
+it depends on why the node was drawn.
+* Put graphnode stats on links, describing the target.
+* bug: making a link into content gives an unavailable view error
+** what I did
+*** Searched 'sharing'. Visited the top result.
+*** Saw a link to 'understanding & sharing' in its content.
+*** Made that link into content.
+*** Visited the now-orphaned link. Deleted it. Saved.
+*** Got this error.
+  * errors
+  ** Collateral view search:sharing: No such file or directory (os error 2)
+*** But save seemed to work.
+* Warn the user if they changed an indefinitive source.
+Don't other kinds of edits to indefinitive nodes
+already bork the save?
 * When staging a change in magit, should update any view with that node.
 Might be hard in the containment direction but at least
 when updating the file corresponding to that node.
