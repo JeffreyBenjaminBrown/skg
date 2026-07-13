@@ -1,3 +1,5 @@
+* TODO/command-name-echo.org
+a config option, for recording videos
 * When staging a change in magit, should update any view with that node.
 Might be hard in the containment direction but at least
 when updating the file corresponding to that node.
