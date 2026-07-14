@@ -14,6 +14,7 @@ intending to replace it, but can't replace it.
 * need to be able to commit all changes from buffer
 not just all new nodes
 for big low-stakes nodes, like my notes from the CA driver's manual
+* from magit, discarding changes to a file should reload just it into skg
 * magit takes too long to reload overlays after each staging event
 * would like to be able to see what a deleted (in magit) node's containers, other relatives were
 * Saving is bumping point in collateral buffers to top of buffer.
