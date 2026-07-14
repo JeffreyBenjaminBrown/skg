@@ -382,8 +382,8 @@ Save the view afterward to apply the merge.
 Sets the privacy level of the relationship instance the headline at
 point represents -- =contains= for a content child, the col's
 relation for a writable PartnerCol member. (Formerly
-=skg-privatize-relationship=, which survives as an alias; renamed
-because the gesture now moves privacy in both directions, see
+=skg-privatize-relationship=; renamed because the gesture now moves
+privacy in both directions, see
 =BUG-and-fix_make-edge-more-public.org=.)
 
 The command asks the server for the edge's DEFAULT level (the more
