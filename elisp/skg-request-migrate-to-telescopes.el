@@ -3,12 +3,13 @@
 (require 'skg-length-prefix)
 
 (defun skg-migrate-to-telescopes ()
-  "Raise every owned node's edge levels to at least their defaults.
+  "Raise every owned node's edge privacy to at least their defaults.
 This lifts leak-shaped memberships (a public file naming a more
 private node's ID) into their proper privacy-telescope sections; it
-never lowers a level. Changed telescopes are rewritten byte-stably
-and the databases are rebuilt. The server refuses unless the active
-source-set is \"all\", since migration must see every level.
+never lowers an edge's privacy. Changed telescopes are rewritten
+byte-stably and the databases are rebuilt. The server refuses unless
+the active source-set is \"all\", since migration must see every
+privacy level.
 
 What migration cannot fix: a public repo's git HISTORY keeps any
 IDs it leaked before migration; repairing that is manual."
