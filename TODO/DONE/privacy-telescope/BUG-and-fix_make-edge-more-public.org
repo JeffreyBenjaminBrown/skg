@@ -1,0 +1,329 @@
+#+TITLE: BUG and fix: an edge can never be made more public
+
+STATUS: FIXED, commit 72d64de1 (2026-07-14). All four suites green
+(Rust 524/524, elisp 274/274, integration, nvim). The narrative
+below is per the plan; see the IMPLEMENTATION NOTE under "proposed
+fix" for the one deviation the test suite forced (the
+foreign-endpoint, below-default shape).
+
+* summary
+Once a relationship edge is saved at some privacy level, nothing
+can ever lower that edge's privacy again -- not even down to the
+edge's own default. The gesture that claims to do it (the "reset to
+default" stop of skg-privatize-relationship) silently does nothing,
+and the documented recipe ("publicize the more private endpoint's
+home first") moves the endpoint but leaves the edge behind. The fix
+is one semantic change on the server: validate an EXPLICIT level
+against the DEFAULT floor instead of the sticky-or-default floor.
+Plus a client rename, since after the fix the gesture both raises
+and lowers privacy: skg-privatize-relationship becomes
+skg-set-relationship-source.
+
+* how it surfaced (repro)
+Migration revealed that node 6652685e-472e-4c07-a456-fbc3432b1dbf
+had content recorded unnecessarily privately: its child
+f0a77ca4-2371-423b-af9c-c07d2cfae4f2 had been misfiled in the
+mincit repo, so migration correctly raised the containment edge's
+privacy to mincit. Jeff then moved f0a77ca4's home back to pers-p --
+but the edge stayed at mincit (the sticky rule keeps disk levels).
+Attempts to lower its privacy:
+
+1. C-c s r (skg-privatize-relationship) on f0a77ca4's headline
+   appeared not to cycle at all: it immediately said "reset to the
+   edge's default". That is because the server had rendered
+   =(relSource mincit)= into the headline's metadata (it does so
+   whenever an edge sits above its default -- 'set_rel_source',
+   server/update_buffer/viewnodestats.rs:330), and mincit is the
+   LAST source in the config ladder, so the cycle's next stop wraps
+   to "no atom".
+2. Saving after that "reset" changed nothing: the ~mincit herald
+   respawned on the next render.
+3. (Not tried, but would also have failed:) cycling further, to an
+   explicit =(relSource pers-p)=, and saving -- the server would
+   have REJECTED the save, "requested level 'pers-p', but the
+   sticky/default floor for this edge is 'mincit'".
+
+* the mechanism
+All in 'apply_sticky_levels'
+(server/from_text/supplement_from_disk.rs:252):
+
+- 'floor_for' (line 272) computes ONE floor per member:
+  sticky-or-default. If the edge already exists on disk, the DISK
+  level is the floor; only otherwise does it fall back to the
+  default (more-private-of the endpoints' homes), then clamps at
+  the owner's home.
+- 'resolve_level' (line 292) uses that same floor for BOTH cases:
+  - no explicit atom -> the floor itself. For an existing edge
+    that means the disk level: removing the atom is a no-op, not a
+    reset. (Hence the respawning herald: no atom = "no opinion",
+    and sticky wins.)
+  - explicit atom -> accepted only if at-or-above the floor. For
+    an existing edge the floor is the DISK level, so an explicit
+    level below it errors -- even when it is at or above the
+    edge's DEFAULT.
+
+Net effect: privacy levels form a ratchet. Saves and migration can
+raise privacy (sticky, clamping, migration's
+raise-privacy-to-defaults), and nothing can lower it.
+
+** ONGOING jbb : Does making all sources available make sense?
+I earlier said we should lift the restriction on sources
+offered for the user to cycle through -- let them pick any source.
+But on further consideration, picking a source
+more public than either endpoint seems nonsensical.
+*** ONGOING claude : right -- and here is the cheap way to filter the menu
+You are correct, with one precision: the invalid region is
+"strictly more public than the DEFAULT", i.e. more public than the
+more private of the two endpoints' homes. A level between the two
+homes is also invalid (it is more public than the more private
+endpoint, so that endpoint's ID would leak), even though it is not
+more public than "either" endpoint. Nothing in that region can
+ever be accepted, so offering it is offering guaranteed errors.
+
+The obstacle to filtering the menu client-side is that the client
+cannot compute the default: it needs both endpoints' homes and the
+ladder, and buffer metadata is not a trustworthy source for homes
+(stale views, concurrent home moves by another client). Three ways
+out:
+
+1. Offer everything, let the server's floor check reject (what the
+   writeup above proposed). Simple, but serves nonsense choices.
+2. Render the default alongside the override: wherever
+   'set_rel_source' already emits =(relSource NAME)= (exactly the
+   edges sitting above their default), also emit the default, e.g.
+   =(relDefault NAME)=. The gesture's completing-read then offers
+   precisely the ladder slice from the default to the most private
+   source. Zero extra round trips, and no new metadata on
+   conforming edges -- only deviant edges carry the extra atom.
+3. A new tiny endpoint: the gesture asks the server for the edge's
+   (default, current) on demand. Always fresh, but adds protocol
+   machinery and a round trip to a buffer-local gesture, against
+   the codebase's "metadata edits touch only the buffer" grain.
+
+I recommend 2, and the asymmetry it leaves is principled. The
+stuck-edge case (your repro) is the one where lowering an edge's
+privacy is legitimate and precision matters -- and it is exactly
+the case where the atom, hence the default, is rendered: the menu
+is perfectly filtered. When NO atom is rendered, the edge already
+sits at its default, so the only legitimate move is raising its
+privacy; the menu falls back to the full ladder, and a user who
+picks a level more public than the default is attempting something
+impossible by design -- for which a save error naming the floor is
+arguably better UX than silent absence from a menu, because it
+explains WHY.
+
+Either way the server-side floor check stays load-bearing, never
+the menu: the atom is plain text anyone can hand-type, and buffers
+go stale. One footnote for the future: hides have a higher floor
+(the most public explaining subscription), so if the gesture ever
+becomes reachable on a hide, the rendered default must use
+'hide_level', not just the endpoint homes.
+
+If you agree, I will fold "menu = relDefault slice when the atom
+is present, full ladder otherwise" into the elisp bullet of the
+proposed fix and add =(relDefault ...)= to the server bullet.
+**** DONE let's go with (3)
+The communication will be brief.
+It's main cost is to the coder.
+Bigger metadata in every buffer would be more friction,
+potentially confusing a curious user -- more important to avoid.
+***** claude : folded into the plan
+Folded into "proposed fix": a new "server: the edge-level-info
+endpoint" subsection, and the elisp bullet now builds its menu
+from that endpoint's reply. No rendered metadata changes.
+* why this is a bug, not a design choice
+Three of our own statements contradict the implementation:
+
+1. The plan's rule (5_plan.org, render-and-gating / save-leveling)
+   was "below-DEFAULT = save error" -- the default, not the sticky
+   level, was to be the floor for the explicit atom.
+2. The docstring over 'apply_sticky_levels' itself says
+   "Renormalization never lowers an edge's privacy silently --
+   privacy-lowering happens only through the explicit gesture's
+   cycle." But the explicit path is floored at sticky, so privacy
+   can NEVER be lowered, through any path. The sentence describes
+   intended behavior the code does not have.
+3. docs/telescopes.md says: "To publicize a relationship,
+   publicize the more private endpoint (move its home) first."
+   Jeff followed that recipe exactly; the home moved and the edge
+   did not. The recipe is incomplete without a way to then lower
+   the edge's privacy to its new default.
+
+And the safety argument says lowering privacy to the default is
+harmless: a level L >= default means both endpoints' homes are at
+least as public as L, so recording the edge at L leaks no ID. The
+only information "lost" by lowering the edge's privacy is the fact
+that the edge was once recorded more privately -- which is precisely
+what the user is asking to discard, explicitly, by name.
+
+The one genuine invariant stays: NOTHING may go below the default
+(either endpoint's file would then name an ID whose home is more
+private -- the leak shape). That floor is untouched by this fix.
+
+* proposed fix
+** server: explicit validates against the DEFAULT floor
+In 'apply_sticky_levels' (server/from_text/supplement_from_disk.rs),
+split the two floors that 'floor_for' currently conflates:
+
+- sticky floor (disk level if the edge exists, else default,
+  clamped at owner home): still what an ABSENT atom resolves to.
+  Unchanged. No edge's privacy lowers silently.
+- default floor (more-private-of the endpoints' homes, clamped at
+  owner home; hides additionally floored at the most public
+  explaining subscription, i.e. 'hide_level' unchanged): what an
+  EXPLICIT atom is validated against.
+
+Resulting semantics per member:
+- explicit atom: any level in [default, most private]. Can now
+  LOWER a stuck edge's privacy, down to but not below the default.
+- no atom: sticky-else-default, exactly as today.
+- new edge: default, exactly as today.
+
+IMPLEMENTATION NOTE (found by the test suite): the explicit floor
+is actually the more PUBLIC of {default floor, sticky level}, not
+the default floor alone. One shape legitimately sits BELOW its
+default: an edge whose more private endpoint is FOREIGN, since the
+owner's telescope has no section at the foreign level to record it
+in. The render emits the =(relSource ...)= atom for every
+off-default edge, so that atom must round-trip through save
+unchanged -- flooring explicit strictly at the default would
+reject every such save (tests/hidden_from_subscriptions.rs caught
+this). Net semantics: privacy never drops below the default, and a
+below-default edge can only be held or raised. Pinned in
+'explicit_at_a_below_default_disk_level_round_trips'.
+
+Round-trip behaves correctly for free: the render emits the
+=(relSource ...)= atom exactly when level differs from default
+('set_rel_source'), so after lowering an edge's privacy TO its
+default, the atom and the ~herald simply stop being rendered.
+
+Error message: previously blamed the "sticky/default floor" and
+said "skg-privatize-relationship's cycle stops at the default",
+which after the fix was both stale (rename) and wrong (the no-atom
+state does NOT mean default for existing edges). Reworded to name
+the default floor and the endpoints' homes.
+
+** server: the edge-level-info endpoint (Jeff chose option 3 above)
+A new request, so the gesture's menu offers only acceptable
+levels without bloating any rendered metadata:
+- Request: ((request . "edge level info") (owner . "ID")
+  (member . "ID") (relation . "contains")), relation being one of
+  contains / subscribes_to / overrides_view_of -- exactly the
+  relations an explicit atom can name ('ExplicitLevels').
+- Reply: ((default "NAME") (current "NAME")), current absent when
+  the graph records no such edge; ((error "...")) when an endpoint
+  is unknown, in which case the client falls back to offering the
+  full ladder.
+- Advisory only: the save-time floor check stays load-bearing
+  (buffers go stale; the atom is plain text anyone can type).
+Handler: server/serve/handlers/edge_level_info.rs; wire strings
+"edge level info" / "edge-level-info" (serve/protocol.rs).
+
+** elisp: rename and replace the blind cycle
+- Renamed skg-privatize-relationship ->
+  skg-set-relationship-source; no alias for the old name (Jeff:
+  "no need for anything legacy -- I'm the only user"). "Privatize"
+  was a misnomer once the gesture moved levels in both directions.
+- The 9-stop blind cycle became a completing-read whose choices
+  come from the endpoint's reply: the ladder's tail from the
+  default onward, plus a "(no override: follow
+  sticky-else-default)" entry. With eight sources, cycling was
+  already clunky; worse, the cycle ORDER made this bug invisible
+  (from the most private source, the first stop was the misleading
+  "reset"). On an error reply the menu falls back to the full
+  ladder and the save validates.
+- The no-atom choice's message now says what it does: the SAVED
+  level survives (sticky); it is not a reset. Lowering privacy
+  happens by CHOOSING the level wanted; the herald's disappearance
+  confirms when the chosen level IS the default.
+- C-c s r keeps its binding, pointing at the new name. The command
+  lives in elisp/skg-request-edge-level-info.el; the pure buffer
+  helpers (edge classification, menu slicing, choice application)
+  in elisp/skg-metadata.el.
+
+** tests
+- Extend the sticky-leveling coverage: an edge saved above its
+  default, then offered an explicit level AT the default ->
+  accepted, disk section moves; offered a level between default
+  and the old sticky level -> accepted; offered a level BELOW the
+  default -> still errors.
+- Leak battery: unchanged expectations (the default floor still
+  holds); add the privacy-lowered-edge case to prove no gated
+  surface starts leaking after privacy is lowered.
+- The repro as a test: home move (mincit -> pers-p) followed by
+  explicitly lowering privacy to pers-p; assert the mincit section
+  file loses the edge (and is deleted if emptied) and the pers-p
+  section gains it.
+
+** docs
+- docs/telescopes.md: complete the publicize recipe -- "move the
+  home, then set the relationship's source down to the new
+  default" -- and rename the gesture in the "Privatizing a
+  relationship" section (retitle it "Setting a relationship's
+  source"). The inexpressible stays inexpressible: nothing goes
+  below the default.
+- docs/COMMANDS.org: rename the entry.
+- glossary.md: adjust the sticky-rule entry to mention the
+  explicit override's floor being the default.
+
+* workarounds available today (before the fix)
+1. Two-save dance: in a view of the parent at source-set 'all',
+   delete the child's headline, save (the edge leaves the disk);
+   re-add the child, save again. The second save finds no disk
+   edge, so sticky-else-default assigns the new default. It MUST
+   be two saves: within one, the disk still holds the old edge and
+   sticky wins.
+2. Edit the section files directly: move the membership line from
+   the parent's section in the old (more private) source to its
+   section in the target source (deleting the old section file if
+   that empties it), then run 'rebuild dbs'.
+
+* glossary of the shorthand used above
+- edge :: one relationship instance between two nodes -- a
+  containment, subscription, hide, or override. Each edge carries
+  its own privacy level, independent of either node's.
+- level (of an edge) :: the source whose section file records the
+  edge. "The edge is at mincit" = the parent's section file in the
+  mincit source holds the membership line.
+- home (of a node) :: the most public source holding a titled
+  section for the node; where its title, body, and extra IDs live.
+- ladder / privacy order :: the config's source list, most public
+  first. "More private" = later in the ladder.
+- default (of an edge) :: the more private of the two endpoints'
+  homes -- the most public level that leaks neither endpoint's ID.
+- sticky rule :: on save, an edge that already exists on disk
+  keeps its disk level unless explicitly overridden. Protects
+  deliberate privatizations from being silently renormalized away.
+- floor :: the most public level a save will accept for an edge.
+  The bug: there is only one floor today (sticky-or-default),
+  used for both the no-atom and the explicit path. The fix: the
+  explicit path gets its own floor, the default.
+- explicit level / (relSource NAME) atom :: a metadata atom on a
+  headline naming the level the user wants for the edge that
+  headline represents. Written by the gesture; also RENDERED by
+  the server whenever an edge sits above its default, which is why
+  a buffer can contain the atom without the user ever setting it.
+- ~NAME herald :: the red marker rendered beside a headline whose
+  edge sits above its default; the visible face of the same
+  condition that renders the atom.
+- clamp (at owner home) :: no edge may be more public than its
+  owner's home (a section more public than the home would imply a
+  titleless public face), so privacy levels are raised to at least
+  the owner's home. When a home MOVES more private, its edges ride
+  up with it.
+- hides floor / explaining subscription :: a hide must be at least
+  as private as the most public subscription that explains it,
+  else the hide's existence leaks that a private subscription
+  exists. Untouched by this fix.
+- section :: one same-ID .skg file in one source; the slice of a
+  node recorded at that source's level. A node's sections across
+  sources form its telescope.
+- sticky-else-default :: the whole save-leveling rule as shipped:
+  disk level if the edge exists, else the default; explicit atom
+  overrides (today: only upward -- the bug; after the fix: to
+  anything at-or-above the default).
+- leak shape :: a file in a more public source naming an ID whose
+  home is more private. The one thing the floor must always
+  forbid; both floors in the fix still forbid it.
+- ratchet :: shorthand for the buggy net effect: every mechanism
+  can raise an edge's privacy, none can lower it.
