@@ -1,3 +1,52 @@
+* for video
+** TODO/command-name-echo.org
+a config option, for recording videos
+** navigate point through herald (overlay)
+walk point through the herald string normally
+treat it as one character
+Shortcut to jump tokens treats it as one from outside,
+but divides it at spaces if point is interior to it.
+* bug : nested links
+See, e.g.,
+[[id:3c5b0fad-1559-42a4-bcaf-eb7c466cc4f8][[[id:758119b6-2b1e-428b-9664-d7b8a4b63ca1][Markets can aim [[id:2208f9f5-43be-49d4-99c0-d803f8c3e44e][selfishness]] toward social efficiency.]]]]
+* bug : C-c G on an alias kills the buffer
+intending to replace it, but can't replace it.
+* need to be able to commit all changes from buffer
+not just all new nodes
+for big low-stakes nodes, like my notes from the CA driver's manual
+* magit takes too long to reload overlays after each staging event
+* would like to be able to see what a deleted (in magit) node's containers, other relatives were
+* Saving is bumping point in collateral buffers to top of buffer.
+* Backpaths should be foldable to their endpoints.
+=> they should be reversed.
+That way they could be folded and their ends easily read.
+Maybe group them under a collector.
+* Option to make backlinks more public than the active source set.
+alternatives
+** in skg : [[id:7212b375-3f7e-4371-80f9-7d7dd7ded7d9][Why build a note on my ex?]]
+** Advantage: I could exclude links from my note on my ex.
+* The parent-independent herald should be purple.
+* In magit, discarding changes should reload that node.
+At least if they are text or outlink chnages.
+* The 'unknown node' scaffold can't always say 'parent references'.
+If it was arrived at by followiing a link,
+it should say 'link source targets unknown node'.
+Etc. for the other relationships --
+it depends on why the node was drawn.
+* Put graphnode stats on links, describing the target.
+* bug: making a link into content gives an unavailable view error
+** what I did
+*** Searched 'sharing'. Visited the top result.
+*** Saw a link to 'understanding & sharing' in its content.
+*** Made that link into content.
+*** Visited the now-orphaned link. Deleted it. Saved.
+*** Got this error.
+  * errors
+  ** Collateral view search:sharing: No such file or directory (os error 2)
+*** But save seemed to work.
+* Warn the user if they changed an indefinitive source.
+Don't other kinds of edits to indefinitive nodes
+already bork the save?
 * When staging a change in magit, should update any view with that node.
 Might be hard in the containment direction but at least
 when updating the file corresponding to that node.

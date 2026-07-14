@@ -1,0 +1,180 @@
+Claude wrote this guide on 2026-07-14, while diagnosing a real
+instance of the problem (Jeff's machine overheated and cut power
+mid-build). Everything in it was verified against that instance.
+
+* TL;DR
+
+After a power loss, crash, or forced reboot, =./bash/start-servers.sh=
+fails even though neither the code nor the data has changed. The
+give-away is a *linker* error, not a compile error:
+
+#+begin_example
+error: linking with `cc` failed: exit status: 1
+  = note: ld.bfd: error: target/debug/deps/libskg-<hash>.rlib: file too short
+error: could not compile `skg` (bin "skg")
+#+end_example
+
+Diagnose:
+
+#+begin_src bash
+python3 docs/troubleshooting/check-rlibs.py
+#+end_src
+
+Fix -- pass every package the script names:
+
+#+begin_src bash
+cargo clean -p skg -p tantivy -p typedb-driver   # e.g.; use YOUR script output
+cargo build --bin skg
+./bash/start-servers.sh
+#+end_src
+
+TypeDB is *not* the problem here, so nothing in
+=typedb-will-not-start.org= will help. Do not delete any data.
+
+* Why this is so confusing
+
+Three things conspire to make this look like a mystery:
+
+1. *"The code hasn't changed."* True -- and irrelevant. What changed is
+   the compiled artifacts on disk, not the source.
+
+2. *Cargo will not rebuild the broken file.* Cargo decides freshness
+   from fingerprints and mtimes; it never checksums its own output. If
+   the machine died *after* the fingerprint was written but *before*
+   the artifact finished streaming to disk, Cargo believes a truncated
+   file is a good one, hands it to the linker, and fails the same way
+   every single time. The failure is permanent, not flaky. Re-running
+   the build does not help, which is exactly what makes people assume
+   the problem must lie elsewhere (TypeDB, the config, the data).
+
+3. *The error is buried.* =start-servers.sh= runs the build inside
+   =preflight_check_config=, and on failure prints "ERROR: skg failed
+   to compile". That wording is misleading: the crate compiled fine.
+   It failed to *link*. And if you started the servers backgrounded,
+   the linker error scrolls past or lands in a log you did not think
+   to read.
+
+* Root cause
+
+An unclean shutdown during =cargo build= truncates whatever artifacts
+were mid-write. Linux writes file data through the page cache and
+flushes it lazily; when power is cut, the bytes still sitting in the
+cache are simply gone.
+
+The signature is unmistakable once you know it: *the truncated files
+end on an exact power-of-two-MiB boundary*, because that is where the
+page-cache writeback got to. In the 2026-07-14 incident the three
+files written in the final 15 seconds of the machine's life were:
+
+| artifact          |     size | boundary       |
+|-------------------+----------+----------------|
+| libtypedb_driver  | 58720256 | 56 MiB exactly |
+| libtantivy        | 50331648 | 48 MiB exactly |
+| libskg            | 50331648 | 48 MiB exactly |
+
+Every one of the other 498 rlibs in =target/debug/deps= was intact.
+Only the files being written at the moment of death were damaged.
+
+* Diagnosis: why the obvious checks all lie
+
+An =.rlib= is an =ar= archive: a chain of member headers, each
+declaring its own size. A truncated rlib keeps a perfectly valid
+header table at the *front* of the file. Therefore:
+
+- =ar t <file>= lists the members and exits *0*. It reads headers, not
+  data. It will happily "validate" a corpse.
+- Scanning for a tail of NUL bytes finds nothing. The tail is real
+  data; the file just stops early.
+- =cargo build= reports it as fresh, per the fingerprint problem above.
+
+The only reliable test is to walk the member chain and confirm it
+lands exactly on EOF. If a member claims to extend past the end of the
+file, the file was truncated. That is all
+=docs/troubleshooting/check-rlibs.py= does:
+
+#+begin_src bash
+python3 docs/troubleshooting/check-rlibs.py
+# checked 501 rlibs in: target/debug/deps
+#
+# CORRUPT: target/debug/deps/libskg-89a0f28566cf142a.rlib
+#   a member runs to byte 50400492, but the file ends at 50331648 -- SHORT BY 68844 bytes
+# ...
+#+end_src
+
+* The fix
+
+=cargo clean -p <pkg>= discards one package's artifacts and
+fingerprints, forcing a genuine rebuild of exactly that package. Use
+it on every package the checker named. Translate the *file* name to
+the *package* name by dropping =lib=/=-<hash>.rlib= and turning
+underscores back into hyphens (=libtypedb_driver-370a4...rlib= ->
+=typedb-driver=).
+
+#+begin_src bash
+cargo clean -p skg -p tantivy -p typedb-driver
+cargo build --bin skg
+#+end_src
+
+Rebuilding those three took *26 seconds*, because the other ~500
+dependency artifacts were sound and were reused.
+
+Prefer this to a bare =cargo clean=, which throws away all ~8.5 GiB of
+=target/= and forces a full cold rebuild of every dependency
+(libgit2, ring, openssl, tantivy, typedb-driver...) -- many minutes,
+to fix three files. A full =cargo clean= is a correct fix, just a
+needlessly expensive one. Reach for it only if =check-rlibs.py=
+reports damage so widespread that enumerating packages is pointless.
+
+* Verifying the fix
+
+Do not stop at "it compiled". Confirm the servers actually come up and
+the data loaded:
+
+#+begin_src bash
+python3 docs/troubleshooting/check-rlibs.py    # expect "all intact"
+./bash/start-servers.sh &
+#+end_src
+
+Then look for =Server ready.= in =data/logs/cargo-watch.log=, preceded
+by a plausible node/edge count, e.g.:
+
+#+begin_example
+INFO initialize_dbs: Incremental init succeeded.
+INFO context_computation:   60794 nodes, 56232 edges, 5979 link dests.
+INFO Server ready.
+#+end_example
+
+and check both ports are listening -- 1729 (TypeDB gRPC) and 1730 (the
+skg <-> Emacs API):
+
+#+begin_src bash
+(exec 3<>/dev/tcp/127.0.0.1/1729) && echo "TypeDB up"
+(exec 3<>/dev/tcp/127.0.0.1/1730) && echo "skg up"
+#+end_src
+
+* What was NOT damaged (so don't go breaking it)
+
+In the 2026-07-14 incident the power loss damaged *only* build
+artifacts. Specifically intact were:
+
+- The TypeDB database (=skg-real=). TypeDB 3.12.0 started clean.
+- The Tantivy index (=data/.index.tantivy=). Incremental init
+  succeeded; no reindex was needed.
+- The git working tree and the source.
+
+So resist the urge to "fix" this by deleting databases or reindexing.
+The one thing a power loss reliably corrupts is whatever was being
+written at the time -- and during =start-servers.sh=, that is
+=target/=.
+
+Note that the log files (=data/logs/*=) *were* left with a tail of NUL
+padding, which is the same crash artifact showing up harmlessly. It is
+cosmetic; ignore it.
+
+* Generalizing
+
+This is not specific to skg or to overheating. Any hard power loss
+during any =cargo build= can leave a truncated artifact that Cargo
+then trusts forever. If you ever see =file too short=, =archive has no
+index=, or an inexplicable linker failure on code you did not touch,
+run the checker before you believe anything else.

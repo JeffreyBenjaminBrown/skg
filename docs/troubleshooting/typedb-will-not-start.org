@@ -1,6 +1,15 @@
 Claude wrote most of this guide.
 Jeff edited those parts but has not fact-checked them.
 
+* FIRST: is TypeDB actually the problem?
+
+If =start-servers.sh= fails after a power loss, crash, or forced
+reboot -- especially with a *linker* error like =file too short= -- then
+TypeDB is fine and nothing in this guide will help. The build artifacts
+in =target/= were truncated mid-write. See
+=docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org=, and
+do not delete any data.
+
 * informal quick fix
 If this doesn't do it, read on.
 ```

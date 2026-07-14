@@ -1,0 +1,14 @@
+Welcome, Claude! Please read coding-advice/ORIENTATION.org, and whatever it refers to (recursively), for orientation.
+
+Then: Please write some code that lets a user
+echo the name to the minibuffer
+of every command they call with a shortcut.
+Hopefully there's a good way to do this without too much code
+but also without relying on something fragile or confusing like macros.
+Although honestly it's 2026;
+maybe nobody but you will ever need to understand it.
+Whatever you consider elegant and most responsible.
+
+This command will not be part of skg, so it needs no 'skg-' prefix.
+It should apply to all buffers and all commands, not just skg ones.
+(It's for making videos.)
