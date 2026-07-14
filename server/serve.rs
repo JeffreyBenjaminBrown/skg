@@ -17,6 +17,7 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_n
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
+use crate::serve::handlers::edge_level_info::handle_edge_level_info_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
@@ -198,6 +199,9 @@ fn handle_emacs (
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (
               &mut stream, &env . config ),
+          Ok (RequestType::EdgeLevelInfo) =>
+            handle_edge_level_info_request (
+              &mut stream, &request_header, &env ),
           Ok (RequestType::ListSourceSets)
           | Ok (RequestType::ActiveSourceSet)
           | Ok (RequestType::SetActiveSourceSet) =>

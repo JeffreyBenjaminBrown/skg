@@ -101,9 +101,11 @@ impl From<SkgfileSourceToml> for SkgfileSource {
 /// section records this edge. The level is about the EDGE, not the
 /// member node (a public node can be a private member). Default
 /// level = the more private of the two endpoints' homes
-/// ('SkgConfig::more_private_of'); 'skg-privatize-relationship' may
-/// raise it; renormalization never lowers it (the sticky rule). See
-/// TODO/user-owned_autofork_chain/5_plan.org.
+/// ('SkgConfig::more_private_of'); 'skg-set-relationship-source'
+/// may move its privacy anywhere at or above that default;
+/// renormalization never lowers its privacy (the sticky rule). See
+/// TODO/user-owned_autofork_chain/5_plan.org and
+/// BUG-and-fix_make-edge-more-public.org.
 ///
 /// INTERIM (work item leveled-lists): every consumer currently runs
 /// DEGENERATE semantics -- level := the owning node's (home) source

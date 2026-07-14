@@ -254,7 +254,7 @@ So far there are these endpoints:
     `((content "..."))` describing the outcome.
   - Behavior: For every owned node, raises each relationship edge's
     privacy level to at least its DEFAULT (the more private of the
-    two endpoints' homes), never lowering anything. This lifts
+    two endpoints' homes), never lowering any edge's privacy. This lifts
     leak-shaped memberships — a public file naming a more private
     node's ID — into their proper telescope sections. Changed
     telescopes are rewritten byte-stably; if anything changed, the
@@ -263,6 +263,23 @@ So far there are these endpoints:
     see and rewrite every level).
   - What it cannot fix: a public repo's git HISTORY keeps any IDs it
     leaked before migration; repairing that is manual.
+
+## Edge level info
+  - Request: ((request . "edge level info") (owner . "ID")
+    (member . "ID") (relation . "contains")) — relation is one of
+    `contains`, `subscribes_to`, `overrides_view_of`: the three
+    relations an explicit `(relSource ...)` atom can name.
+  - Response: LP response-type "edge-level-info" with
+    `((default "NAME") (current "NAME"))`. `(current ...)` is absent
+    when the graph records no such edge (e.g. one typed into a
+    buffer and not yet saved). On failure, `((error "..."))` — e.g.
+    an endpoint the graph does not know.
+  - Behavior: `default` is the more private of the two endpoints'
+    homes; `current` is the edge's recorded level.
+    `skg-set-relationship-source` uses the reply to offer only
+    levels the save can accept. Advisory: the save-time floor check
+    in `apply_sticky_levels` stays load-bearing, since buffers go
+    stale and the atom is plain text.
 
 ## Strip body whitespace
   - Request: ((request . "strip body whitespace"))
@@ -532,12 +549,15 @@ different parents):
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
   the ⌂ source herald; the privacy level of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
-  the col's relation for a PartnerCol member), when that level was
+  the col's relation for a PartnerCol member), when its privacy was
   deliberately raised above the edge's default. Emitted by render;
-  written by `skg-privatize-relationship` (C-c s r); consumed at
+  written by `skg-set-relationship-source` (C-c s r); consumed at
   save, where the server enforces the floor (an offered level less
-  private than the edge's default is a save error). Absent means
-  the edge sits at its default level.
+  private than the edge's default is a save error; a level at or
+  above the default is honored, which is how a stuck edge's privacy
+  is lowered; an edge whose DISK level sits below the default — the
+  foreign-endpoint shape — may be held or raised, never lowered
+  further). Absent means the edge sits at its default level.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 

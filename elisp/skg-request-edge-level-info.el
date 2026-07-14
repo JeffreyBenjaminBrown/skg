@@ -1,0 +1,94 @@
+;;; -*- lexical-binding: t; -*-
+;;;
+;;; PURPOSE: `skg-set-relationship-source' -- set the privacy level
+;;; of one relationship edge, informed by the server's
+;;; 'edge level info' endpoint
+;;; (BUG-and-fix_make-edge-more-public.org). The buffer-local
+;;; helpers it drives live in skg-metadata.el.
+
+(require 'skg-length-prefix)
+(require 'skg-metadata)
+
+(defun skg-set-relationship-source ()
+  "Set the privacy level of the relationship edge at point.
+
+The headline at point represents one edge: `contains' for a content
+child, the col's relation for a writable PartnerCol member. This
+command asks the server for the edge's DEFAULT level (the more
+private of the two endpoints' homes) and its CURRENT level, then
+prompts with the levels at least as private as the default -- more
+public ones could leak an endpoint's ID and would be rejected at
+save -- plus a no-override choice.
+
+Choosing a level writes a `(relSource LEVEL)' metadata atom. The
+no-override choice removes the atom, which on save means the edge
+keeps its saved level (sticky), NOT that it resets to its default.
+To lower an edge's privacy to its default (e.g. after making the
+more private endpoint's home more public), choose the default level
+itself; once saved at the default, the atom and its red ~herald
+stop being rendered.
+
+Refuses on read-only col members (the edge belongs to the other
+end) and on root headlines (no edge). Like other metadata edits,
+this only modifies the buffer; it does NOT save. Call
+`skg-request-save-buffer' afterward. The server re-validates at
+save time, so a stale or hand-typed level more public than the
+edge's default is still rejected there."
+  (interactive)
+  (let ((edge (skg--relationship-edge-at-point))
+        (buffer (current-buffer))
+        (marker (point-marker)))
+    (skg-register-response-handler
+     'edge-level-info
+     (lambda (_tcp-proc payload)
+       (skg--set-relationship-source-from-info buffer marker payload))
+     t)
+    (skg-lp-reset)
+    (process-send-string
+     (skg-tcp-connect-to-rust)
+     (concat
+      (prin1-to-string
+       `((request . "edge level info")
+         (owner . ,(plist-get edge :owner))
+         (member . ,(plist-get edge :member))
+         (relation . ,(plist-get edge :relation))))
+      "\n"))))
+
+(defun skg--set-relationship-source-from-info (buffer marker payload)
+  "Handle the edge-level-info response for `skg-set-relationship-source'.
+Parses PAYLOAD, then prompts and applies the choice at MARKER in
+BUFFER. The prompt runs from a zero-delay timer so the minibuffer
+opens outside the network process filter."
+  (let* ((response (read payload))
+         (as-string (lambda (v) (and v (format "%s" v))))
+         (err     (funcall as-string (cadr (assoc 'error response))))
+         (default (funcall as-string (cadr (assoc 'default response))))
+         (current (funcall as-string (cadr (assoc 'current response)))))
+    (run-at-time
+     0 nil
+     (lambda ()
+       (if (not (buffer-live-p buffer))
+           (message "skg: buffer vanished before the relationship-source prompt")
+         (with-current-buffer buffer
+           (save-excursion
+             (goto-char marker)
+             (when err
+               (message "edge level info: %s -- offering every source; the save will validate."
+                        err))
+             (let* ((ladder (skg--source-names))
+                    (choices (append (skg--relationship-source-choices
+                                      ladder default)
+                                     (list skg--relationship-source-no-override)))
+                    (prompt (concat "Relationship level"
+                                    (when default
+                                      (format " (default %s)" default))
+                                    (when current
+                                      (format " (currently %s)" current))
+                                    ": "))
+                    (choice (completing-read prompt choices nil t nil nil
+                                             (or current default))))
+               (message "%s"
+                        (skg--apply-relationship-source-choice
+                         choice))))))))))
+
+(provide 'skg-request-edge-level-info)

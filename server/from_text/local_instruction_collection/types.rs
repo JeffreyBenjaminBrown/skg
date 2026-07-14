@@ -55,11 +55,12 @@ pub struct DefiningColOwner {
 /// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
 /// member with an Option<SourceName>: Some when the position's
 /// headline carried an explicit '(relSource NAME)' atom (the
-/// 'skg-privatize-relationship' gesture -- see
+/// 'skg-set-relationship-source' gesture -- see
 /// 'ViewNodeStats::rel_source'), None meaning "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
-/// validates the explicit levels against each edge's sticky/default
-/// floor at save time (render-and-gating, 5_plan.org).
+/// validates the explicit levels against each edge's DEFAULT floor
+/// at save time (render-and-gating, 5_plan.org;
+/// BUG-and-fix_make-edge-more-public.org).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum NodeIntent_Local {

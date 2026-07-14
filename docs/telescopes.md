@@ -41,31 +41,48 @@ written.
 ## Where new relationships land: the sticky-else-default rule
 
 When you save, each relationship edge keeps the level it already had
-on disk (**sticky**). A NEW edge defaults to the more private of the
-two endpoints' homes — the most public level that leaks neither
-endpoint. Every level is clamped to be at least the owner's home (a
-section more public than the home would imply a title-less public
-face). Hides floor higher: a hide reveals that you hide something,
-so it must be at least as private as both endpoints and the most
-public subscription that explains it.
+on disk (**sticky**), unless a `(relSource ...)` atom explicitly
+names another level — anything at or above the edge's default. A NEW
+edge defaults to the more private of the two endpoints' homes — the
+most public level that leaks neither endpoint. Every level is
+clamped to be at least the owner's home (a section more public than
+the home would imply a title-less public face). Hides floor higher:
+a hide reveals that you hide something, so it must be at least as
+private as both endpoints and the most public subscription that
+explains it.
 
-## Privatizing a relationship
+## Setting a relationship's source
 
-`skg-privatize-relationship` (`C-c s r`, see `docs/COMMANDS.org`)
-cycles the level of the relationship the headline at point
-represents. A deliberately raised level is marked with a red `~NAME`
-herald and a `(relSource NAME)` metadata atom; the server enforces
-at save that the chosen level is no more public than the edge's
-default. The canonical use: your public reading-list node contains a
-book you would rather not advertise — privatize the *membership*
-and the book stays public, the list stays public, but the edge
-between them lives in your private section.
+`skg-set-relationship-source` (`C-c s r`, see `docs/COMMANDS.org`;
+formerly `skg-privatize-relationship`) sets the level of the
+relationship the headline at point represents. It asks the server
+for the edge's default and current levels (the "edge level info"
+endpoint, see `api-and-formats.md`) and offers the levels at least
+as private as the default. An edge sitting above its default is
+marked with a red `~NAME` herald and a `(relSource NAME)` metadata
+atom; the server re-checks at save that any offered level is no
+more public than the edge's default. The canonical use: your public
+reading-list node contains a book you would rather not advertise —
+privatize the *membership* and the book stays public, the list
+stays public, but the edge between them lives in your private
+section.
 
-There is no inverse gesture below the default: an edge cannot be
-made more public than the more-private of its endpoints' homes,
-because either endpoint's file would then leak the other's ID.
-To publicize a relationship, publicize the more private endpoint
-(move its home) first.
+The same gesture lowers privacy: choose any level down to (but not
+below) the default, and the next save moves the edge's membership
+line into the more public section. Below the default there is
+nothing to choose — an edge more public than the more-private of
+its endpoints' homes would leak that endpoint's ID. To publicize a
+relationship further, publicize the more private endpoint (move its
+home) first; the edge's default falls with it, and this gesture can
+then follow it down. Note that removing the atom (the gesture's
+no-override choice) is not a way down: no atom means "no opinion",
+so a saved edge keeps its sticky level.
+
+One shape legitimately sits *below* its default: an edge whose more
+private endpoint is FOREIGN, since your telescope has no section at
+the foreign level to record it in. Such an edge renders with the
+atom (it is off-default), saves back unchanged, and can be raised —
+but never lowered further.
 
 ## What cannot be expressed
 
@@ -75,19 +92,19 @@ Two things are documented inexpressibles, by design:
   lives in the home section. A link in a public body is public;
   there is no per-link level. Keep the sentence in a private child
   instead.
-- **Publicizing below the default.** As above: relationship levels
-  can be raised above the default, never lowered below it.
+- **Publicizing below the default.** As above: a relationship's
+  privacy can be raised above the default, never lowered below it.
 
 ## What leaks, and what migration fixes
 
 Before telescopes, a public file could name a private node's ID (a
 "leak-shaped membership"). The server now warns about these
 (`telescope-warnings.org` in your data root) rather than erroring.
-`skg-migrate-to-telescopes` raises every owned edge to at least its
-default level, moving such memberships into the right sections and
-rebuilding the databases. What no migration can fix: if a public
-repo ever *committed* a leaked ID, its git history still holds it;
-rewriting history is manual.
+`skg-migrate-to-telescopes` raises every owned edge's privacy to at
+least its default level, moving such memberships into the right
+sections and rebuilding the databases. What no migration can fix: if
+a public repo ever *committed* a leaked ID, its git history still
+holds it; rewriting history is manual.
 
 ## Ownership and folders
 

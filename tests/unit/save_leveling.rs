@@ -119,9 +119,9 @@ fn hide_floor_is_the_most_public_explaining_subscription (
   { // Only a PRIVATE subscription explains the hide: the hide must
     // be private, else it leaks the inference that the private
     // subscription exists. The privatized subscription is a DISK
-    // fact (sticky preserves it); a buffer-raised level would come
-    // through the (relSource ...) atom (see the explicit_level_*
-    // tests below), landed with render-and-gating.
+    // fact (sticky preserves it); raising its privacy from the
+    // buffer would come through the (relSource ...) atom (see the
+    // explicit_level_* tests below), landed with render-and-gating.
     let mut disk : NodeComplete = owner . clone ();
     disk . subscribes_to = MSV::Specified ( vec! [
       pm ("private", "expl-a") ] );
@@ -164,7 +164,7 @@ fn explicit_level_at_or_above_floor_is_honored (
 ) {
   // Above-floor acceptance (render-and-gating, 5_plan.org): an
   // explicit '(relSource ...)' level that is at least as private as
-  // the sticky/default floor wins outright.
+  // the default floor wins outright.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "public");
@@ -189,8 +189,8 @@ fn explicit_level_at_or_above_floor_is_honored (
 fn explicit_level_below_floor_is_rejected (
 ) {
   // Below-floor rejection (render-and-gating, 5_plan.org): an
-  // explicit level more PUBLIC than the sticky/default floor is a
-  // save error naming the member, the offered level, and the floor.
+  // explicit level more PUBLIC than the DEFAULT floor is a save
+  // error naming the member, the offered level, and the floor.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "private"); // forces the default floor to "private"
@@ -209,6 +209,183 @@ fn explicit_level_below_floor_is_rejected (
   assert! ( err . contains ("child"),   "names the member: {}", err );
   assert! ( err . contains ("public"),  "names the offered level: {}", err );
   assert! ( err . contains ("private"), "names the floor: {}", err );
+}
+
+#[test]
+fn explicit_level_lowers_a_sticky_edge_to_its_default (
+) {
+  // The BUG-and-fix_make-edge-more-public.org fix: an explicit
+  // level validates against the DEFAULT floor, not the disk level,
+  // so it can lower a stuck edge's privacy back to the default.
+  let config : SkgConfig =
+    config_with_order ( & ["public", "trusted", "private"] );
+  let child : NodeComplete = node_at ("child", "public");
+  let owner_before : NodeComplete = node_at ("owner", "public");
+  install_graph ( & [ owner_before . clone (), child ] );
+  let mut disk : NodeComplete = owner_before;
+  disk . contains = vec! [
+    pm ("private", "child") ]; // stuck above its default
+  let mut buffer : NodeComplete = node_at ("owner", "public");
+  buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
+  let explicit : ExplicitLevels = ExplicitLevels {
+    contains : HashMap::from ([
+      ( ID::new ("child"), SourceName::from ("public") ) ]), // = default
+    .. ExplicitLevels::default () };
+  let leveled : NodeComplete =
+    apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
+  assert_eq! ( leveled . contains, vec! [
+    pm ("public", "child") ],
+    "an explicit level AT the default lowers the sticky edge's privacy" );
+}
+
+#[test]
+fn explicit_level_between_default_and_sticky_is_accepted (
+) {
+  let config : SkgConfig =
+    config_with_order ( & ["public", "trusted", "private"] );
+  let child : NodeComplete = node_at ("child", "public");
+  let owner_before : NodeComplete = node_at ("owner", "public");
+  install_graph ( & [ owner_before . clone (), child ] );
+  let mut disk : NodeComplete = owner_before;
+  disk . contains = vec! [ pm ("private", "child") ];
+  let mut buffer : NodeComplete = node_at ("owner", "public");
+  buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
+  let explicit : ExplicitLevels = ExplicitLevels {
+    contains : HashMap::from ([
+      ( ID::new ("child"), SourceName::from ("trusted") ) ]),
+    .. ExplicitLevels::default () };
+  let leveled : NodeComplete =
+    apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
+  assert_eq! ( leveled . contains, vec! [
+    pm ("trusted", "child") ],
+    "lowering privacy partway (still above the default) is accepted" );
+}
+
+#[test]
+fn explicit_below_default_is_rejected_and_the_error_names_the_default (
+) {
+  // With the floors split, the error's floor is the DEFAULT, not
+  // the (more private) sticky disk level.
+  let config : SkgConfig =
+    config_with_order ( & ["public", "trusted", "private"] );
+  let child : NodeComplete = node_at ("child", "trusted"); // default floor: trusted
+  let owner_before : NodeComplete = node_at ("owner", "public");
+  install_graph ( & [ owner_before . clone (), child ] );
+  let mut disk : NodeComplete = owner_before;
+  disk . contains = vec! [
+    pm ("private", "child") ]; // sticky sits above the default
+  let mut buffer : NodeComplete = node_at ("owner", "public");
+  buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
+  let explicit : ExplicitLevels = ExplicitLevels {
+    contains : HashMap::from ([
+      ( ID::new ("child"), SourceName::from ("public") ) ]), // below default
+    .. ExplicitLevels::default () };
+  let err : String =
+    apply_sticky_levels (buffer, &disk, &explicit, &config)
+    . unwrap_err ();
+  assert! ( err . contains ("'trusted'"),
+            "the floor named is the default: {}", err );
+  assert! ( ! err . contains ("'private'"),
+            "the sticky level is not the floor: {}", err );
+}
+
+#[test]
+fn explicit_at_a_below_default_disk_level_round_trips (
+) {
+  // The foreign shape: an owned node's edge to a MORE PRIVATE
+  // foreign node cannot rise to its default (foreign sections are
+  // never written), so its disk level sits below the default. The
+  // render emits '(relSource ...)' for every off-default edge, so
+  // that atom must save back unchanged (explicit == disk level),
+  // and raising it partway is fine; only lowering FURTHER is
+  // forbidden.
+  let config : SkgConfig =
+    config_with_order ( & ["public", "trusted", "private"] );
+  let child : NodeComplete = node_at ("child", "private");
+  let owner_before : NodeComplete = node_at ("owner", "public");
+  install_graph ( & [ owner_before . clone (), child ] );
+  let mut disk : NodeComplete = owner_before;
+  disk . contains = vec! [
+    pm ("public", "child") ]; // below the "private" default
+  { // Holding the disk level round-trips.
+    let mut buffer : NodeComplete = node_at ("owner", "public");
+    buffer . contains = vec! [ pm ("public", "child") ];
+    let explicit : ExplicitLevels = ExplicitLevels {
+      contains : HashMap::from ([
+        ( ID::new ("child"), SourceName::from ("public") ) ]),
+      .. ExplicitLevels::default () };
+    let leveled : NodeComplete =
+      apply_sticky_levels (
+        buffer, &disk, &explicit, &config ) . unwrap ();
+    assert_eq! ( leveled . contains, vec! [ pm ("public", "child") ],
+      "the rendered atom saves back unchanged" ); }
+  { // Raising it partway (still below the default) is accepted.
+    let mut buffer : NodeComplete = node_at ("owner", "public");
+    buffer . contains = vec! [ pm ("public", "child") ];
+    let explicit : ExplicitLevels = ExplicitLevels {
+      contains : HashMap::from ([
+        ( ID::new ("child"), SourceName::from ("trusted") ) ]),
+      .. ExplicitLevels::default () };
+    let leveled : NodeComplete =
+      apply_sticky_levels (
+        buffer, &disk, &explicit, &config ) . unwrap ();
+    assert_eq! ( leveled . contains, vec! [ pm ("trusted", "child") ],
+      "raising a below-default edge's privacy is accepted" ); }
+}
+
+#[test]
+fn explicit_lowering_moves_the_edge_between_section_files (
+) {
+  // The repro from BUG-and-fix_make-edge-more-public.org, as files:
+  // a child once homed in "private" was moved home to "trusted",
+  // but the containment edge stayed stuck at "private" (sticky).
+  // Explicitly lowering the edge's privacy to its new default moves
+  // the membership line from the owner's private section file to a
+  // trusted one, deleting the emptied private file.
+  use crate::dbs::filesystem::one_node::write_nodecomplete_telescope;
+  let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let mut config : SkgConfig =
+    config_with_order ( & ["public", "trusted", "private"] );
+  for name in ["public", "trusted", "private"] {
+    let path : PathBuf = tmp . path () . join (name);
+    std::fs::create_dir_all (&path) . unwrap ();
+    config . sources . get_mut ( &SourceName::from (name) )
+      . unwrap () . path = path; }
+  let child : NodeComplete = node_at ("child", "trusted"); // home already moved
+  let owner : NodeComplete = node_at ("owner", "public");
+  install_graph ( & [ owner . clone (), child ] );
+  let mut disk : NodeComplete = owner;
+  disk . contains = vec! [ pm ("private", "child") ];
+  write_nodecomplete_telescope ( &disk, &config ) . unwrap ();
+  let private_file = tmp . path () . join ("private/owner.skg");
+  let trusted_file = tmp . path () . join ("trusted/owner.skg");
+  let public_file  = tmp . path () . join ("public/owner.skg");
+  assert! ( private_file . is_file (),
+            "before: the stuck edge lives in the private section" );
+  assert! ( public_file . is_file (),
+            "before: the home section exists" );
+  assert! ( ! trusted_file . is_file (),
+            "before: no trusted section yet" );
+  let mut buffer : NodeComplete = node_at ("owner", "public");
+  buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
+  let explicit : ExplicitLevels = ExplicitLevels {
+    contains : HashMap::from ([
+      ( ID::new ("child"), SourceName::from ("trusted") ) ]), // the new default
+    .. ExplicitLevels::default () };
+  let leveled : NodeComplete =
+    apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
+  assert_eq! ( leveled . contains, vec! [ pm ("trusted", "child") ] );
+  write_nodecomplete_telescope ( &leveled, &config ) . unwrap ();
+  assert! ( ! private_file . is_file (),
+            "after: the emptied private section is deleted" );
+  assert! ( trusted_file . is_file (),
+            "after: the edge's new section exists" );
+  assert! ( std::fs::read_to_string (&trusted_file) . unwrap ()
+            . contains ("child"),
+            "after: the trusted section holds the membership" );
+  assert! ( ! std::fs::read_to_string (&public_file) . unwrap ()
+            . contains ("child"),
+            "after: the home section does not name the child" );
 }
 
 #[test]

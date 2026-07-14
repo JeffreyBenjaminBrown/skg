@@ -52,9 +52,13 @@ an edge already on disk keeps its level (**sticky**); a new edge
 defaults to the more private of its two endpoints' homes; and every
 level is clamped to at least the owner's home. Hides floor higher
 (at least the most public subscription explaining them). A
-`(relSource NAME)` atom (the `skg-privatize-relationship` gesture)
-raises a level above its default; below-default is a save error.
-See `server/from_text/supplement_from_disk.rs`.
+`(relSource NAME)` atom (the `skg-set-relationship-source` gesture)
+overrides sticky with any level at or above the edge's DEFAULT —
+raising privacy, or lowering a stuck level back down to the
+default; below-default privacy is a save error. (Exception: an edge
+whose disk level already sits below its default — the
+foreign-endpoint shape — may be held or raised, never lowered
+further.) See `server/from_text/supplement_from_disk.rs`.
 
 ## "buffer", or sometimes "forest"
 

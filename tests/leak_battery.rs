@@ -274,3 +274,50 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         at_all . as_deref () . unwrap_or ("") . contains ('S'),
         "under 'all' the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
+
+#[test]
+fn a_lowered_edge_is_governed_by_its_new_level (
+) {
+  // BUG-and-fix_make-edge-more-public.org: after the explicit
+  // gesture lowers an edge's privacy to its default, the gated
+  // surfaces follow the NEW level -- the edge appears under sets
+  // that include that level, while a sibling edge still above its
+  // default stays hidden. Lowering to the default cannot leak: by
+  // definition both endpoints' homes are at least as public as it.
+  use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
+  use skg::types::misc::{PrivaciedMember, SourceName};
+  use skg::types::nodes::complete::empty_node_complete;
+  let node_at = |pid : &str, source : &str| -> NodeComplete {
+    let mut n : NodeComplete = empty_node_complete ();
+    n . pid = ID::from (pid);
+    n . title = pid . to_string ();
+    n . source = SourceName::from (source);
+    n };
+  let mut owner : NodeComplete = node_at ("owner", "public");
+  owner . contains = vec! [
+    PrivaciedMember::at ( // as if just lowered to its default
+      SourceName::from ("public"), ID::from ("lowered") ),
+    PrivaciedMember::at ( // deliberately above its default
+      SourceName::from ("private"), ID::from ("kept") ) ];
+  let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [
+    owner,
+    node_at ("lowered", "public"),
+    node_at ("kept",    "public") ] );
+  let public : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName::from ("public"),
+    sources : [ SourceName::from ("public") ]
+      . into_iter () . collect () };
+  let member_role : RelationRole = RelationRole::new (
+    NodeRelation::Contains, BinaryRolePosition::Second );
+  assert! ( graph . relation_membership_is_visible (
+    & ID::from ("owner"), & ID::from ("lowered"), member_role,
+    Some (&public) ),
+    "an edge lowered to its default renders under the set that \
+     includes that default" );
+  assert! ( ! graph . relation_membership_is_visible (
+    & ID::from ("owner"), & ID::from ("kept"), member_role,
+    Some (&public) ),
+    "a sibling edge still above its default stays gated" );
+  assert! ( graph . relation_membership_is_visible (
+    & ID::from ("owner"), & ID::from ("kept"), member_role, None ),
+    "the full fold sees everything" ); }

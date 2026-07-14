@@ -169,7 +169,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-source t))
 
-(defconst skg--privatize-relationship-readonly-col-atoms
+(defconst skg--set-relationship-source-readonly-col-atoms
   '(subscriberCol overriderCol hiderCol hiddenCol
     hiddenInSubscribeeCol hiddenOutsideOfSubscribeeCol)
   "The PartnerCol scaffold atoms whose membership is READ-ONLY from
@@ -177,22 +177,80 @@ this side of the relationship (ColPolicy::ReadOnlySet /
 ReadOnlyFilter; see server/types/viewnode.rs PartnerCol::policy and
 the matching read-only detection in
 server/from_text/local_instruction_collection/traverse.rs).
-`skg-privatize-relationship' refuses on a member of one of these:
-the edge belongs to the other end, so cycling its level here would
+`skg-set-relationship-source' refuses on a member of one of these:
+the edge belongs to the other end, so setting its level here would
 be meaningless.")
 
-(defun skg--privatize-relationship-parent-readonly-col-atom ()
-  "Return the read-only-col atom (a symbol) that is the org-parent of
-the headline at point, or nil if the parent is not one of
-`skg--privatize-relationship-readonly-col-atoms'."
-  (save-excursion
-    (when (org-up-heading-safe)
-      (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
-        (and (consp parent-sexp)
-             (seq-find (lambda (atom) (memq atom (cdr parent-sexp)))
-                       skg--privatize-relationship-readonly-col-atoms))))))
+(defconst skg--writable-col-relations
+  '((subscribeeCol . "subscribes_to")
+    (overriddenCol . "overrides_view_of"))
+  "The PartnerCol scaffold atoms whose members' edges are WRITABLE
+from this side, each mapped to its relation's wire name
+(NodeRelation::typeql_name, server/dbs/in_rust_graph/
+relation_accessors.rs). The col's org-parent (the anchor) owns the
+outbound edge to each member.")
 
-(defun skg--privatize-relationship-current-value ()
+(defun skg--relationship-edge-at-point ()
+  "Classify the relationship edge the headline at point represents.
+Returns a plist (:owner OWNER-ID :member MEMBER-ID :relation NAME):
+for a content child, the org-parent contains the node at point; for
+a writable-col member, the col's anchor (the col's org-parent) owns
+the col's relation toward the node at point. Signals `user-error'
+when point represents no writable edge: not on an activeNode
+headline, on a root headline (no org-parent, so no edge), on a
+member of a read-only col, or with an ID missing."
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
+    (unless (skg--activeNode-sexp-p member-sexp)
+      (user-error "Not on an activeNode headline"))
+    (let ((member-id (skg--node-id member-sexp))
+          (parent-sexp (save-excursion
+                         (and (org-up-heading-safe)
+                              (skg--metadata-sexp-at-point-or-nil)))))
+      (unless member-id
+        (user-error "No id in this headline's metadata"))
+      (unless parent-sexp
+        (user-error
+         "Root headline: there is no relationship edge here to set"))
+      (let ((readonly-atom
+             (and (consp parent-sexp)
+                  (seq-find (lambda (atom)
+                              (memq atom (cdr parent-sexp)))
+                            skg--set-relationship-source-readonly-col-atoms))))
+        (when readonly-atom
+          (user-error
+           "Cannot set the relationship's source: this is a member of a read-only %s -- the relationship belongs to the other end"
+           readonly-atom)))
+      (let ((writable-col
+             (and (consp parent-sexp)
+                  (seq-find (lambda (entry)
+                              (memq (car entry) (cdr parent-sexp)))
+                            skg--writable-col-relations))))
+        (cond
+         (writable-col
+          (let ((anchor-id
+                 (save-excursion
+                   (and (org-up-heading-safe) ;; to the col
+                        (org-up-heading-safe) ;; to its anchor
+                        (skg--node-id
+                         (skg--metadata-sexp-at-point-or-nil))))))
+            (unless anchor-id
+              (user-error "Could not find the col's anchor headline"))
+            (list :owner anchor-id
+                  :member member-id
+                  :relation (cdr writable-col))))
+         ((skg--activeNode-sexp-p parent-sexp)
+          (let ((parent-id (skg--node-id parent-sexp)))
+            (unless parent-id
+              (user-error "No id in the parent headline's metadata"))
+            (list :owner parent-id
+                  :member member-id
+                  :relation "contains")))
+         (t (user-error
+             "The parent headline is neither a node nor a writable col")))))))
+
+(defun skg--relationship-source-current-value ()
   "Return the current `(relSource NAME)' value (a string) for the
 headline at point, or nil when no such atom is present."
   (let ((values (skg-sexp-cdr-at-path
@@ -201,68 +259,48 @@ headline at point, or nil when no such atom is present."
     (when values
       (format "%s" (car values)))))
 
-(defun skg-privatize-relationship ()
-  "Cycle the `(relSource ...)' privacy level of the relationship
-instance the headline at point represents: `contains' for a content
-child, the col's relation for a PartnerCol member (see
-`ViewNodeStats::rel_source' in server/types/viewnode.rs).
+(defun skg--relationship-source-choices (ladder default)
+  "The source-name menu for `skg-set-relationship-source': the tail
+of LADDER (the configured sources, most public first) starting at
+DEFAULT -- exactly the levels the save's default floor can accept.
+When DEFAULT is nil or absent from LADDER, the whole LADDER (the
+server's save-time floor check backstops any stale offer)."
+  (or (and default (member default ladder))
+      ladder))
 
-The cycle is [no atom (the edge's DEFAULT level), then each source
-configured in skgconfig.toml, in config order]. This client cannot
-compute which sources are actually more private than the edge's
-default -- that needs both endpoints' homes, which live only on the
-server -- so it simply cycles through every configured source,
-skipping none. The SERVER enforces the sticky/default floor at save
-time, rejecting an offered level that is not at least as private as
-that floor with a clear error naming the member, the offered level,
-and the floor (see `apply_sticky_levels' in
-server/from_text/supplement_from_disk.rs). Landing on a value the
-floor rejects is therefore a save-time error, not a no-op here.
+(defconst skg--relationship-source-no-override
+  "(no override: follow sticky-else-default)"
+  "The menu entry that REMOVES the `(relSource ...)' atom instead of
+setting one. For an edge already on disk this means the SAVED level
+survives (sticky); it does NOT mean \"reset to the default\". To
+lower an edge's privacy to its default, choose the default level
+explicitly.")
 
-Reaching the first stop (no atom) REMOVES the `(relSource ...)' atom
-entirely -- the only way to undo a privatization back to the edge's
-default level.
-
-Refuses with `user-error' when point is on a member of a READ-ONLY
-col (subscriberCol, overriderCol, hiderCol, hiddenCol,
-hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the edge
-belongs to the other end there, so cycling its level from this side
-would be meaningless.
-
-Like other metadata edits, this only modifies the buffer; it does
-NOT save. Call `skg-request-save-buffer' afterward."
-  (interactive)
-  (unless (org-at-heading-p)
-    (user-error "Not on a headline"))
-  (unless (skg--activeNode-sexp-p (skg--metadata-sexp-at-point-or-nil))
-    (user-error "Not on an activeNode headline"))
-  (let ((readonly-atom (skg--privatize-relationship-parent-readonly-col-atom)))
-    (when readonly-atom
-      (user-error
-       "Cannot privatize: this is a member of a read-only %s -- the relationship belongs to the other end"
-       readonly-atom)))
-  (let* ((sources (skg--source-names))
-         (cycle (cons nil sources))
-         (current (skg--privatize-relationship-current-value))
-         (pos (or (seq-position cycle current #'equal) 0))
-         (next (nth (mod (1+ pos) (length cycle)) cycle)))
-    (if next
-        (progn
-          ;; Two-step dance (mirrors `skg--change-source-at-point'):
-          ;; the DSL's merge operation appends an unprocessed literal
-          ;; when no existing (viewStats ...) form is found, so an
-          ;; empty (viewStats) placeholder must exist FIRST, in its
-          ;; own edit, before the ENSURE can find and recurse into it.
-          (skg-edit-metadata-at-point '(skg (node (viewStats))))
-          (skg-edit-metadata-at-point
-           `(skg (node (viewStats (ENSURE (relSource ,(intern next))))))))
-      ;; DELETE only ever fires when a relSource atom already exists
-      ;; (see docstring), so viewStats is already guaranteed present.
+(defun skg--apply-relationship-source-choice (choice)
+  "Apply CHOICE -- a source name, or
+`skg--relationship-source-no-override' -- to the headline at point.
+Edits only the buffer; returns a message string describing what the
+next save will do with the edge."
+  (if (equal choice skg--relationship-source-no-override)
+      (if (skg--relationship-source-current-value)
+          (progn
+            ;; A relSource atom exists, so viewStats is present and
+            ;; the DELETE can find it.
+            (skg-edit-metadata-at-point
+             '(skg (node (viewStats (DELETE (relSource))))))
+            "Override removed: on save the edge keeps its saved (sticky) level, or its default if new. Save to apply.")
+        "No override present; nothing to remove.")
+    (progn
+      ;; Two-step dance (mirrors `skg--change-source-at-point'):
+      ;; the DSL's merge operation appends an unprocessed literal
+      ;; when no existing (viewStats ...) form is found, so an
+      ;; empty (viewStats) placeholder must exist FIRST, in its
+      ;; own edit, before the ENSURE can find and recurse into it.
+      (skg-edit-metadata-at-point '(skg (node (viewStats))))
       (skg-edit-metadata-at-point
-       '(skg (node (viewStats (DELETE (relSource)))))))
-    (message (if next
-                 (format "Relationship level set to '%s'. Save to apply." next)
-               "Relationship level reset to the edge's default. Save to apply."))))
+       `(skg (node (viewStats (ENSURE (relSource ,(intern choice)))))))
+      (format "Relationship source set to '%s'. Save to apply."
+              choice))))
 
 (defun skg-set-merge-request (acquiree-id-or-link)
   "Prompt for ACQUIREE-ID-OR-LINK and mark the node at point to merge it.

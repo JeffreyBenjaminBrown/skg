@@ -231,16 +231,23 @@ pub fn refuse_delete_with_inactive_sections (
 ///   '(relSource NAME)' atom, threaded in as a side-channel because
 ///   NodeComplete's 'PrivaciedMember::level' carries no "was this
 ///   explicit" flag) wins outright, PROVIDED it is at or above (at
-///   least as private as) the STICKY-OR-DEFAULT floor below;
-///   otherwise the save fails with a validation error naming the
-///   member, the offered level, and the floor.
-/// - STICKY: absent an explicit level (or with one at the floor
-///   exactly), an edge that already exists on disk (same relation,
-///   same endpoints, through 'pid_of') keeps its DISK level.
-///   Renormalization never lowers a level silently -- lowering
-///   happens only through the explicit gesture's cycle
-///   ('skg-privatize-relationship', whose least-private stop is the
-///   default, which REMOVES the atom).
+///   least as private as) the DEFAULT floor -- the more private of
+///   the two endpoints' homes, NOT the disk level. An explicit atom
+///   is therefore the one path that can LOWER an existing edge's
+///   privacy, down to but never below its default
+///   (BUG-and-fix_make-edge-more-public.org). One exception keeps
+///   the render->save round-trip lossless: when the DISK level
+///   already sits below the default (the shape of an edge whose
+///   more private endpoint is FOREIGN, since foreign sections are
+///   never written), the explicit floor relaxes to that disk
+///   level -- such an edge can be held or raised, never lowered
+///   further. Below its floor, the save fails with a validation
+///   error naming the member, the offered level, and the floor.
+/// - STICKY: absent an explicit level, an edge that already exists
+///   on disk (same relation, same endpoints, through 'pid_of')
+///   keeps its DISK level. Renormalization never lowers an edge's
+///   privacy silently; removing the atom means "no opinion", not
+///   "reset to default".
 /// - DEFAULT: a new edge (no explicit level, no disk level) gets the
 ///   more private of its two endpoints' homes.
 /// - HIDES additionally floor at the most public EXPLAINING
@@ -248,7 +255,7 @@ pub fn refuse_delete_with_inactive_sections (
 ///   some subscription that makes it meaningful, else it leaks the
 ///   inference that a private subscription exists. Hides carry no
 ///   explicit-level path: the col that displays them is read-only
-///   (the privatize gesture refuses there).
+///   (the set-relationship-source gesture refuses there).
 pub(crate) fn apply_sticky_levels (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
@@ -266,46 +273,71 @@ pub(crate) fn apply_sticky_levels (
       . and_then ( |snap| snap . pid_and_source (id)
                    . map ( |(_pid, src)| src ))
       . or_else ( || source_from_disk (id, config) ) };
-  // The sticky-or-default FLOOR for one member -- unchanged from
-  // before this item, just factored out of 'level_for' so EXPLICIT
-  // can validate against it.
-  let floor_for = |disk_list : &[PrivaciedMember<ID>],
-                    member    : &ID|
+  // The DEFAULT floor for one member: the more private of the two
+  // endpoints' homes (the owner's home alone when the target's home
+  // is unknown). By construction at least the owner's home, so the
+  // owner-home clamp is subsumed.
+  let default_floor_for = |member : &ID| -> SourceName {
+    match home_of (member) {
+      Some (target_home) =>
+        config . more_private_of (
+          owner_home . clone (), target_home ),
+      None => owner_home . clone (), }};
+  // The sticky-else-default level for one member -- what an ABSENT
+  // atom resolves to.
+  let sticky_level_for = |disk_list : &[PrivaciedMember<ID>],
+                           member    : &ID|
   -> SourceName {
     let key : ID = resolve (member);
     let unclamped : SourceName = 'unclamped : {
       for d in disk_list { // sticky
         if resolve ( &d . member ) == key {
           break 'unclamped d . level . clone (); }}
-      match home_of (member) { // default
-        Some (target_home) =>
-          config . more_private_of (
-            owner_home . clone (), target_home ),
-        None => owner_home . clone (), }};
+      default_floor_for (member) };
     // Clamp: no section may be more public than the home (the
     // "extends on the other side" junk shape), so when a HOME MOVE
     // makes the node more private, its edges rise with it. (The
     // converse move leaves old, more-private levels in place:
     // publicizing memberships takes the explicit gesture.)
     config . more_private_of (unclamped, owner_home . clone ()) };
-  // EXPLICIT wins at-or-above the floor; else the floor itself.
+  // EXPLICIT wins at-or-above its floor: the more PUBLIC of the
+  // DEFAULT floor and the sticky level. Flooring at the default
+  // (not at sticky) is what lets an atom LOWER a stuck edge's
+  // privacy back down to the default
+  // (BUG-and-fix_make-edge-more-public.org); admitting the sticky
+  // level when IT sits below the default covers the edge whose
+  // more private endpoint is FOREIGN -- its level cannot rise to
+  // the foreign home (foreign sections are never written), the
+  // render emits the '(relSource ...)' atom for every off-default
+  // edge, and that atom must round-trip through save unchanged.
+  // Net: an edge's privacy never drops below the default, and a
+  // below-default edge can only be held or raised. Absent an atom,
+  // sticky-else-default.
   let resolve_level = |disk_list      : &[PrivaciedMember<ID>],
                         member         : &ID,
                         explicit_here  : &HashMap<ID, SourceName>,
                         relation_label : &str|
   -> Result<SourceName, String> {
-    let floor : SourceName = floor_for (disk_list, member);
     match explicit_here . get (member) {
-      Some (level) =>
+      Some (level) => {
+        let default : SourceName = default_floor_for (member);
+        let sticky  : SourceName =
+          sticky_level_for (disk_list, member);
+        let floor : SourceName = // the more PUBLIC of the two
+          if config . is_strictly_more_public (&sticky, &default) {
+            sticky } else { default };
         if config . is_strictly_more_public (level, &floor) {
           Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested \
-             level '{}', but the sticky/default floor for this edge \
-             is '{}'. Levels never lower silently -- \
-             skg-privatize-relationship's cycle stops at the default.",
+             level '{}', but this edge's floor is '{}'. An edge's \
+             privacy can never drop below its default (the more \
+             private of the two endpoints' homes), nor below its \
+             current level when that already sits below the \
+             default. To publicize the edge further, first \
+             publicize the more private endpoint's home.",
             owner_pid, relation_label, member, level, floor ))
-        } else { Ok ( level . clone () ) },
-      None => Ok (floor), }};
+        } else { Ok ( level . clone () ) } },
+      None => Ok ( sticky_level_for (disk_list, member) ), }};
   { let disk : &[PrivaciedMember<ID>] = &disk_node . contains;
     for m in supplemented . contains . iter_mut () {
       m . level = resolve_level (

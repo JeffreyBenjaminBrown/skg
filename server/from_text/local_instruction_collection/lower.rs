@@ -62,12 +62,13 @@ pub struct NodeSaveIntent {
 /// (server/heralds.rs; 'ViewNodeStats::rel_source'), keyed by member
 /// ID, one map per relation that carries per-member levels (hides is
 /// absent: it is inferred, and the col that shows it is read-only --
-/// the privatize gesture refuses there). Threaded separately from
+/// the set-relationship-source gesture refuses there). Threaded
+/// separately from
 /// NodeComplete because NodeComplete's 'PrivaciedMember::level' is a
 /// plain SourceName with no "was this explicit" flag, and gets
 /// unconditionally resolved by 'apply_sticky_levels' -- this is the
 /// side-channel that tells that pass which members carry a real,
-/// user-requested level to validate against the sticky/default
+/// user-requested level to validate against the default
 /// floor, rather than deriving normally (render-and-gating,
 /// TODO/user-owned_autofork_chain/5_plan.org).
 #[derive(Clone, Debug, Default)]

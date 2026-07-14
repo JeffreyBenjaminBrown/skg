@@ -387,10 +387,10 @@ pub struct ViewNodeStats {
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a level from.
   /// LOAD-BEARING, unlike the other view stats (like
-  /// 'overridesHere'): 'skg-privatize-relationship' cycles this
+  /// 'overridesHere'): 'skg-set-relationship-source' sets this
   /// value client-side, and save extraction reads it back as the
   /// user's explicit level, feeding save-leveling's
-  /// sticky-else-default resolution above its floor
+  /// sticky-else-default resolution, floored at the edge's default
   /// ('server/from_text/supplement_from_disk.rs' 'apply_sticky_levels').
   /// Herald: red "~NAME" immediately before the ⌂ sourceHerald
   /// (server/heralds.rs).

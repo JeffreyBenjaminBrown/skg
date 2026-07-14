@@ -27,6 +27,12 @@ and hide INTERNAL from M-x completion."
 (skg-alias skg-view-heralds-mode      heralds-minor-mode)
 (skg-alias skg-view-metadata          skg-edit-metadata)
 
+;; Renamed 2026-07-14 (BUG-and-fix_make-edge-more-public.org):
+;; "privatize" became a misnomer once the gesture could also lower
+;; an edge's privacy back to its default.
+(define-obsolete-function-alias 'skg-privatize-relationship
+  #'skg-set-relationship-source "2026-07-14")
+
 ;;
 ;; Keymaps
 ;;
@@ -139,7 +145,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s d") #'skg-set-definitive)
     (define-key map (kbd "C-c s i") #'skg-set-indefinitive)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
-    (define-key map (kbd "C-c s r") #'skg-privatize-relationship)
+    (define-key map (kbd "C-c s r") #'skg-set-relationship-source)
     (define-key map (kbd "C-c s s") #'skg-set-source)
     (define-key map (kbd "C-c s S") #'skg-set-source-recursive))
   (progn;; graph modifications

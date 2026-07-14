@@ -1,5 +1,6 @@
 pub mod close_view;
 pub mod diff_analysis;
+pub mod edge_level_info;
 pub mod export_to_org;
 pub mod get_file_path;
 pub mod herald_rules;

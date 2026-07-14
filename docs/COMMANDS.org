@@ -378,32 +378,41 @@ and edits the acquirer's metadata to request a merge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
-*** C-c s r : skg-privatize-relationship
-Cycles the privacy level of the relationship instance the headline
-at point represents -- =contains= for a content child, the col's
-relation for a PartnerCol member.
+*** C-c s r : skg-set-relationship-source
+Sets the privacy level of the relationship instance the headline at
+point represents -- =contains= for a content child, the col's
+relation for a writable PartnerCol member. (Formerly
+=skg-privatize-relationship=, which survives as an alias; renamed
+because the gesture now moves privacy in both directions, see
+=BUG-and-fix_make-edge-more-public.org=.)
 
-The cycle is [no atom (the edge's default level), then each source
-in =skgconfig.toml=, in config order]. The client cannot compute
-which sources are actually more private than the edge's default (it
-would need both endpoints' homes, which live only on the server), so
-it simply cycles through every configured source. The server
-enforces the sticky/default floor at save time: an offered level
-that is not at least as private as that floor is rejected with a
-clear error naming the member, the offered level, and the floor.
-Landing on such a value is therefore a save-time error, not a silent
-no-op.
+The command asks the server for the edge's DEFAULT level (the more
+private of the two endpoints' homes) and its CURRENT level (the
+"edge level info" endpoint), then prompts with completion over the
+levels at least as private as the default -- more public ones could
+leak an endpoint's ID and would be rejected at save -- plus a
+no-override choice. If the server cannot resolve the edge (e.g. a
+node not yet saved), every source is offered and the save's floor
+check backstops.
 
-Reaching the first stop (no atom) removes the =(relSource ...)= atom
-entirely -- the only way to undo a privatization back to the edge's
-default level. A deliberately privatized edge is marked with a red
-=~NAME= herald immediately before the ⌂ source herald.
+Choosing a level writes a =(relSource LEVEL)= metadata atom. This
+both raises privacy above the default and lowers it back down to
+(never below) the default -- the way to publicize an edge stuck at
+an old, more private level after its endpoint's home moved. An edge
+sitting above its default is marked with a red =~NAME= herald
+immediately before the ⌂ source herald; once saved at its default,
+atom and herald disappear.
+
+The no-override choice removes the atom, which means "no opinion":
+a saved edge keeps its saved level (sticky). It does NOT reset the
+edge to its default -- to reach the default, choose it.
 
 Refuses with an error when point is on a member of a read-only col
 (subscriberCol, overriderCol, hiderCol, hiddenCol,
-hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the relationship
-belongs to the other end there, so cycling its level from this side
-would be meaningless.
+hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the
+relationship belongs to the other end there, so setting its level
+from this side would be meaningless. Also refuses on a root
+headline, which represents no edge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the change.
@@ -638,7 +647,7 @@ One-time (idempotent) migration to the privacy-telescope model
 privacy level to at least its default -- the more private of the
 two endpoints' homes -- which moves leak-shaped memberships (a
 public file naming a more private node's ID) into their proper
-telescope sections. Never lowers a level. Rewrites only the
+telescope sections. Never lowers an edge's privacy. Rewrites only the
 telescopes that change, then rebuilds the databases. The server
 refuses unless the active source-set is =all=, since migration must
 see every level. What it cannot fix: a public repo's git HISTORY
