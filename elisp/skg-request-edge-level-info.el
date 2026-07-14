@@ -16,9 +16,12 @@ The headline at point represents one edge: `contains' for a content
 child, the col's relation for a writable PartnerCol member. This
 command asks the server for the edge's DEFAULT level (the more
 private of the two endpoints' homes) and its CURRENT level, then
-prompts with the levels at least as private as the default -- more
-public ones could leak an endpoint's ID and would be rejected at
-save -- plus a no-override choice.
+prompts -- with both tab-completion and S-left/S-right cycling,
+like the other source dialogs -- over the levels at least as
+private as the default (more public ones could leak an endpoint's
+ID and would be rejected at save), plus a no-override choice. The
+minibuffer starts pre-filled with the current level when it is
+offerable, else the default, so RET keeps the status quo.
 
 Choosing a level writes a `(relSource LEVEL)' metadata atom. The
 no-override choice removes the atom, which on save means the edge
@@ -79,14 +82,23 @@ opens outside the network process filter."
                     (choices (append (skg--relationship-source-choices
                                       ladder default)
                                      (list skg--relationship-source-no-override)))
-                    (prompt (concat "Relationship level"
+                    (prompt (concat "Relationship level (S-left/right cycle"
                                     (when default
-                                      (format " (default %s)" default))
+                                      (format "; default %s" default))
                                     (when current
-                                      (format " (currently %s)" current))
-                                    ": "))
-                    (choice (completing-read prompt choices nil t nil nil
-                                             (or current default))))
+                                      (format "; currently %s" current))
+                                    "): "))
+                    ;; Pre-fill so RET keeps the status quo and the
+                    ;; cycle starts from it. A below-default CURRENT
+                    ;; (the foreign shape) is not among the choices;
+                    ;; fall back to the default, then to empty.
+                    (prefill (cond ((and current (member current choices))
+                                    current)
+                                   ((and default (member default choices))
+                                    default)))
+                    (choice (skg--completing-read-with-cycle
+                             prompt choices nil t prefill nil nil nil
+                             choices)))
                (message "%s"
                         (skg--apply-relationship-source-choice
                          choice))))))))))

@@ -221,22 +221,24 @@ anything resets to the default."
 (defun test--run-info-handler (payload choice-fn)
   "Run `skg--set-relationship-source-from-info' on PAYLOAD against
 the buffer at point, with `run-at-time' made synchronous and
-`completing-read' stubbed by CHOICE-FN, which receives
- (PROMPT CHOICES DEF) and returns the choice."
+`completing-read' (which `skg--completing-read-with-cycle' wraps)
+stubbed by CHOICE-FN, which receives (PROMPT CHOICES PREFILL) --
+PREFILL being the initial minibuffer contents -- and returns the
+choice."
   (let ((buffer (current-buffer))
         (marker (point-marker)))
     (cl-letf (((symbol-function 'run-at-time)
                (lambda (_secs _repeat fn &rest args) (apply fn args)))
               ((symbol-function 'completing-read)
-               (lambda (prompt choices &optional _pred _req _init
-                        _hist def)
-                 (funcall choice-fn prompt choices def))))
+               (lambda (prompt choices &optional _pred _req init
+                        _hist _def _inherit)
+                 (funcall choice-fn prompt choices init))))
       (skg--set-relationship-source-from-info buffer marker payload))))
 
 (ert-deftest test-relationship-source-handler-slices-and-applies ()
   "A (default, current) reply offers the slice from the default plus
-the no-override entry, defaults the prompt to the current level, and
-applies the selection."
+the no-override entry, pre-fills the minibuffer with the current
+level, and applies the selection."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
@@ -246,19 +248,39 @@ applies the selection."
      (goto-char (point-min))
      (search-forward "(id kid)" nil t)
      (beginning-of-line)
-     (let (seen-choices seen-def)
+     (let (seen-choices seen-prefill)
        (test--run-info-handler
         "((response-type edge-level-info) (default \"private\") (current \"trusted\"))"
-        (lambda (_prompt choices def)
+        (lambda (_prompt choices prefill)
           (setq seen-choices choices
-                seen-def def)
+                seen-prefill prefill)
           "private"))
        (should (equal seen-choices
                       (list "private" "trusted"
                             skg--relationship-source-no-override)))
-       (should (equal seen-def "trusted"))
+       (should (equal seen-prefill "trusted"))
        (should (string-match-p "(relSource private)"
                                (test--buffer-line 2)))))))
+
+(ert-deftest test-relationship-source-handler-below-default-current-prefills-default ()
+  "A below-default CURRENT (the foreign shape) is not among the
+choices, so the prompt pre-fills with the default instead."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id owner) (source public))) owner\n"
+    "** (skg (node (id kid) (source public))) kid\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id kid)" nil t)
+     (beginning-of-line)
+     (let (seen-prefill)
+       (test--run-info-handler
+        "((response-type edge-level-info) (default \"private\") (current \"public\"))"
+        (lambda (_prompt _choices prefill)
+          (setq seen-prefill prefill)
+          skg--relationship-source-no-override))
+       (should (equal seen-prefill "private"))))))
 
 (ert-deftest test-relationship-source-handler-error-offers-full-ladder ()
   "An error reply falls back to the full ladder (plus no-override)."

@@ -388,12 +388,15 @@ privacy in both directions, see
 
 The command asks the server for the edge's DEFAULT level (the more
 private of the two endpoints' homes) and its CURRENT level (the
-"edge level info" endpoint), then prompts with completion over the
-levels at least as private as the default -- more public ones could
-leak an endpoint's ID and would be rejected at save -- plus a
-no-override choice. If the server cannot resolve the edge (e.g. a
-node not yet saved), every source is offered and the save's floor
-check backstops.
+"edge level info" endpoint), then prompts -- with both
+tab-completion and S-left/S-right cycling, like the other source
+dialogs -- over the levels at least as private as the default (more
+public ones could leak an endpoint's ID and would be rejected at
+save), plus a no-override choice. The minibuffer starts pre-filled
+with the current level when it is offerable, else the default, so
+RET keeps the status quo. If the server cannot resolve the edge
+(e.g. a node not yet saved), every source is offered and the save's
+floor check backstops.
 
 Choosing a level writes a =(relSource LEVEL)= metadata atom. This
 both raises privacy above the default and lowers it back down to
