@@ -3,6 +3,64 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noted while diagnosing the 2026-07-14 power-loss startup failure
+  Context: Jeff's machine overheated and cut power mid-'cargo build',
+  truncating 3 of 501 rlibs in target/. Servers then refused to start,
+  permanently and identically, on unchanged code and unchanged data.
+  Fixed by 'cargo clean -p skg -p tantivy -p typedb-driver'. Written up
+  in docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org.
+** start-servers.sh misreports a LINK failure as a COMPILE failure
+   'preflight_check_config' (bash/start-servers.sh) wraps
+   'cargo build -q --bin skg' and, on failure, prints "ERROR: skg
+   failed to compile (see errors above)". In the 2026-07-14 incident the
+   crate compiled fine; it failed to *link*, against a truncated rlib
+   ("file too short"). The wording sends you looking for a source bug
+   that does not exist -- and since the user's premise is "the code
+   hasn't changed", the message reads as nonsense and pushes them toward
+   TypeDB, which was innocent. Suggested fix: on build failure, add a
+   line pointing at
+   docs/troubleshooting/build-artifacts-corrupted-by-power-loss.org and
+   at 'python3 docs/troubleshooting/check-rlibs.py', noting that a
+   linker error on unchanged code usually means truncated artifacts in
+   target/. Cheap, and it would have collapsed this whole investigation
+   into one command.
+** Cargo cannot self-detect its own truncated artifacts (design hazard)
+   Cargo judges freshness by fingerprint + mtime and never checksums its
+   output. If a machine dies AFTER a fingerprint is written but BEFORE
+   the artifact finishes streaming to disk, Cargo believes a truncated
+   file is fresh and re-hands it to the linker forever. So the failure
+   is permanent, not flaky, and 'cargo build' cannot recover on its
+   own. Nothing to fix in skg -- but worth knowing, because the
+   "re-run it and see" instinct is useless here, and the natural next
+   inference ("must be the data / must be TypeDB") is wrong.
+   check-rlibs.py exists to short-circuit that.
+** Empty section header in typedb-will-not-start.org
+   docs/troubleshooting/typedb-will-not-start.org ends with the bare
+   header "* Database Corruption (Non-Accumulation Issues)" and no
+   content beneath it. Either write it or drop it; as it stands it
+   promises help that isn't there, to a reader who is already stuck.
+** Broken command paths in the troubleshooting docs
+   typedb-will-not-start.org tells the reader to run
+   'bash troubleshooting/typedb/check-typedb-status.sh' (lines 30, 146,
+   152 and the caution at 61). There is no 'troubleshooting/' directory
+   at the repo root; the scripts live under 'docs/troubleshooting/'. As
+   written, every one of those commands fails with "No such file".
+   database-cleanup.md has the same stale prefix.
+** database-cleanup.md names the wrong development database
+   It states the dev database is 'skg-dev' ("Database Naming
+   Convention", and the 2025-11-18 "Configuration Issue Fixed" note).
+   data/skgconfig.toml actually sets db_name = "skg-real". The naming
+   *rule* it teaches is still right (never prefix a real db with
+   "skg-test", or the cleanup utilities will eat it); only the example
+   name is stale.
+** Server logs grow without bound
+   data/logs/ currently holds ~500 MB across three files that are only
+   ever appended to, never rotated or truncated:
+   server.jsonl (275 MB), server-to-user.log (124 MB),
+   cargo-watch.log (105 MB, appended with '>>' by start-servers.sh).
+   Nothing trims them. They are also the files a crash leaves NUL-padded,
+   which makes them progressively less pleasant to read. Suggested fix:
+   rotate on startup (keep one previous generation), or cap by size.
 * Problems noted during the fork-fixes arc (TODO/fork-fixes.org)
 ** The git_diff_view test matcher ignores bare metadata atoms
    'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
