@@ -6,9 +6,30 @@ walk point through the herald string normally
 treat it as one character
 Shortcut to jump tokens treats it as one from outside,
 but divides it at spaces if point is interior to it.
+* the hiddenOut herald
+should say "The subscriber ancestor hides these, but subscribes to nothing that contains them."
+* the hiddenIn herald
+should say "It contains these, but the subscribing ancestor hides them."
+* the full-sentence heralds
+should be capitalized and punctuated (end in a period) normally.
+* DEPENDENCIES.toml should record each source's remote URL
+That is, the thing that 'git remote -v' shows,
+between "origin" and "(fetch)".
+That's so other users know where to look --
+skg has as of yet no use for that information itself.
 * bug : nested links
 See, e.g.,
 [[id:3c5b0fad-1559-42a4-bcaf-eb7c466cc4f8][[[id:758119b6-2b1e-428b-9664-d7b8a4b63ca1][Markets can aim [[id:2208f9f5-43be-49d4-99c0-d803f8c3e44e][selfishness]] toward social efficiency.]]]]
+* bug : not warning me when I make changes under an indeefinitive node
+Maybe that's in the spec but it's definitely bad.
+Should prevent save.
+Otherwise I save things under an indefinitive,
+think it worked, and lose them.
+* bug ? Does skg-replace-link-with-content discard fold info?
+* leading heralds should be yellow with black text
+Anomalies in them, orange.
+* later heralds should be blue
+and anomalies in them, purple.
 * bug : C-c G on an alias kills the buffer
 intending to replace it, but can't replace it.
 * need to be able to commit all changes from buffer
