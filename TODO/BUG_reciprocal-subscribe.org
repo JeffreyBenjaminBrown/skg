@@ -1,0 +1,75 @@
+DANGER: This org file quotes org buffers.
+The quotes are indented by two spaces,
+so headlines in the quote are distinguishable from headlines of this file
+(which are not indented).
+* the story
+I search for 'cooking'.
+The top two search results are the ones of interest.
+One is in 'public' and the other in 'cheese' (the name of the source
+written by the fictitious Cheese Man).
+If I open the one in cheese, it opens normally,
+but if I open the onne from public, it comes up indefinitive.
+That's the first bug. Don't fix it immediately; first report why it's happening.
+
+Anyway, I make that node definitive.
+Then I run C-c c s to see what subscription action it has.
+I see Cheese Man's note subscribes to it, and it subscribes to nothing. Good.
+
+I want to subscribe back to Cheese Man's note.
+So I push that ID to the link stack (C-c u),
+start a headline in the public cooking note's collection of subscribees,
+and paste the copied node there.
+* the resulting, offending buffer
+  * (skg (node (id 95fc4b53-483e-475e-a86c-2818c0917166) (source public) (parentIs absent) (rels "C11 2(1)L 1S 1O") (viewStats (sourceHerald ⌂:public)))) cooking
+  ** (skg subscriberCol)
+  *** (skg (node (id 056a7de8-d7e5-4fb4-9a42-7e0f088ab898) (source Cheese-Man) indef (birthHerald "Sb") (rels "C10 H2 Ob") (viewStats (relSource Cheese-Man) (sourceHerald ⌂:Cheese-Man)))) cooking
+  ** (skg subscribeeCol)
+  *** (skg (node (id 056a7de8-d7e5-4fb4-9a42-7e0f088ab898) indef)) cooking
+  ** (skg (node (id ca2a42f7-c0e1-46da-b1d9-4355d7939eef) (source public) (birthHerald "aC") (rels "1H"))) ONGOING [[id:0d037a5d-e027-4b6d-8054-c39aad9bb196][soup]]
+  ** (skg (node (id dd60a0ce-0a1c-4b38-bc64-deba1587ca96) (source public) (birthHerald "aC") (rels "1H"))) ONGOING [[id:0cb70005-87b9-43a3-96e8-45906f1561ec][beans]]
+  ** (skg (node (id 8f22b551-42bf-4a76-84c1-657558ce290f) (source public) indef (birthHerald "2aC"))) [[id:9b6e0646-c3a7-49e9-a3fa-d94721062713][asparagus]]
+  ** (skg (node (id 8c3adf7a-fded-4132-ad57-ea07829dcb7f) (source public) indef (birthHerald "2aC"))) [[id:eb59613b-87d4-4b24-8e5c-be43090989f3][pineapple cheese salad <2025-09-07 Sun>]]
+  ** (skg (node (id 08f171e3-8501-48ef-94d8-f4fa30e8733a) (source public) indef hiddenBody (birthHerald "2aC"))) Add extra salt to the rice, if at all.
+  ** (skg (node (id e89b8d5d-d444-4d8d-8c8f-e6e3c5ba6dfa) (source public) indef (birthHerald "2aC"))) [[id:f29fbdf5-4d91-401d-a614-d0a63bf201e5][refined coconut oil is better for high heat cooking]]
+  ** (skg (node (id 2bcca1c0-d43b-44a1-96d3-5e28b4c854eb) (source public) indef (birthHerald "2aC"))) [[id:89e80e2c-174a-43aa-9349-4c01ab4b0ed6][recipes, some]]
+  ** (skg (node (id 517d6aba-5d99-4ef4-a017-82073ccdf966) (source public) indef (birthHerald "2aC"))) [[id:0382a0b6-82da-4b87-9be1-e302f040a979][cheese dangers]]
+  ** (skg (node (id 12efc0ae-f960-421e-a661-22cf2d0e081f) (source public) indef (birthHerald "2aC"))) [[id:63eec882-c8c1-46ae-af8e-a442ca649fe6][cast-iron pans, how to use]]
+  ** (skg (node (id 9635dc98-9407-4712-9393-55bd164ae697) (source public) indef (birthHerald "2aC"))) [[id:60052c9d-90c2-46f8-ac43-5a1dfdac1a07][hot sauce recipe]]
+  ** (skg (node (id 40b93a4b-bcbe-483d-81e3-85f7e84e63b1) (source public) indef (birthHerald "2aC7"))) u
+  *** (skg (node (id 834fac33-f450-4951-8726-9c76e68067ca) (source public) indef hiddenBody (birthHerald "aC"))) a quarter of a lemon is plenty for a personal dish
+  *** (skg (node (id 16abac3f-bff2-4cb3-accf-45ab2ca73a00) (source public) indef (birthHerald "aC"))) steaming is less work than sauteeing
+  *** (skg (node (id f254a9ae-1657-4308-9084-7cf2ec6fb589) (source public) indef hiddenBody (birthHerald "aC"))) baking is easy
+  *** (skg (node (id 1bdd8899-4da8-4e87-9b2c-9c85c0dc5c42) (source public) indef (birthHerald "aC"))) boil lots of eggs at once
+  *** (skg (node (id ff34c07e-621e-478a-9fed-eb6492669ca8) (source public) indef hiddenBody (birthHerald "aC1"))) ? boil water before adding food
+  **** (skg (node (id f7c26bd7-1107-43db-9750-59d7ba436d02) (source public) indef (birthHerald "aC"))) Not for beans or rice, though.
+  *** (skg (node (id 6affbc16-68d9-4ce4-9be7-50c6ff416798) (source public) indef (birthHerald "aC"))) adjust temp a few minutes after adjusting food, to maintain boil
+  *** (skg (node (id 4d1accb7-dbe9-495c-961e-3e42f2db7aa3) (source public) indef hiddenBody (birthHerald "aC"))) one-vessel recipes @ NYT
+* the error message
+  * errors
+  ** * NOTHING WAS SAVED
+
+  Validation errors found in buffer.
+
+  ** Error 1
+  Local structure violation:
+  - ID: 056a7de8-d7e5-4fb4-9a42-7e0f088ab898
+  - ActiveNode must have a source that exists in the config.
+
+  ** Resolution
+  Please fix these errors and try saving again.
+* my thoughts
+Clearly the source exists.
+Maybe the true error is something else -- but then why is that message happening?
+
+You could imagine Skg giving me grief about creating a subscription cycle,
+but I don't think it does -- those are explicitly necessary, at least in the case of
+two nodes owned by different people.
+You could also imagine grief over overrides cycles,
+but again if they cross the user-foreigner boundary, that at least *ought* to be fine.
+* my request
+For now, just research these things and respond inline in this document,
+appending your findings and thoughts in a new headline,
+subdividing it (and maybe sub-subdividing it --
+remember that the most natural org tree for a topic probably is not uniform-depth,
+and should not use bullets for subdivision instead of asterisks)
+however seems most natural.
