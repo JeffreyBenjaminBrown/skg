@@ -96,9 +96,16 @@ save.approve_fork()
 --    overridden and subscribed (its graphStats say so). (The saved
 --    view still draws N raw -- existing viewnodes are not rewritten;
 --    substitution shows on a fresh open, below.)
+-- The clone committed: N now has one subscriber and one overrider. N
+-- also contains N1,N2 and is contained by P, so its rels carry
+-- (contains ...) and (birth contains) too -- match the two
+-- commit-signal facts as substrings, not the whole rels form.
 local committed = T.wait_for(function ()
   local buf = buffer_showing('P')
-  return buf and T.buffer_text(buf):find('(rels (subscribes (in 1)) (overrides (in 1)))', 1, true)
+  if not buf then return false end
+  local s = T.buffer_text(buf)
+  return s:find('(subscribes (in 1))', 1, true)
+     and s:find('(overrides (in 1))', 1, true)
 end, 10)
 T.check(committed, 'the fork did not commit after approval')
 print('fork committed (N is now overridden and subscribed)')

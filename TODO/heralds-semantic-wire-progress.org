@@ -34,6 +34,22 @@ heralds-tweaks).
   SIMPLER -- they read the semantic facts directly (a relation with an
   =(out ... (ancestors ...))= side -> its role) instead of regexing a
   token string. Updated the elisp helper + all four nvim ports.
+- INTEGRATION suite DOES run here (Emacs 30.2 + nvim 0.12.3 + TypeDB are
+  all present; each run-test.sh spins up its own target/debug/skg). All
+  10 herald-affected tests pass end-to-end in BOTH clients (20 runs):
+  aliases / containerward / content-view-from-non-root / fork /
+  search-enrichment / sourceward / save_collateral_break_cycle /
+  save_collateral_add / git-diff-view-updates / containerward-on-phantom.
+  Fixed one genuinely STALE assertion in fork/test-{emacs.el,nvim.lua}:
+  it waited for N's whole rels to equal
+  =(rels (subscribes (in 1)) (overrides (in 1)))=, but N is also
+  contained by P and contains N1,N2, so its real line carries
+  =(contains (in 1 (ancestors 1)) (out 2))= and =(birth contains)= too.
+  That assertion had assumed "N shows only S,O" across all three wire
+  formats (frontloaded "1S 1O", span, semantic) and was never actually
+  run. Now it matches the two commit-signal facts as substrings; the
+  fork then passes through its reopen =(overridesHere N)= substitution
+  check.
 
 * Relationship to prior branches
 - REUSED unchanged: the fact computation in viewnodestats.rs (counts,
@@ -43,11 +59,7 @@ heralds-tweaks).
   span-renderers + span-form test expecteds.
 
 * What's imperfect / remaining
-- INTEGRATION tests (tests/integration/*/test-{emacs.el,nvim.lua}): their
-  expected-buffer span forms were converted to semantic by the same
-  validated transformer, and the graft-role helpers rewritten; all
-  syntax-check / byte-compile clean. But the integration SUITE needs a
-  live server + Emacs/nvim + TypeDB to RUN, which this environment lacks
-  -- so these are logic-correct and checked, not executed end-to-end.
-- Verification is nextest + the elisp/nvim specs, not a full green
-  `cargo test` (the known in-process TypeDB-collision flake).
+- Rust verification is nextest + the elisp/nvim specs + the 20
+  integration runs above, not a full green `cargo test` (the known
+  in-process TypeDB-collision flake). Every herald-touching surface is
+  now exercised against a live server.

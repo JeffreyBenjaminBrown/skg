@@ -81,8 +81,16 @@
                       (let ((p-buf (fork-test--buffer-showing "P")))
                         (and p-buf
                              (with-current-buffer p-buf
-                               (string-match-p "(rels (subscribes (in 1)) (overrides (in 1)))"
-                                               (buffer-string))))))
+                               ;; The clone committed: N now has one
+                               ;; subscriber and one overrider. N also
+                               ;; contains N1,N2 and is contained by P,
+                               ;; so its rels carry (contains ...) and
+                               ;; (birth contains) too -- match the two
+                               ;; commit-signal facts as substrings, not
+                               ;; the whole rels form.
+                               (let ((s (buffer-string)))
+                                 (and (string-match-p "(subscribes (in 1))" s)
+                                      (string-match-p "(overrides (in 1))" s)))))))
                     10)))
     (unless committed
       (let ((p-buf (fork-test--buffer-showing "P")))
