@@ -469,8 +469,11 @@ the view regenerates it.
   node that links to it, also `linkDest`, `overrider`, `overridden`,
   `hider`, `hidden`, `subscriber`, `subscribee`). ROLENAME is one of the
   nine in `PARTNER_ROLE_VOCAB`
-  (`server/dbs/in_rust_graph/relation_accessors.rs`), which also fixes
-  its herald glyph.
+  (`server/dbs/in_rust_graph/relation_accessors.rs`). The graft's herald
+  is not a fixed glyph: it is the ancestor-lettered relationship token
+  the uniform-herald grammar assembles for that role (see "Stats
+  metadata" — e.g. an `overrider` graft reads `Oa`, an `overridden`
+  graft `aO`).
 
 ## View requests: (viewRequests ...)
 
@@ -496,56 +499,64 @@ the atom, so a request is transient. Three request forms:
 
 ## Stats metadata: graphStats and viewStats
 
-Two keyed forms decorate a `(node ...)` with statistics. Both are
-generated, never save intent; the client renders them as heralds (the
-rule table in `server/heralds.rs`; see "Herald rules"). The atom names
-below are the single source of truth, derived from `GraphNodeStats`
-and `ViewNodeStats` in `server/types/viewnode.rs`.
+Generated display facts decorate a `(node ...)` (never save intent;
+the client renders them as heralds via the rule table in
+`server/heralds.rs`; see "Herald rules"). Since the uniform-herald
+refactor, the graph-wide counts and the view-position RELATIONSHIP
+facts are assembled into two compact token strings rather than emitted
+as individual atoms:
 
-`(graphStats ...)` holds graph-wide facts about the node, independent
-of where it is drawn:
+- `(birthHerald "STRING")` — orange, hugging the ☮; the token(s) for
+  the relation(s) that explain why this node was drawn here (its
+  "birth"). Absent for roots and parked nodes.
+- `(rels "STRING")` — blue; the remaining relationship tokens plus the
+  action tokens `Ak` (k aliases) and `Ik` (k extra IDs).
 
-- keyed counts (emitted only when informative):
-  `(containers N)`, `(contents N)`,
-  `(linksInFromContainers N)`, `(linksInFromLeaves N)`;
-- bare booleans, each present only when true:
-  - `aliasing` — the node has aliases;
-  - `extraIDs` — the node has extra IDs (from a merge);
-  - `overriding` — herald blue "O"; the node plays either role of
-    `overrides_view_of` anywhere;
-  - `subscribing` — herald blue "S"; either role of `subscribes`;
-  - `hiding` — herald blue "H"; either role of
-    `hides_from_its_subscriptions`.
+Both strings are assembled by the token grammar in
+`server/herald_tokens.rs` (the single source of truth), from
+`GraphNodeStats` and `ViewNodeStats` (`server/types/viewnode.rs`).
+Each graph relation contributes at most one token of the shape
+`[inNum][inLetters] X [outNum][outLetters]`:
 
-`(viewStats ...)` holds facts that depend on the node's position in
-this view (the same graph node can warrant different viewStats under
-different parents):
+- `X` is the relation letter: `C` contains, `L` textlinks_to,
+  `H` hides_from_its_subscriptions, `S` subscribes,
+  `O` overrides_view_of.
+- the numbers are member counts on each side: the INBOUND (left) side
+  counts nodes on the far end that point at this node (its containers,
+  its overriders, ...); the OUTBOUND (right) side counts those this
+  node points to (its contents, the nodes it overrides, ...).
+- a lowercase letter flags a tracked ANCESTOR that is a member on that
+  side: `a` = visible org-parent, `b` = grandparent, ... (counting all
+  viewnodes, col scaffolds included). So an ordinary content child
+  reads `aC` ("my parent contains me"); a containerward-ancestry graft
+  reads `...Ca` ("I contain my parent", e.g. `1C8a`); a node its parent
+  overrides reads `aO`, one that overrides its parent `Oa`. When a
+  side's count equals its number of ancestor letters, the count is
+  omitted (a lone parent-override is `Oa`, not `1Oa`).
+- the `L` token is special: its inbound side is the "surprising links"
+  digit form `a(b,c)` and never carries ancestor letters; its outbound
+  side is omitted except for the linkSource-birth graft (`La`).
+
+This replaces the retired per-atom scheme. There is no longer a
+`(graphStats ...)` sexp on an active node: its counts fold into the
+strings above (`overriding`/`subscribing`/`hiding` become the `O`/`S`/
+`H` tokens; `aliasing`/`extraIDs` become the `Ak`/`Ik` action tokens),
+and the per-relation view-position flags (`containsParent`,
+`overridesParent`/`parentOverrides`, `subscribesParent`/
+`parentSubscribes`, `hidesParent`/`parentHides`, `grandparentOverrides`/
+`grandparentSubscribes`) are gone — those facts are the
+ancestor-lettered tokens now. (A phantom, which has graphStats but no
+view position, still carries a counts-only `(rels ...)` from
+`assemble_counts_only`, and the bare `hiddenBody` atom documented above
+still rides an indefinitive node whose graph node has a hidden body.)
+
+`(viewStats ...)` still carries the position facts that are NOT
+relationship tokens (the same graph node can warrant different ones
+under different parents):
 
 - `cycle` — this position repeats an ancestor's ID;
-- `containsParent` — herald "}"; the node's visible org-parent
-  contains it (`parentIsContent`);
 - `(sourceHerald ⌂:LABEL)` — the node sits at a source boundary (a
   root, or a source differing from its nearest truenode ancestor);
-- `grandparentOverrides` — herald red "gO"; computed only for a
-  subscribee-as-such (an Affected child of a `subscribeeCol`) whose
-  col owner also overrides it. Not emitted under an `overriddenCol`,
-  where the col already says it.
-- `grandparentSubscribes` — herald red "gS"; computed only for an
-  Affected child of an `overriddenCol` whose col owner also
-  subscribes to it. Not emitted under a `subscribeeCol`.
-- `overridesParent` / `parentOverrides` — herald red "Op" / "pO"; this
-  node overrides the node of its visible org-parent, or the inverse
-  (the parent overrides this node). Like `containsParent`, necessarily
-  view stats, since the same node can sit under different parents. (pO
-  also marks the original under its clone-to-be in the fork-confirmation
-  buffer.)
-- `subscribesParent` / `parentSubscribes` — herald red "Sp" / "pS"; this
-  node subscribes to its visible org-parent, or the inverse.
-- `hidesParent` / `parentHides` — herald red "Hp" / "pH"; this node
-  hides its visible org-parent (an outbound
-  `hides_from_its_subscriptions` edge), or the inverse. Plain binary
-  edge heralds; the "hidden from which subscription" context lives in
-  the hide cols, not here.
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
   the ⌂ source herald; the privacy level of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or

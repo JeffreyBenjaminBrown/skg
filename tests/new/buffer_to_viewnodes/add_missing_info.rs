@@ -10,7 +10,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::{
 use skg::test_utils::{run_with_shared_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
-use skg::types::misc::{SkgConfig, ID, TantivyIndex};
+use skg::types::misc::{SkgConfig, ID, SourceName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_ids};
@@ -36,7 +36,53 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
       test_source_inheritance_multi_level (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("test_sourceless_col_member_gets_graph_source",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
+      test_sourceless_col_member_gets_graph_source (
+        &s . config, &s . driver ) . await ?;
       Ok (( )) } )) }
+
+/// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
+/// pasted from the link stack arrives as a bare id under a
+/// 'subscribeeCol' scaffold, with no source. Its org-parent is a
+/// scaffold, so 'inherit_parent_source_if_possible' cannot supply a
+/// source; enrichment must resolve it from the graph by id instead.
+/// Before the fix this node stayed sourceless and the save was refused
+/// with "ActiveNode must have a source that exists in the config".
+async fn test_sourceless_col_member_gets_graph_source (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  // 'root' is an extra_id of fixture node 'root-pid', whose source is
+  // 'main'. The subscribee reference below carries neither source nor
+  // the primary id, and is indefinitive -- exactly the bare-paste shape
+  // (a link-stack paste yields an indefinitive node with only an id).
+  let input : &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg subscribeeCol)
+            *** (skg (node (id root) indef)) subscribee reference
+        "};
+  let mut viewforest : MpViewForest =
+    org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+  add_missing_info_to_viewforest (
+    &mut viewforest, &config . db_name, driver ) . await ?;
+  let owner = viewforest . root() . first_child() . unwrap();
+  let col   = owner . first_child() . unwrap();
+  let member = col . first_child() . unwrap();
+  match &member . value() . kind {
+    MpViewnodeKind::Vognode (MpVognode::Active (t)) => {
+      assert_eq! (
+        t . source, Some (SourceName::from ("main")),
+        "Sourceless col member should inherit its source from the \
+         graph (node root-pid lives in source 'main'), not stay \
+         sourceless." );
+      assert_eq! (
+        t . id . as_ref() . unwrap() . 0, "root-pid",
+        "The referenced id 'root' should have resolved to its pid \
+         'root-pid'." ); }
+    _ => panic! ("expected an ActiveNode subscribee member") }
+  Ok (( )) }
 
 async fn test_add_missing_info_comprehensive (
   config   : &SkgConfig,

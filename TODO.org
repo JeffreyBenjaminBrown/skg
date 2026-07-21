@@ -15,6 +15,8 @@ That is, the thing that 'git remote -v' shows,
 between "origin" and "(fetch)".
 That's so other users know where to look --
 skg has as of yet no use for that information itself.
+* Graphstats is no longer used by active nodes, but it is for phantoms.
+Probably shouldn't be used for phantoms either.
 * bug : nested links
 See, e.g.,
 [[id:3c5b0fad-1559-42a4-bcaf-eb7c466cc4f8][[[id:758119b6-2b1e-428b-9664-d7b8a4b63ca1][Markets can aim [[id:2208f9f5-43be-49d4-99c0-d803f8c3e44e][selfishness]] toward social efficiency.]]]]

@@ -948,3 +948,55 @@
    own (subscribee's unintegrated additions surface under the
    subscriber), then note the fork gesture creates this edge together
    with =overrides_view_of=.
+* Herald-system drift found while designing override-ancestry-in-search-results (2026-07-21)
+  Context: the uniform-herald refactor (server/herald_tokens.rs) folded
+  the old per-atom graphStats counts and the per-relation viewStats
+  flags into two assembled token strings, (birthHerald ...) and
+  (rels ...). api-and-formats.md's "Stats metadata" section still
+  described the retired atoms ("Op"/"pO"/"gO"/"Sp"/... and the
+  (graphStats ...) sexp); that section is now REWRITTEN to match, so it
+  is not the open problem. These residuals are:
+** PARTNER_ROLE_VOCAB's glyph column and RelationRole::glyph() are vestigial
+   server/dbs/in_rust_graph/relation_accessors.rs: the third column of
+   PARTNER_ROLE_VOCAB ("}", "Op", "pO", "Sp", ...) and the 'glyph()'
+   accessor no longer drive any rendering -- a backpath graft's herald
+   is the ancestor-lettered token the uniform grammar assembles, not a
+   fixed glyph. 'glyph()' is called only by its own self-consistency
+   test (relation_accessors.rs:449). The "Op"/"pO" strings actively
+   mislead (they read as the retired scheme). Candidate: delete the
+   glyph column, 'glyph()', and that test -- or, if a fixed per-role
+   glyph is still wanted somewhere, document where. Left alone for now
+   (a self-consistent const + test, out of scope for the search feature).
+** fork.rs hand-emits a (viewStats parentOverrides) atom that no longer renders
+   server/from_text/fork.rs:266 writes '(viewStats parentOverrides)' on
+   the original under its clone-to-be in the fork-confirmation buffer,
+   to mark it with the old red "pO" herald. But 'parentOverrides' is no
+   longer a ViewNodeStats field and has no rule in server/heralds.rs
+   (grep finds none), so the lens engine renders nothing for it -- the
+   "this is the node your clone overrides" cue is silently gone from the
+   fork-confirmation buffer. Fix: emit the equivalent under the new
+   grammar (an 'aO'-style token, or a dedicated viewStats atom with a
+   heralds.rs rule), or drop the dead atom deliberately. Needs a Jeff
+   decision on whether that cue is still wanted.
+
+* api-and-formats.md herald section stale after semantic-wire merge (2026-07-21)
+  Merging heralds-semantic-wire into main brought main's herald
+  documentation, which still describes the prior uniform-herald format.
+  On this branch the (rels ...) sub-form is now a SEMANTIC sexp --
+  (rels (contains (in N (ancestors G)) ...) ... (birth RELNAME)) -- and
+  all presentation (letters, colors, order) lives in the clients. So:
+  - api-and-formats.md:509 =(birthHerald "STRING")= and :512
+    =(rels "STRING")= describe retired assembled token strings.
+    birthHerald no longer exists on the wire (birth is =(birth RELNAME)=
+    inside =(rels ...)=); rels is a sexp of facts, not a blue string.
+  - the graft-herald example "aO" (:476) is now
+    =(overrides (in 1 (ancestors 1)))= + =(birth overrides)=.
+  - the "Herald rules" section (:144-155) documents the served rule
+    table, which phase 2 (TODO/semantic-heralds-wire/retire-rule-table)
+    retires.
+  Deliberately NOT fixed in the merge: phase 2 rewrites this whole
+  section (semantic wire + rule-table retirement), so fixing it now and
+  again in phase 2 is wasted. Fold the api-and-formats.md herald rewrite
+  into phase 2. The merge's one CODE/TEST semantic conflict --
+  override_search_ancestry.rs asserting =(birthHerald)= / "aO" -- WAS
+  reconciled to the semantic form as part of the merge.

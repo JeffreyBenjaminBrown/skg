@@ -1,0 +1,12 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+
+# owned/ is the default owned_folder, so "main" is user-owned and
+# "foreign" is read-only. See TODO/override-ancestry-in-search-results.org.
+[[sources]]
+name = "main"
+path = "owned/main"
+
+[[sources]]
+name = "foreign"
+path = "foreign"

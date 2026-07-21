@@ -1,0 +1,208 @@
+* Override ancestry in search results
+Origin: the "Aha!" subtree of TODO/DONE/BUG_reciprocal-subscribe.org,
+and Jeff's answers to Claude's four questions there. This file is the
+design; the bug file keeps the conversation that produced it. This is a
+NEW feature, independent of the reciprocal-subscribe bug (also fixed).
+
+Status: IMPLEMENTED + END-TO-END VERIFIED 2026-07-21 (all four
+open-corner defaults approved).
+- Grafting: 'insert_override_ancestries_into_search_view'
+  (server/serve/handlers/text_search/render_enriched_search_buffer.rs),
+  called from 'handle_snapshot_response' (server/serve.rs) right after
+  the containerward graft.
+- Suppression: 'suppressed_result_ids'
+  (server/serve/handlers/text_search.rs), applied in
+  'build_search_viewforest' before the display-limit truncation.
+- Herald pre-fetch fix (found during end-to-end verification): the
+  graphStats pre-fetch in 'spawn_enrichment_thread' ran BEFORE the
+  grafts existed, so a grafted override node's stats were never
+  fetched and it rendered herald-less (no "aO"/"Oa"). Fixed by unioning
+  'collect_override_relative_ids' into the pre-fetch id-set; that
+  collector MUST stay in sync with the graft's traversal.
+- Tests: tests/override_search_ancestry.rs (+ fixtures) -- (1) the
+  suppression set is exactly {F,G}; (2) U's chain grafts U -> F -> G;
+  (3) end-to-end, replaying phase-1+phase-2, F and G are absent from
+  the top level and reappear nested under U, each rendering its "aO"
+  override herald (which only works with the pre-fetch fix). Full Rust
+  suite green (371 tests).
+- Herald staleness Jeff flagged: fixed in api-and-formats.md and this
+  file; residuals logged in TODO/problems.org.
+** The goal, in one paragraph
+When you text-search, an overridden node and the node(s) that override
+it should be reachable from one another *within the search results*,
+the same way containerward ancestry already hangs beneath each result.
+Then, when one of the user's OWN nodes overrides a result, that result
+need not also appear at top level -- it will already be visible as a
+descendant of the user's node. The payoff: for text search you rarely
+need the separate override-choice menu; you navigate overrides straight
+from the results. (The override-choice menu stays as-is for the
+open-a-node path and any non-search context -- Jeff, Q1.)
+** What already exists (so we build with the grain)
+*** Search enrichment is a bespoke, container-only grafter
+Phase-2 enrichment grafts each result's *containerward* ancestry as
+inverted read-only org-descendants. Entry point
+'insert_containerward_ancestries_into_search_view'
+(server/serve/handlers/text_search/render_enriched_search_buffer.rs:17);
+each graft is hardcoded 'Birth::Backpath (RelationRole::CONTAINER)'
+(render_enriched_search_buffer.rs:105,110). It does NOT use the generic
+role-aware backpath engine -- it is its own containerward-only path,
+fed by a TypeDB pre-fetch ('ancestry_by_id_from_ids_async', computed in
+the detached enrichment thread, text_search.rs:266).
+*** The generic backpath engine already knows all nine roles
+'build_and_integrate_path_with_source_set'
+(server/to_org/expand/backpath.rs:61) is fully role-generic and already
+handles 'overrider'/'overridden' (and re-attaches containerward
+ancestry to each grafted partner, backpath.rs:77-79). But it is driven
+by '(viewRequests (path ROLENAME))' and reads TypeDB, and is not wired
+into search enrichment. So we can either extend the bespoke grafter or
+borrow this engine -- see open corners.
+*** The graph already exposes both override directions
+- nodes X overrides (X's outbound 'overrides_view_of'):
+  'graph.outbound_pids_for_relation (X, OverridesViewOf)'.
+- nodes that override X (inbound): the dedicated inverse index
+  'graph.overriders_of' (server/dbs/in_rust_graph.rs:94), also
+  'inbound_pids_for_relation (X, OverridesViewOf)', also
+  'visible_overriders' (override_menu.rs:106).
+- ownership test for the suppression anchor:
+  'SkgConfig::user_owns_source (&node.source)' (server/types/misc.rs:499).
+*** There is no result suppression today
+Nothing currently drops a top-level result because it appears elsewhere
+in the buffer. The top-level set is decided in 'build_search_viewforest'
+(text_search.rs:445; ranks, then '.take (SEARCH_DISPLAY_LIMIT)',
+~lines 458-468), which produces the canonical 'search_results : Vec<ID>'.
+That is the hook point for suppression.
+** Decisions already made (from Jeff's answers)
+- It's a search-results feature; the open-a-node override menu stays for
+  other contexts. (Q1)
+- Override relatives graft as org-DESCENDANTS, exactly like containerward
+  ancestry does today -- NOT as ancestors. (Q2)
+- Graft BOTH directions: overriderward (who overrides me) and
+  overriddenward (what I override). (original Aha text)
+- Suppress a result from top level ONLY if it will actually appear
+  deeper under a shown result. (Q3)
+- Suppression is anchored at a USER-OWNED overrider; a foreign overrider
+  never suppresses the node it overrides. (Q4 + the "boring author"
+  rationale)
+** The design
+*** Grafting (phase 2, the enrichment step)
+For each shown top-level result X, graft as inverted read-only
+indefinitive org-descendants, recursively and cycle-guarded:
+- its OVERRIDDENWARD relatives -- the nodes X overrides -- each marked
+  'Birth::Backpath (RelationRole::OVERRIDDEN)'. Walk
+  'outbound overrides_view_of'.
+- its OVERRIDERWARD relatives -- the nodes that override X -- each
+  marked 'Birth::Backpath (RelationRole::OVERRIDER)'. Walk
+  'overriders_of'.
+Cycle guard: stop a branch at the first repeated id (the stats pass then
+marks it 'cycle'), exactly as the override menu and the generic backpath
+engine already do. Both foreign and user-owned edges are followed for
+DISPLAY (navigation shows raw graph facts, as the menu does today).
+**** DONE herald note -- Jeff was right, "pO"/"Op" was stale; corrected here and in api-and-formats.md
+Jeff: "those 'parent' heralds are now rendered as 'a' (grandparent 'b',
+etc.)." Correct. The per-relation flag atoms ('overridesParent'/'pO',
+'parentOverrides'/'Op', 'grandparentOverrides'/'gO', and the subscribe/
+hide analogues) were removed in the uniform-herald refactor; the struct
+'ViewNodeStats' no longer holds them (server/types/viewnode.rs) and
+'org_to_text.rs' no longer emits them. They are now folded into the
+assembled 'birth_herald'/'rels_herald' token strings
+(server/herald_tokens.rs): each relation renders
+'[inNum][inLetters] X [outNum][outLetters]', where a lowercase letter
+flags a tracked ANCESTOR that is a member on that side --
+'a' = visible parent, 'b' = grandparent, ... So for these grafts, using
+the "1C8a" containerward form as ground truth (the 'a' sits on the
+OUTBOUND side of C = "this graft contains its org-parent"):
+- an OVERRIDERWARD graft (it overrides the hit above it) renders 'O'
+  with the ancestor letter on the OUTBOUND side -- e.g. birth herald
+  "Oa" for a graft whose only override target is its org-parent;
+- an OVERRIDDENWARD graft (overridden BY the hit above it) renders 'O'
+  with the letter on the INBOUND side -- e.g. "aO".
+Deeper links in a chain render against their IMMEDIATE org-parent (a
+gnode child tracks only its visible parent, generation 'a';
+'viewnodestats.rs' 'tracked_ancestors'), so each link is "Oa"/"aO"
+relative to the link above it, not "b"/"c". (Generations past 'a' show
+up mainly for col members, where a col scaffold sits between.) The
+stale PARTNER_ROLE_VOCAB glyph column and the api-and-formats.md
+"Stats metadata" section are addressed in TODO/problems.org.
+*** Suppression (phase 1, in build_search_viewforest)
+Over the ranked result set R, mark result X SUPPRESSED iff there exists
+another result Y in R such that:
+1. Y is user-owned ('user_owns_source (Y.source)'), and
+2. Y recursively overrides X -- X is reachable from Y by following
+   'outbound overrides_view_of' edges, cycle-guarded. (The intermediate
+   edges may be foreign; only the ANCHOR Y must be user-owned. This is
+   what makes "my U overrides foreign F overrides foreign G" suppress
+   both F and G -- Jeff, Q4.)
+Suppressed results are removed from the top-level list; they still
+appear as overriddenward descendants of Y (grafting guarantees it, since
+Y is shown and grafts its overriddenward chain). Foreign-only override
+clusters -- including a foreign F<->G mutual override with no user-owned
+overrider -- suppress nothing, so both show at top level (Jeff, Q4).
+*** Why this satisfies each of Jeff's cases
+- "U overrides F overrides G", U user-owned & a hit -> F, G suppressed,
+  shown under U. U stays (nothing user-owned overrides U).
+- Foreign F<->G mutual, user owns neither -> neither suppressed; both
+  top-level; each shows the other as an overrider/overridden descendant.
+- Boring foreign B overrides exciting E -> E NOT suppressed (B is
+  foreign), so the user who skips B still sees E and E's content.
+** Code hook points (concrete)
+- Suppression: 'build_search_viewforest' (text_search.rs:~445-468).
+  Compute suppression over the ranked set BEFORE '.take
+  (SEARCH_DISPLAY_LIMIT)', using the in-Rust graph, so suppressed slots
+  are backfilled up to the display limit (see open corner O2).
+- Grafting: alongside 'insert_containerward_ancestries_into_search_view'
+  (render_enriched_search_buffer.rs:17), a sibling pass that grafts the
+  two override roles. Source of the relatives: the in-Rust graph
+  ('overriders_of' + outbound list), which is cheap and available at
+  graft time -- no new TypeDB pre-fetch needed (see open corner O1).
+- Heralds/roles already exist: the roles 'overrider'/'overridden' are in
+  PARTNER_ROLE_VOCAB (relation_accessors.rs:187-198) and the birth herald
+  for a 'Birth::Backpath (role)' graft is assembled by the uniform-herald
+  token grammar (server/herald_tokens.rs), not the vocab's (now vestigial)
+  glyph column. Rendered forms: overriderward "Oa", overriddenward "aO"
+  (see the herald note under Grafting). No new wire vocabulary.
+** Test plan (sketch)
+- A search fixture with: a user-owned U overriding foreign F overriding
+  foreign G; assert F and G are absent from top-level and present as
+  descendants under U, with the right birth heralds.
+- A foreign F<->G mutual override, user owns neither; assert both top-level.
+- Boring foreign B overrides E (a hit), user owns neither; assert E stays
+  top-level and shows B as an overrider descendant.
+- Cycle-guard: a chain that loops; assert the branch stops and the repeat
+  gets the 'cycle' viewstat.
+- Truncation: enough results that suppression frees slots; assert the
+  freed slots backfill up to SEARCH_DISPLAY_LIMIT (pending O2).
+** Open corners -- need a ruling before coding
+Each has a recommended default; say "defaults are fine" or correct them.
+*** DONE O1. Fetch override relatives from the in-Rust graph, or pre-fetch via TypeDB like containerward ancestry does?
+Recommendation: in-Rust graph at graft time. Overrides are direct index
+lookups ('overriders_of' + outbound list), unlike the containerward
+ancestry that the existing code pre-fetches from TypeDB. Reusing the
+generic backpath engine (TypeDB) is possible but heavier and is built
+around view-requests. Default: in-Rust graph, bespoke pass.
+**** TODO yes, the in-rust graph
+*** DONE O2. Suppress before or after the display-limit truncation?
+Recommendation: before -- suppress on the full ranked set, then take the
+limit, so a suppressed result frees a slot for the next-ranked one.
+(Truncating first would let a suppressed result waste a visible slot.)
+**** TODO agreed
+*** DONE O3. A user-owned overrider that is NOT itself a search hit -- promote it?
+If your U overrides hit X but U's title doesn't match the query, U is not
+a top-level result, so by the rule X is NOT suppressed (it has no shown
+carrier). X stays top-level and shows U as an overrider descendant.
+Recommendation: do NOT auto-promote U. Promotion would inject
+non-matching nodes into results and complicate ranking; the overrider
+descendant already makes U reachable. Default: no promotion.
+**** TODO ah that's a good one
+The fact that it is overridden will be visible in its herald,
+and in its org-descendents
+(we plan to draw both overrider and overridden ancestries, right?),
+so yeah, let's not auto-promte its overrider.
+*** DONE O4. Depth / breadth bound on the override graft?
+Containerward ancestry is naturally bounded (it terminates at roots).
+Override chains are short in practice (monogamy on user-owned edges), but
+foreign edges could fan out. Recommendation: reuse whatever budget the
+enrichment already applies to containerward grafting; if there is none,
+cap override-graft depth generously and 'log' when truncated (no silent
+cap). Default: match containerward behavior; add a cap only if it graft
+unbounded.
+**** TODO sure

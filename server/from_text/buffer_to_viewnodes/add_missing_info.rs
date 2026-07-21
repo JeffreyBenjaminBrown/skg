@@ -7,14 +7,15 @@ use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::ParentIs;
-use crate::types::viewnode::{QualCol, Qual};
+use crate::types::viewnode::{IndefOrDef, QualCol, Qual};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
-use ego_tree::{NodeId, NodeMut};
+use crate::dbs::typedb::search::pid_and_source_from_id;
+use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::boxed::Box;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
@@ -48,6 +49,24 @@ pub async fn add_missing_info_to_viewforest(
     viewforest . internal_root_id ();
   replace_ids_with_pids(
     viewforest, root_id, db_name, driver ) . await ?;
+  let source_of_id : HashMap<ID, SourceName> =
+    // A sourceless INDEFINITIVE ActiveNode that already carries an id
+    // (e.g. a col member pasted from the link stack as a bare id -- a
+    // subscribee reference with no source) is a REFERENCE to an EXISTING
+    // node whose source the graph knows. Parent-inheritance below cannot
+    // supply it, because a col member's org-parent is a scaffold, not an
+    // ActiveNode. Resolve those sources here, in bulk, before the DFS.
+    // Ids are already pids (replace_ids_with_pids ran above). Restricted
+    // to indefinitive nodes deliberately: an indefinitive node is read,
+    // not written, so its source is purely informational; a DEFINITIVE
+    // sourceless node is a write whose target source must be stated or
+    // inherited, and stays an error if neither (see
+    // tests/multi_source_errors.rs). A NEW node has no id yet, so it is
+    // not looked up -- it still inherits its parent's source in the DFS.
+    // An id the graph does not know resolves to nothing and falls
+    // through to parent-inheritance too.
+    resolve_sources_for_sourceless_ided_nodes (
+      viewforest, db_name, driver ) . await ?;
   let mut provenance : EnrichmentProvenance =
     EnrichmentProvenance {
       new_nodes              : HashSet::new (),
@@ -58,6 +77,7 @@ pub async fn add_missing_info_to_viewforest(
     true,
     &mut |mut node| {
       make_alias_if_appropriate (&mut node)?;
+      fill_source_from_graph_map (&mut node, &source_of_id);
       let source_inherited : bool =
         inherit_parent_source_if_possible (&mut node)?;
       let id_assigned : bool =
@@ -149,6 +169,64 @@ fn inherit_parent_source_if_possible(
       { t . source = Some (source);
         return Ok (true); }}}
   Ok (false) }
+
+/// Look up, from the graph, the source of every sourceless,
+/// indefinitive ActiveNode that already carries an id (ids are pids
+/// here). Ids the graph does not know resolve to nothing and are
+/// omitted from the map, so those nodes fall through to
+/// parent-inheritance in the DFS.
+async fn resolve_sources_for_sourceless_ided_nodes (
+  viewforest : &MpViewForest,
+  db_name    : &str,
+  driver     : &TypeDBDriver,
+) -> Result<HashMap<ID, SourceName>, Box<dyn Error>> {
+  let mut ids : HashSet<ID> = HashSet::new ();
+  collect_sourceless_active_ids ( viewforest . root (), &mut ids );
+  let mut source_of_id : HashMap<ID, SourceName> = HashMap::new ();
+  for id in ids {
+    if let Some ((_pid, source)) =
+      pid_and_source_from_id ( db_name, driver, &id ) . await ? {
+      source_of_id . insert ( id, source ); }}
+  Ok (source_of_id) }
+
+/// Collect the ids of sourceless, INDEFINITIVE ActiveNodes that
+/// already carry an id. Definitive nodes are excluded on purpose (see
+/// 'resolve_sources_for_sourceless_ided_nodes').
+fn collect_sourceless_active_ids (
+  node_ref : NodeRef<MpViewnode>,
+  ids      : &mut HashSet<ID>,
+) {
+  if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+    = &node_ref . value () . kind
+    { if t . source . is_none ()
+         && matches! ( t . indef_or_def, IndefOrDef::Indefinitive )
+      { if let Some (id) = &t . id {
+          ids . insert ( id . clone () ); }}}
+  for child in node_ref . children () {
+    collect_sourceless_active_ids ( child, ids ); }}
+
+/// If the node is a sourceless, INDEFINITIVE ActiveNode whose id the
+/// graph resolved, set its source from 'source_of_id' (built before the
+/// DFS). This is how a bare col-member reference acquires the source of
+/// the existing node it names -- something
+/// 'inherit_parent_source_if_possible' cannot do, since the org-parent
+/// is a scaffold rather than an ActiveNode with a source. The
+/// indefinitive gate matches the collection above, so a definitive node
+/// sharing an id with an indefinitive one is never filled.
+fn fill_source_from_graph_map (
+  node         : &mut NodeMut<MpViewnode>,
+  source_of_id : &HashMap<ID, SourceName>,
+) {
+  if let MpViewnodeKind::Vognode (MpVognode::Active (t))
+    = &mut node . value () . kind
+  { if t . source . is_some ()
+       || ! matches! ( t . indef_or_def, IndefOrDef::Indefinitive )
+    { return; }
+    let resolved : Option<SourceName> =
+      t . id . as_ref ()
+      . and_then ( |id| source_of_id . get (id) . cloned () );
+    if let Some (source) = resolved {
+      t . source = Some (source); }}}
 
 /// Assign a new UUID to an ActiveNode if it doesn't have an ID.
 /// Returns whether it assigned one.

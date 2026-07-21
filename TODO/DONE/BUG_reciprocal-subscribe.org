@@ -1,0 +1,328 @@
+DANGER: This org file quotes org buffers.
+The quotes are indented by two spaces,
+so headlines in the quote are distinguishable from headlines of this file
+(which are not indented).
+* the story
+I search for 'cooking'.
+The top two search results are the ones of interest.
+One is in 'public' and the other in 'cheese' (the name of the source
+written by the fictitious Cheese Man).
+If I open the one in cheese, it opens normally,
+but if I open the onne from public, it comes up indefinitive.
+That's the first bug. Don't fix it immediately; first report why it's happening.
+
+Anyway, I make that node definitive.
+Then I run C-c c s to see what subscription action it has.
+I see Cheese Man's note subscribes to it, and it subscribes to nothing. Good.
+
+I want to subscribe back to Cheese Man's note.
+So I push that ID to the link stack (C-c u),
+start a headline in the public cooking note's collection of subscribees,
+and paste the copied node there.
+* the resulting, offending buffer
+  * (skg (node (id 95fc4b53-483e-475e-a86c-2818c0917166) (source public) (parentIs absent) (rels "C11 2(1)L 1S 1O") (viewStats (sourceHerald ⌂:public)))) cooking
+  ** (skg subscriberCol)
+  *** (skg (node (id 056a7de8-d7e5-4fb4-9a42-7e0f088ab898) (source Cheese-Man) indef (birthHerald "Sb") (rels "C10 H2 Ob") (viewStats (relSource Cheese-Man) (sourceHerald ⌂:Cheese-Man)))) cooking
+  ** (skg subscribeeCol)
+  *** (skg (node (id 056a7de8-d7e5-4fb4-9a42-7e0f088ab898) indef)) cooking
+  ** (skg (node (id ca2a42f7-c0e1-46da-b1d9-4355d7939eef) (source public) (birthHerald "aC") (rels "1H"))) ONGOING [[id:0d037a5d-e027-4b6d-8054-c39aad9bb196][soup]]
+  ** (skg (node (id dd60a0ce-0a1c-4b38-bc64-deba1587ca96) (source public) (birthHerald "aC") (rels "1H"))) ONGOING [[id:0cb70005-87b9-43a3-96e8-45906f1561ec][beans]]
+  ** (skg (node (id 8f22b551-42bf-4a76-84c1-657558ce290f) (source public) indef (birthHerald "2aC"))) [[id:9b6e0646-c3a7-49e9-a3fa-d94721062713][asparagus]]
+  ** (skg (node (id 8c3adf7a-fded-4132-ad57-ea07829dcb7f) (source public) indef (birthHerald "2aC"))) [[id:eb59613b-87d4-4b24-8e5c-be43090989f3][pineapple cheese salad <2025-09-07 Sun>]]
+  ** (skg (node (id 08f171e3-8501-48ef-94d8-f4fa30e8733a) (source public) indef hiddenBody (birthHerald "2aC"))) Add extra salt to the rice, if at all.
+  ** (skg (node (id e89b8d5d-d444-4d8d-8c8f-e6e3c5ba6dfa) (source public) indef (birthHerald "2aC"))) [[id:f29fbdf5-4d91-401d-a614-d0a63bf201e5][refined coconut oil is better for high heat cooking]]
+  ** (skg (node (id 2bcca1c0-d43b-44a1-96d3-5e28b4c854eb) (source public) indef (birthHerald "2aC"))) [[id:89e80e2c-174a-43aa-9349-4c01ab4b0ed6][recipes, some]]
+  ** (skg (node (id 517d6aba-5d99-4ef4-a017-82073ccdf966) (source public) indef (birthHerald "2aC"))) [[id:0382a0b6-82da-4b87-9be1-e302f040a979][cheese dangers]]
+  ** (skg (node (id 12efc0ae-f960-421e-a661-22cf2d0e081f) (source public) indef (birthHerald "2aC"))) [[id:63eec882-c8c1-46ae-af8e-a442ca649fe6][cast-iron pans, how to use]]
+  ** (skg (node (id 9635dc98-9407-4712-9393-55bd164ae697) (source public) indef (birthHerald "2aC"))) [[id:60052c9d-90c2-46f8-ac43-5a1dfdac1a07][hot sauce recipe]]
+  ** (skg (node (id 40b93a4b-bcbe-483d-81e3-85f7e84e63b1) (source public) indef (birthHerald "2aC7"))) u
+  *** (skg (node (id 834fac33-f450-4951-8726-9c76e68067ca) (source public) indef hiddenBody (birthHerald "aC"))) a quarter of a lemon is plenty for a personal dish
+  *** (skg (node (id 16abac3f-bff2-4cb3-accf-45ab2ca73a00) (source public) indef (birthHerald "aC"))) steaming is less work than sauteeing
+  *** (skg (node (id f254a9ae-1657-4308-9084-7cf2ec6fb589) (source public) indef hiddenBody (birthHerald "aC"))) baking is easy
+  *** (skg (node (id 1bdd8899-4da8-4e87-9b2c-9c85c0dc5c42) (source public) indef (birthHerald "aC"))) boil lots of eggs at once
+  *** (skg (node (id ff34c07e-621e-478a-9fed-eb6492669ca8) (source public) indef hiddenBody (birthHerald "aC1"))) ? boil water before adding food
+  **** (skg (node (id f7c26bd7-1107-43db-9750-59d7ba436d02) (source public) indef (birthHerald "aC"))) Not for beans or rice, though.
+  *** (skg (node (id 6affbc16-68d9-4ce4-9be7-50c6ff416798) (source public) indef (birthHerald "aC"))) adjust temp a few minutes after adjusting food, to maintain boil
+  *** (skg (node (id 4d1accb7-dbe9-495c-961e-3e42f2db7aa3) (source public) indef hiddenBody (birthHerald "aC"))) one-vessel recipes @ NYT
+* the error message
+  * errors
+  ** * NOTHING WAS SAVED
+
+  Validation errors found in buffer.
+
+  ** Error 1
+  Local structure violation:
+  - ID: 056a7de8-d7e5-4fb4-9a42-7e0f088ab898
+  - ActiveNode must have a source that exists in the config.
+
+  ** Resolution
+  Please fix these errors and try saving again.
+* my thoughts
+Clearly the source exists.
+Maybe the true error is something else -- but then why is that message happening?
+
+You could imagine Skg giving me grief about creating a subscription cycle,
+but I don't think it does -- those are explicitly necessary, at least in the case of
+two nodes owned by different people.
+You could also imagine grief over overrides cycles,
+but again if they cross the user-foreigner boundary, that at least *ought* to be fine.
+* my request
+For now, just research these things and respond inline in this document,
+appending your findings and thoughts in a new headline,
+subdividing it (and maybe sub-subdividing it --
+remember that the most natural org tree for a topic probably is not uniform-depth,
+and should not use bullets for subdivision instead of asterisks)
+however seems most natural.
+* Claude's findings
+Both bugs are real, both are cheap to explain, and they are unrelated
+in mechanism even though your session ran into them back-to-back. I did
+not change any code (you asked me only to research). Line references
+below are clickable.
+** Bug 1: opening the public "cooking" comes up indefinitive
+*** What actually happens
+You did not open a content view at all. You opened the *override-choice
+menu*. That menu is, by construction, "an ordinary Skg buffer of
+indefinitive nodes" -- the requested node as root, drawn indefinitively
+(server/to_org/render/override_menu.rs:51, ~mk_indefinitive_viewnode~),
+with each overrider as an indefinitive Independent child. So "comes up
+indefinitive" is exactly the menu's signature, not a broken content view.
+The Cheese node opens normally because *nothing overrides it*, so no menu
+is generated and the normal render path runs.
+*** Why the public node is overridden
+The menu fires whenever the opened node is the *target* of an
+~overrides_view_of~ edge and at least one overrider is visible
+(server/serve/handlers/single_root_view.rs:113-162 -> ~override_menu_view~).
+Your public "cooking" (95fc4b53) is such a target: Cheese Man's "cooking"
+(056a7de8) both ~subscribes_to~ it and ~overrides_view_of~ it. That pair
+of edges is the fork shape (see glossary.md, "clone, and the fork
+operation") -- Cheese Man forked your note into his own source and stayed
+subscribed. The root's own metadata corroborates it: ~(rels "... 1S 1O")~
+means it participates in both a subscribe edge and an override edge.
+*** Why a *foreign* override still hijacks the open
+This is the part worth your judgment. Override *substitution* ignores
+foreign edges -- "Foreign override edges are display-only facts and never
+substitute" (schema.tql:73). But the *menu* deliberately does not: it
+lists "every edge, user-owned and foreign alike"
+(server/to_org/render/override_menu.rs:106-123, ~visible_overriders~;
+also documented in api-and-formats.md under "The override-choice menu:
+... user-owned or foreign"). Because your search returned a Cheese result,
+the Cheese source is active (an inactive-source node would have been
+refused outright, single_root_view.rs:42-58), so the foreign overrider is
+visible and the menu triggers.
+*** Is it a bug?
+Per the current spec, no -- it is documented, intended behavior, and the
+menu is meant as navigation ("Choose a destination"). But I think it is a
+defensible design wart, and probably the thing that surprised you:
+opening *your own* node gets diverted into a chooser purely because some
+foreigner forked it, even though that foreign fork can never actually be
+substituted in for your node anywhere. If a foreign override is
+display-only for substitution, a case can be made that it should not, by
+itself, suppress the plain content view of the overridden node -- perhaps
+foreign-only overriders belong in a herald or a soft prompt rather than a
+menu that replaces the view. I have left this alone pending your call; it
+is a policy choice, not a code fault.
+**** DONE Aha! -- implemented and end-to-end verified 2026-07-21
+Let's just make the override menu feel likee the search menu.
+Right now the search menu provides a containerward ancestry,
+for every result that is content.
+It should similarly provide both an overriderward ancestry
+and an overriddenward ancestry.
+
+For anything overridden by one of the user's nodes,
+we do not need to put it as a top-level search result.
+This rule chains -- if my A overrides my B that overrides someone else's C,
+neither B nor C needs to be a top-level result, because A will contain them
+in its org-descendents. If there's a cycle -- can there be acycle?
+maybe that's a policy violation -- amogn user-owned nodes,
+we can just pick one of them arbitrarily as the 'cycle breaker',
+and suppress from the top-level results
+anything that the cycle breaker recursively overrides.
+***** Claude: this one I did NOT execute -- questions first
+This is a real, sizable feature (it touches search ranking/enrichment,
+and probably the single-root-view open path), and a few things are
+genuinely undecided. I'd rather ask than guess and build the wrong
+shape. It also feels like its own TODO file rather than a rider on this
+bug -- but that's your call.
+****** Q1. Is this about the open-a-node MENU, or about SEARCH results, or both?
+The first sentence says "make the override menu feel like the search
+menu," but the body is all about search results. These are two
+different surfaces. Concretely, after this change, when I *open*
+(single-root view) an overridden node -- the original Bug 1 gesture --
+what should happen? (a) still a menu; (b) a normal content view, with
+the override relatives grafted as ancestry the way search would; or (c)
+the menu goes away entirely and overrides only ever surface through
+search + substitution. My best guess is (b)/(c) -- that the menu is what
+you want to retire -- but I want to be sure before I touch the open path
+and its spec (bypass, precedence, diff-mode -- all documented in
+api-and-formats.md).
+******* TODO I meant to say search results.
+This change would mean there's no longer a need,
+at least when searching for text,
+to show a separate override choice menu -- the choice can be made
+directly from the search results.
+
+(If the override menu comes up in other context, let's keep it there.)
+****** Q2. Where do the override relatives go in the org tree, and which edges do we follow?
+Containerward ancestry grafts containers *above* a result as
+org-ancestors. For "overriderward" and "overriddenward," do the
+relatives go above the result (ancestors) or below it (descendants)?
+Your chaining example ("A will contain B and C in its org-descendents")
+reads as: the chain-top A is the shown node and B, C hang *below* it --
+i.e. overriddenward = descendants. Confirm? And: do we follow only
+USER-OWNED override edges, or foreign ones too? (The current menu shows
+foreign edges; your suppression rule says "overridden by one of the
+USER's nodes," which sounds user-owned-only. The answer decides Q4.)
+******* TODO I don't think you're right.
+Here is a quote from a search results buffer:
+  * (skg (node (id 99db1bd5-f4a6-4f21-b659-57da43fc3106) (source ofiscal) (parentIs absent) indef (rels "1C1") (viewStats (sourceHerald ⌂:ofiscal)))) in data science
+  ** (skg (node (id 1a9d15d0-78f5-4a38-9ee4-ae6e546ed063) (source ofiscal) (parentIs independent) indef (birthHerald "1C8a") (rels "1L"))) PITFALLS in software
+  *** (skg (node (id 62b1112a-5f28-476e-8ddd-c8ada46dd286) (source ofiscal) (parentIs independent) indef hiddenBody (birthHerald "1C6a"))) u, orphaned notes
+  **** (skg (node (id b5b1e9a8-12ab-4f46-8d3a-59202df8a57a) (source ofiscal) (parentIs independent) indef (birthHerald "C20a") (rels "1L"))) ofiscal
+
+You can see that the containerward ancestry of 'in data science'
+is represented as its org-descendents. This would be the same way.
+****** Q3. Suppression must not vanish a result.
+"Suppress from top-level anything overridden by one of the user's
+nodes." If the overriding chain-top is ITSELF a search hit, fine -- it
+carries the suppressed node as a descendant. But if the chain-top is
+NOT a hit, suppressing the overridden node removes it with nothing left
+to show it. Two options: (a) suppress only when the chain-top is also a
+hit; (b) always promote the chain-top into the results as the carrier
+whenever it suppresses a hit. Which?
+******* TODO Oh geez good point.
+Yes, only suppress a result from top-level results
+if it will be present in the results at a deeper level via override.
+****** Q4. Cycles: already impossible among user-owned edges.
+You asked "can there be a cycle?" For USER-OWNED override edges: no --
+schema.tql forbids user-owned override cycles, and it is validated both
+at save and at init/rebuild (see the override-invariants tests). So if
+the traversal follows only user-owned edges (per Q2), a chain cannot
+cycle and the arbitrary "cycle breaker" is unnecessary. It becomes
+necessary ONLY if you also traverse FOREIGN override edges, which are
+display-only and unvalidated and so CAN cycle. So Q4 collapses into Q2:
+tell me user-owned-only vs. include-foreign, and the cycle question
+answers itself.
+******* TODO your question reveals a corner case
+If two foreign nodes mutually override each other,
+and the user overrides neither of them,
+then the search results should show them both.
+(Maybe one author is boring; if the boring author's node was overriding
+the more exciting author's node, we wouldn't want the user to skip
+the boring author's result and therefore not see its org-descendents.)
+
+If the user's U overrides foreign F which overrides foreign G, though,
+then F and G can both be suppressed, because
+the user will probably open their own node.
+***** Claude: your answers unblocked this; design spun out to its own file
+All four answers are captured, and I turned them into a concrete design
+in TODO/DONE/override-ancestry-in-search-results.org -- grafting (both
+override directions, as org-descendants), the suppression rule (anchored
+at a user-owned overrider; foreign overriders and pure-foreign cycles
+suppress nothing), the exact code hook points, and a test plan. I did
+NOT start coding: it is a sizable, standalone feature and four small
+corners still want a default chosen (fetch source, suppress-vs-truncate
+order, whether to promote a non-hit user-owned overrider, graft depth
+bound). Each has a recommended default in that file. Give me a ruling
+(or "defaults are fine") and a go-ahead, and I'll build it.
+** Bug 2: the save that "clearly has a source" is refused
+*** The message is misleading; your instinct is correct
+The config is fine and Cheese-Man does exist in it. The error is not
+about the config at all. The offending node is the pasted subscribee
+reference:
+: *** (skg (node (id 056a7de8-...) indef)) cooking
+It carries *no* ~(source ...)~ atom. The check that fails is
+~has_valid_source~ (server/from_text/buffer_to_viewnodes/local.rs:461-466):
+: t . source . as_ref() . is_some_and( |s| config.sources.contains_key(s) )
+With ~t.source == None~, ~is_some_and~ short-circuits to ~false~ *before the
+config is ever consulted*. So the message
+"ActiveNode must have a source that exists in the config"
+(local.rs:420-422) is doubly wrong as a diagnosis: the source is absent,
+not present-but-unknown, and the config was never checked. A truer message
+would be "this node has no source and I could not infer one."
+*** Why the source is absent -- enrichment can't reach it
+The save pipeline resolves missing sources *before* validating
+(server/from_text.rs:97-114; the comment at :100 says validation "expect[s]
+sources to be inherited/resolved"). But the only source-filling rule is
+~inherit_parent_source_if_possible~
+(server/from_text/buffer_to_viewnodes/add_missing_info.rs:131-151), which
+copies a source *only from an ActiveNode org-parent*. Your pasted node's
+org-parent is the ~subscribeeCol~ scaffold -- a PartnerCol, not an
+ActiveNode -- so ~parent_source~ comes back ~None~ and nothing is inherited.
+The node stays sourceless, and validation rejects it.
+*** The real gap
+A subscribeeCol member is a *reference* to an existing node, not a node
+being written. Its source is knowable from the graph purely from its ID:
+the in-Rust graph already exposes ~pid_and_source~
+(server/dbs/in_rust_graph.rs:150-155), and enrichment already does an
+ID->PID lookup a few lines earlier (~replace_ids_with_pids~,
+add_missing_info.rs:49). It simply never does the analogous ID->source
+lookup. When you *paste from the link stack* you get only an ID (Emacs has
+no source to attach), so the col member arrives bare -- whereas a
+server-rendered col member always carries its source (see the sibling
+subscriber on line 25 of the buffer above, which has ~(source Cheese-Man)~).
+The same node therefore appears twice in your buffer, sourced once and
+sourceless once.
+*** Cycles are a red herring
+You wondered whether the reciprocal subscribe was being rejected as a
+cycle. It is not, on two counts. First, the save aborts in the structural
+validation stage (from_text.rs:112) -- long before any subscribe/override
+cycle reasoning runs -- so it never even gets the chance to object.
+Second, there is no forbidden cycle here anyway: only *user-owned*
+~overrides_view_of~ cycles are prohibited (schema.tql:69-74), the override
+in play is foreign, and mutual *subscriptions* are allowed and expected.
+So if the source were resolved, the reciprocal subscribe would go through.
+*** Fix directions (for when you want one)
+- Best: in enrichment, for a sourceless ActiveNode whose ID resolves in
+  the graph (i.e. an existing node, not a freshly-invented one), fill its
+  source from ~pid_and_source~. This mirrors the existing PID resolution,
+  is localized, and fixes every "pasted reference into a writable col"
+  case, not just subscribees.
+- Narrower: exempt an indefinitive col-member reference from the
+  source-in-config check. Cheaper, but it leaves the node sourceless for
+  downstream stages, which may or may not care.
+- Independent of the above: reword the error so "no source" and "source
+  not in config" are distinguishable. The current text sent you looking
+  in the wrong place.
+**** DONE agreed, the first -- with one scope refinement
+Implemented in 'add_missing_info_to_viewforest'
+(server/from_text/buffer_to_viewnodes/add_missing_info.rs): after
+'replace_ids_with_pids' resolves ids->pids, a bulk step resolves the
+source of every sourceless node from the graph (via
+'pid_and_source_from_id', snapshot-first with a TypeDB fallback, the
+same robustness 'replace_ids_with_pids' has), before the
+parent-inheritance DFS. New nodes (no id yet) and ids the graph does
+not know fall through to parent-inheritance unchanged.
+***** The refinement: indefinitive references only, not every sourceless node
+Your phrasing was "a sourceless ActiveNode whose ID resolves in the
+graph." I first implemented exactly that, and it broke
+tests/multi_source_errors.rs, which asserts that a *definitive*
+sourceless line like ~* (skg (node (id pub-1))) pub-1~ (an existing
+node) still errors. That test is right to: a definitive node is a node
+being *written*, and "you gave me an id but no source to write it to"
+is a real thing to catch. An indefinitive node, by contrast, is *read*,
+never written -- its source is purely informational -- so resolving it
+from the graph is always safe. So I gated the resolution on
+'IndefOrDef::Indefinitive'. This still fixes your bug fully: the pasted
+subscribee was indefinitive (~(node (id 056a7de8-...) indef)~). If you
+actually want definitive sourceless existing-node lines to resolve too,
+say so and I will widen it (and update that test) -- but I think the
+narrower rule is the correct one.
+***** Verification
+Added a regression sub-test
+('test_sourceless_col_member_gets_graph_source' in
+tests/new/buffer_to_viewnodes/add_missing_info.rs): a bare, sourceless,
+indefinitive subscribee under a subscribeeCol scaffold acquires the
+referenced node's source from the graph. It fails without the fix
+(scaffold parents cannot pass down a source). Full Rust suite green
+(370 tests). I did NOT touch the error message (your "the first" was
+just the enrichment fix); the misleading "must have a source that
+exists in the config" text is still there for the cases that legitimately
+remain errors. Say the word if you want it reworded too.
+** One bridge note between the two
+Making the override-menu *root* definitive and then building
+subscriber/subscribee cols under it (your steps 3-5) is slightly
+off-label -- the menu is meant for navigating to a destination, not for
+editing in place -- but the resulting buffer is otherwise legitimate, and
+it is not the cause of either failure. Both bugs would reproduce from a
+plain content view too, given the same override edge and the same bare
+paste.
