@@ -678,13 +678,30 @@ Fred}.
 
 ## DEPENDENCIES.toml
 
-At init (and after config changes) the server writes a
-`DEPENDENCIES.toml` manifest into each OWNED source directory,
-listing the sources that source may reference (itself and everything
-more public, in order). It is generated output — hand edits are
-clobbered — and lets someone who receives one of your repos see
-what it depends on. When a FOREIGN source's manifest orders two
-sources differently than this config does, the server warns at init.
+At every server start the server writes a `DEPENDENCIES.toml`
+manifest into each OWNED source directory. Its `dependencies` is a
+list of pairs, one per source that source may reference — itself and
+everything more public, in privacy order, the source itself last.
+Each pair has a `path` (data-root-relative directory) and, unless the
+source is not a git repo or has no remote, a `git-remote` (the fetch
+URL `git remote -v` prints, `origin` preferred), so a receiver knows
+where to fetch each dependency; when the chosen remote is not `origin`
+its name is also recorded as `git-remote-name`. skg makes no use of
+the `git-remote` values itself. For example:
+
+```toml
+dependencies = [
+  { path = "owned/public", git-remote = "git@github.com:me/public.git" },
+  { path = "owned/private", git-remote = "git@github.com:me/private.git" },
+]
+```
+
+It is generated output — hand edits are clobbered — and lets someone
+who receives one of your repos see what it depends on and where to get
+it. When a FOREIGN source's manifest orders two sources differently
+than this config does, the server warns at init. (The receiver also
+still reads the older bare-string `dependencies` shape, so manifests
+published before this change keep working.)
 
 ## Log files
 

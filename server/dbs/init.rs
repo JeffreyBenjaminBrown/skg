@@ -112,6 +112,17 @@ pub fn initialize_dbs (
           full_init (config, driver) }}
     } else {
       full_init (config, driver) };
+  { // DEPENDENCIES.toml: regenerate the publisher manifests, and
+    // warn when a foreign manifest contradicts this config's order.
+    // Done here (not in full_init) so it runs at EVERY server start,
+    // incremental path included -- the manifests describe the config
+    // and the sources' git remotes, neither of which the incremental
+    // path otherwise revisits.
+    if let Err (e) = write_dependencies_manifests (config) {
+      tracing::warn! ( error = %e,
+        "could not write DEPENDENCIES.toml manifests" ); }
+    for w in foreign_manifest_order_warnings (config) {
+      tracing::warn! ( "{}", w ); }}
   touch_init_marker (&marker_path);
   result }
 
@@ -289,13 +300,6 @@ fn full_init (
       validate_all_telescopes (config, &graph);
     let _ = report_telescope_violations (
       &violations, &config . data_root ); }
-  { // DEPENDENCIES.toml: regenerate the publisher manifests, and
-    // warn when a foreign manifest contradicts this config's order.
-    if let Err (e) = write_dependencies_manifests (config) {
-      tracing::warn! ( error = %e,
-        "could not write DEPENDENCIES.toml manifests" ); }
-    for w in foreign_manifest_order_warnings (config) {
-      tracing::warn! ( "{}", w ); }}
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");

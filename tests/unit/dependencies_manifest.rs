@@ -76,6 +76,82 @@ fn manifests_list_prefixes_for_owned_sources_only (
 }
 
 #[test]
+fn dependency_pair_records_origin_remote_without_naming_it (
+) {
+  let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let config : SkgConfig = config_at (
+    tmp . path (),
+    & [ ("public", "owned/public", true) ] );
+  { // Make the owned source its own git repo with an `origin`.
+    let repo : git2::Repository =
+      git2::Repository::init (
+        tmp . path () . join ("owned/public") ) . unwrap ();
+    repo . remote (
+      "origin",
+      "git@github.com:me/public-notes.git" ) . unwrap (); }
+  write_dependencies_manifests (&config) . unwrap ();
+  let manifest : String =
+    std::fs::read_to_string (
+      tmp . path () . join ("owned/public/DEPENDENCIES.toml") )
+    . unwrap ();
+  assert! (
+    manifest . contains (
+      "{ path = \"owned/public\", \
+       git-remote = \"git@github.com:me/public-notes.git\" }" ),
+    "the pair carries path and git-remote: {manifest}" );
+  assert! (
+    ! manifest . contains ("git-remote-name ="),
+    "does not name the remote when it is the conventional origin: \
+     {manifest}" );
+}
+
+#[test]
+fn dependency_pair_names_a_non_origin_remote (
+) {
+  let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let config : SkgConfig = config_at (
+    tmp . path (),
+    & [ ("public", "owned/public", true) ] );
+  { // A repo whose only remote is not called `origin`.
+    let repo : git2::Repository =
+      git2::Repository::init (
+        tmp . path () . join ("owned/public") ) . unwrap ();
+    repo . remote (
+      "upstream",
+      "https://example.com/notes.git" ) . unwrap (); }
+  write_dependencies_manifests (&config) . unwrap ();
+  let manifest : String =
+    std::fs::read_to_string (
+      tmp . path () . join ("owned/public/DEPENDENCIES.toml") )
+    . unwrap ();
+  assert! (
+    manifest . contains (
+      "git-remote = \"https://example.com/notes.git\", \
+       git-remote-name = \"upstream\"" ),
+    "records the fallback remote's URL and its name: {manifest}" );
+}
+
+#[test]
+fn dependency_pair_omits_git_remote_when_source_is_not_a_git_repo (
+) {
+  let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let config : SkgConfig = config_at (
+    tmp . path (),
+    & [ ("public", "owned/public", true) ] );
+  write_dependencies_manifests (&config) . unwrap ();
+  let manifest : String =
+    std::fs::read_to_string (
+      tmp . path () . join ("owned/public/DEPENDENCIES.toml") )
+    . unwrap ();
+  assert! (
+    manifest . contains ("{ path = \"owned/public\" }"),
+    "a path-only pair when the source is not a git repo: {manifest}" );
+  assert! (
+    ! manifest . contains ("git-remote ="),
+    "no git-remote field when there is no remote: {manifest}" );
+}
+
+#[test]
 fn receiver_warns_on_contradicted_order_and_not_on_agreement (
 ) {
   let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
@@ -88,7 +164,9 @@ fn receiver_warns_on_contradicted_order_and_not_on_agreement (
     // this config orders them the other way.
     std::fs::write (
       tmp . path () . join ("colleague/work/DEPENDENCIES.toml"),
-      "dependencies = [\n  \"owned/extra\",\n  \"owned/work\",\n]\n"
+      "dependencies = [\n  \
+       { path = \"owned/extra\" },\n  \
+       { path = \"owned/work\" },\n]\n"
     ) . unwrap ();
     let warnings : Vec<String> =
       foreign_manifest_order_warnings (&config);
@@ -97,8 +175,19 @@ fn receiver_warns_on_contradicted_order_and_not_on_agreement (
   { // Agreement: no warning.
     std::fs::write (
       tmp . path () . join ("colleague/work/DEPENDENCIES.toml"),
-      "dependencies = [\n  \"owned/work\",\n  \"owned/extra\",\n]\n"
+      "dependencies = [\n  \
+       { path = \"owned/work\" },\n  \
+       { path = \"owned/extra\" },\n]\n"
     ) . unwrap ();
     assert! ( foreign_manifest_order_warnings (&config)
               . is_empty () ); }
+  { // Back-compat: a foreign manifest still in the old bare-string
+    // shape is parsed too, so its order is still checked.
+    std::fs::write (
+      tmp . path () . join ("colleague/work/DEPENDENCIES.toml"),
+      "dependencies = [\n  \"owned/extra\",\n  \"owned/work\",\n]\n"
+    ) . unwrap ();
+    let warnings : Vec<String> =
+      foreign_manifest_order_warnings (&config);
+    assert_eq! ( warnings . len (), 1, "{:?}", warnings ); }
 }
