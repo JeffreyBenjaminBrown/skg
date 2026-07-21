@@ -265,16 +265,16 @@ the rule only POSITIONS them by emitting this sentinel, and
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
   "Return a display-ready herald string for METADATA-SEXP.
 Most composition lives in `heralds--transform-rules' (the served rule
-table); the one exception is the relationship-herald spans, which the
-rule table only positions with a sentinel token that this function
-replaces with `heralds--render-rel-spans' output. Returns nil if
-METADATA-SEXP doesn't parse as an `(skg ...)' form."
+table); the one exception is the relationship heralds, whose SEMANTIC
+`(rels ...)' facts the rule table only positions with a sentinel token
+that this function replaces with `heralds--render-rel-facts' output.
+Returns nil if METADATA-SEXP doesn't parse as an `(skg ...)' form."
   (let* ((sexp (heralds--read-metadata metadata-sexp))
          (is-skg (and (listp sexp) (eq (car sexp) 'skg)))
          (tokens (when is-skg
                    (skg-transform-sexp-flat
                     sexp heralds--transform-rules)))
-         (rel-str (when is-skg (heralds--render-rel-spans sexp))))
+         (rel-str (when is-skg (heralds--render-rel-facts sexp))))
     (heralds--tokens->text
      (heralds--splice-rel-spans tokens rel-str))))
 
@@ -301,36 +301,122 @@ absent anyway) any stray sentinel token is dropped."
                for found = (and (consp child) (heralds--find-rels child))
                when found return found))))
 
-(defun heralds--render-rel-spans (sexp)
-  "Render the `(rels (COLOR \"text\") ...)' payload in SEXP to one
-propertized string, or nil if there is no such payload. Each span's
-COLOR maps to a face (`heralds--span-color-to-face'); a `sep' (or
-unrecognized) span gets no face -- an ordinary space between tokens."
+;; ── relationship heralds: render the server's SEMANTIC facts ─────────
+;; ALL presentation lives here (letters, colors, order, count-omission,
+;; the a(b,c) link form); the server sends only facts. See
+;; TODO/heralds-semantic-wire.org. The nvim client mirrors this exactly
+;; (nvim/lua/skg/heralds.lua).
+
+(defconst heralds--rel-order '(contains textlinksTo subscribes overrides hides)
+  "Relationship display order: C L S O H.")
+
+(defun heralds--rel-letter (rel)
+  "The display letter for relation symbol REL."
+  (pcase rel ('contains "C") ('textlinksTo "L") ('subscribes "S")
+             ('overrides "O") ('hides "H") (_ "?")))
+
+(defun heralds--rel-base-face (rel)
+  "Group base face for REL when it is not the reason-for-being:
+C/L blue, S/O/H purple."
+  (pcase rel ((or 'contains 'textlinksTo) 'heralds-blue-face)
+             (_ 'heralds-purple-face)))
+
+(defun heralds--gen-letters (gens)
+  "GENS (generation integers) as sorted distinct letters: 1->a, 2->b, ..."
+  (mapconcat (lambda (g) (if (and (integerp g) (>= g 1) (<= g 26))
+                             (char-to-string (+ ?a (1- g)))
+                           (format "{%s}" g)))
+             (sort (delete-dups (copy-sequence gens)) #'<)
+             ""))
+
+(defun heralds--rel-side (form side)
+  "FORM is a relation form like (contains (in 2 (ancestors 1)) (out 1));
+return (COUNT . GENS) for SIDE (`in' or `out'), or nil if absent."
+  (let ((s (assq side (cdr form))))
+    (when s
+      (cons (or (cl-find-if #'integerp (cdr s)) 0)
+            (cdr (assq 'ancestors (cdr s)))))))
+
+(defun heralds--rel-side-string (count gens base-face multi)
+  "COUNT then ancestor letters, as a propertized string. Omit the count
+when it equals the number of ancestors (>=1). BASE-FACE colors the
+count, unless MULTI (the contains inbound side) and count > 1, which is
+orange. Ancestor letters are always yellow."
+  (let* ((letters (heralds--gen-letters (or gens '())))
+         (n (length letters))
+         (out ""))
+    (when (or (> count 0) (> n 0))
+      (unless (and (> n 0) (= count n))
+        (setq out (propertize (number-to-string count) 'face
+                              (if (and multi (> count 1))
+                                  'heralds-orange-face base-face))))
+      (when (> n 0)
+        (setq out (concat out (propertize letters 'face 'heralds-yellow-face)))))
+    out))
+
+(defun heralds--ordinary-rel-token (rel form base-face)
+  "Render an ordinary (non-link) relation token, or nil if empty."
+  (let* ((in  (heralds--rel-side form 'in))
+         (out (heralds--rel-side form 'out))
+         (in-s  (heralds--rel-side-string
+                 (if in (car in) 0) (and in (cdr in)) base-face
+                 (eq rel 'contains)))
+         (out-s (heralds--rel-side-string
+                 (if out (car out) 0) (and out (cdr out)) base-face nil)))
+    (unless (and (string-empty-p in-s) (string-empty-p out-s))
+      (concat in-s (propertize (heralds--rel-letter rel) 'face base-face)
+              out-s))))
+
+(defun heralds--link-rel-token (form base-face)
+  "Render the textlinksTo token: the a(b,c) inbound digit form and an
+outbound ancestor-letters-only side. FORM = (textlinksTo (in TOTAL
+(surprising B) (withContent C)) (out (ancestors ...)))."
+  (let* ((in  (assq 'in  (cdr form)))
+         (out (assq 'out (cdr form)))
+         (in-s (when in
+                 (let* ((total (or (cl-find-if #'integerp (cdr in)) 0))
+                        (b (cadr (assq 'surprising  (cdr in))))
+                        (c (cadr (assq 'withContent (cdr in))))
+                        (inner (cond ((and (null b) (null c)) "")
+                                     ((null c) (format "(%d)" b))
+                                     ((null b) (format "(,%d)" c))
+                                     (t (format "(%d,%d)" b c)))))
+                   (propertize (format "%d%s" total inner) 'face base-face))))
+         (out-s (when out
+                  (let ((gens (cdr (assq 'ancestors (cdr out)))))
+                    (when gens
+                      (propertize (heralds--gen-letters gens)
+                                  'face 'heralds-yellow-face))))))
+    (unless (and (null in-s) (null out-s))
+      (concat (or in-s "") (propertize "L" 'face base-face) (or out-s "")))))
+
+(defun heralds--render-rel-facts (sexp)
+  "Render the semantic `(rels ...)' payload in SEXP to one propertized
+string, or nil if there is none / it produces nothing. Coloring: group
+base (C/L blue, S/O/H purple), the reason-for-being token black-on-white,
+ancestor letters black-on-yellow, the contains inbound count>1 orange,
+A/I cyan. Tokens are ordered C L S O H A I and space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
-      (mapconcat
-       (lambda (span)
-         (if (and (consp span) (stringp (cadr span)))
-             (let ((face (heralds--span-color-to-face (car span)))
-                   (text (cadr span)))
-               (if face (propertize text 'face face) text))
-           ""))
-       (cdr rels)
-       ""))))
-
-(defun heralds--span-color-to-face (color)
-  "Map a relationship-herald span COLOR symbol to a face, or nil (default).
-blue = C/L base, purple = S/O/H base, cyan = A/I, yellow = ancestor
-letters, orange = the multi-contains count before C, white = the
-reason-for-being (birth) token."
-  (pcase color
-    ('blue   'heralds-blue-face)
-    ('purple 'heralds-purple-face)
-    ('cyan   'heralds-cyan-face)
-    ('yellow 'heralds-yellow-face)
-    ('orange 'heralds-orange-face)
-    ('white  'heralds-birth-face)
-    (_ nil)))
+      (let ((birth (cdr (assq 'birth (cdr rels))))
+            (tokens '()))
+        (dolist (rel heralds--rel-order)
+          (let ((form (assq rel (cdr rels))))
+            (when form
+              (let* ((base (if (memq rel birth) 'heralds-birth-face
+                             (heralds--rel-base-face rel)))
+                     (tok (if (eq rel 'textlinksTo)
+                              (heralds--link-rel-token form base)
+                            (heralds--ordinary-rel-token rel form base))))
+                (when tok (push tok tokens))))))
+        (let ((a (cadr (assq 'aliases (cdr rels)))))
+          (when a (push (propertize (format "A%d" a) 'face 'heralds-cyan-face)
+                        tokens)))
+        (let ((i (cadr (assq 'extraIds (cdr rels)))))
+          (when i (push (propertize (format "I%d" i) 'face 'heralds-cyan-face)
+                        tokens)))
+        (setq tokens (nreverse tokens))
+        (when tokens (mapconcat #'identity tokens " "))))))
 
 (defun heralds--read-metadata (metadata-sexp)
   "Read METADATA-SEXP string into a Lisp object.

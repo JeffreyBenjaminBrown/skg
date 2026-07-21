@@ -162,11 +162,11 @@ async fn test_single_root_view_with_cycle (
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (rels (blue \"C1\")))) a
-                              ** (skg (node (id b) (source main) (rels (orange \"2\") (yellow \"a\") (white \"C1\")))) b
+      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (rels (contains (out 1))))) a
+                              ** (skg (node (id b) (source main) (rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains)))) b
                               b has a body
-                              *** (skg (node (id c) (source main) (rels (yellow \"a\") (white \"C\") (yellow \"a\")))) c
-                              **** (skg (node (id b) (source main) indef hiddenBody (rels (orange \"2\") (yellow \"a\") (white \"C\") (yellow \"a\")) (viewStats cycle))) b
+                              *** (skg (node (id c) (source main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)))) c
+                              **** (skg (node (id b) (source main) indef hiddenBody (rels (contains (in 2 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)) (viewStats cycle))) b
                               "};
       assert_metadata_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -198,29 +198,29 @@ async fn test_multi_root_view_with_shared_nodes (
       // indef Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\") (sep \" \") (purple \"H2\")))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg hiddenCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (purple \"1O\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (purple \"O2\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
-         ** (skg (node (id 2) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
-         ** (skg (node (id 5) (source main) (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (white \"O2\") (sep \" \") (yellow \"a\") (purple \"H\") (sep \" \") (cyan \"I1\")) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
+         ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg hiderCol)
-         **** (skg (node (id 1) (source main) indef hiddenBody (rels (blue \"C2\") (sep \" \") (white \"H2\") (yellow \"b\")) (viewStats cycle))) title 1
+         **** (skg (node (id 1) (source main) indef hiddenBody (rels (contains (out 2)) (hides (out 2 (ancestors 2))) (birth hides)) (viewStats cycle))) title 1
          *** (skg overriddenCol)
-         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (cyan \"I1\")))) title 3
-         **** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth overrides)))) title 3
+         **** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1 (ancestors 2))) (hides (in 1)) (extraIds 1) (birth overrides)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg subscriberCol)
-         **** (skg (node (id 2) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (cyan \"I1\")))) title 2
-         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (purple \"O\") (sep \" \") (cyan \"I1\")))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
+         **** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 2
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 3
+         * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (white \"C2\") (yellow \"a\") (sep \" \") (purple \"H2\")))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (rels (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"1O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (yellow \"b\") (sep \" \") (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"O2\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -256,29 +256,29 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + cols (cols are not budget-bound); subscribee members
       // are indef.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\") (sep \" \") (purple \"H2\")))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg hiddenCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (purple \"1O\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (purple \"O2\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
-         ** (skg (node (id 2) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
-         ** (skg (node (id 5) (source main) (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (white \"O2\") (sep \" \") (yellow \"a\") (purple \"H\") (sep \" \") (cyan \"I1\")) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
+         ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg hiderCol)
-         **** (skg (node (id 1) (source main) indef hiddenBody (rels (blue \"C2\") (sep \" \") (white \"H2\") (yellow \"b\")) (viewStats cycle))) title 1
+         **** (skg (node (id 1) (source main) indef hiddenBody (rels (contains (out 2)) (hides (out 2 (ancestors 2))) (birth hides)) (viewStats cycle))) title 1
          *** (skg overriddenCol)
-         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (cyan \"I1\")))) title 3
-         **** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth overrides)))) title 3
+         **** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1 (ancestors 2))) (hides (in 1)) (extraIds 1) (birth overrides)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg subscriberCol)
-         **** (skg (node (id 2) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (cyan \"I1\")))) title 2
-         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (purple \"O\") (sep \" \") (cyan \"I1\")))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
+         **** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 2
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 3
+         * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (white \"C2\") (yellow \"a\") (sep \" \") (purple \"H2\")))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (rels (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"1O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (yellow \"b\") (sep \" \") (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"O2\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");
@@ -317,16 +317,16 @@ async fn test_limit_with_multiple_sibling_groups (
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\")))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2))))) 1
                               1 body
-                              ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C2\")))) 11
+                              ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 11
                               11 body
-                              *** (skg (node (id 111) (source main) (rels (yellow \"a\") (white \"C\")))) 111
+                              *** (skg (node (id 111) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 111
                               111 body
-                              *** (skg (node (id 112) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 112
-                              ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C1\")))) 12
+                              *** (skg (node (id 112) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 112
+                              ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12
                               12 body
-                              *** (skg (node (id 121) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 121
+                              *** (skg (node (id 121) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
                               "};
       assert_metadata_eq!(result, expected,
                  "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");

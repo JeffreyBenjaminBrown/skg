@@ -1,0 +1,53 @@
+Execution log for the semantic-heralds-wire work. Plan of record:
+TODO/heralds-semantic-wire.org. Branch: heralds-semantic-wire (off
+heralds-tweaks).
+
+* What's done and went well (verified everywhere runnable)
+- WIRE is now SEMANTIC. The server emits per-relation facts --
+  =(rels (contains (in COUNT (ancestors GEN...)) (out ...)) ...
+   (aliases K) (extraIds K) (birth RELNAME...))= -- and every bit of
+  presentation (letters, colors, order, count-omission, the a(b,c) link
+  form) moved into the clients. Decisions used: generation NUMBERS
+  (1=parent), server-emitted =(birth ...)=, uniform =in=/=out=, rels-only
+  scope (the full rule-table move is Jeff's separate TODO), Emacs and
+  nvim identical.
+- SERVER: herald_tokens.rs rewritten to =relationship_heralds_sexp=
+  (facts -> sexp); the styled-span types/assembly deleted;
+  ViewNodeStats.rel_spans -> rel_heralds (the semantic string);
+  org_to_text emits it; the =rels= rule stays the positioning sentinel
+  (the new sub-atoms are value-position, so the conformance vocabulary
+  and the elisp fixture are unchanged). 10 herald_tokens unit tests pin
+  the emit; conformance + metadata_canon green.
+- CLIENTS: elisp/heralds-minor-mode.el and nvim/lua/skg/heralds.lua each
+  gained an identical semantic renderer (render-rel-facts et al.): parse
+  the facts, order C L S O H A I, build+color each token. The
+  sentinel-splice and faces/hl-groups carried over. 9/9 elisp + 10/10
+  nvim herald specs pass.
+- WIRE TESTS re-baselined (third time) span-form -> semantic via a
+  validated transformer (my-dot-claude/.../span_to_semantic.py, which
+  reconstructs the facts from the spans incl. birth via the white color;
+  self-tested, then validated end-to-end against content_view). 30
+  herald-affected Rust tests pass under nextest. partner_col_matrix and
+  view_stats_sharing hand-fixed to assert on the semantic relation forms
+  / =(birth ...)=.
+- BONUS the plan predicted: the integration graft-role helpers got
+  SIMPLER -- they read the semantic facts directly (a relation with an
+  =(out ... (ancestors ...))= side -> its role) instead of regexing a
+  token string. Updated the elisp helper + all four nvim ports.
+
+* Relationship to prior branches
+- REUSED unchanged: the fact computation in viewnodestats.rs (counts,
+  ancestor flags with edge-level gating, birth_relations), and the
+  metadata_canon / assert_metadata_eq! tooling.
+- SUPERSEDED: the heralds-tweaks branch's styled-span assembly +
+  span-renderers + span-form test expecteds.
+
+* What's imperfect / remaining
+- INTEGRATION tests (tests/integration/*/test-{emacs.el,nvim.lua}): their
+  expected-buffer span forms were converted to semantic by the same
+  validated transformer, and the graft-role helpers rewritten; all
+  syntax-check / byte-compile clean. But the integration SUITE needs a
+  live server + Emacs/nvim + TypeDB to RUN, which this environment lacks
+  -- so these are logic-correct and checked, not executed end-to-end.
+- Verification is nextest + the elisp/nvim specs, not a full green
+  `cargo test` (the known in-process TypeDB-collision flake).

@@ -9,8 +9,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (node (id 123) (rels (blue \"C2\")) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (rels (blue \"3(3)L\")) (editRequest delete))) more text\n")
+      (insert "Test line with (skg (node (id 123) (rels (contains (out 2))) (viewStats cycle))) herald\n")
+      (insert "Another line (skg (node (id 456) (rels (textlinksTo (in 3 (surprising 3)))) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -36,13 +36,14 @@
        (null heralds-overlays)))))
 
 (ert-deftest test-heralds-minor-mode-visual-check ()
-  "The relationship-herald spans render with per-span faces, the ⊥/⟳/
-delete heralds appear, the sentinel placeholder never leaks, and the
-overlay clears on disable. The injected node's rels payload is the C
-token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
+  "The relationship heralds render from SEMANTIC facts with per-token
+faces, the ⊥/⟳/delete heralds appear, the sentinel placeholder never
+leaks, and the overlay clears on disable. The injected node's rels
+payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
+the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
 (yellow), and the birth \"C\" (black-on-white)."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (parentIs independent) (rels (orange \"2\") (yellow \"a\") (white \"C\")) (viewStats cycle) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (parentIs independent) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ( ( herald-start
@@ -200,7 +201,7 @@ would leak content the user hid by restricting the source-set."
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg (node (id 1) (source s) (rels (blue \"C2\"))))\n")
+    (insert "(skg (node (id 1) (source s) (rels (contains (out 2)))))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
@@ -227,7 +228,7 @@ the fixture table."
     (cl-letf (((symbol-function 'skg-request-herald-rules)
                (lambda () (skg-test-install-herald-rules))))
       (with-temp-buffer
-        (insert "(skg (node (id 1) (source s) (rels (blue \"C2\"))))\n")
+        (insert "(skg (node (id 1) (source s) (rels (contains (out 2)))))\n")
         (heralds-minor-mode 1)
         (should heralds-minor-mode)       ;; stayed on
         (should heralds--transform-rules) ;; table recovered

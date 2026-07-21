@@ -1,57 +1,42 @@
 ;;; Shared helpers for save_collateral integration tests.
 ;;; Load with (load-file "path/to/test-helpers.el").
 
-(defun headline--graft-role-from-herald (herald)
-  "Classify a graft HERALD STRING into its backpath ROLENAME, or nil.
-Under the uniform-herald grammar a node's relationship info lives in its
-(rels ...) tokens (server/herald_tokens.rs); HERALD here is the VISIBLE
-text of those tokens. A token has the shape [inSide]X[outSide],
-where X is the relationship letter (C contains, L textlinks_to, H hides,
-S subscribes, O overrides), counts are digits, and lowercase letters
-a/b/... on a side flag a tracked ANCESTOR member there.
-
-A backpath graft reaches an ancestor on its OUTBOUND side: a relation
-letter followed (after any count digits) by lowercase ancestor letters
-(\"Ca\" / \"La\" / \"aC2a\"). That letter maps to the old (birth backpath
-ROLENAME): C->container, L->linkSource, S->subscribee, O->overrider,
-H->hider.  Only call this for nodes already known to be grafts (parentIs
-independent); an ordinary content child can carry the same outbound
-letters (e.g. a cycle's \"aCa\") yet is NOT a graft."
-  (when (and herald (stringp herald)
-             (string-match "\\([CLHSO]\\)[0-9]*[a-z]" herald))
-    (pcase (match-string 1 herald)
-      ("C" 'container)
-      ("L" 'linkSource)
-      ("S" 'subscribee)
-      ("O" 'overrider)
-      ("H" 'hider))))
-
-(defun headline--rels-visible-text (spans)
-  "Concatenate the quoted text of each span in SPANS -- the cdr of a
-(rels (COLOR \"text\") ...) form -- into the visible herald text. Since
-birth is now a WHITE span inside rels (not a separate birthHerald atom),
-a graft's outbound-ancestor token still appears in this text."
-  (mapconcat (lambda (span)
-               (if (and (listp span) (stringp (cadr span)))
-                   (cadr span)
-                 ""))
-             spans ""))
+(defun headline--graft-role-from-rels (rels-body)
+  "Classify a graft from its SEMANTIC relationship facts, or nil.
+RELS-BODY is the cdr of the (rels ...) form -- a list of relation
+sub-forms like (contains (in ...) (out ...)) and (birth ...). A backpath
+graft relates OUTBOUND to a tracked ancestor: it has a relation with an
+(out ... (ancestors ...)) side. That relation names the role: contains
+-> container, textlinksTo -> linkSource, subscribes -> subscribee,
+overrides -> overrider, hides -> hider. Only meaningful for a node
+already known to be a graft (parentIs independent); an ordinary content
+child can carry the same outbound ancestor (e.g. a cycle) yet is NOT a
+graft."
+  (cl-loop for (rel . role) in '((contains    . container)
+                                 (textlinksTo . linkSource)
+                                 (subscribes  . subscribee)
+                                 (overrides   . overrider)
+                                 (hides       . hider))
+           for form = (assq rel rels-body)
+           when (and form
+                     (let ((out (assq 'out (cdr form))))
+                       (and out (assq 'ancestors (cdr out)))))
+           return role))
 
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
 Birth provenance is more specific than parentIs: a backpath graft (a node
 with (parentIs independent)) returns its ROLENAME from its (rels ...)
-tokens (e.g. `container', `linkSource'); otherwise the result is the
+facts (e.g. `container', `linkSource'); otherwise the result is the
 explicit parentIs or the implicit `affected'."
   (let* ((parentIs-list (when sexp
                           (skg-sexp-cdr-at-path sexp
                                                 '(skg node parentIs))))
-         (rels-herald (when sexp
-                        (headline--rels-visible-text
-                         (skg-sexp-cdr-at-path sexp '(skg node rels)))))
+         (rels-body (when sexp
+                      (skg-sexp-cdr-at-path sexp '(skg node rels))))
          (independent (eq (car parentIs-list) 'independent))
          (graft-role (when independent
-                       (headline--graft-role-from-herald rels-herald))))
+                       (headline--graft-role-from-rels rels-body))))
     (cond
      ;; A backpath graft: independent, with an outbound-ancestor herald.
      (graft-role graft-role)

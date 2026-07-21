@@ -388,15 +388,20 @@ async fn path_request_scenarios (
   // letter 'a' (yellow) then the birth 'O' (white). The 'overrider'
   // partner overrides its parent among others -> "O2a". The birth token's
   // spans appear consecutively inside (rels ...) on the partner's line.
+  // Each row's 5th field is the SEMANTIC relationship the grafted
+  // partner has to the origin (its org-parent, generation 1), which is
+  // its reason-for-being. The direction (in vs out) distinguishes e.g.
+  // overridden (the origin overrides it) from overrider (it overrides
+  // the origin, among others).
   let sharing : [(&str, &str, &str, &str, &str); 6] = [
-    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         r#"(yellow "a") (white "O")"#),
-    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     r#"(white "O2") (yellow "a")"#),
-    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         r#"(yellow "a") (white "S")"#),
-    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     r#"(white "S3") (yellow "a")"#),
-    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     r#"(yellow "a") (white "H")"#),
-    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", r#"(white "H2") (yellow "a")"#),
+    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "(overrides (in 1 (ancestors 1)))"),
+    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "(overrides (out 2 (ancestors 1)))"),
+    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "(subscribes (in 1 (ancestors 1)))"),
+    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "(subscribes (out 3 (ancestors 1)))"),
+    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "(hides (in 1 (ancestors 1)))"),
+    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "(hides (out 2 (ancestors 1)))"),
   ];
-  for (s, owner, role, partner, birth_span) in sharing {
+  for (s, owner, role, partner, birth_rel) in sharing {
     let _ = role;
     let resp : SaveResponse = save (
       &req (owner, role, owner), // title == owner (matches its disk title)
@@ -405,13 +410,13 @@ async fn path_request_scenarios (
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view,
                            &format! ("(id {})", partner) );
-    // The matching birth-token spans, on the grafted partner's own line.
+    // The matching birth relationship, on the grafted partner's own line.
     match resp . saved_view . lines ()
             . find ( |l| l . contains (&format! ("(id {})", partner)) ) {
-      Some (line) => if ! line . contains (birth_span) {
+      Some (line) => if ! line . contains (birth_rel) {
         fails . record (s, format! (
-          "partner {} missing birth span {:?}: {}",
-          partner, birth_span, line )); },
+          "partner {} missing birth relation {:?}: {}",
+          partner, birth_rel, line )); },
       None => {}, // already recorded by want_contains above
     } }
   { // (path linkDest) on a node whose TITLE carries [[id:pathLink-dst]]:
@@ -424,11 +429,11 @@ async fn path_request_scenarios (
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
-    // The grafted dest carries the linkSource-birth token (1L): one
-    // inbound link (from the origin), no outbound. Now a black-on-white
-    // (birth) span. (Replaces the gone "(birth backpath linkDest)" marker.)
+    // The grafted dest is born of a single inbound link (from the
+    // origin), no outbound. (Replaces the gone "(birth backpath
+    // linkDest)" marker.)
     fails . want_contains (
-      s, &resp . saved_view, r#"(white "1L")"# ); }
+      s, &resp . saved_view, "(textlinksTo (in 1))" ); }
   { // Self-referential fixture: a node that links to ITSELF. A
     // non-container path role is cycle-guarded and needs NO view-root
     // special-case (unlike containerward) -- the build must not panic,

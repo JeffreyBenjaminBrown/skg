@@ -1,10 +1,10 @@
-use crate::herald_tokens::assemble_counts_only;
+use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
-  PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats, HeraldSpan,
+  PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats,
   ParentIs,
 };
 
@@ -252,8 +252,9 @@ fn activeNode_metadata_to_string (
     config    : & SkgConfig,
   ) -> String {
     fn rels_herald ( activeNode : & ActiveNode ) -> Option < String > {
-      activeNode . viewStats . rel_spans . as_ref () . map (
-        |spans| rel_spans_atom (spans) ) }
+      // The semantic (rels ...) sexp, assembled in the viewnodestats
+      // pass (server/herald_tokens.rs); emitted verbatim.
+      activeNode . viewStats . rel_heralds . clone () }
     fn view_stats (
       activeNode : & ActiveNode,
       config    : & SkgConfig,
@@ -469,40 +470,15 @@ fn deleted_scaff_metadata_to_string (
   parts . push ( "(deletedScaffold deadScaffold)" . to_string () );
   parts . join (" ") }
 
-/// Serialize the styled relationship-herald spans as the metadata form
-///   (rels (COLOR "text") (COLOR "text") ...)
-/// where COLOR is a span color name (blue/purple/cyan/yellow/orange/
-/// white/sep). The client renders these directly (not via the rule
-/// table); see server/herald_tokens.rs and elisp/heralds-minor-mode.el.
-fn rel_spans_atom (
-  spans : &[HeraldSpan],
-) -> String {
-  let parts : Vec<String> = spans . iter () . map ( |sp|
-    format! ("({} {})",
-             sp . color . repr_in_client (),
-             quote_herald (& sp . text)) )
-    . collect ();
-  format! ("(rels {})", parts . join (" ")) }
-
-/// The relationship-herald atom for a phantom: counts-only styled spans
-/// (no ancestor flags, no birth, no view position) plus =Ak= / =Ik=.
+/// The relationship-herald atom for a phantom: counts-only semantic
+/// facts (no ancestor flags, no birth, no view position).
 fn phantom_rels_atom (
   gs : &GraphNodeStats,
 ) -> Option < String > {
-  gs . rels . as_ref () . and_then ( |counts| {
-    let spans : Vec<HeraldSpan> =
-      assemble_counts_only ( counts, gs . aliases, gs . extra_ids );
-    if spans . is_empty () { None }
-    else { Some ( rel_spans_atom (&spans) ) } } ) }
-
-/// Quote an assembled herald string for the metadata sexp. The strings
-/// contain spaces and parens (e.g. =2(1,1)L=), so they MUST be quoted;
-/// both the Rust 'sexp' parser and Emacs 'read' accept quoted strings.
-fn quote_herald (
-  s : &str,
-) -> String {
-  format! ( "\"{}\"",
-            s . replace ('\\', "\\\\") . replace ('"', "\\\"") ) }
+  gs . rels . as_ref () . and_then ( |counts|
+    relationship_heralds_sexp (
+      counts, gs . aliases, gs . extra_ids,
+      &AncestorFlags::default (), &[] ) ) }
 
 fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level . max (1)) }

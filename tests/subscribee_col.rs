@@ -86,17 +86,17 @@ fn test_subscribee_col_appears_for_subscribers(
     // from the edge's DEFAULT (more_private_of(home, away) = "away"),
     // render-and-gating's herald surfaces it: (relSource home).
     let expected = indoc! {
-      "* (skg (node (id 1) (source home) (parentIs absent) (rels (blue \"C4\")) (viewStats (sourceHerald ⌂:home)))) 1
-      ** (skg (node (id 11) (source home) (rels (yellow \"a\") (white \"C1\") (sep \" \") (purple \"S1\")))) 11
+      "* (skg (node (id 1) (source home) (parentIs absent) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
+      ** (skg (node (id 11) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribes (out 1)) (birth contains)))) 11
       *** (skg subscribeeCol)
-      **** (skg (node (id 11-sees) (source away) indef (rels (yellow \"b\") (white \"S\")) (viewStats (relSource home) (sourceHerald ⌂:away)))) 11-sees
-      *** (skg (node (id 111) (source home) (rels (yellow \"a\") (white \"C\")))) 111
-      ** (skg (node (id 12) (source home) (rels (yellow \"a\") (white \"C\") (sep \" \") (purple \"S1\")))) 12
+      **** (skg (node (id 11-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (relSource home) (sourceHerald ⌂:away)))) 11-sees
+      *** (skg (node (id 111) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 111
+      ** (skg (node (id 12) (source home) (rels (contains (in 1 (ancestors 1))) (subscribes (out 1)) (birth contains)))) 12
       *** (skg subscribeeCol)
-      **** (skg (node (id 12-sees) (source away) indef (rels (yellow \"b\") (white \"S\")) (viewStats (relSource home) (sourceHerald ⌂:away)))) 12-sees
-      ** (skg (node (id 13) (source home) (rels (yellow \"a\") (white \"C\")))) 13
-      ** (skg (node (id 14) (source home) (rels (yellow \"a\") (white \"C1\")))) 14
-      *** (skg (node (id 141) (source home) (rels (yellow \"a\") (white \"C\")))) 141
+      **** (skg (node (id 12-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (relSource home) (sourceHerald ⌂:away)))) 12-sees
+      ** (skg (node (id 13) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+      ** (skg (node (id 14) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 14
+      *** (skg (node (id 141) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 141
 "};
     assert_metadata_eq!(result, expected,
       "Nodes with subscriptions should have SubscribeeCol children");

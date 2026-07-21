@@ -455,7 +455,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
     let ViewNodeStats {
       cycle : _,
       sourceAtBoundary : _, // -> the sourceHerald atom
-      rel_spans : _,        // -> the node-level rels atom (styled spans)
+      rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       hidden_body : _,      // -> the node-level hiddenBody atom
       rel_source : _,       // -> the relSource atom (keyed, load-bearing AND its own herald)

@@ -114,25 +114,25 @@ async fn test_definitive_view_ample_budget (
 
       // With an ample budget, all children should be expanded
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
-        ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
-        ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C4\")))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+        ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
+        ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
         12 body
-        *** (skg (node (id 121) (source main) (rels (yellow \"a\") (white \"C2\")))) 121
+        *** (skg (node (id 121) (source main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
         121 body
-        **** (skg (node (id 1211) (source main) (rels (yellow \"a\") (white \"C\")))) 1211
+        **** (skg (node (id 1211) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1211
         1211 body
-        **** (skg (node (id 1212) (source main) (rels (yellow \"a\") (white \"C\")))) 1212
+        **** (skg (node (id 1212) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1212
         1212 body
-        *** (skg (node (id 122) (source main) (rels (yellow \"a\") (white \"C1\")))) 122
+        *** (skg (node (id 122) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
         122 body
-        **** (skg (node (id 1221) (source main) (rels (yellow \"a\") (white \"C\")))) 1221
+        **** (skg (node (id 1221) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1221
         1221 body
-        *** (skg (node (id 123) (source main) (rels (yellow \"a\") (white \"C\")))) 123
+        *** (skg (node (id 123) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
         123 body
-        *** (skg (node (id 124) (source main) (rels (yellow \"a\") (white \"C\")))) 124
+        *** (skg (node (id 124) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
         124 body
-        ** (skg (node (id 13) (source main) (rels (yellow \"a\") (white \"C\")))) 13
+        ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
@@ -208,33 +208,33 @@ async fn test_definitive_view_limit_5_or_6 (
       // and drew its WHOLE group 121..124, but the budget hit 0 at 13, so when
       // 121..124 are visited they stay indefinitive (none expands -> no gen-3).
       let expected_5 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
-        ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
-        ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C4\")))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+        ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
+        ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C2\")))) 121
-        *** (skg (node (id 122) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C1\")))) 122
-        *** (skg (node (id 123) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 123
-        *** (skg (node (id 124) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 124
-        ** (skg (node (id 13) (source main) (rels (yellow \"a\") (white \"C\")))) 13
+        *** (skg (node (id 121) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
+        *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 123) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 124) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
       // limit=6: one more expansion than limit=5 -- 121 (the 6th) now expands and
       // draws its whole gen-3 group 1211,1212 (both then indefinitive, budget
       // spent); 122..124 remain indefinitive.
       let expected_6 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
-        ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
-        ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C4\")))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+        ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
+        ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
         12 body
-        *** (skg (node (id 121) (source main) (rels (yellow \"a\") (white \"C2\")))) 121
+        *** (skg (node (id 121) (source main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
         121 body
-        **** (skg (node (id 1211) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 1211
-        **** (skg (node (id 1212) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 1212
-        *** (skg (node (id 122) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C1\")))) 122
-        *** (skg (node (id 123) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 123
-        *** (skg (node (id 124) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 124
-        ** (skg (node (id 13) (source main) (rels (yellow \"a\") (white \"C\")))) 13
+        **** (skg (node (id 1211) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1211
+        **** (skg (node (id 1212) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1212
+        *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 123) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 124) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
@@ -309,10 +309,10 @@ async fn test_definitive_view_limit_1_to_4 (
       // all three are then indefinitive (budget spent), so 12 never expands and
       // none of 121.. is created. Root 2 still expands (root exemption).
       let expected_1 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
-        ** (skg (node (id 11) (source main) indef (rels (yellow \"a\") (white \"C\")))) 11
-        ** (skg (node (id 12) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C4\")))) 12
-        ** (skg (node (id 13) (source main) indef (rels (yellow \"a\") (white \"C\")))) 13
+        * (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+        ** (skg (node (id 11) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
+        ** (skg (node (id 12) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
+        ** (skg (node (id 13) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
       // hiddenBody marks only 12: the saved buffer drew 11 and 13
@@ -322,15 +322,15 @@ async fn test_definitive_view_limit_1_to_4 (
       // whole group 121..124, all indefinitive (budget spent); 13 is reached
       // after the budget is gone, so it too is indefinitive.
       let expected_4 = indoc! {"
-        * (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
-        ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
-        ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C4\")))) 12
+        * (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+        ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
+        ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C2\")))) 121
-        *** (skg (node (id 122) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C1\")))) 122
-        *** (skg (node (id 123) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 123
-        *** (skg (node (id 124) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 124
-        ** (skg (node (id 13) (source main) indef (rels (yellow \"a\") (white \"C\")))) 13
+        *** (skg (node (id 121) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
+        *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 123) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 124) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        ** (skg (node (id 13) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
@@ -386,13 +386,13 @@ async fn test_definitive_view_conflicting (
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C1\")))) 1
-         ** (skg (node (id 12) (source main) indef (rels (yellow \"a\") (white \"C1\")))) 12
-         *** (skg (node (id 122) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C1\")))) 122
-         * (skg (node (id 12) (source main) (parentIs absent) (rels (blue \"1C1\")))) 12
-         ** (skg (node (id 122) (source main) (rels (yellow \"a\") (white \"C1\")))) 122
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 1))))) 1
+         ** (skg (node (id 12) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12
+         *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+         * (skg (node (id 12) (source main) (parentIs absent) (rels (contains (in 1) (out 1))))) 12
+         ** (skg (node (id 122) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
          122 body
-         *** (skg (node (id 1221) (source main) (rels (yellow \"a\") (white \"C\")))) 1221
+         *** (skg (node (id 1221) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1221
          1221 body
       "};
 
@@ -437,11 +437,11 @@ async fn test_definitive_view_with_cycle (
 
       // a should expand to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (node (id cyc-a) (source main) (parentIs absent) (rels (blue \"1C1\")))) cyc-a
+        * (skg (node (id cyc-a) (source main) (parentIs absent) (rels (contains (in 1) (out 1))))) cyc-a
         cyc-a body
-        ** (skg (node (id cyc-b) (source main) (rels (yellow \"a\") (white \"C\") (yellow \"a\")))) cyc-b
+        ** (skg (node (id cyc-b) (source main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)))) cyc-b
         cyc-b body
-        *** (skg (node (id cyc-a) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\") (yellow \"a\")) (viewStats cycle))) cyc-a
+        *** (skg (node (id cyc-a) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)) (viewStats cycle))) cyc-a
       "};
 
       assert_metadata_eq!(result, expected,
@@ -491,17 +491,17 @@ async fn test_definitive_view_with_repeat (
         // and so clobbers the Tentative bare root 121 (§5.2). So the bare
         // root 121 is now indefinitive and 12's child 121 is the definitive
         // occurrence (childless, since the save emptied 121's contains).
-        "* (skg (node (id 121) (source main) (parentIs absent) indef (rels (blue \"1C\")))) 121
-         * (skg (node (id 12) (source main) (parentIs absent) (rels (blue \"1C4\")))) 12
+        "* (skg (node (id 121) (source main) (parentIs absent) indef (rels (contains (in 1))))) 121
+         * (skg (node (id 12) (source main) (parentIs absent) (rels (contains (in 1) (out 4))))) 12
          12 body
-         ** (skg (node (id 121) (source main) (rels (yellow \"a\") (white \"C\")))) 121
-         ** (skg (node (id 122) (source main) (rels (yellow \"a\") (white \"C1\")))) 122
+         ** (skg (node (id 121) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
+         ** (skg (node (id 122) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
          122 body
-         *** (skg (node (id 1221) (source main) (rels (yellow \"a\") (white \"C\")))) 1221
+         *** (skg (node (id 1221) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1221
          1221 body
-         ** (skg (node (id 123) (source main) (rels (yellow \"a\") (white \"C\")))) 123
+         ** (skg (node (id 123) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
          123 body
-         ** (skg (node (id 124) (source main) (rels (yellow \"a\") (white \"C\")))) 124
+         ** (skg (node (id 124) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
          124 body
       "};
 
@@ -595,12 +595,12 @@ async fn test_budget_aliascol_is_neutral (
       println!("alias-budget (budget 3):\n{}", result);
 
       let expected = indoc! {"
-        * (skg (node (id r) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (cyan \"A2\")))) r
+        * (skg (node (id r) (source main) (parentIs absent) (rels (contains (out 1)) (aliases 2)))) r
         ** (skg aliasCol)
         *** (skg alias) first alias
         *** (skg alias) second alias
-        ** (skg (node (id c1) (source main) (rels (yellow \"a\") (white \"C1\")))) c1
-        *** (skg (node (id c2) (source main) (rels (yellow \"a\") (white \"C\")))) c2
+        ** (skg (node (id c1) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
+        *** (skg (node (id c2) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
       "};
       assert_metadata_eq!(result, expected,
         "budget 3 expands the whole content chain; the AliasCol is whole + budget-neutral");

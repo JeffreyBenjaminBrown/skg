@@ -36,9 +36,9 @@ describe('skg.heralds', function ()
 
   it('toggling adds and removes extmarks', function ()
     local buf = scratch_buffer_with({
-      'Test line with (skg (node (id 123) (rels (blue "C2"))'
+      'Test line with (skg (node (id 123) (rels (contains (out 2)))'
       .. ' (viewStats cycle))) herald',
-      'Another line (skg (node (id 456) (rels (blue "3(3)L"))'
+      'Another line (skg (node (id 456) (rels (textlinksTo (in 3 (surprising 3))))'
       .. ' (editRequest delete))) more text',
       'Plain line without heralds' })
     assert.is_true(heralds.enable(buf))
@@ -53,14 +53,15 @@ describe('skg.heralds', function ()
     assert.are.equal(0, #herald_extmarks(buf))
   end)
 
-  it('conceals the metadata extent and displays the styled herald spans',
+  it('conceals the metadata extent and renders semantic rel facts',
      function ()
-    -- rels payload is the C token 2aC: the multi-contains "2" (orange),
-    -- the ancestor "a" (yellow), and the birth "C" (black-on-white).
+    -- rels payload (contains (in 2 (ancestors 1))), birth contains
+    -- renders as the C token 2aC: the multi-contains "2" (orange), the
+    -- ancestor "a" (yellow), and the birth "C" (black-on-white).
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) (parentIs independent)'
-      .. ' (rels (orange "2") (yellow "a") (white "C")) (viewStats cycle)'
-      .. ' (editRequest delete))) text' })
+      .. ' (rels (contains (in 2 (ancestors 1))) (birth contains))'
+      .. ' (viewStats cycle) (editRequest delete))) text' })
     heralds.enable(buf)
     local marks = herald_extmarks(buf)
     assert.are.equal(1, #marks)
@@ -142,7 +143,7 @@ describe('skg.heralds', function ()
     local original = herald_rules.request_herald_rules
     herald_rules.request_herald_rules = install_fixture_rules
     local buf = scratch_buffer_with({
-      '(skg (node (id 1) (source s) (rels (blue "C2"))))' })
+      '(skg (node (id 1) (source s) (rels (contains (out 2)))))' })
     local enabled = heralds.enable(buf)
     herald_rules.request_herald_rules = original
     assert.is_true(enabled)
@@ -175,7 +176,7 @@ describe('skg.heralds', function ()
     heralds.enable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
     vim.api.nvim_buf_set_lines(buf, 0, 1, false, {
-      '* (skg (node (id 9) (rels (blue "C2")))) now a headline' })
+      '* (skg (node (id 9) (rels (contains (out 2))))) now a headline' })
     vim.wait(200, function () return #herald_extmarks(buf) > 0 end, 10)
     assert.are.equal(1, #herald_extmarks(buf))
   end)

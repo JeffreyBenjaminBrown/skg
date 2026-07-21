@@ -25,11 +25,11 @@
       (message "✗ FAIL: leaf-b search root is independent during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent) indef (rels (white \"C\") (yellow \"a\"))" line)
+    (when (string-match-p "(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent) indef (rels (white \"L\") (yellow \"a\"))" line)
+    (when (string-match-p "(parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))
@@ -86,9 +86,9 @@
        "enriched search results")
       (message "✓ containerward path enrichment arrived")
       ;; Phase 3: verify node relationship stats in enriched results.
-      ;; leaf-b is a root with 1 content,
-      ;; so its line should include (rels (blue "1C")).
-      (if (string-match-p "(rels (blue \"1C\"))" content)
+      ;; leaf-b has one container (its inserted containerward ancestor),
+      ;; so its line should include (rels (contains (in 1))).
+      (if (string-match-p "(rels (contains (in 1)))" content)
           (progn
             (message "✓ PASS: node relationship stats present in enriched search results")
             (message "Buffer content:\n%s" content)

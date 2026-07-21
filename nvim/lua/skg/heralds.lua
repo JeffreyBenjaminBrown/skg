@@ -49,19 +49,6 @@ local color_to_highlight_group = {
   YELLOW = 'SkgHeraldYellow',
   ORANGE = 'SkgHeraldOrange' }
 
----Map relationship-herald SPAN color names to highlight groups. blue =
----C/L base, purple = S/O/H base, cyan = A/I, yellow = ancestor letters,
----orange = the multi-contains count before C, white = the
----reason-for-being (birth) token; `sep' (and anything unknown) -> nil
----(Normal). Mirrors `heralds--span-color-to-face' in elisp.
-local span_color_to_highlight_group = {
-  blue = 'SkgHeraldBlue',
-  purple = 'SkgHeraldPurple',
-  cyan = 'SkgHeraldCyan',
-  yellow = 'SkgHeraldYellow',
-  orange = 'SkgHeraldOrange',
-  white = 'SkgHeraldBirth' }
-
 function M.define_highlight_groups ()
   vim.api.nvim_set_hl(0, 'SkgHeraldRed',
     { fg = 'white', bg = 'red', default = true })
@@ -89,11 +76,6 @@ function M.color_highlight_group (color)
   return color_to_highlight_group[sexpr.atom_text(color)]
 end
 
----@param color_name string a span color name (blue/purple/.../sep)
----@return string|nil highlight group name (nil for sep/unknown)
-function M.span_color_highlight_group (color_name)
-  return span_color_to_highlight_group[color_name]
-end
 
 -- ── tokens -> display chunks ───────────────────────────────────────
 
@@ -220,25 +202,181 @@ function M.find_rels (sexp)
   return nil
 end
 
----Render the (rels (COLOR "text") ...) payload in SEXP to virtual-text
----chunks, or nil if there is no such payload. Each span's color name
----maps to a highlight group (a `sep' span is Normal -- an ordinary
----space between tokens). The analog of `heralds--render-rel-spans'.
----@param sexp any
----@return table[]|nil
-function M.render_rel_spans (sexp)
-  local rels = M.find_rels(sexp)
-  if not rels then return nil end
+-- ── relationship heralds: render the server's SEMANTIC facts ─────────
+-- ALL presentation lives here (letters, colors, order, count-omission,
+-- the a(b,c) link form); the server sends only facts. See
+-- TODO/heralds-semantic-wire.org. Mirrors the elisp renderer
+-- (heralds--render-rel-facts et al.) exactly.
+
+local REL_ORDER = { 'contains', 'textlinksTo', 'subscribes',
+                    'overrides', 'hides' }
+
+local function rel_letter (rel)
+  return ({ contains = 'C', textlinksTo = 'L', subscribes = 'S',
+            overrides = 'O', hides = 'H' })[rel] or '?'
+end
+
+local function rel_base_hl (rel)
+  if rel == 'contains' or rel == 'textlinksTo' then return 'SkgHeraldBlue' end
+  return 'SkgHeraldPurple' -- subscribes / overrides / hides
+end
+
+---The child of SEXP (from index 2) whose head is the symbol NAME, or nil.
+local function assq (sexp, name)
+  if not sexpr.is_list(sexp) then return nil end
+  for i = 2, #sexp do
+    local child = sexp[i]
+    if sexpr.is_list(child) and child[1] == sexpr.symbol(name) then
+      return child end
+  end
+  return nil
+end
+
+---The first number among SEXP's elements (from index 2), or nil.
+local function first_number (sexp)
+  for i = 2, #sexp do
+    if type(sexp[i]) == 'number' then return sexp[i] end
+  end
+  return nil
+end
+
+---Generation integers of an (ancestors ...) sub-form inside SIDE, else {}.
+local function ancestors_of (side)
+  local anc = assq(side, 'ancestors')
+  if not anc then return {} end
+  local gens = {}
+  for i = 2, #anc do table.insert(gens, anc[i]) end
+  return gens
+end
+
+---GENS as sorted distinct letters: 1->a, 2->b, ...
+local function gen_letters (gens)
+  local seen, sorted = {}, {}
+  for _, g in ipairs(gens) do
+    if not seen[g] then seen[g] = true; table.insert(sorted, g) end
+  end
+  table.sort(sorted)
+  local out = {}
+  for _, g in ipairs(sorted) do
+    if type(g) == 'number' and g >= 1 and g <= 26 then
+      table.insert(out, string.char(96 + g))
+    else
+      table.insert(out, '{' .. tostring(g) .. '}') end
+  end
+  return table.concat(out)
+end
+
+---Chunks for one side: the count then ancestor letters. Omits the count
+---when it equals the number of ancestors (>=1). MULTI (contains inbound)
+---makes a count > 1 orange; ancestor letters are yellow.
+local function side_chunks (count, gens, base_hl, multi)
+  local letters = gen_letters(gens)
+  local n = #letters
   local chunks = {}
-  for i = 2, #rels do
-    local span = rels[i]
-    if sexpr.is_list(span) and #span >= 2
-       and type(span[2]) == 'string' then
-      local color = sexpr.atom_text(span[1])
-      table.insert(chunks,
-        { span[2], M.span_color_highlight_group(color) or 'Normal' })
+  if count > 0 or n > 0 then
+    if not (n > 0 and count == n) then
+      local hl = (multi and count > 1) and 'SkgHeraldOrange' or base_hl
+      table.insert(chunks, { tostring(count), hl })
+    end
+    if n > 0 then
+      table.insert(chunks, { letters, 'SkgHeraldYellow' })
     end
   end
+  return chunks
+end
+
+local function rel_side (form, side)
+  local s = assq(form, side)
+  if not s then return nil end
+  return { count = first_number(s) or 0, gens = ancestors_of(s) }
+end
+
+local function ordinary_rel_chunks (rel, form, base_hl)
+  local inn = rel_side(form, 'in')
+  local out = rel_side(form, 'out')
+  local in_c = side_chunks(inn and inn.count or 0, inn and inn.gens or {},
+                           base_hl, rel == 'contains')
+  local out_c = side_chunks(out and out.count or 0, out and out.gens or {},
+                            base_hl, false)
+  if #in_c == 0 and #out_c == 0 then return nil end
+  local chunks = {}
+  for _, c in ipairs(in_c) do table.insert(chunks, c) end
+  table.insert(chunks, { rel_letter(rel), base_hl })
+  for _, c in ipairs(out_c) do table.insert(chunks, c) end
+  return chunks
+end
+
+local function link_rel_chunks (form, base_hl)
+  local inn = assq(form, 'in')
+  local out = assq(form, 'out')
+  local in_chunk
+  if inn then
+    local total = first_number(inn) or 0
+    local surp = assq(inn, 'surprising')
+    local wc = assq(inn, 'withContent')
+    local b = surp and first_number(surp) or nil
+    local c = wc and first_number(wc) or nil
+    local inner
+    if b == nil and c == nil then inner = ''
+    elseif c == nil then inner = '(' .. b .. ')'
+    elseif b == nil then inner = '(,' .. c .. ')'
+    else inner = '(' .. b .. ',' .. c .. ')' end
+    in_chunk = { tostring(total) .. inner, base_hl }
+  end
+  local out_chunk
+  if out then
+    local gens = ancestors_of(out)
+    if #gens > 0 then out_chunk = { gen_letters(gens), 'SkgHeraldYellow' } end
+  end
+  if not in_chunk and not out_chunk then return nil end
+  local chunks = {}
+  if in_chunk then table.insert(chunks, in_chunk) end
+  table.insert(chunks, { 'L', base_hl })
+  if out_chunk then table.insert(chunks, out_chunk) end
+  return chunks
+end
+
+---Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
+---or nil if there is none / it produces nothing. Coloring: group base
+---(C/L blue, S/O/H purple), the reason-for-being token black-on-white,
+---ancestor letters black-on-yellow, the contains inbound count>1 orange,
+---A/I cyan. Tokens ordered C L S O H A I, space-separated.
+---@param sexp any
+---@return table[]|nil
+function M.render_rel_facts (sexp)
+  local rels = M.find_rels(sexp)
+  if not rels then return nil end
+  local birth = {}
+  local birth_form = assq(rels, 'birth')
+  if birth_form then
+    for i = 2, #birth_form do
+      birth[sexpr.atom_text(birth_form[i])] = true end
+  end
+  local chunks = {}
+  local function add_token (tok)
+    if tok then
+      if #chunks > 0 then table.insert(chunks, { ' ', 'Normal' }) end
+      for _, c in ipairs(tok) do table.insert(chunks, c) end
+    end
+  end
+  for _, rel in ipairs(REL_ORDER) do
+    local form = assq(rels, rel)
+    if form then
+      local base = birth[rel] and 'SkgHeraldBirth' or rel_base_hl(rel)
+      add_token((rel == 'textlinksTo')
+        and link_rel_chunks(form, base)
+        or ordinary_rel_chunks(rel, form, base))
+    end
+  end
+  local aliases = assq(rels, 'aliases')
+  if aliases then
+    add_token({ { 'A' .. tostring(first_number(aliases)), 'SkgHeraldCyan' } })
+  end
+  local extra = assq(rels, 'extraIds')
+  if extra then
+    add_token({ { 'I' .. tostring(first_number(extra)), 'SkgHeraldCyan' } })
+  end
+  if #chunks == 0 then return nil end
   return chunks
 end
 
@@ -305,7 +443,7 @@ function M.chunks_from_metadata (metadata_text)
   local rules = herald_rules.get_rules()
   if not rules then return nil end
   local tokens = lens.transform_sexp_flat(sexp, rules)
-  return M.tokens_to_chunks_with_rels(tokens, M.render_rel_spans(sexp))
+  return M.tokens_to_chunks_with_rels(tokens, M.render_rel_facts(sexp))
 end
 
 -- ── per-buffer application ─────────────────────────────────────────

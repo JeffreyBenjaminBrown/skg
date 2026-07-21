@@ -70,18 +70,18 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-line0
-         (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\")))) 1\n"
-                 "** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\")))) 11\n"
-                 "** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C\")))) 12\n"))
+         (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2))))) 1\n"
+                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n"
+                 "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n"))
         (expected-line2
-         (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\")))) 1\n"
-                 "** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\")))) 11\n"
-                 "** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C\")))) 12\n"))
+         (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2))))) 1\n"
+                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n"
+                 "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n"))
         (expected-changed
-         (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\")))) 1\n"
-                 "** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\")))) 11\n"
-                 "*** (skg (node (id l-11) (source main) (parentIs independent) indef (rels (white \"L\") (yellow \"a\")))) [[id:11][a link to 11]]\n"
-                 "** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C\")))) 12\n"))
+         (concat "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2))))) 1\n"
+                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n"
+                 "*** (skg (node (id l-11) (source main) (parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo)))) [[id:11][a link to 11]]\n"
+                 "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))
 

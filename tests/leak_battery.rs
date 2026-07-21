@@ -259,18 +259,19 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         let ViewNodeKind::Vognode (Vognode::Active (t)) =
           & s_ref . value () . kind
         else { return Err ("S is not an Active vognode" . into ()); };
-        Ok ( t . viewStats . rel_spans . as_ref () . map ( |spans|
-               spans . iter () . map ( |s| s . text . as_str () )
-               . collect::<String> () ) ) };
+        Ok ( t . viewStats . rel_heralds . clone () ) };
+      // In the semantic wire the subscription shows as a `subscribes`
+      // relation; gated out at public, present under `all`. (S's only
+      // subscription here is to its buffer-parent C.)
       let at_public : Option<String> = herald_of_S (&public) ?;
       assert! (
         ! at_public . as_deref () . unwrap_or ("")
-          . contains ('S'),
+          . contains ("subscribes"),
         "S's privately-recorded subscription to its buffer-parent C \
          must not tint an ancestor herald at public: {:?}", at_public );
       let at_all : Option<String> = herald_of_S (&all) ?;
       assert! (
-        at_all . as_deref () . unwrap_or ("") . contains ('S'),
+        at_all . as_deref () . unwrap_or ("") . contains ("subscribes"),
         "under 'all' the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
 

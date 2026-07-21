@@ -11,56 +11,55 @@ local sexpr = require('skg.sexpr.parse')
 local INDEPENDENT = sexpr.symbol('independent')
 local AFFECTED = sexpr.symbol('affected')
 
----A node's graft role from a HERALD token (the rels spans' visible text)
----('C' -> 'container' etc.), or nil. Port of
----headline--graft-role-from-herald: a token has the shape
----[inSide]X[outSide], and a backpath graft reaches an ancestor on its
----outbound side (a relation letter, optional count digits, then a
----lowercase ancestor letter).
----@param herald string|nil
----@return string|nil
-local function graft_role_from_herald (herald)
-  if not herald or herald == '' then return nil end
-  local letter = herald:match('([CLHSO])%d*%l')
-  if not letter then return nil end
-  local role_by_letter = {
-    C = 'container', L = 'linkSource', S = 'subscribee',
-    O = 'overrider', H = 'hider' }
-  return role_by_letter[letter]
+---The first element of LIST (a 1-indexed array of sexps) that is a list
+---whose head is the symbol NAME, or nil.
+local function child_named (list, name)
+  if not list then return nil end
+  for _, child in ipairs(list) do
+    if type(child) == 'table' and child[1] == sexpr.symbol(name) then
+      return child end
+  end
+  return nil
 end
 
----The VISIBLE text of a (rels (COLOR "text") ...) payload: RELS_LIST is
----the cdr of the (rels ...) form (a list of (COLOR "text") spans). We
----concatenate each span's text. Since birth is now a WHITE span inside
----rels (not a separate birthHerald atom), the graft's outbound-ancestor
----token still appears here for graft_role_from_herald's regex.
----@param rels_list any|nil
+---A backpath graft's ROLENAME from its SEMANTIC relationship facts, or
+---nil. RELS_BODY is the cdr of the (rels ...) form. A graft relates
+---OUTBOUND to a tracked ancestor: a relation with an (out ...
+---(ancestors ...)) side, mapped to its role (contains -> container,
+---textlinksTo -> linkSource, subscribes -> subscribee, overrides ->
+---overrider, hides -> hider). Only meaningful for a node already known
+---to be a graft (parentIs independent).
+---@param rels_body any|nil
 ---@return string|nil
-local function rels_visible_text (rels_list)
-  if not rels_list then return nil end
-  local pieces = {}
-  for _, span in ipairs(rels_list) do
-    if type(span) == 'table' and type(span[2]) == 'string' then
-      table.insert(pieces, span[2]) end
+local function graft_role_from_rels (rels_body)
+  if not rels_body then return nil end
+  local roles = { { 'contains', 'container' }, { 'textlinksTo', 'linkSource' },
+                  { 'subscribes', 'subscribee' }, { 'overrides', 'overrider' },
+                  { 'hides', 'hider' } }
+  for _, pair in ipairs(roles) do
+    local form = child_named(rels_body, pair[1])
+    if form then
+      local out = child_named(form, 'out')
+      if out and child_named(out, 'ancestors') then return pair[2] end
+    end
   end
-  return table.concat(pieces)
+  return nil
 end
 
 ---Classify a parsed metadata SEXP (or nil) into a relation string:
 ---the graft role of a backpath graft (independent node with an
----outbound-ancestor herald), else the explicit parentIs, else the
+---outbound-ancestor relation), else the explicit parentIs, else the
 ---implicit 'affected'. Port of headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
   local parentIs_list =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'parentIs' })
-  local rels_list =
+  local rels_body =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
-  local rels_herald = rels_visible_text(rels_list)
   local independent = parentIs_list and parentIs_list[1] == INDEPENDENT
   local graft_role = independent
-    and graft_role_from_herald(rels_herald) or nil
+    and graft_role_from_rels(rels_body) or nil
   if graft_role then return graft_role end
   if not parentIs_list or parentIs_list[1] == AFFECTED then
     return 'affected' end

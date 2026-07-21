@@ -91,7 +91,7 @@ print('=== SKG Aliases View Request Integration Test ===')
 
 local expected_with_aliases =
   '* (skg (node (id test-node) (source main) (parentIs absent)'
-  .. ' (rels (cyan "A2")))) Test Node\n'
+  .. ' (rels (aliases 2)))) Test Node\n'
   .. '** (skg aliasCol)\n'
   .. '*** (skg alias) first alias\n'
   .. '*** (skg alias) second alias\n'

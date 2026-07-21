@@ -41,10 +41,10 @@ local function assert_leaf_b_root_is_content (buf, phase)
   T.check(not line:find('(parentIs independent)', 1, true),
     'leaf-b search root is not independent during ' .. phase)
   T.check(not line:find(
-            '(parentIs independent) indef (rels (white "C") (yellow "a"))', 1, true),
+            '(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
     'leaf-b search root is not content-birthed during ' .. phase)
   T.check(not line:find(
-            '(parentIs independent) indef (rels (white "L") (yellow "a"))', 1, true),
+            '(parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
     'leaf-b search root is not linksToParent-birthed during ' .. phase)
 end
 
@@ -75,9 +75,9 @@ assert_leaf_b_root_is_content(buf, 'enriched search results')
 print('containerward path enrichment arrived')
 
 -- PHASE 3: verify node relationship stats in enriched results. leaf-b
--- is a root with 1 content, so its line should include (rels (blue "1C")).
+-- is a root with 1 content, so its line should include (rels (contains (in 1))).
 content = T.buffer_text(buf)
-if content:find('(rels (blue "1C"))', 1, true) then
+if content:find('(rels (contains (in 1)))', 1, true) then
   print('node relationship stats present in enriched search results')
   print('Buffer content:\n' .. content)
   T.pass('PASS: Integration test successful!')

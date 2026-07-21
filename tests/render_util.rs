@@ -3,7 +3,7 @@
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, HeraldSpan, SpanColor, default_activeNode };
+use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, default_activeNode };
 use skg::types::viewnode::QualCol;
 use std::collections::HashMap;
 
@@ -92,13 +92,13 @@ fn test_metadata_ordering () {
   assert_metadata_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
 
 #[test]
-fn test_rel_spans_emitted () {
-  // The styled relationship-herald spans round-trip verbatim as a
-  // (rels (COLOR "text") ...) form; a node with none emits no rels atom.
-  let mk = | spans : Option<Vec<HeraldSpan>> | -> String {
+fn test_rel_heralds_emitted () {
+  // The semantic (rels ...) string round-trips verbatim; a node with
+  // none emits no rels atom.
+  let mk = | rels : Option<&str> | -> String {
     let t : ActiveNode = ActiveNode {
       viewStats : ViewNodeStats {
-        rel_spans : spans,
+        rel_heralds : rels . map ( |s| s . to_string () ),
         .. ViewNodeStats::default () },
       .. default_activeNode ( ID::from ("n"),
                             SourceName::from ("main"),
@@ -109,14 +109,11 @@ fn test_rel_spans_emitted () {
     viewnode_to_text (
       1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
       . unwrap () };
-  let with_spans : String = mk ( Some ( vec! [
-    HeraldSpan { color : SpanColor::Yellow, text : "a"  . to_string () },
-    HeraldSpan { color : SpanColor::White,  text : "C"  . to_string () },
-    HeraldSpan { color : SpanColor::Sep,    text : " "  . to_string () },
-    HeraldSpan { color : SpanColor::Purple, text : "S2" . to_string () } ] ) );
-  assert! ( with_spans . contains (
-    r#"(rels (yellow "a") (white "C") (sep " ") (purple "S2"))"# ),
-            "rels spans not emitted verbatim: {}", with_spans );
+  let with_rels : String =
+    mk ( Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))") );
+  assert! ( with_rels . contains (
+    "(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))" ),
+            "rels not emitted verbatim: {}", with_rels );
   let neither : String = mk ( None );
   assert! ( ! neither . contains ("(rels ") );
   assert_metadata_eq! ( neither, "* (skg (node (id n) (source main))) N\n" ); }
