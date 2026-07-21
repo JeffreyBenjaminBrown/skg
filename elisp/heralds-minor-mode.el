@@ -253,18 +253,84 @@ buffer-local `heralds-overlays' list) are also deleted."
         (delete-overlay ov)))
     (setq heralds-overlays (nreverse keep))))
 
+(defconst heralds--rels-sentinel "__RELS_SPANS__"
+  "Placeholder token the server's `rels' rule emits (RELS_SPANS_SENTINEL
+in server/heralds.rs). The relationship heralds are per-CHARACTER styled
+spans -- more than the rule table's atom-level coloring can express -- so
+the rule only POSITIONS them by emitting this sentinel, and
+`heralds-from-metadata' swaps it for the spans it renders itself from the
+`(rels (COLOR \"text\") ...)' payload.")
+
 (defun heralds-from-metadata
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
   "Return a display-ready herald string for METADATA-SEXP.
-All composition rules live in `heralds--transform-rules'; there
-is no post-processing step. Returns nil if METADATA-SEXP doesn't
-parse as an `(skg ...)' form."
+Most composition lives in `heralds--transform-rules' (the served rule
+table); the one exception is the relationship-herald spans, which the
+rule table only positions with a sentinel token that this function
+replaces with `heralds--render-rel-spans' output. Returns nil if
+METADATA-SEXP doesn't parse as an `(skg ...)' form."
   (let* ((sexp (heralds--read-metadata metadata-sexp))
-         (tokens (when (and (listp sexp)
-                            (eq (car sexp) 'skg))
+         (is-skg (and (listp sexp) (eq (car sexp) 'skg)))
+         (tokens (when is-skg
                    (skg-transform-sexp-flat
-                    sexp heralds--transform-rules))))
-    (heralds--tokens->text tokens)))
+                    sexp heralds--transform-rules)))
+         (rel-str (when is-skg (heralds--render-rel-spans sexp))))
+    (heralds--tokens->text
+     (heralds--splice-rel-spans tokens rel-str))))
+
+(defun heralds--splice-rel-spans (tokens rel-str)
+  "Return TOKENS with the sentinel token replaced by REL-STR.
+When REL-STR is nil (no `(rels ...)' payload, so the sentinel should be
+absent anyway) any stray sentinel token is dropped."
+  (when tokens
+    (delq nil
+          (mapcar
+           (lambda (tok)
+             (if (equal (substring-no-properties tok)
+                        heralds--rels-sentinel)
+                 rel-str ;; may be nil -> removed by delq
+               tok))
+           tokens))))
+
+(defun heralds--find-rels (sexp)
+  "Return the first `(rels ...)' sub-list anywhere within SEXP, else nil."
+  (when (consp sexp)
+    (if (eq (car-safe sexp) 'rels)
+        sexp
+      (cl-loop for child in (cdr sexp)
+               for found = (and (consp child) (heralds--find-rels child))
+               when found return found))))
+
+(defun heralds--render-rel-spans (sexp)
+  "Render the `(rels (COLOR \"text\") ...)' payload in SEXP to one
+propertized string, or nil if there is no such payload. Each span's
+COLOR maps to a face (`heralds--span-color-to-face'); a `sep' (or
+unrecognized) span gets no face -- an ordinary space between tokens."
+  (let ((rels (heralds--find-rels sexp)))
+    (when rels
+      (mapconcat
+       (lambda (span)
+         (if (and (consp span) (stringp (cadr span)))
+             (let ((face (heralds--span-color-to-face (car span)))
+                   (text (cadr span)))
+               (if face (propertize text 'face face) text))
+           ""))
+       (cdr rels)
+       ""))))
+
+(defun heralds--span-color-to-face (color)
+  "Map a relationship-herald span COLOR symbol to a face, or nil (default).
+blue = C/L base, purple = S/O/H base, cyan = A/I, yellow = ancestor
+letters, orange = the multi-contains count before C, white = the
+reason-for-being (birth) token."
+  (pcase color
+    ('blue   'heralds-blue-face)
+    ('purple 'heralds-purple-face)
+    ('cyan   'heralds-cyan-face)
+    ('yellow 'heralds-yellow-face)
+    ('orange 'heralds-orange-face)
+    ('white  'heralds-birth-face)
+    (_ nil)))
 
 (defun heralds--read-metadata (metadata-sexp)
   "Read METADATA-SEXP string into a Lisp object.
@@ -303,7 +369,22 @@ YELLOW, so this face is presently unused.")
 
 (defface heralds-orange-face
   '((t :foreground "white" :background "#d2691e"))
-  "White-on-orange: the reason-for-being (birth) relationship herald,
-the parentIs-independent marker (⊥), and the \"unknown node\" message.")
+  "White-on-orange: the multi-contained containers count (the number
+before C), the parentIs-independent marker (⊥), and the \"unknown
+node\" message.")
+
+(defface heralds-purple-face
+  '((t :foreground "white" :background "#8b00ff"))
+  "White-on-purple for the S / O / H relationship-herald tokens.")
+
+(defface heralds-cyan-face
+  '((t :foreground "black" :background "#00ffff"))
+  "Black-on-cyan for the A / I count tokens (cyan is too light for
+white text).")
+
+(defface heralds-birth-face
+  '((t :foreground "black" :background "white"))
+  "Black-on-white for the reason-for-being (birth) relationship token
+-- the token that explains why the node was drawn.")
 
 (provide 'heralds-minor-mode)

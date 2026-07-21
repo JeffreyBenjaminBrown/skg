@@ -4,7 +4,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
-  PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats,
+  PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats, HeraldSpan,
   ParentIs,
 };
 
@@ -251,12 +251,9 @@ fn activeNode_metadata_to_string (
     activeNode : & ActiveNode,
     config    : & SkgConfig,
   ) -> String {
-    fn birth_herald ( activeNode : & ActiveNode ) -> Option < String > {
-      activeNode . viewStats . birth_herald . as_ref () . map (
-        |s| format! ("(birthHerald {})", quote_herald (s)) ) }
     fn rels_herald ( activeNode : & ActiveNode ) -> Option < String > {
-      activeNode . viewStats . rels_herald . as_ref () . map (
-        |s| format! ("(rels {})", quote_herald (s)) ) }
+      activeNode . viewStats . rel_spans . as_ref () . map (
+        |spans| rel_spans_atom (spans) ) }
     fn view_stats (
       activeNode : & ActiveNode,
       config    : & SkgConfig,
@@ -335,8 +332,6 @@ fn activeNode_metadata_to_string (
       if activeNode . viewStats . hidden_body {
         // The rendering is hiding a body (herald "B" on the ☮).
         parts . push ( "hiddenBody" . to_string () ); }}
-    if let Some (s) = birth_herald (activeNode)
-    { parts . push (s); }
     if let Some (s) = rels_herald (activeNode)
     { parts . push (s); }
     if let Some (s) = view_stats (activeNode, config)
@@ -474,15 +469,31 @@ fn deleted_scaff_metadata_to_string (
   parts . push ( "(deletedScaffold deadScaffold)" . to_string () );
   parts . join (" ") }
 
-/// The blue relationship-herald atom for a phantom: counts-only tokens
+/// Serialize the styled relationship-herald spans as the metadata form
+///   (rels (COLOR "text") (COLOR "text") ...)
+/// where COLOR is a span color name (blue/purple/cyan/yellow/orange/
+/// white/sep). The client renders these directly (not via the rule
+/// table); see server/herald_tokens.rs and elisp/heralds-minor-mode.el.
+fn rel_spans_atom (
+  spans : &[HeraldSpan],
+) -> String {
+  let parts : Vec<String> = spans . iter () . map ( |sp|
+    format! ("({} {})",
+             sp . color . repr_in_client (),
+             quote_herald (& sp . text)) )
+    . collect ();
+  format! ("(rels {})", parts . join (" ")) }
+
+/// The relationship-herald atom for a phantom: counts-only styled spans
 /// (no ancestor flags, no birth, no view position) plus =Ak= / =Ik=.
 fn phantom_rels_atom (
   gs : &GraphNodeStats,
 ) -> Option < String > {
-  gs . rels . as_ref ()
-    . and_then ( |counts| assemble_counts_only (
-      counts, gs . aliases, gs . extra_ids ) )
-    . map ( |s| format! ("(rels {})", quote_herald (&s)) ) }
+  gs . rels . as_ref () . and_then ( |counts| {
+    let spans : Vec<HeraldSpan> =
+      assemble_counts_only ( counts, gs . aliases, gs . extra_ids );
+    if spans . is_empty () { None }
+    else { Some ( rel_spans_atom (&spans) ) } } ) }
 
 /// Quote an assembled herald string for the metadata sexp. The strings
 /// contain spaces and parens (e.g. =2(1,1)L=), so they MUST be quoted;

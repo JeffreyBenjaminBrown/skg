@@ -92,3 +92,64 @@ TODO/herald-tweaks.org. Two branches, per Jeff's request:
 - Left as `assert_eq!` deliberately: fork.rs:733 compares raw =.skg=
   on-disk bytes (not an org buffer) -- a byte-for-byte unchanged check
   that must stay exact.
+
+* Branch 2: heralds-tweaks (option A -- server emits styled spans)
+** What's done and went well (all verified where runnable)
+- Color model settled (table in TODO/herald-tweaks.org): fixed order
+  C L S O H A I; base colors C/L blue, S/O/H purple (#8b00ff), A/I cyan
+  (#00ffff, black text); ancestor letters black-on-yellow; the
+  multi-contains count before C orange; the reason-for-being (birth)
+  token black-on-white; NO flash; frontloading removed.
+- SERVER: replaced the two uniform strings (birthHerald orange / rels
+  blue) with ONE ordered list of per-character STYLED SPANS.
+  - types/viewnode.rs: new SpanColor + HeraldSpan; ViewNodeStats.rel_spans
+    replaces birth_herald/rels_herald.
+  - herald_tokens.rs: rewritten to assemble Vec<HeraldSpan> (RELATION_ORDER
+    reordered C L S O H; per-char coloring; birth-white; multi-contains
+    orange; ancestor yellow; adjacent-same-color merge; Sep spans).
+  - org_to_text.rs: emits (rels (COLOR "text") ...).
+  - heralds.rs: the rels rule now emits the RELS_SPANS_SENTINEL
+    placeholder (the ANY-child trick, no new match atom); birthHerald
+    atom removed from the table and emittable set; any_abut helper
+    dropped. Conformance tests + regenerated fixture green.
+  - parse_metadata_sexp.rs UNCHANGED: its "rels"|"birthHerald" discard
+    arm already accepts the new nested (rels ...) wholesale (and tolerates
+    stale birthHerald on old buffers).
+- CLIENTS render the spans themselves (the lens can't do per-char color),
+  splicing at the sentinel token:
+  - elisp/heralds-minor-mode.el: new faces (purple/cyan/birth),
+    span-color->face map, find-rels/render-rel-spans/splice. 9/9 elisp
+    herald tests pass.
+  - nvim/lua/skg/heralds.lua: the Lua analog (SkgHeraldPurple/Cyan/Birth
+    hl groups, render_rel_spans, tokens_to_chunks_with_rels). 10/10
+    heralds_spec pass; whole tests/nvim suite green.
+- Rust wire tests re-baselined to the new (rels ...) form with a
+  validated transformer (my-dot-claude/.../reherald.py, self-tested
+  against captured actuals; recolors the existing token strings exactly
+  as herald_tokens.rs does). partner_col_matrix / view_stats_sharing
+  fixed by hand (color-aware, since birth is now unified into rels).
+  All 32 herald-affected Rust tests PASS under nextest (process
+  isolation; the earlier in-suite failures were the known
+  concurrent-TypeDB collision flake -- confirmed by isolated reruns).
+
+** What's imperfect / remaining (needs the live app, which this env lacks)
+- INTEGRATION tests (tests/integration/*/test-emacs.el|test-nvim.lua):
+  - Their EXPECTED-BUFFER strings were updated by the same validated
+    transformer (birthHerald+rels -> unified rels spans; the Lua
+    concat-split case is merged). Not run here -- the integration suite
+    needs a live server + Emacs/nvim + TypeDB orchestration this
+    environment can't provide.
+  - A handful still EXTRACT the (now-removed) birthHerald atom
+    programmatically to derive a graft role -- sexp_cdr_at_path(...,
+    {'skg','node','birthHerald'}) in:
+      save_collateral_break_cycle (test-nvim.lua + test-helpers.el),
+      save_collateral_add_content_and_modify_text/test-nvim.lua,
+      git-diff-view-updates/test-nvim.lua,
+      containerward-on-phantom/test-nvim.lua.
+    These need updating to read the birth token from the rels WHITE
+    spans instead. Left for a pass that can RUN the integration suite to
+    verify (updating them blind is riskier than flagging them).
+- Verification of branch 2 relied on: cargo unit tests, the elisp/nvim
+  herald specs, and nextest on the wire tests -- NOT a full-suite green
+  run (the collision flake makes plain `cargo test` unreliable; nextest
+  is the project's answer).

@@ -1,11 +1,11 @@
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
-use crate::herald_tokens::{AncestorFlags, assemble_active, HeraldStrings};
+use crate::herald_tokens::{AncestorFlags, assemble_active};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{
-  Birth, GraphNodeStats, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
+  Birth, GraphNodeStats, HeraldSpan, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -137,12 +137,12 @@ fn set_herald_strings_in_viewnode (
   let birth_rels : Vec<NodeRelation> =
     birth_relations (&parent_kind, parentIs, birth, &flags,
                      overridesHere);
-  let strings : HeraldStrings = assemble_active (
+  let spans : Vec<HeraldSpan> = assemble_active (
     &counts, gstats . aliases, gstats . extra_ids, &flags, &birth_rels );
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . birth_herald = strings . birth;
-    t . viewStats . rels_herald  = strings . rels; } }
+  { t . viewStats . rel_spans =
+      if spans . is_empty () { None } else { Some (spans) }; } }
 
 fn parent_kind_of (
   tree   : &Tree<ViewNode>,

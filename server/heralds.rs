@@ -121,15 +121,6 @@ fn any (
 ) -> RuleChild {
   rule ( "ANY", children ) }
 
-/// (ANY ABUT children...) -- an ANY leaf whose echoed token glues onto
-/// the preceding token (so the orange birth herald hugs the ☮).
-fn any_abut (
-  children : Vec<RuleChild>,
-) -> RuleChild {
-  RuleChild::Rule ( HeraldRule {
-    color : None, interc : None, label : Some ("ANY"),
-    abut : true, children } ) }
-
 /// ([COLOR] INTERC "sep" [label] children...)
 fn interc (
   color    : Option<HeraldColor>,
@@ -142,6 +133,15 @@ fn interc (
     abut : false, children } ) }
 
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
+
+/// The placeholder token the `rels` rule emits. The relationship
+/// heralds are per-character styled spans the lens engine cannot color,
+/// so the rule only POSITIONS them: it emits this sentinel where the
+/// relationship heralds belong, and the client
+/// (`heralds-from-metadata`) replaces the sentinel token with the
+/// spans it renders itself from the `(rels ...)` payload. Kept in sync
+/// with `heralds--rels-sentinel` in elisp/heralds-minor-mode.el.
+pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 
 //
 // The table
@@ -261,18 +261,19 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("affected"),
           leaf (Orange, "independent", "⊥") ]),
         // The server emits the abbreviated atom 'indef'
-        // (see org_to_text.rs); we match that here. It leads so the
-        // orange birth herald can hug it.
+        // (see org_to_text.rs); we match that here.
         leaf_abut (Green, "indef", "☮"),
         // Emitted only on an indefinitive node whose graph node has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
         leaf_abut (Green, "hiddenBody", "B"),
-        // The orange BIRTH herald: one quoted string of space-joined
-        // relationship tokens, assembled in Rust (server/herald_tokens.rs)
-        // and echoed verbatim. ABUT so it hugs the ☮.
-        crule (Orange, "birthHerald", vec! [ any_abut (vec! [RuleChild::It]) ]),
-        // The blue relationship heralds: another assembled string.
-        crule (Blue, "rels", vec! [ any (vec! [RuleChild::It]) ]),
+        // The relationship heralds are per-CHARACTER styled spans that
+        // the lens cannot color, so the server assembles them
+        // (herald_tokens.rs) as a (rels (COLOR "text") ...) payload and
+        // the CLIENT renders them. This rule only POSITIONS them: the
+        // ANY child makes it match the (rels ...) list form and consumes
+        // the span sub-forms, and it emits the sentinel token, which the
+        // client swaps for the rendered spans.
+        rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         crule (Blue, "viewStats", vec! [
           leaf (Blue, "cycle", "⟳"),
           // overridesHere is displayed as the orange O birth herald
@@ -318,7 +319,7 @@ pub fn herald_rule_table () -> HeraldRule {
         vac ("id"),
         vac ("source"),
         leaf_abut (Green, "indef", "☮"),
-        crule (Blue, "rels", vec! [ any (vec! [RuleChild::It]) ]),
+        rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
           leaf (Green, "newX",     "X"),
@@ -413,8 +414,10 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "source",
     "parentIs", "indef", "hiddenBody", "notInGit",
-    // The two assembled herald-string atoms (server/herald_tokens.rs):
-    "birthHerald", "rels",
+    // The assembled relationship-herald atom, a payload of styled spans
+    // (server/herald_tokens.rs); its span sub-forms are value position,
+    // consumed by the client's renderer, so they are not match atoms.
+    "rels",
     "viewStats", "editRequest", "viewRequests",
     "staged", "unstaged",
     // EditRequest atoms:
@@ -452,8 +455,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
     let ViewNodeStats {
       cycle : _,
       sourceAtBoundary : _, // -> the sourceHerald atom
-      birth_herald : _,     // -> the node-level birthHerald atom
-      rels_herald : _,      // -> the node-level rels atom
+      rel_spans : _,        // -> the node-level rels atom (styled spans)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       hidden_body : _,      // -> the node-level hiddenBody atom
       rel_source : _,       // -> the relSource atom (keyed, load-bearing AND its own herald)

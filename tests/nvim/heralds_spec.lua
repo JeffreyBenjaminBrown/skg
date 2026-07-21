@@ -36,9 +36,9 @@ describe('skg.heralds', function ()
 
   it('toggling adds and removes extmarks', function ()
     local buf = scratch_buffer_with({
-      'Test line with (skg (node (id 123) (rels "C2")'
+      'Test line with (skg (node (id 123) (rels (blue "C2"))'
       .. ' (viewStats cycle))) herald',
-      'Another line (skg (node (id 456) (rels "3(3)L")'
+      'Another line (skg (node (id 456) (rels (blue "3(3)L"))'
       .. ' (editRequest delete))) more text',
       'Plain line without heralds' })
     assert.is_true(heralds.enable(buf))
@@ -53,11 +53,13 @@ describe('skg.heralds', function ()
     assert.are.equal(0, #herald_extmarks(buf))
   end)
 
-  it('conceals the metadata extent and displays the herald symbols',
+  it('conceals the metadata extent and displays the styled herald spans',
      function ()
+    -- rels payload is the C token 2aC: the multi-contains "2" (orange),
+    -- the ancestor "a" (yellow), and the birth "C" (black-on-white).
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) (parentIs independent)'
-      .. ' (birthHerald "La") (rels "3(1)L") (viewStats cycle)'
+      .. ' (rels (orange "2") (yellow "a") (white "C")) (viewStats cycle)'
       .. ' (editRequest delete))) text' })
     heralds.enable(buf)
     local marks = herald_extmarks(buf)
@@ -65,18 +67,21 @@ describe('skg.heralds', function ()
     local details = marks[1][4]
     assert.are.equal('', details.conceal)
     local text = ''
+    local hl_of = {}
     for _, chunk in ipairs(details.virt_text) do
-      text = text .. chunk[1] end
-    -- The orange birth herald "La", the blue rels "3(1)L", the cycle
-    -- ⟳, the independent ⊥, and the delete request -- with the birth
-    -- herald before the rels.
+      text = text .. chunk[1]
+      hl_of[chunk[1]] = chunk[2] end
+    -- the sentinel placeholder must never leak into the display
+    assert.is_falsy(text:find('__RELS_SPANS__', 1, true))
+    -- ⊥ (independent), the 2aC relationship token, ⟳ (cycle), delete
     assert.is_truthy(text:find('⊥', 1, true))
-    assert.is_truthy(text:find('La', 1, true))
+    assert.is_truthy(text:find('2aC', 1, true))
     assert.is_truthy(text:find('⟳', 1, true))
-    assert.is_truthy(text:find('3(1)L', 1, true))
-    assert.is_truthy(text:find('La', 1, true)
-                     < text:find('3(1)L', 1, true))
     assert.is_truthy(text:find('delete', 1, true))
+    -- per-span highlight groups on the 2aC token
+    assert.are.equal('SkgHeraldOrange', hl_of['2'])
+    assert.are.equal('SkgHeraldYellow', hl_of['a'])
+    assert.are.equal('SkgHeraldBirth', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
   end)
@@ -137,7 +142,7 @@ describe('skg.heralds', function ()
     local original = herald_rules.request_herald_rules
     herald_rules.request_herald_rules = install_fixture_rules
     local buf = scratch_buffer_with({
-      '(skg (node (id 1) (source s) (rels "C2")))' })
+      '(skg (node (id 1) (source s) (rels (blue "C2"))))' })
     local enabled = heralds.enable(buf)
     herald_rules.request_herald_rules = original
     assert.is_true(enabled)
@@ -170,7 +175,7 @@ describe('skg.heralds', function ()
     heralds.enable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
     vim.api.nvim_buf_set_lines(buf, 0, 1, false, {
-      '* (skg (node (id 9) (rels "C2"))) now a headline' })
+      '* (skg (node (id 9) (rels (blue "C2")))) now a headline' })
     vim.wait(200, function () return #herald_extmarks(buf) > 0 end, 10)
     assert.are.equal(1, #herald_extmarks(buf))
   end)

@@ -90,21 +90,21 @@ async fn test_bfs_limit_across_multiple_trees (
 
       println!("BFS multi-tree limit result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
-                              ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
-                              ** (skg (node (id 12) (source main) (birthHerald \"aC3\"))) 12
-                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
-                              *** (skg (node (id 122) (source main) indef (birthHerald \"aC\"))) 122
-                              *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
-                              ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels \"C3\"))) 2
-                              ** (skg (node (id 21) (source main) (birthHerald \"aC\"))) 21
-                              ** (skg (node (id 22) (source main) indef (birthHerald \"aC3\"))) 22
-                              ** (skg (node (id 23) (source main) indef (birthHerald \"aC\"))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (rels \"C3\"))) 3
-                              ** (skg (node (id 31) (source main) indef (birthHerald \"aC\"))) 31
-                              ** (skg (node (id 32) (source main) indef (birthHerald \"aC3\"))) 32
-                              ** (skg (node (id 33) (source main) indef (birthHerald \"aC\"))) 33
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
+                              ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
+                              ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C3\")))) 12
+                              *** (skg (node (id 121) (source main) indef (rels (yellow \"a\") (white \"C\")))) 121
+                              *** (skg (node (id 122) (source main) indef (rels (yellow \"a\") (white \"C\")))) 122
+                              *** (skg (node (id 123) (source main) indef (rels (yellow \"a\") (white \"C\")))) 123
+                              ** (skg (node (id 13) (source main) (rels (yellow \"a\") (white \"C\")))) 13
+                              * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"C3\")))) 2
+                              ** (skg (node (id 21) (source main) (rels (yellow \"a\") (white \"C\")))) 21
+                              ** (skg (node (id 22) (source main) indef (rels (yellow \"a\") (white \"C3\")))) 22
+                              ** (skg (node (id 23) (source main) indef (rels (yellow \"a\") (white \"C\")))) 23
+                              * (skg (node (id 3) (source main) (parentIs absent) (rels (blue \"C3\")))) 3
+                              ** (skg (node (id 31) (source main) indef (rels (yellow \"a\") (white \"C\")))) 31
+                              ** (skg (node (id 32) (source main) indef (rels (yellow \"a\") (white \"C3\")))) 32
+                              ** (skg (node (id 33) (source main) indef (rels (yellow \"a\") (white \"C\")))) 33
                               "};
       assert_metadata_eq!(result, expected,
                  "BFS truncates by the §5.5 budget, leaving whole groups indefinitive");
@@ -137,24 +137,24 @@ async fn test_bfs_limit_9_three_branches (
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
-                              ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
-                              ** (skg (node (id 12) (source main) (birthHerald \"aC3\"))) 12
-                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
-                              *** (skg (node (id 122) (source main) indef (birthHerald \"aC\"))) 122
-                              *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
-                              ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels \"C3\"))) 2
-                              ** (skg (node (id 21) (source main) (birthHerald \"aC\"))) 21
-                              ** (skg (node (id 22) (source main) (birthHerald \"aC3\"))) 22
-                              *** (skg (node (id 221) (source main) indef (birthHerald \"aC\"))) 221
-                              *** (skg (node (id 222) (source main) indef (birthHerald \"aC\"))) 222
-                              *** (skg (node (id 223) (source main) indef (birthHerald \"aC\"))) 223
-                              ** (skg (node (id 23) (source main) (birthHerald \"aC\"))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (rels \"C3\"))) 3
-                              ** (skg (node (id 31) (source main) indef (birthHerald \"aC\"))) 31
-                              ** (skg (node (id 32) (source main) indef (birthHerald \"aC3\"))) 32
-                              ** (skg (node (id 33) (source main) indef (birthHerald \"aC\"))) 33
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
+                              ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
+                              ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C3\")))) 12
+                              *** (skg (node (id 121) (source main) indef (rels (yellow \"a\") (white \"C\")))) 121
+                              *** (skg (node (id 122) (source main) indef (rels (yellow \"a\") (white \"C\")))) 122
+                              *** (skg (node (id 123) (source main) indef (rels (yellow \"a\") (white \"C\")))) 123
+                              ** (skg (node (id 13) (source main) (rels (yellow \"a\") (white \"C\")))) 13
+                              * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"C3\")))) 2
+                              ** (skg (node (id 21) (source main) (rels (yellow \"a\") (white \"C\")))) 21
+                              ** (skg (node (id 22) (source main) (rels (yellow \"a\") (white \"C3\")))) 22
+                              *** (skg (node (id 221) (source main) indef (rels (yellow \"a\") (white \"C\")))) 221
+                              *** (skg (node (id 222) (source main) indef (rels (yellow \"a\") (white \"C\")))) 222
+                              *** (skg (node (id 223) (source main) indef (rels (yellow \"a\") (white \"C\")))) 223
+                              ** (skg (node (id 23) (source main) (rels (yellow \"a\") (white \"C\")))) 23
+                              * (skg (node (id 3) (source main) (parentIs absent) (rels (blue \"C3\")))) 3
+                              ** (skg (node (id 31) (source main) indef (rels (yellow \"a\") (white \"C\")))) 31
+                              ** (skg (node (id 32) (source main) indef (rels (yellow \"a\") (white \"C3\")))) 32
+                              ** (skg (node (id 33) (source main) indef (rels (yellow \"a\") (white \"C\")))) 33
                               "};
       assert_metadata_eq!(result, expected,
                  "BFS limit=9 fully expands the first two roots; the third stays indefinitive");
@@ -186,20 +186,20 @@ async fn test_bfs_limit_8_two_branches (
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C3\"))) 1
-                              ** (skg (node (id 11) (source main) (birthHerald \"aC\"))) 11
-                              ** (skg (node (id 12) (source main) (birthHerald \"aC3\"))) 12
-                              *** (skg (node (id 121) (source main) indef (birthHerald \"aC\"))) 121
-                              *** (skg (node (id 122) (source main) indef (birthHerald \"aC\"))) 122
-                              *** (skg (node (id 123) (source main) indef (birthHerald \"aC\"))) 123
-                              ** (skg (node (id 13) (source main) (birthHerald \"aC\"))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels \"C3\"))) 2
-                              ** (skg (node (id 21) (source main) (birthHerald \"aC\"))) 21
-                              ** (skg (node (id 22) (source main) (birthHerald \"aC3\"))) 22
-                              *** (skg (node (id 221) (source main) indef (birthHerald \"aC\"))) 221
-                              *** (skg (node (id 222) (source main) indef (birthHerald \"aC\"))) 222
-                              *** (skg (node (id 223) (source main) indef (birthHerald \"aC\"))) 223
-                              ** (skg (node (id 23) (source main) (birthHerald \"aC\"))) 23
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C3\")))) 1
+                              ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C\")))) 11
+                              ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C3\")))) 12
+                              *** (skg (node (id 121) (source main) indef (rels (yellow \"a\") (white \"C\")))) 121
+                              *** (skg (node (id 122) (source main) indef (rels (yellow \"a\") (white \"C\")))) 122
+                              *** (skg (node (id 123) (source main) indef (rels (yellow \"a\") (white \"C\")))) 123
+                              ** (skg (node (id 13) (source main) (rels (yellow \"a\") (white \"C\")))) 13
+                              * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"C3\")))) 2
+                              ** (skg (node (id 21) (source main) (rels (yellow \"a\") (white \"C\")))) 21
+                              ** (skg (node (id 22) (source main) (rels (yellow \"a\") (white \"C3\")))) 22
+                              *** (skg (node (id 221) (source main) indef (rels (yellow \"a\") (white \"C\")))) 221
+                              *** (skg (node (id 222) (source main) indef (rels (yellow \"a\") (white \"C\")))) 222
+                              *** (skg (node (id 223) (source main) indef (rels (yellow \"a\") (white \"C\")))) 223
+                              ** (skg (node (id 23) (source main) (rels (yellow \"a\") (white \"C\")))) 23
                               "};
       assert_metadata_eq!(result, expected,
                  "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + indefinitive");
@@ -230,12 +230,12 @@ async fn test_budget_content_beats_subscribers (
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (rels \"C1 S2\"))) r
+      let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\")))) r
                               ** (skg subscribeeCol)
-                              *** (skg (node (id s1) (source main) indef (birthHerald \"bS\"))) s1
-                              *** (skg (node (id s2) (source main) indef (birthHerald \"bS\"))) s2
-                              ** (skg (node (id c1) (source main) (birthHerald \"aC1\"))) c1
-                              *** (skg (node (id c2) (source main) (birthHerald \"aC\"))) c2
+                              *** (skg (node (id s1) (source main) indef (rels (yellow \"b\") (white \"S\")))) s1
+                              *** (skg (node (id s2) (source main) indef (rels (yellow \"b\") (white \"S\")))) s2
+                              ** (skg (node (id c1) (source main) (rels (yellow \"a\") (white \"C1\")))) c1
+                              *** (skg (node (id c2) (source main) (rels (yellow \"a\") (white \"C\")))) c2
                               "};
       assert_metadata_eq!(result, expected,
                  "budget 3 expands the whole content chain; the SubscribeeCol is whole + budget-neutral");

@@ -9,8 +9,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (node (id 123) (rels \"C2\") (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (rels \"3(3)L\") (editRequest delete))) more text\n")
+      (insert "Test line with (skg (node (id 123) (rels (blue \"C2\")) (viewStats cycle))) herald\n")
+      (insert "Another line (skg (node (id 456) (rels (blue \"3(3)L\")) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -36,47 +36,50 @@
        (null heralds-overlays)))))
 
 (ert-deftest test-heralds-minor-mode-visual-check ()
-  "Test that the display property is properly set and cleared."
+  "The relationship-herald spans render with per-span faces, the ⊥/⟳/
+delete heralds appear, the sentinel placeholder never leaks, and the
+overlay clears on disable. The injected node's rels payload is the C
+token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
+(yellow), and the birth \"C\" (black-on-white)."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (parentIs independent) (birthHerald \"La\") (rels \"3(1)L\") (viewStats cycle) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (parentIs independent) (rels (orange \"2\") (yellow \"a\") (white \"C\")) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
-      (let* ;; Find the overlay covering our herald
-          ( ( herald-start
-              ( save-excursion
-                ( goto-char ( point-min ))
-                ( search-forward "(skg " )
-                ( match-beginning 0 )) )
-            ( overlays-at-herald ( overlays-at herald-start ))
-            ( display-overlay
-              ( cl-find-if ( lambda ( ov ) ( overlay-get ov 'display ))
-                           overlays-at-herald )) )
-        (should display-overlay) ;; Should have a display overlay
+      (let* ( ( herald-start
+                ( save-excursion
+                  ( goto-char ( point-min ))
+                  ( search-forward "(skg " )
+                  ( match-beginning 0 )) )
+              ( display-overlay
+                ( cl-find-if ( lambda ( ov ) ( overlay-get ov 'display ))
+                             ( overlays-at herald-start ))) )
+        (should display-overlay)
         (should ( stringp ( overlay-get display-overlay 'display )) )
-        (let ;; The display should contain our herald symbols: the
-             ;; orange birth herald "La", the blue rels "3(1)L", the
-             ;; cycle ⟳, the independent ⊥, and the delete request --
-             ;; with the orange birth herald before the blue rels.
-            ( ( display-text ( overlay-get display-overlay 'display )) )
+        (let ( ( display-text ( overlay-get display-overlay 'display )) )
+          ;; the sentinel placeholder must never reach the display
+          ( should-not ( string-match-p "__RELS_SPANS__" display-text ))
           ( should ( string-match "⊥" display-text ))
-          ( should ( string-match "La" display-text ))
+          ( should ( string-match "2aC" display-text ))
           ( should ( string-match "⟳" display-text ))
-          ( should ( string-match "3(1)L" display-text ))
-          ( should (< (string-match "La" display-text)
-                      (string-match "3(1)L" display-text)) )
-          ( should ( string-match "delete" display-text )) )) )
+          ( should ( string-match "delete" display-text ))
+          ;; per-span faces on the 2aC relationship token
+          (let ( ( i ( string-match "2aC" display-text )) )
+            ( should ( eq ( get-text-property i 'face display-text )
+                          'heralds-orange-face )) ;; the "2"
+            ( should ( eq ( get-text-property (+ i 1) 'face display-text )
+                          'heralds-yellow-face )) ;; the "a"
+            ( should ( eq ( get-text-property (+ i 2) 'face display-text )
+                          'heralds-birth-face )) )))) ;; the "C"
     (progn ;; what happens upon disabling it
-      (heralds-minor-mode -1) ;; disable
-      (let* ;; Check that no display overlays remain
-          ( ( herald-start
-              ( save-excursion
-                ( goto-char ( point-min ))
-                ( search-forward "(skg " )
-                ( match-beginning 0 )) )
-            ( overlays-at-herald ( overlays-at herald-start ))
-            ( display-overlay
-              ( cl-find-if ( lambda ( ov ) ( overlay-get ov 'display ))
-                           overlays-at-herald )) )
+      (heralds-minor-mode -1)
+      (let* ( ( herald-start
+                ( save-excursion
+                  ( goto-char ( point-min ))
+                  ( search-forward "(skg " )
+                  ( match-beginning 0 )) )
+              ( display-overlay
+                ( cl-find-if ( lambda ( ov ) ( overlay-get ov 'display ))
+                             ( overlays-at herald-start ))) )
         ( should-not display-overlay )) )) )
 
 (ert-deftest test-heralds-viewrequests-display ()
@@ -197,7 +200,7 @@ would leak content the user hid by restricting the source-set."
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg (node (id 1) (source s) (rels \"C2\")))\n")
+    (insert "(skg (node (id 1) (source s) (rels (blue \"C2\"))))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
@@ -224,7 +227,7 @@ the fixture table."
     (cl-letf (((symbol-function 'skg-request-herald-rules)
                (lambda () (skg-test-install-herald-rules))))
       (with-temp-buffer
-        (insert "(skg (node (id 1) (source s) (rels \"C2\")))\n")
+        (insert "(skg (node (id 1) (source s) (rels (blue \"C2\"))))\n")
         (heralds-minor-mode 1)
         (should heralds-minor-mode)       ;; stayed on
         (should heralds--transform-rules) ;; table recovered

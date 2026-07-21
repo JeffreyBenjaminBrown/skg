@@ -812,17 +812,17 @@ async fn test_subscribee_and_filter_cols (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H3 S2\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\") (sep \" \") (purple \"H3\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id hidden-in-E1) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E1
-       *** (skg (node (id hidden-in-E2) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E2
-       *** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"bH\"))) hidden-for-no-reason
+       *** (skg (node (id hidden-in-E1) (source main) indef (rels (blue \"1C\") (sep \" \") (yellow \"b\") (white \"H\")))) hidden-in-E1
+       *** (skg (node (id hidden-in-E2) (source main) indef (rels (blue \"1C\") (sep \" \") (yellow \"b\") (white \"H\")))) hidden-in-E2
+       *** (skg (node (id hidden-for-no-reason) (source main) indef (rels (yellow \"b\") (white \"H\")))) hidden-for-no-reason
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
-       *** (skg (node (id E2) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (rels (blue \"C2\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (rels (blue \"C2\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg folded (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       **** (skg folded (node (id hidden-for-no-reason) (source main) indef (rels (yellow \"c\") (white \"H\")))) hidden-for-no-reason
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribees are bare leaves; only HiddenOutsideOfSubscribeeCol shown");
@@ -848,23 +848,23 @@ async fn test_subscribee_and_filter_cols (
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H3 S2\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\") (sep \" \") (purple \"H3\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id hidden-in-E1) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E1
-       *** (skg (node (id hidden-in-E2) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) hidden-in-E2
-       *** (skg (node (id hidden-for-no-reason) (source main) indef (birthHerald \"bH\"))) hidden-for-no-reason
+       *** (skg (node (id hidden-in-E1) (source main) indef (rels (blue \"1C\") (sep \" \") (yellow \"b\") (white \"H\")))) hidden-in-E1
+       *** (skg (node (id hidden-in-E2) (source main) indef (rels (blue \"1C\") (sep \" \") (yellow \"b\") (white \"H\")))) hidden-in-E2
+       *** (skg (node (id hidden-for-no-reason) (source main) indef (rels (yellow \"b\") (white \"H\")))) hidden-for-no-reason
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (blue \"C2\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg folded (node (id hidden-in-E1) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E1
-       **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
-       *** (skg (node (id E2) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-2
+       ***** (skg folded (node (id hidden-in-E1) (source main) indef (rels (yellow \"b\") (white \"C\") (sep \" \") (yellow \"d\") (white \"H\")))) hidden-in-E1
+       **** (skg (node (id E11) (source main) (rels (yellow \"a\") (white \"C\")))) E11
+       *** (skg (node (id E2) (source main) (rels (blue \"C2\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg folded (node (id hidden-in-E2) (source main) indef (birthHerald \"dH bC\"))) hidden-in-E2
-       **** (skg (node (id E21) (source main) (birthHerald \"aC\"))) E21
+       ***** (skg folded (node (id hidden-in-E2) (source main) indef (rels (yellow \"b\") (white \"C\") (sep \" \") (yellow \"d\") (white \"H\")))) hidden-in-E2
+       **** (skg (node (id E21) (source main) (rels (yellow \"a\") (white \"C\")))) E21
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg folded (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       **** (skg folded (node (id hidden-for-no-reason) (source main) indef (rels (yellow \"c\") (white \"H\")))) hidden-for-no-reason
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol shown before content; HiddenOutsideOfSubscribeeCol at end");
@@ -894,12 +894,12 @@ async fn test_hidden_within_but_none_without (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S1\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S1\") (sep \" \") (purple \"H1\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) H
+       *** (skg (node (id H) (source main) indef (rels (blue \"1C\") (sep \" \") (yellow \"b\") (white \"H\")))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C3\"))) subscribee-1
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       *** (skg (node (id E1) (source main) indef (rels (blue \"C3\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribee is bare leaf; H doesn't appear");
@@ -927,16 +927,16 @@ async fn test_hidden_within_but_none_without (
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S1\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S1\") (sep \" \") (purple \"H1\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"1C\"))) H
+       *** (skg (node (id H) (source main) indef (rels (blue \"1C\") (sep \" \") (yellow \"b\") (white \"H\")))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C3\"))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (blue \"C3\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH bC\"))) H
-       **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
-       **** (skg (node (id E12) (source main) (birthHerald \"aC\"))) E12
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       ***** (skg folded (node (id H) (source main) indef (rels (yellow \"b\") (white \"C\") (sep \" \") (yellow \"d\") (white \"H\")))) H
+       **** (skg (node (id E11) (source main) (rels (yellow \"a\") (white \"C\")))) E11
+       **** (skg (node (id E12) (source main) (rels (yellow \"a\") (white \"C\")))) E12
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol with H before E11 and E12");
@@ -1130,15 +1130,15 @@ async fn test_hidden_without_but_none_within (
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\") (sep \" \") (purple \"H1\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id H) (source main) indef (birthHerald \"bH\"))) H
+       *** (skg (node (id H) (source main) indef (rels (yellow \"b\") (white \"H\")))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
-       *** (skg (node (id E2) (source main) indef (birthHerald \"bS\"))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (rels (blue \"C2\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (rels (yellow \"b\") (white \"S\")))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg folded (node (id H) (source main) indef (birthHerald \"cH\"))) H
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       **** (skg folded (node (id H) (source main) indef (rels (yellow \"c\") (white \"H\")))) H
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: H in HiddenOutsideOfSubscribeeCol; E1 and E2 are indef bare leaves");
@@ -1162,18 +1162,18 @@ async fn test_hidden_without_but_none_within (
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\") (sep \" \") (purple \"H1\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id H) (source main) indef (birthHerald \"bH\"))) H
+       *** (skg (node (id H) (source main) indef (rels (yellow \"b\") (white \"H\")))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C2\"))) subscribee-1
-       **** (skg (node (id E11) (source main) (birthHerald \"aC\"))) E11
-       **** (skg (node (id E12) (source main) (birthHerald \"aC1\"))) E12
-       ***** (skg (node (id E121) (source main) (birthHerald \"aC\"))) E121
-       *** (skg (node (id E2) (source main) (birthHerald \"bS\"))) subscribee-2
+       *** (skg (node (id E1) (source main) (rels (blue \"C2\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
+       **** (skg (node (id E11) (source main) (rels (yellow \"a\") (white \"C\")))) E11
+       **** (skg (node (id E12) (source main) (rels (yellow \"a\") (white \"C1\")))) E12
+       ***** (skg (node (id E121) (source main) (rels (yellow \"a\") (white \"C\")))) E121
+       *** (skg (node (id E2) (source main) (rels (yellow \"b\") (white \"S\")))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg folded (node (id H) (source main) indef (birthHerald \"cH\"))) H
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       **** (skg folded (node (id H) (source main) indef (rels (yellow \"c\") (white \"H\")))) H
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(with_subscribees_expanded, expected_expanded,
       "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol (at end); E1 expanded with E11, E12; E2 expanded but empty");
@@ -1240,13 +1240,13 @@ async fn test_overlapping_hidden_within (
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\") (sep \" \") (purple \"H1\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"2C\"))) H
+       *** (skg (node (id H) (source main) indef (rels (orange \"2\") (blue \"C\") (sep \" \") (yellow \"b\") (white \"H\")))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C1\"))) subscribee-1
-       *** (skg (node (id E2) (source main) indef (birthHerald \"bS\") (rels \"C1\"))) subscribee-2
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       *** (skg (node (id E1) (source main) indef (rels (blue \"C1\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (rels (blue \"C1\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-2
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribees are bare leaves; H doesn't appear");
@@ -1270,17 +1270,17 @@ async fn test_overlapping_hidden_within (
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels \"C1 H1 S2\"))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (rels (blue \"C1\") (sep \" \") (purple \"S2\") (sep \" \") (purple \"H1\")))) R
        ** (skg hiddenCol)
-       *** (skg (node (id H) (source main) indef (birthHerald \"bH\") (rels \"2C\"))) H
+       *** (skg (node (id H) (source main) indef (rels (orange \"2\") (blue \"C\") (sep \" \") (yellow \"b\") (white \"H\")))) H
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (birthHerald \"bS\") (rels \"C1\"))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (blue \"C1\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
-       *** (skg (node (id E2) (source main) (birthHerald \"bS\") (rels \"C1\"))) subscribee-2
+       ***** (skg folded (node (id H) (source main) indef (rels (orange \"2\") (yellow \"b\") (white \"C\") (sep \" \") (yellow \"d\") (white \"H\")))) H
+       *** (skg (node (id E2) (source main) (rels (blue \"C1\") (sep \" \") (yellow \"b\") (white \"S\")))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
-       ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
+       ***** (skg folded (node (id H) (source main) indef (rels (orange \"2\") (yellow \"b\") (white \"C\") (sep \" \") (yellow \"d\") (white \"H\")))) H
+       ** (skg (node (id R1) (source main) (rels (yellow \"a\") (white \"C\")))) R1
        "};
     assert_metadata_eq!(expanded, expected_expanded,
       "View with expanded subscribees: H appears in HiddenInSubscribeeCol under both E1 and E2");

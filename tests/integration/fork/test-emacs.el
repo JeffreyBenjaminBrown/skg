@@ -81,7 +81,7 @@
                       (let ((p-buf (fork-test--buffer-showing "P")))
                         (and p-buf
                              (with-current-buffer p-buf
-                               (string-match-p "(rels \"1S 1O\")"
+                               (string-match-p "(rels (purple \"1S\") (sep \" \") (purple \"1O\"))"
                                                (buffer-string))))))
                     10)))
     (unless committed

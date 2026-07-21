@@ -4,7 +4,7 @@
 (defun headline--graft-role-from-herald (herald)
   "Classify a graft HERALD STRING into its backpath ROLENAME, or nil.
 Under the uniform-herald grammar a node's relationship info lives in its
-orange (birthHerald \"STR\") and/or blue (rels \"STR\") tokens
+orange (rels (white \"S\") (yellow \"TR\")) and/or blue (rels (purple \"S\") (yellow \"TR\")) tokens
 (server/herald_tokens.rs). A token has the shape [inSide]X[outSide],
 where X is the relationship letter (C contains, L textlinks_to, H hides,
 S subscribes, O overrides), counts are digits, and lowercase letters

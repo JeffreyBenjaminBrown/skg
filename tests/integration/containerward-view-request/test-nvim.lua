@@ -94,15 +94,15 @@ local expected_without_metadata =
   .. '*** 121\n'
   .. '** 13\n'
 local expected =
-  '* (skg (node (id 1) (source main) (parentIs absent) (rels "1C3"))) 1\n'
-  .. '** (skg (node (id 11) (source main) (birthHerald "aC"))) 11\n'
-  .. '** (skg (node (id 12) (source main) (birthHerald "aC1"))) 12\n'
+  '* (skg (node (id 1) (source main) (parentIs absent) (rels (blue "1C3")))) 1\n'
+  .. '** (skg (node (id 11) (source main) (rels (yellow "a") (white "C")))) 11\n'
+  .. '** (skg (node (id 12) (source main) (rels (yellow "a") (white "C1")))) 12\n'
   .. '*** (skg (node (id 1) (source main) (parentIs independent) indef'
-     .. ' (birthHerald "1C3a") (viewStats cycle))) 1\n'
+     .. ' (rels (white "1C3") (yellow "a")) (viewStats cycle))) 1\n'
   .. '**** (skg (node (id 0) (source main) (parentIs independent) indef'
-     .. ' (birthHerald "Ca"))) 0\n'
-  .. '*** (skg (node (id 121) (source main) (birthHerald "aC"))) 121\n'
-  .. '** (skg (node (id 13) (source main) (birthHerald "aC"))) 13\n'
+     .. ' (rels (white "C") (yellow "a")))) 0\n'
+  .. '*** (skg (node (id 121) (source main) (rels (yellow "a") (white "C")))) 121\n'
+  .. '** (skg (node (id 13) (source main) (rels (yellow "a") (white "C")))) 13\n'
 
 print('Buffer-Content with metadata: ' .. buffer_content)
 print('Expected buffer-content with metadata: ' .. expected)

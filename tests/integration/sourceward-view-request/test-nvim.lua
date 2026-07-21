@@ -80,19 +80,17 @@ print('=== SKG Sourceward View Request Integration Test ===')
 
 local expected_line0 =
   '* (skg (node (id 1) (source main) (parentIs absent)'
-  .. ' (rels "C2"))) 1\n'
-  .. '** (skg (node (id 11) (source main) (birthHerald "aC")'
-  .. ' (rels "1L"))) 11\n'
-  .. '** (skg (node (id 12) (source main) (birthHerald "aC"))) 12\n'
+  .. ' (rels (blue "C2")))) 1\n'
+  .. '** (skg (node (id 11) (source main) (rels (yellow "a") (white "C") (sep " ") (blue "1L")))) 11\n'
+  .. '** (skg (node (id 12) (source main) (rels (yellow "a") (white "C")))) 12\n'
 local expected_line2 = expected_line0
 local expected_changed =
   '* (skg (node (id 1) (source main) (parentIs absent)'
-  .. ' (rels "C2"))) 1\n'
-  .. '** (skg (node (id 11) (source main) (birthHerald "aC")'
-  .. ' (rels "1L"))) 11\n'
+  .. ' (rels (blue "C2")))) 1\n'
+  .. '** (skg (node (id 11) (source main) (rels (yellow "a") (white "C") (sep " ") (blue "1L")))) 11\n'
   .. '*** (skg (node (id l-11) (source main) (parentIs independent)'
-  .. ' indef (birthHerald "La"))) [[id:11][a link to 11]]\n'
-  .. '** (skg (node (id 12) (source main) (birthHerald "aC"))) 12\n'
+  .. ' indef (rels (white "L") (yellow "a")))) [[id:11][a link to 11]]\n'
+  .. '** (skg (node (id 12) (source main) (rels (yellow "a") (white "C")))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'
 local expected_with_link =
   '* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n'

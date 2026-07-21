@@ -81,47 +81,43 @@ fn assert_sharing_stats_in_view_of_R (
   assert_eq! ( e_lines . len (), 2,
     "{}: E should appear under both the subscribeeCol and the \
      overriddenCol:\n{}", label, buf );
-  // Since uniform-heralds the parent-relative stats are blue rels
-  // tokens: the OLD grandparentOverrides ("gO") is the token "bO" (the
-  // grandparent b=R overrides E) and grandparentSubscribes ("gS") is
-  // "bS" (b=R subscribes to E). They render inside (rels "..."); E's
-  // birthHerald carries the col-defining relation (bS under subscribee,
-  // bO under overridden), so we look only inside the (rels "...") chunk.
-  let rels_of = | line : &str | -> String {
-    match line . find ("(rels \"") {
-      Some (i) => { let rest : &str = & line [ i + 7 .. ];
-        match rest . find ('"') {
-          Some (j) => rest [ .. j ] . to_string (),
-          None => String::new (), } },
-      None => String::new (), } };
+  // Since uniform-heralds the parent-relative stats are relationship
+  // tokens inside (rels ...): the OLD grandparentOverrides ("gO") is the
+  // token "bO" (the grandparent b=R overrides E) and grandparentSubscribes
+  // ("gS") is "bS" (b=R subscribes to E). We compare the VISIBLE text of
+  // the (rels ...) spans (see rels_visible), so a token like bO reads as
+  // "bO" even though its characters carry different span colors.
+  // Since birth is now unified INTO the (rels ...) spans (no separate
+  // birthHerald), E under a col shows BOTH its relations to R: the
+  // COL-DEFINING one as the reason-for-being (black-on-white) token, and
+  // the OTHER (the old gO/gS sharing stat) as an ordinary purple token.
+  // The two cols differ by WHICH relation is white -- so we assert on the
+  // colored spans, not just the color-blind visible text.
   for (col, line) in &e_lines {
-    let rels : String = rels_of (line);
     match *col {
       "subscribeeCol" => {
-        assert! ( rels . contains ("bO"),
-          "{}: the subscribee-as-such copy of E carries bO (gO):\n{}",
-          label, buf );
-        assert! ( ! rels . contains ("bS"),
-          "{}: the subscribee-as-such copy of E must not carry bS (gS) \
-           (the col itself already says R subscribes):\n{}",
-          label, buf ); },
+        assert! ( line . contains (r#"(white "S")"#),
+          "{}: E-as-subscribee's col relation (subscribe) is the birth \
+           (white) token:\n{}", label, buf );
+        assert! ( line . contains (r#"(purple "O")"#),
+          "{}: E-as-subscribee also shows gO (R overrides E) as an \
+           ordinary purple O:\n{}", label, buf ); },
       "overriddenCol" => {
-        assert! ( rels . contains ("bS"),
-          "{}: the overriddenCol copy of E carries bS (gS):\n{}",
-          label, buf );
-        assert! ( ! rels . contains ("bO"),
-          "{}: the overriddenCol copy of E must not carry bO (gO):\n{}",
-          label, buf ); },
+        assert! ( line . contains (r#"(white "O")"#),
+          "{}: E-as-overridden's col relation (override) is the birth \
+           (white) token:\n{}", label, buf );
+        assert! ( line . contains (r#"(purple "S")"#),
+          "{}: E-as-overridden also shows gS (R subscribes E) as an \
+           ordinary purple S:\n{}", label, buf ); },
       other => panic! (
         "{}: E drawn outside any col ({:?}):\n{}", label, other, buf ),
     }}
   for f_line in lines_containing (buf, "(id F)") {
-    let f_rels : String = rels_of (f_line);
-    assert! ( ! f_rels . contains ("bO")
-              && ! f_rels . contains ("bS")
-              && ! f_rels . contains ("Oa"),
-      "{}: F, a subscribee R does not override, carries none of the \
-       three stats (bO/bS/Oa):\n{}", label, buf ); }
+    // F is a subscribee R does NOT override, so it carries no override
+    // token at all -- only its col relation (subscribe, the white birth).
+    assert! ( ! rels_visible (f_line) . contains ("O"),
+      "{}: F, a subscribee R does not override, shows no override \
+       token:\n{}", label, buf ); }
   { // Since override substitution (plan 11), a fresh view of R draws
     // C in place of P (C overrides P), marked; the Op position (C
     // under a drawn P) is asserted from a view of P instead, in
@@ -136,12 +132,30 @@ fn assert_op_in_view_of_P (
   label : &str,
 ) {
   let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
-  // Since uniform-heralds the old overridesParent ("Op") is the blue
-  // token "Oa" (C overrides its visible parent a=P) inside (rels "...").
+  // Since uniform-heralds the old overridesParent ("Op") is the token
+  // "Oa" (C overrides its visible parent a=P) inside (rels ...).
   assert! ( c_lines . iter ()
-            . any ( |l| l . contains ("Oa") ),
+            . any ( |l| rels_visible (l) . contains ("Oa") ),
     "{}: C drawn as content of P (which it overrides) carries \
      Oa (Op):\n{}", label, buf ); }
+
+/// The VISIBLE text of a line's (rels ...) styled-span form: every
+/// span's quoted text concatenated (seps included as spaces), so a token
+/// like "bO" reads as "bO" even though 'b' and 'O' carry different span
+/// colors. Empty when the line has no (rels ...).
+fn rels_visible ( line : &str ) -> String {
+  match line . find ("(rels ") {
+    None => String::new (),
+    Some (i) => {
+      let mut out : String = String::new ();
+      let mut rest : &str = & line [i ..];
+      while let Some (a) = rest . find ('"') {
+        let after : &str = & rest [a + 1 ..];
+        match after . find ('"') {
+          Some (b) => { out . push_str (& after [.. b]);
+                        rest = & after [b + 1 ..]; },
+          None => break, } }
+      out } } }
 
 async fn save_and_rerender (
   buf     : &str,

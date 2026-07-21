@@ -162,11 +162,11 @@ async fn test_single_root_view_with_cycle (
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (rels \"C1\"))) a
-                              ** (skg (node (id b) (source main) (birthHerald \"2aC1\"))) b
+      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (rels (blue \"C1\")))) a
+                              ** (skg (node (id b) (source main) (rels (orange \"2\") (yellow \"a\") (white \"C1\")))) b
                               b has a body
-                              *** (skg (node (id c) (source main) (birthHerald \"aCa\"))) c
-                              **** (skg (node (id b) (source main) indef hiddenBody (birthHerald \"2aCa\") (viewStats cycle))) b
+                              *** (skg (node (id c) (source main) (rels (yellow \"a\") (white \"C\") (yellow \"a\")))) c
+                              **** (skg (node (id b) (source main) indef hiddenBody (rels (orange \"2\") (yellow \"a\") (white \"C\") (yellow \"a\")) (viewStats cycle))) b
                               "};
       assert_metadata_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -198,29 +198,29 @@ async fn test_multi_root_view_with_shared_nodes (
       // indef Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels \"C2 H2\"))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\") (sep \" \") (purple \"H2\")))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg hiddenCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"bH\") (rels \"2S 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (birthHerald \"bH\") (rels \"1L 2S O2 I1\"))) this title includes a [[id:22][textlink to another file]]
-         ** (skg (node (id 2) (source main) indef hiddenBody (birthHerald \"aC\") (rels \"1L S2 I1\"))) title 2
-         ** (skg (node (id 5) (source main) (birthHerald \"O2\") (rels \"1L aH 2S I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (purple \"1O\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (purple \"O2\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
+         ** (skg (node (id 5) (source main) (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (white \"O2\") (sep \" \") (yellow \"a\") (purple \"H\") (sep \" \") (cyan \"I1\")) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg hiderCol)
-         **** (skg (node (id 1) (source main) indef hiddenBody (birthHerald \"H2b\") (rels \"C2\") (viewStats cycle))) title 1
+         **** (skg (node (id 1) (source main) indef hiddenBody (rels (blue \"C2\") (sep \" \") (white \"H2\") (yellow \"b\")) (viewStats cycle))) title 1
          *** (skg overriddenCol)
-         **** (skg (node (id 3) (source main) indef hiddenBody (birthHerald \"bO\") (rels \"1C 1L S2b I1\"))) title 3
-         **** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"bO\") (rels \"1H 2S I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (cyan \"I1\")))) title 3
+         **** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg subscriberCol)
-         **** (skg (node (id 2) (source main) indef hiddenBody (birthHerald \"S2b\") (rels \"1C 1L I1\"))) title 2
-         **** (skg (node (id 3) (source main) indef hiddenBody (birthHerald \"S2b\") (rels \"1C 1L bO I1\"))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) (rels \"1C 1L S2 I1\"))) title 2
+         **** (skg (node (id 2) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (cyan \"I1\")))) title 2
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (purple \"O\") (sep \" \") (cyan \"I1\")))) title 3
+         * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (birthHerald \"C2a\") (rels \"H2\"))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (white \"C2\") (yellow \"a\") (sep \" \") (purple \"H2\")))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1H 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1Lb 1H O2 I1\"))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"1O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (yellow \"b\") (sep \" \") (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"O2\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -256,29 +256,29 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + cols (cols are not budget-bound); subscribee members
       // are indef.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels \"C2 H2\"))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\") (sep \" \") (purple \"H2\")))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg hiddenCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"bH\") (rels \"2S 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (birthHerald \"bH\") (rels \"1L 2S O2 I1\"))) this title includes a [[id:22][textlink to another file]]
-         ** (skg (node (id 2) (source main) indef hiddenBody (birthHerald \"aC\") (rels \"1L S2 I1\"))) title 2
-         ** (skg (node (id 5) (source main) (birthHerald \"O2\") (rels \"1L aH 2S I1\") (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (purple \"1O\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (purple \"O2\") (sep \" \") (yellow \"b\") (white \"H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
+         ** (skg (node (id 5) (source main) (rels (blue \"1L\") (sep \" \") (purple \"2S\") (sep \" \") (white \"O2\") (sep \" \") (yellow \"a\") (purple \"H\") (sep \" \") (cyan \"I1\")) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          *** (skg hiderCol)
-         **** (skg (node (id 1) (source main) indef hiddenBody (birthHerald \"H2b\") (rels \"C2\") (viewStats cycle))) title 1
+         **** (skg (node (id 1) (source main) indef hiddenBody (rels (blue \"C2\") (sep \" \") (white \"H2\") (yellow \"b\")) (viewStats cycle))) title 1
          *** (skg overriddenCol)
-         **** (skg (node (id 3) (source main) indef hiddenBody (birthHerald \"bO\") (rels \"1C 1L S2b I1\"))) title 3
-         **** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"bO\") (rels \"1H 2S I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (cyan \"I1\")))) title 3
+         **** (skg (node (id 4) (source main) indef hiddenBody (rels (purple \"2S\") (sep \" \") (yellow \"b\") (white \"O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg subscriberCol)
-         **** (skg (node (id 2) (source main) indef hiddenBody (birthHerald \"S2b\") (rels \"1C 1L I1\"))) title 2
-         **** (skg (node (id 3) (source main) indef hiddenBody (birthHerald \"S2b\") (rels \"1C 1L bO I1\"))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) (rels \"1C 1L S2 I1\"))) title 2
+         **** (skg (node (id 2) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (cyan \"I1\")))) title 2
+         **** (skg (node (id 3) (source main) indef hiddenBody (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (white \"S2\") (yellow \"b\") (sep \" \") (yellow \"b\") (purple \"O\") (sep \" \") (cyan \"I1\")))) title 3
+         * (skg (node (id 2) (source main) (parentIs absent) (rels (blue \"1C\") (sep \" \") (blue \"1L\") (sep \" \") (purple \"S2\") (sep \" \") (cyan \"I1\")))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (birthHerald \"C2a\") (rels \"H2\"))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (white \"C2\") (yellow \"a\") (sep \" \") (purple \"H2\")))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1H 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1Lb 1H O2 I1\"))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef hiddenBody (rels (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"1O\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef hiddenBody (rels (blue \"1L\") (yellow \"b\") (sep \" \") (white \"2\") (yellow \"b\") (white \"S\") (sep \" \") (purple \"O2\") (sep \" \") (purple \"1H\") (sep \" \") (cyan \"I1\")))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");
@@ -317,16 +317,16 @@ async fn test_limit_with_multiple_sibling_groups (
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels \"C2\"))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (blue \"C2\")))) 1
                               1 body
-                              ** (skg (node (id 11) (source main) (birthHerald \"aC2\"))) 11
+                              ** (skg (node (id 11) (source main) (rels (yellow \"a\") (white \"C2\")))) 11
                               11 body
-                              *** (skg (node (id 111) (source main) (birthHerald \"aC\"))) 111
+                              *** (skg (node (id 111) (source main) (rels (yellow \"a\") (white \"C\")))) 111
                               111 body
-                              *** (skg (node (id 112) (source main) indef hiddenBody (birthHerald \"aC\"))) 112
-                              ** (skg (node (id 12) (source main) (birthHerald \"aC1\"))) 12
+                              *** (skg (node (id 112) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 112
+                              ** (skg (node (id 12) (source main) (rels (yellow \"a\") (white \"C1\")))) 12
                               12 body
-                              *** (skg (node (id 121) (source main) indef hiddenBody (birthHerald \"aC\"))) 121
+                              *** (skg (node (id 121) (source main) indef hiddenBody (rels (yellow \"a\") (white \"C\")))) 121
                               "};
       assert_metadata_eq!(result, expected,
                  "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");

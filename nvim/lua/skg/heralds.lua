@@ -31,6 +31,15 @@ local M = {}
 
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
 
+-- The placeholder token the server's `rels` rule emits
+-- (RELS_SPANS_SENTINEL in server/heralds.rs). The relationship heralds
+-- are per-CHARACTER styled spans -- more than the rule table's
+-- atom-level coloring can express -- so the rule only POSITIONS them by
+-- emitting this sentinel, which `chunks_from_metadata' replaces with the
+-- spans it renders from the `(rels (COLOR "text") ...)' payload. The
+-- analog of `heralds--rels-sentinel' in elisp.
+M.RELS_SENTINEL = '__RELS_SPANS__'
+
 ---Map lens color keywords to highlight groups, mirroring the five
 ---heralds-*-face definitions.
 local color_to_highlight_group = {
@@ -39,6 +48,19 @@ local color_to_highlight_group = {
   BLUE = 'SkgHeraldBlue',
   YELLOW = 'SkgHeraldYellow',
   ORANGE = 'SkgHeraldOrange' }
+
+---Map relationship-herald SPAN color names to highlight groups. blue =
+---C/L base, purple = S/O/H base, cyan = A/I, yellow = ancestor letters,
+---orange = the multi-contains count before C, white = the
+---reason-for-being (birth) token; `sep' (and anything unknown) -> nil
+---(Normal). Mirrors `heralds--span-color-to-face' in elisp.
+local span_color_to_highlight_group = {
+  blue = 'SkgHeraldBlue',
+  purple = 'SkgHeraldPurple',
+  cyan = 'SkgHeraldCyan',
+  yellow = 'SkgHeraldYellow',
+  orange = 'SkgHeraldOrange',
+  white = 'SkgHeraldBirth' }
 
 function M.define_highlight_groups ()
   vim.api.nvim_set_hl(0, 'SkgHeraldRed',
@@ -51,6 +73,12 @@ function M.define_highlight_groups ()
     { fg = 'black', bg = 'yellow', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldOrange',
     { fg = 'white', bg = '#d2691e', default = true })
+  vim.api.nvim_set_hl(0, 'SkgHeraldPurple',
+    { fg = 'white', bg = '#8b00ff', default = true })
+  vim.api.nvim_set_hl(0, 'SkgHeraldCyan',
+    { fg = 'black', bg = '#00ffff', default = true })
+  vim.api.nvim_set_hl(0, 'SkgHeraldBirth',
+    { fg = 'black', bg = 'white', default = true })
 end
 M.define_highlight_groups()
 
@@ -59,6 +87,12 @@ M.define_highlight_groups()
 function M.color_highlight_group (color)
   if color == nil then return nil end
   return color_to_highlight_group[sexpr.atom_text(color)]
+end
+
+---@param color_name string a span color name (blue/purple/.../sep)
+---@return string|nil highlight group name (nil for sep/unknown)
+function M.span_color_highlight_group (color_name)
+  return span_color_to_highlight_group[color_name]
 end
 
 -- ── tokens -> display chunks ───────────────────────────────────────
@@ -163,6 +197,101 @@ function M.chunks_text (chunks)
   return table.concat(pieces)
 end
 
+---Concatenate a lens TOKEN's chunk texts (to recognize the sentinel).
+---@param token table
+---@return string
+function M.token_text (token)
+  local pieces = {}
+  for _, chunk in ipairs(token.chunks) do
+    table.insert(pieces, chunk.text) end
+  return table.concat(pieces)
+end
+
+---Find the first (rels ...) sub-list anywhere within SEXP, else nil.
+---@param sexp any
+---@return table|nil
+function M.find_rels (sexp)
+  if not sexpr.is_list(sexp) then return nil end
+  if sexp[1] == sexpr.symbol('rels') then return sexp end
+  for i = 1, #sexp do
+    local found = M.find_rels(sexp[i])
+    if found then return found end
+  end
+  return nil
+end
+
+---Render the (rels (COLOR "text") ...) payload in SEXP to virtual-text
+---chunks, or nil if there is no such payload. Each span's color name
+---maps to a highlight group (a `sep' span is Normal -- an ordinary
+---space between tokens). The analog of `heralds--render-rel-spans'.
+---@param sexp any
+---@return table[]|nil
+function M.render_rel_spans (sexp)
+  local rels = M.find_rels(sexp)
+  if not rels then return nil end
+  local chunks = {}
+  for i = 2, #rels do
+    local span = rels[i]
+    if sexpr.is_list(span) and #span >= 2
+       and type(span[2]) == 'string' then
+      local color = sexpr.atom_text(span[1])
+      table.insert(chunks,
+        { span[2], M.span_color_highlight_group(color) or 'Normal' })
+    end
+  end
+  return chunks
+end
+
+---Like `tokens_to_chunks', but the sentinel token is replaced by
+---REL_CHUNKS (the rendered relationship-herald spans). When REL_CHUNKS
+---is nil the sentinel -- which should then be absent -- is dropped.
+---@param tokens table[]
+---@param rel_chunks table[]|nil
+---@return table[]|nil
+function M.tokens_to_chunks_with_rels (tokens, rel_chunks)
+  if #tokens == 0 then return nil end
+  local chunks = {}
+  local emitted = false
+  local function sep_if_needed (abut)
+    if emitted and not abut then
+      table.insert(chunks, { ' ', 'Normal' }) end
+  end
+  for _, token in ipairs(tokens) do
+    if M.token_text(token) == M.RELS_SENTINEL then
+      if rel_chunks and #rel_chunks > 0 then
+        sep_if_needed(token.abut)
+        for _, c in ipairs(rel_chunks) do
+          table.insert(chunks, c) end
+        emitted = true
+      end
+    else
+      local cells = M.strip_structural_colons(
+        M.token_character_cells(token))
+      if #cells > 0 then
+        sep_if_needed(token.abut)
+        local cur_text, cur_color = nil, nil
+        local function flush ()
+          if cur_text and #cur_text > 0 then
+            table.insert(chunks,
+              { cur_text,
+                M.color_highlight_group(cur_color) or 'Normal' }) end
+        end
+        for _, cell in ipairs(cells) do
+          if cur_text ~= nil and cell.color == cur_color then
+            cur_text = cur_text .. cell.character
+          else
+            flush(); cur_text = cell.character
+            cur_color = cell.color end
+        end
+        flush()
+        emitted = true
+      end
+    end
+  end
+  if #chunks == 0 then return nil end
+  return chunks
+end
+
 ---Display chunks for METADATA_TEXT (a string beginning '(skg').
 ---Returns nil if it does not parse as an (skg ...) form or the rules
 ---produce no tokens. The analog of 'heralds-from-metadata'.
@@ -175,7 +304,8 @@ function M.chunks_from_metadata (metadata_text)
     return nil end
   local rules = herald_rules.get_rules()
   if not rules then return nil end
-  return M.tokens_to_chunks(lens.transform_sexp_flat(sexp, rules))
+  local tokens = lens.transform_sexp_flat(sexp, rules)
+  return M.tokens_to_chunks_with_rels(tokens, M.render_rel_spans(sexp))
 end
 
 -- ── per-buffer application ─────────────────────────────────────────

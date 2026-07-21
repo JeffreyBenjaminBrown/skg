@@ -37,10 +37,10 @@
         (when (string-match-p "(parentIs independent)" root-line)
           (fail "contained view-root should be content, not independent; line: %S"
                 root-line))
-        (when (string-match-p "(parentIs independent) indef (birthHerald \"Ca\")" root-line)
+        (when (string-match-p "(parentIs independent) indef (rels (white \"C\") (yellow \"a\"))" root-line)
           (fail "contained view-root should be content, not content; line: %S"
                 root-line))
-        (when (string-match-p "(parentIs independent) indef (birthHerald \"La\")" root-line)
+        (when (string-match-p "(parentIs independent) indef (rels (white \"L\") (yellow \"a\"))" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
       (let ((line (and (string-match
@@ -48,8 +48,8 @@
                        (match-string 0 text))))
         (unless line
           (fail "no level-2 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "(parentIs independent) indef (birthHerald \"Ca\")" line)
-          (fail "parent is not (parentIs independent) indef (birthHerald \"Ca\"); line: %S" line))
+        (unless (string-match-p "(parentIs independent) indef (rels (white \"C\") (yellow \"a\"))" line)
+          (fail "parent is not (parentIs independent) indef (rels (white \"C\") (yellow \"a\")); line: %S" line))
         (unless (string-match-p " indef\\b" line)
           (fail "parent is not indefinitive; line: %S" line))))))
 

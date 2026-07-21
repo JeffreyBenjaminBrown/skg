@@ -48,12 +48,12 @@ T.check(not root_line:find('(parentIs independent)', 1, true),
     'contained view-root should be content, not independent; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(parentIs independent) indef (birthHerald "Ca")', 1, true),
+    '(parentIs independent) indef (rels (white "C") (yellow "a"))', 1, true),
   string.format(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(parentIs independent) indef (birthHerald "La")', 1, true),
+    '(parentIs independent) indef (rels (white "L") (yellow "a"))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 
@@ -69,9 +69,9 @@ T.check(parent_line, string.format(
   'no level-2 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(parentIs independent) indef (birthHerald "Ca")', 1, true) ~= nil,
+    '(parentIs independent) indef (rels (white "C") (yellow "a"))', 1, true) ~= nil,
   string.format(
-    'parent is not (parentIs independent) indef (birthHerald "Ca"); '
+    'parent is not (parentIs independent) indef (rels (white "C") (yellow "a")); '
     .. 'line: %s', parent_line))
 T.check(parent_line:find(' indef%f[%A]') ~= nil,
   string.format('parent is not indefinitive; line: %s', parent_line))

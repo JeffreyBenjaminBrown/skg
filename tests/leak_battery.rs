@@ -259,10 +259,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         let ViewNodeKind::Vognode (Vognode::Active (t)) =
           & s_ref . value () . kind
         else { return Err ("S is not an Active vognode" . into ()); };
-        Ok ( [ t . viewStats . birth_herald . clone (),
-               t . viewStats . rels_herald . clone () ]
-             . into_iter () . flatten ()
-             . reduce ( |a, b| format! ("{} {}", a, b) ) ) };
+        Ok ( t . viewStats . rel_spans . as_ref () . map ( |spans|
+               spans . iter () . map ( |s| s . text . as_str () )
+               . collect::<String> () ) ) };
       let at_public : Option<String> = herald_of_S (&public) ?;
       assert! (
         ! at_public . as_deref () . unwrap_or ("")

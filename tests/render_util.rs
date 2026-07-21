@@ -3,7 +3,7 @@
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, default_activeNode };
+use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, HeraldSpan, SpanColor, default_activeNode };
 use skg::types::viewnode::QualCol;
 use std::collections::HashMap;
 
@@ -92,14 +92,13 @@ fn test_metadata_ordering () {
   assert_metadata_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
 
 #[test]
-fn test_birth_and_rels_heralds_emitted () {
-  // The assembled birth (orange) and rels (blue) strings round-trip
-  // verbatim as quoted atoms; a node with neither emits neither.
-  let mk = | birth : Option<&str>, rels : Option<&str> | -> String {
+fn test_rel_spans_emitted () {
+  // The styled relationship-herald spans round-trip verbatim as a
+  // (rels (COLOR "text") ...) form; a node with none emits no rels atom.
+  let mk = | spans : Option<Vec<HeraldSpan>> | -> String {
     let t : ActiveNode = ActiveNode {
       viewStats : ViewNodeStats {
-        birth_herald : birth . map ( |s| s . to_string () ),
-        rels_herald  : rels  . map ( |s| s . to_string () ),
+        rel_spans : spans,
         .. ViewNodeStats::default () },
       .. default_activeNode ( ID::from ("n"),
                             SourceName::from ("main"),
@@ -110,12 +109,14 @@ fn test_birth_and_rels_heralds_emitted () {
     viewnode_to_text (
       1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
       . unwrap () };
-  let with_both : String = mk ( Some ("aC"), Some ("3O 2(1,1)L A2") );
-  assert! ( with_both . contains (r#"(birthHerald "aC")"#),
-            "birthHerald not emitted: {}", with_both );
-  assert! ( with_both . contains (r#"(rels "3O 2(1,1)L A2")"#),
-            "rels not emitted: {}", with_both );
-  let neither : String = mk ( None, None );
-  assert! ( ! neither . contains ("birthHerald") );
+  let with_spans : String = mk ( Some ( vec! [
+    HeraldSpan { color : SpanColor::Yellow, text : "a"  . to_string () },
+    HeraldSpan { color : SpanColor::White,  text : "C"  . to_string () },
+    HeraldSpan { color : SpanColor::Sep,    text : " "  . to_string () },
+    HeraldSpan { color : SpanColor::Purple, text : "S2" . to_string () } ] ) );
+  assert! ( with_spans . contains (
+    r#"(rels (yellow "a") (white "C") (sep " ") (purple "S2"))"# ),
+            "rels spans not emitted verbatim: {}", with_spans );
+  let neither : String = mk ( None );
   assert! ( ! neither . contains ("(rels ") );
   assert_metadata_eq! ( neither, "* (skg (node (id n) (source main))) N\n" ); }

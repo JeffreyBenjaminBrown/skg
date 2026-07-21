@@ -378,24 +378,25 @@ async fn path_request_scenarios (
     format! (
       "* (skg (node (id {}) (source public) (viewRequests (path {})))) {}\n",
       owner, role, title ) };
-  // Each row: (scenario, owner, role, partner-id, birthHerald-token).
+  // Each row: (scenario, owner, role, partner-id, birth-span-fragment).
   // Since uniform-heralds, the grafted partner no longer carries the
   // old (birth backpath ROLE) marker nor a parent-relative viewStat;
-  // instead its relationship TO its org-parent (the origin) shows as an
-  // orange birthHerald token. E.g. the 'overridden' partner is overridden
-  // BY the origin -> its parent (a) overrides it -> token "aO" (the old
-  // pO/parentOverrides). The 'overrider' partner overrides its parent
-  // among others -> "O2a" (the old Op/overridesParent, folded into the
-  // count). The token appears in (birthHerald "...") on the partner's line.
+  // instead its relationship TO its org-parent (the origin) shows as the
+  // reason-for-being (black-on-white) token inside its (rels ...) spans.
+  // E.g. the 'overridden' partner is overridden BY the origin -> its
+  // parent (a) overrides it -> token "aO", rendered as the ancestor
+  // letter 'a' (yellow) then the birth 'O' (white). The 'overrider'
+  // partner overrides its parent among others -> "O2a". The birth token's
+  // spans appear consecutively inside (rels ...) on the partner's line.
   let sharing : [(&str, &str, &str, &str, &str); 6] = [
-    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "aO"),
-    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "O2a"),
-    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "aS"),
-    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "S3a"),
-    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "aH"),
-    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "H2a"),
+    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         r#"(yellow "a") (white "O")"#),
+    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     r#"(white "O2") (yellow "a")"#),
+    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         r#"(yellow "a") (white "S")"#),
+    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     r#"(white "S3") (yellow "a")"#),
+    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     r#"(yellow "a") (white "H")"#),
+    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", r#"(white "H2") (yellow "a")"#),
   ];
-  for (s, owner, role, partner, birth_token) in sharing {
+  for (s, owner, role, partner, birth_span) in sharing {
     let _ = role;
     let resp : SaveResponse = save (
       &req (owner, role, owner), // title == owner (matches its disk title)
@@ -404,14 +405,13 @@ async fn path_request_scenarios (
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view,
                            &format! ("(id {})", partner) );
-    // The matching birthHerald token, on the grafted partner's own line.
+    // The matching birth-token spans, on the grafted partner's own line.
     match resp . saved_view . lines ()
             . find ( |l| l . contains (&format! ("(id {})", partner)) ) {
-      Some (line) => if ! line . contains (
-          &format! ("(birthHerald \"{}\")", birth_token) ) {
+      Some (line) => if ! line . contains (birth_span) {
         fails . record (s, format! (
-          "partner {} missing birthHerald {:?}: {}",
-          partner, birth_token, line )); },
+          "partner {} missing birth span {:?}: {}",
+          partner, birth_span, line )); },
       None => {}, // already recorded by want_contains above
     } }
   { // (path linkDest) on a node whose TITLE carries [[id:pathLink-dst]]:
@@ -424,11 +424,11 @@ async fn path_request_scenarios (
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
-    // The grafted dest carries the orange linkSource-birth token (1L):
-    // one inbound link (from the origin), no outbound. (Replaces the
-    // gone "(birth backpath linkDest)" marker.)
+    // The grafted dest carries the linkSource-birth token (1L): one
+    // inbound link (from the origin), no outbound. Now a black-on-white
+    // (birth) span. (Replaces the gone "(birth backpath linkDest)" marker.)
     fails . want_contains (
-      s, &resp . saved_view, "(birthHerald \"1L\")" ); }
+      s, &resp . saved_view, r#"(white "1L")"# ); }
   { // Self-referential fixture: a node that links to ITSELF. A
     // non-container path role is cycle-guarded and needs NO view-root
     // special-case (unlike containerward) -- the build must not panic,

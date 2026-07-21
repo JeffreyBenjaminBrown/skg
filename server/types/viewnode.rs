@@ -326,6 +326,45 @@ pub struct RelationCounts {
   pub link_with_content : usize,
 }
 
+/// The color of one herald SPAN -- a run of same-styled characters in
+/// the assembled relationship heralds. Emitted inside the `(rels ...)`
+/// metadata form as `(COLOR "text")` spans and rendered by the Emacs
+/// client's dedicated span renderer (elisp/heralds-minor-mode.el), NOT
+/// by the declarative rule table: per-CHARACTER coloring (a yellow
+/// ancestor letter and an orange multi-contains digit inside one
+/// otherwise-blue token) is more than the lens engine's atom-level
+/// coloring can express. The client maps each name to a face.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpanColor {
+  Blue,    // C / L token base -- white on blue
+  Purple,  // S / O / H token base -- white on purple
+  Cyan,    // A / I count tokens -- black on cyan
+  Yellow,  // ancestor-flag letters (a/b/c...) -- black on yellow
+  Orange,  // the multi-contained containers count before C -- white on orange
+  White,   // reason-for-being (birth) token base -- black on white
+  Sep,     // inter-token separator (a space) -- no face
+}
+
+impl SpanColor {
+  pub fn repr_in_client (self) -> &'static str {
+    match self {
+      SpanColor::Blue   => "blue",
+      SpanColor::Purple => "purple",
+      SpanColor::Cyan   => "cyan",
+      SpanColor::Yellow => "yellow",
+      SpanColor::Orange => "orange",
+      SpanColor::White  => "white",
+      SpanColor::Sep    => "sep", } } }
+
+/// One styled run of the assembled relationship heralds. Assembled in
+/// server/herald_tokens.rs, ordered C L S O H A I with `Sep` spans
+/// between tokens.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeraldSpan {
+  pub color : SpanColor,
+  pub text  : String,
+}
+
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
 /// regardless of where/how the node appears in a view.
@@ -345,16 +384,14 @@ pub struct GraphNodeStats {
 pub struct ViewNodeStats {
   pub cycle             : bool,
   pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest activeNode ancestor.
-  /// The assembled orange BIRTH herald string (one or more
-  /// space-joined relationship tokens for the relation(s) that explain
-  /// why this node was drawn) -- e.g. "aC", "3bS", "dH bC". None when
-  /// the node has no birth relation in view (roots, parked nodes).
-  /// Computed by the viewnodestats pass (server/herald_tokens.rs).
-  pub birth_herald          : Option<String>,
-  /// The assembled blue relationship-herald string: the non-birth
-  /// relationship tokens plus =Ak= / =Ik=, space-joined -- e.g.
-  /// "3O 2(1)L A2". None when there is nothing to show.
-  pub rels_herald           : Option<String>,
+  /// The assembled relationship heralds as an ORDERED list of styled
+  /// spans (server/herald_tokens.rs): the tokens C L S O H A I in fixed
+  /// order, per-character colored (group base color, with the birth
+  /// token black-on-white, ancestor letters yellow, the multi-contains
+  /// count orange), joined by `Sep` spans. None when there is nothing to
+  /// show. Serialized as the `(rels (COLOR "text") ...)` metadata form
+  /// and rendered by the client's dedicated span renderer.
+  pub rel_spans             : Option<Vec<HeraldSpan>>,
   /// Some(N) means this viewnode was drawn here in place of N,
   /// which it (transitively) overrides. Herald red "Oh".
   /// LOAD-BEARING, unlike the other view stats: save extraction
@@ -841,8 +878,7 @@ impl Default for ViewNodeStats {
     ViewNodeStats {
       cycle             : false,
       sourceAtBoundary  : false,
-      birth_herald      : None,
-      rels_herald       : None,
+      rel_spans         : None,
       overridesHere     : None,
       hidden_body       : false,
       rel_source        : None,
