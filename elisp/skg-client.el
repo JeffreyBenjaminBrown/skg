@@ -45,7 +45,12 @@
   ;; until its reply happened to land, so a server whose rule table had
   ;; changed (e.g. the styled-span heralds) rendered raw metadata.
   (setq heralds--transform-rules nil)
-  (skg-herald-rules-ensure))
+  (skg-herald-rules-ensure)
+  ;; Return nil, not the rule table: `skg-herald-rules-ensure' returns
+  ;; the (large) table, and as the last form it would otherwise become
+  ;; `skg-client-init''s value -- which an interactive eval echoes in
+  ;; full into the minibuffer.
+  nil)
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()
