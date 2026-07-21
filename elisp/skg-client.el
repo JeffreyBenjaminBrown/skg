@@ -36,7 +36,16 @@
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
   (skg-connection-verify)
-  (skg-request-herald-rules))
+  ;; Re-fetch the herald rule table from the (possibly rebuilt) server,
+  ;; DISCARDING any cached table first and WAITING for the reply. So a
+  ;; reconnect -- including one right after `skg-reload', which
+  ;; deliberately preserves the previous table across the unload -- ends
+  ;; up with the CURRENT server's table, ready before this returns. The
+  ;; bare async `skg-request-herald-rules' left the stale table in place
+  ;; until its reply happened to land, so a server whose rule table had
+  ;; changed (e.g. the styled-span heralds) rendered raw metadata.
+  (setq heralds--transform-rules nil)
+  (skg-herald-rules-ensure))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()
