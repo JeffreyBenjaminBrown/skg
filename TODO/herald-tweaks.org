@@ -1,0 +1,28 @@
+* the 'a' herald
+It should flash.
+* the hiddenOut herald
+should say "The subscriber ancestor hides these, but subscribes to nothing that contains them."
+* the hiddenIn herald
+should say "It contains these, but the subscribing ancestor hides them."
+* the full-sentence heralds
+should be capitalized and punctuated (end in a period) normally.
+* the order of numeric heralds should be fixed
+C L S O (H?) A I
+Let's make the C and L heralds white text on blue
+(not just the letters but the numbers around them),
+the S and O (and H? does that exist?) heralds white text on purple,
+and the A and I heralds black text on a cyan background
+(cyan is too light for white text).
+* The 'reason for being' numeric herald should be orange, but not necessarily first.
+Currently a reason-for-being (I'm making up language; I forget what the code uses)
+herald is first and orange. Usually it's the C herald.
+It would be easier to read them if their order were fixed,
+and orange already does a perfectly good job highlighting the reason for being.
+* Multi-contained nodes should stand out with yellow.
+A multi-contained node has a number greater than 1 before the C in its herald.
+For multi-contained nodes let's make that herald white text on yellow.
+* an 'a' in a relationship herald should flash
+Each of the heralds C L S O and H if it exists
+might have an 'a' on either side of it,
+indicating that that herald describes the relationship from the node to its parent.
+To make those 'a' characters stand out, let's have them flash.
