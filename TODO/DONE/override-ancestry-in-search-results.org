@@ -1,10 +1,11 @@
 * Override ancestry in search results
-Origin: the "Aha!" subtree of TODO/BUG_reciprocal-subscribe.org, and
-Jeff's answers to Claude's four questions there. This file is the design;
-the bug file keeps the conversation that produced it. This is a NEW
-feature, independent of the reciprocal-subscribe bug (which is fixed).
+Origin: the "Aha!" subtree of TODO/DONE/BUG_reciprocal-subscribe.org,
+and Jeff's answers to Claude's four questions there. This file is the
+design; the bug file keeps the conversation that produced it. This is a
+NEW feature, independent of the reciprocal-subscribe bug (also fixed).
 
-Status: IMPLEMENTED 2026-07-21 (all four open-corner defaults approved).
+Status: IMPLEMENTED + END-TO-END VERIFIED 2026-07-21 (all four
+open-corner defaults approved).
 - Grafting: 'insert_override_ancestries_into_search_view'
   (server/serve/handlers/text_search/render_enriched_search_buffer.rs),
   called from 'handle_snapshot_response' (server/serve.rs) right after
@@ -12,10 +13,18 @@ Status: IMPLEMENTED 2026-07-21 (all four open-corner defaults approved).
 - Suppression: 'suppressed_result_ids'
   (server/serve/handlers/text_search.rs), applied in
   'build_search_viewforest' before the display-limit truncation.
-- Test: tests/override_search_ancestry.rs (+ fixtures under
-  tests/override_search_ancestry/fixtures) -- asserts the suppression
-  set is exactly {F,G} and that U's overriddenward chain grafts as
-  U -> F -> G. Full Rust suite green.
+- Herald pre-fetch fix (found during end-to-end verification): the
+  graphStats pre-fetch in 'spawn_enrichment_thread' ran BEFORE the
+  grafts existed, so a grafted override node's stats were never
+  fetched and it rendered herald-less (no "aO"/"Oa"). Fixed by unioning
+  'collect_override_relative_ids' into the pre-fetch id-set; that
+  collector MUST stay in sync with the graft's traversal.
+- Tests: tests/override_search_ancestry.rs (+ fixtures) -- (1) the
+  suppression set is exactly {F,G}; (2) U's chain grafts U -> F -> G;
+  (3) end-to-end, replaying phase-1+phase-2, F and G are absent from
+  the top level and reappear nested under U, each rendering its "aO"
+  override herald (which only works with the pre-fetch fix). Full Rust
+  suite green (371 tests).
 - Herald staleness Jeff flagged: fixed in api-and-formats.md and this
   file; residuals logged in TODO/problems.org.
 ** The goal, in one paragraph

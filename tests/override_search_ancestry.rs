@@ -13,16 +13,27 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::sync::Arc;
 
-use ego_tree::{NodeRef, Tree};
+use ego_tree::{NodeId, NodeRef, Tree};
+use typedb_driver::TypeDBDriver;
 
 use skg::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use skg::dbs::typedb::search::all_graphnodestats::{
+  AllGraphNodeStats, fetch_all_graphnodestats_with_source_set};
+use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, suppressed_result_ids};
-use skg::serve::handlers::text_search::render_enriched_search_buffer::insert_override_ancestries_into_search_view;
-use skg::source_sets::{ActiveSourceSet, SourceSetName};
+use skg::serve::handlers::text_search::render_enriched_search_buffer::{
+  collect_override_relative_ids,
+  insert_override_ancestries_into_search_view};
+use skg::source_sets::{
+  ActiveSourceSet, SourceSetName, apply_source_set_to_viewforest};
 use skg::test_utils::run_with_shared_test_db;
+use skg::to_org::util::mark_view_roots_parent_absent;
 use skg::types::misc::{ID, SkgConfig, SourceName};
+use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Birth, ViewNode, ViewNodeKind, Vognode};
+use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
+use skg::update_buffer::set_viewnodestats_in_viewforest;
 
 /// One search hit, as a MatchGroups entry.
 fn hit (
@@ -47,7 +58,88 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
           &s . config, SourceSetName::from ("all") ) ?;
       suppression_anchors_at_user_owned ( &s . config, &active ) ?;
       override_relatives_graft_as_descendants ( &active ) ?;
+      end_to_end_render_shows_suppressed_grafts_with_heralds (
+        &s . config, &s . driver, &active ) . await ?;
       Ok (( )) } )) }
+
+/// End-to-end: replay production's phase-1 + phase-2 enrichment
+/// (suppression -> pre-fetch graphStats for results + override
+/// relatives -> graft -> graphStats -> heralds -> render) and check the
+/// rendered buffer. The suppressed F and G are absent from the top
+/// level and reappear nested under U (U -> F -> G), each carrying the
+/// override birth herald "aO" -- which only renders because the
+/// pre-fetch now includes the override-relative ids
+/// ('collect_override_relative_ids').
+async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  active : &ActiveSourceSet,
+) -> Result<(), Box<dyn Error>> {
+  let graph : Arc<InRustGraph> =
+    snapshot_global () . expect ("graph handle installed above");
+  let matches : MatchGroups = [
+    hit ("U", "main",    "cooking the owned way"),
+    hit ("F", "foreign", "cooking, forked once"),
+    hit ("G", "foreign", "cooking, the original"),
+  ] . into_iter () . collect ();
+  // Phase 1: suppression, then build the top-level viewforest.
+  let suppressed : HashSet<ID> =
+    suppressed_result_ids ( &matches, &graph, config, active );
+  let (mut viewforest, search_results)
+    : (ViewForest, Vec<ID>) =
+    build_search_viewforest ( "cooking", &matches, &suppressed );
+  assert_eq! (
+    search_results, vec![ ID::from ("U") ],
+    "F and G are suppressed, so only U is a top-level result" );
+  // Production's pre-fetch id-set: results + ancestry (none here) +
+  // the override relatives the graft will add.
+  let all_ids : Vec<ID> = {
+    let mut ids : HashSet<ID> =
+      search_results . iter () . cloned () . collect ();
+    ids . extend (
+      collect_override_relative_ids ( &search_results, active ) );
+    ids . into_iter () . collect () };
+  let stats : AllGraphNodeStats =
+    fetch_all_graphnodestats_with_source_set (
+      &config . db_name, driver, &all_ids, Some (active) ) . await ?;
+  // Phase 2: graft, then the same stats/herald/render passes as
+  // handle_snapshot_response.
+  insert_override_ancestries_into_search_view (
+    &mut viewforest, &search_results, active );
+  let root_id : NodeId = viewforest . root () . id ();
+  set_metadata_relationships_in_node_recursive (
+    &mut viewforest, root_id, &stats, config );
+  mark_view_roots_parent_absent ( &mut viewforest );
+  set_viewnodestats_in_viewforest (
+    &mut viewforest,
+    & stats . container_to_contents,
+    & stats . content_to_containers,
+    config, Some (active) );
+  apply_source_set_to_viewforest ( &mut viewforest, active );
+  let buffer : String = viewforest_to_string ( &viewforest, config ) ?;
+
+  let level_of = |needle : &str| -> usize {
+    buffer . lines ()
+      . find ( |l| l . contains (needle) )
+      . map ( |l| l . chars () . take_while (|c| *c == '*') . count () )
+      . unwrap_or (0) };
+  assert_eq! ( level_of ("cooking the owned way"), 1,
+    "U is the top-level result.\n{}", buffer );
+  assert_eq! ( level_of ("cooking, forked once"), 2,
+    "F (suppressed) reappears one level under U.\n{}", buffer );
+  assert_eq! ( level_of ("cooking, the original"), 3,
+    "G (suppressed) reappears one level under F.\n{}", buffer );
+
+  let herald_line = |needle : &str| -> String {
+    buffer . lines () . find ( |l| l . contains (needle) )
+      . unwrap_or ("") . to_string () };
+  for title in ["cooking, forked once", "cooking, the original"] {
+    let line : String = herald_line (title);
+    assert! ( line . contains ("(birthHerald") && line . contains ("aO"),
+      "the override graft must render its \"aO\" birth herald \
+       (parent overrides this node), proving graphStats were fetched \
+       for it: {}", line ); }
+  Ok (( )) }
 
 /// Only nodes recursively overridden by a USER-OWNED result are
 /// suppressed. A foreign overrider suppresses nothing.

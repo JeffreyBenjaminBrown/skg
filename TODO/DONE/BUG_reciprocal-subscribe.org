@@ -121,7 +121,7 @@ itself, suppress the plain content view of the overridden node -- perhaps
 foreign-only overriders belong in a herald or a soft prompt rather than a
 menu that replaces the view. I have left this alone pending your call; it
 is a policy choice, not a code fault.
-**** ONGOING Aha!
+**** DONE Aha! -- implemented and end-to-end verified 2026-07-21
 Let's just make the override menu feel likee the search menu.
 Right now the search menu provides a containerward ancestry,
 for every result that is content.

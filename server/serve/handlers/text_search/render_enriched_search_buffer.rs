@@ -127,6 +127,44 @@ pub fn insert_override_ancestries_into_search_view (
         node_id, *node_nid, dir, &graph,
         viewforest, active, &mut path ); }} }
 
+/// Every id that 'insert_override_ancestries_into_search_view' would
+/// graft under the given results -- the override-relative closure in
+/// both directions, gated identically to the graft. The enrichment
+/// thread unions these into the graphStats pre-fetch so the grafted
+/// nodes get their relationship heralds; without this they would render
+/// herald-less (their graphStats would never be fetched, since the
+/// grafts do not exist yet when the pre-fetch runs). MUST stay in sync
+/// with 'graft_override_chain' (same directions, same gated accessors,
+/// same node-source gate). Returns empty without a graph handle.
+pub fn collect_override_relative_ids (
+  search_results : &[ID],
+  active         : &ActiveSourceSet,
+) -> HashSet<ID> {
+  let mut out : HashSet<ID> = HashSet::new ();
+  let Some (graph) = snapshot_global () else { return out; };
+  for root in search_results {
+    for dir in [ OverrideDir::Overriddenward,
+                 OverrideDir::Overriderward ] {
+      let mut seen  : HashSet<ID> = HashSet::from ([ root . clone () ]);
+      let mut stack : Vec<ID> = vec![ root . clone () ];
+      while let Some (cur) = stack . pop () {
+        let relatives : Vec<ID> = match dir {
+          OverrideDir::Overriddenward =>
+            graph . outbound_pids_for_relation_gated (
+              &cur, NodeRelation::OverridesViewOf, Some (active) ),
+          OverrideDir::Overriderward =>
+            graph . inbound_pids_for_relation_gated (
+              &cur, NodeRelation::OverridesViewOf, Some (active) ), };
+        for rel in relatives {
+          let visible : bool = graph . nodes . get (&rel)
+            . map_or ( false,
+                       |n| active . contains_source (&n . source) );
+          if ! visible { continue; }
+          out . insert ( rel . clone () );
+          if seen . insert ( rel . clone () ) {
+            stack . push ( rel ); }} }} }
+  out }
+
 /// Append, under 'parent_nid', one indefinitive Independent child per
 /// override relative of 'pid' in direction 'dir', recursing into each
 /// relative not already on the path (cycle guard: a repeated id is

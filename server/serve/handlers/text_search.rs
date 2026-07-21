@@ -287,12 +287,17 @@ fn spawn_enrichment_thread (
       tracing::info! ("search enrichment: cancelled after ancestry");
       return; }
     let all_enriched_ids : Vec<ID> = {
-      // Collect result IDs + every ID from ancestry trees.
+      // Collect result IDs + every ID from ancestry trees + every
+      // override relative the enrichment will graft (so those grafted
+      // nodes get their graphStats, hence their override heralds).
       let mut id_set : HashSet<ID> = HashSet::new ();
       for id in &ids_clone {
         id_set . insert ( id . clone () ); }
       for tree in ancestry_by_id . values () {
         collect_ids_from_ancestry_node ( tree, &mut id_set ); }
+      id_set . extend (
+        render_enriched_search_buffer::collect_override_relative_ids (
+          &ids_clone, &active_clone ) );
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =
       futures::executor::block_on (

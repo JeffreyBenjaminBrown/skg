@@ -42,7 +42,7 @@ fn all_tests
         &s . config, &s . driver ) . await ?;
       Ok (( )) } )) }
 
-/// Regression for TODO/BUG_reciprocal-subscribe.org: a subscribee
+/// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a
 /// 'subscribeeCol' scaffold, with no source. Its org-parent is a
 /// scaffold, so 'inherit_parent_source_if_possible' cannot supply a
