@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# all-tests.sh — Run emacs, nextest, and integration tests politely.
+# all-tests.sh — Run emacs, nextest, doctests, and integration tests politely.
 #
 # RESULTS ARE WRITTEN here:
 # - tests/results/ALL.org: a plain-text org-mode summary
@@ -20,9 +20,10 @@ usage () {
   cat <<EOF
 Usage: $0 [--no-sound]
 
-Runs Emacs, Neovim, nextest, and integration tests sequentially with
-conservative internal concurrency. Integration tests run once per
-client (emacs, then nvim), labeled CLIENT/DIRECTORY in the output.
+Runs Emacs, Neovim, nextest, doctests, and integration tests
+sequentially with conservative internal concurrency. Integration tests
+run once per client (emacs, then nvim), labeled CLIENT/DIRECTORY in the
+output.
 
 Options:
   --no-sound   Do not play the completion sound.
@@ -155,6 +156,25 @@ else
 fi
 ELAPSED_NEXTEST=$((SECONDS - T_NEXTEST))
 
+T_DOCTEST=$SECONDS
+echo -n "  Doctests ... "
+if (
+  cd "$PROJECT_ROOT"
+  # nextest structurally cannot run doctests, so they get their own
+  # phase. They compile and run pure examples and never open TypeDB, so
+  # they cannot hit the in-process collision that makes plain `cargo
+  # test` flaky here -- no serialization needed. --jobs caps build
+  # parallelism for politeness, matching the build phase.
+  skg_low_priority cargo test --doc --jobs "$BUILD_JOBS"
+) >"$RESULTS_DIR/doctest.log" 2>&1; then
+  EXIT_DOCTEST=0
+  echo -e "${GREEN}PASS${NC} ${DIM}($((SECONDS - T_DOCTEST))s)${NC}"
+else
+  EXIT_DOCTEST=$?
+  echo -e "${RED}FAIL${NC} ${DIM}($((SECONDS - T_DOCTEST))s)${NC}"
+fi
+ELAPSED_DOCTEST=$((SECONDS - T_DOCTEST))
+
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()   # each entry is "CLIENT/DIR-NAME"
 INTEGRATION_STARTED=()
@@ -269,6 +289,13 @@ else
   overall=1
 fi
 
+if [ $EXIT_DOCTEST -eq 0 ]; then
+  echo -e "  ${GREEN}PASS${NC}  Doctests"
+else
+  echo -e "  ${RED}FAIL${NC}  Doctests       (see doctest.log)"
+  overall=1
+fi
+
 n_total=${#INTEGRATION_NAMES[@]}
 n_failed=${#INTEGRATION_FAILED[@]}
 n_real=${#RETRY_STILL_FAILING[@]}
@@ -332,6 +359,13 @@ ORG="$RESULTS_DIR/ALL.org"
     echo "** PASS : Nextest (${ELAPSED_NEXTEST}s) [[file:nextest.log]]"
   else
     echo "** FAIL : Nextest (${ELAPSED_NEXTEST}s) [[file:nextest.log]]"
+  fi
+
+  # Doctests
+  if [ $EXIT_DOCTEST -eq 0 ]; then
+    echo "** PASS : Doctests (${ELAPSED_DOCTEST}s) [[file:doctest.log]]"
+  else
+    echo "** FAIL : Doctests (${ELAPSED_DOCTEST}s) [[file:doctest.log]]"
   fi
 
   # Integration
