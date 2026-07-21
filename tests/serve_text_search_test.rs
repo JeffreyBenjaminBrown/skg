@@ -77,7 +77,8 @@ fn test_text_search_org_format (
       let (viewforest, _search_results) =
         build_search_viewforest (
           search_terms,
-          &matches_by_id );
+          &matches_by_id,
+          &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
         SkgConfig::dummyFromSources (HashMap::new ());
       let result : String =
@@ -203,7 +204,7 @@ fn test_search_results_preserve_textlinks_in_title (
         best_matches, searcher, &tantivy_index,
         "science", &SearchOptions::default (), None );
       let (viewforest, _ids) = build_search_viewforest (
-        "science", &matches_by_id );
+        "science", &matches_by_id, &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
         SkgConfig::dummyFromSources (HashMap::new ());
       let result : String =

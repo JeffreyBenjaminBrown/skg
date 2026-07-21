@@ -14,6 +14,8 @@ use crate::context::ContextOriginType;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats,
   fetch_all_graphnodestats_with_source_set};
@@ -73,13 +75,17 @@ pub fn enriched_search_buffer_for_source_set_for_test (
   active         : &ActiveSourceSet,
 ) -> Result<String, Box<dyn std::error::Error>> {
   let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
-    build_search_viewforest (terms, matches_by_id);
+    build_search_viewforest (terms, matches_by_id, &HashSet::new ());
   render_enriched_search_buffer::insert_containerward_ancestries_into_search_view (
     &mut viewforest,
     search_results,
     ancestry_by_id,
     tantivy_index,
     config,
+    active );
+  render_enriched_search_buffer::insert_override_ancestries_into_search_view (
+    &mut viewforest,
+    search_results,
     active );
   set_viewnodestats_in_viewforest (
     // Mirror the production enrichment path (handle_snapshot_response):
@@ -170,10 +176,17 @@ pub fn handle_text_search_request (
                 TcpToClient::SearchResults,
                 "No matches found." ));
             return; }
+          let suppressed : HashSet<ID> =
+            suppressed_result_ids (
+              &matches_by_id,
+              & env . in_rust_graph_snapshot (),
+              &env . config,
+              active );
           let (viewforest, search_results) : (ViewForest, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
-              &matches_by_id );
+              &matches_by_id,
+              &suppressed );
           let rendered : String =
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &env . config )
@@ -442,9 +455,48 @@ pub fn group_matches_by_id (
 ///
 /// Forest structure: each root is a search result, with AliasCol +
 /// Alias children if aliases matched.
+/// The result ids to drop from the top level because a USER-OWNED
+/// result recursively overrides them: they will reappear as
+/// overriddenward graft descendants of that owned result
+/// (TODO/override-ancestry-in-search-results.org, "Suppression"). A
+/// FOREIGN overrider never suppresses -- so a pure-foreign mutual
+/// override shows both, and a "boring" foreign overrider does not hide
+/// the node it overrides. Reachability follows edge-level-visible
+/// outbound overrides, matching what the graft will actually draw.
+/// Only search hits ('matches_by_id' keys) are ever suppressed. A
+/// user-owned overrider that matched the query but ranks past the
+/// display limit could suppress its target without itself being shown
+/// (rare; suppression frees slots, so the anchor usually fits).
+pub fn suppressed_result_ids (
+  matches_by_id : &MatchGroups,
+  graph         : &InRustGraph,
+  config        : &SkgConfig,
+  active         : &ActiveSourceSet,
+) -> HashSet<ID> {
+  let candidates : HashSet<ID> =
+    matches_by_id . keys () . cloned () . collect ();
+  let mut suppressed : HashSet<ID> = HashSet::new ();
+  for owned in candidates . iter () . filter ( |id|
+    graph . nodes . get (*id)
+      . map_or ( false, |n| config . user_owns_source (&n . source) ) )
+  { // Walk owned's overriddenward closure; any HIT in it is suppressed
+    // (it will hang under 'owned'). Cycle-guarded: foreign edges in the
+    // chain can form cycles even though user-owned ones cannot.
+    let mut stack : Vec<ID> = vec![ owned . clone () ];
+    let mut seen  : HashSet<ID> = HashSet::from ([ owned . clone () ]);
+    while let Some (cur) = stack . pop () {
+      for target in graph . outbound_pids_for_relation_gated (
+        &cur, NodeRelation::OverridesViewOf, Some (active) ) {
+        if ! seen . insert (target . clone ()) { continue; }
+        if candidates . contains (&target) {
+          suppressed . insert (target . clone ()); }
+        stack . push (target); }} }
+  suppressed }
+
 pub fn build_search_viewforest (
   _search_terms : &str,
   matches_by_id : &MatchGroups,
+  suppressed    : &HashSet<ID>,
 ) -> (ViewForest, Vec<ID>) {
   let mut viewforest : ViewForest =
     ViewForest::new ();
@@ -464,6 +516,9 @@ pub fn build_search_viewforest (
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut search_results : Vec < ID > = Vec::new ();
   for (id, source, matches) in id_entries . iter ()
+        // Suppress before truncation, so a dropped result frees a slot
+        // for the next-ranked hit (design corner O2).
+        . filter ( |entry| ! suppressed . contains (entry . 0) )
         . take (SEARCH_DISPLAY_LIMIT)
     { search_results . push ( (*id) . clone () );
       let mut sorted_matches : Vec < &(f32, String) > =

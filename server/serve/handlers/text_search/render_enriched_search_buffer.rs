@@ -1,5 +1,5 @@
 use crate::dbs::tantivy::title_and_source_by_id;
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
@@ -9,7 +9,7 @@ use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefin
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Insert full containerward ancestry trees into the search viewforest,
 /// under each level-1 result ActiveNode.
@@ -81,6 +81,90 @@ fn insert_containerward_ancestry_tree(
       insert_containerward_ancestry_tree (
         child, node . id (), child_nid,
         viewforest, tantivy_index, config, active ); } } }
+
+/// Which way an override graft walks from a node, and the backpath
+/// birth role it stamps on each grafted relative.
+#[derive(Clone, Copy)]
+enum OverrideDir {
+  /// The nodes this node OVERRIDES (outbound `overrides_view_of`).
+  /// Birth OVERRIDDEN; renders herald "aO" (parent overrides child).
+  Overriddenward,
+  /// The nodes that OVERRIDE this node (inbound). Birth OVERRIDER;
+  /// renders herald "Oa" (child overrides parent).
+  Overriderward,
+}
+
+/// Graft each result's override relatives -- BOTH directions -- as
+/// inverted read-only indefinitive org-descendants, so an overridden
+/// node and the node(s) overriding it are navigable straight from the
+/// search results
+/// (TODO/override-ancestry-in-search-results.org). Each direction is
+/// its own one-directional chain hanging under the result, recursive
+/// and cycle-guarded. Reads the in-Rust graph (override edges are
+/// direct index lookups); a relative whose override EDGE is
+/// edge-level-hidden, or whose own source is inactive, is skipped.
+pub fn insert_override_ancestries_into_search_view (
+  viewforest     : &mut Tree<ViewNode>,
+  search_results : &[ID],
+  active         : &ActiveSourceSet,
+) {
+  let Some (graph) = snapshot_global () else { return; };
+  let level1_ids : Vec<(NodeId, ID)> = {
+    let root_ref : NodeRef<ViewNode> = viewforest . root ();
+    root_ref . children ()
+    . filter_map ( |c| match &c . value () . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t))
+        => Some (( c . id (), t . id . clone () )),
+      _ => None } )
+    . collect () };
+  for (node_nid, node_id) in &level1_ids {
+    if ! search_results . contains (node_id) { continue; }
+    for dir in [ OverrideDir::Overriddenward,
+                 OverrideDir::Overriderward ] {
+      let mut path : HashSet<ID> =
+        HashSet::from ([ node_id . clone () ]);
+      graft_override_chain (
+        node_id, *node_nid, dir, &graph,
+        viewforest, active, &mut path ); }} }
+
+/// Append, under 'parent_nid', one indefinitive Independent child per
+/// override relative of 'pid' in direction 'dir', recursing into each
+/// relative not already on the path (cycle guard: a repeated id is
+/// still drawn, so the stats pass marks it 'cycle', but its branch
+/// stops).
+fn graft_override_chain (
+  pid        : &ID,
+  parent_nid : NodeId,
+  dir        : OverrideDir,
+  graph      : &InRustGraph,
+  viewforest : &mut Tree<ViewNode>,
+  active     : &ActiveSourceSet,
+  path       : &mut HashSet<ID>,
+) {
+  let relatives : Vec<ID> = match dir {
+    OverrideDir::Overriddenward =>
+      graph . outbound_pids_for_relation_gated (
+        pid, NodeRelation::OverridesViewOf, Some (active) ),
+    OverrideDir::Overriderward =>
+      graph . inbound_pids_for_relation_gated (
+        pid, NodeRelation::OverridesViewOf, Some (active) ), };
+  let birth_role : RelationRole = match dir {
+    OverrideDir::Overriddenward => RelationRole::OVERRIDDEN,
+    OverrideDir::Overriderward  => RelationRole::OVERRIDER, };
+  for rel in relatives {
+    let Some (node) = graph . nodes . get (&rel) else { continue; };
+    if ! active . contains_source (&node . source) { continue; }
+    let child : ViewNode = mk_indefinitive_viewnode_with_birth (
+      rel . clone (), node . source . clone (), node . title . clone (),
+      ParentIs::Independent, Birth::Backpath (birth_role) );
+    let child_nid : NodeId = {
+      let mut parent_mut : NodeMut<ViewNode> =
+        viewforest . get_mut (parent_nid) . unwrap ();
+      parent_mut . append (child) . id () };
+    if path . insert (rel . clone ()) {
+      graft_override_chain (
+        &rel, child_nid, dir, graph, viewforest, active, path );
+      path . remove (&rel); }} }
 
 /// Looks up a node's title and source from Tantivy,
 /// prepends an indefinitive independent ActiveNode child

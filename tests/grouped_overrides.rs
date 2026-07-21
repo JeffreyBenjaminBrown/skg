@@ -43,6 +43,9 @@ mod overridden_as_such;
 #[path = "override_menu.rs"]
 mod override_menu;
 
+#[path = "override_search_ancestry.rs"]
+mod override_search_ancestry;
+
 #[path = "override_substitution.rs"]
 mod override_substitution;
 

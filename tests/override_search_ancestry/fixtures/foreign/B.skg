@@ -1,0 +1,4 @@
+pid: B
+title: boring override
+overrides_view_of:
+  - E
