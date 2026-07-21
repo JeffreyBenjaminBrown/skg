@@ -1,0 +1,376 @@
+* the 'a' herald
+It should flash.
+* the hiddenOut herald
+should say "The subscriber ancestor hides these, but subscribes to nothing that contains them."
+* the hiddenIn herald
+should say "It contains these, but the subscribing ancestor hides them."
+* the full-sentence heralds
+should be capitalized and punctuated (end in a period) normally.
+* the order of numeric heralds should be fixed
+C L S O (H?) A I
+Let's make the C and L heralds white text on blue
+(not just the letters but the numbers around them),
+the S and O (and H? does that exist?) heralds white text on purple,
+and the A and I heralds black text on a cyan background
+(cyan is too light for white text).
+* The 'reason for being' numeric herald should be orange, but not necessarily first.
+Currently a reason-for-being (I'm making up language; I forget what the code uses)
+herald is first and orange. Usually it's the C herald.
+It would be easier to read them if their order were fixed,
+and orange already does a perfectly good job highlighting the reason for being.
+* Multi-contained nodes should stand out with yellow.
+A multi-contained node has a number greater than 1 before the C in its herald.
+For multi-contained nodes let's make that herald white text on yellow.
+* an 'a' in a relationship herald should flash
+Each of the heralds C L S O and H if it exists
+might have an 'a' on either side of it,
+indicating that that herald describes the relationship from the node to its parent.
+To make those 'a' characters stand out, let's have them flash.
+
+* DONE (Claude) Assessment: not yet executable -- please answer the open questions below
+Jeff, I read the spec and the herald subsystem end to end. Most of it
+is clear, but it is NOT a drop-in tweak: it requires a real change to
+how relationship heralds are colored, plus a few decisions I should not
+guess at (chiefly: Emacs has no native "flash"). Once you answer the
+blocking questions I'll execute. I've committed nothing.
+
+Two items I could do right now, independent of everything else -- say
+the word: the hiddenIn/hiddenOut text (your two sentences) and the
+full-sentence capitalization (Q5). They don't depend on the
+architecture work.
+
+** Glossary (so this section stands alone)
+- *relationship heralds / "numeric heralds"*: the compact tokens
+  assembled in =server/herald_tokens.rs=, one per graph relation, of the
+  shape =[inNum][inLetters] X [outNum][outLetters]= where X is the
+  relation letter -- (C)ontains, text(L)inks_to, (H)ides,
+  (S)ubscribes, (O)verrides -- plus the two count tokens =Ak= (aliases)
+  and =Ik= (extra IDs). Example: =2aC3= means "2 nodes contain it (one
+  is its visible parent, the 'a'); it contains 3."
+- *ancestor letters a/b/c*: lowercase flags inside a token marking that
+  a tracked ANCESTOR is a member on that side. =a= = visible parent
+  (generation 1), =b= = grandparent, =c= = great-grandparent, ... So
+  =aC= = "my parent contains me"; =Ca= = "I contain my parent."
+- *reason for being* (code term: *birth* relation; see =Birth= and
+  =birth_relations()= in =server/update_buffer/viewnodestats.rs=): the
+  one relation a viewnode was drawn for -- usually Contains (it's
+  content of its parent), but for a col member it's the col's relation
+  (e.g. a subscribeeCol member's birth is Subscribes). Today this token
+  is pulled to the front and colored orange.
+- *multi-contained*: =containers > 1= (the "number before C"), i.e. the
+  =RelationCounts.containers= field.
+- The color of a herald today is decided by a Rust rule table
+  (=server/heralds.rs=) that the Emacs "lens engine"
+  (=elisp/skg-sexpr/skg-lens.el=) applies; faces (fg/bg pairs) live in
+  =elisp/heralds-minor-mode.el=.
+
+** Answers to the two factual questions you raised inline
+- "H? does that exist?" -- *Yes.* H = =hides_from_its_subscriptions=,
+  relation letter =H=. So your target order C L S O H A I is five
+  relation tokens + two count tokens. (Heads-up: the code's current
+  relation order is C L *H* S O; your spec moves H after O, giving
+  C L S O H. I'll reorder =RELATION_ORDER= to match.)
+- "I forget what the code uses [for 'reason for being']" -- it's called
+  the *birth* relation / *birthHerald*. Your language is fine; I'll keep
+  "reason for being" in comments as a synonym.
+
+** DONE (Claude) Q1 -- How should "flash" work? (blocks both 'a'-flash headlines)
+Your first headline ("the 'a' herald / It should flash") and your last
+("an 'a' in a relationship herald should flash") appear to be the SAME
+feature stated twice -- there is no separate standalone 'a' herald; 'a'
+only ever appears as the generation-1 ancestor letter inside a C/L/S/O/H
+token. *Confirm they're one requirement.*
+
+The real problem: *Emacs faces have no "blink"/"flash" attribute.* GUI
+Emacs cannot blink text at all; terminal blink (ANSI SGR 5) is
+unreliable and disabled in most terminals. So "flash" is not a face I
+can set -- it needs a repeating timer that toggles the 'a' sub-ranges'
+face on/off and forces redisplay. That's real ongoing cost (a timer per
+herald buffer) and an accessibility concern (motion). Please pick:
+- (a) *Timer-driven blink* -- I add a ~2 Hz timer that toggles the 'a'
+  characters. Works in GUI and terminal. (What blink rate?)
+- (b) *Static emphasis instead of animation* (my recommendation) -- make
+  the 'a' "stand out" without motion: e.g. bright inverse-video, a box,
+  bold+underline, or a distinct bright fg. Cheaper, no timer, no motion.
+- (c) something else you have in mind.
+
+Sub-questions (assuming we flash SOMETHING):
+- Only the generation-1 =a= flashes, right? Not =b=/=c=/... (those mark
+  grandparent/great-grandparent, not the parent). *Confirm.*
+- The L token's inbound form is a NUMBER-triple =a(b,c)= (link counts),
+  where the "a" is a digit, not an ancestor letter. That "a" must NOT
+  flash. *Confirm* (I'll only ever flash a literal lowercase 'a' that is
+  an ancestor flag, never a digit).
+*** DONE
+No flash then.
+
+The highlight should apply to all the ancestor heralds --
+I'd forgotten about b, c, etc.
+
+Let's use yellow for the ancestor highlight,
+orange for the multicontains highlight.
+
+Confirm, the 'a' that is a digit does not get the ancestor highlight.
+** DONE (Claude) Q2 -- Per-token coloring is an architecture change; approve the approach
+Today Rust assembles the relationship heralds into exactly TWO strings
+-- one =birthHerald= (colored orange as a whole) and one =rels= (colored
+blue as a whole) -- and Emacs colors each string uniformly. Your request
+needs *per-token* colors (C/L blue, S/O/H purple, A/I cyan) with
+*per-token overrides* (orange for birth, white-on-yellow for
+multi-contained C) and *per-character* flashing. None of that fits the
+"one color per string" pipeline.
+
+My proposed refactor: have Rust emit an ORDERED LIST of styled tokens,
+each carrying (text, color, and which sub-characters flash), in the
+fixed order C L S O H A I; render each token with its own face in Emacs,
+with the flash sub-ranges handled per Q1. Base color = the token's group
+(C/L blue, S/O/H purple, A/I cyan); then override to orange if the token
+is the birth relation, and to white-on-yellow if it's the C token with
+=containers > 1=. This touches: =herald_tokens.rs=, =heralds.rs=,
+=org_to_text.rs=, =viewnodestats.rs=, =skg-lens.el=,
+=heralds-minor-mode.el=, and their tests (incl. the herald conformance
+test and the elisp fixture).
+
+*Approve this shape?* If you'd rather keep the change smaller (e.g. only
+recolor by group without the orange/yellow single-token overrides), tell
+me and I'll scope down.
+
+Note this REVERSES one existing design rule: today the birth token is
+"moved to the front" (=uniform-heralds/vision.org=, "how to avoid some
+redundancy"). Your spec keeps it in fixed position and relies on orange
+alone. *Confirm you want the frontloading removed.*
+*** DONE yes
+** DONE (Claude) Q3 -- Exact colors
+I need concrete values:
+- *purple* background for S/O/H -- which? (e.g. =purple=, =#6a0dad=,
+  =#8b00ff=). Text white, as you said.
+- *cyan* background for A/I with BLACK text -- =cyan= / =#00ffff=, or a
+  specific shade?
+- *blue* for C/L -- reuse the existing white-on-blue herald face
+  (=:background "blue"=)? I'll assume yes unless told otherwise.
+*** DONE yeah whatever
+** DONE (Claude) Q4 -- multi-contained yellow: contrast, and precedence vs orange
+Two things:
+1. *Contrast.* You asked for WHITE text on yellow. That's very
+   low-contrast -- harder to read than the black-on-cyan you
+   deliberately chose for A/I. The existing yellow herald face is
+   BLACK-on-yellow. Did you mean black-on-yellow, a darker amber so
+   white reads, or literally white-on-yellow? I'll do exactly what you
+   confirm. (Also note: =HeraldColor::Yellow= is currently defined but
+   UNUSED by the live rule table, so introducing it here is clean.)
+2. *Precedence.* A node can be BOTH multi-contained AND have Contains as
+   its reason-for-being (its parent is one of its >1 containers -- common
+   for ordinary content). Then the C token wants to be orange (birth)
+   AND white-on-yellow (multi-contained) at once. Which wins? My guess:
+   yellow wins (multi-containment is the rarer, more surprising fact, and
+   is C-specific), but it's your call. Options: orange wins / yellow wins
+   / some combined signal.
+*** DONE
+Black on yellow.
+
+The multi-contains highlight applies only to the number before the C.
+** DONE (Claude) Q5 -- "full-sentence heralds" + hiddenIn/hiddenOut text (executed 2026-07-21)
+Executed, since these three headlines are independent of the blocked
+architecture work. Landed in =server/heralds.rs= (the display TEXT only;
+match atoms unchanged, so the herald conformance test is unaffected):
+- hiddenInSubscribeeCol  -> "It contains these, but the subscribing ancestor hides them."
+- hiddenOutsideOfSubscribeeCol -> "The subscriber ancestor hides these, but subscribes to nothing that contains them."
+- subscribeeCol/subscriberCol/overriddenCol/overriderCol/hiderCol/hiddenCol:
+  capitalized + terminal period (scope below).
+Regenerated the pinned elisp fixture (=tests/elisp/herald-rules.sexp=)
+via =cargo run --bin emit-herald-rules=; all 3 herald unit tests pass.
+Also fixed two stale herald-face docstrings in
+=elisp/heralds-minor-mode.el= (logged in =TODO/problems.org=). Nothing
+committed -- staged for your review.
+
+The scope I used for "full-sentence heralds" was:
+I read "full-sentence heralds" as the collection-DESCRIPTION heralds --
+the eight PartnerCol descriptions plus your two new hiddenIn/hiddenOut
+sentences. Concretely I'd capitalize + add a period to:
+- subscribeeCol: "it subscribes to these" -> "It subscribes to these."
+- subscriberCol: "these subscribe to it" -> "These subscribe to it."
+- overriddenCol: "it overrides the view of these" -> "It overrides the view of these."
+- overriderCol: "these override the view of it" -> "These override the view of it."
+- hiderCol:  "these hide it from their subscriptions"  -> "These hide it from their subscriptions."
+- hiddenCol: "it hides these from its subscriptions"   -> "It hides these from its subscriptions."
+- hiddenInSubscribeeCol / hiddenOutsideOfSubscribeeCol: your two new sentences (already capitalized + period).
+Leave AS-IS (not full sentences): "aliases", "IDs", "alias", "ID",
+"node from inactive source", "text changed : ...", the diff axes.
+Already fine: "Parent references unknown node."
+*Confirm this scope* (this is the one item I can also just do now).
+
+** Recommended defaults (if you'd rather I "just pick" and proceed)
+If you say "use your judgment," I'll go with: Q1(b) static emphasis
+(bright inverse-video on the 'a', no timer); Q2 approve the ordered
+styled-token refactor with frontloading removed; Q3 purple =#8b00ff=,
+cyan =#00ffff= black text, C/L reuse existing blue; Q4 black-on-yellow
+(legibility) with yellow winning over orange on a shared C token; Q5 the
+scope above. Tell me to proceed with those, or answer individually.
+
+* DONE (Claude) Reiteration (2026-07-21): consolidated behavior + ONE open contradiction
+Folding in your answers. Everything below is settled EXCEPT the last row
+of the table (reason-for-being's color), which your answers left in
+conflict. Confirm the table and answer that one row, and I'll build it.
+
+** Settled from your answers
+- *Q2 yes*: I'll do the styled-token refactor -- Rust emits an ordered
+  list of per-character-styled tokens instead of the two uniform
+  =birthHerald=/=rels= strings. Frontloading of the birth token is
+  REMOVED; order is always C L S O H A I.
+- *Q1 no flash*: flashing is dropped entirely. The "stand out" treatment
+  is a STATIC highlight.
+- *Q1 all ancestors*: the highlight applies to EVERY ancestor-flag letter
+  (=a=, =b=, =c=, ... any generation), not just =a=.
+- *Q1 digit confirm -- CONFIRMED*: only ancestor-flag LETTERS get the
+  highlight. The L token's inbound =a(b,c)= are COUNT DIGITS, never
+  ancestor letters, so they are never highlighted. (More precisely: I
+  highlight the letters that =gen_letters= emits, never any digit
+  =render_side=/=link_inbound= emit.)
+- *Q3 "yeah whatever"*: purple =#8b00ff= (white text) for S/O/H; cyan
+  =#00ffff= (black text) for A/I; C/L reuse the existing white-on-blue
+  herald face.
+
+** The color scheme, as I now understand it
+| element                                             | background | text  | scope                          |
+|-----------------------------------------------------+------------+-------+--------------------------------|
+| C, L token (base)                                   | blue       | white | whole token                    |
+| S, O, H token (base)                                | #8b00ff    | white | whole token                    |
+| A, I token (base)                                   | #00ffff    | black | whole token                    |
+| ancestor letters a/b/c... (any relation, any side)  | yellow     | black | those letters only             |
+| multi-contained: the containers NUMBER before C     | orange     | white | that number only (when >1)     |
+| reason-for-being (birth) token                      | ??? OPEN   | ???   | ??? -- see contradiction below |
+
+The base color is the token's group; the ancestor-yellow and
+multi-contains-orange overrides paint specific CHARACTERS on top of that
+base. Example, a C token =2aC3= (2 containers, one is the parent; 3
+contents): =2= orange (multi-contained), =a= black-on-yellow (ancestor),
+=C3= white-on-blue (base).
+
+** DONE The one contradiction I can't resolve for you: what color is "reason for being" now?
+Your Q1 said *"orange for the multicontains highlight"* -- but your
+standing headline *"The 'reason for being' numeric herald should be
+orange"* also claims orange. Orange can't distinctly mean both.
+(Also: Q1 assigned yellow to the ANCESTOR highlight, while your Q4
+answer "Black on yellow" and the multi-contained headline assign yellow
+to MULTI-CONTAINS. I reconciled that by reading your "Black on yellow"
+as the TEXT color of the now-ancestor yellow highlight, and taking Q1's
+"orange for multicontains" as final -- with your Q4 line "only the
+number before the C" as its scope. If that reconciliation is wrong, say
+so.)
+
+So the only truly open question: with orange now spent on
+multi-contains, how should the reason-for-being (birth) token be shown?
+- (A) [my recommendation] *Drop the separate birth highlight.* You keep
+  the birth signal for free: the fixed order plus the black-on-yellow
+  ancestor letter already mark it -- ordinary content shows =aC= (parent
+  contains it), a col member shows its birth relation flagged toward its
+  owning ancestor. Each color is then used exactly once.
+- (B) *Birth stays orange too.* Multi-contains orange lands on the number
+  before C; birth orange lands on the relation letter/token. Two orange
+  regions can sit in one C token (=2C3= -> orange "2" and orange "C"),
+  distinguished only by position. Legible-ish but muddy.
+- (C) *Multi-contains orange; birth gets its OWN distinct treatment* --
+  e.g. bold, underline, or a fifth color you name.
+
+Caveat for (A): the =(overridesHere N)= "Oh" marker currently rides the
+birth/orange path (frontloaded in viewnodestats.rs). If we drop birth
+color, I'll give "Oh" its own explicit treatment; it won't silently
+vanish. Flagging so the decision is eyes-open.
+*** DONE black on white
+Resolved: reason-for-being = black on white. Folded into the table
+above. The color model is now fully settled.
+
+* TODO (Claude) Sideways during execution (2026-07-21): where does per-character styling live?
+The color MODEL is settled (table above). But starting execution, I hit
+an architectural fork we only discussed in the abstract (your Q2 "yes"),
+now revealed to be expensive and HARD TO REVERSE -- so per
+=when-to-stop.org= I'm surfacing it before spending the effort.
+
+*** What forces a wire change
+Two of your requirements change the relationship-herald WIRE (the
+=(birthHerald ...)= / =(rels ...)= atoms in each headline's =(skg ...)=):
+1. fixed order C L S O H A I (today birth is frontloaded and rels is
+   C L H S O), and
+2. per-CHARACTER color (ancestor letters yellow, the multi-contains
+   number orange, birth token black-on-white) -- which a plain string
+   can't carry.
+That wire is asserted BYTE-FOR-BYTE in ~228 Rust expected-buffer strings
+(concentrated in =hidden_from_subscriptions.rs=,
+=definitive_view_cascade_and_budget.rs=, =initial_view_bfs.rs=,
+=content_view.rs=) plus ~60 client-display assertions (elisp + nvim
+Lua). There is no strip/normalize helper; tests pin the exact text.
+
+*** The fork
+- *(A) Server emits styled spans* (what your Q2 "yes" approved). Rust
+  replaces =birthHerald=/=rels= with one ordered list of styled spans,
+  e.g. =(rels (white "aC") (sep " ") (purple "2S"))=. Each client stays
+  DUMB: iterate spans, map color -> face. Presentation stays
+  single-homed in Rust (matches your herald-rules design).
+  - COST: rewrite ~228 Rust wire assertions to the span shape; the raw
+    buffer metadata (visible only with heralds off / while editing)
+    becomes verbose. Big one-time churn; expensive to redo if we change
+    our minds.
+- *(C) Clients compute styling from the UNCHANGED wire.* Leave
+  =birthHerald=/=rels= exactly as today; each client reorders to
+  C L S O H A I and applies the per-char colors itself (lowercase =
+  ancestor -> yellow; the C token's leading count digits > 1 -> orange;
+  birth tokens = whatever came from =birthHerald= -> black-on-white).
+  - COST: that reorder+color logic must be written in EVERY client
+    (Emacs AND nvim today, vim later) and kept in sync -- presentation
+    goes MULTI-homed, against your single-source-of-truth design. But
+    the server and all ~228 Rust wire tests are untouched; only ~60
+    client-display assertions change.
+
+*** My recommendation: (A)
+You already approved (A), and with two clients today (Emacs + nvim) plus
+a planned vim client, "compute once in Rust, clients just map colors" is
+both correct for your design and LESS client code than duplicating the
+renderer 2-3 times. The price is the ~228-assertion rewrite, which I'll
+absorb -- I just don't want to spend it if you'd rather take the cheaper
+(C) and accept per-client styling logic.
+
+*** Your birthHerald question, answered from the code
+Good instinct -- but "birth" names TWO different things, and only one is
+display-only. I audited every consumer:
+
+1. =(birthHerald "aC")= -- the assembled DISPLAY STRING.
+   - the herald renderer shows it (display);
+   - =skg-sexpr-search.el= STRIPS it (and =rels=) as display noise before
+     structural compare/search;
+   - the server DISCARDS it on save (=parse_metadata_sexp.rs=:
+     "display-only ... accept and discard").
+   Nothing else. It never touches the graph, the save, or any
+   computation. Folding it into the styled spans loses NOTHING functional
+   -- the "reason for being" survives as the black-on-white token,
+   decided by the same =birth_relations()=.
+
+2. =(birth backpath ROLENAME)= / the =Birth= enum (=ActiveNode.birth=) --
+   a SEPARATE, load-bearing thing: it records that a node is a BACKPATH
+   GRAFT playing an ancestry role. Used by the backpath engine (view
+   generation), stale-claim cleanup (=to_org/util.rs=), search
+   enrichment, and it GATES the load-bearing =rel_source= computation (a
+   graft is not a genuine member, so it earns no edge-level herald). It
+   ROUND-TRIPS through the wire. *Untouched by anything here* -- different
+   atom, different field.
+
+So your instinct is right that "birth" has load-bearing uses -- they live
+in the =Birth= enum (#2), not the =birthHerald= string (#1). My earlier
+"goes away entirely" was sloppy: only the display STRING folds into the
+spans; the birth CONCEPT and its provenance stay.
+
+Re "deduced from the numeric heralds": only partly. For ordinary content,
+birth = the C token bearing an inbound ancestor letter, which a client
+COULD read off. But for col members / grafts / overridesHere it depends
+on view context that =birth_relations()= computes server-side -- so birth
+stays a SERVER decision either way. Under (A) the server marks the birth
+token in the spans; under (C) the server still signals birth-ness via the
+birthHerald-vs-rels split and the client just reorders + recolors.
+Neither option asks the client to re-derive birth.
+
+Bottom line: nothing load-bearing is lost under either option. The A/C
+question is only about WHERE the (display-only) styling is computed.
+
+*** TODO the one thing I need from you
+Confirm *(A)* (I'll proceed and report when the whole thing is done,
+tests green), or say *(C)* if you'd rather keep the wire untouched and
+pay in per-client logic instead. Nothing else is open.

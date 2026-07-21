@@ -1,3 +1,16 @@
+** Stale herald-face docstrings in elisp/heralds-minor-mode.el (fixed 2026-07-21)
+   Noticed while scoping the herald-tweaks work; fixed across the
+   heralds-tweaks branch.
+*** heralds-yellow-face claimed a use it no longer had
+    The docstring cited "link-count heralds and cycle markers", but
+    YELLOW was unused by the live rule table and cycle is BLUE. FIXED:
+    yellow now genuinely renders the ancestor-flag letters (a/b/c...) in
+    the relationship-herald spans, and its docstring says so.
+*** heralds-orange-face docstring was stale
+    It cited "non-content parentIs heralds (⊥, }, ←)". FIXED: orange now
+    renders the multi-contained containers count (the number before C),
+    the parentIs-independent ⊥ marker, and the "unknown node" message,
+    and its docstring matches.
 ** Cargo.lock was gitignored, so builds were not reproducible across clones
    Noticed 2026-07-10 during the typedb-driver 3.12.0 bump: 'Cargo.lock'
    was untracked and matched by .gitignore. For a binary/application

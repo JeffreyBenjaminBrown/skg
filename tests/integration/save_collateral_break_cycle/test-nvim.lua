@@ -43,16 +43,17 @@ local function relation_from_sexp (sexp)
     and parentIs_list[1] == sexpr.symbol('independent')
   local graft_role = nil
   if independent then
-    local birth_list = metadata.sexp_cdr_at_path(
-      sexp, { 'skg', 'node', 'birthHerald' })
+    -- Birth is now a WHITE span inside (rels ...) (no separate
+    -- birthHerald atom); the graft's outbound-ancestor token still
+    -- shows in the rels spans' VISIBLE text, which we concatenate here.
     local rels_list = metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' })
-    local birth_text = birth_list and birth_list[1]
-      and sexpr.atom_text(birth_list[1]) or nil
-    local rels_text = rels_list and rels_list[1]
-      and sexpr.atom_text(rels_list[1]) or nil
-    graft_role = graft_role_from_herald(birth_text)
-      or graft_role_from_herald(rels_text)
+    local pieces = {}
+    for _, span in ipairs(rels_list or {}) do
+      if type(span) == 'table' and type(span[2]) == 'string' then
+        table.insert(pieces, span[2]) end
+    end
+    graft_role = graft_role_from_herald(table.concat(pieces))
   end
   if graft_role then return graft_role end
   if parentIs_list == nil

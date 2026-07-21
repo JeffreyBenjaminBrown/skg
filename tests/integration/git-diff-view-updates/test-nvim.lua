@@ -11,7 +11,7 @@ local sexpr = require('skg.sexpr.parse')
 local INDEPENDENT = sexpr.symbol('independent')
 local AFFECTED = sexpr.symbol('affected')
 
----A node's graft role from its birthHerald/rels HERALD string
+---A node's graft role from a HERALD token (the rels spans' visible text)
 ---('C' -> 'container' etc.), or nil. Port of
 ---headline--graft-role-from-herald: a token has the shape
 ---[inSide]X[outSide], and a backpath graft reaches an ancestor on its
@@ -29,6 +29,23 @@ local function graft_role_from_herald (herald)
   return role_by_letter[letter]
 end
 
+---The VISIBLE text of a (rels (COLOR "text") ...) payload: RELS_LIST is
+---the cdr of the (rels ...) form (a list of (COLOR "text") spans). We
+---concatenate each span's text. Since birth is now a WHITE span inside
+---rels (not a separate birthHerald atom), the graft's outbound-ancestor
+---token still appears here for graft_role_from_herald's regex.
+---@param rels_list any|nil
+---@return string|nil
+local function rels_visible_text (rels_list)
+  if not rels_list then return nil end
+  local pieces = {}
+  for _, span in ipairs(rels_list) do
+    if type(span) == 'table' and type(span[2]) == 'string' then
+      table.insert(pieces, span[2]) end
+  end
+  return table.concat(pieces)
+end
+
 ---Classify a parsed metadata SEXP (or nil) into a relation string:
 ---the graft role of a backpath graft (independent node with an
 ---outbound-ancestor herald), else the explicit parentIs, else the
@@ -38,18 +55,12 @@ end
 local function relation_from_sexp (sexp)
   local parentIs_list =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'parentIs' })
-  local birth_herald_list =
-    metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'birthHerald' })
   local rels_list =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
-  local birth_herald = birth_herald_list and birth_herald_list[1]
-    and sexpr.atom_text(birth_herald_list[1]) or nil
-  local rels_herald = rels_list and rels_list[1]
-    and sexpr.atom_text(rels_list[1]) or nil
+  local rels_herald = rels_visible_text(rels_list)
   local independent = parentIs_list and parentIs_list[1] == INDEPENDENT
   local graft_role = independent
-    and (graft_role_from_herald(birth_herald)
-         or graft_role_from_herald(rels_herald)) or nil
+    and graft_role_from_herald(rels_herald) or nil
   if graft_role then return graft_role end
   if not parentIs_list or parentIs_list[1] == AFFECTED then
     return 'affected' end

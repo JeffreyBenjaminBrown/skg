@@ -4,8 +4,8 @@
 (defun headline--graft-role-from-herald (herald)
   "Classify a graft HERALD STRING into its backpath ROLENAME, or nil.
 Under the uniform-herald grammar a node's relationship info lives in its
-orange (rels (white \"S\") (yellow \"TR\")) and/or blue (rels (purple \"S\") (yellow \"TR\")) tokens
-(server/herald_tokens.rs). A token has the shape [inSide]X[outSide],
+(rels ...) tokens (server/herald_tokens.rs); HERALD here is the VISIBLE
+text of those tokens. A token has the shape [inSide]X[outSide],
 where X is the relationship letter (C contains, L textlinks_to, H hides,
 S subscribes, O overrides), counts are digits, and lowercase letters
 a/b/... on a side flag a tracked ANCESTOR member there.
@@ -26,25 +26,32 @@ letters (e.g. a cycle's \"aCa\") yet is NOT a graft."
       ("O" 'overrider)
       ("H" 'hider))))
 
+(defun headline--rels-visible-text (spans)
+  "Concatenate the quoted text of each span in SPANS -- the cdr of a
+(rels (COLOR \"text\") ...) form -- into the visible herald text. Since
+birth is now a WHITE span inside rels (not a separate birthHerald atom),
+a graft's outbound-ancestor token still appears in this text."
+  (mapconcat (lambda (span)
+               (if (and (listp span) (stringp (cadr span)))
+                   (cadr span)
+                 ""))
+             spans ""))
+
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
 Birth provenance is more specific than parentIs: a backpath graft (a node
-with (parentIs independent)) returns its ROLENAME from its birthHerald or
-rels token (e.g. `container', `linkSource'); otherwise the result is the
+with (parentIs independent)) returns its ROLENAME from its (rels ...)
+tokens (e.g. `container', `linkSource'); otherwise the result is the
 explicit parentIs or the implicit `affected'."
   (let* ((parentIs-list (when sexp
                           (skg-sexp-cdr-at-path sexp
                                                 '(skg node parentIs))))
-         (birth-herald (when sexp
-                         (car (skg-sexp-cdr-at-path
-                               sexp '(skg node birthHerald)))))
          (rels-herald (when sexp
-                        (car (skg-sexp-cdr-at-path
-                              sexp '(skg node rels)))))
+                        (headline--rels-visible-text
+                         (skg-sexp-cdr-at-path sexp '(skg node rels)))))
          (independent (eq (car parentIs-list) 'independent))
          (graft-role (when independent
-                       (or (headline--graft-role-from-herald birth-herald)
-                           (headline--graft-role-from-herald rels-herald)))))
+                       (headline--graft-role-from-herald rels-herald))))
     (cond
      ;; A backpath graft: independent, with an outbound-ancestor herald.
      (graft-role graft-role)

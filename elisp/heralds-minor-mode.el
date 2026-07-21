@@ -363,9 +363,9 @@ orange birth herald the server assembles (an (skg (node ... (birthHerald
 
 (defface heralds-yellow-face
   '((t :foreground "black" :background "yellow"))
-  "Black-on-yellow: the rendering of the YELLOW herald color.
-No rule in the current server-side table (server/heralds.rs) emits
-YELLOW, so this face is presently unused.")
+  "Black-on-yellow for the ancestor-flag letters (a/b/c...) inside the
+relationship-herald spans -- the letters that mark a tracked ancestor as
+a member on that side.")
 
 (defface heralds-orange-face
   '((t :foreground "white" :background "#d2691e"))
