@@ -1,7 +1,3 @@
-* DONE TODO/heralds-semantic-wire.org
-* ONGOING make the rest of the wire semantic
-(This is not part of the plan at TODO/heralds-semantic-wire.org but needs doing.)
-Currently the server still computes display information like 'it subscribes to these'.
 * for video
 ** TODO/command-name-echo.org
 a config option, for recording videos
@@ -10,11 +6,6 @@ walk point through the herald string normally
 treat it as one character
 Shortcut to jump tokens treats it as one from outside,
 but divides it at spaces if point is interior to it.
-* DEPENDENCIES.toml should record each source's remote URL
-That is, the thing that 'git remote -v' shows,
-between "origin" and "(fetch)".
-That's so other users know where to look --
-skg has as of yet no use for that information itself.
 * Graphstats is no longer used by active nodes, but it is for phantoms.
 Probably shouldn't be used for phantoms either.
 * bug : nested links
