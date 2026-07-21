@@ -6,12 +6,6 @@ walk point through the herald string normally
 treat it as one character
 Shortcut to jump tokens treats it as one from outside,
 but divides it at spaces if point is interior to it.
-* the hiddenOut herald
-should say "The subscriber ancestor hides these, but subscribes to nothing that contains them."
-* the hiddenIn herald
-should say "It contains these, but the subscribing ancestor hides them."
-* the full-sentence heralds
-should be capitalized and punctuated (end in a period) normally.
 * DEPENDENCIES.toml should record each source's remote URL
 That is, the thing that 'git remote -v' shows,
 between "origin" and "(fetch)".
@@ -28,10 +22,6 @@ Should prevent save.
 Otherwise I save things under an indefinitive,
 think it worked, and lose them.
 * bug ? Does skg-replace-link-with-content discard fold info?
-* leading heralds should be yellow with black text
-Anomalies in them, orange.
-* later heralds should be blue
-and anomalies in them, purple.
 * bug : C-c G on an alias kills the buffer
 intending to replace it, but can't replace it.
 * need to be able to commit all changes from buffer
