@@ -297,10 +297,13 @@ orange birth herald the server assembles (an (skg (node ... (birthHerald
 
 (defface heralds-yellow-face
   '((t :foreground "black" :background "yellow"))
-  "Black-on-yellow for link-count heralds and cycle markers.")
+  "Black-on-yellow: the rendering of the YELLOW herald color.
+No rule in the current server-side table (server/heralds.rs) emits
+YELLOW, so this face is presently unused.")
 
 (defface heralds-orange-face
   '((t :foreground "white" :background "#d2691e"))
-  "White-on-orange for non-content parentIs heralds (⊥, }, ←).")
+  "White-on-orange: the reason-for-being (birth) relationship herald,
+the parentIs-independent marker (⊥), and the \"unknown node\" message.")
 
 (provide 'heralds-minor-mode)
