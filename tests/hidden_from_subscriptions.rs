@@ -7,6 +7,7 @@
 
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::assert_metadata_eq;
 use skg::test_utils::{
   extract_string_field_from_sexp,
   graph_handle_from_config,
@@ -823,7 +824,7 @@ async fn test_subscribee_and_filter_cols (
        **** (skg folded (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(initial_view, expected_initial,
+    assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribees are bare leaves; only HiddenOutsideOfSubscribeeCol shown");
 
     let expanded = { // Request definitive views, then save
@@ -865,7 +866,7 @@ async fn test_subscribee_and_filter_cols (
        **** (skg folded (node (id hidden-for-no-reason) (source main) indef (birthHerald \"cH\"))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(expanded, expected_expanded,
+    assert_metadata_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol shown before content; HiddenOutsideOfSubscribeeCol at end");
 
     Ok (( )) }
@@ -900,7 +901,7 @@ async fn test_hidden_within_but_none_without (
        *** (skg (node (id E1) (source main) indef (birthHerald \"bS\") (rels \"C3\"))) subscribee-1
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(initial_view, expected_initial,
+    assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribee is bare leaf; H doesn't appear");
 
     let expanded = { // request definitive views, then save
@@ -937,7 +938,7 @@ async fn test_hidden_within_but_none_without (
        **** (skg (node (id E12) (source main) (birthHerald \"aC\"))) E12
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(expanded, expected_expanded,
+    assert_metadata_eq!(expanded, expected_expanded,
       "View with expanded subscribees: HiddenInSubscribeeCol with H before E11 and E12");
 
     Ok (( )) }
@@ -1139,7 +1140,7 @@ async fn test_hidden_without_but_none_within (
        **** (skg folded (node (id H) (source main) indef (birthHerald \"cH\"))) H
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(initial_view, expected_initial,
+    assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: H in HiddenOutsideOfSubscribeeCol; E1 and E2 are indef bare leaves");
     let with_subscribees_expanded = {
       let modified_view : String =
@@ -1174,7 +1175,7 @@ async fn test_hidden_without_but_none_within (
        **** (skg folded (node (id H) (source main) indef (birthHerald \"cH\"))) H
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(with_subscribees_expanded, expected_expanded,
+    assert_metadata_eq!(with_subscribees_expanded, expected_expanded,
       "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol (at end); E1 expanded with E11, E12; E2 expanded but empty");
 
     Ok (( )) }
@@ -1247,7 +1248,7 @@ async fn test_overlapping_hidden_within (
        *** (skg (node (id E2) (source main) indef (birthHerald \"bS\") (rels \"C1\"))) subscribee-2
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(initial_view, expected_initial,
+    assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: indef subscribees are bare leaves; H doesn't appear");
     let expanded = {
       let modified_view : String =
@@ -1281,6 +1282,6 @@ async fn test_overlapping_hidden_within (
        ***** (skg folded (node (id H) (source main) indef (birthHerald \"dH 2bC\"))) H
        ** (skg (node (id R1) (source main) (birthHerald \"aC\"))) R1
        "};
-    assert_eq!(expanded, expected_expanded,
+    assert_metadata_eq!(expanded, expected_expanded,
       "View with expanded subscribees: H appears in HiddenInSubscribeeCol under both E1 and E2");
     Ok (( )) }

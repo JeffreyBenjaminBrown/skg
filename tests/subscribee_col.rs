@@ -1,6 +1,7 @@
 // cargo nextest run --test grouped_unit -E 'test(subscribee_col::)'
 
 use indoc::indoc;
+use skg::assert_metadata_eq;
 use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -97,7 +98,7 @@ fn test_subscribee_col_appears_for_subscribers(
       ** (skg (node (id 14) (source home) (birthHerald \"aC1\"))) 14
       *** (skg (node (id 141) (source home) (birthHerald \"aC\"))) 141
 "};
-    assert_eq!(result, expected,
+    assert_metadata_eq!(result, expected,
       "Nodes with subscriptions should have SubscribeeCol children");
     cleanup_test(
       db_name,

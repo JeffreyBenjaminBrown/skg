@@ -4,6 +4,7 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
+use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_db;
 use skg::dbs::typedb::paths::path_containerward_to_first_nonlinearity;
 use skg::types::misc::{ID, SkgConfig};
@@ -141,7 +142,7 @@ async fn test_multi_root_view_logic (
                           // 'hiddenBody': node 1 HAS a body, and this
                           // (repeated, hence indefinitive) draw of it
                           // hides that body -- herald B (TODO/more.org).
-  assert_eq!(result, expected,
+  assert_metadata_eq!(result, expected,
              "Multi-root view should produce exact expected output");
 
   Ok (( )) }
@@ -167,7 +168,7 @@ async fn test_single_root_view_with_cycle (
                               *** (skg (node (id c) (source main) (birthHerald \"aCa\"))) c
                               **** (skg (node (id b) (source main) indef hiddenBody (birthHerald \"2aCa\") (viewStats cycle))) b
                               "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
 
       Ok (( )) }}
@@ -221,7 +222,7 @@ async fn test_multi_root_view_with_shared_nodes (
          *** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1H 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1Lb 1H O2 I1\"))) this title includes a [[id:22][textlink to another file]]
          "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
 
       Ok (( )) }}
@@ -279,7 +280,7 @@ async fn test_multi_root_view_with_node_limit (
          *** (skg (node (id 4) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1H 1O I1\"))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (birthHerald \"2bS\") (rels \"1Lb 1H O2 I1\"))) this title includes a [[id:22][textlink to another file]]
          "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");
 
       Ok (( )) }}
@@ -327,7 +328,7 @@ async fn test_limit_with_multiple_sibling_groups (
                               12 body
                               *** (skg (node (id 121) (source main) indef hiddenBody (birthHerald \"aC\"))) 121
                               "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");
 
       Ok (( )) }}

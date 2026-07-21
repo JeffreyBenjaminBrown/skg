@@ -10,6 +10,7 @@ use skg::to_org::expand::backpath::build_and_integrate_containerward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
+use skg::assert_metadata_eq;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::ViewNode;
 
@@ -89,7 +90,7 @@ async fn test_multi_cycle_fork_impl(
     viewforest_to_string (&viewforest, config)?;
   let expected_str : String =
     viewforest_to_string (&expected_trees, config)?;
-  assert_eq!(
+  assert_metadata_eq!(
     actual_str, expected_str,
     "Multi-cycle fork: tree structure should match" );
   Ok(()) }

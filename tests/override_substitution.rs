@@ -27,6 +27,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::from_text::buffer_to_validated_saveplan;
+use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
@@ -201,7 +202,7 @@ async fn save_roundtrips_to_original_and_is_idempotent (
       let saved_again : String =
         save_and_rerender (&saved, config, driver, tantivy)
         . await ?;
-      assert_eq! ( saved, saved_again,
+      assert_metadata_eq! ( saved, saved_again,
         "a second save is a noop (idempotence through the \
          collected-ID orderkey)" );
       Ok (( )) }

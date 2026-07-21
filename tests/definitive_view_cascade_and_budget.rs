@@ -11,6 +11,7 @@ use std::net::TcpStream;
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
   install_or_swap_global_handle };
+use skg::assert_metadata_eq;
 use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
@@ -135,7 +136,7 @@ async fn test_definitive_view_ample_budget (
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
         "Definitive view with an ample budget should expand all children");
 
       Ok (( )) }
@@ -237,9 +238,9 @@ async fn test_definitive_view_limit_5_or_6 (
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
-      assert_eq!(result_5, expected_5,
+      assert_metadata_eq!(result_5, expected_5,
         "limit=5: 121 expands one gen-3 child (1211), rest indefinitive (§5.5)");
-      assert_eq!(result_6, expected_6,
+      assert_metadata_eq!(result_6, expected_6,
         "limit=6: 121 expands both gen-3 children, rest indefinitive (§5.5)");
 
       Ok (( )) }
@@ -333,9 +334,9 @@ async fn test_definitive_view_limit_1_to_4 (
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
-      assert_eq!(result_1, expected_1,
+      assert_metadata_eq!(result_1, expected_1,
         "limit=1 creates only the first gen-2 child, indefinitive (§5.5)");
-      assert_eq!(result_4, expected_4,
+      assert_metadata_eq!(result_4, expected_4,
         "limit=4 creates all four gen-2 children, all indefinitive (§5.5)");
 
       Ok (( )) }
@@ -395,7 +396,7 @@ async fn test_definitive_view_conflicting (
          1221 body
       "};
 
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
         "First definitive instance should become indef when second requests definitive");
 
       Ok (( )) }
@@ -443,7 +444,7 @@ async fn test_definitive_view_with_cycle (
         *** (skg (node (id cyc-a) (source main) indef hiddenBody (birthHerald \"aCa\") (viewStats cycle))) cyc-a
       "};
 
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
         "Definitive view should detect cycles and mark them");
 
       Ok (( )) }
@@ -504,7 +505,7 @@ async fn test_definitive_view_with_repeat (
          124 body
       "};
 
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
         "Definitive view should mark repeated nodes as indefinitive");
 
       Ok (( )) }
@@ -601,7 +602,7 @@ async fn test_budget_aliascol_is_neutral (
         ** (skg (node (id c1) (source main) (birthHerald \"aC1\"))) c1
         *** (skg (node (id c2) (source main) (birthHerald \"aC\"))) c2
       "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
         "budget 3 expands the whole content chain; the AliasCol is whole + budget-neutral");
 
       Ok (( )) }

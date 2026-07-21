@@ -9,6 +9,7 @@ pub mod git_ops;
 pub mod herald_tokens;
 pub mod heralds;
 pub mod import_org_roam;
+pub mod metadata_canon;
 pub mod nodeMerge;
 pub mod org_to_text;
 pub mod save;

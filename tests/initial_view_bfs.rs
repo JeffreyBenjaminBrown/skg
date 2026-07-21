@@ -4,6 +4,7 @@ use indoc::indoc;
 use std::error::Error;
 
 use skg::to_org::render::content_view::multi_root_view;
+use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_db;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
@@ -105,7 +106,7 @@ async fn test_bfs_limit_across_multiple_trees (
                               ** (skg (node (id 32) (source main) indef (birthHerald \"aC3\"))) 32
                               ** (skg (node (id 33) (source main) indef (birthHerald \"aC\"))) 33
                               "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "BFS truncates by the §5.5 budget, leaving whole groups indefinitive");
 
       Ok (( )) }
@@ -155,7 +156,7 @@ async fn test_bfs_limit_9_three_branches (
                               ** (skg (node (id 32) (source main) indef (birthHerald \"aC3\"))) 32
                               ** (skg (node (id 33) (source main) indef (birthHerald \"aC\"))) 33
                               "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "BFS limit=9 fully expands the first two roots; the third stays indefinitive");
 
       Ok (( )) }
@@ -200,7 +201,7 @@ async fn test_bfs_limit_8_two_branches (
                               *** (skg (node (id 223) (source main) indef (birthHerald \"aC\"))) 223
                               ** (skg (node (id 23) (source main) (birthHerald \"aC\"))) 23
                               "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + indefinitive");
 
       Ok (( )) }
@@ -236,7 +237,7 @@ async fn test_budget_content_beats_subscribers (
                               ** (skg (node (id c1) (source main) (birthHerald \"aC1\"))) c1
                               *** (skg (node (id c2) (source main) (birthHerald \"aC\"))) c2
                               "};
-      assert_eq!(result, expected,
+      assert_metadata_eq!(result, expected,
                  "budget 3 expands the whole content chain; the SubscribeeCol is whole + budget-neutral");
 
       Ok (( )) }

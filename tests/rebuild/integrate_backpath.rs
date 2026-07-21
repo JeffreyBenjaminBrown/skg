@@ -12,6 +12,7 @@ use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use skg::org_to_text::viewforest_to_string;
+use skg::assert_metadata_eq;
 
 use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
@@ -99,7 +100,7 @@ async fn test_path_with_cycle_impl(
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
-  assert_eq!(
+  assert_metadata_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with cycle should match expected"
   );
@@ -178,7 +179,7 @@ async fn test_path_with_branches_no_cycle_impl(
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
-  assert_eq!(
+  assert_metadata_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (no cycle) should match expected"
   );
@@ -258,7 +259,7 @@ async fn test_path_with_branches_with_cycle_impl(
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
-  assert_eq!(
+  assert_metadata_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (with cycle) should match expected"
   );
@@ -314,7 +315,7 @@ async fn test_fork_expansion_at_origin_impl(
     viewforest_to_string (&viewforest, config)?;
   let expected_str : String =
     viewforest_to_string (&expected_trees, config)?;
-  assert_eq!(
+  assert_metadata_eq!(
     actual_str, expected_str,
     "Fork expansion at origin should expand immediate branches" );
   Ok(()) }

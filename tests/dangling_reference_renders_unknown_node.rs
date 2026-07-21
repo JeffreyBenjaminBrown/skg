@@ -18,6 +18,7 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::sync::Arc;
 
+use skg::assert_metadata_eq;
 use skg::to_org::render::content_view::single_root_view;
 use skg::test_utils::run_with_shared_test_db;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -63,7 +64,7 @@ async fn test_dangling_reference_renders_unknown_node (
       let expected = indoc! {"* (skg (node (id parent) (source main) (parentIs absent))) parent
                               ** (skg (unknown (id ghost)))
                               "};
-      assert_eq! (rendered, expected,
+      assert_metadata_eq! (rendered, expected,
                   "view should render the dangling child as an \
                    PhantomUnknown rather than aborting");
       Ok (( ))

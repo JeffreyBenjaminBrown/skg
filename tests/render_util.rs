@@ -1,5 +1,6 @@
 // cargo nextest run --test grouped_unit -E 'test(render_util::)'
 
+use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, default_activeNode };
@@ -19,7 +20,7 @@ fn test_viewnode_to_text_no_metadata () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_eq! ( result, "* (skg (node (id test) (source main))) Test Title\n" ); }
+  assert_metadata_eq! ( result, "* (skg (node (id test) (source main))) Test Title\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_body () {
@@ -38,7 +39,7 @@ fn test_viewnode_to_text_with_body () {
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_eq! ( result, "** (skg (node (id test) (source main))) Test Title\nTest body content\n" ); }
+  assert_metadata_eq! ( result, "** (skg (node (id test) (source main))) Test Title\nTest body content\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_metadata () {
@@ -52,7 +53,7 @@ fn test_viewnode_to_text_with_metadata () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("AliasCol rendering never fails");
-  assert_eq! ( result, "* (skg folded aliasCol)\n" ); }
+  assert_metadata_eq! ( result, "* (skg folded aliasCol)\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_id_metadata () {
@@ -69,7 +70,7 @@ fn test_viewnode_to_text_with_id_metadata () {
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_eq! ( result, "*** (skg (node (id test123) (source main) indef)) Test Title\n" ); }
+  assert_metadata_eq! ( result, "*** (skg (node (id test123) (source main) indef)) Test Title\n" ); }
 
 #[test]
 fn test_metadata_ordering () {
@@ -88,7 +89,7 @@ fn test_metadata_ordering () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
+  assert_metadata_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
 
 #[test]
 fn test_birth_and_rels_heralds_emitted () {
@@ -117,4 +118,4 @@ fn test_birth_and_rels_heralds_emitted () {
   let neither : String = mk ( None, None );
   assert! ( ! neither . contains ("birthHerald") );
   assert! ( ! neither . contains ("(rels ") );
-  assert_eq! ( neither, "* (skg (node (id n) (source main))) N\n" ); }
+  assert_metadata_eq! ( neither, "* (skg (node (id n) (source main))) N\n" ); }

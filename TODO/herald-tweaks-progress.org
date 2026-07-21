@@ -1,0 +1,94 @@
+Execution log for the herald-tweaks work. Plan of record:
+TODO/herald-tweaks.org. Two branches, per Jeff's request:
+- 'ignore-order-in-test-metadata' (this file's branch 1): the metadata
+  unordered-comparison tool + adopting it in the metadata tests.
+- 'heralds-tweaks' (branch 2, off branch 1): the herald changes (option A
+  -- server emits styled spans).
+
+* Branch 1: ignore-order-in-test-metadata
+** What's done and went well
+- New library module =server/metadata_canon.rs= (=pub mod metadata_canon=
+  in =server/lib.rs=). It canonicalizes each =(skg ...)= metadata sexp in
+  a rendered org buffer by SORTING every list's tail while keeping the
+  head (the keyword) first, recursively; all non-metadata text (bullets,
+  titles, bodies) is preserved byte-for-byte. Two same-order-modulo
+  buffers canonicalize identically.
+  - Semantics match Jeff's spec: =(a b c)= == =(a c b)=, != =(b a c)=;
+    recursive; =(a (b c d) (e f g))= == =(a (e f g) (b d c))= !=
+    =(a (c b d) (e f g))=.
+  - 8 unit tests in the module (no DB needed) cover head-fixed,
+    tail-unordered, recursion, multisets, quoted-strings-with-parens
+    (the =2(1,1)L= herald), the =⌂:main= sourceHerald atom, and
+    buffer-level preservation of non-metadata text. All pass.
+- Exported macro =assert_metadata_eq!(actual, expected [, msg])= (a
+  drop-in for =assert_eq!= that canonicalizes both sides first; keeps a
+  readable diff since both sides are canonicalized identically).
+- Migrated the metadata-buffer VIEW tests from =assert_eq!= to
+  =assert_metadata_eq!= (exemplar: =tests/content_view.rs=; the rest via
+  parallel mechanical conversion). Only STRING buffer comparisons were
+  converted; scalar/Vec/Option asserts were left alone.
+
+** Why this is safe to do broadly without running every test
+- =canonicalize_metadata_ordering= is a deterministic pure function, so a
+  currently-passing =assert_eq!(a, b)= has a == b, hence
+  canon(a) == canon(b): the conversion is PASS-PRESERVING as long as it
+  compiles.
+- Converting a NON-string assert is a compile error (the macro feeds
+  =&str= to =canonicalize_metadata_ordering=), so a wrong conversion is
+  caught by the compiler, never silent.
+  So: compile-clean + the pass-preservation guarantee == correctness;
+  a few groups were also spot-run under TypeDB.
+
+** Choices determining the future
+- The tool lives in the LIBRARY (=skg::metadata_canon=), like the
+  existing =skg::test_utils=, so every integration-test binary can reach
+  it. It is unused in production (pure, no warnings).
+- CAVEAT (documented in the module): unordered comparison applies to ALL
+  metadata, including the ORDERED relationship-herald spans inside a
+  future =(rels ...)= form. Span display-order is instead pinned by the
+  =herald_tokens= unit tests, which assert the assembled order directly.
+  If we ever want the wire tests to also pin span order, the tool would
+  need a per-keyword "ordered children" exception.
+- The herald RULE-TABLE sexp assertions (tests/unit/heralds.rs, the elisp
+  fixture) were deliberately NOT converted: that sexp's order is
+  significant (it is presentation order).
+
+** Scope of the sweep (what got converted, and why the rest didn't need it)
+- 40 =assert_eq!= -> =assert_metadata_eq!= conversions across 10 files:
+  content_view, hidden_from_subscriptions,
+  definitive_view_cascade_and_budget, initial_view_bfs,
+  rebuild/integrate_backpath, override_substitution, subscribee_col,
+  dangling_reference_renders_unknown_node, render_util, typedb/paths.
+  These are the only tests that pinned a WHOLE rendered buffer (metadata
+  sibling order included) via string equality.
+- The rest of the suite needed NO change, for good reasons discovered
+  during the sweep:
+  - Parse-direction tests (=new/local_instruction_collection/*=,
+    =new/buffer_to_viewnodes/*=) feed org buffers as INPUT and assert on
+    the resulting data structures -- no rendered buffer to canonicalize.
+  - The git-diff tests compare buffers via =assert_buffer_contains=
+    (tests/git_diff_view/common.rs), which already decomposes each line's
+    metadata into LEAF fragments =(id x)=, =(source s)= and checks each
+    independently -- so it is ALREADY sibling-order-insensitive.
+  - The partner-col tests use a =want_contains=/=want_before= substring
+    harness (also fragment-based), not full-buffer equality.
+  So the tool now covers every place where metadata sibling order was
+  actually pinned; nothing order-brittle remains that it would fix.
+- Full compile of all test binaries: clean. Spot-runs under TypeDB:
+  content_view, hidden_from_subscriptions,
+  definitive_view_cascade_and_budget, initial_view_bfs, render_util all
+  green. (One flake, subscribee_col_empty_persists -- an UNCONVERTED file
+  -- failed under a full-suite run with the known "in-Rust graph not
+  coherent" TypeDB-collision panic, and passed in isolation; see the
+  concurrent-test-runs-collide memory.)
+
+** What's imperfect / deferred
+- Verification relied on the pass-preservation argument (above) plus
+  compile + targeted spot-runs, NOT a full green suite run, because the
+  full suite needs a long serialized TypeDB pass and exhibits the known
+  collision flakes. The argument is airtight for value-preserving
+  wrapper changes, but a full nextest pass would be the belt-and-braces
+  confirmation.
+- Left as `assert_eq!` deliberately: fork.rs:733 compares raw =.skg=
+  on-disk bytes (not an org buffer) -- a byte-for-byte unchanged check
+  that must stay exact.
