@@ -100,6 +100,39 @@ pub fn open_repo (
 ) -> Option<Repository> {
   Repository::discover (source_path) . ok () }
 
+/// The git remote a receiver would fetch this source from, as
+/// `(remote_name, fetch_url)`: the remote named `origin` when one
+/// exists, else the first remote listed (whose name is reported
+/// alongside, precisely because it is not the conventional
+/// `origin`). The URL is the fetch URL -- the string `git remote -v`
+/// prints between the remote name and `(fetch)`.
+///
+/// `None` when the source directory is not itself a git repository,
+/// has no remotes, or the chosen remote carries no (utf-8) URL. The
+/// path is opened EXACTLY, without searching parent directories, so a
+/// bare source directory that merely sits inside some unrelated
+/// enclosing repository is never mistaken for a repo of its own (and
+/// its enclosing repo's remote never misreported as the source's).
+pub fn source_git_remote (
+  source_path : &Path
+) -> Option<(String, String)> {
+  let repo : Repository =
+    Repository::open (source_path) . ok () ?;
+  let remotes : git2::string_array::StringArray =
+    repo . remotes () . ok () ?;
+  let names : Vec<&str> =
+    remotes . iter () . flatten () . collect ();
+  let chosen_name : &str =
+    if names . iter () . any ( |n| *n == "origin" ) {
+      "origin"
+    } else {
+      names . first () . copied () ? };
+  let remote : git2::Remote =
+    repo . find_remote (chosen_name) . ok () ?;
+  let url : String =
+    remote . url () . map ( str::to_string ) ?;
+  Some (( chosen_name . to_string (), url )) }
+
 /// Get the content of a file at HEAD.
 /// Returns None if the file doesn't exist at HEAD.
 /// The path should be relative to the repository root.
