@@ -1,0 +1,262 @@
+Phase 2 of the semantic-wire work. Phase 1 (DONE_numeric-rels/) made
+the =(rels ...)= sub-form semantic and moved its presentation into the
+clients. This plan covers the REST of the wire. Written for async
+review in org-mode: my headings are plain; please mark your responses
+TODO. The open-questions section at the end is self-contained -- you
+can answer it before reading the body. Not committed (planning churns).
+
+* Goal, restated
+
+Make the server emit only SEMANTIC FACTS and carry ZERO presentation,
+so it is agnostic about how any client displays a node. "Presentation"
+= colors, symbols (☮ ⊥ ⟳ ⌂), letters (C/L/S/O/H, M/-M/X/-X, B), token
+order, and gluing. "Semantic" = the atoms and values that name what is
+true about a node (its ids, sources, memberships, relation counts,
+diff state, requests).
+
+* Where we are now
+
+The wire is TWO logically separate payloads, and the clients treat them
+very differently. This split is the whole story.
+
+** Payload 1 -- the per-node =(skg (node ...))= metadata (in buffer text)
+
+Already essentially semantic. Built by =viewnode_to_text=
+(server/org_to_text.rs:122); the relation facts by
+=relationship_heralds_sexp= (server/herald_tokens.rs:149). It rides
+inside the buffer as RAW TEXT and round-trips on save; both clients
+display it via overlay (Emacs) / extmark (nvim) ONLY, never mutating
+the text. A radically different client can already ignore all styling
+and read these atoms directly -- so for the DATA, "server is
+display-agnostic" is already true today.
+
+One presentation leak remains in this payload:
+- =(sourceHerald ⌂:LABEL)= bakes the ⌂ glyph into the value
+  (server/org_to_text.rs:275, and again in the fork starter buffer
+  server/from_text/fork.rs:261). Only LABEL is semantic; ⌂ is display.
+
+Two stale atoms to sweep while here:
+- =parentOverrides= appears only in the fork template
+  (server/from_text/fork.rs:266); it is not emitted by org_to_text, not
+  in the rule table, not in =emittable_metadata_atoms=. Dead.
+- a =container= parentIs sub-rule is described in a heralds.rs doc
+  comment (heralds.rs:191-198) but does not exist in code.
+- =RelationRole::glyph= (relation_accessors.rs:160) and the role glyphs
+  =} ← → Op pO ...= in =PARTNER_ROLE_VOCAB= are referenced only by a
+  test; never reach the wire.
+
+** Payload 2 -- the served herald RULE TABLE (the presentation layer)
+
+This is the real target. =herald_rule_table()= (server/heralds.rs:199)
+is ~50 rules mapping each metadata atom to a colored display token. The
+client fetches it once per connection over the =HeraldRules= endpoint
+(request "herald rules" -> serve/handlers/herald_rules.rs:11 ->
+=herald_rules_sexp=), caches it, and feeds it to a generic LENS ENGINE
+(elisp/skg-sexpr/skg-lens.el =skg-transform-sexp-flat=;
+nvim/lua/skg/sexpr/lens.lua) that walks a node's metadata and emits
+styled tokens.
+
+Everything presentation about non-rels atoms lives HERE:
+- colors RED/GREEN/BLUE/YELLOW/ORANGE (mapped to real RGB client-side),
+- symbols ☮ (indef, and prefixed into the read-only column
+  descriptions), ⊥ (independent), ⟳ (cycle), the ~ relSource prefix,
+- diff letters M/-M/X/-X, the B (hiddenBody) letter,
+- token ORDER (rule order = presentation order), ABUT gluing,
+- and the column DESCRIPTIONS ("It subscribes to these.", "aliases",
+  "text changed : ", "DELETED", "node from inactive source", the
+  =req:col:= / =req:path:= diagnostics, etc.) -- human-readable strings
+  that are the one gray zone (semantic label vs. presentation).
+
+** Why =(rels ...)= already bypasses the table (this is the model)
+
+The lens rule language CANNOT express the relation heralds: no
+per-character color, no value-dependent color ("orange only when
+count>1"), no conditionals/arithmetic ("omit the count when it equals
+the ancestor count"), no value transforms (gen integer 1 -> letter a,
+the a(b,c) link form), and only 5 colors (no purple/cyan/black-on-
+white). So phase 1 pulled rels OUT of the table: the =rels= rule now
+just emits a positioning SENTINEL =__RELS_SPANS__=
+(RELS_SPANS_SENTINEL, heralds.rs:144), and the client splices in its
+own hardcoded renderer (=heralds--render-rel-facts=,
+heralds-minor-mode.el:393; nvim heralds.lua:346) at that token.
+
+That renderer -- server sends facts, client owns all presentation -- is
+exactly the end-state we want for EVERY atom. Phase 2 generalizes it.
+
+* The decision this plan proposes
+
+** End-state B: retire the rule table; each client renders everything
+   from the raw semantic metadata sexp.
+
+Replace the lens+table path with a hardcoded client renderer (call it
+=heralds--render-metadata=) that walks the =(skg ...)= sexp and produces
+styled tokens for ALL atoms -- the natural extension of the rels
+renderer that already exists. Then delete, server-side: the rule table,
+=herald_rules_sexp=/=serialize_rule=, the =HeraldRules= request/response
+and its handler; and client-side: the fetch/ensure/reload machinery
+(skg-request-herald-rules.el, nvim herald_rules.lua, the reload-
+preservation blocks) and the SENTINEL (no longer needed -- rels is just
+one more form the renderer handles inline).
+
+** The honest tradeoff (so you can weigh it)
+
+This is a SIMPLIFICATION and consistency play, NOT a new capability --
+the data is already semantic, so no client gains any power it lacks
+today. What we gain:
+- the server carries zero presentation; one rendering model everywhere
+  (today it is split awkwardly: lens-table for most atoms, hardcoded
+  for rels, RGB + colon-convention client-side regardless);
+- a lot of code goes away: the whole serve/fetch/ensure/reload/cache
+  path for the table, plus the endpoint.
+What we pay:
+- the ~50-atom atom->display mapping gets DUPLICATED across the two
+  clients (today the served table is the single source of truth and the
+  lens engine is generic). This is already the situation for rels; we
+  are extending it. The mapping is small and stable, but it is real.
+- we lose the rule-table conformance test's guarantee and must replace
+  it with a client-side coverage contract (see Tests).
+
+** Wrinkle: the lens engine has a second caller
+
+=skg-transform-sexp-flat= is used not only by heralds but by
+skg-sexpr-edit.el:134-148, which runs the lens + the herald table to
+show an edit-hint "matching what the content view would show." So the
+lens engine is only deletable if this caller ALSO migrates to the new
+=heralds--render-metadata=. It should -- same intent, better source.
+(nvim's lens.lua has no non-herald caller; grep confirms.)
+
+* What changes, concretely
+
+** Server (server/)
+- org_to_text.rs:275 + from_text/fork.rs:261: emit =(sourceHerald
+  LABEL)= (drop the ⌂; the client prepends its own glyph). See Q5 for
+  the exact shape.
+- Delete parentOverrides from fork.rs:266; fix/remove the container doc
+  comment; optionally drop the unused RelationRole::glyph + role vocab.
+- Delete heralds.rs's rule-table half: =herald_rule_table=,
+  =herald_rules_sexp=, =serialize_rule=, =quote_string=, the helper
+  constructors (rule/crule/leaf/leaf_ro!/vac/leaf_abut/any/interc/s),
+  the =HeraldColor= enum, RELS_SPANS_SENTINEL.
+- KEEP =emittable_metadata_atoms= and its exhaustiveness guards
+  (graphstats/viewstats/parentIs/axis/qual_and_col atoms) -- they are
+  the vocabulary contract and stay valuable (see Tests).
+- Protocol: remove =RequestType::HeraldRules= (protocol.rs:17,46),
+  =TcpToClient::HeraldRules= (protocol.rs:80,115), serve.rs:216-217
+  dispatch, serve/handlers/herald_rules.rs, tools/emit-herald-rules.rs.
+
+** Emacs client (elisp/)
+- New =heralds--render-metadata= (sexp -> propertized tokens) covering
+  every atom the table covered, reusing the existing faces
+  (heralds-minor-mode.el:438-474) and the rel renderer. Fold the colon-
+  convention + separator policy in.
+- heralds-from-metadata: drop the lens call + sentinel splice; call the
+  new renderer directly.
+- Delete heralds--transform-rules, heralds-install-rules,
+  heralds--ensure-rules, the sentinel constant/splice, and
+  skg-request-herald-rules.el. skg-client.el:47-48 stops
+  clearing/awaiting the table. Prune the reload-preservation
+  (skg-reload.el:46-60,77).
+- skg-sexpr-edit.el:134 switches its edit-hint to
+  =heralds--render-metadata= over a minimal object sexp.
+- Then skg-lens.el is caller-free -> delete it (verify no other
+  require).
+
+** nvim client (nvim/lua/skg/)
+- Mirror: new =render_metadata= in heralds.lua; drop lens + sentinel;
+  delete herald_rules.lua, the init.lua:44 fetch, reload.lua:31-63
+  preservation, lens.lua. The extmark/conceal machinery stays.
+- This also erases the Emacs-blocks-vs-nvim-async fetch asymmetry
+  (there is no fetch anymore).
+
+** Tests / the new coverage contract
+- The rule-table conformance test
+  (=herald_rules_cover_the_emittable_vocabulary=) loses its rule-table
+  side. Replace the GUARANTEE it gave -- "every emittable atom is
+  handled" -- with a client-side coverage test in each client:
+  render every atom in =emittable_metadata_atoms= and assert non-empty
+  / expected output. The clients learn the vocabulary from a committed
+  fixture the server emits (repurpose tests/elisp/herald-rules.sexp ->
+  an emittable-atoms fixture, still pinned to the server so adding an
+  atom fails until both clients handle it). See Q3.
+- The existing golden herald tests (elisp 9, nvim 10) become the parity
+  oracle: keep them green across the swap by rendering the SAME strings
+  the table+lens produce today, then they lock the new renderer.
+- =elisp_fixture_matches_the_live_table= and the emit-herald-rules tool
+  retire with the table.
+
+* Low-cost cleanups (independent of the big decision)
+These are safe to do first, in any case:
+- the ⌂ leak (Q5), parentOverrides, the container doc comment.
+
+* Sequencing (each step independently verifiable)
+1. Cleanups above (small, no architecture change).
+2. Build =heralds--render-metadata= / =render_metadata= ALONGSIDE the
+   lens path, behind a flag; assert byte-for-byte parity against the
+   current table+lens output on the golden fixtures + a live buffer.
+3. Flip both clients + skg-sexpr-edit to the new renderer; golden tests
+   + the 20 integration runs stay green.
+4. Delete the rule table, endpoint, lens engine, fetch/reload
+   machinery, sentinel.
+5. Swap the conformance test for the client-coverage test.
+
+* Open questions -- please answer before I execute (TODO)
+
+Glossary for this section: "rule table" = the ~50-rule presentation
+spec the server serves and clients apply via the lens engine. "lens
+engine" = the generic sexp->tokens transformer that applies it.
+"column descriptions" = the human sentences like "It subscribes to
+these." "vocabulary" = =emittable_metadata_atoms=, the server's list of
+every atom it can put on the wire.
+
+** DONE Q1 -- retire the table, or keep it as an ignorable default?
+End-state B retires it entirely (my recommendation: it is a net
+simplification and matches your "server agnostic" goal). The
+alternative is to KEEP serving it as an optional default renderer spec
+that new/different clients may ignore -- less code deleted, but the
+awkward split (lens for most, hardcoded for rels) stays forever, and
+the server keeps owning presentation. Retire (B), or keep-as-default?
+
+*** agreed
+
+** DONE Q2 -- where do the column DESCRIPTIONS live? (the hard one)
+The sentences ("It subscribes to these.", etc.) are semantic-ish but
+also English prose. Options:
+  (a) hardcode them in each client (fully client-owned; prose
+      duplicated in elisp + lua, and a third client reinvents them);
+  (b) the server serves a presentation-FREE semantic DICTIONARY
+      (atom -> description string, NO color/symbol/order) that clients
+      MAY use; keeps prose DRY, server still owns zero DISPLAY. My
+      recommendation.
+  (c) drop server descriptions; each client writes its own.
+Which?
+
+*** (b)
+
+** DONE Q3 -- how do we guarantee client coverage without the table?
+My plan: keep =emittable_metadata_atoms= + a committed fixture; each
+client has a test that its renderer handles every atom in it, and the
+fixture is pinned to the live server list so a new atom breaks the
+build until handled. Good enough, or do you want a stronger cross-check
+(e.g. a shared golden of atom->rendered-string per client)?
+
+*** it's good
+
+** DONE Q4 -- accept two-client duplication of the mapping?
+Retiring the table duplicates the atom->display mapping in elisp and
+lua (as rels already is). Accept it (my rec -- small, stable, matches
+precedent), or do you want a generator / shared spec so the mapping has
+one source of truth?
+
+** DONE Q5 -- the sourceHerald shape once ⌂ is removed
+=(sourceHerald LABEL)= (client prepends ⌂) or =(sourceHerald (boundary
+LABEL))= (more explicit, room for future boundary kinds)? I lean to the
+former for simplicity.
+
+*** the former
+
+** DONE Q6 -- scope check
+Do you want this done as ONE branch off the current one, or split
+(cleanups + ⌂ leak first as a quick branch, then the table retirement
+as a second)? The cleanups are cheap and independent.
+
+*** one is fine

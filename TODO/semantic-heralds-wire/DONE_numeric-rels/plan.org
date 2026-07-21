@@ -1,0 +1,190 @@
+* Direction (Claude agrees)
+Move relationship-herald PRESENTATION out of the server and into the
+clients. The server sends SEMANTIC FACTS about a node's relationships;
+each client decides letters, colors, order, layout. This fixes both of
+Jeff's concerns:
+- the raw =(skg ...)= metadata in the buffer becomes roughly meaningful
+  to a human (no pre-styled color spans);
+- the server stops dictating appearance, so a client can render these
+  completely differently.
+
+It is honestly cleaner than the styled-span wire I just shipped: those
+spans existed only because the Emacs "lens" engine can't color a single
+token per-character, which forced the server to pre-bake the colors.
+Once the CLIENT owns rendering, that constraint disappears.
+
+This is the THIRD wire shape for these heralds (frontloaded strings ->
+styled spans -> semantic facts). The good news: the semantic facts are
+the underlying truth, so this shape should finally be stable -- future
+appearance tweaks won't touch the wire at all, only client code.
+
+* The principle, stated once
+- WIRE = facts. What relates to what, how many, which tracked ancestors,
+  what is the reason-for-being. No colors, no letters, no order-as-meaning.
+- CLIENT = presentation. The C/L/S/O/H letters, the a/b/c ancestor
+  letters, the group colors, the birth/multi-contains highlights, the
+  fixed order, the count-omission, the a(b,c) link form.
+The server already COMPUTES all the facts (server/update_buffer/viewnodestats.rs:
+=RelationCounts=, =AncestorFlags=, =birth_relations=, the edge-level
+gating). That computation STAYS server-side -- it needs the graph and the
+active source-set, which clients don't have. Only the styled-span
+ASSEMBLY (server/herald_tokens.rs) and its client rendering change.
+
+* Proposed wire format
+Replace the current =(rels (COLOR "text") ...)= payload with per-relation
+semantic sub-forms. A relation appears only if it has something to say;
+a side (in/out) appears only if its count > 0; a sub-list appears only if
+non-empty (Jeff's "empty-except-for-its-key => absent" rule).
+
+** Grammar
+#+begin_example
+(rels
+  (contains     (in  COUNT (ancestors GEN...))
+                (out COUNT (ancestors GEN...)))
+  (subscribes   (in ...) (out ...))
+  (overrides    (in ...) (out ...))
+  (hides        (in ...) (out ...))
+  (textlinksTo  (in  COUNT (surprising B) (withContent C))   ; no ancestors on in
+                (out (ancestors GEN...)))                     ; no count on out
+  (aliases  K)      ; the old A token
+  (extraIds K)      ; the old I token
+  (birth RELNAME...))  ; the reason-for-being relation(s)
+#+end_example
+- =in= = "N nodes RELATION it" (e.g. contains-in = nodes that contain it).
+- =out= = "it RELATIONs N nodes".
+- =COUNT= is the whole member count on that side (always present when the
+  side is present -- it is a fact; the client omits it when it equals the
+  number of ancestors).
+- =(ancestors GEN...)= lists the tracked ancestors that are members on
+  that side, by generation distance (1 = visible parent, 2 = grandparent,
+  ...). The client maps generation -> letter (1->a, 2->b, ...). See Q1.
+- =textlinksTo= is the odd one, matching today's =a(b,c)L=: its IN side
+  never carries ancestors (only the surprising/with-content sub-split of
+  the link total); its OUT side is only the linkSource-birth case and
+  carries ancestors but no count.
+- =(birth RELNAME...)= names the relation(s) the node was drawn for
+  (usually =contains=; =[hides contains]= for a HiddenInSubscribee
+  member). See Q2.
+
+** Worked examples (each reproduces a real current render)
+- =aC= (parent contains it), birth contains:
+  =(rels (contains (in 1 (ancestors 1))) (birth contains))=
+  -> client: count 1 == 1 ancestor so omit count; "a" (yellow), "C"
+     (white, birth). Renders "aC".
+- =2aC1= (2 containers incl. parent; contains 1), birth contains:
+  =(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))=
+  -> "2" orange (multi-contains, in-count>1 on contains), "a" yellow,
+     "C1" white (birth). Renders "2aC1".
+- =bS= (grandparent subscribes to it), birth subscribes:
+  =(rels (subscribes (in 1 (ancestors 2))) (birth subscribes))=
+  -> "b" yellow, "S" white. Renders "bS".
+- =2(1,1)L= (surprising links), no birth:
+  =(rels (textlinksTo (in 2 (surprising 1) (withContent 1))))=
+- =La= (links to its parent), birth textlinksTo:
+  =(rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))=
+
+* Change inventory
+** Server (mostly deletion + a simpler emit)
+- =server/herald_tokens.rs=: DELETE the span assembly (=assemble_active=,
+  =assemble_counts_only=, =SpanColor=, =HeraldSpan=, the coloring/merge).
+  Keep only the fact plumbing if any is still needed.
+- =server/types/viewnode.rs=: replace =ViewNodeStats.rel_spans= with the
+  raw facts needed to emit (the =RelationCounts=, the =AncestorFlags= as
+  per-side generation lists, and the birth relations); drop =SpanColor= /
+  =HeraldSpan=.
+- =server/update_buffer/viewnodestats.rs=: unchanged computation; store
+  the facts instead of assembled spans.
+- =server/org_to_text.rs=: emit the semantic =(rels ...)= form above.
+- =server/heralds.rs=: the =rels= rule stays the positioning SENTINEL
+  (the client renders the payload); the new sub-atoms (=contains=, =in=,
+  =ancestors=, =birth=, ...) are value-position, so they do NOT enter the
+  rule table or the conformance vocabulary -- same status the span colors
+  had. Update the =ViewNodeStats= destructuring guard for the field swap.
+- =server/serve/parse_metadata_sexp.rs=: UNCHANGED -- the "rels" arm
+  discards the whole =(rels ...)= form regardless of shape (verify).
+- Regenerate the elisp fixture (likely a no-op: the =rels= rule is
+  unchanged).
+** Clients (this is where the work lands -- x2, then vim later)
+- Port the retired =herald_tokens.rs= logic into EACH client's herald
+  renderer (elisp/heralds-minor-mode.el and nvim/lua/skg/heralds.lua):
+  parse the semantic =(rels ...)=, order C L S O H A I, build each token
+  (count + ancestor letters + relation letter + count + ancestor letters,
+  with count-omission and the a(b,c) link form), and color it (group base;
+  birth -> white; contains in-count>1 -> orange; ancestor letters ->
+  yellow). The existing sentinel-splice + faces/hl-groups carry over.
+** Tests (third re-baseline)
+- Wire tests: re-baseline =(rels (COLOR "text") ...)= ->
+  =(rels (contains ...) ...)=. The =metadata_canon= tool (branch
+  ignore-order-in-test-metadata) keeps them order-robust, so only content
+  changes.
+- The =herald_tokens= unit tests MOVE from Rust to the clients -- the
+  token-building logic they pin now lives in elisp/Lua, so they become
+  elisp/nvim herald-spec cases.
+- BONUS simplification: the integration helpers that currently dig a
+  graft's role out of the token TEXT can read =(birth RELNAME)= directly
+  (=contains -> container=, =textlinksTo -> linkSource=, etc.).
+
+* Relationship to the just-finished work
+- REUSED: the fact computation in viewnodestats.rs (counts, ancestor
+  flags with edge-level gating, birth_relations) -- it is genuinely
+  server-side and semantic.
+- REUSED: =metadata_canon= / =assert_metadata_eq!= -- still the right way
+  to keep the wire tests order-insensitive.
+- REPLACED: the styled-span assembly (herald_tokens.rs) and the client
+  span-renderers -- assembly is deleted, rendering is re-homed and
+  rewritten against the semantic facts.
+So the heralds-tweaks branch's viewnodestats work survives; its
+herald_tokens.rs + org_to_text span emit + client span renderers are
+what this supersedes.
+
+* DONE problems I anticipate
+** DONE Multi-client duplication is the real cost
+The full rendering (order, letters, colors, omission, link form) now
+lives in EVERY client and must be kept consistent unless you WANT
+divergence. This is exactly what the served rule table was built to
+avoid. Two clients today (Emacs, nvim), a vim one planned -- so the logic
+gets written ~3 times. Accepting this is the price of the principle; it
+is the single biggest downside. (The lens engine is already duplicated
+per client, so there's precedent.)
+** DONE Scope: just rels, or the whole rule table?
+This makes RELS presentation client-owned, but the OTHER heralds -- the
+col-description TEXT ("It subscribes to these."), the ☮/⊥ glyphs and
+their colors, cycle, sourceHerald, diff axes -- still come from the
+SERVER-SERVED rule table. So presentation ends up SPLIT: rels client-side,
+everything else server-side. That is inconsistent with "the server is
+agnostic about display." Fully realizing the principle means moving the
+whole rule table client-side (each client ships its own default; the
+server stops serving one) -- a much larger change. Decide: (a) do rels
+now, leave the rest server-driven; or (b) go all-in.
+*** DONE Deferred. I've added it to my own TODO.org.
+** DONE Birth is a per-node fact that doesn't fit "each rel has ins/outs"
+You said each rel knows only its ins and outs, but the reason-for-being
+is a whole-node fact (which relation the node was drawn FOR), and the
+client can't easily re-derive it (it depends on col type, backpath role,
+and overridesHere -- server-only context). So I propose a rels-level
+=(birth RELNAME...)= sibling, not something inside a rel. See Q2.
+** DONE Ancestors as generation NUMBERS vs LETTERS
+Your example used =(ancestors a)= (letters), which is friendlier to read
+but bakes the a/b/c convention -- a presentation choice -- into the wire,
+against goal #2 (a different client might show "P/G/GG" or a count).
+Generation NUMBERS =(ancestors 1 2)= are fully agnostic but a hair less
+human-friendly in the raw buffer. See Q1.
+*** DONE agreed, numbers then. 1 = parent, 2 = grandparent, etc.
+** DONE overridesHere still rides birth
+The =(overridesHere N)= marker (load-bearing save metadata) currently
+DISPLAYS via the birth mechanism (a drawn overrider's O token leads,
+now white). Under client rendering the client must treat an
+overridesHere node's override as (part of) its birth -- carry that
+mapping over so the "Oh" still shows. Not hard, just easy to forget.
+** DONE Atom-name reuse
+=contains=, =subscribes=, =overrides=, =hides= double as schema relation
+names; =in=/=out=/=ancestors=/=birth= are new. They live only inside
+=(rels ...)= (parser discards it; client renderer consumes it), so no
+real collision -- but confirm nothing else in the lens/parser trips on
+them at that nesting.
+** DONE Q5 -- Emacs and nvim: identical for now?
+The architecture ENABLES divergent clients (your reason #2). Do you want
+Emacs and nvim to render rels identically at first (port the same logic),
+with divergence available later -- or is making them differ part of this
+task? I assume identical-for-now unless you say otherwise.
+*** DONE yes, identical

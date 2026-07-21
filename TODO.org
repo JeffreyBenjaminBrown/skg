@@ -1,3 +1,7 @@
+* DONE TODO/heralds-semantic-wire.org
+* ONGOING make the rest of the wire semantic
+(This is not part of the plan at TODO/heralds-semantic-wire.org but needs doing.)
+Currently the server still computes display information like 'it subscribes to these'.
 * for video
 ** TODO/command-name-echo.org
 a config option, for recording videos
