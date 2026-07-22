@@ -9,8 +9,13 @@
 (require 'skg-length-prefix)
 (require 'skg-metadata)
 
-(defun skg-set-relationship-source ()
+(defun skg-set-relationship-source (&optional recursive)
   "Set the privacy level of the relationship edge at point.
+
+With a prefix argument RECURSIVE, instead run
+`skg-set-relationship-source-recursive', which prompts for a
+relationship kind and a level and applies the level throughout the
+subtree at point.
 
 The headline at point represents one edge: `contains' for a content
 child, the col's relation for a writable PartnerCol member. This
@@ -37,7 +42,15 @@ this only modifies the buffer; it does NOT save. Call
 `skg-request-save-buffer' afterward. The server re-validates at
 save time, so a stale or hand-typed level more public than the
 edge's default is still rejected there."
-  (interactive)
+  (interactive "P")
+  (if recursive
+      (skg-set-relationship-source-recursive)
+    (skg--set-relationship-source-at-point)))
+
+(defun skg--set-relationship-source-at-point ()
+  "The single-edge path of `skg-set-relationship-source': classify
+the edge at point, ask the server for its (default, current) levels,
+and prompt from the reply."
   (let ((edge (skg--relationship-edge-at-point))
         (buffer (current-buffer))
         (marker (point-marker)))

@@ -1,0 +1,58 @@
+* shortcut to show/hide body
+Let's call this skg-org-body-toggle.
+It should just check whether the body is visible,
+and then delegate to outline-show-entry and outline-hide-entry.
+It should work both from a headline or the headline's body.
+If point was on the body when it was called,
+point should move to the start of the headline.
+* Retain in magit the map from node ID to node title.
+Rather than (I guess) asking for and interpreting a new amp
+after every staging event -- a friction that has been quite noticeable.
+* fix the stage-moves generated script
+** I'm not sure the fixed example below is perfect.
+** motivation, and what's new in the fixed example below
+ORIGIN, cd behavior, capitalization of all variables
+Before it hardcoded .., but now the folders could be at unpredictable levels.
+** fixed (as in repaired) example
+moves=(
+  "10ca3334-5c56-41c4-849d-686d7d8d4068 owned/personal-proc owned/personal-ish"
+  "14720624-d4b5-4bf0-a465-5d8e0d743813 owned/personal-proc owned/personal-ish"
+  "1cc3ce06-b992-452c-aac0-0c31d5eaeafc owned/personal-proc owned/personal-ish"
+  "2b493dfa-5001-4580-b3c4-8ed937598336 owned/personal-proc owned/personal-ish"
+  "30ce1828-e4a7-4b44-81b4-3407bdc35206 owned/personal-proc owned/personal-ish"
+  "3d445e10-2dda-46f7-8fcc-a3ecda3301a1 owned/personal-proc owned/personal-ish"
+  "4257332c-38fa-4fcc-8c18-921a972e4d6c owned/personal-proc owned/personal-ish"
+  "49d815a9-b8d1-4e7b-9ea4-54b53767e722 owned/personal-proc owned/personal-ish"
+  "54f37ff4-f458-46c6-87f2-99ae1141f9c4 owned/personal-proc owned/personal-ish"
+  "59e68bd3-3e57-44f4-b964-cae978fc5dd7 owned/personal-proc owned/personal-ish"
+  "64b8af5f-57b3-4e70-8ad9-b5823b2b2c5c owned/personal-proc owned/personal-ish"
+  "6cbed966-842c-4181-8a70-dfee99bb33ec owned/personal-proc owned/personal-ish"
+  "7a506226-1280-4759-800b-8c4796dd088b owned/personal-proc owned/personal-ish"
+  "870fb3cb-20af-44b5-8332-436a5165e653 owned/personal-proc owned/personal-ish"
+  "a52d6c9f-1639-4ba3-894a-c1c472e993c1 owned/personal-proc owned/personal-ish"
+  "a54c3405-e157-43c8-a07a-037653e9ae71 owned/personal-proc owned/personal-ish"
+  "a76f36dd-4432-4e42-a67c-53eeb7741349 owned/personal-proc owned/personal-ish"
+  "aefa212d-5948-4817-a2a2-4d73d0d64f8e owned/personal-proc owned/personal-ish"
+  "b466de2b-f126-459b-bb3d-7b2860ce7062 owned/personal-proc owned/personal-ish"
+  "ca30f0f3-706a-4c66-8be4-7c22dcf1114e owned/personal-proc owned/personal-ish"
+  "d6b4ef1d-fb20-48d1-b5c4-2f067c378929 owned/personal-proc owned/personal-ish"
+  "fbf3fa04-e25d-4b41-9578-1ae30ed56c94 owned/personal-proc owned/personal-ish"
+)
+
+ORIGIN=$(pwd)
+for move in "${moves[@]}"; do
+  read -r ID OLD NEW <<< "$move"
+  echo "---- moving $ID : $OLD -> $NEW"
+  cd "$ORIGIN/$OLD" || { echo "  SKIP: cannot enter $OLD"; continue; }
+  if [ -e "$ID.skg" ]; then
+    echo "  SKIP: $ID.skg is still present in $OLD; leaving it alone"
+    cd $ORIGIN
+    continue
+  fi
+  echo "  removing $ID from $OLD"
+  git rm "$ID.skg"
+  echo "  adding $ID to $NEW"
+  cd "$ORIGIN/$NEW"
+  git add "$ID.skg"
+done
+cd "$ORIGIN/$NEW"

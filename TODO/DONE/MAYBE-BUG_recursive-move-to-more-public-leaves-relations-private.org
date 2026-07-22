@@ -1,0 +1,218 @@
+#+title: MAYBE-BUG: recursive move to a more public source leaves relationships private
+#+date: 2026-07-22
+
+* Summary
+
+On 2026-07-22 at 18:20:55 you moved 'ba64989e-1ed7-4d3f-972e-b3c7835fbfbd'
+("skg app walkthrough") and its recursive content -- 32 nodes -- from
+'owned/personal-proc' (pers-p) to 'owned/personal-ish' (pers-i, more
+public) via recursive set-source (C-u C-c s s) and one save. The
+HOMES moved; the RELATIONSHIPS did not. Every one of the subtree's 31
+'contains' edges is still recorded at level pers-p, so under any
+source-set that excludes pers-p the subtree renders childless, and
+sharing personal-ish alone would share the notes but not their tree
+structure.
+
+Verdict, in three parts:
+
+- The headline effect is BY DESIGN, not a bug: the sticky rule
+  deliberately never lowers an edge's privacy without an explicit
+  gesture. What was missing was a wholesale explicit gesture. That
+  gesture now exists: 'skg-set-relationship-source-recursive'
+  (C-c s R, or C-u C-c s r). See "How to repair" below -- one
+  invocation plus one save heals everything.
+- One REAL bug compounded it: the save silently skipped moving two of
+  the 32 nodes ('295cae73', 'eb73db7a'), because (evidently) their
+  instances in the saved buffer were indefinitive, and an
+  indefinitive instance's source edit is silently dropped. Reported
+  in 'TODO/problems.org' ("skg-set-source silently no-ops on
+  indefinitive instances").
+- The confusing aftermath (five nodes now titled in BOTH sources) was
+  produced by later repair attempts, most likely magit discards of
+  the leftover pers-p section files. Harmless to the fold (the more
+  public title wins, with a 'NonHomeTitle' warning), and the same
+  repair below cleans it up.
+
+* What the move actually did on disk
+
+Privacy order (data/skgconfig.toml, most public first): Cheese,
+public, pers-i, decid, pers-p, pers-deprecated, pers-m. So pers-p ->
+pers-i is a PUBLICIZING move.
+
+The save at 18:20:55 processed each moved node as a SourceMove (home
+pers-p -> pers-i) plus a rewrite of its telescope sections:
+
+- Its title (and body) moved into a new pers-i section -- the new home.
+- Each of its 'contains' edges kept its DISK level, pers-p (the
+  sticky rule), so the edge stayed in the pers-p section.
+- A LEAF's pers-p section thereby emptied, and an owned section
+  emptied by a save is deleted: 22 files cleanly left personal-proc.
+- A CONTAINER's pers-p section did not empty -- it kept the contains
+  list -- so personal-proc retained a TITLELESS section file holding
+  the node's children. E.g. the root itself:
+
+  personal-ish/ba64989e....skg        personal-proc/ba64989e....skg
+    title: skg app walkthrough          pid: ba64989e-...
+    pid: ba64989e-...                   contains:
+                                        - 295cae73-...
+                                        - e8105ee7-...
+                                        - 7ceb81ba-...
+                                        - 855f8426-...
+
+This is exactly the "titleless section = re-leveling residue" shape
+that 'stage moves' refuses to auto-stage (mixed move), which is why
+the 22 leaves were staged for you but the containers were only
+reported.
+
+* Why: the sticky rule, and its deliberate asymmetry
+
+'apply_sticky_levels' ('server/from_text/supplement_from_disk.rs')
+resolves every edge's privacy level at save:
+
+- EXPLICIT: a '(relSource NAME)' atom wins, floored at the edge's
+  default (the more private of the two endpoints' homes).
+- STICKY: absent an atom, an edge already on disk KEEPS its disk
+  level. "Renormalization never lowers an edge's privacy silently;
+  removing the atom means 'no opinion', not 'reset to default'."
+- DEFAULT: only a NEW edge gets the default.
+
+The clamp in 'sticky_level_for' is intentionally one-directional:
+when a home moves MORE PRIVATE, its edges rise with it (a section
+may never be more public than its home); but, quoting the comment,
+"the converse move leaves old, more-private levels in place:
+publicizing memberships takes the explicit gesture."
+
+After your move, every in-subtree edge's DEFAULT became pers-i (both
+endpoints' homes are now pers-i), but sticky kept the recorded level
+at pers-p. Nothing was wrong by the rule's lights; the rule simply
+had no wholesale way to say "and publicize the edges too."
+
+Note that 'skg-migrate-to-telescopes' cannot fix this: it only
+RAISES edges to at least their default. These edges sit ABOVE their
+default; lowering takes the explicit '(relSource ...)' path.
+
+* The second problem: two nodes silently did not move
+
+The 18:20:55 save wrote 30 pers-i home sections, not 32. Skipped:
+'295cae73' ("TODO tools to have in place first") and its child
+'eb73db7a' ("TODO org-mode : fold body and not children") -- an
+org-parent/child pair in the middle of the subtree, whose own
+descendants DID move. The recursive source-changer edits the
+'(source ...)' metadata of every affected descendent, indefinitive
+or not; but save-side emission happens only for definitive
+instances ('visit_active_vognode' in
+'server/from_text/local_instruction_collection/traverse.rs'), so an
+indefinitive instance's source edit is dropped with no warning. The
+most plausible cause of their indefinitiveness: another open view
+held their definitive instances (a view of '846207ef' was opened at
+18:20:17, just before the big view at 18:20:31).
+
+You then mopped these up by hand: '295cae73' moved via its own view
+at 18:34:56, 'eb73db7a' at 18:55:34. Both homes are now correctly in
+pers-i. The silent skip is the real defect here; it is now an entry
+in 'TODO/problems.org'.
+
+* The third problem: five nodes titled in both sources
+
+Current worktree state, personal-proc:
+
+- Titleless contains-holding sections (the expected sticky residue):
+  'ba64989e' (4 members), 'b2219a94' (3), 'c6f5d981' (1),
+  'e8105ee7' (3), 'eb73db7a' (1).
+- Full HEAD-identical files, title AND contains, alongside a pers-i
+  home: '295cae73' (1), '40259660' (4), '4f507c40' (1),
+  '7ceb81ba' (6), '855f8426' (7).
+
+The second group's files were restored to byte-exact HEAD content at
+18:35:14-18:36:02, a window containing NO server requests but
+several magit-originated bypass jumps -- so almost certainly magit
+discards (git checkout) of what looked like junk titleless files.
+(Please correct me if you remember doing something else.) Restoring
+them re-titled sections whose homes had already moved to pers-i,
+producing the "titled section below the home" junk shape. The fold
+tolerates it: the most public title wins as home and the pers-p
+title raises a 'NonHomeTitle' FoldWarning
+('server/telescope/fold.rs'). The repair below removes it, because
+saving a node rewrites its whole telescope and a title is only ever
+written to the home section.
+
+Your manual C-c s r attempts at 18:37-18:38 (four 'edge level info'
+requests: ba64989e->295cae73, 295cae73->eb73db7a,
+eb73db7a->54f37ff4 twice) left no trace on disk -- all 31 edges are
+still at pers-p. That per-edge tedium is what the new recursive
+gesture replaces.
+
+* How to repair the data now
+
+All 31 stuck edges have both endpoints homed in pers-i (verified:
+every member listed in a pers-p section has a titled pers-i
+section), so the save will accept pers-i for every one of them.
+
+1. Reload the client ('skg-reload') so the new command exists, and
+   make sure the active source-set is 'all' (the pers-p edges must
+   be visible to be edited).
+2. Open 'ba64989e' as a single-root content view.
+3. On the root headline: C-c s R (or C-u C-c s r). Pick 'contained'
+   (under 'contains') in the org-menu, then level 'pers-i'.
+   Expect "Relationship source set to 'pers-i' on 31 'contained'
+   edges." -- fewer means some branch was drawn indefinitively;
+   widen/definitivize and rerun (the command is idempotent).
+4. Save. For every edge, the explicit level pers-i equals its
+   default, so 'apply_sticky_levels' accepts it and the unfold moves
+   the edge into each node's pers-i section. Every pers-p section
+   thereby empties and is deleted -- including the five junk titled
+   ones, since a title is only written to the home.
+5. In git: personal-proc should now show all 32 files gone (the 10
+   remaining worktree files deleted); personal-ish should show the
+   10 untracked files' contains lists filled in. Run 'stage moves'
+   again or stage by hand, and commit both repos.
+
+The usual caveat: personal-proc's git HISTORY keeps everything it
+ever held; that repo is yours, so presumably fine.
+
+* Should the software change? (options -- now largely implemented)
+
+The new recursive gesture is the manual fix. Beyond it, as decided
+2026-07-22, 'skg-set-source' (single and recursive) now:
+
+- ANALYZES the requested move first: it computes which affected
+  content edges the move would leave stuck at a level more private
+  than their new default (edges already carrying an explicit
+  '(relSource ...)' atom count as deliberately leveled and are
+  excluded). If nothing would be left behind, the user is not
+  bothered.
+- OFFERS to fix it in one go: writing the same '(relSource ...)'
+  atoms C-c s R would, at each edge's new default. Declining leaves
+  the edges alone and the summary message mentions that C-c s R can
+  publicize them later.
+- WARNS LOUDLY about indefinitive instances: they are no longer
+  edited at all (the save would silently drop the edit); their IDs
+  go to *Messages* and the summary carries "WARNING: N indefinitive
+  nodes NOT changed ... see *Messages* for the ID list."
+
+Not implemented (deliberately): server-side auto-lowering on
+publicizing moves -- it would erase the distinction between "edge at
+old default" and "edge deliberately held private that happened to
+equal the old home", weakening the never-lower-silently principle.
+
+Still open, in 'TODO/problems.org': the server-side warning for a
+source edit that reaches the save on an indefinitive instance by
+some path other than skg-set-source.
+
+* Pointers
+
+- Sticky rule: 'apply_sticky_levels',
+  'server/from_text/supplement_from_disk.rs'; glossary.md "sticky
+  rule"; TODO/DONE/privacy-telescope/BUG-and-fix_make-edge-more-public.org.
+- The new gesture: 'skg-set-relationship-source-recursive' and
+  'skg--set-relationship-source-recursive-walk' in
+  'elisp/skg-metadata.el'; entry + C-u dispatch in
+  'elisp/skg-request-edge-level-info.el'; keybinding C-c s R;
+  docs in docs/COMMANDS.org; tests in
+  'tests/elisp/test-skg-set-relationship-source.el'.
+- Evidence for the timeline: 'data/logs/server.jsonl' (requests),
+  file mtimes in 'data/owned/personal-{proc,ish}/', and both repos'
+  git status. Key timestamps: 18:20:55 the big save (30 homes);
+  18:21-18:29 stage-moves runs; 18:34:56 '295cae73' moved solo;
+  18:35:14-18:36:02 the out-of-band pers-p restores; 18:37-18:38
+  the manual edge-level-info attempts; 18:55:34 'eb73db7a' moved.

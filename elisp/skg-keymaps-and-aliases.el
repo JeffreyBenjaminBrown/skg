@@ -140,6 +140,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s i") #'skg-set-indefinitive)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
     (define-key map (kbd "C-c s r") #'skg-set-relationship-source)
+    (define-key map (kbd "C-c s R") #'skg-set-relationship-source-recursive)
     (define-key map (kbd "C-c s s") #'skg-set-source)
     (define-key map (kbd "C-c s S") #'skg-set-source-recursive))
   (progn;; graph modifications

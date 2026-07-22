@@ -305,4 +305,417 @@ choices, so the prompt pre-fills with the default instead."
        (should-not (string-match-p "relSource"
                                    (test--buffer-line 2)))))))
 
+;; --- The recursive walk: skg--set-relationship-source-recursive-walk ---
+
+(defvar test--recursive-content-tree
+  (concat
+   "* (skg (node (id r) (source public))) r\n"
+   "** (skg (node (id a) (source public))) a\n"
+   "*** (skg (node (id b) (source public))) b\n"
+   "** (skg (node (id c) (source public) (parentIs independent))) c\n"
+   "*** (skg (node (id d) (source public))) d\n"
+   "** (skg (node (id e) (source public) indef)) e\n"
+   "*** (skg (node (id f) (source public))) f\n"
+   "** (skg subscribeeCol)\n"
+   "*** (skg (node (id g) (source public))) g\n"
+   "**** (skg (node (id h) (source public))) h\n"
+   "** (skg aliasCol) aliases\n")
+  "A view-root tree exercising the walk's qualification and pruning:
+affected content (a, b), an independent branch (c, d), an
+indefinitive-but-affected member (e) over content (f), a
+subscribeeCol member (g) over subscribee-as-such content (h), and an
+aliasCol.")
+
+(defun test--line-of-id (id)
+  "Return the text of the buffer line whose metadata carries ID."
+  (save-excursion
+    (goto-char (point-min))
+    (search-forward (format "(id %s)" id))
+    (buffer-substring-no-properties
+     (line-beginning-position) (line-end-position))))
+
+(ert-deftest test-recursive-walk-contained ()
+  "Kind `contained' hits affected content children of definitive
+activeNode parents only: the root's own (absent) edge is skipped, the
+independent branch and everything below the indefinitive node and the
+subscribee-as-such member are pruned, and col members are untouched."
+  (test--with-skg-content-view
+   test--recursive-content-tree
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (let ((count (skg--set-relationship-source-recursive-walk
+                   'contained "trusted")))
+       (should (= count 3)) ;; a, b, e
+       (dolist (id '("a" "b" "e"))
+         (should (string-match-p "(relSource trusted)"
+                                 (test--line-of-id id))))
+       (dolist (id '("r" "c" "d" "f" "g" "h"))
+         (should-not (string-match-p "relSource"
+                                     (test--line-of-id id))))))))
+
+(ert-deftest test-recursive-walk-subscribee ()
+  "Kind `subscribee' hits only subscribeeCol members, leaving content
+children and subscribee-as-such content untouched."
+  (test--with-skg-content-view
+   test--recursive-content-tree
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (let ((count (skg--set-relationship-source-recursive-walk
+                   'subscribee "private")))
+       (should (= count 1)) ;; g
+       (should (string-match-p "(relSource private)"
+                               (test--line-of-id "g")))
+       (dolist (id '("r" "a" "b" "c" "d" "e" "f" "h"))
+         (should-not (string-match-p "relSource"
+                                     (test--line-of-id id))))))))
+
+(ert-deftest test-recursive-walk-root-edge-inclusive ()
+  "Starting the walk below the view root includes the start node's
+own edge to its view-parent."
+  (test--with-skg-content-view
+   test--recursive-content-tree
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id a)")
+     (beginning-of-line)
+     (let ((count (skg--set-relationship-source-recursive-walk
+                   'contained "trusted")))
+       (should (= count 2)) ;; a and b
+       (should (string-match-p "(relSource trusted)"
+                               (test--line-of-id "a")))
+       (should (string-match-p "(relSource trusted)"
+                               (test--line-of-id "b")))))))
+
+(ert-deftest test-recursive-walk-overridden-and-member-content ()
+  "An overriddenCol member matches kind `overridden'; the member's
+own content children (the member being definitive) match kind
+`contained' through the col."
+  (let ((tree (concat
+               "* (skg (node (id anchor) (source public))) anchor\n"
+               "** (skg overriddenCol)\n"
+               "*** (skg (node (id o) (source public))) o\n"
+               "**** (skg (node (id oc) (source public))) oc\n")))
+    (test--with-skg-content-view
+     tree test--config-public-private-trusted
+     (lambda ()
+       (goto-char (point-min))
+       (should (= 1 (skg--set-relationship-source-recursive-walk
+                     'overridden "private")))
+       (should (string-match-p "(relSource private)"
+                               (test--line-of-id "o")))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id "oc")))))
+    (test--with-skg-content-view
+     tree test--config-public-private-trusted
+     (lambda ()
+       (goto-char (point-min))
+       (should (= 1 (skg--set-relationship-source-recursive-walk
+                     'contained "private")))
+       (should (string-match-p "(relSource private)"
+                               (test--line-of-id "oc")))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id "o")))))))
+
+(ert-deftest test-recursive-walk-prunes-readonly-col ()
+  "A read-only col's whole branch is pruned: even a definitive
+member's content children are not reached."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id owner) (source public))) owner\n"
+    "** (skg subscriberCol)\n"
+    "*** (skg (node (id s) (source public))) s\n"
+    "**** (skg (node (id sc) (source public))) sc\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (should (= 0 (skg--set-relationship-source-recursive-walk
+                   'contained "trusted")))
+     (dolist (id '("s" "sc"))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id id)))))))
+
+(ert-deftest test-recursive-walk-indefinitive-col-anchor ()
+  "A writable col under an INDEFINITIVE anchor is not collected at
+save, so its members do not match -- whether the walk starts at the
+anchor (pruned below the indefinitive node) or at the col itself
+(refused by the anchor-definitiveness check)."
+  (let ((tree (concat
+               "* (skg (node (id anchor) (source public) indef)) anchor\n"
+               "** (skg subscribeeCol)\n"
+               "*** (skg (node (id g) (source public))) g\n")))
+    (test--with-skg-content-view
+     tree test--config-public-private-trusted
+     (lambda ()
+       (goto-char (point-min))
+       (should (= 0 (skg--set-relationship-source-recursive-walk
+                     'subscribee "trusted")))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id "g")))))
+    (test--with-skg-content-view
+     tree test--config-public-private-trusted
+     (lambda ()
+       (goto-char (point-min))
+       (search-forward "subscribeeCol")
+       (beginning-of-line)
+       (should (= 0 (skg--set-relationship-source-recursive-walk
+                     'subscribee "trusted")))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id "g")))))))
+
+(ert-deftest test-recursive-walk-removes-overrides ()
+  "The no-override choice removes existing (relSource ...) atoms
+throughout the subtree."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (source public))) r\n"
+    "** (skg (node (id a) (source public) (viewStats (relSource trusted)))) a\n"
+    "*** (skg (node (id b) (source public) (viewStats (relSource private)))) b\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (should (= 2 (skg--set-relationship-source-recursive-walk
+                   'contained skg--relationship-source-no-override)))
+     (dolist (id '("a" "b"))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id id)))))))
+
+;; --- The kind menu: skg--select-relationship-kind ---
+
+(ert-deftest test-relationship-kind-menu-settable-roles ()
+  "The menu tree offers exactly the three writable kinds, one per
+writable position, and covers all five schema relations."
+  (should (equal (mapcar #'car skg--relationship-kind-menu-tree)
+                 '("contains" "textlinks_to" "subscribes"
+                   "hides_from_its_subscriptions" "overrides_view_of")))
+  (should (equal (delq nil
+                       (mapcar (lambda (role) (nth 1 role))
+                               (apply #'append
+                                      (mapcar #'cdr
+                                              skg--relationship-kind-menu-tree))))
+                 '(contained subscribee overridden))))
+
+(defun test--choose-menu-role (role-line)
+  "In the relationship-kind menu buffer, move to ROLE-LINE and choose it."
+  (with-current-buffer "*skg-relationship-kinds*"
+    (goto-char (point-min))
+    (search-forward role-line)
+    (beginning-of-line)
+    (skg--relationship-kind-menu-choose)))
+
+(ert-deftest test-relationship-kind-menu-choose ()
+  "RET on a settable role calls the continuation with its kind; RET
+on a read-only role refuses; RET on a relation (level-1) headline
+does neither."
+  (unwind-protect
+      (progn
+        (let (chosen)
+          (cl-letf (((symbol-function 'pop-to-buffer)
+                     (lambda (buffer &rest _) (set-buffer buffer))))
+            (skg--select-relationship-kind
+             (lambda (kind) (setq chosen kind))))
+          (with-current-buffer "*skg-relationship-kinds*"
+            (goto-char (point-min))
+            (search-forward "* subscribes")
+            (beginning-of-line)
+            (skg--relationship-kind-menu-choose) ;; level-1: a no-op
+            (should-not chosen)
+            (should-error (test--choose-menu-role "** subscriber")
+                          :type 'user-error))
+          (test--choose-menu-role "** contained")
+          (should (eq chosen 'contained))
+          ;; Choosing killed the menu buffer.
+          (should-not (get-buffer "*skg-relationship-kinds*"))))
+    (when (get-buffer "*skg-relationship-kinds*")
+      (kill-buffer "*skg-relationship-kinds*"))))
+
+(ert-deftest test-set-relationship-source-recursive-end-to-end ()
+  "The full command: menu choice, level prompt, walk. Point and
+window plumbing are stubbed as in the other handler tests."
+  (test--with-skg-content-view
+   test--recursive-content-tree
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (let ((view-buffer (current-buffer)))
+       (unwind-protect
+           (progn
+             (cl-letf (((symbol-function 'pop-to-buffer)
+                        (lambda (buffer &rest _) (set-buffer buffer)))
+                       ((symbol-function 'completing-read)
+                        (lambda (&rest _) "trusted")))
+               (skg-set-relationship-source-recursive)
+               (test--choose-menu-role "** contained"))
+             (with-current-buffer view-buffer
+               (dolist (id '("a" "b" "e"))
+                 (should (string-match-p "(relSource trusted)"
+                                         (test--line-of-id id))))
+               (should-not (string-match-p "relSource"
+                                           (test--line-of-id "g")))))
+         (when (get-buffer "*skg-relationship-kinds*")
+           (kill-buffer "*skg-relationship-kinds*")))))))
+
+;; --- set-source stuck-edge offer and indefinitive warning ---
+;; (Here rather than in test-skg-metadata.el because these need the
+;; config harness: the stuck-edge analysis reads the privacy ladder.
+;; In test--config-public-private-trusted the order is public,
+;; private, trusted -- so private -> public publicizes.)
+
+(defun test--messages-during (fn)
+  "Run FN with `message' captured; return (RESULT . MESSAGES)."
+  (let (messages)
+    (cl-letf (((symbol-function 'message)
+               (lambda (fmt &rest args)
+                 (when fmt
+                   (push (apply #'format fmt args) messages))
+                 nil)))
+      (cons (funcall fn) (nreverse messages)))))
+
+(ert-deftest test-set-source-recursive-offers-stuck-edge-fix ()
+  "A publicizing recursive move detects the content edges it would
+leave behind, and on acceptance writes (relSource NEW) atoms on them."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (source private))) r\n"
+    "** (skg (node (id a) (source private))) a\n"
+    "*** (skg (node (id b) (source private))) b\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (let (offer-prompt)
+       (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                  (lambda (_current) "public"))
+                 ((symbol-function 'y-or-n-p)
+                  (lambda (prompt) (setq offer-prompt prompt) t)))
+         (let ((msgs (cdr (test--messages-during
+                           (lambda () (skg-set-source t))))))
+           (should (string-match-p "2 content relationships" offer-prompt))
+           (should (seq-find (lambda (m)
+                               (string-match-p "Also publicized 2" m))
+                             msgs))))
+       (dolist (id '("r" "a" "b"))
+         (should (string-match-p "(source public)"
+                                 (test--line-of-id id))))
+       (dolist (id '("a" "b"))
+         (should (string-match-p "(relSource public)"
+                                 (test--line-of-id id))))
+       (should-not (string-match-p "relSource"
+                                   (test--line-of-id "r")))))))
+
+(ert-deftest test-set-source-recursive-decline-mentions-recursive-relsource ()
+  "Declining the stuck-edge offer leaves the edges alone and points
+at C-c s R."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (source private))) r\n"
+    "** (skg (node (id a) (source private))) a\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                (lambda (_current) "public"))
+               ((symbol-function 'y-or-n-p)
+                (lambda (_prompt) nil)))
+       (let ((msgs (cdr (test--messages-during
+                         (lambda () (skg-set-source t))))))
+         (should (seq-find (lambda (m) (string-match-p "C-c s R" m))
+                           msgs))))
+     (should-not (string-match-p "relSource" (test--line-of-id "a"))))))
+
+(ert-deftest test-set-source-recursive-no-offer-when-privatizing ()
+  "A privatizing move strands nothing (edges rise automatically), so
+no offer is made."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (source public))) r\n"
+    "** (skg (node (id a) (source public))) a\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                (lambda (_current) "trusted"))
+               ((symbol-function 'y-or-n-p)
+                (lambda (_prompt)
+                  (error "Should not offer a stuck-edge fix"))))
+       (test--messages-during (lambda () (skg-set-source t))))
+     (should (string-match-p "(source trusted)" (test--line-of-id "a")))
+     (should-not (string-match-p "relSource" (test--line-of-id "a"))))))
+
+(ert-deftest test-set-source-recursive-warns-about-indefinitive ()
+  "An indefinitive matching instance is NOT edited; its ID goes to
+*Messages* and the summary carries a loud WARNING. Edges touching
+it are not offered (they cannot actually publicize)."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (source private))) r\n"
+    "** (skg (node (id e) (source private) indef)) e\n"
+    "*** (skg (node (id f) (source private))) f\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                (lambda (_current) "public"))
+               ((symbol-function 'y-or-n-p)
+                (lambda (_prompt)
+                  (error "Should not offer: both edges touch the indefinitive node"))))
+       (let ((msgs (cdr (test--messages-during
+                         (lambda () (skg-set-source t))))))
+         (should (seq-find (lambda (m)
+                             (and (string-match-p "NOT changed" m)
+                                  (string-match-p ": e" m)))
+                           msgs))
+         (should (seq-find (lambda (m)
+                             (and (string-match-p "WARNING" m)
+                                  (string-match-p "\\*Messages\\*" m)))
+                           msgs))))
+     (should (string-match-p "(source private)" (test--line-of-id "e")))
+     (dolist (id '("r" "f"))
+       (should (string-match-p "(source public)"
+                               (test--line-of-id id)))))))
+
+(ert-deftest test-set-source-single-offers-direct-child-edges ()
+  "A single (non-recursive) publicizing move offers only the edges it
+actually changes: its direct children's inbound edges whose default
+rises. A child still more private than the new source is left alone."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id r) (source private))) r\n"
+    "** (skg (node (id a) (source public))) a\n"
+    "** (skg (node (id c) (source trusted))) c\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                (lambda (_current) "public"))
+               ((symbol-function 'y-or-n-p)
+                (lambda (prompt)
+                  (should (string-match-p "1 content relationship "
+                                          prompt))
+                  t)))
+       (test--messages-during (lambda () (skg-set-source))))
+     (should (string-match-p "(source public)" (test--line-of-id "r")))
+     ;; a's edge default rose private->public; c's stayed trusted.
+     (should (string-match-p "(relSource public)" (test--line-of-id "a")))
+     (should-not (string-match-p "relSource" (test--line-of-id "c")))
+     (should (string-match-p "(source trusted)" (test--line-of-id "c"))))))
+
+(ert-deftest test-set-source-single-indefinitive-warns-and-skips ()
+  "A single move of an indefinitive instance edits nothing and warns."
+  (test--with-skg-content-view
+   "* (skg (node (id x) (source private) indef)) x\n"
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                (lambda (_current) "public")))
+       (let ((msgs (cdr (test--messages-during
+                         (lambda () (skg-set-source))))))
+         (should (seq-find (lambda (m) (string-match-p "WARNING" m))
+                           msgs))))
+     (should (string-match-p "(source private)" (test--line-of-id "x")))
+     (should-not (string-match-p "(source public)"
+                                 (test--line-of-id "x"))))))
+
 (provide 'test-skg-set-relationship-source)

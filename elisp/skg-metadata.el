@@ -138,6 +138,20 @@ descendent whose source matches the source at point.
 Only descendents for which parentIs=affected are traversed.
 On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
+
+When the move would leave content relationships stuck at their old,
+more private levels (the sticky rule never lowers an edge's privacy
+without an explicit gesture; see
+TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
+offers to publicize them in the same go by writing `(relSource ...)'
+atoms; declining leaves them and mentions that
+`skg-set-relationship-source-recursive' (C-c s R) can publicize them
+later.
+
+Indefinitive instances are NOT changed -- the save would silently
+ignore their source edits -- and produce a loud warning, with the
+full ID list in *Messages*.
+
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if (skg--headline-metadata-empty-p)
@@ -149,16 +163,8 @@ Does NOT save; call `skg-request-save-buffer' afterward."
         (skg--validate-source-name new-source)
         (if (string= current-source new-source)
             (message "Source unchanged: %s" current-source)
-          (let ((changed-count
-                 (if recursive
-                     (skg--change-source-recursive current-source
-                                                  new-source)
-                   (skg--change-source-at-point new-source))))
-            (message "Source changed from %s to %s on %d node%s. Save to apply."
-                     current-source
-                     new-source
-                     changed-count
-                     (if (= changed-count 1) "" "s"))))))))
+          (skg--set-source-and-handle-stuck-edges
+           current-source new-source recursive))))))
 
 (defun skg-set-source-recursive ()
   "Prompt for and recursively change the source of the node at point.
@@ -168,6 +174,169 @@ Only descendents for which parentIs=affected are traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-source t))
+
+(defun skg--set-source-and-handle-stuck-edges (old-source new-source recursive)
+  "The body of `skg-set-source' once a real move is requested:
+analyze which content edges the move would leave stuck at more
+private levels, retarget the sources (skipping indefinitive
+instances), offer to publicize the stuck edges in the same go, and
+report -- loudly, when indefinitive instances were skipped."
+  (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old sources
+          (skg--analyze-move-stuck-edges old-source new-source recursive))
+         (change-result (if recursive
+                            (skg--change-source-recursive old-source
+                                                          new-source)
+                          (skg--change-source-at-point-unless-indefinitive
+                           new-source)))
+         (changed-count (car change-result))
+         (indef-ids (cdr change-result))
+         (fixed-count
+          (when (and stuck
+                     (y-or-n-p
+                      (format "This move would leave %d content relationship%s at their old, more private level%s. Publicize them too? "
+                              (length stuck)
+                              (if (= (length stuck) 1) "" "s")
+                              (if (= (length stuck) 1) "" "s"))))
+            (skg--apply-stuck-edge-levels stuck))))
+    (dolist (id indef-ids)
+      (message "skg-set-source: indefinitive instance NOT changed (the save would ignore it): %s"
+               id))
+    (message "%s"
+             (concat
+              (format "Source changed from %s to %s on %d node%s. Save to apply."
+                      old-source new-source changed-count
+                      (if (= changed-count 1) "" "s"))
+              (cond
+               (fixed-count
+                (format " Also publicized %d relationship%s."
+                        fixed-count (if (= fixed-count 1) "" "s")))
+               (stuck
+                " Relationships kept their old, more private levels; C-c s R can publicize them later."))
+              (when indef-ids
+                (format "  WARNING: %d indefinitive node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
+                        (length indef-ids)
+                        (if (= (length indef-ids) 1) "" "s")))))))
+
+(defun skg--analyze-move-stuck-edges (old-source new-source recursive)
+  "With point on the node a `skg-set-source' move starts from, and
+BEFORE any source is rewritten: return the affected content edges
+the move would leave stuck at a more private level than their new
+default, as a list of (MARKER . LEVEL) -- MARKER at the child
+headline, LEVEL the edge's new default. Only edges without an
+existing `(relSource ...)' atom qualify: an atom-carrying edge was
+already leveled deliberately. The walk's root itself is always
+retargeted (unless indefinitive); its org-parent lies outside the
+move, so its source counts as unchanging. With RECURSIVE nil only
+the point node moves, so only its own edge and its direct
+children's edges are examined."
+  (save-excursion
+    (let* ((stuck '())
+           (start-level (org-outline-level))
+           (consider ;; point on a candidate child C, whose inbound edge is examined; the arguments say whether each endpoint's source is about to be retargeted
+            (lambda (parent-retargets-p child-retargets-p)
+              (when (skg--relationship-kind-matches-p 'contained)
+                (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
+                       (child-source (skg--node-source child-meta))
+                       (child-moves ;; an indefinitive instance is skipped by the retargeting walk, so its source does not actually change
+                        (and child-retargets-p
+                             (not (skg--node-indefinitive-p child-meta))))
+                       (parent-source
+                        (save-excursion
+                          (org-up-heading-safe)
+                          (skg--node-source
+                           (skg--metadata-sexp-at-point-or-nil))))
+                       (eff (lambda (source retargets-p)
+                              (if (and retargets-p
+                                       (equal source old-source))
+                                  new-source
+                                source)))
+                       (level (skg--content-edge-stuck-level
+                               parent-source
+                               (funcall eff parent-source
+                                        parent-retargets-p)
+                               child-source
+                               (funcall eff child-source child-moves))))
+                  (when level
+                    (push (cons (copy-marker (line-beginning-position))
+                                level)
+                          stuck)))))))
+      (funcall consider nil t) ;; the root's own inbound edge
+      (outline-next-heading)
+      (while (and (not (eobp))
+                  (> (org-outline-level) start-level))
+        (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+          (if (not (and (skg--activeNode-sexp-p meta)
+                        (skg--node-parentIs-content-of-p meta)))
+              (skg--goto-next-heading-after-subtree)
+            (if recursive
+                (funcall consider t t)
+              (when (= (org-outline-level) (1+ start-level))
+                ;; Single move: only the point node moves, so only
+                ;; its direct children's inbound edges can change.
+                (funcall consider t nil)))
+            (outline-next-heading))))
+      (nreverse stuck))))
+
+(defun skg--content-edge-stuck-level (parent-eff-old parent-eff-new
+                                      child-eff-old child-eff-new)
+  "The level to which the content edge at point (from its view-parent
+to the headline at point) should be publicized after a source move,
+or nil when the move does not strand it: nil when the edge carries
+an explicit `(relSource ...)' atom (deliberately leveled), when a
+default cannot be computed (a source unknown to the config -- the
+save validates anyway), or when the edge's default does not become
+more public. The four arguments are the endpoints' sources before
+and after the move."
+  (unless (skg--relationship-source-current-value)
+    (let ((old-default (skg--more-private-of-sources
+                        parent-eff-old child-eff-old))
+          (new-default (skg--more-private-of-sources
+                        parent-eff-new child-eff-new)))
+      (when (and old-default new-default
+                 (skg--strictly-more-public-source-p new-default
+                                                     old-default))
+        new-default))))
+
+(defun skg--apply-stuck-edge-levels (stuck)
+  "Write a `(relSource LEVEL)' atom at each (MARKER . LEVEL) in
+STUCK, then free the markers. Returns the number of atoms written."
+  (save-excursion
+    (dolist (entry stuck)
+      (goto-char (car entry))
+      (skg--apply-relationship-source-choice (cdr entry))
+      (set-marker (car entry) nil))
+    (length stuck)))
+
+(defun skg--change-source-at-point-unless-indefinitive (new-source)
+  "Set the source at point to NEW-SOURCE, unless the instance is
+indefinitive -- the save would silently ignore that edit. Returns
+(CHANGED-COUNT . INDEF-IDS), matching `skg--change-source-recursive'."
+  (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+    (if (skg--node-indefinitive-p meta)
+        (cons 0 (list (or (skg--node-id meta) "(no id)")))
+      (cons (skg--change-source-at-point new-source) nil))))
+
+(defun skg--more-private-of-sources (a b)
+  "The more private of sources A and B per the config's privacy
+order (later in the ladder = more private), or nil when either
+names no configured source."
+  (let ((pa (skg--source-privacy-position a))
+        (pb (skg--source-privacy-position b)))
+    (when (and pa pb)
+      (if (> pa pb) a b))))
+
+(defun skg--strictly-more-public-source-p (a b)
+  "Non-nil iff source A is strictly more public than source B per
+the config's privacy order. Nil when either is unknown."
+  (let ((pa (skg--source-privacy-position a))
+        (pb (skg--source-privacy-position b)))
+    (and pa pb (< pa pb))))
+
+(defun skg--source-privacy-position (source)
+  "SOURCE's index in the config's privacy order (0 = most public),
+or nil when SOURCE is nil or names no configured source."
+  (and source
+       (seq-position (skg--source-names) source #'string=)))
 
 (defconst skg--set-relationship-source-readonly-col-atoms
   '(subscriberCol overriderCol hiderCol hiddenCol
@@ -302,6 +471,280 @@ next save will do with the edge."
       (format "Relationship source set to '%s'. Save to apply."
               choice))))
 
+(defconst skg--relationship-kind-menu-tree
+  '(("contains"
+     ("container" nil
+      "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
+     ("contained" contained
+      "The view-parent contains the node: ordinary content. Sets the level of each parent-contains-child edge."))
+    ("textlinks_to"
+     ("source" nil
+      "Textlinks are inferred from body text; they carry no independent privacy level, so there is nothing to set.")
+     ("dest" nil
+      "Textlinks are inferred from body text; they carry no independent privacy level, so there is nothing to set."))
+    ("subscribes"
+     ("subscriber" nil
+      "A subscriberCol member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
+     ("subscribee" subscribee
+      "A member of the view-parent's subscribeeCol. Sets the level of each anchor-subscribes-to-member edge."))
+    ("hides_from_its_subscriptions"
+     ("hider" nil
+      "Hide levels are derived at save, floored at the most public explaining subscription; the hiderCol is read-only.")
+     ("hidden" nil
+      "Hide levels are derived at save, floored at the most public explaining subscription; the hiddenCol is read-only."))
+    ("overrides_view_of"
+     ("overrider" nil
+      "An overriderCol member: the overrides edge belongs to the member (the overrider), not to the view-parent. Read-only from here.")
+     ("overridden" overridden
+      "A member of the view-parent's overriddenCol. Sets the level of each anchor-overrides-view-of-member edge.")))
+  "The relationship-kind menu for
+`skg-set-relationship-source-recursive': one entry per node-node
+relation in schema.tql, each listing its two roles as
+(ROLE-NAME KIND-OR-NIL DESCRIPTION). ROLE-NAME is the role the
+VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
+symbol the walk dispatches on (`contained', `subscribee' or
+`overridden') for the three roles whose edge is writable from the
+child's buffer position, and nil for the rest; DESCRIPTION then
+explains why the edge cannot be set from that position.")
+
+(defvar-local skg--relationship-kind-menu-continuation nil
+  "The continuation `skg--select-relationship-kind' stores in its
+menu buffer, called with the chosen kind symbol.")
+
+(defun skg-set-relationship-source-recursive ()
+  "Set the privacy level of every matching relationship edge in the
+subtree at point.
+
+First presents an org-menu of the schema's five node-node relations
+(level-1 headlines) and their roles (level-2 headlines); pick, with
+RET, the role the view-CHILDREN should play toward their
+view-parents. Only three roles are settable from the child's
+position: `contained' (ordinary content), `subscribee' (a
+subscribeeCol member) and `overridden' (an overriddenCol member);
+RET on any other role explains why it cannot be set from there.
+
+Then prompts for a level over the whole ladder, plus the
+no-override choice that instead REMOVES existing `(relSource ...)'
+atoms. Unlike `skg-set-relationship-source', no per-edge default is
+fetched: the subtree's edges have different defaults, so the save's
+floor check (see `apply_sticky_levels') is what validates each one.
+
+The walk starts at the node at point (inclusive: its own edge to
+its view-parent counts when it matches) and recurses only on
+viewchildren that affect their viewparents: parentIs=affected
+activeNodes and writable cols. It prunes below indefinitive nodes
+and subscribee-as-such members (their org-children's edges are not
+collected at save), and prunes read-only cols and other scaffolds
+entirely.
+
+Like other metadata edits, this only modifies the buffer; it does
+NOT save. Call `skg-request-save-buffer' afterward."
+  (interactive)
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (let ((buffer (current-buffer))
+        (marker (point-marker)))
+    (skg--select-relationship-kind
+     (lambda (kind)
+       (unless (buffer-live-p buffer)
+         (user-error "skg: buffer vanished before the relationship-level prompt"))
+       (with-current-buffer buffer
+         (save-excursion
+           (goto-char marker)
+           (let* ((ladder (skg--source-names))
+                  (choices (append ladder
+                                   (list skg--relationship-source-no-override)))
+                  (choice (skg--completing-read-with-cycle
+                           (format "Level for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
+                                   kind)
+                           choices nil t nil nil nil nil choices))
+                  (count (skg--set-relationship-source-recursive-walk
+                          kind choice)))
+             (message "%s"
+                      (if (equal choice
+                                 skg--relationship-source-no-override)
+                          (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) level, or its default if new. Save to apply."
+                                  count kind (if (= count 1) "" "s"))
+                        (format "Relationship source set to '%s' on %d '%s' edge%s. Save to apply."
+                                choice count kind
+                                (if (= count 1) "" "s")))))))))))
+
+(defun skg--select-relationship-kind (continuation)
+  "Pop up the org-menu over `skg--relationship-kind-menu-tree'.
+RET on a settable role headline buries the menu and calls
+CONTINUATION with the role's kind symbol; RET on a read-only role
+explains the refusal; q aborts."
+  (let ((menu-buffer (get-buffer-create "*skg-relationship-kinds*")))
+    (with-current-buffer menu-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "# What kind of relationships to the view-parent should qualify?\n"
+                "# Each level-2 headline is a role the view-CHILD would play toward\n"
+                "# its view-parent. RET on one picks it; q aborts.\n")
+        (dolist (relation skg--relationship-kind-menu-tree)
+          (insert (format "* %s\n" (car relation)))
+          (dolist (role (cdr relation))
+            (let ((headline-start (point)))
+              (insert (format "** %s%s\n"
+                              (nth 0 role)
+                              (if (nth 1 role) "" " (not settable here)")))
+              (add-text-properties
+               headline-start (point)
+               (list 'skg-relationship-role (nth 0 role)
+                     'skg-relationship-kind (nth 1 role)
+                     'skg-relationship-refusal (nth 2 role))))
+            (insert (format "%s\n" (nth 2 role))))))
+      (org-mode)
+      (setq-local org-adapt-indentation nil)
+      (read-only-mode 1)
+      (use-local-map
+       (let ((map (make-sparse-keymap)))
+         (set-keymap-parent map org-mode-map)
+         (define-key map (kbd "RET")
+                     #'skg--relationship-kind-menu-choose)
+         (define-key map (kbd "q") #'quit-window)
+         map))
+      (setq skg--relationship-kind-menu-continuation continuation)
+      (goto-char (point-min)))
+    (pop-to-buffer menu-buffer)))
+
+(defun skg--relationship-kind-menu-choose ()
+  "Choose the role headline at point in the relationship-kind menu."
+  (interactive)
+  (let* ((pos (line-beginning-position))
+         (role (get-text-property pos 'skg-relationship-role))
+         (kind (get-text-property pos 'skg-relationship-kind))
+         (refusal (get-text-property pos 'skg-relationship-refusal))
+         (continuation skg--relationship-kind-menu-continuation))
+    (cond
+     ((not role)
+      (message "Pick a role: a level-2 headline"))
+     ((not kind)
+      (user-error "Cannot set that kind of edge from the child's position: %s"
+                  refusal))
+     (t
+      (if (get-buffer-window) ;; nil in batch tests, where no window shows the menu
+          (quit-window t)
+        (kill-buffer))
+      (funcall continuation kind)))))
+
+(defun skg--set-relationship-source-recursive-walk (kind choice)
+  "Apply CHOICE (a source name, or
+`skg--relationship-source-no-override') to every headline in the
+subtree at point, the headline at point included, whose relationship
+to its view-parent is of KIND (`contained', `subscribee' or
+`overridden'; see `skg--relationship-kind-matches-p'). Recurses only
+where edits still affect the graph: it prunes below indefinitive
+nodes and subscribee-as-such members, prunes non-affected
+(parentIs=independent) nodes -- except the walk's root, which the
+user chose deliberately -- and prunes scaffolds other than the two
+writable cols. Returns the number of edges affected."
+  (save-excursion
+    (let ((count 0)
+          (start-level (org-outline-level))
+          (root-meta (skg--metadata-sexp-at-point-or-nil)))
+      (when (skg--relationship-kind-matches-p kind)
+        (skg--apply-relationship-source-choice choice)
+        (setq count (1+ count)))
+      (when (or (and (skg--activeNode-sexp-p root-meta)
+                     (not (skg--relSource-prune-below-p root-meta)))
+                (skg--writable-col-sexp-p root-meta))
+        (outline-next-heading)
+        (while (and (not (eobp))
+                    (> (org-outline-level) start-level))
+          (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+            (cond
+             ((skg--activeNode-sexp-p meta)
+              (if (not (skg--node-parentIs-content-of-p meta))
+                  (skg--goto-next-heading-after-subtree)
+                (when (skg--relationship-kind-matches-p kind)
+                  (skg--apply-relationship-source-choice choice)
+                  (setq count (1+ count)))
+                (if (skg--relSource-prune-below-p meta)
+                    (skg--goto-next-heading-after-subtree)
+                  (outline-next-heading))))
+             ((skg--writable-col-sexp-p meta)
+              (outline-next-heading))
+             (t ;; read-only cols, alias/ID cols, phantoms, etc.
+              (skg--goto-next-heading-after-subtree))))))
+      count)))
+
+(defun skg--relationship-kind-matches-p (kind)
+  "Non-nil iff the headline at point is an affected activeNode whose
+relationship to its view-parent is of KIND, writable-and-collected
+from this position: for `contained', the view-parent must be a
+definitive activeNode not in subscribee-as-such position (an
+indefinitive or subscribee-as-such parent's contains is not
+collected at save, so a `(relSource ...)' atom under one would be
+inert); for `subscribee' and `overridden', the view-parent must be
+the matching writable col with a definitive anchor."
+  (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+    (and (skg--activeNode-sexp-p meta)
+         (skg--node-parentIs-content-of-p meta)
+         (save-excursion
+           (and (org-up-heading-safe)
+                (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
+                  (cond
+                   ((skg--activeNode-sexp-p parent-sexp)
+                    (and (eq kind 'contained)
+                         (not (skg--node-indefinitive-p parent-sexp))
+                         (not (skg--subscribee-as-such-at-point-p))))
+                   ((skg--scaffold-atom-present-p parent-sexp
+                                                  'subscribeeCol)
+                    (and (eq kind 'subscribee)
+                         (skg--col-anchor-definitive-p)))
+                   ((skg--scaffold-atom-present-p parent-sexp
+                                                  'overriddenCol)
+                    (and (eq kind 'overridden)
+                         (skg--col-anchor-definitive-p)))
+                   (t nil))))))))
+
+(defun skg--relSource-prune-below-p (metadata-sexp)
+  "Non-nil iff the walk should not descend below the activeNode
+headline at point (with METADATA-SEXP its parsed metadata): an
+indefinitive node's contains is not collected at save, and a
+subscribee-as-such member's org-children are hide/unhide signals,
+not writable edges."
+  (or (skg--node-indefinitive-p metadata-sexp)
+      (skg--subscribee-as-such-at-point-p)))
+
+(defun skg--subscribee-as-such-at-point-p ()
+  "Non-nil iff the headline at point sits in subscribee-as-such
+position: an affected activeNode member of a subscribeeCol."
+  (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+    (and (skg--activeNode-sexp-p meta)
+         (skg--node-parentIs-content-of-p meta)
+         (save-excursion
+           (and (org-up-heading-safe)
+                (skg--scaffold-atom-present-p
+                 (skg--metadata-sexp-at-point-or-nil)
+                 'subscribeeCol))))))
+
+(defun skg--col-anchor-definitive-p ()
+  "Non-nil iff the col headline at point has a definitive activeNode
+anchor (its org-parent). An indefinitive anchor's writable cols are
+not collected at save (the col owner is not save-eligible), so
+atoms on their members would be inert."
+  (save-excursion
+    (and (org-up-heading-safe)
+         (let ((anchor-sexp (skg--metadata-sexp-at-point-or-nil)))
+           (and (skg--activeNode-sexp-p anchor-sexp)
+                (not (skg--node-indefinitive-p anchor-sexp)))))))
+
+(defun skg--scaffold-atom-present-p (metadata-sexp atom)
+  "Non-nil iff METADATA-SEXP is a (skg ...) sexp carrying the bare ATOM."
+  (and (consp metadata-sexp)
+       (memq atom (cdr metadata-sexp))))
+
+(defun skg--writable-col-sexp-p (metadata-sexp)
+  "Non-nil iff METADATA-SEXP is a writable-col scaffold's metadata:
+it carries one of the `skg--writable-col-relations' atoms."
+  (and (consp metadata-sexp)
+       (seq-find (lambda (entry)
+                   (memq (car entry) (cdr metadata-sexp)))
+                 skg--writable-col-relations)
+       t))
+
 (defun skg-set-merge-request (acquiree-id-or-link)
   "Prompt for ACQUIREE-ID-OR-LINK and mark the node at point to merge it.
 The command is run from the acquirer.  The prompt accepts either a
@@ -346,14 +789,28 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 
 (defun skg--change-source-recursive (old-source new-source)
   "Change OLD-SOURCE to NEW-SOURCE in this content subtree.
-Returns the number of changed nodes.  The root node is inclusive;
-only descendents for which parentIs=affected are traversed."
+Returns (CHANGED-COUNT . INDEF-IDS).  The root node is inclusive;
+only descendents for which parentIs=affected are traversed.
+An indefinitive instance is NOT edited -- the save would silently
+ignore its source edit (see TODO/problems.org, \"skg-set-source
+silently no-ops on indefinitive instances\") -- and its ID is
+collected into INDEF-IDS instead, for the caller to warn about.
+Its org-descendents are still traversed: they are self-writers, so
+their source edits take effect even under an indefinitive parent."
   (save-excursion
-    (let ((changed-count 0)
-          (start-level (org-outline-level)))
-      (setq changed-count
-            (+ changed-count
-               (skg--change-source-at-point new-source)))
+    (let* ((changed-count 0)
+           (indef-ids '())
+           (start-level (org-outline-level))
+           (change-or-collect
+            (lambda ()
+              (let ((meta (skg--metadata-sexp-at-point-or-nil)))
+                (if (skg--node-indefinitive-p meta)
+                    (push (or (skg--node-id meta) "(no id)")
+                          indef-ids)
+                  (setq changed-count
+                        (+ changed-count
+                           (skg--change-source-at-point new-source))))))))
+      (funcall change-or-collect) ;; the root
       (outline-next-heading)
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
@@ -362,11 +819,9 @@ only descendents for which parentIs=affected are traversed."
                         (skg--node-parentIs-content-of-p metadata-sexp)))
               (skg--goto-next-heading-after-subtree)
             (when (equal (skg--node-source metadata-sexp) old-source)
-              (setq changed-count
-                    (+ changed-count
-                       (skg--change-source-at-point new-source))))
+              (funcall change-or-collect))
             (outline-next-heading))))
-      changed-count)))
+      (cons changed-count (nreverse indef-ids)))))
 
 (defun skg--goto-next-heading-after-subtree ()
   "Move to the next heading after the current subtree."

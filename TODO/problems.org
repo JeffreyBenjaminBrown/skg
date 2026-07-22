@@ -3,7 +3,45 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* Problems noted while diagnosing the 2026-07-14 power-loss startup failure
+* Problems noted while building recursive set-relationship-source (2026-07-22)
+  Context: the investigation written up in
+  TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.
+** The server silently drops source edits on indefinitive instances
+   The save pipeline emits NOTHING for an indefinitive instance
+   (visit_active_vognode in
+   server/from_text/local_instruction_collection/traverse.rs: emission
+   happens only inside the 'is_definitive' block), so a '(source ...)'
+   differing from disk on an indefinitive headline is dropped with no
+   error and no warning. This is how the 2026-07-22 move of
+   ba64989e's subtree silently skipped exactly two nodes (295cae73
+   and eb73db7a, evidently drawn indefinitively in the saved buffer)
+   while moving their ancestors AND descendants.
+   THE CLIENT SIDE IS FIXED (2026-07-22): 'skg-set-source' no longer
+   edits indefinitive instances at all; it collects their IDs, writes
+   them to *Messages*, and puts a loud WARNING in the summary
+   message. WHAT REMAINS is the server-side gap: a source change that
+   reaches the save on an indefinitive instance by any other path
+   (hand-edited metadata, a stale buffer) is still dropped silently.
+   Suggested fix: the save could warn when a buffer's indefinitive
+   instance carries a source differing from disk, like the "Inactive
+   nodes present..." warning.
+** skg--relationship-edge-at-point misclassifies some positions
+   It classifies "activeNode child of an activeNode parent" as the
+   parent-contains-child edge, without checking:
+   - 'birth': a backpath graft (e.g. '(birth backpath container)')
+     represents the INVERTED relation -- the child contains the
+     parent -- so the command queries and offers to set a
+     nonexistent parent->child contains edge;
+   - 'parentIs': a parked (independent) child is not a member of the
+     parent's collection, so the written '(relSource ...)' atom is
+     inert (extraction only reads the atom off collected members);
+   - the parent's definitiveness: under an indefinitive parent the
+     contains list is not collected, so the atom is inert there too.
+   Inert atoms are harmless to the data but lie to the user: the
+   command reports "Save to apply" and the save applies nothing.
+   (The recursive walker added 2026-07-22,
+   'skg--set-relationship-source-recursive-walk', checks parentIs and
+   parent definitiveness; the single-edge command still does not.)
   Context: Jeff's machine overheated and cut power mid-'cargo build',
   truncating 3 of 501 rlibs in target/. Servers then refused to start,
   permanently and identically, on unchanged code and unchanged data.

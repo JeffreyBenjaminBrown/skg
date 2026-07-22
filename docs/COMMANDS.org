@@ -362,11 +362,27 @@ with that source's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the move.
+
+Two safeguards, shared with the recursive form below:
+
+- If the move would leave content relationships stuck at their old,
+  more private levels (the sticky rule never lowers an edge's
+  privacy without an explicit gesture), the command says so and
+  offers to publicize them in the same go, by writing the same
+  =(relSource ...)= atoms 'skg-set-relationship-source' would.
+  Declining leaves them and notes that =C-c s R= can publicize them
+  later. Edges already carrying an explicit =(relSource ...)= atom
+  are considered deliberately leveled and are never touched.
+- An indefinitive instance is NOT changed -- the save would
+  silently ignore its source edit -- and produces a loud WARNING,
+  with the full ID list written to =*Messages*=.
 *** C-c s S : skg-set-source-recursive
 Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Only descendents for which ParentIs=Affected are traversed.
+The stuck-relationship offer and the indefinitive warning described
+under =C-c s s= apply here too, across the whole subtree.
 *** C-c s m : skg-set-merge-request
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
 and what it means to do that.)
@@ -419,6 +435,50 @@ headline, which represents no edge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the change.
+
+With a prefix argument (=C-u C-c s r=) it instead runs
+'skg-set-relationship-source-recursive', described next.
+*** C-c s R : skg-set-relationship-source-recursive
+Like 'skg-set-relationship-source', but applied throughout the
+subtree at point (the node at point's own edge to its view-parent
+included). Also reachable as =C-u C-c s r=.
+
+It first presents an org-menu asking what kind of relationships to
+the view-parent should qualify: the schema's five node-node
+relations are the level-1 headlines, and each level-2 headline is a
+role the view-CHILD would play in that relation toward its
+view-parent. Only three roles are settable from the child's
+position -- =contained= (ordinary content), =subscribee= (a
+subscribeeCol member) and =overridden= (an overriddenCol member);
+RET on any other role explains why its edge cannot be set from
+there (read-only cols belong to the other end; textlinks carry no
+independent level; hide levels are derived at save). RET picks a
+role; q aborts.
+
+It then prompts for a level over the whole ladder, plus the
+no-override choice, which instead REMOVES existing =(relSource ...)=
+atoms throughout the subtree. Unlike the single-edge command, no
+per-edge default is fetched -- the subtree's edges have different
+defaults -- so every source is offered and the save's floor check
+validates each edge (an offered level more public than some edge's
+default makes the save fail, naming that edge).
+
+The walk applies to, and recurses on, only viewchildren that affect
+their viewparents: parentIs=affected activeNodes, through the two
+writable cols. It prunes below indefinitive nodes and
+subscribee-as-such members (their org-children's edges are not
+collected at save), and prunes read-only cols and other scaffolds
+entirely.
+
+This is the gesture for republicizing a subtree's relationship
+edges after 'skg-set-source-recursive' moved its nodes to a more
+public source: the sticky rule keeps each edge at its old, more
+private level, so the contains edges stay behind until explicitly
+lowered to the new default (see
+=MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org=).
+
+The command only edits metadata in the current buffer.
+Save the view afterward to apply the changes.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
