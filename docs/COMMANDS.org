@@ -536,7 +536,7 @@ whose title is an =[[id:...][...]]= link to the original node.
 
 If the original headline title already contains a link, the
 command asks "Are you sure?" before proceeding.
-** C-c v : view-level commands
+** C-c v : view changes, local (to a specific node)
 *** C-c v b : skg-org-body-toggle
 Toggles the visibility of the body of the headline at point:
 checks whether the body is visible, then delegates to
@@ -544,6 +544,22 @@ checks whether the body is visible, then delegates to
 headline or from inside its body; called from the body, point
 moves to the start of the headline. A bodyless headline is left
 alone.
+*** C-c v m : skg-view-metadata
+When called from a node in a view of the graph,
+this switches to a view of the metadata of that node,
+with one item per line.
+It's easy to edit this way.
+Note that some properties don't make sense to edit,
+like the count of how many contents it has.
+(If you want to change how much content a node has,
+don't change the node's metadata; change its children in the view.)
+*** C-c v o : skg-view-org-ancestry
+If you're at a headline so deep in the tree
+that you can't remember where it came from,
+this brings you to a new view showing only that ancestry.
+This actually works in org-mode outside of skg.
+(skg uses org-mode, but org-mode can be used without skg.)
+** C-c v : view changes, global
 *** C-c v d : skg-view-diff-mode
 If you use git to manage your data,
 enable this view to see what you've changed since your last commit,
@@ -572,21 +588,6 @@ shift-right cycling walk the ladder in privacy order. The command
 then re-renders open Skg buffers after confirmation, and tells the
 server to use that source-set for subsequent requests. Choose =all=
 (the whole ladder) to remove the limit.
-*** C-c v m : skg-view-metadata
-When called from a node in a view of the graph,
-this switches to a view of the metadata of that node,
-with one item per line.
-It's easy to edit this way.
-Note that some properties don't make sense to edit,
-like the count of how many contents it has.
-(If you want to change how much content a node has,
-don't change the node's metadata; change its children in the view.)
-*** C-c v o : skg-view-org-ancestry
-If you're at a headline so deep in the tree
-that you can't remember where it came from,
-this brings you to a new view showing only that ancestry.
-This actually works in org-mode outside of skg.
-(skg uses org-mode, but org-mode can be used without skg.)
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.
@@ -600,10 +601,13 @@ to find titles for deleted files.)
 The ID-to-title map is cached for the whole Emacs session, so a
 magit refresh (e.g. after every staging event) re-requests nothing
 it has already seen; a refresh whose IDs are all cached costs no
-server round-trip at all. The cache can go stale -- a node
-retitled, or the source-set widened (IDs inactive under the old
-set were cached as unresolvable) -- in which case
-M-x skg-readable-ids-refresh-titles empties it and re-annotates.
+server round-trip at all. See =C-c v R= for when it goes stale.
+*** C-c v R : skg-readable-ids-refresh
+Empties the session's ID-to-title cache (see =C-c v r=) and
+re-annotates the current buffer. Use it after anything that changes
+what titles the server would answer with: a node retitled, or the
+active source-set widened (IDs inactive under the old set were
+cached as unresolvable).
 *** C-c v s : skg-view-id-stack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)

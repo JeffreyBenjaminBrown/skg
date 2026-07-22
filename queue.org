@@ -20,7 +20,7 @@ UNCACHED IDs are requested; a magit refresh whose IDs are all cached
 sends no request at all. IDs the server does not resolve are cached
 as missing, so they too are never re-asked. The cache can go stale
 (a node retitled; the source-set widened, since inactive IDs cache
-as missing): M-x skg-readable-ids-refresh-titles empties it and
+as missing): M-x skg-readable-ids-refresh empties it and
 re-annotates. Tested in 'tests/elisp/test-skg-readable-ids.el';
 documented under C-c v r in docs/COMMANDS.org.
 * DONE fix the stage-moves generated script

@@ -185,7 +185,7 @@ and the response's titles merge into the cache."
 
 (ert-deftest test-skg-readable-ids-missing-cached-and-refreshable ()
   "An ID the server does not answer for is cached as missing, so a
-re-annotation sends nothing; `skg-readable-ids-refresh-titles'
+re-annotation sends nothing; `skg-readable-ids-refresh'
 clears the cache and asks again."
   (test-skg-readable-ids--with-clean-state
    (with-temp-buffer
@@ -201,5 +201,5 @@ clears the cache and asks again."
      (skg-readable-ids--annotate-buffer) ;; like a magit refresh
      (should (= 1 (length sent)))
      (should (= 0 (test-skg-readable-ids--after-string-count)))
-     (skg-readable-ids-refresh-titles)
+     (skg-readable-ids-refresh)
      (should (= 2 (length sent))))))

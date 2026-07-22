@@ -35,9 +35,9 @@ under the current source-set). Retained across magit refreshes so
 that a staging event re-requests nothing it has already seen; a
 refresh whose IDs are all cached sends no request at all. Can go
 stale -- a node retitled, the source-set widened -- in which case
-`skg-readable-ids-refresh-titles' rebuilds it.")
+`skg-readable-ids-refresh' rebuilds it.")
 
-(defun skg-readable-ids-refresh-titles ()
+(defun skg-readable-ids-refresh ()
   "Empty the ID-to-title cache and re-annotate the current buffer.
 Use this after anything that changes what titles the server would
 answer with: a node retitled, or the active source-set widened
