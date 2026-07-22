@@ -170,11 +170,11 @@ fn test_stage_moves_detects_single_pair_move() {
             "the move should appear as a list entry:\n{}", script );
   assert! ( script . contains ("for move in"),
             "the script should be a single loop:\n{}", script );
-  assert! ( script . contains ("[ -e \"$id.skg\" ]"),
+  assert! ( script . contains ("[ -e \"$ID.skg\" ]"),
             "the loop should assert the file is gone before removing:\n{}",
             script );
-  assert! ( script . contains ("git rm \"$id.skg\""),  "script:\n{}", script );
-  assert! ( script . contains ("git add \"$id.skg\""), "script:\n{}", script );
+  assert! ( script . contains ("git rm \"$ID.skg\""),  "script:\n{}", script );
+  assert! ( script . contains ("git add \"$ID.skg\""), "script:\n{}", script );
   assert! ( ! script . contains ("fresh"),
             "a brand-new node is not a move:\n{}", script ); }
 

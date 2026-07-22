@@ -211,30 +211,32 @@ So far there are these endpoints:
       ...
     )
 
+    ORIGIN=$(pwd)
     for move in "${moves[@]}"; do
-      read -r id old new <<< "$move"
-      echo "---- moving $id : $old -> $new"
-      cd "$old" || { echo "  SKIP: cannot enter $old"; continue; }
-      if [ -e "$id.skg" ]; then
-        echo "  SKIP: $id.skg is still present in $old; leaving it alone"
-        cd ..
+      read -r ID OLD NEW <<< "$move"
+      echo "---- moving $ID : $OLD -> $NEW"
+      cd "$ORIGIN/$OLD" || { echo "  SKIP: cannot enter $OLD"; continue; }
+      if [ -e "$ID.skg" ]; then
+        echo "  SKIP: $ID.skg is still present in $OLD; leaving it alone"
         continue
       fi
-      echo "  removing $id from $old"
-      git rm "$id.skg"
-      echo "  adding $id to $new"
-      cd "../$new"
-      git add "$id.skg"
-      cd ..
+      echo "  removing $ID from $OLD"
+      git rm "$ID.skg"
+      echo "  adding $ID to $NEW"
+      cd "$ORIGIN/$NEW"
+      git add "$ID.skg"
     done
+    cd "$ORIGIN"
     ```
-    The `[ -e "$id.skg" ]` check guards against a stale entry: `git rm`
+    The `[ -e "$ID.skg" ]` check guards against a stale entry: `git rm`
     deletes whatever is present and gives no distinct output, so a file
     still present in the old source (the move not yet done on disk) is
     skipped rather than deleted. Source directories are named relative
     to the data root, so the script is meant to be run from there
-    (bash); it assumes each source is a direct subdirectory of the data
-    root. The logic lives in
+    (bash); they may nest at any depth below it (e.g.
+    `owned/personal-proc`), which is why every `cd` is absolute,
+    anchored at `ORIGIN` (the data root, captured before the loop).
+    The logic lives in
     `server/git_ops/find_and_stage_moves.rs`.
   - Scans all sources regardless of the active source-set (a move can
     cross source-set boundaries). Sources that are not git repos

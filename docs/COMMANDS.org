@@ -537,6 +537,13 @@ whose title is an =[[id:...][...]]= link to the original node.
 If the original headline title already contains a link, the
 command asks "Are you sure?" before proceeding.
 ** C-c v : view-level commands
+*** C-c v b : skg-org-body-toggle
+Toggles the visibility of the body of the headline at point:
+checks whether the body is visible, then delegates to
+'outline-hide-entry' or 'outline-show-entry'. Works from the
+headline or from inside its body; called from the body, point
+moves to the start of the headline. A bodyless headline is left
+alone.
 *** C-c v d : skg-view-diff-mode
 If you use git to manage your data,
 enable this view to see what you've changed since your last commit,
@@ -589,6 +596,14 @@ and they are followed by the title of the node with that ID,
 if Skg can figure it out.
 (It doesn't yet know how to read the git history
 to find titles for deleted files.)
+
+The ID-to-title map is cached for the whole Emacs session, so a
+magit refresh (e.g. after every staging event) re-requests nothing
+it has already seen; a refresh whose IDs are all cached costs no
+server round-trip at all. The cache can go stale -- a node
+retitled, or the source-set widened (IDs inactive under the old
+set were cached as unresolvable) -- in which case
+M-x skg-readable-ids-refresh-titles empties it and re-annotates.
 *** C-c v s : skg-view-id-stack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)

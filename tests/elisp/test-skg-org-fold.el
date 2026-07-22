@@ -95,3 +95,30 @@ Body text.
     visible-count))
 
 (provide 'test-skg-org-fold)
+
+(ert-deftest test-skg-org-body-toggle ()
+  "Toggling hides then shows a body; from inside the body point
+moves to the headline start; a bodyless headline is left alone."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* first\nbody line one\nbody line two\n* second\n")
+    (progn ;; from the headline: hide, then show
+      (goto-char (point-min))
+      (skg-org-body-toggle)
+      (should (invisible-p (save-excursion (forward-line 1) (point))))
+      (skg-org-body-toggle)
+      (should-not (invisible-p (save-excursion (forward-line 1)
+                                               (point)))))
+    (progn ;; from inside the body: point moves to the headline start
+      (goto-char (point-min))
+      (search-forward "body line two")
+      (skg-org-body-toggle)
+      (should (= (point) (point-min)))
+      (should (org-at-heading-p))
+      (should (invisible-p (save-excursion (forward-line 1) (point)))))
+    (progn ;; a bodyless headline: no error, nothing hidden
+      (goto-char (point-min))
+      (search-forward "* second")
+      (beginning-of-line)
+      (skg-org-body-toggle)
+      (should (org-at-heading-p)))))

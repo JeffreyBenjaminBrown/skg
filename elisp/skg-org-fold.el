@@ -15,6 +15,29 @@
 (require 'skg-metadata)
 (require 'skg-sexpr-search)
 
+(defun skg-org-body-toggle ()
+  "Toggle the visibility of the body of the headline at point.
+Checks whether the body is visible, then delegates to
+`outline-hide-entry' or `outline-show-entry'. Works from the
+headline or from inside its body; when called from the body, point
+moves to the start of the headline. A bodyless headline is left
+alone, with a message."
+  (interactive)
+  (unless (org-at-heading-p)
+    (org-back-to-heading t))
+  (let ((body-state ;; one of 'absent, 'hidden, 'visible
+         (save-excursion
+           (forward-line 1)
+           (cond ((or (eobp) (org-at-heading-p)) 'absent)
+                 ((invisible-p (point)) 'hidden)
+                 (t 'visible)))))
+    (cond
+     ((eq body-state 'absent)
+      (message "This headline has no body."))
+     ((eq body-state 'hidden)
+      (outline-show-entry))
+     (t (outline-hide-entry)))))
+
 (defun skg-fold-marked-headlines ()
   "PURPOSE:
 Restore the user's fold state from per-headline metadata markers.

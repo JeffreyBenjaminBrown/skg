@@ -1,15 +1,41 @@
-* shortcut to show/hide body
+* DONE shortcut to show/hide body
 Let's call this skg-org-body-toggle.
 It should just check whether the body is visible,
 and then delegate to outline-show-entry and outline-hide-entry.
 It should work both from a headline or the headline's body.
 If point was on the body when it was called,
 point should move to the start of the headline.
-* Retain in magit the map from node ID to node title.
+** notes (Claude, 2026-07-22)
+Implemented in 'elisp/skg-org-fold.el', tested in
+'tests/elisp/test-skg-org-fold.el', documented in docs/COMMANDS.org.
+Judgment calls: bound to C-c v b (the view group; rebind freely);
+a bodyless headline is left alone, with a message.
+* DONE Retain in magit the map from node ID to node title.
 Rather than (I guess) asking for and interpreting a new amp
 after every staging event -- a friction that has been quite noticeable.
-* fix the stage-moves generated script
+** notes (Claude, 2026-07-22)
+'elisp/skg-readable-ids.el' now keeps a session-global ID-to-title
+cache. Annotation happens instantly from the cache, and only
+UNCACHED IDs are requested; a magit refresh whose IDs are all cached
+sends no request at all. IDs the server does not resolve are cached
+as missing, so they too are never re-asked. The cache can go stale
+(a node retitled; the source-set widened, since inactive IDs cache
+as missing): M-x skg-readable-ids-refresh-titles empties it and
+re-annotates. Tested in 'tests/elisp/test-skg-readable-ids.el';
+documented under C-c v r in docs/COMMANDS.org.
+* DONE fix the stage-moves generated script
 ** I'm not sure the fixed example below is perfect.
+** notes (Claude, 2026-07-22)
+Adopted the fixed example (ORIGIN anchor, absolute cds, capitalized
+variables) in 'server/git_ops/find_and_stage_moves.rs', with three
+repairs to it: the skip branch's unquoted 'cd $ORIGIN' is dropped
+entirely (every iteration cds absolutely, so no cd-back is needed);
+the trailing cd after the loop goes to "$ORIGIN" rather than
+"$ORIGIN/$NEW"; and all expansions are quoted. Updated the script
+copy in api-and-formats.md and the assertions in tests/git_ops.rs.
+One pre-existing rarity left as-is: a source OUTSIDE the data root
+renders as an absolute path, which "$ORIGIN/$OLD" would mangle --
+but the old relative-cd loop mishandled that case too.
 ** motivation, and what's new in the fixed example below
 ORIGIN, cd behavior, capitalization of all variables
 Before it hardcoded .., but now the folders could be at unpredictable levels.
