@@ -3,6 +3,142 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noted while cleaning up stray servers (2026-07-26)
+  Context: two cargo-watch processes and one skg were alive at once;
+  the newer skg had died with 'Address already in use'. Root cause is
+  in TODO/DONE/problems.org ("start-servers.sh could not kill the
+  cargo-watch it was trying to kill"), fixed the same day. These are
+  the things I noticed but did NOT change.
+** stop-servers.sh stops TypeDB only if you never re-ran start-servers.sh
+   start-servers.sh rewrites bash/stop-servers.sh with
+   'kill -TERM -$$' -- its OWN process group. TypeDB is nohup'd from
+   whichever run first found it absent, so it sits in THAT run's group.
+   Re-running start-servers.sh (which correctly leaves a healthy
+   TypeDB alone) therefore produces a stop-servers.sh whose group kill
+   reaches cargo-watch and skg but not TypeDB. Verified 2026-07-26:
+   after the second run, stop-servers.sh freed port 1730 and left
+   TypeDB listening on 1729. cleanup ()'s own report is right either
+   way (it checks with pgrep), so nothing lies -- but "does
+   stop-servers.sh stop TypeDB?" answers differently depending on
+   history, which is a bad property for a script whose whole job is
+   teardown.
+   This needs a decision, not just a patch: leaving TypeDB up is
+   arguably RIGHT (it is slow to start, other test runs want it, and
+   coding-advice says exactly one should be running). If so, say so --
+   stop killing it by side effect of the group kill, and print "TypeDB
+   left running (stop it with pkill -f typedb_server_bin)". If not,
+   record the TypeDB PID at start and kill it explicitly.
+** api-and-formats.md misdescribes the verify-connection response
+   Line 11 says: "Response: Plain text with newline termination: 'This
+   is the skg server verifying the connection.'" The server actually
+   sends a length-prefixed tagged response --
+   'handle_verify_connection_request' (server/serve.rs:369) calls
+   'send_response_with_length_prefix' on 'tag_text_response
+   (TcpToClient::VerifyConnection, ...)'. Observed on the wire:
+   "Content-Length: 96\r\n\r\n" then the tagged sexp. A client written
+   from the doc (as I did, reading one line) hangs waiting for a
+   newline that never comes. Same suspicion applies to the other
+   "Plain text with newline termination" entries (e.g. line 116, the
+   file-path response) -- worth auditing all of them against
+   'send_response_with_length_prefix' call sites rather than fixing
+   just this one line.
+** data/logs/ grows without bound (516 MB as of 2026-07-26)
+   cargo-watch.log 114 MB (681k lines, appended with '>>' across every
+   run since June), server.jsonl 294 MB, server-to-user.log 133 MB.
+   Two costs, one of them not obvious:
+   - Disk: 516 MB of a 452 GB volume already 81% full.
+   - Diagnosis: the log is now the FIRST place to look when the server
+     will not start (see the 2026-07-25 entry below and the
+     skg-wont-start memory), and 'tail' of a 114 MB file interleaves
+     runs with no separator -- the AddrInUse error from this incident
+     sat 156 lines from the end, indistinguishable at a glance from
+     the healthy startup that followed it.
+   Cheapest useful fix: have start_skg_with_restart append a banner
+   line ("=== start-servers.sh run at <date>, script PID <n> ===")
+   before launching cargo-watch, and rotate (mv to .1, keep 2) when
+   the log exceeds some size. Rotation of server.jsonl probably wants
+   to live in the server instead.
+* Problems noted while recovering a wedged server (2026-07-25)
+  Context: Jeff reported "I can't start the server -- usually TypeDB is
+  borked." TypeDB was innocent and healthy the whole time. The actual
+  cause was ONE zero-byte .skg file
+  (data/owned/personal-proc/13ca0844-195a-4709-aa60-2fc9df91027a.skg,
+  mtime 2026-07-23 16:09, i.e. written empty by the crash that ended
+  that session). Init refused to load, skg exit(1)'d, and cargo-watch
+  sat idle -- so the symptom was "port 1730 dead", which looks exactly
+  like a TypeDB problem. Diagnosis cost was almost entirely in the two
+  entries below.
+** The unreadable-files report names the SOURCE FOLDER, not the file
+   This is the big one: it is the difference between a 30-second fix
+   and a manual scan of 54,566 files.
+   'read_skg_sections_from_folder'
+   (server/dbs/filesystem/multiple_nodes.rs:203) calls
+   'read_nodecomplete (&path) ?' and lets '?' propagate the serde error
+   with the path DROPPED. The caller (same file, line 39-44) then
+   records 'source . path . display ()' -- the folder -- into a tuple
+   slot whose own comment (line 24) says "// filename". So the report
+   reads:
+     * /home/ubuntu/host/data/owned/personal-proc
+     ** pers-p
+     *** Error: missing field `pid`
+   naming a directory of 2,937 files. Worse, the folder read aborts at
+   the FIRST bad file, so "Found 1 unreadable file(s)" actually means
+   "1 unreadable *folder*" -- with 2 bad files you still get 1, and
+   fixing one just reveals the next on the following boot.
+   Suggested fix: at line 203, '. map_err' the error to attach
+   'path . display ()' before propagating; and either collect per-file
+   errors instead of aborting the folder, or rename the count to say
+   "source" so it stops lying.
+** A titleless single-section node makes the whole server unbootable
+   After the empty file got a valid 'pid', init failed again, further
+   in, with "Telescope '...' has no home: no section carries a title."
+   (multiple_nodes.rs:133). One contentless node -- no title, body,
+   contains, or aliases, referenced only as the first child of
+   'doing' -- blocks the entire database from loading, and this failure
+   path writes NO report file at all (unlike the unreadable-file path),
+   just a bare ERROR line. The two failure modes for the same broken
+   file are reported inconsistently.
+   Note this shape is reachable in normal use: a crash between "create
+   node" and "write its title" leaves it behind, and a node whose only
+   section is titleless is otherwise legal on disk (its titled siblings
+   in owned/public are what make the pattern valid).
+   Suggested fix: degrade "no home" from a boot-blocking error to a
+   warning in telescope-warnings.org -- quarantine or synthesize a
+   placeholder for that one telescope and load the other 54,565 files.
+   Refusing to boot the whole graph over one empty node is
+   disproportionate, and it is precisely when you can least afford to
+   lose the tool (you cannot inspect or delete the offending node
+   through the UI, because the UI will not start).
+** The unreadable-files report is not deleted after a successful boot
+   data/initialization-error_unreadable-skg-files.org survives from the
+   failed run into the healthy one, so a stale "Found 1 unreadable
+   file(s)" sits in the data root claiming a problem that no longer
+   exists. Suggested fix: remove it at the top of a successful init
+   (same for telescope-warnings.org when the warning count is 0).
+** start-servers.sh's pkill patterns match nothing
+   The process is '/bin/cargo-watch watch -w server/ -x run --bin skg
+   -- data/skgconfig.toml' (cargo dispatches 'cargo watch' to the
+   'cargo-watch' binary, so argv[0] is hyphenated and the literal
+   string "cargo watch" never appears). But both
+   'start_skg_with_restart' and 'cleanup' use
+   'pkill -f "cargo watch.*skg"', which cannot match it. 'cleanup'
+   also greps 'cargo run --bin skg', while the running child is
+   'target/debug/skg data/skgconfig.toml' -- also no match. So both
+   kills are silent no-ops. Verified today: the "Kill any existing
+   cargo-watch processes" line left a stale watcher alive, and I had
+   to kill it by PID.
+   Consequence: re-running start-servers.sh does NOT replace the old
+   watcher, so two watchers can race to rebuild and rebind port 1730 --
+   another way to produce "I can't connect". ('stop-servers.sh' is
+   unaffected; its 'kill -TERM -$$' process-group kill does work,
+   which is probably why this has gone unnoticed.)
+   Suggested fix: 'pkill -f "cargo[- ]watch.*--bin skg"' and
+   'pkill -f "target/debug/skg"'.
+** data/logs/ is unrotated and now ~540 MB
+   cargo-watch.log 114 MB, server-to-user.log 133 MB, server.jsonl
+   294 MB. server.jsonl in particular grows without bound and made
+   grepping for one node ID slow enough to notice. Suggested fix:
+   rotate or truncate on startup, or cap by size.
 * Problems noted while building recursive set-relationship-source (2026-07-22)
   Context: the investigation written up in
   TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org.

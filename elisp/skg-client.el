@@ -45,12 +45,27 @@
   ;; until its reply happened to land, so a server whose rule table had
   ;; changed (e.g. the styled-span heralds) rendered raw metadata.
   (setq heralds--transform-rules nil)
-  (skg-herald-rules-ensure)
-  ;; Return nil, not the rule table: `skg-herald-rules-ensure' returns
-  ;; the (large) table, and as the last form it would otherwise become
-  ;; `skg-client-init''s value -- which an interactive eval echoes in
-  ;; full into the minibuffer.
-  nil)
+  (let ((rules (skg-herald-rules-ensure)))
+    ;; Report the outcome in a SHORT string, rather than returning the
+    ;; rule table: `skg-herald-rules-ensure' returns the (large) table,
+    ;; and as the last form it would otherwise become
+    ;; `skg-client-init''s value -- which an interactive eval echoes in
+    ;; full into the minibuffer. This returned a bare nil for that
+    ;; reason, but nil in the echo area reads as failure when in fact
+    ;; everything worked. `message' returns the string it prints, so
+    ;; the echoed value and the echoed message now agree, and they say
+    ;; which port was reached -- worth stating, since several skg
+    ;; instances (different configs, different ports) can be up at once.
+    ;; The rule count is the evidence that the round trip landed: the
+    ;; table is `(skg RULE ...)', hence the 1-.
+    (if rules
+        (message "skg ready on port %s -- %d herald rules loaded."
+                 skg-port (1- (length rules)))
+      (message
+       (concat "skg connected on port %s, but the herald rule table"
+               " came back EMPTY, so heralds will not render."
+               " See %slogs/server-to-user.log .")
+       skg-port skg-config-dir))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()

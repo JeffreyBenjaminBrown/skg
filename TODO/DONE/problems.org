@@ -1,3 +1,42 @@
+** start-servers.sh could not kill the cargo-watch it was trying to kill (fixed 2026-07-26)
+   Found while cleaning up stray processes: two cargo-watch processes
+   were alive, and the newer run's skg had exited with
+   'Error: Os { code: 98, kind: AddrInUse }'.
+   Cause: both 'start_skg_with_restart' and 'cleanup' used
+   'pkill -f "cargo watch.*skg"', but the executable's argv is
+   '/bin/cargo-watch watch -w server/ -x run --bin skg -- <config>' --
+   'cargo-watch', hyphenated, not 'cargo watch'. The pattern matched
+   nothing, always, so the "kill any existing cargo-watch" step was a
+   no-op and re-running the script stacked a second supervisor on top
+   of the first. The second skg then lost the race for the API port
+   and exit(1)'d, leaving an idle cargo-watch that LOOKS like a
+   running server in 'ps' -- the same misleading shape as the
+   2026-07-25 incident, with the real error buried in a 114 MB
+   cargo-watch.log.
+   Neither old pattern matched the server binary either (its argv is
+   'target/debug/skg <config>'), and cargo-watch does not reliably
+   take its child down with it -- so even a corrected cargo-watch
+   pattern would have left an orphan holding the port.
+   FIXED: added 'kill_stale_skg' (used by both call sites), which
+   pkills, in order, 'cargo[- ]watch .*--bin skg -- $SKG_CONFIG', then
+   'cargo run --bin skg -- $SKG_CONFIG', then
+   'target/debug/skg $SKG_CONFIG'. Every pattern is scoped to the
+   config this run was given, so instances serving other configs and
+   ports (Jeff runs ~3 containers) are not collateral damage.
+   Also added 'wait_for_free_api_port': it reads the port from
+   $SKG_CONFIG (never assumes 1730), waits up to 5s for a just-killed
+   server to release it, and if something else still holds it, aborts
+   in red naming the port and 'ss -tlnp | grep <port>' -- instead of
+   launching a cargo-watch that can only crash-loop.
+   Verified 2026-07-26: three consecutive runs, the 2nd and 3rd made
+   while a healthy server was up, each reached "Server ready" with
+   exactly one cargo-watch + one skg + one TypeDB, no new AddrInUse in
+   the log, and text-search requests answered over TCP.
+   PITFALL for the next agent, learned the hard way in this session:
+   'pkill -f cargo-watch' typed at a shell prompt also matches your
+   own shell's command line (it contains the pattern), so it kills the
+   very shell running it, mid-script. Kill by PID, or match a pattern
+   your own command line does not contain.
 ** Stale herald-face docstrings in elisp/heralds-minor-mode.el (fixed 2026-07-21)
    Noticed while scoping the herald-tweaks work; fixed across the
    heralds-tweaks branch.

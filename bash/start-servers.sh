@@ -119,13 +119,63 @@ start_typedb() {
   return 1
 }
 
+skg_api_port() {
+  # Never assume 1730: Jeff runs several containers at once, each with
+  # its own config naming a different port (see coding-advice/docker.org),
+  # so the port must come from the config this run was given.
+  sed -n 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+    "$SKG_CONFIG" | head -1
+}
+
+port_is_bound() {
+  (exec 3<>/dev/tcp/127.0.0.1/"$1") 2>/dev/null
+}
+
+kill_stale_skg() {
+  # PITFALL: the executable calls itself 'cargo-watch', not
+  # 'cargo watch', so the old pattern "cargo watch.*skg" matched
+  # nothing. A second run of this script therefore left the previous
+  # cargo-watch and its skg alive; the new skg died with
+  # 'Address already in use' and cargo-watch sat there idle -- which
+  # presents as "the server won't start" with the real error buried in
+  # logs/cargo-watch.log. Match both spellings, and match the server
+  # binary itself ('target/debug/skg <config>'), which neither old
+  # pattern caught -- cargo-watch does not always take its child down
+  # with it. Kill cargo-watch first so it cannot respawn skg.
+  # Every pattern is scoped to THIS config, so skg instances serving
+  # other configs (other ports, other data) are left alone.
+  pkill -f "cargo[- ]watch .*--bin skg -- $SKG_CONFIG" 2>/dev/null || true
+  pkill -f "cargo run --bin skg -- $SKG_CONFIG"        2>/dev/null || true
+  pkill -f "target/debug/skg $SKG_CONFIG"              2>/dev/null || true
+}
+
+wait_for_free_api_port() {
+  # Refuse to launch into an occupied port: skg would exit(1) and
+  # cargo-watch would idle, silently, forever.
+  local port
+  port="$( skg_api_port )"
+  if [ -z "$port" ]; then return 0; fi
+  for i in 1 2 3 4 5; do
+    port_is_bound "$port" || return 0
+    sleep 1 # a just-killed server needs a moment to release the port
+  done
+  printf '\033[1;31m'   # bold red
+  echo "=================================================================="
+  echo "ERROR: TCP port $port (from $SKG_CONFIG) is still in use, by"
+  echo "something this script did not start and cannot identify as an"
+  echo "skg server for this config. skg would die with"
+  echo "'Address already in use'. Servers NOT started. Find the holder:"
+  echo "  ss -tlnp | grep $port"
+  echo "=================================================================="
+  printf '\033[0m'      # reset color
+  exit 1
+}
+
 start_skg_with_restart() {
   echo ""
   echo "Starting skg server with auto-restart on code changes..."
-
-  # Kill any existing cargo-watch processes (fallback to broader kill since we're not tracking PID)
-  pkill -f "cargo watch.*skg" 2>/dev/null || true
-
+  kill_stale_skg
+  wait_for_free_api_port
   echo "cargo-watch starting..."
   echo "Server logs go to $DATA_ROOT/logs/server-to-user.log and $DATA_ROOT/logs/server.jsonl"
   echo "cargo-watch/stdout-stderr go to $DATA_ROOT/logs/cargo-watch.log"
@@ -138,8 +188,7 @@ cleanup() { # trap handler for graceful shutdown
   echo "Shutting down skg server..."
 
   # Kill cargo-watch and skg processes
-  pkill -f "cargo watch.*skg" 2>/dev/null || true
-  pkill -f "cargo run --bin skg" 2>/dev/null || true
+  kill_stale_skg
   sleep 1  # Give TypeDB a second to shutdown
   if typedb_process_exists; then
     echo "TypeDB server was still running (a second after start-servers.sh initiated cleanup)."
