@@ -12,6 +12,22 @@ but divides it at spaces if point is interior to it.
 for git discard hunk to work
 ** when creating a fork, immediately replace with the overerider
 ** try neovim
+** staging should refresh views
+be it via magit, or via C-c t (a|A)
+** sort backpaths most-public first
+* BUG : making private content public
+Asks about publicizing the edge;
+I say do it;
+then it can't save.
+Trying to do it to some content of
+8c9108c0-ebc6-4820-945e-a7e7bce3d153
+* does make-content delete well?
+If the link it replaces with content has no other relationships
+beyond the one just removed from its parent --
+that is, if the link becomes an island --
+it should be deleted.
+But not if it retains other relationships, in or out,
+including non-content relationships.
 * Don't show overriddenCol etc. by default.
 ** request for Claude
 The default view of a node should include
