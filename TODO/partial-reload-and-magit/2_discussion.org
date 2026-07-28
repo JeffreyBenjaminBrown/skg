@@ -1,0 +1,334 @@
+* partial reload and magit -- discussion
+This responds to =1_vision.org=. I read the orientation material, the
+API/formats/schema/glossary, the telescope docs, and the relevant code
+(server-side load/rebuild/save paths, the in-Rust graph, git_ops, and
+the Emacs magit-adjacent code). Citations below point at real files so
+you can check my claims.
+
+My one-paragraph take: the *reload* half of this is mostly already
+built and low-risk -- the building blocks exist and I sketch how they
+compose. The *guard-against-invalid-discards* half is where the vision
+and the code disagree, and I want to push back hard before either of us
+designs to it: the specific "bad" state the vision names is a state skg
+already tolerates and displays. So I think the real feature is smaller
+and differently shaped than "intercept magit and prevent bad ops." I
+recommend a reactive "reload after magit refreshes" design over a
+"prevent before the git op" design, and I lay out the tradeoff for you
+to decide.
+
+* DONE (probably) The reload machinery mostly exists; here's what composes
+You guessed (§"a vague sketch") that partial reload "isn't built yet,
+only total, but it seems straightforward," and that it means: delete a
+node's out-links, replace its entity data, replace its relationships.
+That's right, and better than you feared -- the pieces are already
+written:
+
+- *Read one telescope, folded, fresh from disk*:
+  =nodecomplete_from_telescope_on_disk (config, pid)=
+  (=server/dbs/filesystem/multiple_nodes.rs=). This already re-reads
+  ALL of a node's sections across sources and folds them -- exactly
+  your §"multiple .skg files can define one node." So that nuance is
+  already solved by the fold; a reload never has to reason about
+  sections by hand.
+- *Apply a set of node definitions to the three stores*, scoped, not
+  wholesale: the save path already does "delete all outbound
+  relationships to these pids, then recreate" plus node upsert plus
+  Tantivy update plus an in-Rust-graph swap:
+  - in-Rust graph: =apply_definenodes= (RCU on the =ArcSwap=;
+    =server/dbs/in_rust_graph.rs=, structural-sharing clone, atomic
+    publish -- globally visible to all connections);
+  - TypeDB: =update_typedb_from_saveinstructions= with the
+    delete-outbound + recreate path (=server/save.rs=);
+  - Tantivy: =update_index_with_nodes= /
+    =delete_nodes_by_id_from_index=.
+- *The incremental-init path is already a batch partial reload*:
+  =read_recently_modified_skgfiles_from_sources= +
+  =incremental_init_of_dbs= (=server/dbs/init.rs=) re-fold whole
+  telescopes for touched files and re-apply them. A magit reload is the
+  same operation with an explicitly-supplied pid set instead of an
+  mtime cutoff.
+- *Collateral re-render already exists*: =update_views_after_save= and
+  =views_needing_collateral_rerender= (=save_buffer.rs=) recompute every
+  open view that shares a node with the changed set. A reload can reuse
+  them verbatim.
+
+So the genuinely new code is thin: a request handler that takes a set
+of pids (or file paths), re-folds those telescopes from disk, applies
+them to the three stores, and re-renders affected open views -- a
+scoped sibling of =rebuild_dbs_in_place=. I have a good handle on this
+part.
+
+* ONGOING The central premise is wrong: skg already tolerates the "bad" state
+§"invalid discards" says: deleting a node while a container still lists
+it as content yields "an 'x contains y' relationship where y does not
+exist. That would be bad. So skg has to guard against invalid discards."
+
+But that is not bad in skg -- it is a supported, rendered state. A
+=contains= (or textlink) edge whose target is absent renders as an
+*unknown-node scaffold*, "Parent references unknown node."
+(=server/heralds.rs:240=; =parse_metadata_sexp.rs= =unknown_node_id=;
+=server/diff_analysis/vanished.rs=). The graph stores edges by ID and
+never requires the target to exist. Deletion in the SAVE path even
+*deliberately* leaves such danglers -- =apply_delete_propagation_cleanup=
+only cleans references it can reach, and the display layer is built to
+show the rest.
+
+This matters because it collapses most of the "guard" work. The states
+that are *actually* fatal (a reload of them would fail, or the graph
+couldn't be loaded) are a short, specific list:
+
+- YAML that no longer parses (=read_nodecomplete=);
+- a pid that no longer matches its filename
+  (=validate_pid_matches_filename=);
+- a telescope with no titled section left -- no *home*
+  (=fold_one_telescope= errors);
+- duplicate IDs across sources
+  (=check_for_duplicate_ids_across_sources=);
+- override-invariant violations: user-owned override cycles or
+  monogamy breaks (=error_unless_override_invariants_hold=).
+
+Everything else a hunk-discard can produce -- a removed member, a
+dangling reference, a re-leveled edge, a leak-shaped membership (only a
+*warning*, per =telescope/invariants.rs=) -- is already legal.
+
+So my question: **when you say "guard against invalid discards," do you
+mean the short fatal list above, or did you believe dangling references
+were fatal?** If the latter, I think this section of the vision
+dissolves: there is far less to guard than it implies, and the honest
+default is "tolerate and display," not "prevent."
+
+** TODO Great! So:
+We should like you suggest
+guard against the things that are actually bad,
+not the thing I imagined bad that isn't.
+That said, this should to the extent possible
+not constitute new machinery. We probably already have methods
+for detecting and responding to offenses like the
+(hopefully exhaustive) list you gave.
+
+* ONGOING "Reload after" vs "prevent before": I recommend reload-after
+The vision frames the guard as *prevention*: "skg should prevent the
+operation if it would result in invalid data." I want to argue against
+prevention as the primary mechanism.
+
+Against *prevent-before*:
+- It requires intercepting magit's destructive commands *before* they
+  run, simulating the resulting file bytes, validating, and aborting
+  the git op. Magit's discard/reverse surface is broad (hunk, region,
+  whole-file, staged vs unstaged, and reverse-apply), with many entry
+  points; wrapping all of them reliably is the fragile part of this
+  whole feature.
+- Given the section above, it would mostly be guarding against states
+  skg already accepts.
+- The one thing prevention genuinely buys -- not losing *uncommitted*
+  worktree edits -- is a git property magit already guards with its own
+  confirmation prompts. That's not skg's job.
+
+For *reload-after* (my recommendation):
+- Let the git op run. The worktree is the source of truth; skg re-reads
+  it.
+- Re-fold the affected telescopes and update the derived stores.
+- If a re-fold hits the fatal list (unparseable / no home / pid
+  mismatch / dup ID / override-invariant), *reject that node's reload*:
+  keep the last-good graph state for it, and surface a loud warning
+  ("your file X on disk no longer loads: <reason>; skg is showing you
+  stale data for it until you fix or revert"). The graph never silently
+  desyncs, and the user is pointed at the real problem.
+- This is strictly simpler, can't corrupt the stores, and degrades
+  gracefully.
+
+The cost: we can't stop the user from *creating* a broken file. But we
+can't really stop that anyway (they can edit the file in any editor),
+and "detect + warn + keep last-good" covers the desync you actually
+care about.
+
+**Decision I need from you:** is detect-and-warn-after acceptable, or
+you specifically want pre-op prevention for the narrow fatal cases? I'de
+build reload-after first regardless; prevention, if wanted, is a later
+bolt-on.
+
+** TODO
+For that to be sufficient,
+th user must be able
+to restore the disk state from the graph state.
+We therefore need three things to happen:
+
+- First announce what's happening in the client,
+  because these ops (esp. the last) might take a little while.
+- Save the state that was written to disk
+  to a new branch called maybe-bad[-<number>],
+  where the not-necessarily-present -<number> suffix
+  contains the lowest natural number needed
+  to guarantee that this branch has a new name,
+  in every repo (the save may have touched multiple)
+  that needs it. The suffix should be the same
+  across all branches.
+- Check out the prior branch (again in each repo that needs it)
+  and write the graph's current state there.
+
+If the data was not in git, we can initialize a git repo there.
+Call the main one 'main' and the maybe-bad one 'maybe-bad',
+and mention in the explanatory message that that happened,
+naming each data source it happened in.
+
+* DONE "Any magit op that modifies a file" conflates worktree vs index
+The vision says reload should fire when "a magit operation would modify
+a .skg file" and gives the example "unstaging the removal of the line."
+This mixes two git layers that matter very differently to skg:
+
+- *Worktree-changing ops* -- discard (hunk/file), =checkout -- <file>=,
+  reverse-apply, stash. These change the bytes on disk that skg's
+  stores mirror. **These need a graph reload.**
+- *Index-only ops* -- stage (=git add=) and unstage (=git reset=). These
+  copy between worktree and index; **the worktree file is unchanged**,
+  so skg's in-Rust/TypeDB/Tantivy data (which reflect the worktree) do
+  NOT need reloading. Your own example, "unstaging the removal of the
+  line," does not touch the worktree at all.
+
+Staging/unstaging *does* matter in exactly one way: *git diff mode*
+(=diff_mode_enabled=, per-connection; =server/serve.rs:63=) shows the
+HEAD/index/worktree split, and staging moves the staged-vs-unstaged
+boundary. So after stage/unstage, diff-mode views want a *re-render*
+(cheap, no graph change), while non-diff views want nothing. This lines
+up with TODO.org: "When staging a change in magit, should update any
+view with that node." -- that's a re-render, not a reload.
+
+**Please confirm the intended trigger set.** My proposal:
+- worktree change to a =.skg= file  -> reload telescope + collateral
+  re-render;
+- index change while diff mode on   -> collateral re-render only;
+- index change while diff mode off  -> nothing.
+
+** TODO agreed
+
+* DONE (probably) The reactive trigger: magit-post-refresh, not per-command advice
+Rather than advise each magit command, I'd key off the fact that magit
+ALWAYS refreshes after an operation, and skg already hooks that:
+=skg-readable-ids.el= adds to =magit-post-refresh-hook=. After a
+refresh, Emacs can diff the worktree state of the source dirs against a
+remembered snapshot (mtimes or content hashes of =.skg= files it last
+saw) to compute exactly which files changed, then send one "reload
+these" request. This avoids enumerating magit's command surface
+entirely and catches worktree changes however they were made.
+
+Downside: it is inherently *after* the fact (reinforcing that
+prevention doesn't fit this hook) and needs a small amount of
+change-detection bookkeeping. I think that's a good trade. If you insist
+on prevention, that instead forces per-command =advice-add :around= on
+the discard/reverse family -- the fragile path above -- so this choice
+and the prevent/reload choice are linked.
+
+** TODO
+Agreed, we should piggyback on magit-post-refresh-hook.
+For this we should not, though, require readable ids mode to be on.
+
+* ONGOING Reload must never write to the filesystem (unlike save)
+A subtlety that constrains the handler: the SAVE path, on a delete,
+writes *cleanup edits to other files* (=apply_delete_propagation_cleanup=
+adds saves that strip references to the deleted node). A *reload* must
+NOT do this. The filesystem is the thing we're syncing FROM; writing
+=.skg= files during a reload would (a) fight the source of truth and (b)
+perform changes the user's magit op never requested, possibly
+cascading. So the reload path deliberately updates only the derived
+stores (TypeDB, Tantivy, in-Rust graph) and leaves any resulting
+dangling references alone -- which is consistent with "tolerate and
+display" above. Worth stating as an invariant of the new endpoint. I
+have a handle on it, but it's load-bearing enough that I want you to see
+it.
+
+** TODO wait does this invalidate what I was saying earlier?
+I talked about that whole git maybe-bad branch dance
+because I thought you were saying bad changes could be
+written to the filesystem, which would make reloading from it hard.
+
+I'll leave your other TODO items in this file untouched
+until I have a better handle on this.
+
+* TODO Deletion of a section vs deletion of a node
+Your sketch covers "rebuild a node." It doesn't cleanly cover the case
+where the discard *removes a file*:
+- If the removed file was a *more-private section* of a telescope whose
+  home survives: re-fold the remaining sections -> the node still
+  exists, with fewer members/aliases. (Handled by re-folding.)
+- If the removed file was the *home* (or the only section): the node no
+  longer loads. This is a *delete* from the derived stores (map it to a
+  =DeleteNode=), not a re-fold. Its inbound references become
+  unknown-node danglers (fine, per above).
+The reload set therefore has to be computed as "telescopes touched,"
+and each telescope resolved to either re-fold or delete depending on
+whether any titled section remains. Mechanically easy (both operations
+exist), but the vision's single "rebuild" verb hides the branch.
+
+* TODO Concurrency: reload is a new writer on a shared graph
+The in-Rust graph handle is =Arc<ArcSwap<InRustGraph>>=, shared across
+all connection threads; each connection runs on its own thread with a
+cloned =SkgEnv= (=server/serve.rs:78=). A writer does read-modify-write:
+load the Arc, clone-mutate, =store=. Two concurrent writers can lose an
+update (last =store= wins). Saves are not globally serialized today, so
+this is arguably already latent for concurrent saves; a magit reload
+adds a second writer that can race a save.
+
+For a single user with one Emacs this is unlikely to bite, but it's the
+kind of thing that corrupts state rarely and unreproducibly. Options: a
+process-global write mutex around graph mutations (reload + save), or
+accept the risk for now and document it. **Do you want me to add the
+mutex as part of this work, or note it and move on?** (I'd lean toward
+the mutex -- it's cheap and closes a real hole.)
+
+* DONE (probably) Multi-connection collateral re-render is already incomplete
+Collateral re-render is per-connection: =ViewsState= is owned by
+=handle_emacs= and dropped when the connection closes. So a save in
+connection A already does NOT refresh connection B's open buffers, and a
+reload would inherit that. For your single-Emacs workflow this is a
+non-issue; I'm flagging it only so neither of us expects reload to be
+better than save here. Not proposing to fix it in this work.
+
+* DONE (probably) Reload is source-set-agnostic; diff mode needs a re-render pass
+Two interactions I've checked and think are fine:
+- The in-Rust graph always holds the *full fold* (every source);
+  source-set restriction happens at render time, not in the graph. So
+  reload re-reads the full telescope regardless of the connection's
+  active source-set -- no special-casing needed.
+- After a reload, diff-mode views (=diff_mode_enabled=) must re-render
+  because HEAD-vs-worktree changed. That's just including them in the
+  collateral set. The existing rerender stream (rerender-lock ->
+  rerender-view* -> rerender-done) is the vehicle.
+
+* TODO Scope check: is magit the real boundary, or is it "external file changes"?
+The desync you describe ("filesystem and the other skg data stores
+disagree") happens for ANY out-of-band change to a =.skg= file, not just
+magit -- e.g. editing a =.skg= buffer directly and =C-x C-s=, a
+=git pull=, a rebase, a script. Magit is the motivating case, but the
+=magit-post-refresh= reactive design generalizes to "detect changed
+=.skg= worktree files and reload them," which could also hang off
+=after-save-hook= in =skg-file-minor-mode= and off a manual
+=skg-reload-changed= command.
+
+I'd *implement* the magit hook first (your stated need) but design the
+server endpoint as "reload these paths/pids," source-agnostic, so the
+other triggers are free later. **Do you want me to keep it magit-only,
+or design the endpoint generically (recommended) and wire only magit
+now?**
+
+* Recommended shape, if you like the above
+In order:
+1. Server: a "reload nodes" endpoint taking a set of pids (or paths ->
+   pids). For each touched telescope: re-fold from disk; if it still has
+   a home, apply as a Save-style upsert (delete-outbound + recreate +
+   node + Tantivy); if not, apply as a Delete. Never write =.skg= files.
+   On a fatal fold/parse/pid error for a node, skip that node, keep
+   last-good state, return a warning. Then run the existing collateral
+   re-render (including diff-mode views) and stream updated buffers.
+2. Emacs: on =magit-post-refresh=, diff the source dirs' =.skg= worktree
+   state against a remembered snapshot, and if anything changed, call
+   the endpoint with the changed set; on stage/unstage-only changes with
+   diff mode on, request a re-render instead of a reload.
+3. (Optional, pending your call) a global write mutex serializing reload
+   against save.
+4. (Optional, later) prevention for the narrow fatal set, if
+   detect-and-warn proves insufficient in practice.
+
+I did no writes to code or git; this is read-and-discuss only. Waiting
+on your inline answers to the TODO headlines before proposing a concrete
+plan.
+* TODO jeff speaking : In which ways can changes happen?
