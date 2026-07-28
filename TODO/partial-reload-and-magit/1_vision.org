@@ -1,0 +1,36 @@
+* partial reloading of the graph, and magit
+** motivation
+Currently, when I view changes to a .skg file in magit,
+if I discard a hunk, the filesystem and the other skg data stores disagree.
+This needs correction.
+Any time a magit operation would modify a .skg file,
+skg should reload that file.
+** a vague sketch of the data transformation
+I don't think partial reload from the filesystem is built yet, only total,
+but it seems straightforward.
+Each .skg file encodes the outlinks from that node,
+so in the worst case, all it should take to rebuild a set of nodes
+is to delete all their existing out-links (outside of the FS)
+replace their entity data (text, aliases, maybe more?),
+and then replace their relationships.
+** invalid discards
+There are, though, ways that the user could create invalid data
+by discarding a hunk. Maybe a node was deleted,
+and with it a relationship from a container to that node
+(which was part of the container's content).
+Unstaging the removal of the line that included it as content
+would create an "x contains y" relationship where y does not exist.
+That would be bad. So skg has to guard against invalid discards.
+The easy solution would seem to be:
+if the user effectively asks magit to change a file,
+regardless of how the would-be change was requested
+(discarding a hunk; maybe other stuff),
+skg should prevent the operation if it would result in invalid data.
+If skg permits it, skg should update the node that was changed.
+** multiple .skg files can define one node
+Another nuance is that the privacy telescope permits multiple sources
+to each contribute (via separate .skg files, one per source)
+information about a node's outlinks.
+It seems natural to simply read them all,
+construct a complete node from them,
+and then see whether it passes muster.

@@ -1,3 +1,5 @@
+* ONGOING skg2 : partial rebuild
+for git discard hunk to work
 * easy & important
 ** for video
 *** TODO/command-name-echo.org
@@ -8,8 +10,6 @@ treat it as one character
 Shortcut to jump tokens treats it as one from outside,
 but divides it at spaces if point is interior to it.
 ** work through TODO/problems.org
-** ONGOING skg2 : partial rebuild
-for git discard hunk to work
 ** when creating a fork, immediately replace with the overerider
 ** try neovim
 ** staging should refresh views
