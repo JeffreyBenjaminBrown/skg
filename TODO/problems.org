@@ -3,6 +3,55 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Fallout from "duplicate ids across sources" (2026-07-28)
+  Full investigation and plan: [[../dup-ids-maybe-bad.org]]. The check
+  'check_for_duplicate_ids_across_sources'
+  (server/dbs/filesystem/multiple_nodes.rs:144) is CORRECT -- it flags
+  only ids claimed by two distinct pids, and every call site passes
+  post-fold nodes -- but its name and all its user-facing strings still
+  describe the privacy telescope, which is now the feature. These are
+  the live defects behind that name.
+** 'source_from_disk' returns an arbitrary section, not the home
+   server/types/phantom.rs:106 iterates 'config . sources' (a HashMap)
+   and returns the first directory holding '<id>.skg'. Pre-telescope
+   there was at most one; now any node with a privatized edge has
+   several, so the answer is chosen by randomized hash order. It also
+   breaks the "no other code may compare source positions" rule at
+   server/types/misc.rs:191-201. Consumers read the result as the HOME:
+   'home_of' in supplement_from_disk.rs:275 (which sets a new edge's
+   default privacy floor, and the level is sticky once written),
+   'member_is_visible' in weave.rs:42, and several render paths.
+   Latent -- it is the last fallback, and the in-Rust graph normally
+   answers first -- but nondeterministic by construction on the path
+   that decides how public an edge gets written.
+   Fix: iterate 'ordered_sources ()' and return the most public
+   TITLED section.
+** The duplicate-id report discards the pids
+   multiple_nodes.rs:162-164 maps the pid away before reporting, so
+   'report_duplicate_ids' can only print sources. Post-telescope the
+   sources are the uninformative half (both claimants can be in one
+   source, which prints it twice); the two pids are what you need to
+   open and repair.
+** 'initialization-error_duplicate-ids.org' is never deleted
+   The empty-set early return at multiple_nodes.rs:166 precedes the
+   report writer, so a stale copy survives a clean boot -- same defect
+   already filed below for the unreadable-files report, but worse here:
+   a stale pre-telescope copy names id/source pairs that are now
+   healthy, inviting the reader to "repair" a valid telescope.
+   'report_telescope_violations' (telescope/invariants.rs:135) shows
+   the fix.
+** Init checks ids only after TypeDB and Tantivy are populated
+   server/main.rs:130-144 runs 'initialize_dbs' (which populates both,
+   exiting on failure at init.rs:309-313) and checks afterward. Given
+   'extra_id owns id @key' (schema.tql:112), a real conflict may die
+   inside TypeDB with a raw driver message and never reach the readable
+   report. 'rebuild_dbs_in_place' already gets this order right.
+   NOT yet confirmed -- see the experiment in dup-ids-maybe-bad.org.
+** A forbidden-overlay promise no validator keeps
+   server/dbs/filesystem/one_node.rs:139-141 says a foreign same-pid
+   file is "left for the validators to report", but 'TelescopeViolation'
+   (telescope/invariants.rs:26-49) has only 'LeakShapedMember' and
+   'UnconfiguredLevel'. Add the variant or drop the claim.
 * Problems noted while cleaning up stray servers (2026-07-26)
   Context: two cargo-watch processes and one skg were alive at once;
   the newer skg had died with 'Address already in use'. Root cause is
@@ -516,6 +565,11 @@
 
    These did not block connection verification, but they are important
    enough that the client should probably surface them after init.
+   NOTE (2026-07-28): the duplicate-id example above predates the
+   privacy telescope. One id in two sources is now the normal shape of
+   any node with a privatized edge, not a defect. The entry's point --
+   init warning files are easy to miss -- still stands; only the
+   illustration is stale. See [[../dup-ids-maybe-bad.org]].
 ** Replacing data/skgconfig.toml can leave server and client on different ports
    Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
    but the already-running server process was still listening on 1730.
