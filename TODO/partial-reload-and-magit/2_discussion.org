@@ -58,7 +58,7 @@ them to the three stores, and re-renders affected open views -- a
 scoped sibling of =rebuild_dbs_in_place=. I have a good handle on this
 part.
 
-* ONGOING The central premise is wrong: skg already tolerates the "bad" state
+* DONE The central premise is wrong: skg already tolerates the "bad" state
 §"invalid discards" says: deleting a node while a container still lists
 it as content yields "an 'x contains y' relationship where y does not
 exist. That would be bad. So skg has to guard against invalid discards."
@@ -97,7 +97,7 @@ were fatal?** If the latter, I think this section of the vision
 dissolves: there is far less to guard than it implies, and the honest
 default is "tolerate and display," not "prevent."
 
-** TODO Great! So:
+** DONE Great! So:
 We should like you suggest
 guard against the things that are actually bad,
 not the thing I imagined bad that isn't.
@@ -105,6 +105,22 @@ That said, this should to the extent possible
 not constitute new machinery. We probably already have methods
 for detecting and responding to offenses like the
 (hopefully exhaustive) list you gave.
+
+*** DONE claude: detection reuses existing checks; only the response is new
+Confirmed -- for detection you already have every check; a reload just
+calls the same functions the init/rebuild path does, each returning
+=Result<_, String>=:
+- parse failure    -> =read_nodecomplete= / =read_node_from_path=
+- pid != filename  -> =validate_pid_matches_filename=
+- no home          -> =fold_one_telescope=
+- duplicate IDs    -> =check_for_duplicate_ids_across_sources=
+- override breaks  -> =error_unless_override_invariants_hold=
+So "detect" = zero new machinery: gather the touched telescopes, run the
+existing folds/checks, branch on Ok/Err. The one genuinely new bit is
+the *response* to an Err -- "keep last-good graph for that node + warn"
+-- a thin orchestration wrapper, not new detection. Exactly what that
+response should DO (warn only? offer to restore disk from graph?) is the
+live question in the reload-after thread below.
 
 * ONGOING "Reload after" vs "prevent before": I recommend reload-after
 The vision frames the guard as *prevention*: "skg should prevent the
@@ -147,7 +163,7 @@ you specifically want pre-op prevention for the narrow fatal cases? I'de
 build reload-after first regardless; prevention, if wanted, is a later
 bolt-on.
 
-** TODO
+** ONGOING
 For that to be sufficient,
 th user must be able
 to restore the disk state from the graph state.
@@ -171,6 +187,96 @@ Call the main one 'main' and the maybe-bad one 'maybe-bad',
 and mention in the explanatory message that that happened,
 naming each data source it happened in.
 
+*** ONGOING claude: right instinct -- and it does NOT conflict with "reload never writes"
+First, to answer the worry you raise further down (§"wait does this
+invalidate..."): no. These are two different operations with two
+different write-policies:
+- *Reload* (automatic, on every magit refresh): reads disk -> updates
+  the derived stores. Never writes =.skg=. This is what must stay
+  read-only, so the automatic sync can never corrupt disk.
+- *Restore-from-graph* (what you describe here): a deliberate recovery
+  that writes graph -> disk, on purpose, only when the user (or a
+  confirmation) asks. It is not the reload.
+They coexist because they aren't the same code path: the thing that runs
+on its own is read-only; the thing that writes runs only when invoked.
+
+Second -- I owe you a correction. I earlier implied "if a discard breaks
+a file, just revert the discard." That is WRONG for the case you
+actually care about. Magit "discard" of an *uncommitted* change is
+destructive and unrecoverable from git: the good bytes were never
+committed, and the discard threw them out of the worktree. Afterward
+=git checkout= gives you HEAD, not the good uncommitted state. So when
+the good state was uncommitted, *skg's in-memory graph is the only place
+it still exists* -- git cannot restore it. That is exactly why "warn and
+keep last-good in memory" is not sufficient on its own: if skg restarts,
+the graph is rebuilt from disk = the broken/old bytes, and the good
+state is gone. Persisting it back to disk is the only durable fix. Your
+instinct is correct, and I withdraw "reload-after alone is enough" for
+the fatal case.
+
+Refinements I'd want before building it:
+
+**** *It only fires in the fatal case.* If the discard produced a *legal*
+   state (the common case -- dangling refs etc.), the reload just
+   succeeds and the discard becomes the new truth; there is nothing to
+   restore, and restoring would wrongly undo the user's edit. The branch
+   dance is reserved for reloads that hit the fatal list.
+
+**** 2. *Offer, don't silently auto-apply.* Restoring disk-from-graph
+   *reverses a deliberate user action* (their discard). I'd surface:
+   "=<file>= no longer loads (<reason>); skg still holds the last good
+   version. [Restore it to disk -- your current files are saved on
+   branch =maybe-bad=] / [Leave the broken file; I'll fix it myself]."
+   Auto-restoring would fight a user who discarded on purpose and meant
+   to hand-fix the invariant.
+
+**** 3. *The write itself is just a save.* "Write the graph's state to disk"
+   = unfold the affected telescope into its sections and write them --
+   the existing save/unfold path. No new write machinery; the graph
+   already knows every section.
+
+**** 4. *The git orchestration is the actually-new, actually-risky part*, and
+   it has edge cases I want your call on before building:
+***** Which repos: a telescope spans sources = possibly several repos, so
+     the shared =-<number>= suffix is computed across all of them (fine,
+     just fiddly).
+***** Non-clean HEAD: detached HEAD, mid-rebase/merge, or a dirty index in
+     one target repo. Creating/committing/checking-out branches there can
+     fail or make a mess. I'd *abort the auto-restore and fall back to
+     "warn only"* if any target repo isn't on a clean branch, rather than
+     do surgery in a fragile state.
+****** TODO
+Good point. Let's create three branches:
+  - oops-<number>_1-pre-incident
+  - oops-<number>-2-with-only-legal-changes-from-incident
+  - oops-<number>-3-with-all-changes-from-incident
+After storing all that data,
+we check out the branch that we were previously on,
+and explain to the user what happened (esp. naming all four branches).
+
+Branch 'oops..1..' has to be computed by saving a diff of the worktree
+against the last commit before applying any of the save.
+That way git has all the relevant graph states we could possibly save
+somewhere, no? (Again <number> should be equal across them all,
+only high enough to make them all distinct from preexisting branches.
+I guess the number should not be optional, and should start at 1.)
+***** "the prior branch": I read it as "the branch checked out when we
+     started." Committing the current (broken) worktree to =maybe-bad=,
+     switching back, and writing graph state is coherent -- but only if
+     the worktree/index are otherwise clean.
+***** Non-git source: init =main= + =maybe-bad=, mention it. Agreed
+
+**** *Decisions I need:*
+***** (a) Offer-and-confirm, or fully automatic? (I strongly prefer offer.)
+****** TODO Agreed.
+***** (b) On a target repo that isn't on a clean branch: abort to warn-only, or
+    attempt anyway? (I prefer abort-to-warn-only.)
+****** TODO is what I said earlier about the three oops branches sufficient answer to this question?
+***** (c) Is restore-from-graph in scope for THIS feature, or a follow-on? The
+    read-only reload is shippable without it -- with the honest caveat
+    that fatal discards of *uncommitted* edits are then only recoverable
+    while skg stays running.
+****** TODO let's include it here
 * DONE "Any magit op that modifies a file" conflates worktree vs index
 The vision says reload should fire when "a magit operation would modify
 a .skg file" and gives the example "unstaging the removal of the line."
@@ -199,7 +305,9 @@ view with that node." -- that's a re-render, not a reload.
 - index change while diff mode on   -> collateral re-render only;
 - index change while diff mode off  -> nothing.
 
-** TODO agreed
+** DONE agreed
+*** DONE claude: settled -- worktree change -> reload; index change +
+diff mode -> re-render only; index change + no diff mode -> nothing.
 
 * DONE (probably) The reactive trigger: magit-post-refresh, not per-command advice
 Rather than advise each magit command, I'd key off the fact that magit
@@ -218,11 +326,16 @@ on prevention, that instead forces per-command =advice-add :around= on
 the discard/reverse family -- the fragile path above -- so this choice
 and the prevent/reload choice are linked.
 
-** TODO
+** DONE
 Agreed, we should piggyback on magit-post-refresh-hook.
 For this we should not, though, require readable ids mode to be on.
+*** DONE claude: right -- I'll add a dedicated, always-loaded hook
+function (in a core skg elisp file, NOT =skg-readable-ids.el=) that does
+the change-detection + reload request, so it runs whether or not
+readable-ids annotation is enabled. Readable-ids keeps its own separate
+=magit-post-refresh-hook= entry; the two are independent.
 
-* ONGOING Reload must never write to the filesystem (unlike save)
+* DONE Reload must never write to the filesystem (unlike save)
 A subtlety that constrains the handler: the SAVE path, on a delete,
 writes *cleanup edits to other files* (=apply_delete_propagation_cleanup=
 adds saves that strip references to the deleted node). A *reload* must
@@ -236,15 +349,31 @@ display" above. Worth stating as an invariant of the new endpoint. I
 have a handle on it, but it's load-bearing enough that I want you to see
 it.
 
-** TODO wait does this invalidate what I was saying earlier?
+** DONE wait does this invalidate what I was saying earlier?
 I talked about that whole git maybe-bad branch dance
 because I thought you were saying bad changes could be
 written to the filesystem, which would make reloading from it hard.
 
 I'll leave your other TODO items in this file untouched
 until I have a better handle on this.
+*** DONE claude: it doesn't invalidate it -- these are three different writers
+Short version (also in the reload-after thread above):
+- *Reload* (automatic, on magit refresh) never writes =.skg=; it only
+  reads disk and updates the derived stores. So reload can't corrupt
+  disk, and reloading from disk is never "hard" because reload never put
+  anything bad there.
+- Your *maybe-bad dance* is a separate, deliberate *restore-from-graph*
+  that writes graph -> disk on purpose. It doesn't clash with "reload
+  never writes" because it isn't the reload -- the automatic path is
+  read-only; the writing path runs only when invoked/confirmed.
+- What I was flagging with =apply_delete_propagation_cleanup= is a
+  *third* thing entirely: the SAVE path today writes cleanup edits into
+  OTHER files. I called it out only so we don't accidentally copy that
+  behavior into the reload path.
+So nothing you said is invalidated; the live recovery decisions now sit
+in the reload-after thread above. You can un-freeze the other TODO items.
 
-* TODO Deletion of a section vs deletion of a node
+* DONE Deletion of a section vs deletion of a node
 Your sketch covers "rebuild a node." It doesn't cleanly cover the case
 where the discard *removes a file*:
 - If the removed file was a *more-private section* of a telescope whose
@@ -259,7 +388,9 @@ and each telescope resolved to either re-fold or delete depending on
 whether any titled section remains. Mechanically easy (both operations
 exist), but the vision's single "rebuild" verb hides the branch.
 
-* TODO Concurrency: reload is a new writer on a shared graph
+** DONE agreed
+
+* DONE Concurrency: reload is a new writer on a shared graph
 The in-Rust graph handle is =Arc<ArcSwap<InRustGraph>>=, shared across
 all connection threads; each connection runs on its own thread with a
 cloned =SkgEnv= (=server/serve.rs:78=). A writer does read-modify-write:
@@ -274,6 +405,8 @@ process-global write mutex around graph mutations (reload + save), or
 accept the risk for now and document it. **Do you want me to add the
 mutex as part of this work, or note it and move on?** (I'd lean toward
 the mutex -- it's cheap and closes a real hole.)
+
+** DONE yes, mutex!
 
 * DONE (probably) Multi-connection collateral re-render is already incomplete
 Collateral re-render is per-connection: =ViewsState= is owned by
@@ -294,7 +427,7 @@ Two interactions I've checked and think are fine:
   collateral set. The existing rerender stream (rerender-lock ->
   rerender-view* -> rerender-done) is the vehicle.
 
-* TODO Scope check: is magit the real boundary, or is it "external file changes"?
+* DONE Scope check: is magit the real boundary, or is it "external file changes"?
 The desync you describe ("filesystem and the other skg data stores
 disagree") happens for ANY out-of-band change to a =.skg= file, not just
 magit -- e.g. editing a =.skg= buffer directly and =C-x C-s=, a
@@ -309,6 +442,8 @@ server endpoint as "reload these paths/pids," source-agnostic, so the
 other triggers are free later. **Do you want me to keep it magit-only,
 or design the endpoint generically (recommended) and wire only magit
 now?**
+
+** DONE generically!
 
 * Recommended shape, if you like the above
 In order:
@@ -331,4 +466,46 @@ In order:
 I did no writes to code or git; this is read-and-discuss only. Waiting
 on your inline answers to the TODO headlines before proposing a concrete
 plan.
-* TODO jeff speaking : In which ways can changes happen?
+* ONGOING jeff speaking : In which ways can changes happen?
+** TODO claude: the change vectors, and which trigger catches each
+On-disk =.skg= *worktree* bytes can change via:
+
+1. *Magit worktree ops* -- discard (hunk/region/file), reverse-apply,
+   =checkout -- <file>=, stash apply/pop, =reset --hard=, and
+   merge/rebase/cherry-pick/=pull= that touch the file. -> caught by
+   =magit-post-refresh-hook=.
+2. *Magit branch switch* (=git switch=/checkout of a branch) -- can
+   rewrite many =.skg= files at once. -> also =magit-post-refresh=; the
+   changed-set is just larger, which the snapshot-diff handles.
+3. *In-Emacs save of a =.skg= buffer in skg-file-minor-mode* (=C-x C-s=)
+   -> already goes through skg's save pipeline, so the stores are updated
+   as part of the save. NO reload needed (a naive reload would
+   double-work).
+4. *In-Emacs save of a =.skg= file NOT in skg mode* (opened as plain
+   text) -> writes bytes, no store update. -> would need =after-save-hook=
+   or a manual command; NOT caught by magit.
+5. *External writers* -- another editor, a shell =git=, a
+   restore-from-backup, =git clean=. -> NOT caught by magit-post-refresh
+   at all.
+
+Index-only changes (stage/unstage) do NOT change worktree bytes -> no
+reload, at most a diff-mode re-render (settled in the worktree-vs-index
+thread).
+
+So =magit-post-refresh= covers (1) and (2) -- your motivating cases --
+but misses (4) and (5). Full coverage needs one of:
+- a filesystem watcher on the source dirs (server =notify= or Emacs
+  file-notify): catches everything, but is the most machinery;
+- or the cheaper "magit hook + =after-save-hook= for skg buffers + a
+  manual =skg-reload-changed= command": covers everything a single user
+  does inside Emacs plus an escape hatch, ignoring purely-external edits
+  until the manual command.
+
+*Decision:* (a) magit-only for now, (b) magit + after-save + manual
+command, or (c) a real FS watcher? This is the same choice as the "is
+magit the real boundary" TODO above; I'd pick (b) -- it fits your
+single-Emacs workflow, needs no watcher, and the server endpoint stays
+the same source-agnostic "reload these paths" either way.
+*** TODO What's the cost?
+You call the full watcher costly.
+Please elaborate.
