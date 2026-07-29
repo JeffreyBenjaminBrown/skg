@@ -9,12 +9,61 @@ what's imperfect about what's done; choices determining the future.
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.
 - Compile baseline established (=cargo check --lib= clean).
+- *Component 1 (reload-paths request), through store commit -- DONE + tested.*
+  - Protocol wiring: =RequestType::ReloadPaths= ("reload paths"),
+    =TcpToClient::ReloadPaths= ("reload-paths"), module registered,
+    dispatch arm added. (Skeleton commit.)
+  - Classification: =classify_touched_telescopes= resolves each path to
+    (source, pid) by matching configured source dirs (pid = file stem),
+    dedups to telescopes in first-seen order, and classifies each via a
+    fresh fold: Ok -> Save, NotFound -> Delete, other io::Err -> Fatal.
+    Unit tests cover path resolution.
+  - Reuse without FS writes: =apply_define_nodes_to_stores= gained a
+    =write_fs= flag; save passes true, reload false. Reload routes here
+    directly, so =apply_delete_propagation_cleanup= (which rewrites other
+    files) never runs.
+  - Store commit: =reload_touched_telescopes= (async) builds Save/Delete
+    DefineNodes, rejects the batch if it would break override invariants
+    (keeping last-good), then applies to graph+TypeDB+Tantivy with
+    write_fs=false. Fatal telescopes keep last-good and are reported.
+  - DB-backed parity tests (=tests/reload/=): an out-of-band edit and a
+    section deletion each leave the graph identical to a full rebuild,
+    untouched telescopes undisturbed. 2/2 green.
+- *Component 2 (write mutex) -- DONE + regression-checked.*
+  - =server/write_lock.rs=: process-global tokio async Mutex serialising
+    every graph read-modify-write. Acquired in the save entry
+    (=update_graph_including_nodeMerges=), reload, and rebuild. Reads
+    stay lock-free. Full =grouped_saves= suite (109 tests) green.
+- TypeDB was started locally (port 1729) to run the DB-backed tests.
 
 * changes to the plan's envisioned order
-(none yet)
+- Within Component 1, the plan's batch "scoped duplicate-ID check" (plan
+  1.4 step 6) is NOT yet implemented; only the override-invariant batch
+  guard is. Duplicate-IDs remain caught by a full rebuild, not yet by a
+  scoped reload. Tracked under "imperfect" below.
+- Component 1's collateral re-render (plan 1.4 step 8 / step 5 in the
+  build order) is NOT yet done: after a reload the stores are correct
+  but already-open client views are not yet re-streamed. Next up.
 
 * what's imperfect about what's done
-(none yet)
+- Override-invariant rejection is coarse: a violation rejects the WHOLE
+  reload batch (all touched telescopes keep last-good), not just the
+  offending one. Safe, but blunt. (Planned as acceptable.)
+- Scoped duplicate-ID detection on reload is not implemented yet (see
+  above). A reload that introduces a cross-source duplicate ID would be
+  applied; a subsequent full rebuild would catch it.
+- No collateral re-render yet (see above).
 
 * choices determining the future
-(none yet)
+- Reload's store commit reuses =apply_define_nodes_to_stores= directly
+  (never =update_graph_minus_nodeMerges=). This is the mechanism that
+  keeps reload from writing any =.skg= file. Any future change to the
+  save pipeline must preserve that this function, with write_fs=false,
+  performs no filesystem writes.
+- =reload_touched_telescopes= is async and pub, so tests can =.await= it
+  and the handler =block_on=s it. The recovery work (Component 4) will
+  add a =pending_incident= parameter here and to the dispatch arm.
+- The write mutex is a tokio async mutex acquired under
+  =block_on=-per-connection-thread. If the server ever moves to a shared
+  multithreaded async runtime, revisit that the guard is not held across
+  a point that could deadlock the runtime.
