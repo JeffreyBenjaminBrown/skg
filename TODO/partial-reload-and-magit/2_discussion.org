@@ -245,11 +245,11 @@ Refinements I'd want before building it:
      fail or make a mess. I'd *abort the auto-restore and fall back to
      "warn only"* if any target repo isn't on a clean branch, rather than
      do surgery in a fragile state.
-****** TODO
+****** ONGOING
 Good point. Let's create three branches:
   - oops-<number>_1-pre-incident
-  - oops-<number>-2-with-only-legal-changes-from-incident
-  - oops-<number>-3-with-all-changes-from-incident
+  - oops-<number>_2-with-only-legal-changes-from-incident
+  - oops-<number>_3-with-all-changes-from-incident
 After storing all that data,
 we check out the branch that we were previously on,
 and explain to the user what happened (esp. naming all four branches).
@@ -260,6 +260,40 @@ That way git has all the relevant graph states we could possibly save
 somewhere, no? (Again <number> should be equal across them all,
 only high enough to make them all distinct from preexisting branches.
 I guess the number should not be optional, and should start at 1.)
+
+******* TODO claude: love it -- three branches works; here's how each is actually built
+Adopting your names (this supersedes the earlier two-branch =maybe-bad=
+sketch). The key thing: at recovery time the three states come from
+three *different* sources, and only one of them is a worktree diff.
+
+- =oops-N_1-pre-incident= = the last-good graph, snapshotted at the
+  *start* of the reload, before we apply any node. This is NOT a
+  worktree-vs-HEAD diff -- at recovery time the worktree already holds
+  the post-incident (broken) bytes, so the pre-incident state no longer
+  exists on disk; it lives only in the graph. Branch 1 is built by
+  unfolding that graph snapshot to bytes and committing them.
+- =oops-N_-with-only-legal-changes-from-incident= = the graph *after*
+  the reload (legal per-node changes applied, fatal nodes kept at
+  last-good). That's exactly what reload-after leaves in memory, so it's
+  just "unfold the live graph."
+- =oops-N_3-with-all-changes-from-incident= = the current worktree bytes
+  as-is (the broken state). THIS is the worktree-vs-HEAD diff you
+  described -- and it's the only one of the three that is.
+
+So all three are recoverable, but your "diff the worktree against the
+last commit" line yields branch 3, not branch 1; branch 1 needs the
+pre-incident graph snapshot. Confirm that matches your intent.
+
+*Build them without ever checking out* (this also answers (b) below):
+construct each as a commit off the base via git plumbing -- hash-object
+each file -> build a tree -> commit-tree with the pre-incident commit as
+parent -> create the =oops-N-*= ref. HEAD never moves, the worktree is
+never disturbed. Then write branch 2's state (the recovered graph) into
+the worktree on the branch you were already on, and explain, naming all
+four.
+
+=N=: agreed -- mandatory, starts at 1, equal across every affected repo,
+smallest value unused in all of them.
 ***** "the prior branch": I read it as "the branch checked out when we
      started." Committing the current (broken) worktree to =maybe-bad=,
      switching back, and writing graph state is coherent -- but only if
@@ -268,15 +302,35 @@ I guess the number should not be optional, and should start at 1.)
 
 **** *Decisions I need:*
 ***** (a) Offer-and-confirm, or fully automatic? (I strongly prefer offer.)
-****** TODO Agreed.
+****** DONE Agreed.
+******* DONE claude: offer-and-confirm it is.
 ***** (b) On a target repo that isn't on a clean branch: abort to warn-only, or
     attempt anyway? (I prefer abort-to-warn-only.)
-****** TODO is what I said earlier about the three oops branches sufficient answer to this question?
+****** ONGOING is what I said earlier about the three oops branches sufficient answer to this question?
+******* ONGOING claude: mostly -- and building the branches via plumbing closes most of the rest
+The three-branch scheme answers *what to preserve*; the clean-repo worry
+was *whether it's safe to operate*. If we build the oops branches with
+plumbing (no checkout, HEAD never moves, per the note above), then
+detached HEAD and an in-progress rebase/merge stop being dangerous --
+we're only creating refs, not moving the user off their work. So yes,
+your scheme largely subsumes the worry. Two residuals I still want a
+ruling on:
+- *Unrelated dirty files*: when we finally write branch 2 into the
+  worktree, we must touch ONLY the =.skg= files skg owns -- never
+  =git add -A= -- so we don't sweep in or clobber the user's unrelated
+  uncommitted work. Agreed?
+- *Base commit while mid-rebase*: "the last commit before the incident"
+  is ambiguous during a rebase (HEAD is transient). I'd use the commit
+  HEAD pointed at when skg last successfully loaded the file. Acceptable,
+  or would you rather just abort-to-warn-only when a repo is
+  mid-sequencer?
+******** TODO yes to both
 ***** (c) Is restore-from-graph in scope for THIS feature, or a follow-on? The
     read-only reload is shippable without it -- with the honest caveat
     that fatal discards of *uncommitted* edits are then only recoverable
     while skg stays running.
-****** TODO let's include it here
+****** DONE let's include it here
+******* DONE claude: in scope. Recovery ships with the reload, not as a follow-on.
 * DONE "Any magit op that modifies a file" conflates worktree vs index
 The vision says reload should fire when "a magit operation would modify
 a .skg file" and gives the example "unstaging the removal of the line."
@@ -407,6 +461,9 @@ mutex as part of this work, or note it and move on?** (I'd lean toward
 the mutex -- it's cheap and closes a real hole.)
 
 ** DONE yes, mutex!
+*** DONE claude: will add a process-global mutex serializing every graph
+read-modify-write (save AND reload), so no two writers can lose an
+update via last-=store=-wins.
 
 * DONE (probably) Multi-connection collateral re-render is already incomplete
 Collateral re-render is per-connection: =ViewsState= is owned by
@@ -458,14 +515,25 @@ In order:
    state against a remembered snapshot, and if anything changed, call
    the endpoint with the changed set; on stage/unstage-only changes with
    diff mode on, request a re-render instead of a reload.
-3. (Optional, pending your call) a global write mutex serializing reload
-   against save.
-4. (Optional, later) prevention for the narrow fatal set, if
-   detect-and-warn proves insufficient in practice.
+3. Global write mutex serializing every graph read-modify-write (save +
+   reload). CONFIRMED (was "optional").
+4. Restore-from-graph on a *fatal* reload (CONFIRMED in scope, offer-and-
+   confirm): build the three =oops-N-*= branches via git plumbing (no
+   checkout), write branch 2's recovered state into the working branch's
+   worktree (skg-owned files only), and explain, naming all four
+   branches. Non-git sources get =main= + the oops branches, mentioned.
+5. Endpoint is source-agnostic "reload these paths/pids" (CONFIRMED);
+   magit-post-refresh wired now, =after-save-hook= + manual command the
+   likely coverage (your pick still open), full FS watcher declined as
+   too heavy.
+6. (Not planned) pre-op prevention -- only if detect + recover proves
+   insufficient in practice.
 
-I did no writes to code or git; this is read-and-discuss only. Waiting
-on your inline answers to the TODO headlines before proposing a concrete
-plan.
+Still open (marked TODO/ONGOING above): the exact branch-construction
+confirmation, the two clean-repo residuals (skg-owned-files-only write;
+mid-sequencer base commit), and your coverage pick (magit-only vs
++after-save+manual). I did no writes to code or git; this stays
+read-and-discuss until you close those.
 * ONGOING jeff speaking : In which ways can changes happen?
 ** TODO claude: the change vectors, and which trigger catches each
 On-disk =.skg= *worktree* bytes can change via:
@@ -506,6 +574,47 @@ command, or (c) a real FS watcher? This is the same choice as the "is
 magit the real boundary" TODO above; I'd pick (b) -- it fits your
 single-Emacs workflow, needs no watcher, and the server endpoint stays
 the same source-agnostic "reload these paths" either way.
-*** TODO What's the cost?
+*** DONE What's the cost?
 You call the full watcher costly.
 Please elaborate.
+**** DONE claude: what a real FS watcher costs
+A watcher that catches *purely-external* edits (another editor, shell
+=git=, a script) is a permanent, always-on subsystem -- that's the cost:
+- *A new watch backend.* Either a server-side =notify=-crate thread
+  watching every source dir recursively (new dependency, long-lived
+  thread, platform backends inotify/FSEvents/ReadDirectoryChangesW with
+  their own quirks -- inotify watch-descriptor limits on big trees,
+  dropped events under rapid change), or Emacs =file-notify= watches
+  (per dir/file, with its own limits).
+- *Echo-suppression.* skg itself writes =.skg= files (save, and now the
+  restore). A naive watcher fires on skg's OWN writes and reloads what it
+  just wrote -- a feedback loop. You must suppress events for paths skg
+  just touched, within a time window: fiddly and race-prone.
+- *Debounce/coalesce.* A branch checkout or an editor atomic-save (tmp +
+  rename) emits bursts -- hundreds of events. Without batching you get a
+  reload storm; with it you add a settle-timer and burst logic.
+- *Messy event semantics.* Rename-based saves, truncate-then-write, and
+  directory moves each surface differently per platform; mapping raw
+  events to "these telescopes changed" is real work.
+- *Mid-operation firing.* The watcher fires *while* a multi-file external
+  op (rebase, pull) is half-applied; reloading a half-written tree throws
+  transient fatal errors until it settles -- so you need quiescence
+  detection too.
+- *Always-on maintenance surface.* It runs for every user forever, even
+  those who only edit inside Emacs, and brings a new bug class: dropped
+  events = silent desync, spurious events = wasted reloads.
+
+Option (b) -- magit hook + =after-save-hook= for skg buffers + a manual
+=skg-reload-changed= -- reuses events skg already sees, fires only on
+explicit in-Emacs actions (so no echo-suppression, no debounce storms,
+no half-written-tree races, since git ops have finished by the time
+magit refreshes), and needs zero new infrastructure. Its only gap: a
+=.skg= file edited *entirely outside Emacs* isn't noticed until the
+manual command -- tiny for your single-Emacs workflow.
+
+So the watcher buys coverage of fully-external edits at the price of a
+permanent OS-level watch subsystem plus echo-suppression, debounce,
+cross-platform event handling, and settle-timing. I'd still pick (b);
+the open pick is yours, under the "change vectors" heading just above.
+***** TODO (b)
+The watcher sounds like hell. I agree with you.
