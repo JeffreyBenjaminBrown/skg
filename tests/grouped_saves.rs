@@ -23,5 +23,8 @@ mod new;
 #[path = "rebuild.rs"]
 mod rebuild;
 
+#[path = "reload.rs"]
+mod reload;
+
 #[path = "save.rs"]
 mod save;

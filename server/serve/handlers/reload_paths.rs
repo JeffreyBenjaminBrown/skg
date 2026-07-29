@@ -11,6 +11,12 @@
 //! TODO/partial-reload-and-magit/.
 
 use crate::dbs::filesystem::multiple_nodes::nodecomplete_from_telescope_on_disk;
+use crate::dbs::in_rust_graph::{
+  InRustGraph,
+  apply_definenodes_to_inRustGraph,
+  override_invariants::error_unless_override_invariants_hold,
+};
+use crate::save::apply_define_nodes_to_stores;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
@@ -18,8 +24,10 @@ use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
+use futures::executor::block_on;
 use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::net::TcpStream;
@@ -73,20 +81,82 @@ pub fn handle_reload_paths_request (
     path_strings . into_iter () . map (PathBuf::from) . collect ();
   let touched : Vec<TouchedTelescope> =
     classify_touched_telescopes (&env . config, &paths);
-  let (mut saves, mut deletes, mut fatals)
-    : (usize, usize, usize) = (0, 0, 0);
-  for t in & touched {
-    match t . outcome {
-      TelescopeReloadOutcome::Save (_)   => saves   += 1,
-      TelescopeReloadOutcome::Delete     => deletes += 1,
-      TelescopeReloadOutcome::Fatal (_)  => fatals  += 1, } }
-  let msg : String = format! (
-    "Reload: {} to save, {} to delete, {} fatal \
-     (store writes not yet implemented).",
-    saves, deletes, fatals );
+  let msg : String =
+    match block_on ( reload_touched_telescopes (env, touched) ) {
+      Ok (m)  => m,
+      Err (e) => {
+        send_reload_error (stream, &format! ("Reload failed: {}", e));
+        return; } };
   send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::ReloadPaths, &msg )); }
+
+/// Apply the survivors of a classification to the three derived stores
+/// WITHOUT writing the filesystem. Fatal telescopes keep their last-good
+/// graph state. Returns a human-readable summary, or `Err` if the store
+/// update itself failed.
+pub async fn reload_touched_telescopes (
+  env     : &mut SkgEnv,
+  touched : Vec<TouchedTelescope>,
+) -> Result<String, String> {
+  let mut defs : Vec<DefineNode> = Vec::new ();
+  let mut fatals : Vec<(ID, String)> = Vec::new ();
+  let (mut saves, mut deletes) : (usize, usize) = (0, 0);
+  for t in touched {
+    match t . outcome {
+      TelescopeReloadOutcome::Save (nc) => {
+        saves += 1;
+        defs . push ( DefineNode::Save ( SaveNode (nc) )); }
+      TelescopeReloadOutcome::Delete => {
+        deletes += 1;
+        defs . push ( DefineNode::Delete ( DeleteNode {
+          id     : t . pid,
+          source : t . source, } )); }
+      TelescopeReloadOutcome::Fatal (reason) =>
+        fatals . push (( t . pid, reason )), } }
+
+  if defs . is_empty () {
+    return Ok ( summarize_reload (0, 0, &fatals) ); }
+
+  // Batch guard: applying these to a clone of the live graph must not
+  // break override invariants. If it would, reject the whole batch and
+  // keep last-good (coarse attribution; see progress.org).
+  { let mut candidate : InRustGraph =
+      (* env . in_rust_graph . load_full () ) . clone ();
+    apply_definenodes_to_inRustGraph (&mut candidate, &defs);
+    if let Err (e) =
+      error_unless_override_invariants_hold (&env . config, &candidate) {
+        return Err ( format! (
+          "reloading would violate override invariants ({}); \
+           kept last-good state, stores unchanged", e )); } }
+
+  // Commit to the three stores, filesystem untouched.
+  let config = env . config . clone ();
+  match apply_define_nodes_to_stores (
+    defs, &[], config,
+    &env . tantivy_index, &env . driver, &env . in_rust_graph,
+    false /* write_fs */ ) . await {
+    Ok (Some (new_index)) => { env . tantivy_index = new_index; }
+    Ok (None) => {}
+    Err (e) => return Err ( format! (
+      "store update failed: {}", e )), }
+  Ok ( summarize_reload (saves, deletes, &fatals) ) }
+
+fn summarize_reload (
+  saves   : usize,
+  deletes : usize,
+  fatals  : &[(ID, String)],
+) -> String {
+  let mut msg : String = format! (
+    "Reloaded {} telescope(s), removed {}.", saves, deletes );
+  if ! fatals . is_empty () {
+    msg . push_str ( &format! (
+      " {} telescope(s) could not be reloaded and kept their last-good \
+       state:", fatals . len () ));
+    for (pid, reason) in fatals {
+      msg . push_str ( &format! (
+        "\n  {}: {}", pid . as_str (), reason )); } }
+  msg }
 
 /// Dedup the request's paths to telescope pids (first-seen order) and
 /// classify each by attempting a fresh fold from disk. Pure w.r.t. the
