@@ -1,5 +1,6 @@
 use super::*;
 use super::super::git::{GitDiffStatus, NodeChanges};
+use super::super::misc::SkgfileSource;
 
 fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
 fn id        (s: &str) -> ID         { ID ( s . to_string () ) }
@@ -156,4 +157,48 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
     staged: None, unstaged: Some (Sign::Minus) },
     "the overriddenCol phantom is labeled from \
      overrides_view_of_diff only" );
+}
+
+/// A node with sections in TWO sources has exactly one home: the
+/// most public section. The privacy order here is declaration order
+/// ("zed" then "alpha"), deliberately NOT alphabetical, so this also
+/// catches a fallback to alphabetical -- and, being run repeatedly,
+/// a walk over 'config.sources' (a HashMap, whose order Rust
+/// randomizes per process, and which used to decide this).
+#[test]
+fn home_from_disk_is_the_most_public_section () {
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let public_path  : PathBuf = dir . path () . join ("zed");
+  let private_path : PathBuf = dir . path () . join ("alpha");
+  std::fs::create_dir_all (&public_path)  . unwrap ();
+  std::fs::create_dir_all (&private_path) . unwrap ();
+  let config : SkgConfig = {
+    let mut sources : HashMap<SourceName, SkgfileSource> =
+      HashMap::new ();
+    for (name, path) in [ ("zed",   public_path  . clone ()),
+                          ("alpha", private_path . clone ()) ] {
+      sources . insert ( source_name (name), SkgfileSource {
+        name         : source_name (name),
+        abbreviation : None,
+        path,
+        user_owns_it : true, } ); }
+    let mut config : SkgConfig =
+      SkgConfig::dummyFromSources (sources);
+    config . source_order = // most public first
+      vec! [ source_name ("zed"), source_name ("alpha") ];
+    config };
+  { // Sections in both sources: the more public one is the home.
+    std::fs::write ( public_path  . join ("N.skg"),
+                     "pid: N\ntitle: N\n" ) . unwrap ();
+    std::fs::write ( private_path . join ("N.skg"),
+                     "pid: N\ncontains:\n- C\n" ) . unwrap ();
+    for _ in 0 .. 20 { // a HashMap walk would not survive 20 tries
+      assert_eq! ( home_from_disk ( &id ("N"), &config ),
+                   Some ( source_name ("zed") ) ); }}
+  { // A section in only the more private source: that is the home.
+    std::fs::write ( private_path . join ("P.skg"),
+                     "pid: P\ntitle: P\n" ) . unwrap ();
+    assert_eq! ( home_from_disk ( &id ("P"), &config ),
+                 Some ( source_name ("alpha") ) ); }
+  assert_eq! ( home_from_disk ( &id ("absent"), &config ), None );
 }

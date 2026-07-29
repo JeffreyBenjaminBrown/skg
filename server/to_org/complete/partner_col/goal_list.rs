@@ -12,7 +12,7 @@ use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -355,4 +355,4 @@ fn snapshot_global_source (
       . as_deref ()
       . and_then ( |g| g . pid_and_source (pid) . map ( |(_, s)| s ) )
   { return Some (s); }
-  source_from_disk (pid, config) }
+  home_from_disk (pid, config) }

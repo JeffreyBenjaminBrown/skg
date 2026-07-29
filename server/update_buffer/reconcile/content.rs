@@ -7,7 +7,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
@@ -246,7 +246,7 @@ fn reconcile_content_children (
       apparent_content_ids, active_source_set,
       |id : &ID| graph_snap . pid_and_source (id)
                  . map ( |(_pid, src)| src )
-                 . or_else ( || source_from_disk (id, config) ));
+                 . or_else ( || home_from_disk (id, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_activeNode),
   // not per child, so a node either fully expands or is left indefinitive; we

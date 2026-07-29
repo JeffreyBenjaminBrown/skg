@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff, existence_axes_in_source_diff};
 use super::list::Diff_Item;
-use super::misc::{ID, SkgConfig, SourceName};
+use super::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
 /// Unified title lookup for phantom nodes.
 /// Lookup order: source_diffs deleted_nodes → in-Rust graph/disk → fallback.
@@ -101,18 +101,29 @@ pub fn phantom_axes (
 
   (existence, membership) }
 
-/// Find the source for a node by checking which source directory
-/// contains its .skg file on disk. Returns None if not found in any source.
-pub fn source_from_disk (
+/// A node's HOME read from disk: the MOST PUBLIC source holding a
+/// section of its telescope. Returns None if no source holds one.
+///
+/// Walks 'ordered_sources' (the privacy order, most public first),
+/// never 'config.sources' -- that is a HashMap, whose iteration
+/// order Rust randomizes per process, so returning its first hit
+/// answered arbitrarily for any node with more than one section.
+/// Since the home is DEFINITIONALLY the most public section
+/// (docs/telescopes.md), the first hit in privacy order is the
+/// answer; a home whose section carries no title is a violation the
+/// fold reports, not a reason to keep looking.
+pub fn home_from_disk (
   id     : &ID,
   config : &SkgConfig,
 ) -> Option<SourceName> {
   let filename : String = format!( "{}.skg", id . 0 );
-  for (source_name, source_config) in &config . sources {
+  for source_name in config . ordered_sources () {
+    let Some (source_config) : Option<&SkgfileSource> =
+      config . sources . get (&source_name) else { continue; };
     let path : PathBuf =
       PathBuf::from( &source_config . path ) . join (&filename);
     if path . exists() {
-      return Some( source_name . clone() ); }}
+      return Some( source_name ); }}
   None }
 
 #[cfg(test)]

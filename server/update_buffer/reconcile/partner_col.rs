@@ -14,7 +14,7 @@ use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SourceName};
 use crate::source_sets::ActiveSourceSet;
-use crate::types::phantom::{phantom_axes, source_from_disk};
+use crate::types::phantom::{phantom_axes, home_from_disk};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
@@ -59,7 +59,7 @@ pub fn reconcile_partnerCol_children (
   let source_resolver = |id : &ID| -> Option<SourceName> {
     graph_snap . pid_and_source (id)
       . map ( |(_pid, src)| src )
-      . or_else ( || source_from_disk (id, &env . config) ) };
+      . or_else ( || home_from_disk (id, &env . config) ) };
   let outbound : bool = // the col shows a list in the OWNER's file
     owner_role . is_first_role ();
   let inbound_scan : HashMap<ID, MembershipAxes> =

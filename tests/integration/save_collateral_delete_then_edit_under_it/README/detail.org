@@ -394,7 +394,7 @@ This prevents collateral updates from picking up new children
 created by another buffer's save.
 
 The fix: when =child_sources.get(id)= returns =None=, fall back
-to =source_from_disk(id, config)= (defined in
+to =home_from_disk(id, config)= (defined in
 =server/types/phantom.rs=). This mirrors the fallback chain in
 =source_for_phantom= (same file).
 
@@ -421,7 +421,7 @@ All four parameters are already available in
     child_sources.get( id ).cloned()
     .or_else( || deleted_since_head_pid_src_map.get( id ).cloned() )
     .or_else( || map.get( id ).map( |n| n.source.clone() ) )
-    .or_else( || source_from_disk( id, config ) )
+    .or_else( || home_from_disk( id, config ) )
     .ok_or( format!(
       "build_child_creation_data: \
        no source for {}",
@@ -433,8 +433,8 @@ Note: the variable changes from =&SourceName= to =SourceName=
 =nodecomplete_from_map_or_disk=) takes =&SourceName=, so use
 =&child_source= there.
 
-Import =source_from_disk= at the top of the file from
-=crate::types::phantom::source_from_disk=.
+Import =home_from_disk= at the top of the file from
+=crate::types::phantom::home_from_disk=.
 
 * Files to create
 
@@ -563,7 +563,7 @@ because it's not in =child_sources= (existing tree children).
 This is the same limitation from the
 =save_collateral_add_content_and_modify_text= test.
 
-Fix: add a =source_from_disk= fallback to
+Fix: add a =home_from_disk= fallback to
 =build_child_creation_data= (see "Rust code fix" section above).
 After the fix, the collateral update succeeds: =complete_viewtree=
 processes =subee=, reads the updated =subee.skg=, finds =subee-2=

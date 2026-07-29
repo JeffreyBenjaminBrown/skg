@@ -21,7 +21,7 @@
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -39,7 +39,7 @@ pub fn member_is_visible (
       snapshot_global ()
       . and_then ( |snap| snap . pid_and_source (id)
                           . map ( |(_pid, src)| src ));
-    from_graph . or_else ( || source_from_disk (id, config) ) };
+    from_graph . or_else ( || home_from_disk (id, config) ) };
   match source {
     Some (src) => active . contains_source (&src),
     None       => false, }}

@@ -16,7 +16,7 @@ use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, members_of, privacied_all};
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::collections::HashMap;
@@ -272,7 +272,7 @@ pub(crate) fn apply_sticky_levels (
     snapshot_global ()
       . and_then ( |snap| snap . pid_and_source (id)
                    . map ( |(_pid, src)| src ))
-      . or_else ( || source_from_disk (id, config) ) };
+      . or_else ( || home_from_disk (id, config) ) };
   // The DEFAULT floor for one member: the more private of the two
   // endpoints' homes (the owner's home alone when the target's home
   // is unknown). By construction at least the owner's home, so the
