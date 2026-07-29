@@ -14,6 +14,7 @@ pub mod nodeMerge;
 pub mod org_to_text;
 pub mod save;
 pub mod serve;
+pub mod write_lock;
 pub mod source_sets;
 pub mod test_utils;
 pub mod to_org;

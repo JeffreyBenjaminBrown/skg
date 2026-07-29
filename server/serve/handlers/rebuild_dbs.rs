@@ -47,6 +47,10 @@ pub fn rebuild_dbs_in_place (
   views_state : &mut ViewsState,
 ) -> Result<(), String> {
   tracing::info!("Rebuilding databases from disk...");
+  // Serialize this wholesale rebuild against any concurrent save / reload
+  // so no RCU update is lost (last-store-wins on the ArcSwap).
+  let _write_guard = block_on (
+    crate::write_lock::acquire_graph_write_lock () );
   // Let any in-flight background save-index writes finish before we wipe
   // and rebuild the index out from under them.
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();

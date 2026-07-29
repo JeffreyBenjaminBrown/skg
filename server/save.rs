@@ -180,6 +180,9 @@ pub async fn update_graph_including_nodeMerges (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
+  // Serialize this store mutation against any concurrent save / reload /
+  // rebuild so no RCU update is lost (last-store-wins on the ArcSwap).
+  let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "validate_override_invariants_after_save" ). entered();
     validate_override_invariants_after_save (

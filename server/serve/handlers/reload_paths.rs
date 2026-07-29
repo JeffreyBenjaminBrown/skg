@@ -118,6 +118,11 @@ pub async fn reload_touched_telescopes (
   if defs . is_empty () {
     return Ok ( summarize_reload (0, 0, &fatals) ); }
 
+  // Serialize this store mutation against any concurrent save / reload /
+  // rebuild so no RCU update is lost (last-store-wins on the ArcSwap).
+  let _write_guard =
+    crate::write_lock::acquire_graph_write_lock () . await;
+
   // Batch guard: applying these to a clone of the live graph must not
   // break override invariants. If it would, reject the whole batch and
   // keep last-good (coarse attribution; see progress.org).
