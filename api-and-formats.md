@@ -250,22 +250,6 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
-## Migrate to telescopes
-  - Request: ((request . "migrate to telescopes"))
-  - Response: LP response-type "migrate-to-telescopes" with
-    `((content "..."))` describing the outcome.
-  - Behavior: For every owned node, raises each relationship edge's
-    privacy level to at least its DEFAULT (the more private of the
-    two endpoints' homes), never lowering any edge's privacy. This lifts
-    leak-shaped memberships — a public file naming a more private
-    node's ID — into their proper telescope sections. Changed
-    telescopes are rewritten byte-stably; if anything changed, the
-    databases are rebuilt as in "rebuild dbs".
-  - Refusal: requires the active source-set `all` (migration must
-    see and rewrite every level).
-  - What it cannot fix: a public repo's git HISTORY keeps any IDs it
-    leaked before migration; repairing that is manual.
-
 ## Edge level info
   - Request: ((request . "edge level info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of

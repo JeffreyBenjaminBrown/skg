@@ -28,8 +28,8 @@ pub enum TelescopeViolation {
   /// more public than its target's home, so the (more public) file
   /// names an ID whose node is more private -- exactly what the
   /// telescope exists to prevent. Repair: re-level the membership
-  /// to the target's home or beyond ('skg-migrate-to-telescopes'
-  /// does this wholesale). NOTE the git caveat: the leaking file's
+  /// to the target's home or beyond ('skg-set-relationship-source',
+  /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
   /// bleeding.
   LeakShapedMember {
@@ -72,7 +72,7 @@ impl fmt::Display for TelescopeViolation {
       TelescopeViolation::LeakShapedMember {
         relation, level, member, member_home } =>
         write! ( f,
-          "leak-shaped {} member: edge at level '{}' names '{}', whose home '{}' is more private. Re-level the membership (skg-migrate-to-telescopes repairs these wholesale). The leaking file's git history already contains the ID.",
+          "leak-shaped {} member: edge at level '{}' names '{}', whose home '{}' is more private. Re-level the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.",
           relation, level, member, member_home ),
       TelescopeViolation::UnconfiguredLevel {
         relation, level, member } =>
@@ -190,7 +190,7 @@ pub fn report_telescope_violations (
   content . push_str ("#+title: Telescope warnings\n");
   content . push_str ("#+date: <generated at initialization>\n\n");
   content . push_str ( & format! (
-    "{} telescope warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired (see each line; skg-migrate-to-telescopes repairs leak-shaped memberships wholesale).\n\n",
+    "{} telescope warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired -- each line says how.\n\n",
     violations . len () ));
   let mut current : Option<&ID> = None;
   for (pid, v) in violations {

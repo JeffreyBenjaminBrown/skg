@@ -1,0 +1,336 @@
+#+title: Plan: retire "duplicate ids across sources", and pin the home to the most public section
+
+  Background, evidence and the decisions behind this plan are in
+  [[./1_discussion.org]]. This file states what to do, not why we
+  argued about it. Each work item is one commit.
+
+  ONE COMPLICATION arose while writing this plan and needs Jeff's
+  attention: see [[*Complication that needs a decision][the last section]]. It does not block any item
+  below; item 7 implements the safe interim behavior.
+
+* Vocabulary this plan fixes
+
+  Two distinct facts have been sharing one name.
+
+  - A TELESCOPE is same-pid '.skg' files across sources. This is the
+    feature. It is never an error.
+  - An ID CONFLICT is one id (primary or extra) claimed by two
+    DIFFERENT pids. This is the error. It need not span sources.
+
+  Everything named "duplicate ids across sources" means the second
+  and reads as the first.
+
+  A third fact gets a name for the first time:
+
+  - The HOME of a node is THE MOST PUBLIC SECTION of its telescope.
+    Not, as today, "the most public section bearing a title". A
+    titleless section more public than the title is a violation to
+    report, not a shape to search past.
+
+* Work items
+
+** 1. Rename the id-conflict check and its vocabulary
+
+   In server/dbs/filesystem/multiple_nodes.rs:
+
+   - 'check_for_duplicate_ids_across_sources'
+     -> 'error_unless_each_id_names_one_node'
+   - 'report_duplicate_ids' -> 'report_ids_claimed_by_two_nodes'
+   - report file 'initialization-error_duplicate-ids.org'
+     -> 'initialization-error_ids-claimed-by-two-nodes.org'
+   - report title "Duplicate IDs Across Sources"
+     -> "IDs claimed by more than one node"
+   - report body, error string and log lines: "N id(s) claimed by
+     more than one node"
+   - the doc comment explaining that same-id files across sources
+     are the telescope and are fine moves to the TOP of the block,
+     ahead of the code.
+
+   Call sites to update: server/main.rs, server/save.rs,
+   server/nodeMerge.rs (x2), server/serve/handlers/rebuild_dbs.rs,
+   tools/bench-audit.rs, tools/probe-audit.rs, tools/top-contents.rs,
+   tools/bench-context-inmemory.rs,
+   tools/top-contentward-descendants.rs,
+   tests/multi_source_loading.rs.
+
+   Tests to rename: 'test_duplicate_id_detection_across_sources',
+   'test_node_with_multiple_ids_duplicate_detection'. The >10-conflict
+   test's expected report text changes with the strings.
+
+   No legacy alias (coding-advice/for-ai.md).
+
+** 2. Report the claimant pids
+
+   'error_unless_each_id_names_one_node' currently collects claimants
+   as '(pid, home)' and discards the pid before reporting. Keep the
+   pid: the report and the log lines name each claimant as
+   "pid (home)".
+
+   Rationale in one line: the violation is "two nodes claim this id",
+   so the two pids are the only way to find them, and both claimants
+   can now live in one source.
+
+** 3. Delete stale init reports on a clean run
+
+   Neither 'initialization-error_ids-claimed-by-two-nodes.org' nor
+   'initialization-error_unreadable-skg-files.org' is ever removed,
+   so a stale copy outlives the condition it describes. Remove each
+   at the start of its own reporting function when there is nothing
+   to report, exactly as 'report_telescope_violations'
+   (server/telescope/invariants.rs) already does.
+
+** 4. 'source_from_disk' -> 'home_from_disk', deterministic
+
+   server/types/phantom.rs. Iterate 'config . ordered_sources ()',
+   never '&config . sources', and return the first source whose
+   '<pid>.skg' exists. This makes the answer deterministic, most
+   public first, and stops the function from comparing source
+   positions outside the chokepoints named at server/types/misc.rs.
+
+   Rename to 'home_from_disk': it answers the home, and the old name
+   invites the reader to think it answers "the source of the file I
+   have in mind". Update all callers (server/types/env.rs x2,
+   server/from_text/weave.rs, server/from_text/supplement_from_disk.rs,
+   server/to_org/complete/partner_col/mod.rs x3,
+   server/to_org/complete/partner_col/goal_list.rs,
+   server/update_buffer/reconcile/content.rs,
+   server/update_buffer/reconcile/partner_col.rs).
+
+** 5. Home := the most public section
+
+   server/telescope/fold.rs. 'fold_sections' currently scans for the
+   most public section BEARING A TITLE and calls that the home. It
+   should take the most public section as the home unconditionally,
+   and record separately which level the title came from.
+
+   New 'FoldWarning' variant:
+
+   #+begin_src rust
+     /// The home carries no title; the title sits at a more private
+     /// level, where a reader restricted to the home's level cannot
+     /// see it.
+     TitleBelowHome { home : SourceName, title_at : SourceName },
+   #+end_src
+
+   Distinct from the existing 'MissingTitle' (no section has a title
+   at all) and 'NonHomeTitle' (a stray SECOND title further down).
+   The fold already treats this shape as anomalous for the BODY
+   ('NonHomeBody', emitted for a body in a titleless section seen
+   before any home); this makes title and body agree.
+
+   UNCHANGED: a telescope with no title anywhere remains a hard load
+   error ('nodecomplete_from_fold' returns None). Degrading THAT to a
+   warning is a separate open entry in TODO/problems.org ("A titleless
+   single-section node makes the whole server unbootable") with its
+   own design question, and is out of scope here.
+
+   Docs that define the home by the title search, all three to be
+   restated as "the most public section", with the title rule stated
+   as the invariant: glossary.md ("privacy telescope, telescope
+   section, home"), docs/telescopes.md ("What lives where"),
+   api-and-formats.md (".skg file format").
+
+** 6. Surface load-time telescope warnings in the report
+
+   Today 'fold_one_telescope' logs its 'FoldWarning's and drops them,
+   so telescope-warnings.org shows only what
+   'validate_all_telescopes' finds from the in-Rust graph. The
+   'TitleBelowHome' warning from item 5 and the foreign-overlay shape
+   both need to reach that file.
+
+   Add 'read_all_skg_files_from_sources_collecting_fold_warnings',
+   returning '(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)'.
+   'read_all_skg_files_from_sources' keeps its signature and
+   delegates, logging the warnings as today, so its seven other
+   callers are untouched. Only 'full_init', the incremental init path
+   (both server/dbs/init.rs) and 'rebuild_dbs_in_place'
+   (server/serve/handlers/rebuild_dbs.rs) take the new entry point and
+   merge the result into what they hand 'report_telescope_violations'.
+
+   Two new 'TelescopeViolation' variants:
+
+   - 'TitleBelowHome { home, title_at }' -- from the fold warning.
+   - 'ForeignOverlay { home }' -- a source the user does NOT own holds
+     the most public section of a pid for which the user DOES own a
+     section. Detected where the section list and the config are both
+     in hand (the new collecting function), not in
+     'telescope_violations_of', which sees only the folded graph.
+
+   'ForeignOverlay' is the variant
+   server/dbs/filesystem/one_node.rs promises ("left for the
+   validators to report") and no validator has delivered.
+
+** 7. Write guards on 'write_nodecomplete_telescope'
+
+   server/dbs/filesystem/one_node.rs. The writer's doc comment claims
+   foreign sources are never written, but its write loop has no
+   ownership check -- only the delete sweep does. The guarantee lives
+   in callers (from_text/validate.rs, from_text/fork.rs). With the
+   home now definitionally the most public section, a foreign home
+   becomes conceivable, so the writer must enforce its own claim.
+
+   Two refusals, both returning Err before writing anything:
+
+   - FOREIGN HOME: the node's home is a source the user does not own.
+     Writing it is forbidden; silently skipping it would lose the
+     title. Refuse and name the source.
+   - TITLE HOIST: the node's home section already exists on disk,
+     carries no title, and this write would give it one. Refuse; the
+     shape means a more private section holds the text, and writing
+     would publish it. Name the repair.
+
+   The second guard is the safe interim answer to the complication at
+   the end of this file. It is one 'exists()' walk plus at most one
+   file read, on a path that is already doing file I/O.
+
+** 8. Move the id-conflict check before database population
+
+   server/dbs/init.rs and server/main.rs. 'full_init' populates
+   TypeDB and then Tantivy, each exiting the process on failure, and
+   only afterward does main.rs check for id conflicts. Push the check
+   into 'full_init' and the incremental path, immediately after
+   'read_all_skg_files_from_sources' and before
+   'wipe_then_init_typedb_db' -- the order
+   'rebuild_dbs_in_place' already uses. Delete the call and the
+   'drop (nodes)' comment at main.rs.
+
+   Both flavors of conflict need this, for different reasons
+   (experiment in 1_discussion.org):
+
+   - extra_id vs extra_id: TypeDB rejects it with a '[CNT9]' key
+     violation naming the contested value and neither claimant, so
+     today the readable report never runs.
+   - pid vs extra_id: TypeDB accepts it silently, so the Rust check is
+     the only thing that catches it -- today only after both databases
+     have been built from data already known to be broken.
+
+** 9. Make the two id-resolvers agree
+
+   While an id is both one node's pid and another's extra_id, the
+   layers disagree: 'pid_and_source_from_id'
+   (server/dbs/typedb/search.rs) matches an 'or' over "node has id X"
+   and "extra_id has id X" and returns two rows; the in-Rust graph's
+   'pid_of' checks 'nodes . contains_key' first and returns one.
+
+   Item 8 makes the state unreachable in a running server. This item
+   is the insurance: the TypeDB resolver takes the node branch when
+   both match, so a degraded database resolves the same way the
+   in-Rust graph does instead of arbitrarily.
+
+** 10. Bury 'skg-migrate-to-telescopes'
+
+   The migration is complete and single-use; every future user starts
+   with telescopes in place. Bury it in the existing graveyard, in the
+   directory form used by
+   _burying/not_using/obsolete/to-org_complete_content-children/:
+
+   - new _burying/not_using/obsolete/migrate-to-telescopes/ holding
+     README.md (why buried, and the commit that removed it),
+     migrate_to_telescopes.rs, skg-request-migrate-to-telescopes.el.
+
+   Remove from live code: the handler file, the elisp file,
+   'RequestType::MigrateToTelescopes' and its wire string
+   (server/serve/protocol.rs), the dispatch arm (server/serve.rs), the
+   'pub mod' entry (server/serve/handlers/mod.rs), the '(require ...)'
+   (elisp/skg-client.el), the endpoint (api-and-formats.md) and the
+   command entry (docs/COMMANDS.org).
+
+   Rewrite the three places that tell the user to run it: two messages
+   in server/telescope/invariants.rs and docs/telescopes.md ("What
+   leaks, and what migration fixes"). The replacement guidance for a
+   leak-shaped membership is the per-edge gesture that still exists,
+   'skg-set-relationship-source'. Regenerate the affected
+   tests/integration/*/data/telescope-warnings.org artifacts.
+
+** 11. Give the telescope a type
+
+   Replace the anonymous 'HashMap<ID, Vec<(SourceName, NodeFS)>>' and
+   the bare 'Vec<(SourceName, NodeFS)>' with a named 'Telescope'
+   carrying its pid and its sections in privacy order. Sites:
+   server/dbs/filesystem/multiple_nodes.rs,
+   server/dbs/filesystem/one_node.rs.
+
+   The point is not tidiness. It is that the next function tempted to
+   answer a one-file question about a many-file node meets a
+   'Telescope' and has to say which section it means -- which is
+   exactly what 'source_from_disk' was never forced to do. With item 5
+   landed the type carries an invariant worth asserting: a
+   'Telescope''s home is its first section.
+
+   Last, and separable: it touches the load path, where a mistake is
+   expensive.
+
+** 12. Bookkeeping
+
+   - Write the audit list that
+     TODO/DONE/privacy-telescope/4_discussion.org asked for and never
+     got: the sites where "an ID has exactly one file" was assumed,
+     each marked resolved or still-assumed. Put it in this directory.
+   - Move the entries this plan closes out of TODO/problems.org and
+     into TODO/DONE/problems.org, per that file's protocol.
+
+* Testing
+
+  Per coding-advice/development-process.md: run the relevant unit
+  tests as each item lands, and the whole suite before calling the
+  plan done. 'typedb server' must be running for the Rust tests, and
+  'cargo run --bin skg' for the Emacs and integration tests. Test runs
+  are serialized -- concurrent runs collide on TypeDB.
+
+  New tests this plan requires:
+
+  - 'home_from_disk' returns the most public section for a node with
+    sections in two sources, and does so identically across runs
+    (item 4).
+  - The fold emits 'TitleBelowHome' for a titleless public section
+    over a titled private one, and sets the home to the public source
+    (item 5).
+  - 'write_nodecomplete_telescope' refuses a foreign home, and refuses
+    a write that would hoist a title into a titleless existing home
+    (item 7).
+  - The renamed id-conflict tests keep their coverage: a telescope is
+    not a conflict; two pids sharing an extra id is; the report names
+    both pids (items 1, 2).
+
+* Complication that needs a decision
+
+  ATTENTION: this arose while writing the plan and is not settled by
+  1_discussion.org.
+
+  Item 5 makes the home the most public section. 'unfold_node' puts
+  title and body in the home section. Composing those two: for a node
+  whose most public section is titleless while a more private section
+  holds the text, an ORDINARY SAVE would move the title up into the
+  public section -- publishing text that was private, with no
+  gesture from the user and no prompt.
+
+  This is the HOIST behavior that 1_discussion.org proposed and you
+  buried for the migration. Burying the migration removed the tool
+  that would have done it wholesale; it did not decide what the
+  ordinary save path should do when it meets the shape.
+
+  Three answers:
+
+  - REFUSE (what item 7 implements, as the safe interim). The writer
+    detects the shape from disk and errors, naming the repair. Nothing
+    is published and nothing is lost, but the node cannot be edited
+    until a human fixes the files by hand.
+  - HOIST. The save publishes the title, which does conform the data
+    to the rule. Simple, self-healing, and it publicizes private text
+    without asking.
+  - COLLAPSE. The save folds the public section's contents down into
+    the titled one and deletes the public file. Never publicizes, but
+    it silently deletes a file the user may have created deliberately,
+    and it changes the node's home behind their back.
+
+  Item 7 implements REFUSE because it is the only one of the three
+  that can neither publish nor destroy. If you prefer HOIST or
+  COLLAPSE, the change is local to
+  'write_nodecomplete_telescope' -- one guard swapped for one repair.
+
+  How reachable the shape is: not by any path this code writes. Every
+  save clamps every level to at least the owner's home
+  ('apply_sticky_levels'), so skg does not create it. It arrives only
+  from hand-edited files, from a pull, or from a foreign overlay. That
+  is why REFUSE is tolerable as an interim: the nodes it blocks are
+  already broken.

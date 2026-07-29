@@ -101,16 +101,22 @@ Two things are documented inexpressibles, by design:
 - **Publicizing below the default.** As above: a relationship's
   privacy can be raised above the default, never lowered below it.
 
-## What leaks, and what migration fixes
+## What leaks, and what repair fixes
 
-Before telescopes, a public file could name a private node's ID (a
-"leak-shaped membership"). The server now warns about these
-(`telescope-warnings.org` in your data root) rather than erroring.
-`skg-migrate-to-telescopes` raises every owned edge's privacy to at
-least its default level, moving such memberships into the right
-sections and rebuilding the databases. What no migration can fix: if
-a public repo ever *committed* a leaked ID, its git history still
-holds it; rewriting history is manual.
+A public file naming a private node's ID is a "leak-shaped
+membership". It can arrive from a hand edit or a pull, and it is what
+this model exists to prevent. The server warns about these
+(`telescope-warnings.org` in your data root) rather than erroring: a
+pull must never brick a source. Repair one with
+`skg-set-relationship-source` (`C-c s r`), which re-levels the
+membership into the right section. What no repair can fix: if a
+public repo ever *committed* a leaked ID, its git history still holds
+it; rewriting history is manual.
+
+(A wholesale migration, `skg-migrate-to-telescopes`, existed while
+pre-telescope data did. It is buried in
+`_burying/not_using/obsolete/migrate-to-telescopes/`; every user now
+starts with telescopes in place.)
 
 ## Ownership and folders
 

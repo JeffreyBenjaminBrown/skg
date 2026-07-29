@@ -4,7 +4,6 @@ pub mod edge_level_info;
 pub mod export_to_org;
 pub mod get_file_path;
 pub mod herald_rules;
-pub mod migrate_to_telescopes;
 pub mod rebuild_dbs;
 pub mod rerender_all_views;
 pub mod save_buffer;
