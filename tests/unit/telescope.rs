@@ -308,3 +308,60 @@ fn anchors_resolve_through_the_resolver ( // extra-id safety
   assert_eq! ( got, vec! ["a", "y"] );
   assert! ( warnings . is_empty (), "{:?}", warnings );
 }
+
+#[test]
+fn the_home_is_the_most_public_section_titled_or_not (
+) { // Jeff's rule: a node's text always lives in its most public
+    // section. So the home is the most public SECTION, not the most
+    // public section bearing a title; a titleless one above the
+    // title is a violation to report, not a shape to search past.
+  let titleless_public : (SourceName, SectionSlices) =
+    ( SourceName::from ("public"),
+      SectionSlices { contains : Some ( vec! [
+        ListItem::Member ( ID::new ("C") ) ] ),
+        .. SectionSlices::default () } );
+  let titled_private : (SourceName, SectionSlices) =
+    ( SourceName::from ("private"),
+      SectionSlices { title : Some ( "N" . to_string () ),
+                      body  : Some ( "secret" . to_string () ),
+                      .. SectionSlices::default () } );
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
+    fold_sections (
+      & [ titleless_public, titled_private ],
+      & identity_resolve );
+  assert_eq! ( folded . home,
+               Some ( SourceName::from ("public") ),
+               "the home is the most public section" );
+  assert_eq! ( folded . title, Some ( "N" . to_string () ),
+               "the title still folds in, from wherever it sits" );
+  assert! ( warnings . contains ( & FoldWarning::TitleBelowHome {
+              home     : SourceName::from ("public"),
+              title_at : SourceName::from ("private"), } ),
+            "the shape is reported: {:?}", warnings );
+}
+
+#[test]
+fn a_titled_most_public_section_raises_no_title_warning (
+) {
+  let titled_public : (SourceName, SectionSlices) =
+    ( SourceName::from ("public"),
+      SectionSlices { title : Some ( "N" . to_string () ),
+                      .. SectionSlices::default () } );
+  let titleless_private : (SourceName, SectionSlices) =
+    ( SourceName::from ("private"),
+      SectionSlices { contains : Some ( vec! [
+        ListItem::Member ( ID::new ("C") ) ] ),
+        .. SectionSlices::default () } );
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
+    fold_sections (
+      & [ titled_public, titleless_private ],
+      & identity_resolve );
+  assert_eq! ( folded . home,
+               Some ( SourceName::from ("public") ) );
+  assert! ( ! warnings . iter () . any ( |w| matches! (
+              w, FoldWarning::TitleBelowHome { .. }
+                 | FoldWarning::NonHomeTitle { .. }
+                 | FoldWarning::MissingTitle )),
+            "the ordinary telescope shape warns about nothing: {:?}",
+            warnings );
+}

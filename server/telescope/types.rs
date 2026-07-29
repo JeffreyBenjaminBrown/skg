@@ -113,7 +113,16 @@ pub enum FoldWarning {
   /// The same member appeared at two levels; the more public
   /// occurrence won.
   DuplicateMember { member : ID },
-  /// A non-home section carried a title; the home's won.
+  /// The home -- the most public section -- carries no title, so
+  /// the text sits at 'title_at', where a reader restricted to the
+  /// home's level cannot see it. Distinct from 'NonHomeTitle' (a
+  /// stray SECOND title) and 'MissingTitle' (no title anywhere).
+  TitleBelowHome {
+    home     : crate::types::misc::SourceName,
+    title_at : crate::types::misc::SourceName,
+  },
+  /// A section below the one holding the title carried a title too;
+  /// the more public one won.
   NonHomeTitle { level : crate::types::misc::SourceName },
   /// A non-home section carried a body; the home's won.
   NonHomeBody { level : crate::types::misc::SourceName },

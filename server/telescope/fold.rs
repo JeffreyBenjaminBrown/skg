@@ -40,9 +40,11 @@ pub struct FoldedNode {
   pub overrides_view_of            : Option<Vec<PrivaciedMember<ID>>>,
 }
 
-/// The fold as a NodeComplete. None iff the telescope has no home
-/// (no section carried a title) -- the caller decides whether that
-/// is a hard load error (it is, at init) or a warning.
+/// The fold as a NodeComplete. None iff the telescope has no
+/// sections at all, or no section carried a title anywhere -- the
+/// caller decides whether that is a hard load error (it is, at
+/// init) or a warning. A title present but BELOW the home is not
+/// such a case: it folds, carrying a 'TitleBelowHome' warning.
 pub fn nodecomplete_from_fold (
   pid       : ID,
   extra_ids : Vec<ID>,
@@ -81,12 +83,21 @@ pub fn fold_sections (
 ) -> (FoldedNode, Vec<FoldWarning>) {
   let mut warnings : Vec<FoldWarning> = Vec::new ();
   let mut folded : FoldedNode = FoldedNode::default ();
-  { // scalars: the home is the most public section bearing a title.
+  { // scalars: the home is THE MOST PUBLIC SECTION, full stop.
+    folded . home = sections . first ()
+      . map ( |(level, _)| level . clone () );
     for (level, s) in sections {
       match (&folded . title, &s . title) {
         (None, Some (t)) => {
           folded . title = Some ( t . clone () );
-          folded . home  = Some ( level . clone () );
+          if let Some (home) = &folded . home {
+            if home != level {
+              // The home carries no title, so the text sits at a
+              // more private level, where a reader restricted to
+              // the home's level cannot see it.
+              warnings . push ( FoldWarning::TitleBelowHome {
+                home     : home  . clone (),
+                title_at : level . clone () } ); }}
           if let Some (b) = &s . body {
             folded . body = Some ( b . clone () ); }}
         (Some (_), Some (_)) => {
@@ -99,7 +110,7 @@ pub fn fold_sections (
               level : level . clone () } ); }}
         _ => {
           if s . body . is_some () && folded . title . is_none () {
-            // body in a titleless section, before any home was seen
+            // body at a level that does not hold the title
             warnings . push ( FoldWarning::NonHomeBody {
               level : level . clone () } ); }} }}
     if folded . title . is_none () {

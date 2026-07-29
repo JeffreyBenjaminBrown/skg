@@ -22,10 +22,16 @@ ladder. Screen-sharing with a colleague, you might switch to the
 
 ## What lives where
 
-The most public section carrying a title is the node's **home**. It
-holds the title, body, and extra IDs. Every relationship edge (a
-`contains` membership, a subscription, a hide, an override) carries
-its own privacy level: the level of the section that records it.
+The node's **home** is its most public section. It holds the title,
+body, and extra IDs. That the home is the section with the title is
+an invariant rather than a definition: it would be silly to share a
+node without sharing its text, so a node's text always lives in its
+most public section. Data that breaks the rule — a titleless
+section more public than the title — still loads, but the fold
+reports it, and a save refuses to rewrite such a node rather than
+silently publish the text. Every relationship edge (a `contains`
+membership, a subscription, a hide, an override) carries its own
+privacy level: the level of the section that records it.
 
 Reading the node **folds** the sections, most public first, into one
 effective node. Under a restricted source-set you see the **visible

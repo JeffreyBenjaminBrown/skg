@@ -736,10 +736,13 @@ Each file is one **telescope section**: the slice of one node
 recorded at one privacy level (see `docs/telescopes.md`). One node =
 one ID = same-ID `.skg` files across sources, at most one per
 source; the filename is the node's primary ID followed by `.skg` in
-every source. The most public section carrying a `title` is the
-node's **home**. A field a section omits is a field that section has
-no opinion about. Pre-telescope single-file nodes parse unchanged
-(one section, title present, no anchors).
+every source. The node's **home** is its MOST PUBLIC section, and
+that section carries the `title` — an invariant, not a search rule.
+A titleless section more public than the title still loads (the
+fold reports it) but cannot be rewritten by a save. A field a
+section omits is a field that section has no opinion about.
+Pre-telescope single-file nodes parse unchanged (one section, title
+present, no anchors).
 
 Fields:
 
