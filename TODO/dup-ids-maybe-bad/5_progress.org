@@ -1,0 +1,162 @@
+#+title: Progress on 3_plan.org
+
+  All twelve work items are implemented, in nine commits. The plan
+  itself is left as written; this file records what differed.
+
+* What's done and went well
+
+** Every item landed, and one extra
+
+   1-3 (rename, report the pids, delete stale reports), 4
+   ('home_from_disk'), 5 (home := most public section), 6 (report
+   load-time violations), 7 (write guards), 8 (check ids before the
+   databases), 9 (resolvers agree), 10 (bury the migration), 11 (the
+   'Telescope' type), 12 (audit list + problems.org).
+
+   The extra: 'deleted_ids_to_source'
+   (server/serve/handlers/save_buffer.rs) turned out to be the same
+   bug as 'source_from_disk' in a second place -- it mapped a deleted
+   node's id to a source by walking a HashMap and letting the last
+   writer win, and deleting a node deletes every owned section, so
+   one id routinely appears as deleted in several sources at once.
+   Found while writing the audit list, which is exactly what the
+   audit list was for.
+
+** Jeff's rule made item 4 smaller, not larger
+
+   Pinning the home to the most public section turned
+   'home_from_disk' into a single 'exists()' walk with no file reads
+   and no title check. The draft plan had it reading each section
+   looking for a title. Better still, checking the rule found that
+   the save path ALREADY enforces it, unnamed: 'apply_sticky_levels'
+   clamps every level -- relations, hides, aliases -- to at least the
+   owner's home, and its own comment calls a more-public section "the
+   'extends on the other side' junk shape".
+
+** The stale-report hazard was live, on real data
+
+   Predicted in 1_discussion.org, then found on disk:
+   'data/initialization-error_duplicate-ids.org', written 2026-07-03,
+   lists 9 ids each "duplicated" across two sources. Every one is a
+   healthy privacy telescope. It has been sitting in the data root
+   for 26 days describing the feature as a defect.
+
+   That file is NOT deleted by this work: it carries the old name, so
+   the new code neither writes nor removes it. Removing it is one
+   command, left to Jeff since it is his data directory and the file
+   is evidence.
+
+** The new load-time reporting fires on real data
+
+   Starting the server against 'data/skgconfig.toml' produced two
+   telescope warnings, one of which -- a 'DuplicateMember' fold
+   warning on node 33d5cd4e -- was previously logged and dropped.
+   That is item 6 doing its job on the first real run.
+
+** Tests
+
+   - Rust: 540/541. The one failure, 'override_menu::all_tests', is
+     PRE-EXISTING -- verified by stashing every change in this arc
+     and re-running, which fails identically. Filed in
+     TODO/problems.org.
+   - Emacs: 295/295.
+   - Integration: 26/26, including 'override-menu' (a different test
+     from the failing unit one) and every fork and save test.
+
+* Changes to the plan's envisioned order
+
+** Items 1-3 became one commit
+
+   All three edit the same two functions in multiple_nodes.rs, and
+   item 2 forces item 1's signature change. Splitting them would have
+   meant rewriting one function three times for a quieter history
+   that describes nothing real.
+
+** Items 6 and 8 became one commit
+
+   Both rewrite the same three call sites (full_init, the incremental
+   init path, 'rebuild_dbs_in_place'). Landing them separately would
+   have touched each site twice.
+
+** Item 6 reports EVERY fold warning, not the two new ones
+
+   The plan named 'TitleBelowHome' and 'ForeignOverlay'. Reporting
+   those while continuing to drop dangling anchors and duplicate
+   members would have been arbitrary, and the plumbing is the same
+   either way. 'TelescopeViolation::Fold' wraps any 'FoldWarning', so
+   all of them reach telescope-warnings.org. 'FoldWarning' gained a
+   'Display' impl to say each one in a sentence with its repair.
+
+* What's imperfect about what's done
+
+** The incremental init path checks ids too late to help itself
+
+   Item 8 put the check before database population in 'full_init'. In
+   the INCREMENTAL path, 'incremental_init_of_dbs' has already
+   applied its deltas by the time the full read happens, so the check
+   there still runs after TypeDB was touched. Narrowing that would
+   mean reading every file before the incremental update, which is
+   the whole cost incremental init exists to avoid. The exposure is
+   small (only a modified file can introduce a conflict, and the
+   deltas are applied, not a wipe-and-rebuild), and that path is
+   marked "DEAD ?" at server/dbs/init.rs.
+
+** The title-hoist guard reads a file on some writes
+
+   'error_unless_home_is_writable' stats the home's path and, when it
+   exists, parses it to check for a title -- on every
+   'write_nodecomplete_telescope'. That is one extra read per node
+   written, on a path already doing file I/O, and it is what makes
+   the refusal precise rather than approximate. If save profiling
+   ever shows it, the check could move behind a fold-supplied flag.
+
+** 'Telescope' is a load-side type only
+
+   It groups sections and folds them. The UNFOLD side still speaks
+   'Vec<(SourceName, SectionSlices)>' and 'write_nodecomplete_telescope'
+   builds its sections by hand. Making unfold return a 'Telescope'
+   would close the loop and let 'fold(unfold(x)) == x' be stated on
+   the type rather than on lists. Not needed for anything here.
+
+** The audit list is a document, not a test
+
+   Nothing fails if a new one-file assumption appears. The 'Telescope'
+   type is the real protection; the list is the record of what was
+   checked.
+
+* Choices determining the future
+
+** The home is now DEFINITIONAL, not searched
+
+   'fold_sections' sets the home to the most public section before
+   looking at any title. Every read path can therefore compute the
+   home cheaply and get the same answer, which is what removed the
+   class of bug this arc was about. The cost: data whose most public
+   section is titleless now has a home that does not hold its text,
+   and that shape has to be handled explicitly rather than searched
+   past -- which is what the write guards do.
+
+** A save REFUSES the two unwritable shapes
+
+   Rather than hoisting (publishes private text) or collapsing
+   (deletes a file the user may have made). This is the interim
+   answer to the open question at the end of 3_plan.org, and it is
+   the only one of the three that can neither publish nor destroy.
+   Swapping it for either is one guard's worth of work, local to
+   'error_unless_home_is_writable'.
+
+** Foreign sections are refused at the WRITER, not just by callers
+
+   The promise "foreign sources are never written" used to live in
+   'from_text/validate.rs' and 'from_text/fork.rs'. Any future
+   caller of 'write_nodecomplete_telescope' now inherits it. A
+   resurrected 'skg-migrate-to-telescopes' would have to SKIP such
+   nodes rather than propagate the error, since it walks every owned
+   node at once -- noted in its burial README.
+
+** 'skg-migrate-to-telescopes' is gone from the live code
+
+   Its guidance role passed to 'skg-set-relationship-source', which
+   repairs one edge at a time. If a wholesale re-leveling is ever
+   wanted again, the code is at
+   _burying/not_using/obsolete/migrate-to-telescopes/.
