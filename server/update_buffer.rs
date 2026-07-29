@@ -70,7 +70,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
         else {None};
     let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
       source_diffs . as_ref()
-      . map ( |d| deleted_ids_to_source (d))
+      . map ( |d| deleted_ids_to_source (d, &env . config))
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> =
       // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
@@ -312,7 +312,7 @@ pub async fn render_initial_view (
     if diff_mode { Some ( compute_diff_for_every_source (&env . config) ) }
     else         { None };
   let deleted_src : HashMap<ID, SourceName> =
-    real_diffs . as_ref () . map ( |d| deleted_ids_to_source (d) )
+    real_diffs . as_ref () . map ( |d| deleted_ids_to_source (d, &env . config) )
       . unwrap_or_default ();
   let empty_deleted_pids : HashSet<ID> = HashSet::new ();
   let mut sink : Vec<CompletionWarning> = Vec::new ();

@@ -506,15 +506,25 @@ pub fn compute_diff_for_every_source (
           source_name, e ); }} }
   source_diffs }
 
-/// Build a map from ID to source for all deleted files.
-/// This is used to determine the source of nodes
-/// that exist in git HEAD but not in the worktree.
+/// Build a map from ID to HOME for all deleted files: the source of
+/// nodes that exist in git HEAD but not in the worktree.
+///
+/// Walks the sources in privacy order and keeps the FIRST (most
+/// public) hit, because deleting a node deletes its whole
+/// TELESCOPE -- every owned section, in as many sources as hold one
+/// ('delete_all_nodes_from_fs') -- so one id routinely appears as
+/// deleted in several sources at once. Iterating 'source_diffs'
+/// (a HashMap) and letting the last writer win answered that
+/// arbitrarily, per process.
 pub fn deleted_ids_to_source (
-  source_diffs : &HashMap<SourceName, SourceDiff>
+  source_diffs : &HashMap<SourceName, SourceDiff>,
+  config       : &SkgConfig,
 ) -> HashMap<ID, SourceName> {
   let mut result : HashMap<ID, SourceName> =
     HashMap::new();
-  for (source_name, source_diff) in source_diffs {
+  for source_name in config . ordered_sources () {
+    let Some (source_diff) : Option<&SourceDiff> =
+      source_diffs . get (&source_name) else { continue; };
     for diffs in [ &source_diff . staged,
                    &source_diff . unstaged ] {
       for (path, nodecomplete_diff) in diffs {
@@ -522,8 +532,8 @@ pub fn deleted_ids_to_source (
           if let Some (stem) = path . file_stem() {
             let id : ID = ID ( stem . to_string_lossy()
                                . into_owned() );
-            result . insert ( id,
-                              source_name . clone() ); }} }} }
+            result . entry (id) // most public wins
+              . or_insert_with ( || source_name . clone() ); }} }} }
   result }
 
 /// Every other open view sharing at least one PID with the saved view.
