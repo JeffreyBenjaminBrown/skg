@@ -1,0 +1,129 @@
+#+title: The one-ID-one-file audit list
+
+  TODO/DONE/privacy-telescope/4_discussion.org asked for this and
+  never got it:
+
+    Unlike adding a =NodeRelation= variant (exhaustive matches), the
+    "an ID has exactly one file/source" assumption hides in ordinary
+    code ... A written audit list of these sites, checked off during
+    implementation, is the only protection; budget for it explicitly.
+
+  Its absence is why 'source_from_disk' survived the telescope work
+  unnoticed. This is that list, checked off. It names the sites the
+  discussion predicted, plus the ones found since.
+
+  STATUS values:
+  - RESOLVED :: the site now asks a telescope-shaped question.
+  - BY CONSTRUCTION :: the site never assumed one file; recorded so
+    the next reader need not re-derive that.
+  - STILL ASSUMED :: open. (None as of this writing.)
+
+* Sites the discussion predicted
+
+** RESOLVED init's duplicate check
+   'error_unless_each_id_names_one_node'
+   (server/dbs/filesystem/multiple_nodes.rs). Narrowed to "one id
+   claimed by two DISTINCT pids" during the telescope work, but kept
+   the old name and messages until now, which is how it went on
+   reading as a check against telescopes. Renamed, remessaged, and
+   moved ahead of database population.
+
+** RESOLVED the daily audit
+   'server/dbs/in_rust_graph/audit.rs' compares each pid's
+   'node.source' in the in-Rust graph against TypeDB's 'has_source'.
+   Both are the HOME, one per node -- TypeDB never held per-section
+   rows (schema.tql: 'has_source ... @card(1)', and edges are stored
+   unleveled). So the comparison is telescope-correct as written.
+
+** RESOLVED diff analysis's duplicate bucket
+   'duplicate_id_reports' (server/diff_analysis/diff.rs) reports only
+   an id claimed by two distinct pids; endpoints are compared as whole
+   telescopes (sections grouped by pid and folded). Done during the
+   telescope work; api-and-formats.md says so explicitly.
+
+** RESOLVED source_from_disk
+   Now 'home_from_disk' (server/types/phantom.rs). It walked
+   'config.sources', a HashMap, and returned the first directory
+   holding '<pid>.skg' -- an arbitrary section, chosen by an order
+   Rust randomizes per process, for any node with more than one.
+   Consumers read it as the HOME, including the computation of a new
+   edge's default privacy level. Walks 'ordered_sources' now.
+
+   This is the site the audit list was supposed to catch.
+
+** RESOLVED pid_and_source
+   'InRustGraph::pid_and_source' reads 'node.source', which the fold
+   sets. Ambiguous while the home was "the most public TITLED
+   section" (a titleless section above it was silently skipped);
+   unambiguous now that the home is the most public section, full
+   stop.
+
+** BY CONSTRUCTION get-file-path
+   'path_from_pid_and_source' (server/util.rs) takes the source as an
+   argument, so it never guesses which section is meant -- the caller
+   must say. Nothing to fix; the type already asks the right question.
+
+** RESOLVED delete-propagation
+   'delete_all_nodes_from_fs' (server/dbs/filesystem/multiple_nodes.rs)
+   sweeps every OWNED level for the pid, so deleting a node deletes
+   its whole telescope. Done during the telescope work.
+
+** RESOLVED stage-moves
+   Redefined during the telescope work around TITLE presence rather
+   than file presence: a node moved iff its title vanished from
+   exactly one source and appeared in exactly one other. Titleless
+   section creations and deletions are re-levelings of individual
+   relationships, and stage as ordinary edits.
+
+* Sites found since
+
+** RESOLVED deleted_ids_to_source
+   server/serve/handlers/save_buffer.rs. Maps a deleted node's id to
+   its source by walking 'source_diffs' (a HashMap) and letting the
+   last writer win. Deleting a node deletes every owned section, so
+   one id routinely appears as deleted in several sources at once,
+   and the reported home was chosen by hash order. Walks the privacy
+   order now, keeping the most public.
+
+** RESOLVED write_nodecomplete_telescope's ownership claim
+   server/dbs/filesystem/one_node.rs. Its doc comment promised
+   foreign sections are never written; the write loop checked
+   nothing (only the delete sweep did), so the promise lived in the
+   callers. With the home definitionally the most public section, a
+   foreign home is conceivable, so
+   'error_unless_home_is_writable' enforces it at the writer.
+
+** RESOLVED the fold's own home search
+   'fold_sections' (server/telescope/fold.rs) searched for the most
+   public section BEARING A TITLE. That is the two-notions-of-home
+   problem in miniature, and every read path wanting the home had to
+   repeat or approximate the search. The home is now the most public
+   section; a title below it is 'FoldWarning::TitleBelowHome'.
+
+** RESOLVED pid_and_source_from_id's disjunction
+   server/dbs/typedb/search.rs. Not a one-file assumption but the
+   same shape: an 'or' over "node has id X" and "extra_id has id X",
+   taking whichever row came first, so a database in which one id is
+   both answered differently from the in-Rust graph. Prefers the node
+   branch now, matching 'pid_of'.
+
+* The structural fix
+
+  Each entry above was a function that could answer a one-file
+  question about a many-file node without anything forcing it to say
+  which section it meant. Grouping the same-pid files ended in an
+  anonymous 'HashMap<ID, Vec<(SourceName, NodeFS)>>'.
+
+  It ends in a 'Telescope' now (server/telescope/types.rs), which is
+  what 4_discussion.org asked for:
+
+    Making "several files, one node" a type, not a condition, is what
+    keeps the scattered-assumption sweep from regressing later: new
+    code meets =Accordion=, not a surprising second file.
+
+  A 'Telescope' knows its sections are in privacy order and that its
+  home is the first of them. A function that wants one section has to
+  choose one.
+
+  This list should still be extended, not retired: a type prevents
+  the shape from being invisible, not from being written.
