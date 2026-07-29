@@ -1,5 +1,5 @@
-use crate::telescope::fold::{fold_sections, nodecomplete_from_fold};
-use crate::telescope::types::SectionSlices;
+use crate::telescope::fold::fold_telescope;
+use crate::telescope::types::{SectionSlices, Telescope};
 use crate::telescope::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
 use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
@@ -32,8 +32,8 @@ pub async fn nodecomplete_from_id (
 /// TELESCOPE -- every same-pid section file across the configured
 /// sources, folded. The 'source' parameter survives only as the
 /// caller's belief about the home; the fold derives the true home
-/// (the most public titled section), so a stale belief cannot
-/// corrupt the read. Extra-id anchor resolution here is
+/// (the most public section), so a stale belief cannot corrupt the
+/// read. Extra-id anchor resolution here is
 /// identity-only (this telescope's own extra_ids are unknown until
 /// read; cross-node merges resolve at the graph layer).
 pub fn nodecomplete_from_pid_and_source (
@@ -41,51 +41,23 @@ pub fn nodecomplete_from_pid_and_source (
   pid    : ID,
   source : &SourceName,
 ) -> io::Result<NodeComplete> {
-  let sections : Vec<(SourceName, NodeFS)> =
-    read_telescope_sections (config, &pid) ?;
-  if sections . is_empty () {
+  let telescope : Telescope =
+    telescope_from_disk (config, &pid) ?;
+  if telescope . is_empty () {
     return Err ( io::Error::new (
       io::ErrorKind::NotFound,
       format! ("No .skg file for '{}' in any source (caller expected one in '{}')",
                pid, source ))); }
-  let extra_ids : Vec<ID> = {
-    // gathered before folding, from every section
-    let mut extra_ids : Vec<ID> = Vec::new ();
-    for (_, node_fs) in &sections {
-      for e in &node_fs . extra_ids {
-        if ! extra_ids . contains (e) {
-          extra_ids . push ( e . clone () ); }} }
-    extra_ids };
-  let misc : Vec<crate::types::nodes::complete::FileProperty> = {
-    let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
-      Vec::new ();
-    for (_, node_fs) in &sections {
-      for m in &node_fs . misc {
-        if ! misc . contains (m) {
-          misc . push ( m . clone () ); }} }
-    misc };
-  let slices : Vec<(SourceName, SectionSlices)> =
-    sections . into_iter ()
-    . map ( |(level, node_fs)|
-            (level, node_fs . into_section_slices ()) )
-    . collect ();
-  let (folded, warnings) =
-    fold_sections ( &slices, & |id : &ID| id . clone () );
-  for w in &warnings {
-    tracing::warn! ( pid = %pid, warning = ?w,
-                     "telescope fold warning (single-node read)" ); }
-  nodecomplete_from_fold ( pid . clone (), extra_ids, misc, folded )
-    . ok_or_else ( || io::Error::new (
-      io::ErrorKind::InvalidData,
-      format! ("Telescope '{}' has no home: no section carries a title.",
-               pid ))) }
+  fold_telescope ( telescope, & |id : &ID| id . clone () ) }
 
-/// Every section of PID's telescope, in privacy order: for each
-/// configured source (most public first), pid.skg if present.
-fn read_telescope_sections (
+/// PID's telescope as it sits on disk, in privacy order: for each
+/// configured source (most public first), pid.skg if present. The
+/// order is what makes the first section the home, so it comes from
+/// 'ordered_sources' and nowhere else.
+fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
-) -> io::Result<Vec<(SourceName, NodeFS)>> {
+) -> io::Result<Telescope> {
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   for source_name in config . ordered_sources () {
     let path : String =
@@ -96,7 +68,7 @@ fn read_telescope_sections (
     if ! Path::new (&path) . is_file () { continue; }
     let node_fs : NodeFS = read_nodecomplete (&path) ?;
     sections . push (( source_name, node_fs )); }
-  Ok (sections) }
+  Ok ( Telescope { pid : pid . clone (), sections } ) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
@@ -137,8 +109,9 @@ pub async fn fetch_aliases_from_file (
 /// write each section file only when its bytes changed
 /// (no-cosmetic-rewrites), and delete OWNED section files whose
 /// level lost its last member. Foreign sources are never written or
-/// deleted: a foreign same-pid file is the forbidden-overlay shape,
-/// left for the validators to report.
+/// deleted -- 'error_unless_home_is_writable' refuses rather than
+/// skipping, so a foreign home cannot silently lose the title, and
+/// the load reports that shape as 'TelescopeViolation::ForeignOverlay'.
 pub fn write_nodecomplete_to_source (
   nodecomplete : &NodeComplete,
   config  : &SkgConfig,

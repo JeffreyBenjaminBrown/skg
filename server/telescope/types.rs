@@ -17,7 +17,81 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
+use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::fs::NodeFS;
+
+/// ONE NODE, as it sits on disk: its sections, in privacy order,
+/// most public first.
+///
+/// The point of the type is that "several files, one node" is a
+/// VALUE rather than a condition to be discovered. Before it,
+/// grouping the same-pid files ended in an anonymous
+/// 'Vec<(SourceName, NodeFS)>', and any function tempted to answer a
+/// one-file question about a many-file node could do so without
+/// anything forcing it to say which section it meant --- which is
+/// how 'source_from_disk' went on answering the pre-telescope
+/// question long after telescopes arrived (see
+/// TODO/dup-ids-maybe-bad/1_discussion.org). New code meets a
+/// 'Telescope' and has to choose.
+///
+/// The privacy order is the CALLER's to establish (both builders
+/// walk 'SkgConfig::ordered_sources'), because only the config knows
+/// it. Given that, the HOME is simply the first section.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Telescope {
+  pub pid      : ID,
+  pub sections : Vec<(SourceName, NodeFS)>,
+}
+
+impl Telescope {
+  /// The most public section's level. None iff there are no
+  /// sections, which callers reject.
+  pub fn home (
+    &self,
+  ) -> Option<&SourceName> {
+    self . sections . first () . map ( |(level, _)| level ) }
+
+  pub fn is_empty (
+    &self,
+  ) -> bool {
+    self . sections . is_empty () }
+
+  /// Every extra id any section claims, first occurrence first.
+  /// Unioned across sections rather than read from the home alone:
+  /// extra ids are home-section data by convention, and a stray one
+  /// elsewhere should still resolve rather than silently dangle.
+  pub fn extra_ids (
+    &self,
+  ) -> Vec<ID> {
+    let mut extra_ids : Vec<ID> = Vec::new ();
+    for (_, node_fs) in &self . sections {
+      for e in &node_fs . extra_ids {
+        if ! extra_ids . contains (e) {
+          extra_ids . push ( e . clone () ); }} }
+    extra_ids }
+
+  /// Every unrecognized file property any section carries, first
+  /// occurrence first. Unioned defensively, like 'extra_ids'.
+  pub fn misc (
+    &self,
+  ) -> Vec<FileProperty> {
+    let mut misc : Vec<FileProperty> = Vec::new ();
+    for (_, node_fs) in &self . sections {
+      for m in &node_fs . misc {
+        if ! misc . contains (m) {
+          misc . push ( m . clone () ); }} }
+    misc }
+
+  /// The sections in the form the fold consumes, order preserved.
+  pub fn into_slices (
+    self,
+  ) -> Vec<(SourceName, SectionSlices)> {
+    self . sections . into_iter ()
+      . map ( |(level, node_fs)|
+              (level, node_fs . into_section_slices ()) )
+      . collect () }
+}
 
 /// One entry of an ordered relation's stored sequence.
 ///

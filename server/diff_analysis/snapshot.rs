@@ -1,5 +1,7 @@
 use crate::dbs::filesystem::multiple_nodes::{
-  fold_one_telescope, read_skg_sections_from_folder};
+  read_skg_sections_from_folder};
+use crate::telescope::fold::fold_telescope;
+use crate::telescope::types::Telescope;
 use crate::diff_analysis::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
 use crate::git_ops::misc::path_relative_to_repo;
@@ -605,8 +607,9 @@ fn fold_telescope_tolerating_homelessness (
 ) -> Result<NodeComplete, String> {
   let retry : Vec<(SourceName, NodeFS)> =
     sections . clone ();
-  match fold_one_telescope (pid, sections, resolve) {
-    Ok (node) => Ok (node),
+  match fold_telescope (
+    Telescope { pid : pid . clone (), sections }, resolve )
+  { Ok (node) => Ok (node),
     Err (_) => {
       let mut retry : Vec<(SourceName, NodeFS)> = retry;
       match retry . first_mut () {
@@ -615,7 +618,9 @@ fn fold_telescope_tolerating_homelessness (
             Some ("(no titled section)" . to_string ()),
         None => return Err ( format! (
           "Telescope '{}' has no sections to fold.", pid )), }
-      fold_one_telescope (pid, retry, resolve)
+      fold_telescope (
+        Telescope { pid : pid . clone (), sections : retry },
+        resolve )
         . map_err ( |e| e . to_string () ) }}
 }
 

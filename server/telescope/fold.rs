@@ -17,11 +17,12 @@
 //! level order; a member repeated across levels keeps its most
 //! public occurrence, with a warning.
 
-use crate::telescope::types::{FoldWarning, ListItem, SectionSlices};
+use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
+use std::io;
 
 /// The fold of one node's sections, as effective leveled lists plus
 /// scalars. Field names mirror 'NodeComplete'.
@@ -39,6 +40,46 @@ pub struct FoldedNode {
   pub hides_from_its_subscriptions : Option<Vec<PrivaciedMember<ID>>>,
   pub overrides_view_of            : Option<Vec<PrivaciedMember<ID>>>,
 }
+
+/// THE fold entry point: one telescope on disk -> the effective
+/// node, plus whatever the fold complained about. 'resolve' maps
+/// extra ids to pids for anchor resolution and must be built from
+/// the whole corpus, not just this telescope (else a nodeMerge can
+/// dangle an anchor).
+///
+/// Errors only when no section anywhere carries a title. A title
+/// present but BELOW the home folds fine, carrying a
+/// 'TitleBelowHome' warning.
+pub fn fold_telescope_collecting_warnings (
+  telescope : Telescope,
+  resolve   : &dyn Fn (&ID) -> ID,
+) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
+  let pid       : ID                = telescope . pid . clone ();
+  let extra_ids : Vec<ID>           = telescope . extra_ids ();
+  let misc      : Vec<FileProperty> = telescope . misc ();
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
+    fold_sections ( & telescope . into_slices (), resolve );
+  let node : NodeComplete = nodecomplete_from_fold (
+    pid . clone (), extra_ids, misc, folded )
+    . ok_or_else ( || io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! ("Telescope '{}' has no title in any section.",
+               pid ))) ?;
+  Ok (( node, warnings )) }
+
+/// 'fold_telescope_collecting_warnings', with the warnings logged
+/// rather than returned -- for callers with no way to report them.
+pub fn fold_telescope (
+  telescope : Telescope,
+  resolve   : &dyn Fn (&ID) -> ID,
+) -> io::Result<NodeComplete> {
+  let pid : ID = telescope . pid . clone ();
+  let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+    fold_telescope_collecting_warnings ( telescope, resolve ) ?;
+  for w in &warnings {
+    tracing::warn! ( pid = %pid, warning = %w,
+                     "telescope fold warning" ); }
+  Ok (node) }
 
 /// The fold as a NodeComplete. None iff the telescope has no
 /// sections at all, or no section carried a title anywhere -- the

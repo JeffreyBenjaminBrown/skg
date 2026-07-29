@@ -1,5 +1,5 @@
-use crate::telescope::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
-use crate::telescope::types::{FoldWarning, SectionSlices};
+use crate::telescope::fold::fold_telescope_collecting_warnings;
+use crate::telescope::types::{FoldWarning, Telescope};
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_telescope};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
@@ -142,74 +142,17 @@ fn fold_grouped_sections (
   let mut all_nodes : Vec<NodeComplete> = Vec::new ();
   let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
-    let sections : Vec<(SourceName, NodeFS)> =
-      sections_by_pid . remove (&pid)
-      . expect ("pid_order tracks sections_by_pid");
+    let telescope : Telescope = Telescope {
+      sections : sections_by_pid . remove (&pid)
+        . expect ("pid_order tracks sections_by_pid"),
+      pid      : pid . clone (), };
     let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
-      fold_one_telescope_collecting_warnings (
-        &pid, sections, &resolve ) ?;
+      fold_telescope_collecting_warnings ( telescope, &resolve ) ?;
     all_nodes . push (node);
     for w in warnings {
       all_violations . push (
         ( pid . clone (), TelescopeViolation::Fold (w) )); }}
   Ok (( all_nodes, all_violations )) }
-
-/// 'fold_one_telescope_collecting_warnings', with the warnings
-/// logged rather than returned -- for the callers that have no way
-/// to report them.
-pub fn fold_one_telescope (
-  pid      : &ID,
-  sections : Vec<(SourceName, NodeFS)>,
-  resolve  : &dyn Fn (&ID) -> ID,
-) -> io::Result<NodeComplete> {
-  let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
-    fold_one_telescope_collecting_warnings (
-      pid, sections, resolve ) ?;
-  for w in &warnings {
-    tracing::warn! ( pid = %pid, warning = %w,
-                     "telescope fold warning" ); }
-  Ok (node) }
-
-/// Fold ONE telescope's sections (in privacy order) into a
-/// NodeComplete, plus whatever the fold complained about.
-/// 'resolve' maps extra ids to pids for anchor resolution and must
-/// be built from the whole corpus, not just this telescope. A
-/// telescope with no title in any section is a hard error.
-pub fn fold_one_telescope_collecting_warnings (
-  pid      : &ID,
-  sections : Vec<(SourceName, NodeFS)>,
-  resolve  : &dyn Fn (&ID) -> ID,
-) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
-  let extra_ids : Vec<ID> = {
-    let mut extra_ids : Vec<ID> = Vec::new ();
-    for (_, node_fs) in &sections {
-      for e in &node_fs . extra_ids {
-        if ! extra_ids . contains (e) {
-          extra_ids . push ( e . clone () ); }} }
-    extra_ids };
-  let misc : Vec<crate::types::nodes::complete::FileProperty> = {
-    // home-section data, like extra_ids; unioned defensively
-    let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
-      Vec::new ();
-    for (_, node_fs) in &sections {
-      for m in &node_fs . misc {
-        if ! misc . contains (m) {
-          misc . push ( m . clone () ); }} }
-    misc };
-  let slices : Vec<(SourceName, SectionSlices)> =
-    sections . into_iter ()
-    . map ( |(level, node_fs)|
-            (level, node_fs . into_section_slices ()) )
-    . collect ();
-  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
-    fold_sections ( &slices, resolve );
-  let node : NodeComplete = nodecomplete_from_fold (
-    pid . clone (), extra_ids, misc, folded )
-    . ok_or_else ( || io::Error::new (
-      io::ErrorKind::InvalidData,
-      format! ("Telescope '{}' has no title in any section.",
-               pid ))) ?;
-  Ok (( node, warnings )) }
 
 /// NOT AN ERROR: same-id files across sources. Those are the
 /// SECTIONS of one privacy telescope, grouped and folded at load,
