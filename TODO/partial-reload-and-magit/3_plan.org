@@ -1,0 +1,344 @@
+* partial reload and magit -- plan
+
+This is the definitive, declarative build spec. The motivation is in
+=1_vision.org=; every design decision below was settled in
+=2_discussion.org= (all headlines there are now DONE). This document
+does not re-argue those decisions; it states what will be built, in
+which files, reusing which existing functions. File:line citations are
+current as of this writing.
+
+Terminology: "telescope" = one node's full set of same-pid =.skg=
+sections across sources, folded to one =NodeComplete=. "the three
+stores" = the in-Rust graph (=InRustGraph= behind
+=Arc<ArcSwap<...>>=), TypeDB, and Tantivy. The filesystem is the
+source of truth; the three stores are derived caches.
+
+* Goal and shape
+When a =.skg= worktree file changes out of band (a magit discard is the
+motivating case), skg re-reads the affected telescopes from disk and
+updates the three stores to match -- a *partial* reload, not a full
+rebuild. Reload is read-only with respect to the filesystem. When a
+re-read of a telescope is *fatal* (the short list below), skg keeps its
+last-good in-memory state for that telescope, warns loudly, and *offers*
+a git-based recovery that preserves every relevant state on named
+branches and restores the good state to disk.
+
+The work is four components, built and committed in this order:
+1. Server: a "reload paths" request that reloads specific telescopes.
+2. A process-global write mutex serialising save and reload.
+3. Emacs: the triggers (magit-post-refresh, after-save, manual command).
+4. Server + Emacs: the fatal-case recovery (three =oops-N_*= branches),
+   offered and confirmed like the existing fork flow.
+
+* Invariants (load-bearing; hold across all components)
+- *Reload never writes =.skg= files.* It updates only the three derived
+  stores. It therefore must NOT go through =update_graph_minus_nodeMerges=
+  (=server/save.rs:52=), whose =apply_delete_propagation_cleanup=
+  (=server/save.rs:388=) appends Saves that rewrite *other* nodes' files.
+  Reload drives the store writers directly (see 1.4).
+- *Dangling references are legal* and are left alone (rendered as the
+  "Parent references unknown node." scaffold). Reload never tries to
+  "fix" them.
+- *The fatal list is exactly*: unparseable YAML / empty title / empty pid
+  (=read_nodecomplete=, =one_node.rs:229=); pid != filename
+  (=validate_pid_matches_filename=, =one_node.rs:206=); a telescope with
+  sections but no home (=fold_one_telescope=, =multiple_nodes.rs:131=);
+  duplicate IDs across sources; override-invariant violation
+  (=error_unless_override_invariants_hold=). Everything else is legal.
+- *Recovery is a separate, deliberate, user-confirmed write.* It is the
+  only code that writes git or restores disk, and it runs only on
+  explicit confirmation. It never runs as a side effect of reload.
+- *Restore writes only skg-owned =.skg= files*, never =git add -A=; it
+  must not touch the user's unrelated uncommitted work.
+
+* Component 1 -- Server: the "reload paths" request  [Phase 1]
+A new request that takes a set of worktree paths and reloads the
+telescopes they belong to. Modeled on =RebuildDbs= (mutates =env= and
+=views_state=, but carries a payload like =TitlesByIds=).
+
+** 1.1 Protocol wiring (=server/serve/protocol.rs=)
+- Add =RequestType::ReloadPaths= to the enum (near line 7-30).
+- Add the arm ="reload paths" => Ok (RequestType::ReloadPaths)= to
+  =from_client_string= (lines 36-59).
+- Add =TcpToClient::ReloadPaths= (lines 68-97) and its
+  =repr_in_client= arm ="reload-paths"= (lines 103-131).
+
+** 1.2 Handler registration
+- =server/serve/handlers/mod.rs=: add =pub mod reload_paths;=.
+- =server/serve.rs=: add =use crate::serve::handlers::reload_paths::handle_reload_paths_request;=
+  (join lines 18-34) and the dispatch arm (before the =Err= arm ~line
+  247):
+  =Ok (RequestType::ReloadPaths) => handle_reload_paths_request (&mut stream, &request_header, &mut env, &mut views_state, &active_source_set, &mut pending_incident),=
+  (=pending_incident= is a new per-connection local; see Component 4.)
+
+** 1.3 Path -> (source, pid) resolution
+New helper (new file =server/serve/handlers/reload_paths.rs=, or a small
+fn in =git_ops=/=filesystem=): =source_and_pid_for_path (config, path)
+-> Option<(SourceName, ID)>=. A =.skg= file lives at
+=<source.path>/<pid>.skg=; iterate =config.sources=, find the source
+whose directory contains =path=, take =pid= = file stem. The client
+sends absolute paths (present or already-deleted); the server resolves
+and dedups to a set of touched pids. A path resolving to no source is
+skipped with a warning.
+
+** 1.4 The reload itself (=handle_reload_paths_request=)
+Signature mirrors the payload-bearing handlers:
+=(stream: &mut TcpStream, request: &str, env: &mut SkgEnv, views_state: &mut ViewsState, active_source_set: &ActiveSourceSet, pending_incident: &mut Option<PendingIncident>)=.
+
+Steps:
+1. Parse the path list from the request sexp (list-field parse, as
+   =titles by ids= does with =ids=).
+2. Resolve to a set of touched pids (1.3).
+3. Acquire the global write mutex (Component 2) for the whole
+   store-mutating section.
+4. Snapshot the current graph: =g_pre = env.in_rust_graph_snapshot ()=
+   (=Arc<InRustGraph>=, cheap structural share). Held for keep-last-good
+   and for possible recovery.
+5. Classify each touched pid by attempting =nodecomplete_from_telescope_on_disk
+   (config, pid)= (=multiple_nodes.rs:55=, returns =io::Result=):
+   - =Ok(nc)= -> *Save* (=DefineNode::Save(SaveNode(nc))=).
+   - =Err= with =ErrorKind::NotFound= (no section on disk at all) ->
+     *Delete* (=DefineNode::Delete(DeleteNode{ id: pid, source })=). This
+     is the "home/only section removed" case from =2_discussion.org=;
+     inbound refs become legal danglers.
+   - =Err= otherwise (=InvalidData=: parse / empty title / pid mismatch /
+     no home) -> *per-pid Fatal(reason)*: drop from the batch, keep
+     last-good, record for the warning + recovery offer.
+6. Batch validation of the surviving Saves/Deletes, against a *clone* of
+   =g_pre= with them applied (=apply_definenodes_to_inRustGraph= on the
+   clone):
+   - scoped duplicate-ID check: collide =all_ids()= of the candidates
+     among themselves and against untouched graph nodes. (New small
+     helper; do NOT call =check_for_duplicate_ids_across_sources= here --
+     it writes a report file, =multiple_nodes.rs:248=.) Colliding pids ->
+     Fatal.
+   - =error_unless_override_invariants_hold (config, &simulated)=. On
+     Err, the batch's override-participating change is fatal; v1 rejects
+     the *whole* batch (keep last-good for all), warns with the reason.
+     (Coarse attribution is acceptable; recorded as a known imperfection.)
+7. Commit the survivors to the three stores *without touching the
+   filesystem*, by calling a refactored store-apply that skips the FS
+   write (see 1.5). This yields the new live graph =g_post=.
+8. Collateral re-render: for every open view in =views_state= containing
+   any touched pid (=find_collateral_view_uris=, =update_buffer.rs:240=,
+   plus diff-mode views since HEAD-vs-worktree changed), rerender and
+   stream each as =TcpToClient::CollateralView=
+   (=update_buffer.rs:186=). Reuse =rerender_collateral_view=
+   (=update_buffer.rs:202=; expose =pub(crate)=).
+9. Response:
+   - If no fatal telescopes: =tag_text_response (TcpToClient::ReloadPaths,
+     "Reloaded N telescope(s).")=.
+   - If fatal telescopes exist: stash a =PendingIncident= (Component 4)
+     in =pending_incident= and reply with a structured sexp listing each
+     fatal telescope (pid, path, reason) plus an =incident-id=, so the
+     client can warn and offer recovery.
+
+** 1.5 Refactor to reuse store-apply without FS writes
+=apply_define_nodes_to_stores= (=server/save.rs:73=, currently private)
+does FS-write -> graph -> context -> TypeDB -> Tantivy. Parameterise its
+FS step: add =write_fs: bool= (or split off the FS write as the caller's
+first step). The save path calls it with =write_fs = true=; reload calls
+it with =write_fs = false=. Because reload calls this function directly
+(never =update_graph_minus_nodeMerges=), =apply_delete_propagation_cleanup=
+never runs, so no other files are rewritten -- satisfying the top
+invariant while reusing the context/TypeDB/Tantivy logic verbatim.
+
+* Component 2 -- Global write mutex  [Phase 2]
+A process-global mutex serialising every graph read-modify-write so two
+writers (two saves, or a save and a reload) cannot lose an update via
+last-=store=-wins on the =ArcSwap=.
+
+- Define a global =tokio::sync::Mutex<()>= (a =OnceLock= in
+  =server/dbs/in_rust_graph.rs= or a new =server/serve/write_lock.rs=).
+  Async because the critical section spans TypeDB =.await=; acquired via
+  =.lock().await= in async contexts and =block_on(lock.lock())= in the
+  sync handlers (rebuild/reload).
+- Wrap the store-mutating section of the save path
+  (=update_graph_including_nodeMerges=, =server/save.rs:162=) and of the
+  reload handler (1.4 step 3). =rebuild_dbs_in_place= wipes and rebuilds
+  wholesale; bring it under the same lock for consistency.
+- The lock guards only the mutation; reads (renders) continue to use
+  =ArcSwap= lock-free.
+
+* Component 3 -- Emacs triggers  [Phase 3]
+All send the new "reload paths" request via the persistent connection,
+using the one-shot idiom from =skg-request-rebuild-dbs.el=
+(=skg-tcp-connect-to-rust= -> =skg-register-response-handler 'reload-paths
+... t= -> =skg-lp-reset= -> =process-send-string=). New file
+=elisp/skg-request-reload-paths.el= holds the request builder and the
+response handler (warn + offer recovery).
+
+** 3.1 Worktree snapshot + change detection
+=skg--reload-source-paths= = =skg--source-paths= (=skg-config.el:94=),
+the alist of (source-name . absolute-dir) from the TOML. Maintain a hash
+table =path -> (mtime . size)= (mtime is a cheap stat; hash only if we
+later find it too coarse). =skg--reload-scan-changed= re-stats every
+=.skg= under those dirs, returns the paths whose (mtime.size) differ from
+the snapshot (including vanished paths), and updates the snapshot.
+
+** 3.2 magit-post-refresh trigger (does NOT require any minor mode)
+Register a *global* hook at file top level (mirroring the top-level
+=(add-hook 'find-file-hook ...)= at =skg-file-minor-mode.el:28=), NOT the
+buffer-local pattern inside =skg-readable-ids-mode=:
+=(add-hook 'magit-post-refresh-hook #'skg--reload-on-magit-refresh)=.
+The function runs =skg--reload-scan-changed=; if non-empty, sends "reload
+paths" with that set.
+
+** 3.3 after-save trigger for plain =.skg= buffers
+In the =skg-file-minor-mode= body (=skg-file-minor-mode.el=), add
+=(add-hook 'after-save-hook #'skg--reload-after-skg-save nil t)=. On save
+of a =.skg= buffer, send "reload paths" for that one file and refresh its
+snapshot entry. (This closes the gap that plain =.skg= saves never
+notify the server.)
+
+** 3.4 Manual command
+=skg-reload-changed= (=interactive=): run =skg--reload-scan-changed= and
+send the changed set; =message= the count. Covers purely-external edits.
+
+** 3.5 Echo note
+A content-view save ("save buffer") makes the server write =.skg= files;
+the next scan sees them as changed and reloads them redundantly. This is
+*harmless* (reload is idempotent). Mitigation: on =save-result=, refresh
+the snapshot for touched files. Not correctness-critical.
+
+* Component 4 -- Fatal-case recovery: three =oops-N_*= branches  [Phase 4]
+Offered and confirmed exactly like the fork flow
+(=skg-request-save.el:311-525=): the reload response carries the fatal
+list + an =incident-id=; the client shows the details and asks
+=yes-or-no-p=; on yes it sends a second request that performs the
+recovery. Recovery is the only code that writes git or restores disk.
+
+** 4.1 The pending incident (server-side, per-connection)
+Because reload and recover arrive on the same persistent connection, the
+reload handler stashes, in a new per-connection local
+=pending_incident: Option<PendingIncident>= (owned in =handle_emacs=
+beside =views_state=):
+#+begin_src
+PendingIncident {
+  incident_id  : u64,                 // monotonic per connection
+  g_pre        : Arc<InRustGraph>,    // last-good, pre-reload
+  g_post       : Arc<InRustGraph>,    // legal-only (what reload left live)
+  touched      : Vec<TouchedTelescope>, // pid, source, abs path, was-fatal
+  base_commits : HashMap<PathBuf, git2::Oid>, // repo workdir -> HEAD at incident
+}
+#+end_src
+=base_commits= is captured at incident time. A worktree discard does not
+move HEAD, so HEAD-at-incident is an unambiguous, correct base for the
+oops commits -- *provided* the repo is not mid-sequencer, which 4.3
+enforces by aborting. This is why no separate "HEAD at last load"
+tracking is needed.
+
+** 4.2 The "reload recover" request
+- Protocol: =RequestType::ReloadRecover= / ="reload recover"=;
+  =TcpToClient::ReloadRecover= / ="reload-recover"=. Payload:
+  =incident-id= (+ optionally the subset of fatal pids the user
+  approved; v1 recovers all fatal telescopes of the incident).
+- Handler =handle_reload_recover_request= looks up =pending_incident= by
+  id (mismatch/absent -> error response), performs 4.3-4.5 under the
+  global write mutex, then clears the slot.
+
+** 4.3 Per-repo precondition guard
+Group the incident's touched files by repo (=open_repo=,
+=read_repo.rs:98=; =path_relative_to_repo=, =misc.rs:27=). For each repo:
+if =repo.state() != RepositoryState::Clean= (mid rebase/merge/cherry-pick)
+OR =repo.head_detached()? = true=, *abort recovery for that repo* and
+report warn-only for its telescopes. (Neither guard exists today; both
+are plain git2 calls to add.) Non-git source dirs: =git2::Repository::init=
+the dir, creating =main=; note it in the report.
+
+** 4.4 Build the three branches via git plumbing (no checkout)
+For each repo, with base commit =C= (4.1) and =N= = smallest natural
+number making all three branch names unused in *every* affected repo
+(mandatory, starts at 1, equal across repos):
+- =oops-N_1-pre-incident= = tree of =C= with each incident-touched
+  =.skg= file replaced by =g_pre='s bytes for that telescope.
+- =oops-N_2-with-only-legal-changes-from-incident= = tree of =C= with
+  those files replaced by =g_post='s bytes (legal applied, fatal at
+  last-good).
+- =oops-N_3-with-all-changes-from-incident= = tree of =C= with those
+  files replaced by the *current worktree bytes* (read from disk; the
+  broken state).
+Construct each with git2 plumbing: =repo.blob(bytes)= per file ->
+=repo.treebuilder= layered on =C='s tree -> =repo.commit(None, ...)= (no
+ref move) with parent =C= -> =repo.reference("refs/heads/oops-N_...",
+oid, false, msg)=. HEAD never moves; the worktree is never touched.
+
+Branches 1 and 2 require rendering a telescope from an =InRustGraph=
+snapshot to its on-disk *bytes* (unfold to sections + serialize),
+without writing to disk. See Risks: this "render telescope to bytes"
+capability is the one new primitive Component 4 needs and may require
+factoring the save/unfold path.
+
+** 4.5 Restore the good state to the worktree
+After the branches exist, write =g_post='s bytes for the *fatal*
+telescopes into the working branch's worktree (skg-owned =.skg= files
+only; never =git add -A=; legal telescopes already match =g_post= on
+disk, so no write). Leave them as uncommitted worktree changes (matching
+the user's normal uncommitted workflow). Then reload succeeds on the
+next pass (disk now == graph). HEAD and the current branch are untouched.
+
+** 4.6 Announce
+Reply with a =skg-big-nonfatal-message=-style report (long, org buffer)
+naming, per repo: the base commit, the three =oops-N_*= branches, any
+=git init= that happened, and which telescopes were restored vs
+warn-only-aborted.
+
+* Build order and commit granularity
+Per =when-to-stop.org=: proceed without stopping except for a stumper or
+an unanticipated architectural decision; record deviations and progress
+in =TODO/partial-reload-and-magit/progress.org= (leaving this plan as
+is).
+
+Granular commits, roughly:
+1. Protocol + handler skeleton for =ReloadPaths= (compiles, returns
+   "not yet implemented").
+2. Path->pid resolution + classify (Save/Delete/Fatal), no store writes
+   yet; unit tests for classification.
+3. Refactor =apply_define_nodes_to_stores= for =write_fs=; save path
+   unchanged behaviourally (tests still green).
+4. Reload commits survivors to the three stores; integration test:
+   external edit -> reload -> stores match.
+5. Collateral re-render on reload.
+6. Global write mutex (Component 2).
+7. Emacs: request builder + response handler + snapshot/scan.
+8. Emacs: magit-post-refresh, after-save, manual command; end-to-end
+   manual check.
+9. Recovery protocol + =PendingIncident= + offer/confirm (client).
+10. Recovery precondition guard + branch plumbing + restore + report.
+
+Each numbered item is at least one commit; sub-steps commit when they
+compile and pass tests.
+
+* Testing
+- Rust unit tests for path->pid resolution and Save/Delete/Fatal
+  classification (temp source dirs).
+- Rust integration tests mirroring =tests/= fixtures: write a =.skg=
+  change out of band, call the reload path, assert the three stores
+  match a full rebuild of the same disk state (parity oracle:
+  =rebuild_dbs_in_place=).
+- A fatal-case test: corrupt a section, reload, assert last-good is kept
+  and a fatal report is returned and no =.skg= file was written.
+- Recovery tests use the git2-write helpers already present in =tests/=
+  (=tests/git_ops.rs=) to set up repos, then assert the three
+  =oops-N_*= branches exist with the expected trees and the worktree
+  holds =g_post=.
+
+* Risks and things I will surface in progress.org
+- *"Render telescope to bytes" primitive (Component 4).* Branches 1 and 2
+  need a telescope's on-disk bytes derived from an in-memory
+  =InRustGraph= snapshot, without writing to disk. The save/unfold path
+  writes straight to the filesystem; if its byte-rendering cannot be
+  cleanly factored out, this is the one place Component 4 may need a real
+  refactor rather than reuse. This is the likeliest source of extra work
+  and I will report what I find when I reach Phase 4.
+- *Override-invariant attribution.* v1 rejects the whole reload batch on
+  an override-invariant violation rather than pinpointing the offending
+  telescope. Coarse but safe; noted as an imperfection, revisited only if
+  it bites.
+- *Async mutex across =.await=.* The write mutex spans TypeDB =.await=;
+  it must be a =tokio= async mutex, and the sync handlers must acquire it
+  via =block_on= without nesting a =block_on= inside an already-async
+  frame. I will verify no handler deadlocks.
+- *Scan cost.* =skg--reload-scan-changed= stats every =.skg= on each
+  magit refresh. mtime-only keeps it cheap; if a large tree makes it
+  laggy, upgrade to hashing only mtime-changed files.

@@ -122,7 +122,7 @@ the *response* to an Err -- "keep last-good graph for that node + warn"
 response should DO (warn only? offer to restore disk from graph?) is the
 live question in the reload-after thread below.
 
-* ONGOING "Reload after" vs "prevent before": I recommend reload-after
+* DONE "Reload after" vs "prevent before": I recommend reload-after
 The vision frames the guard as *prevention*: "skg should prevent the
 operation if it would result in invalid data." I want to argue against
 prevention as the primary mechanism.
@@ -163,7 +163,7 @@ you specifically want pre-op prevention for the narrow fatal cases? I'de
 build reload-after first regardless; prevention, if wanted, is a later
 bolt-on.
 
-** ONGOING
+** DONE
 For that to be sufficient,
 th user must be able
 to restore the disk state from the graph state.
@@ -187,7 +187,7 @@ Call the main one 'main' and the maybe-bad one 'maybe-bad',
 and mention in the explanatory message that that happened,
 naming each data source it happened in.
 
-*** ONGOING claude: right instinct -- and it does NOT conflict with "reload never writes"
+*** DONE claude: right instinct -- and it does NOT conflict with "reload never writes"
 First, to answer the worry you raise further down (§"wait does this
 invalidate..."): no. These are two different operations with two
 different write-policies:
@@ -245,7 +245,7 @@ Refinements I'd want before building it:
      fail or make a mess. I'd *abort the auto-restore and fall back to
      "warn only"* if any target repo isn't on a clean branch, rather than
      do surgery in a fragile state.
-****** ONGOING
+****** DONE
 Good point. Let's create three branches:
   - oops-<number>_1-pre-incident
   - oops-<number>_2-with-only-legal-changes-from-incident
@@ -261,7 +261,7 @@ somewhere, no? (Again <number> should be equal across them all,
 only high enough to make them all distinct from preexisting branches.
 I guess the number should not be optional, and should start at 1.)
 
-******* TODO claude: love it -- three branches works; here's how each is actually built
+******* DONE claude: love it -- three branches works; here's how each is actually built
 Adopting your names (this supersedes the earlier two-branch =maybe-bad=
 sketch). The key thing: at recovery time the three states come from
 three *different* sources, and only one of them is a worktree diff.
@@ -306,8 +306,8 @@ smallest value unused in all of them.
 ******* DONE claude: offer-and-confirm it is.
 ***** (b) On a target repo that isn't on a clean branch: abort to warn-only, or
     attempt anyway? (I prefer abort-to-warn-only.)
-****** ONGOING is what I said earlier about the three oops branches sufficient answer to this question?
-******* ONGOING claude: mostly -- and building the branches via plumbing closes most of the rest
+****** DONE is what I said earlier about the three oops branches sufficient answer to this question?
+******* DONE claude: mostly -- and building the branches via plumbing closes most of the rest
 The three-branch scheme answers *what to preserve*; the clean-repo worry
 was *whether it's safe to operate*. If we build the oops branches with
 plumbing (no checkout, HEAD never moves, per the note above), then
@@ -324,7 +324,12 @@ ruling on:
   HEAD pointed at when skg last successfully loaded the file. Acceptable,
   or would you rather just abort-to-warn-only when a repo is
   mid-sequencer?
-******** TODO yes to both
+******** DONE yes to both
+********* DONE claude: locked -- (1) restore writes only skg-owned =.skg=
+files, never =git add -A=; (2) base commit = the commit HEAD had at
+skg's last successful load of that file, and if a repo is mid-sequencer
+(rebase/merge/cherry-pick) or on a detached HEAD, abort THAT repo to
+warn-only instead of doing branch surgery.
 ***** (c) Is restore-from-graph in scope for THIS feature, or a follow-on? The
     read-only reload is shippable without it -- with the honest caveat
     that fatal discards of *uncommitted* edits are then only recoverable
@@ -534,8 +539,8 @@ confirmation, the two clean-repo residuals (skg-owned-files-only write;
 mid-sequencer base commit), and your coverage pick (magit-only vs
 +after-save+manual). I did no writes to code or git; this stays
 read-and-discuss until you close those.
-* ONGOING jeff speaking : In which ways can changes happen?
-** TODO claude: the change vectors, and which trigger catches each
+* DONE jeff speaking : In which ways can changes happen?
+** DONE claude: the change vectors, and which trigger catches each
 On-disk =.skg= *worktree* bytes can change via:
 
 1. *Magit worktree ops* -- discard (hunk/region/file), reverse-apply,
@@ -616,5 +621,8 @@ So the watcher buys coverage of fully-external edits at the price of a
 permanent OS-level watch subsystem plus echo-suppression, debounce,
 cross-platform event handling, and settle-timing. I'd still pick (b);
 the open pick is yours, under the "change vectors" heading just above.
-***** TODO (b)
+***** DONE (b)
 The watcher sounds like hell. I agree with you.
+****** DONE claude: settled -- coverage = magit-post-refresh +
+=after-save-hook= for skg buffers + a manual =skg-reload-changed=. No
+watcher.
