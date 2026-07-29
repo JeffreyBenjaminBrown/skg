@@ -68,21 +68,33 @@ pub async fn update_graph_minus_nodeMerges (
                                  config,
                                  tantivy_index,
                                  driver,
-                                 graph ). await }
+                                 graph,
+                                 true ). await }
 
-async fn apply_define_nodes_to_stores (
+/// Apply prepared `DefineNode`s to the derived stores (in-Rust graph,
+/// TypeDB, Tantivy), optionally writing the filesystem first.
+///
+/// `write_fs = true` is the save path: the filesystem is the source of
+/// truth and is written first. `write_fs = false` is the RELOAD path:
+/// the filesystem already holds the new state (skg is syncing FROM it),
+/// so the stores are updated to match without touching any `.skg` file.
+/// Callers wanting a reload MUST route here directly (never through
+/// `update_graph_minus_nodeMerges`), so `apply_delete_propagation_cleanup`
+/// -- which rewrites OTHER nodes' files -- never runs.
+pub(crate) async fn apply_define_nodes_to_stores (
   node_defs     : Vec<DefineNode>,
   source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
+  write_fs      : bool,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   let db_name : &str = &config . db_name;
   let old_graph_snap : Arc<InRustGraph> = // pre-apply state, for edge deltas
     graph . load_full ();
 
-  { // FS (source of truth)
+  if write_fs { // FS (source of truth)
     // TODO: Print per-source write information
     tracing::info!( "Writing {} instruction(s) to disk ...",
                { let total_input : usize = node_defs . len ();
