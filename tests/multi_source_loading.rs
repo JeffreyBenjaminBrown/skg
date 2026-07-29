@@ -102,12 +102,14 @@ fn test_load_from_multiple_sources() {
   set_source_retagging_levels ( &mut node2, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
-  // Create nodes in shared source
-  let mut node3 : NodeComplete = empty_node_complete();
-  node3 . pid = ID::new ("shared1");
-  node3 . title = "Shared Node 1" . to_string();
-  set_source_retagging_levels ( &mut node3, &SourceName::from ("shared") );
-  write_nodecomplete_to_source(&node3, &config) . unwrap();
+  // Create a node in the shared source. Written RAW: 'shared' is
+  // foreign, and the node writer is the SAVE path, which refuses a
+  // foreign home rather than drop the title silently. Planting a
+  // foreign fixture is a filesystem act, not a save.
+  fs::write (
+    config . sources . get (&SourceName::from ("shared"))
+      . unwrap () . path . join ("shared1.skg"),
+    "pid: shared1\ntitle: Shared Node 1\n" ) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -246,13 +248,12 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
-  // Create node in shared that has one overlapping ID
-  let mut node2 : NodeComplete = empty_node_complete();
-  node2 . pid = ID::new ("id2");
-  node2 . extra_ids = vec![ID::new ("id3")];
-  node2 . title = "Another Node" . to_string();
-  set_source_retagging_levels ( &mut node2, &SourceName::from ("shared") );
-  write_nodecomplete_to_source(&node2, &config) . unwrap();
+  // Create node in shared that has one overlapping ID. Written RAW:
+  // 'shared' is foreign, and the node writer refuses a foreign home.
+  fs::write (
+    config . sources . get (&SourceName::from ("shared"))
+      . unwrap () . path . join ("id2.skg"),
+    "pid: id2\ntitle: Another Node\nextra_ids:\n- id3\n" ) . unwrap();
 
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) . unwrap();
@@ -542,4 +543,71 @@ fn test_unreadable_files_creates_org_file() {
           "Error should mention file/directory not found");
 
   // No explicit cleanup: temp_dir's Drop handles it.
+}
+
+/// The two shapes 'write_nodecomplete_telescope' refuses. Neither
+/// arises from a skg save (every level is clamped to at least the
+/// owner's home); both arrive from hand-edited files or a pull.
+/// Writing either would publish the node's text or lose it.
+#[test]
+fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
+  let temp_dir : TempDir = tempdir() . unwrap();
+  let public_path  : PathBuf = temp_dir . path() . join ("public");
+  let foreign_path : PathBuf = temp_dir . path() . join ("foreign");
+  fs::create_dir_all (&public_path)  . unwrap();
+  fs::create_dir_all (&foreign_path) . unwrap();
+  let config : SkgConfig = {
+    let mut sources : HashMap<SourceName, SkgfileSource> =
+      HashMap::new();
+    for (name, path, owned) in
+      [ ("public",  public_path  . clone(), true  ),
+        ("foreign", foreign_path . clone(), false ) ] {
+      sources . insert ( SourceName::from (name), SkgfileSource {
+        name         : SourceName::from (name),
+        abbreviation : None,
+        path,
+        user_owns_it : owned, } ); }
+    let mut config : SkgConfig =
+      test_config (sources, temp_dir . path () . to_path_buf ());
+    config . source_order = // most public first
+      vec! [ SourceName::from ("foreign"),
+             SourceName::from ("public") ];
+    config };
+  { // FOREIGN HOME: refused, rather than silently dropping the title.
+    let mut node : NodeComplete = empty_node_complete();
+    node . pid   = ID::new ("F");
+    node . title = "foreign-homed" . to_string();
+    set_source_retagging_levels (
+      &mut node, &SourceName::from ("foreign") );
+    let err : IoError =
+      write_nodecomplete_to_source (&node, &config)
+      . expect_err ("a foreign home is not writable");
+    assert!( err . to_string() . contains ("do not own"),
+             "the refusal says why: {}", err ); }
+  { // TITLE HOIST: the home exists and is titleless, so the text
+    // lives more privately and this write would publish it.
+    fs::write ( public_path . join ("H.skg"),
+                "pid: H\ncontains:\n- C\n" ) . unwrap();
+    let mut node : NodeComplete = empty_node_complete();
+    node . pid   = ID::new ("H");
+    node . title = "private text" . to_string();
+    set_source_retagging_levels (
+      &mut node, &SourceName::from ("public") );
+    let err : IoError =
+      write_nodecomplete_to_source (&node, &config)
+      . expect_err ("hoisting a title into a titleless home is refused");
+    assert!( err . to_string() . contains ("would publish it"),
+             "the refusal says why: {}", err );
+    assert_eq!( fs::read_to_string (
+                  public_path . join ("H.skg") ) . unwrap(),
+                "pid: H\ncontains:\n- C\n",
+                "and nothing was written" ); }
+  { // The ordinary shape still writes: an owned, titled home.
+    let mut node : NodeComplete = empty_node_complete();
+    node . pid   = ID::new ("N");
+    node . title = "ordinary" . to_string();
+    set_source_retagging_levels (
+      &mut node, &SourceName::from ("public") );
+    write_nodecomplete_to_source (&node, &config)
+      . expect ("an owned titled home writes"); }
 }

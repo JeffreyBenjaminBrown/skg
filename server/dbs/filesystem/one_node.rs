@@ -150,6 +150,7 @@ pub fn write_nodecomplete_telescope (
   config       : &SkgConfig,
 ) -> io::Result<()> {
   let pid : &ID = &nodecomplete . pid;
+  error_unless_home_is_writable (nodecomplete, config) ?;
   let sections : Vec<(SourceName, SectionSlices)> =
     unfold_node (
       & UnfoldInput {
@@ -199,6 +200,52 @@ pub fn write_nodecomplete_telescope (
           return Err (e), }} }
   Ok (( )) }
 
+
+/// The two shapes 'write_nodecomplete_telescope' refuses, because
+/// writing either would publish or destroy the node's text. Both
+/// are unreachable through skg's own saves -- 'apply_sticky_levels'
+/// clamps every level to at least the owner's home, so no save
+/// creates a section more public than the home -- and arrive only
+/// from hand-edited files, a pull, or a foreign overlay.
+///
+/// The nodes this blocks are already broken; the fold reports both
+/// shapes in telescope-warnings.org with their repairs.
+fn error_unless_home_is_writable (
+  nodecomplete : &NodeComplete,
+  config       : &SkgConfig,
+) -> io::Result<()> {
+  let home : &SourceName = &nodecomplete . source;
+  if ! config . user_owns_source (home) {
+    // FOREIGN HOME. Foreign sections are never written. Skipping
+    // the home silently would drop the title on the floor, so
+    // refuse instead. (This function is what makes the promise in
+    // this module's write doc-comment true of the writer itself;
+    // it was previously kept only by the writer's callers.)
+    return Err ( io::Error::new (
+      io::ErrorKind::PermissionDenied,
+      format! (
+        "Refusing to write '{}': its home is '{}', which you do not own. Foreign sections are never written, so this node cannot be saved from here. See the foreign-overlay entry in telescope-warnings.org.",
+        nodecomplete . pid, home ))); }
+  { // TITLE HOIST. The home exists on disk and carries no title,
+    // so the node's text lives at a more private level and this
+    // write would move it up into the home -- publishing it,
+    // silently, with no gesture from the user.
+    let Ok (home_path) : Result<String, _> =
+      path_from_pid_and_source (
+        config, home, nodecomplete . pid . clone () )
+      else { return Ok (( )); };
+    if ! Path::new (&home_path) . is_file () { return Ok (( )); }
+    let home_is_titleless : bool =
+      read_nodecomplete ( &home_path )
+      . map ( |section| section . title . is_none () )
+      . unwrap_or (false); // unreadable: a different error, reported elsewhere
+    if home_is_titleless && ! nodecomplete . title . is_empty () {
+      return Err ( io::Error::new (
+        io::ErrorKind::InvalidData,
+        format! (
+          "Refusing to write '{}': its home '{}' carries no title, so its text lives at a more private level and this save would publish it. Repair the files by hand -- move the title up to '{}', or delete the '{}' section if it holds nothing else. See telescope-warnings.org.",
+          nodecomplete . pid, home, home, home ))); }}
+  Ok (( )) }
 
 /// Checks that a node's primary ID matches the filename stem.
 /// This property is assumed by `path_from_pid_and_source` and
