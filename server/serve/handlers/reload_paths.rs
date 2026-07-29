@@ -21,6 +21,7 @@ use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
+use crate::update_buffer::rerender_views_after_reload;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -63,7 +64,6 @@ pub fn handle_reload_paths_request (
   views_state       : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
 ) {
-  let _ = ( views_state, active_source_set );
   let parsed = match sexp::parse (request) {
     Ok (s) => s,
     Err (e) => {
@@ -81,12 +81,20 @@ pub fn handle_reload_paths_request (
     path_strings . into_iter () . map (PathBuf::from) . collect ();
   let touched : Vec<TouchedTelescope> =
     classify_touched_telescopes (&env . config, &paths);
-  let msg : String =
+  let (msg, applied) : (String, Vec<DefineNode>) =
     match block_on ( reload_touched_telescopes (env, touched) ) {
-      Ok (m)  => m,
-      Err (e) => {
+      Ok (pair) => pair,
+      Err (e)   => {
         send_reload_error (stream, &format! ("Reload failed: {}", e));
         return; } };
+  if ! applied . is_empty () {
+    // Re-stream every open view touched by the reload (diff-mode views
+    // included), then send the summary.
+    let diff_mode : bool = views_state . diff_mode_enabled;
+    if let Err (e) = block_on ( rerender_views_after_reload (
+      stream, &applied, env, diff_mode,
+      views_state, Some (active_source_set) )) {
+        tracing::error! ("reload collateral re-render failed: {}", e); } }
   send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::ReloadPaths, &msg )); }
@@ -98,7 +106,7 @@ pub fn handle_reload_paths_request (
 pub async fn reload_touched_telescopes (
   env     : &mut SkgEnv,
   touched : Vec<TouchedTelescope>,
-) -> Result<String, String> {
+) -> Result<(String, Vec<DefineNode>), String> {
   let mut defs : Vec<DefineNode> = Vec::new ();
   let mut fatals : Vec<(ID, String)> = Vec::new ();
   let (mut saves, mut deletes) : (usize, usize) = (0, 0);
@@ -116,7 +124,7 @@ pub async fn reload_touched_telescopes (
         fatals . push (( t . pid, reason )), } }
 
   if defs . is_empty () {
-    return Ok ( summarize_reload (0, 0, &fatals) ); }
+    return Ok (( summarize_reload (0, 0, &fatals), Vec::new () )); }
 
   // Serialize this store mutation against any concurrent save / reload /
   // rebuild so no RCU update is lost (last-store-wins on the ArcSwap).
@@ -135,7 +143,9 @@ pub async fn reload_touched_telescopes (
           "reloading would violate override invariants ({}); \
            kept last-good state, stores unchanged", e )); } }
 
-  // Commit to the three stores, filesystem untouched.
+  // Commit to the three stores, filesystem untouched. Keep a copy of the
+  // instructions so the caller can re-render the views they touched.
+  let applied : Vec<DefineNode> = defs . clone ();
   let config = env . config . clone ();
   match apply_define_nodes_to_stores (
     defs, &[], config,
@@ -145,7 +155,7 @@ pub async fn reload_touched_telescopes (
     Ok (None) => {}
     Err (e) => return Err ( format! (
       "store update failed: {}", e )), }
-  Ok ( summarize_reload (saves, deletes, &fatals) ) }
+  Ok (( summarize_reload (saves, deletes, &fatals), applied )) }
 
 fn summarize_reload (
   saves   : usize,

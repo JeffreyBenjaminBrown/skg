@@ -233,6 +233,54 @@ async fn rerender_collateral_view (
     viewforest,
   }) }
 
+/// Re-render every open view containing any reloaded/deleted telescope,
+/// streaming each as a CollateralView. Called after a PARTIAL RELOAD has
+/// already updated the stores. Unlike `update_views_after_save` there is
+/// no "saved" view -- all affected views are collateral -- and no
+/// filesystem write is involved. Diff-mode views that contain a changed
+/// pid re-render too, picking up the fresh HEAD-vs-worktree diff via
+/// `for_save`'s recomputed `source_diffs`.
+pub async fn rerender_views_after_reload (
+  stream            : &mut std::net::TcpStream,
+  define_nodes      : &[DefineNode],
+  env               : &SkgEnv,
+  diff_mode_enabled : bool,
+  views_state       : &mut ViewsState,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result<(), Box<dyn Error>> {
+  let changed_pids : HashSet<ID> =
+    define_nodes . iter ()
+    . filter_map ( |instr| match instr {
+      DefineNode::Save ( SaveNode (n)) => Some ( n . pid . clone () ),
+      DefineNode::Delete (dn)          => Some ( dn . id . clone () ) } )
+    . collect ();
+  let affected_uris : Vec<ViewUri> = {
+    let set : HashSet<ViewUri> =
+      changed_pids . iter ()
+      . flat_map ( |pid|
+        views_state . open_views . views_containing (pid) )
+      . collect ();
+    set . into_iter () . collect () };
+  if affected_uris . is_empty () { return Ok (( )); }
+  let mut context : RerenderAfterSaveContext =
+    RerenderAfterSaveContext::for_save (
+      env, diff_mode_enabled, define_nodes, active_source_set );
+  for uri in affected_uris {
+    match rerender_collateral_view ( uri, views_state, &mut context )
+      . await {
+      Ok (rendered) => {
+        views_state . open_views . update_view (
+          &rendered . uri, rendered . viewforest);
+        send_response_with_length_prefix (
+          stream,
+          & tag_sexp_response (
+            TcpToClient::CollateralView,
+            & format_single_view_sexp (
+              &rendered . uri, &rendered . text) )); },
+      Err (e) =>
+        tracing::error! ("reload rerender of a view failed: {}", e), } }
+  Ok (( )) }
+
 /// Given the saved ViewUri and DefineNodes,
 /// return the URIs of other views whose viewforests
 /// contain any changed PID. Includes search views --
