@@ -10,14 +10,19 @@
 
 (require 'skg-keymaps-and-aliases)
 (require 'skg-id-search)
+(require 'skg-request-reload-paths)
 
 ;;;###autoload
 (define-minor-mode skg-file-minor-mode
   "Minor mode for buffers visiting .skg files.
 Enables skg navigation keys like \\[skg-goto] on UUIDs
-and .skg filenames."
+and .skg filenames. While on, a plain save of the buffer tells the
+server to reload the file (its stores mirror the worktree)."
   :lighter " skg"
-  :keymap skg-file-minor-mode-map)
+  :keymap skg-file-minor-mode-map
+  (if skg-file-minor-mode
+      (add-hook 'after-save-hook #'skg--reload-after-skg-save nil t)
+    (remove-hook 'after-save-hook #'skg--reload-after-skg-save t)))
 
 (defun skg-file-minor-mode--maybe-enable ()
   "Enable `skg-file-minor-mode' if the current buffer visits a .skg file."

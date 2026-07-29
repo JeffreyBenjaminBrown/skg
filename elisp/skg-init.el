@@ -31,5 +31,6 @@
 (require 'skg-sexpr-search)
 (require 'skg-view-org-ancestry)
 (require 'skg-readable-ids)
+(require 'skg-request-reload-paths)
 (require 'skg-file-minor-mode)
 (require 'skg-git-add)
