@@ -3,7 +3,7 @@ use crate::context::{
   content_maps_from_nodes,
   had_id_set_from_nodes,
   link_dests_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use crate::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
@@ -60,9 +60,9 @@ pub fn rebuild_dbs_in_place (
     let nodes : Vec<NodeComplete> =
       read_all_skg_files_from_sources (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-    check_for_duplicate_ids_across_sources (
+    error_unless_each_id_names_one_node (
       &nodes, &fresh_config . data_root)
-      . map_err ( |e| format! ("Duplicate ID check failed: {}", e) ) ?;
+      . map_err ( |e| format! ("Id-conflict check failed: {}", e) ) ?;
     let fresh_graph : InRustGraph =
       InRustGraph::from_nodecompletes (&nodes);
     error_unless_override_invariants_hold (

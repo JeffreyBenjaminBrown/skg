@@ -8,7 +8,7 @@
 
 use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
-use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::export_org::{export_to_org, ExportReport};
@@ -137,10 +137,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
-  check_for_duplicate_ids_across_sources (
+  error_unless_each_id_names_one_node (
     &nodes, &config . data_root)
     . unwrap_or_else ( |e| {
-      tracing::error! ("Duplicate ID check failed: {}", e);
+      tracing::error! ("Id-conflict check failed: {}", e);
       std::process::exit (1); } );
   drop (nodes); // free the NodeCompletes — we kept them only for the dup check above
 

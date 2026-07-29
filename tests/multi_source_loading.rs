@@ -6,7 +6,7 @@ use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
 use skg::test_utils::set_source_retagging_levels;
@@ -129,7 +129,7 @@ fn test_load_from_multiple_sources() {
 }
 
 #[test]
-fn test_duplicate_id_detection_across_sources() {
+fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
   // Create two source directories
@@ -181,7 +181,7 @@ fn test_duplicate_id_detection_across_sources() {
   assert_eq!( nodes[0] . title, "Node in Main",
     "the home (most public titled section) wins the title" );
   assert_eq!( nodes[0] . source, SourceName::from ("main") );
-  check_for_duplicate_ids_across_sources (
+  error_unless_each_id_names_one_node (
     &nodes, &config . data_root)
     . expect ("a telescope is not an id conflict");
 
@@ -198,18 +198,19 @@ fn test_duplicate_id_detection_across_sources() {
     node_b . extra_ids = vec! [ ID::new ("contested") ];
     set_source_retagging_levels ( &mut node_b, &SourceName::from ("shared") );
     let result : IoResult<()> =
-      check_for_duplicate_ids_across_sources (
+      error_unless_each_id_names_one_node (
         & [ node_a, node_b ], &config . data_root);
     assert!(result . is_err(), "Should fail: two pids claim one id");
     let err : IoError = result . unwrap_err();
     assert_eq!(err . kind(), IoErrorKind::InvalidData);
     let err_msg = err . to_string();
-    assert!(err_msg . contains ("Duplicate ID"), "Error should mention duplicate ID");
+    assert!(err_msg . contains ("claimed by more than one node"),
+            "Error should say what the violation is: {}", err_msg);
     assert!(err_msg . contains ("contested"), "Error should include the ID"); }
 }
 
 #[test]
-fn test_node_with_multiple_ids_duplicate_detection() {
+fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
   // Create two source directories
@@ -256,7 +257,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) . unwrap();
   let result : IoResult<()> =
-    check_for_duplicate_ids_across_sources (
+    error_unless_each_id_names_one_node (
       &nodes, &config . data_root);
   assert!(result . is_err(), "Should fail due to overlapping ID");
 
@@ -354,7 +355,7 @@ fn test_source_field_set_correctly() {
 }
 
 #[test]
-fn test_many_duplicate_ids_creates_org_file() {
+fn test_many_id_conflicts_create_org_file() {
   // Test that >10 duplicates triggers org file creation
   let temp_dir : TempDir = tempdir() . unwrap();
 
@@ -404,27 +405,29 @@ fn test_many_duplicate_ids_creates_org_file() {
     nodes . push (node_b); }
 
   let result : IoResult<()> =
-    check_for_duplicate_ids_across_sources (
+    error_unless_each_id_names_one_node (
       &nodes, &config . data_root);
-  assert!(result . is_err(), "Should fail due to duplicate IDs");
+  assert!(result . is_err(), "Should fail: 15 ids claimed by two nodes each");
 
   let err : IoError = result . unwrap_err();
   assert_eq!(err . kind(), IoErrorKind::InvalidData);
   let err_msg = err . to_string();
-  assert!(err_msg . contains ("15") || err_msg . contains ("duplicate"),
-          "Error should mention duplicates: {}", err_msg);
+  assert!(err_msg . contains ("15")
+          && err_msg . contains ("claimed by more than one node"),
+          "Error should count the conflicts and name them: {}", err_msg);
 
   // Check that org file was created in the test's tempdir.
   let org_file_path : PathBuf =
-    temp_dir . path () . join ("initialization-error_duplicate-ids.org");
+    temp_dir . path () . join (
+      "initialization-error_ids-claimed-by-two-nodes.org");
   assert!(org_file_path . exists(),
-          "Org file should be created for >10 duplicates");
+          "Org file should be created for >10 conflicts");
 
   // Generate expected content programmatically
   let mut expected : String = String::new();
-  expected . push_str ("#+title: Duplicate IDs Across Sources\n");
+  expected . push_str ("#+title: IDs claimed by more than one node\n");
   expected . push_str ("#+date: <generated at initialization>\n\n");
-  expected . push_str ("Found 15 duplicate IDs across sources.\n\n");
+  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
 
   // IDs are sorted alphabetically (lexicographic), not numerically
   // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...
@@ -433,9 +436,10 @@ fn test_many_duplicate_ids_creates_org_file() {
   ids . sort();
 
   for id in ids {
+    let n : &str = id . rsplit ('_') . next () . unwrap ();
     expected . push_str(&format!("* {}\n", id));
-    expected . push_str ("** source_a\n");
-    expected . push_str ("** source_b\n");
+    expected . push_str(&format!("** pid_a_{} (source_a)\n", n));
+    expected . push_str(&format!("** pid_b_{} (source_b)\n", n));
   }
 
   // Read and verify full org file content

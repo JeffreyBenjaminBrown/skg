@@ -335,7 +335,7 @@ fn touch_init_marker (
 /// creates all nodes and relationships.
 /// Uses an existing driver connection rather than creating a new one.
 /// Callers are responsible for reading the .skg files
-/// (and, if desired, checking duplicate IDs) beforehand.
+/// (and, if desired, checking for ids claimed by two nodes) beforehand.
 pub async fn wipe_then_init_typedb_db (
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -393,7 +393,7 @@ fn wipe_then_init_tantivy_db_with_logs_and_errors (
 /// Destroys and rebuilds the Tantivy index from the given nodes.
 /// Returns a fresh TantivyIndex.
 /// Callers are responsible for reading the .skg files
-/// (and, if desired, checking duplicate IDs) beforehand.
+/// (and, if desired, checking for ids claimed by two nodes) beforehand.
 pub fn rebuild_tantivy_from_nodes (
   config : &SkgConfig,
   nodes  : &[NodeComplete],

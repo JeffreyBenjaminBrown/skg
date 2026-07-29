@@ -16,7 +16,7 @@ use skg::context::{
   MapToContainers,
 };
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -42,7 +42,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   let t0 : Instant = Instant::now ();
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) ?;
-  check_for_duplicate_ids_across_sources (
+  error_unless_each_id_names_one_node (
     &nodes, &config . data_root) ?;
   let read_time : f64 = t0 . elapsed () . as_secs_f64 ();
   println! ("\n1. Read {} .skg files: {:.3}s", nodes . len (), read_time);

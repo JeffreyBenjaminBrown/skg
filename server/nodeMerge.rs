@@ -2,7 +2,7 @@ pub mod nodeMergeInstructionTriple;
 pub mod validate_nodeMerge;
 
 use crate::dbs::filesystem::multiple_nodes::{
-  check_for_duplicate_ids_across_sources,
+  error_unless_each_id_names_one_node,
   read_all_skg_files_from_sources};
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
@@ -84,7 +84,7 @@ pub async fn merge_nodes (
         . map_err ( |e2| -> Box<dyn Error> { format!(
            "TypeDB rebuild also failed: {}. Restart the server.", e2)
            . into () } ) ?;
-      check_for_duplicate_ids_across_sources (
+      error_unless_each_id_names_one_node (
         &nodes, &config . data_root)
         . map_err ( |e2| -> Box<dyn Error> { format!(
            "TypeDB rebuild also failed: {}. Restart the server.", e2)
@@ -113,7 +113,7 @@ pub async fn merge_nodes (
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;
-        check_for_duplicate_ids_across_sources (
+        error_unless_each_id_names_one_node (
           &nodes, &config . data_root)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)

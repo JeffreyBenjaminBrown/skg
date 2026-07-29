@@ -42,8 +42,8 @@ pub fn read_all_skg_files_from_sources (
           source . path . display() . to_string(),
           e . to_string()
         )); }} }
+  report_load_errors (&load_errors, &config . data_root) ?;
   if ! load_errors . is_empty() {
-    report_load_errors (&load_errors, &config . data_root) ?;
     return Err (io::Error::new (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
@@ -133,15 +133,19 @@ pub fn fold_one_telescope (
       format! ("Telescope '{}' has no home: no section carries a title.",
                pid ))) }
 
-/// Same-ID files across sources are no longer duplicates -- they
-/// are the sections of one privacy telescope, grouped and folded at
-/// load. What remains a CONFLICT is one id claimed by two DIFFERENT
-/// nodes: an id (primary or extra) appearing among the all_ids() of
-/// two nodes with distinct pids. If any exists, writes a detailed
+/// NOT AN ERROR: same-id files across sources. Those are the
+/// SECTIONS of one privacy telescope, grouped and folded at load,
+/// and they are the feature -- see docs/telescopes.md. Sections of
+/// one telescope share a pid, so they can never trip this check.
+///
+/// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
+/// (primary or extra) appearing among the all_ids() of two nodes
+/// with distinct pids. Nothing about it is cross-source; both
+/// claimants can sit in one source. If any exists, writes a detailed
 /// report (to stderr for ≤10, to an org file otherwise) and returns
 /// a summary error. (Callers pass post-fold nodes, one per
 /// telescope.)
-pub fn check_for_duplicate_ids_across_sources (
+pub fn error_unless_each_id_names_one_node (
   nodes     : &[NodeComplete],
   data_root : &Path,
 ) -> io::Result<()> {
@@ -153,30 +157,28 @@ pub fn check_for_duplicate_ids_across_sources (
       claimants . entry (id . clone())
         . or_insert_with (Vec::new)
         . push ((node . pid . clone(), node . source . clone())); }}
-  let duplicate_ids: HashMap<ID, Vec<SourceName>> =
+  let contested: HashMap<ID, Vec<(ID, SourceName)>> =
     claimants . into_iter()
     . filter ( |(_, owners)| {
       let distinct_pids : HashSet<&ID> =
         owners . iter() . map ( |(pid, _)| pid ) . collect();
       distinct_pids . len() > 1 } )
-    . map ( |(id, owners)|
-            (id, owners . into_iter()
-                 . map ( |(_, src)| src ) . collect()) )
     . collect();
-  if duplicate_ids . is_empty() {
+  report_ids_claimed_by_two_nodes (&contested, data_root) ?;
+  if contested . is_empty() {
     return Ok (( )); }
-  report_duplicate_ids (&duplicate_ids, data_root) ?;
   let msg: String =
-    if duplicate_ids . len() <= 10 {
+    if contested . len() <= 10 {
       // Include details in error message for small numbers
-      let ids_list: Vec<String> = duplicate_ids . keys()
+      let ids_list: Vec<String> = contested . keys()
         . map ( |id| format! ("'{}'", id) )
         . collect();
-      format! ("Duplicate ID(s) found: {}",
+      format! ("{} id(s) claimed by more than one node: {}",
+               contested . len(),
                ids_list . join (", "))
     } else {
-      format! ("{} duplicate IDs found (see org file)",
-               duplicate_ids . len() ) };
+      format! ("{} id(s) claimed by more than one node (see org file)",
+               contested . len() ) };
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
 
@@ -241,58 +243,79 @@ pub fn read_recently_modified_skgfiles_from_sources (
       nodecomplete_from_telescope_on_disk (config, &pid) ? ); }
   Ok (all_nodes) }
 
-/// Reports duplicate IDs found across sources.
-/// If there are errors, writes a detailed report to an org file.
-/// For ≤10 duplicates, also lists each one on stderr.
-/// For >10 duplicates, logs only the count and the file path.
-fn report_duplicate_ids(
-  duplicates : &HashMap<ID, Vec<SourceName>>,
-  data_root  : &Path,
+/// Reports each id claimed by more than one node, naming every
+/// CLAIMANT as "pid (home)" -- the pids are what the reader must
+/// open to repair the conflict, and both claimants can share one
+/// home, so the homes alone identify nothing.
+/// If there are none, removes a stale report, so the file's
+/// presence is meaningful.
+/// Otherwise writes a detailed report to an org file, and for ≤10
+/// also lists each conflict on stderr; for >10, logs the count and
+/// the file path.
+fn report_ids_claimed_by_two_nodes(
+  contested : &HashMap<ID, Vec<(ID, SourceName)>>,
+  data_root : &Path,
 ) -> io::Result<()> {
-  let count: usize = duplicates . len();
+  let count: usize = contested . len();
   // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
   let report_path: PathBuf = data_root . join (
-    "initialization-error_duplicate-ids.org");
-  let mut content: String = String::new();
-  content . push_str ("#+title: Duplicate IDs Across Sources\n");
-  content . push_str ("#+date: <generated at initialization>\n\n");
-  content . push_str(
-    &format!("Found {} duplicate IDs across sources.\n\n",
-             count));
-
-  let mut sorted_ids: Vec<(&ID, &Vec<SourceName>)> =
-    // for deterministic output
-    duplicates . iter() . collect();
-  sorted_ids . sort_by_key(|(id, _)| *id);
-
-  for (id, sources) in sorted_ids {
-    content . push_str(&format!("* {}\n", id));
-    let mut sorted_sources: Vec<SourceName> =
+    "initialization-error_ids-claimed-by-two-nodes.org");
+  if count == 0 {
+    return remove_stale_report (&report_path); }
+  let claimant_lines = | claimants : &Vec<(ID, SourceName)> |
+                       -> Vec<String> {
+    let mut lines : Vec<String> = // for deterministic output
+      claimants . iter ()
+      . map ( |(pid, home)| format! ("{} ({})", pid, home) )
+      . collect ();
+    lines . sort ();
+    lines . dedup ();
+    lines };
+  let content: String = {
+    let mut content: String = String::new();
+    content . push_str ("#+title: IDs claimed by more than one node\n");
+    content . push_str ("#+date: <generated at initialization>\n\n");
+    content . push_str( &format!(
+      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
+      count));
+    let mut sorted_ids: Vec<(&ID, &Vec<(ID, SourceName)>)> =
       // for deterministic output
-      sources . clone();
-    sorted_sources . sort();
-    for source in sorted_sources {
-      content . push_str(&format!("** {}\n", source)); }}
-
-  if count > 0 { // otherwise nothing to report
-    fs::write(&report_path, content)?;
-    if count <= 10 {
-      tracing::error!("Found {} duplicate ID(s) across sources:",
-                count);
-      for (id, sources) in duplicates . iter() {
-        let names : Vec<String> =
-          sources . iter () . map (|s| s . to_string ()) . collect ();
-        tracing::error!("  - ID '{}' in sources: {}",
-                  id, names . join (", ")); }
-    } else {
-      tracing::error!("Found {} duplicate ID(s) across sources.",
-                count);
-      tracing::error!("Details written to: {}",
-                report_path . display()); }}
+      contested . iter() . collect();
+    sorted_ids . sort_by_key(|(id, _)| *id);
+    for (id, claimants) in sorted_ids {
+      content . push_str(&format!("* {}\n", id));
+      for line in claimant_lines (claimants) {
+        content . push_str(&format!("** {}\n", line)); }}
+    content };
+  fs::write(&report_path, content)?;
+  if count <= 10 {
+    tracing::error!("{} id(s) claimed by more than one node:",
+              count);
+    for (id, claimants) in contested . iter() {
+      tracing::error!("  - ID '{}' claimed by: {}",
+                id, claimant_lines (claimants) . join (", ")); }
+  } else {
+    tracing::error!("{} id(s) claimed by more than one node.",
+              count);
+    tracing::error!("Details written to: {}",
+              report_path . display()); }
   Ok (( )) }
 
+/// Delete a report whose condition no longer holds, so that a
+/// report file left on disk always describes the LAST run rather
+/// than some earlier one.
+fn remove_stale_report (
+  report_path : &Path,
+) -> io::Result<()> {
+  match fs::remove_file (report_path) {
+    Ok (( ))                                          => Ok (( )),
+    Err (e) if e . kind () == io::ErrorKind::NotFound => Ok (( )),
+    Err (e)                                           => Err (e), } }
+
 /// Reports file loading errors.
-/// Always writes to org file and reports count to stderr.
+/// If there are none, removes a stale report, so the file's
+/// presence is meaningful. Otherwise writes to an org file and
+/// reports the count to stderr.
 fn report_load_errors(
   errors    : &[(String, String, String)],
   data_root : &Path,
@@ -301,6 +324,8 @@ fn report_load_errors(
   let report_path: PathBuf = data_root . join ( // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
 
     "initialization-error_unreadable-skg-files.org");
+  if count == 0 {
+    return remove_stale_report (&report_path); }
 
   let mut content: String = String::new();
   content . push_str ("#+title: Unreadable SKG Files\n");

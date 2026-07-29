@@ -1,7 +1,7 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::multiple_nodes::{
-  check_for_duplicate_ids_across_sources,
+  error_unless_each_id_names_one_node,
   delete_all_nodes_from_fs,
   read_all_skg_files_from_sources,
   write_all_nodes_to_fs};
@@ -129,7 +129,7 @@ async fn apply_define_nodes_to_stores (
         . map_err (|e2| -> Box<dyn Error> {
           format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
           . into () }) ?;
-      check_for_duplicate_ids_across_sources (
+      error_unless_each_id_names_one_node (
         &nodes, &config . data_root)
         . map_err (|e2| -> Box<dyn Error> {
           format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
