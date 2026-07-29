@@ -29,21 +29,53 @@ what's imperfect about what's done; choices determining the future.
   - DB-backed parity tests (=tests/reload/=): an out-of-band edit and a
     section deletion each leave the graph identical to a full rebuild,
     untouched telescopes undisturbed. 2/2 green.
+  - Collateral re-render: =rerender_views_after_reload= (in
+    =update_buffer.rs=, reusing the save path's =rerender_collateral_view=
+    / =RerenderAfterSaveContext=) re-streams every open view containing a
+    changed pid as a CollateralView, diff-mode views included.
+    =reload_touched_telescopes= now returns the applied DefineNodes so the
+    handler can drive it.
 - *Component 2 (write mutex) -- DONE + regression-checked.*
   - =server/write_lock.rs=: process-global tokio async Mutex serialising
     every graph read-modify-write. Acquired in the save entry
     (=update_graph_including_nodeMerges=), reload, and rebuild. Reads
     stay lock-free. Full =grouped_saves= suite (109 tests) green.
+- *Component 3 (Emacs triggers) -- DONE + byte-compiled clean.*
+  - =elisp/skg-request-reload-paths.el=: mtime+size snapshot change
+    detection over the =.skg= source dirs; the "reload paths" request
+    (reusing =skg--collateral-view-handler= to refresh open buffers); a
+    GLOBAL =magit-post-refresh-hook= (no minor mode required; first
+    refresh only baselines); =M-x skg-reload-changed=. Hooks wrapped in
+    =condition-case= so a bug can never break magit refresh / saving.
+  - =skg-file-minor-mode= gains an =after-save-hook= so a plain save of a
+    =.skg= buffer notifies the server. Required from =skg-init.el=.
+  - Byte-compiles clean under Emacs 30.2 (one benign "not known to be
+    defined" for =skg-tcp-connect-to-rust=, same as rebuild-dbs.el). NOT
+    runtime-verified: no live magit/server in this environment.
 - TypeDB was started locally (port 1729) to run the DB-backed tests.
+
+* Component 4 (recovery) -- NOT STARTED; assessed, no stumper
+The three-=oops-N_*=-branch recovery (plan Component 4) is the remaining
+work. The one flagged risk -- rendering a telescope from an in-memory
+graph snapshot to its on-disk BYTES without writing to disk -- is
+FACTORABLE, not a stumper: =write_nodecomplete_telescope= (=one_node.rs=)
+already does =unfold_node= -> =nodefs_from_section= -> =node_fs.to_yaml()=
+-> path; factoring that into a =Vec<(path, yaml)>= producer (leaving the
+=fs::write= to the caller) gives exactly the bytes git2 blob-building
+needs. Everything else is new but understood: git2 0.18 plumbing
+(blob/treebuilder/commit/reference, no checkout), =repo.state()= /
+=head_detached()= precondition guards (added fresh), a per-connection
+=PendingIncident= (=g_pre=, =g_post=, touched set, base commits), and a
+second "reload recover" request offered/confirmed like the fork flow.
+No git-writing code exists in the server yet, so this is all additive.
 
 * changes to the plan's envisioned order
 - Within Component 1, the plan's batch "scoped duplicate-ID check" (plan
-  1.4 step 6) is NOT yet implemented; only the override-invariant batch
-  guard is. Duplicate-IDs remain caught by a full rebuild, not yet by a
-  scoped reload. Tracked under "imperfect" below.
-- Component 1's collateral re-render (plan 1.4 step 8 / step 5 in the
-  build order) is NOT yet done: after a reload the stores are correct
-  but already-open client views are not yet re-streamed. Next up.
+  1.4 step 6) is NOT implemented; only the override-invariant batch guard
+  is. Duplicate-IDs remain caught by a full rebuild, not by a scoped
+  reload. Tracked under "imperfect" below.
+- Built in the order Components 1 -> 2 -> 3 (server core, mutex, Emacs)
+  as planned; Component 4 (recovery) is the remaining phase.
 
 * what's imperfect about what's done
 - Override-invariant rejection is coarse: a violation rejects the WHOLE
@@ -52,7 +84,15 @@ what's imperfect about what's done; choices determining the future.
 - Scoped duplicate-ID detection on reload is not implemented yet (see
   above). A reload that introduces a cross-source duplicate ID would be
   applied; a subsequent full rebuild would catch it.
-- No collateral re-render yet (see above).
+- Collateral re-render has no dedicated open-view integration test: the
+  parity tests register no views, so the re-render path early-returns in
+  them. It reuses the heavily-tested save collateral path, but a reload
+  test that registers a view and asserts a streamed CollateralView is
+  still owed.
+- Component 3 (elisp) is byte-compiled but not runtime-verified (no live
+  Emacs/magit/server here). The change-detection scans all =.skg= files
+  on each magit refresh via mtime (cheap); if a large tree lags, upgrade
+  to hashing only mtime-changed files.
 
 * choices determining the future
 - Reload's store commit reuses =apply_define_nodes_to_stores= directly
