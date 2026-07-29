@@ -1,5 +1,6 @@
 use crate::telescope::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
-use crate::telescope::types::SectionSlices;
+use crate::telescope::types::{FoldWarning, SectionSlices};
+use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_telescope};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
@@ -14,9 +15,34 @@ use std::fs::{self, DirEntry, ReadDir};
 /// Sets each node's source field to the appropriate source name.
 /// If any files fail to load, writes a detailed report to an
 /// org file in the config's data_root and returns a summary error.
+///
+/// Load-time telescope violations are LOGGED here and dropped.
+/// Callers that report them to the user (init and rebuild) take
+/// 'read_all_skg_files_from_sources_collecting_violations' instead.
 pub fn read_all_skg_files_from_sources (
   config: &SkgConfig
 ) -> io::Result<Vec<NodeComplete>> {
+  let (nodes, violations)
+    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    read_all_skg_files_from_sources_collecting_violations (config) ?;
+  for (pid, v) in &violations {
+    tracing::warn! ( pid = %pid, violation = %v,
+                     "telescope violation found at load" ); }
+  Ok (nodes) }
+
+/// As 'read_all_skg_files_from_sources', but hands back the
+/// load-time telescope violations rather than logging them, so
+/// init and rebuild can report them alongside the graph-level ones
+/// in DATA_ROOT/telescope-warnings.org.
+///
+/// Two kinds arise here and nowhere else, because only here are a
+/// node's SECTION LIST and the config both in hand:
+/// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
+/// - 'ForeignOverlay', where an unowned source holds the node's
+///   most public section while the user owns another.
+pub fn read_all_skg_files_from_sources_collecting_violations (
+  config: &SkgConfig
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
     : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
   let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
@@ -48,7 +74,39 @@ pub fn read_all_skg_files_from_sources (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
                load_errors . len() ))); }
-  fold_grouped_sections (sections_by_pid, pid_order) }
+  let overlays : Vec<(ID, TelescopeViolation)> =
+    foreign_overlays (&sections_by_pid, &pid_order, config);
+  let (nodes, fold_violations)
+    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    fold_grouped_sections (sections_by_pid, pid_order) ?;
+  Ok (( nodes,
+        { let mut all : Vec<(ID, TelescopeViolation)> = overlays;
+          all . extend (fold_violations);
+          all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
+          all } )) }
+
+/// The nodes whose HOME -- most public section -- sits in a source
+/// the user does not own, while the user owns some other section of
+/// the same pid. Sections arrive in privacy order, so the home is
+/// simply the first.
+fn foreign_overlays (
+  sections_by_pid : &HashMap<ID, Vec<(SourceName, NodeFS)>>,
+  pid_order       : &[ID],
+  config          : &SkgConfig,
+) -> Vec<(ID, TelescopeViolation)> {
+  let mut overlays : Vec<(ID, TelescopeViolation)> = Vec::new ();
+  for pid in pid_order {
+    let Some (sections) : Option<&Vec<(SourceName, NodeFS)>> =
+      sections_by_pid . get (pid) else { continue; };
+    let Some ((home, _)) : Option<&(SourceName, NodeFS)> =
+      sections . first () else { continue; };
+    if config . user_owns_source (home) { continue; }
+    if sections . iter () . skip (1) . any (
+      |(level, _)| config . user_owns_source (level) ) {
+      overlays . push (( pid . clone (),
+                         TelescopeViolation::ForeignOverlay {
+                           home : home . clone () } )); }}
+  overlays }
 
 /// One telescope, read fresh from disk by pid (all its sections,
 /// folded). Errors if no section exists or no section has a title.
@@ -63,14 +121,14 @@ pub fn nodecomplete_from_telescope_on_disk (
 /// Fold each telescope (already grouped by pid; sections arrive in
 /// privacy order because the caller iterated 'ordered_sources').
 /// Anchors resolve through the extra-id map built from every
-/// section, so a nodeMerge cannot dangle an anchor. A titleless
-/// telescope (no home) is a hard load error; fold warnings are
-/// logged for now (the telescope validators, next work item,
-/// formalize their reporting).
+/// section, so a nodeMerge cannot dangle an anchor. A telescope
+/// with no title in any section is a hard load error; every other
+/// fold complaint comes back as a violation for the caller to
+/// report.
 fn fold_grouped_sections (
   mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
   pid_order           : Vec<ID>,
-) -> io::Result<Vec<NodeComplete>> {
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {
@@ -82,24 +140,46 @@ fn fold_grouped_sections (
     pid_of . get (id) . cloned ()
       . unwrap_or_else ( || id . clone () ) };
   let mut all_nodes : Vec<NodeComplete> = Vec::new ();
+  let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
     let sections : Vec<(SourceName, NodeFS)> =
       sections_by_pid . remove (&pid)
       . expect ("pid_order tracks sections_by_pid");
-    all_nodes . push (
-      fold_one_telescope ( &pid, sections, &resolve ) ? ); }
-  Ok (all_nodes) }
+    let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+      fold_one_telescope_collecting_warnings (
+        &pid, sections, &resolve ) ?;
+    all_nodes . push (node);
+    for w in warnings {
+      all_violations . push (
+        ( pid . clone (), TelescopeViolation::Fold (w) )); }}
+  Ok (( all_nodes, all_violations )) }
 
-/// Fold ONE telescope's sections (in privacy order) into a
-/// NodeComplete. 'resolve' maps extra ids to pids for anchor
-/// resolution and must be built from the whole corpus, not just
-/// this telescope. A titleless telescope (no home) is a hard error;
-/// fold warnings are logged.
+/// 'fold_one_telescope_collecting_warnings', with the warnings
+/// logged rather than returned -- for the callers that have no way
+/// to report them.
 pub fn fold_one_telescope (
   pid      : &ID,
   sections : Vec<(SourceName, NodeFS)>,
   resolve  : &dyn Fn (&ID) -> ID,
 ) -> io::Result<NodeComplete> {
+  let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+    fold_one_telescope_collecting_warnings (
+      pid, sections, resolve ) ?;
+  for w in &warnings {
+    tracing::warn! ( pid = %pid, warning = %w,
+                     "telescope fold warning" ); }
+  Ok (node) }
+
+/// Fold ONE telescope's sections (in privacy order) into a
+/// NodeComplete, plus whatever the fold complained about.
+/// 'resolve' maps extra ids to pids for anchor resolution and must
+/// be built from the whole corpus, not just this telescope. A
+/// telescope with no title in any section is a hard error.
+pub fn fold_one_telescope_collecting_warnings (
+  pid      : &ID,
+  sections : Vec<(SourceName, NodeFS)>,
+  resolve  : &dyn Fn (&ID) -> ID,
+) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
   let extra_ids : Vec<ID> = {
     let mut extra_ids : Vec<ID> = Vec::new ();
     for (_, node_fs) in &sections {
@@ -121,17 +201,15 @@ pub fn fold_one_telescope (
     . map ( |(level, node_fs)|
             (level, node_fs . into_section_slices ()) )
     . collect ();
-  let (folded, warnings) : (FoldedNode, _) =
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
     fold_sections ( &slices, resolve );
-  for w in &warnings {
-    tracing::warn! ( pid = %pid, warning = ?w,
-                     "telescope fold warning" ); }
-  nodecomplete_from_fold (
+  let node : NodeComplete = nodecomplete_from_fold (
     pid . clone (), extra_ids, misc, folded )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ("Telescope '{}' has no home: no section carries a title.",
-               pid ))) }
+      format! ("Telescope '{}' has no title in any section.",
+               pid ))) ?;
+  Ok (( node, warnings )) }
 
 /// NOT AN ERROR: same-id files across sources. Those are the
 /// SECTIONS of one privacy telescope, grouped and folded at load,

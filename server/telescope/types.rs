@@ -129,3 +129,36 @@ pub enum FoldWarning {
   /// No section carried a title.
   MissingTitle,
 }
+
+impl std::fmt::Display for FoldWarning {
+  fn fmt (
+    &self,
+    f : &mut std::fmt::Formatter<'_>,
+  ) -> std::fmt::Result {
+    match self {
+      FoldWarning::DanglingAnchor { anchor } =>
+        write! ( f,
+          "dangling anchor '{}': it named no member of any more public section, so its run attached after the preceding run (or the prepend)",
+          anchor ),
+      FoldWarning::AnchorInBase { anchor } =>
+        write! ( f,
+          "anchor '{}' appeared in the most public section mentioning its relation, where there is no more public fold to anchor into; handled like a dangling anchor",
+          anchor ),
+      FoldWarning::DuplicateMember { member } =>
+        write! ( f,
+          "member '{}' appeared at two levels; the more public occurrence won",
+          member ),
+      FoldWarning::TitleBelowHome { home, title_at } =>
+        write! ( f,
+          "title below the home: the home '{}' carries no title, so this node's text sits at '{}', invisible to anyone reading at '{}'. A node's text belongs in its most public section. A save of this node is refused until the files are repaired by hand: either move the title up to '{}', or delete the '{}' section if it holds nothing else.",
+          home, title_at, home, home, home ),
+      FoldWarning::NonHomeTitle { level } =>
+        write! ( f,
+          "section '{}' carried a second title; the more public one won",
+          level ),
+      FoldWarning::NonHomeBody { level } =>
+        write! ( f,
+          "section '{}' carried a body at a level that does not hold the title",
+          level ),
+      FoldWarning::MissingTitle =>
+        write! ( f, "no section carried a title" ), }}}

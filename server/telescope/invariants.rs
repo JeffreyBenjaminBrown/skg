@@ -14,6 +14,7 @@
 //! hard-error, and those live in the parser, not here.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::telescope::types::FoldWarning;
 use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName};
 use crate::types::nodes::rust::NodeRust;
 
@@ -45,6 +46,21 @@ pub enum TelescopeViolation {
     level    : SourceName,
     member   : ID,
   },
+  /// A source the user does NOT own holds the node's most public
+  /// section -- its HOME -- while the user owns some other section
+  /// of the same pid. The forbidden OVERLAY shape: you cannot
+  /// write the home (foreign sections are never written), so you
+  /// cannot repair it; a save of this node is refused rather than
+  /// allowed to lose or publish its text. Arises from a pull whose
+  /// source happens to hold a same-pid file.
+  ForeignOverlay {
+    home : SourceName,
+  },
+  /// Anything the FOLD noticed while combining a node's sections
+  /// (a dangling anchor, a title below the home, a stray second
+  /// title, ...). These were logged and dropped before; they
+  /// belong in the report with the rest.
+  Fold ( FoldWarning ),
 }
 
 impl fmt::Display for TelescopeViolation {
@@ -62,7 +78,13 @@ impl fmt::Display for TelescopeViolation {
         relation, level, member } =>
         write! ( f,
           "{} member '{}' carries level '{}', which names no configured source",
-          relation, member, level ), }}}
+          relation, member, level ),
+      TelescopeViolation::ForeignOverlay { home } =>
+        write! ( f,
+          "foreign overlay: source '{}', which you do not own, holds this node's most public section -- its home -- while you own another section of it. You cannot write that home, so this cannot be repaired from here, and a save of this node is refused. Either drop your own section, or ask the source's owner about the id collision.",
+          home ),
+      TelescopeViolation::Fold (w) =>
+        write! ( f, "{}", w ), }}}
 
 /// THE PRIMITIVE both gates call: one node's telescope violations,
 /// judged against the whole graph (targets' homes) and the config
@@ -123,6 +145,28 @@ pub fn validate_all_telescopes (
       all . push (( pid . clone (), v )); }}
   all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
   all }
+
+/// The whole init/rebuild report: what the graph shows
+/// ('validate_all_telescopes') plus what the LOAD saw that the
+/// graph cannot show -- fold complaints and foreign overlays, which
+/// need a node's section list rather than its fold. Reporting
+/// failures are logged, not propagated: a report we could not write
+/// is no reason to refuse to start.
+pub fn report_all_telescope_violations (
+  config           : &SkgConfig,
+  graph            : &InRustGraph,
+  load_violations  : Vec<(ID, TelescopeViolation)>,
+) {
+  let all : Vec<(ID, TelescopeViolation)> = {
+    let mut all : Vec<(ID, TelescopeViolation)> =
+      validate_all_telescopes (config, graph);
+    all . extend (load_violations);
+    all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
+    all };
+  if let Err (e) = report_telescope_violations (
+    &all, &config . data_root ) {
+    tracing::warn! ( error = %e,
+                     "could not write the telescope report" ); }}
 
 /// Write the aggregated init report (one line per violation,
 /// grouped by node; a count up top) to
