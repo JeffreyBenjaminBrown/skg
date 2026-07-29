@@ -23,6 +23,7 @@ use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_sou
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::migrate_to_telescopes::handle_migrate_to_telescopes_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
+use crate::serve::handlers::reload_paths::handle_reload_paths_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -242,6 +243,13 @@ fn handle_emacs (
             handle_rerender_all_views_request (
               &mut stream,
               &env,
+              &mut views_state,
+              &active_source_set ),
+          Ok (RequestType::ReloadPaths) =>
+            handle_reload_paths_request (
+              &mut stream,
+              &request_header,
+              &mut env,
               &mut views_state,
               &active_source_set ),
           Err (err) => {

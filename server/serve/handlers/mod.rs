@@ -6,6 +6,7 @@ pub mod get_file_path;
 pub mod herald_rules;
 pub mod migrate_to_telescopes;
 pub mod rebuild_dbs;
+pub mod reload_paths;
 pub mod rerender_all_views;
 pub mod save_buffer;
 pub mod single_root_view;

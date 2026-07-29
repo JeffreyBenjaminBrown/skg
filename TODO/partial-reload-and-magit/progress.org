@@ -1,0 +1,20 @@
+* partial reload and magit -- progress
+
+Execution log for =3_plan.org=. Per =when-to-stop.org=: the plan is left
+as-is; deviations in *how* goals are met are recorded here. Categories:
+what's done and went well; changes to the plan's envisioned order;
+what's imperfect about what's done; choices determining the future.
+
+* what's done and went well
+- Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
+- Feature branch =partial-reload-and-magit=; design docs committed.
+- Compile baseline established (=cargo check --lib= clean).
+
+* changes to the plan's envisioned order
+(none yet)
+
+* what's imperfect about what's done
+(none yet)
+
+* choices determining the future
+(none yet)
