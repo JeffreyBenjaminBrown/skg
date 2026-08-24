@@ -1,14 +1,42 @@
+* TODO [[./TODO/cant-visit-cooking/plan.org][BUG : Can't visit my cooking node]]
+after subscribing back to (but not overriding) cheese-man's cooking node
 * ONGOING skg2 : partial rebuild
 for git discard hunk to work
+* TODO the content herald for s subscribee should count unintegated content, not all of it
+or both somehow
+* document telescoping privacy's representation in .skg files with an illustration
+* BUG : it reports heralds will not render at startup, and yet they do
+* TODO : if changing a link to a content rel orphans the link node, delete it
+* TODO Each save should update the magit map from id to title
+* TODO the warning about two modified buffers
+should not come upon save, but upon modifying the second
+* TODO there's no way to delete stale hides relationships
+They should be deletable from 'it hides these for no reason',
+or maybe deleted automatically when that is discovered to be nonempty.
+* BUG in export to org-roam
+The 'exporter' node, the one that defines where to write the org file
+derived from its parent, might have multiple parents.
+* BUG : mouse into buffers triggers errors
+* TODO warn user if part of their saved changes would be discarded
+because indefinitive
+* "indefinitive" is user-facing and confusing
+"actual"?
+* matching all words should be much more highly valued
+In fact maybe they should all require presence,
+barring an OR statement.
 * easy & important
 ** for video
 *** TODO/command-name-echo.org
-a config option, for recording videos
+A config option, for recording videos.
+Could put a second minibuffer line,
+that reads if anything (key sequence -> command),
+leaving a trail for five seconds or until interrupted.
 *** navigate point through herald (overlay)
 walk point through the herald string normally
 treat it as one character
 Shortcut to jump tokens treats it as one from outside,
 but divides it at spaces if point is interior to it.
+*** [[id:eb73db7a-acf4-4463-9398-f09279000337][org-mode : fold body and not children]]
 ** work through TODO/problems.org
 ** when creating a fork, immediately replace with the overerider
 ** try neovim

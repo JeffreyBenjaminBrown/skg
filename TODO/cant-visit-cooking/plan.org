@@ -1,0 +1,191 @@
+* Outcome
+
+Make visits reliable when two distinct Skg views have the same rendered
+title, and make the existing-view shortcut recover instead of silently doing
+nothing if the client and server ever disagree about whether the target view
+still exists.
+
+No graph or rendering change is needed.  Reciprocal subscriptions are valid,
+and the two cooking nodes render normally on a fresh connection.
+
+* Diagnosis
+
+** The request is not looping
+
+The live server log records the failed visit at
+=2026-08-24T02:57:10=, but no =single_root_view= rendering spans follow it.
+That means 'handle_single_root_view_request' returns through one of its two
+early =switch-to-view= branches in
+[[../../server/serve/handlers/single_root_view.rs]].  A fresh diagnostic TCP
+connection requested the same node and received the complete 740-byte
+override-choice view immediately:
+
+#+begin_example
+  * ... 95fc4b53-... ... cooking
+  ** ... 056a7de8-... ... cooking
+#+end_example
+
+The response reports one inbound and one outbound subscription on each
+relevant side.  There is no subscription traversal in the override-menu
+builder, and its override traversal has a path-local repeated-ID guard anyway.
+
+** The two distinct views collide on the Emacs buffer name
+
+Both nodes have the title =cooking=:
+
+- =95fc4b53-483e-475e-a86c-2818c0917166= in =public=;
+- =056a7de8-d7e5-4fb4-9a42-7e0f088ab898= in =Cheese=.
+
+'skg-content-view-buffer-name' therefore names either view =*cooking*=.
+'skg-open-org-buffer-from-text' in [[../../elisp/skg-buffer.el]] uses
+'get-buffer-create' with that name, then erases the returned buffer and
+replaces its =skg-view-uri=.  Opening the second cooking view consequently
+destroys the first view in place instead of allocating =*cooking*<2>=.
+Because the buffer was not killed, its =kill-buffer-hook= does not send the
+old URI's =close view= request.
+
+The log shows exactly that lifecycle on 2026-08-21:
+
+- the public node's override menu is opened and registered as
+  =override-menu:95fc4b53-...=;
+- the Cheese cooking node is later opened as an ordinary content view;
+- no close request for the override-menu URI occurs between those events;
+- every later ordinary visit to the public node returns immediately through
+  the already-open-menu shortcut.
+
+The server is therefore pointing at a URI that no Emacs buffer carries.
+
+** The stale-URI response is intentionally invisible to the user today
+
+'skg-handle-content-view-sexp' in
+[[../../elisp/skg-request-single-root-content-view.el]] receives
+=(switch-to-view override-menu:95fc4b53-...)= and calls
+'skg-find-buffer-by-uri'.  When that returns nil, the handler only writes a
+structured log entry.  The last user-visible text remains the earlier
+="Visiting node: ..."= message.
+
+There is also prior evidence in
+[[../from-dot-claude/done/investigations.org]] that even a successful lookup is
+fragile: 'switch-to-buffer' is currently called inside the network process
+filter, where the selected buffer can be restored when the filter returns.
+
+* Implementation plan
+
+** Allocate a distinct buffer for every newly opened content view
+
+In 'skg-open-org-buffer-from-text', replace the unconditional
+'get-buffer-create' reuse with collision-safe allocation, using
+'generate-new-buffer' (or equivalently a generated unique name).  Preserve the
+pleasant unsuffixed title when it is free; when it is occupied, let Emacs use
+its conventional =<2>=, =<3>= suffixes.
+
+Do not overwrite even a non-Skg buffer that happens to have the same name.
+The server has already decided that this response represents a new view; the
+client should create a new buffer for it.  Existing-view reuse belongs only to
+the explicit =switch-to-view= response path.
+
+Keep the existing mode setup, URI assignment, hooks, modified flag, point
+placement, and return value unchanged.
+
+*** TODO (Jeff speaking) Better: append the source name.
+If two buffers have the same name,
+it's probably the case that they come from different sources.
+Unless there's a collision, do not append source name.
+But once a collision arises, see if appending source names disambiguates.
+If so, do that rather than use numbers; otherwise, numbers it is.
+
+There might already be a norm in Emacs for appending information like that
+in a buffer name. if so, reuse that; if not,
+put the source in angle brackets.
+
+** Display an existing target after leaving the process filter
+
+Refactor the =switch-to-view= arm of 'skg-handle-content-view-sexp' into a
+small helper scheduled with a zero-delay timer, following the established
+pattern in 'skg--set-relationship-source-from-info'.  Recheck that the buffer
+is live in the timer callback, then use 'pop-to-buffer' to select and display
+it.  This covers the ordinary raw-content shortcut and the one-menu-per-node
+shortcut uniformly.
+
+Retain the =Already viewing this node= message when the target is already the
+selected buffer.
+
+** Recover once from genuinely stale server bookkeeping
+
+Carry the requested node ID and the override-bypass choice into the response
+handler closure.  If the deferred lookup finds no buffer:
+
+- send =close view= for the stale URI on the same TCP connection;
+- after the current one-shot content-view handler has returned and been
+  removed, issue the original single-root request again on that connection;
+- mark the retry internally so a second missing-URI response stops and shows a
+  user-visible error rather than retrying forever.
+
+The close and retry remain ordered on the persistent TCP stream, so the server
+unregisters the stale view before handling the replacement request.  Keep this
+logic client-side: the server cannot inspect Emacs's buffer list, and its
+deduplication decision is correct given the close/open messages it received.
+
+If factoring the close request avoids duplicating protocol formatting, add a
+'skg-send-close-view-uri' helper in [[../../elisp/skg-buffer.el]] and make the
+existing buffer-local 'skg-send-close-view' call it.
+
+* Regression tests
+
+** Buffer allocation unit test
+
+Extend [[../../tests/elisp/test-skg-view-uri-persistence.el]]:
+
+- open two texts under the same requested buffer name but different URIs;
+- assert that two distinct live buffers exist;
+- assert that the first buffer's text and URI were not changed;
+- assert that the second has the conventional suffixed name and its own text
+  and URI;
+- also pin that an unrelated preexisting buffer of the requested name is not
+  erased.
+
+This test should fail on today's 'get-buffer-create' behavior.
+
+** Switch response unit tests
+
+Add focused ERT coverage near
+[[../../tests/elisp/test-skg-warning-channel.el]] (or a new navigation test
+file) for both branches:
+
+- a =switch-to-view= URI with a live buffer is displayed by the deferred
+  callback;
+- a missing URI sends one close, retries the original ID with the original
+  bypass choice, and reports visibly rather than looping if the retry also
+  receives a missing URI.
+
+Stub the timer in the unit tests so the deferred action is deterministic.
+
+** End-to-end same-title navigation test
+
+Extend the override-menu integration fixture, or add a small sibling fixture,
+so the overridden node and its overrider share a title.  In order:
+
+- visit the overridden node and retain its override-menu buffer;
+- visit the same-titled overrider and assert that a distinct suffixed buffer
+  opens without altering the menu buffer or URI;
+- visit the overridden node again and assert that Skg displays the original
+  menu through =switch-to-view=;
+- close both and assert that their respective close-view lifecycle remains
+  functional.
+
+The fixture may also give the two nodes reciprocal =subscribes_to= edges.  That
+pins the user's graph shape, although the failure assertion must remain about
+buffer identity and URI bookkeeping, not graph traversal.
+
+* Verification
+
+Run the focused ERT files first, then the Emacs override-menu integration test.
+Run the complete Emacs test suite and the complete integration suite before
+handoff.  Rust logic should remain unchanged; if no Rust file changes, the
+existing 'tests/override_menu.rs' switch/dedup tests are sufficient server-side
+coverage, with the full repository test command as the final regression check.
+
+Manually inspect the integration output for the user-visible behavior: a
+second same-title view gets a suffixed buffer name, revisiting either view
+selects it, and no attempt ends with only =Visiting node: ...= in the
+minibuffer.
