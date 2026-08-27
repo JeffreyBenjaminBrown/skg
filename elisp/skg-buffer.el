@@ -25,6 +25,13 @@ and provides C-c prefix keybindings for skg commands."
      'permanent-local ; to survive major-mode changes
      t)
 
+(defvar-local skg-contentView-initialRoot-source nil
+  "Source of the initial first root in this skg content view.
+Captured when the view opens and retained only to disambiguate its
+buffer name if another content view opens with the same title.  Later
+view-forest edits do not change it.")
+(put 'skg-contentView-initialRoot-source 'permanent-local t)
+
 (defun skg-content-view-buffer-name (org-text)
   "Generate buffer name for content view from ORG-TEXT."
   (let ((title (skg-extract-top-headline-title org-text)))
@@ -33,6 +40,58 @@ and provides C-c prefix keybindings for skg commands."
                      (skg-normalize-buffer-name-links title)) "*")
       (error "skg: content view has no headline (first 200 chars: %s)"
              (substring (or org-text "") 0 (min 200 (length (or org-text ""))))))))
+
+(defun skg-content-view-source-name (org-text)
+  "Return the initial first root's source from ORG-TEXT, or nil.
+The first headline of a content view begins with a skg metadata sexp.
+Malformed or absent metadata is tolerated here because it should not
+prevent a view from opening."
+  (condition-case nil
+      (when (and org-text
+                 (string-match "^\\*+ +(skg\\_>" org-text))
+        (let* ((start (match-beginning 0))
+               (sexp-start (string-match "(skg\\_>" org-text start))
+               (sexp (car (read-from-string org-text sexp-start)))
+               (kind (or (assoc 'node (cdr sexp))
+                         (assoc 'diffPhantom (cdr sexp))
+                         (assoc 'deleted (cdr sexp))))
+               (source (and kind (cadr (assoc 'source (cdr kind))))))
+          (when source (format "%s" source))))
+    (error nil)))
+
+(defun skg--source-qualified-buffer-name (buffer-name source)
+  "Append SOURCE in angle brackets to BUFFER-NAME."
+  (format "%s <%s>" buffer-name (skg-sanitize-buffer-name source)))
+
+(defun skg--generate-contentView-buffer (buffer-name source)
+  "Generate a new content-view buffer named from BUFFER-NAME and SOURCE.
+When BUFFER-NAME is occupied by an skg view from another known source,
+rename that view and the new one with source qualifiers.  Otherwise use
+Emacs's conventional numeric suffix.  Never reuse or erase an existing
+buffer."
+  (let ((existing (get-buffer buffer-name)))
+    (if (not existing)
+        (generate-new-buffer buffer-name)
+      (let* ((existing-source
+              (and (skg-buffer-p existing)
+                   (buffer-local-value
+                    'skg-contentView-initialRoot-source existing)))
+             (existing-name
+              (and existing-source
+                   (skg--source-qualified-buffer-name
+                    buffer-name existing-source)))
+             (new-name
+              (and source
+                   (skg--source-qualified-buffer-name buffer-name source))))
+        (if (and existing-source source
+                 (not (string= existing-source source))
+                 (not (get-buffer existing-name))
+                 (not (get-buffer new-name)))
+            (progn
+              (with-current-buffer existing
+                (rename-buffer existing-name))
+              (generate-new-buffer new-name))
+          (generate-new-buffer buffer-name))))))
 
 (defun skg-search-buffer-name (search-terms)
   "Generate buffer name for title search with SEARCH-TERMS."
@@ -83,7 +142,8 @@ and truncates to a reasonable length."
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
 If VIEW-URI is provided, set it as the buffer's skg-view-uri;
 otherwise generate a new UUID."
-  (let ((buffer (get-buffer-create buffer-name))
+  (let* ((source (skg-content-view-source-name org-text))
+         (buffer (skg--generate-contentView-buffer buffer-name source))
         (uri (or view-uri (org-id-uuid))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
@@ -92,6 +152,7 @@ otherwise generate a new UUID."
         (skg-content-view-mode)
         (heralds-minor-mode))
       (setq skg-view-uri uri)
+      (setq skg-contentView-initialRoot-source source)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook
                 #'skg-warn-if-other-buffer-modified nil t)
@@ -99,17 +160,19 @@ otherwise generate a new UUID."
       (goto-char (point-min)))
     (switch-to-buffer buffer)))
 
-(defun skg-send-close-view ()
-  "Send a close-view message to the server for this buffer's view URI."
-  (when (and skg-view-uri
-             (boundp 'skg-rust-tcp-proc)
-             skg-rust-tcp-proc
-             (process-live-p skg-rust-tcp-proc))
+(defun skg-send-close-view-uri (tcp-proc view-uri)
+  "Send a close-view message for VIEW-URI over TCP-PROC."
+  (when (and view-uri tcp-proc (process-live-p tcp-proc))
     (let ((request (concat (prin1-to-string
                             `((request . "close view")
-                              (view-uri . ,skg-view-uri)))
+                              (view-uri . ,view-uri)))
                            "\n")))
-      (process-send-string skg-rust-tcp-proc request))))
+      (process-send-string tcp-proc request))))
+
+(defun skg-send-close-view ()
+  "Send a close-view message to the server for this buffer's view URI."
+  (when (boundp 'skg-rust-tcp-proc)
+    (skg-send-close-view-uri skg-rust-tcp-proc skg-view-uri)))
 
 (defun skg-warn-if-other-buffer-modified ()
   "Warn if another skg buffer has unsaved modifications."

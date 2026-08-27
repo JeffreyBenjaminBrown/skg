@@ -1,4 +1,4 @@
-* TODO [[./TODO/cant-visit-cooking/plan.org][BUG : Can't visit my cooking node]]
+* DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
 * ONGOING skg2 : partial rebuild
 for git discard hunk to work

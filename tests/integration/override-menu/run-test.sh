@@ -7,7 +7,8 @@
 # - Uses Emacs to visit an overridden node (expects the menu, under
 #   the server-assigned "override-menu:Z" URI, with the minibuffer
 #   notice delivered via the to-minibuffer field)
-# - Visits it again with override-choice bypass (expects the raw node)
+# - Exercises same-title nodes from different sources; the Emacs client also
+#   revisits the menu through switch-to-view and checks close/reopen lifecycle
 
 set -e  # Exit on any error
 
@@ -45,8 +46,12 @@ beep_when_server_becomes_available = false
 delete_on_quit = true
 
 [[sources]]
-name = "main"
+name = "public"
 path = "$TEST_DIR/data/owned/skg"
+
+[[sources]]
+name = "Cheese"
+path = "$TEST_DIR/data/cheese"
 EOF
 
 start_skg_server

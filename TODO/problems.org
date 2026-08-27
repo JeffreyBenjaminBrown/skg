@@ -1174,13 +1174,10 @@
   into phase 2. The merge's one CODE/TEST semantic conflict --
   override_search_ancestry.rs asserting =(birthHerald)= / "aO" -- WAS
   reconciled to the semantic form as part of the merge.
-* Same-title Skg views overwrite each other and leave stale server URIs (2026-08-24)
-  'skg-open-org-buffer-from-text' uses 'get-buffer-create' with a name
-  derived only from the first headline's title.  Opening a distinct
-  same-titled view erases and reuses that buffer, replacing its
-  =skg-view-uri= without firing the old view's close hook.  The server
-  keeps the old URI registered; a later visit receives =switch-to-view=
-  for a URI no buffer has, and the client only logs the failed lookup.
-  This is the cause of the public/Cheese reciprocal-cooking report, not
-  a subscription cycle.  Diagnosis and fix plan:
-  [[./cant-visit-cooking/plan.org]].
+* override_menu::all_tests expects Oa heralds that rendering omits (2026-08-24)
+  Found during final verification of an unrelated Emacs navigation fix.
+  Both the full =cargo nextest run= and an isolated rerun fail at
+  =tests/override_menu.rs:126=: the override-menu tree has the correct Z,
+  F, F2, and R shape and semantic override facts, but the rendered
+  overriders lack the expected =Oa= herald marker.  No Rust production
+  code changed in the navigation fix.

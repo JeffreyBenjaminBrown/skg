@@ -49,6 +49,53 @@
       (should (string-match-p "^\\* errors\n\\*\\* inactive source"
                               (nth 2 shown))))))
 
+(ert-deftest test-switch-to-view-is-displayed-by-deferred-callback ()
+  (let ((target (generate-new-buffer " *skg-switch-target*"))
+        displayed timer-called)
+    (unwind-protect
+        (progn
+          (with-current-buffer target
+            (setq skg-view-uri "existing-uri"))
+          (cl-letf (((symbol-function 'run-at-time)
+                     (lambda (_secs _repeat function &rest args)
+                       (setq timer-called t)
+                       (apply function args)))
+                    ((symbol-function 'pop-to-buffer)
+                     (lambda (buffer &rest _args)
+                       (setq displayed buffer))))
+            (skg-handle-content-view-sexp
+             nil "((switch-to-view existing-uri))" "unused-uri" "node-x")
+            (should timer-called)
+            (should (eq displayed target))))
+      (when (buffer-live-p target) (kill-buffer target)))))
+
+(ert-deftest test-missing-switch-uri-closes-and-retries-only-once ()
+  (let (closed retried visible)
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_secs _repeat function &rest args)
+                 (apply function args)))
+              ((symbol-function 'skg-send-close-view-uri)
+               (lambda (tcp uri) (setq closed (list tcp uri))))
+              ((symbol-function 'skg-request-single-root-content-view-from-id)
+               (lambda (&rest args) (setq retried args)))
+              ((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (setq visible (apply #'format format-string args)))))
+      (skg-handle-content-view-sexp
+       'test-tcp "((switch-to-view stale-uri))" "unused-uri"
+       "node-x" t nil)
+      (should (equal closed '(test-tcp "stale-uri")))
+      (should (equal retried '("node-x" test-tcp t t)))
+      (setq closed nil retried nil)
+      (skg-handle-content-view-sexp
+       'test-tcp "((switch-to-view still-stale))" "unused-uri"
+       "node-x" t t)
+      (should-not closed)
+      (should-not retried)
+      (should (string-match-p
+               "server twice returned a missing view (still-stale)"
+               visible)))))
+
 (ert-deftest test-rerender-done-with-errors-and-warnings-shows-both ()
   (let ((shown nil)
         (ended nil)

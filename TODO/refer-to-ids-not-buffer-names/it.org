@@ -210,7 +210,7 @@ minibuffer.
   =override_menu::all_tests= herald assertion, because rendered
   overriders lack expected =Oa= markers.  No Rust production file changed;
   this independent failure is recorded in =TODO/problems.org=.
-* TODO code review
+* DONE code review
 Codex, please respond to each of the following by appending a subchild.
 The last of them can be half-executed; please execut that part of it.
 ** (defvar-local skg-content-view-source nil
@@ -222,8 +222,34 @@ Is one of those what you mean here?
 Does the fact that the user could add more roots,
 or (if it's a search buffer) the buffer might have begun life with many roots,
 throw a spanner into your work?
+*** DONE Jeff confirmed the clarified name
+I meant the source of the *initial first root*, captured when
+'skg-open-org-buffer-from-text' first opens the content view.  Its only use is
+to disambiguate buffer names if a later content view has the same title.  It
+is intentionally stable if the user later adds, removes, or reorders roots;
+those edits should not rename an already-open buffer or change the identity
+that originally distinguished it.
+
+Search buffers do not go through 'skg-open-org-buffer-from-text' and neither
+set nor consume this variable, so a search buffer's many roots do not affect
+the mechanism.
+
+I clarified the variable's docstring accordingly.  Per the rename comment
+below, I have not renamed the variable yet.  My proposed eventual name is
+=skg-contentView-initialRoot-source=: =contentView= and =initialRoot= bind as
+units, and =source= is the property of that initial root.  Please confirm or
+replace that spelling.
+
+Jeff confirmed it; the variable and its integration-test reference now use
+=skg-contentView-initialRoot-source=.
 ** skg--allocate-content-view-buffer
 What do you mean by 'allocate'? Is this standard emacs terminology?
+*** DONE Codex response
+I meant "create a fresh buffer object under a collision-safe name".  Although
+"allocate" is ordinary implementation terminology, it is not the clearest
+Emacs-specific verb here.  The underlying Emacs primitive is
+'generate-new-buffer', so I renamed the helper to
+'skg--generate-contentView-buffer'.
 ** renames
 Let's rename
   skg--finish-switch-to-content-view
@@ -241,3 +267,9 @@ so don't actually call it skg-contentView-source,
 but adhere to the principle.
 So that means you can't actually do this second rename yet;
 wait until I'm clear on the skg-content-view-source question.
+*** DONE Codex response
+Renamed 'skg--finish-switch-to-content-view' to the requested
+'skg--finish-switchToContentView'.
+
+After Jeff confirmed the clarified concept, I renamed
+'skg-content-view-source' to 'skg-contentView-initialRoot-source'.

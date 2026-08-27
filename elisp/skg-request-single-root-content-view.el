@@ -20,14 +20,16 @@ When BYPASS-OVERRIDE is non-nil, the request carries
               '((override-choice . "bypass")))))
           "\n"))
 
-(defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc bypass-override)
+(defun skg-request-single-root-content-view-from-id
+    (node-id &optional tcp-proc bypass-override stale-uri-retry-p)
   "Ask Rust for an single root content view view of NODE-ID.
 Registers a response handler in the dispatch map.
 Optional TCP-PROC allows reusing an existing connection.
 When BYPASS-OVERRIDE is non-nil, the request carries
 \(override-choice . \"bypass\"): if NODE-ID is overridden, the
 server opens the node itself instead of the override-choice menu.
-\(Recursive content beneath the root still substitutes.)"
+\(Recursive content beneath the root still substitutes.)
+STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
          (view-uri (org-id-uuid))
@@ -41,29 +43,58 @@ server opens the node itself instead of the override-choice menu.
     (skg-register-response-handler
      'content-view
      (lambda (tcp-proc payload)
-       (skg-handle-content-view-sexp tcp-proc payload view-uri))
+       (skg-handle-content-view-sexp
+        tcp-proc payload view-uri clean-id bypass-override
+        stale-uri-retry-p))
      t)
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)) )
 
-(defun skg-handle-content-view-sexp (tcp-proc sexp-string view-uri)
+(defun skg--finish-switchToContentView
+    (tcp-proc switch-uri node-id bypass-override stale-uri-retry-p)
+  "Display SWITCH-URI, or repair stale server bookkeeping once."
+  (let ((buf (skg-find-buffer-by-uri switch-uri)))
+    (cond
+     ((not buf)
+      (skg-log 'warn 'view
+               "server said switch to view %s, but no buffer found"
+               switch-uri)
+      (if stale-uri-retry-p
+          (message
+           "skg: could not visit %s: server twice returned a missing view (%s)"
+           node-id switch-uri)
+        (skg-send-close-view-uri tcp-proc switch-uri)
+        (skg-request-single-root-content-view-from-id
+         node-id tcp-proc bypass-override t)))
+     ((eq buf (current-buffer))
+      (message "Already viewing this node (it is a root of this view)"))
+     (t (pop-to-buffer buf)))))
+
+(defun skg--defer-switch-to-content-view
+    (tcp-proc switch-uri node-id bypass-override stale-uri-retry-p)
+  "Handle a switch response outside the network process filter."
+  (run-at-time
+   0 nil #'skg--finish-switchToContentView
+   tcp-proc switch-uri node-id bypass-override stale-uri-retry-p))
+
+(defun skg-handle-content-view-sexp
+    (tcp-proc sexp-string view-uri
+              &optional node-id bypass-override stale-uri-retry-p)
   "Parse and handle content view response s-exp.
 Expected shape: ((content ...) (errors ...) (warnings ...)).
 If the server returns ((switch-to-view URI)) instead, switch to the
 existing buffer for that view rather than opening a new one.
-VIEW-URI is the pre-generated UUID to assign to the new buffer."
+VIEW-URI is the pre-generated UUID to assign to the new buffer.
+NODE-ID and BYPASS-OVERRIDE reproduce the request during one stale-URI
+recovery attempt; STALE-URI-RETRY-P prevents an infinite retry."
   (condition-case err
       (let* ((response (read sexp-string))
              (switch-uri (cadr (assoc 'switch-to-view response))))
         (if switch-uri
             ;; The requested ID is already a root of an open view.
-            (let ((buf (skg-find-buffer-by-uri switch-uri)))
-              (cond
-               ((not buf)
-                (skg-log 'warn 'view "server said switch to view %s, but no buffer found" switch-uri))
-               ((eq buf (current-buffer))
-                (message "Already viewing this node (it is a root of this view)"))
-               (t (switch-to-buffer buf))))
+            (skg--defer-switch-to-content-view
+             tcp-proc (format "%s" switch-uri) node-id bypass-override
+             stale-uri-retry-p)
           ;; Normal content view response.
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))

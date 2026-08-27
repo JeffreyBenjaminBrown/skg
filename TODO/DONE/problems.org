@@ -1,3 +1,17 @@
+** Same-title Skg views overwrote each other and left stale server URIs (fixed 2026-08-24)
+   'skg-open-org-buffer-from-text' used 'get-buffer-create' with a name
+   derived only from the first headline's title. Opening a distinct
+   same-titled view erased and reused that buffer, replacing its
+   =skg-view-uri= without firing the old view's close hook. The server
+   kept the old URI registered; a later visit received =switch-to-view=
+   for a URI no buffer had, and the client only logged the failed lookup.
+   This caused the public/Cheese reciprocal-cooking report; the reciprocal
+   subscriptions themselves were valid. FIXED: new views never reuse an
+   existing buffer, different-source title collisions qualify both names,
+   same-source/ambiguous collisions get numeric suffixes, switch responses
+   display outside the process filter, and stale server URIs are closed and
+   retried once. Diagnosis, implementation, and verification:
+   [[../refer-to-ids-not-buffer-names/it.org]].
 ** start-servers.sh could not kill the cargo-watch it was trying to kill (fixed 2026-07-26)
    Found while cleaning up stray processes: two cargo-watch processes
    were alive, and the newer run's skg had exited with

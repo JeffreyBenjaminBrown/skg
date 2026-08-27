@@ -1,2 +1,4 @@
 pid: Z
-title: the overridden node
+title: cooking
+subscribes_to:
+  - R

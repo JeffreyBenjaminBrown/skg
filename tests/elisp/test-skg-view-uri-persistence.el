@@ -121,4 +121,68 @@ but skg-content-view-mode is lost."
           (should (equal skg-view-uri "uri-rename")))
       (kill-buffer buf))))
 
+(ert-deftest test-same-name-content-views-do-not-overwrite-each-other ()
+  "A same-name view gets a numeric suffix when sources cannot distinguish it."
+  (let (first second)
+    (unwind-protect
+        (progn
+          (setq first (test--make-skg-buffer
+                       "*same-title*" "* first\n" "uri-first"))
+          (setq second (test--make-skg-buffer
+                        "*same-title*" "* second\n" "uri-second"))
+          (should-not (eq first second))
+          (should (equal (buffer-name first) "*same-title*"))
+          (should (equal (buffer-name second) "*same-title*<2>"))
+          (with-current-buffer first
+            (should (equal (buffer-string) "* first\n"))
+            (should (equal skg-view-uri "uri-first")))
+          (with-current-buffer second
+            (should (equal (buffer-string) "* second\n"))
+            (should (equal skg-view-uri "uri-second"))))
+      (when (buffer-live-p first) (kill-buffer first))
+      (when (buffer-live-p second) (kill-buffer second)))))
+
+(ert-deftest test-same-title-different-sources-qualify-both-buffer-names ()
+  "Different root sources are more informative than numeric suffixes."
+  (let (public cheese)
+    (unwind-protect
+        (progn
+          (setq public
+                (test--make-skg-buffer
+                 "*cooking*"
+                 "* (skg (node (id public-id) (source public))) cooking\n"
+                 "uri-public"))
+          (setq cheese
+                (test--make-skg-buffer
+                 "*cooking*"
+                 "* (skg (node (id cheese-id) (source Cheese))) cooking\n"
+                 "uri-cheese"))
+          (should (equal (buffer-name public) "*cooking* <public>"))
+          (should (equal (buffer-name cheese) "*cooking* <Cheese>"))
+          (should (equal (buffer-local-value 'skg-view-uri public)
+                         "uri-public"))
+          (should (equal (buffer-local-value 'skg-view-uri cheese)
+                         "uri-cheese")))
+      (when (buffer-live-p public) (kill-buffer public))
+      (when (buffer-live-p cheese) (kill-buffer cheese)))))
+
+(ert-deftest test-content-view-does-not-erase-unrelated-same-name-buffer ()
+  (let ((unrelated (generate-new-buffer "*occupied-title*"))
+        opened)
+    (unwind-protect
+        (progn
+          (with-current-buffer unrelated (insert "keep me"))
+          (setq opened
+                (test--make-skg-buffer
+                 "*occupied-title*"
+                 "* (skg (node (id x) (source public))) occupied title\n"
+                 "uri-new"))
+          (should-not (eq unrelated opened))
+          (should (equal (buffer-name opened) "*occupied-title*<2>"))
+          (with-current-buffer unrelated
+            (should (equal (buffer-string) "keep me"))
+            (should-not skg-view-uri)))
+      (when (buffer-live-p unrelated) (kill-buffer unrelated))
+      (when (buffer-live-p opened) (kill-buffer opened)))))
+
 (provide 'test-skg-view-uri)

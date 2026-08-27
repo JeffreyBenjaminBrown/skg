@@ -1,0 +1,6 @@
+pid: R
+title: cooking
+overrides_view_of:
+  - Z
+subscribes_to:
+  - Z
