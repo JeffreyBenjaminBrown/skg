@@ -1,5 +1,10 @@
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
+* TODO BUG skg-goto should not change both buffers if the window is split
+* TODO BUG cannot change editRequest from delete to none
+using the in metadata buffer.
+If one does, the resulting metadata is invalid
+(and also the experience of doing it is awkward).
 * ONGOING skg2 : partial rebuild
 for git discard hunk to work
 * TODO the content herald for s subscribee should count unintegated content, not all of it
