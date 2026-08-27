@@ -1,4 +1,7 @@
-* Outcome
+* maybe done
+** Outcome
+
+Implemented and verified 2026-08-24.
 
 Make visits reliable when two distinct Skg views have the same rendered
 title, and make the existing-view shortcut recover instead of silently doing
@@ -8,9 +11,9 @@ still exists.
 No graph or rendering change is needed.  Reciprocal subscriptions are valid,
 and the two cooking nodes render normally on a fresh connection.
 
-* Diagnosis
+** Diagnosis
 
-** The request is not looping
+*** The request is not looping
 
 The live server log records the failed visit at
 =2026-08-24T02:57:10=, but no =single_root_view= rendering spans follow it.
@@ -29,7 +32,7 @@ The response reports one inbound and one outbound subscription on each
 relevant side.  There is no subscription traversal in the override-menu
 builder, and its override traversal has a path-local repeated-ID guard anyway.
 
-** The two distinct views collide on the Emacs buffer name
+*** The two distinct views collide on the Emacs buffer name
 
 Both nodes have the title =cooking=:
 
@@ -55,7 +58,7 @@ The log shows exactly that lifecycle on 2026-08-21:
 
 The server is therefore pointing at a URI that no Emacs buffer carries.
 
-** The stale-URI response is intentionally invisible to the user today
+*** The stale-URI response is intentionally invisible to the user today
 
 'skg-handle-content-view-sexp' in
 [[../../elisp/skg-request-single-root-content-view.el]] receives
@@ -69,9 +72,9 @@ There is also prior evidence in
 fragile: 'switch-to-buffer' is currently called inside the network process
 filter, where the selected buffer can be restored when the filter returns.
 
-* Implementation plan
+** Implementation plan
 
-** Allocate a distinct buffer for every newly opened content view
+*** Allocate a distinct buffer for every newly opened content view
 
 In 'skg-open-org-buffer-from-text', replace the unconditional
 'get-buffer-create' reuse with collision-safe allocation, using
@@ -87,7 +90,7 @@ the explicit =switch-to-view= response path.
 Keep the existing mode setup, URI assignment, hooks, modified flag, point
 placement, and return value unchanged.
 
-*** TODO (Jeff speaking) Better: append the source name.
+**** DONE (Jeff speaking) Better: append the source name.
 If two buffers have the same name,
 it's probably the case that they come from different sources.
 Unless there's a collision, do not append source name.
@@ -98,7 +101,11 @@ There might already be a norm in Emacs for appending information like that
 in a buffer name. if so, reuse that; if not,
 put the source in angle brackets.
 
-** Display an existing target after leaving the process filter
+Implemented as =*title* <source>= for both colliding buffers when their
+root sources differ.  Ambiguous and same-source collisions use Emacs's
+conventional numeric suffix.
+
+*** Display an existing target after leaving the process filter
 
 Refactor the =switch-to-view= arm of 'skg-handle-content-view-sexp' into a
 small helper scheduled with a zero-delay timer, following the established
@@ -110,7 +117,7 @@ shortcut uniformly.
 Retain the =Already viewing this node= message when the target is already the
 selected buffer.
 
-** Recover once from genuinely stale server bookkeeping
+*** Recover once from genuinely stale server bookkeeping
 
 Carry the requested node ID and the override-bypass choice into the response
 handler closure.  If the deferred lookup finds no buffer:
@@ -130,9 +137,9 @@ If factoring the close request avoids duplicating protocol formatting, add a
 'skg-send-close-view-uri' helper in [[../../elisp/skg-buffer.el]] and make the
 existing buffer-local 'skg-send-close-view' call it.
 
-* Regression tests
+** Regression tests
 
-** Buffer allocation unit test
+*** Buffer allocation unit test
 
 Extend [[../../tests/elisp/test-skg-view-uri-persistence.el]]:
 
@@ -146,7 +153,7 @@ Extend [[../../tests/elisp/test-skg-view-uri-persistence.el]]:
 
 This test should fail on today's 'get-buffer-create' behavior.
 
-** Switch response unit tests
+*** Switch response unit tests
 
 Add focused ERT coverage near
 [[../../tests/elisp/test-skg-warning-channel.el]] (or a new navigation test
@@ -160,7 +167,7 @@ file) for both branches:
 
 Stub the timer in the unit tests so the deferred action is deterministic.
 
-** End-to-end same-title navigation test
+*** End-to-end same-title navigation test
 
 Extend the override-menu integration fixture, or add a small sibling fixture,
 so the overridden node and its overrider share a title.  In order:
@@ -177,7 +184,7 @@ The fixture may also give the two nodes reciprocal =subscribes_to= edges.  That
 pins the user's graph shape, although the failure assertion must remain about
 buffer identity and URI bookkeeping, not graph traversal.
 
-* Verification
+** Verification
 
 Run the focused ERT files first, then the Emacs override-menu integration test.
 Run the complete Emacs test suite and the complete integration suite before
@@ -189,3 +196,48 @@ Manually inspect the integration output for the user-visible behavior: a
 second same-title view gets a suffixed buffer name, revisiting either view
 selects it, and no attempt ends with only =Visiting node: ...= in the
 minibuffer.
+
+*** Verification result (2026-08-24)
+
+- Focused ERT: 18/18 passed.
+- Complete Emacs ERT suite: 300/300 passed.
+- Override-menu Emacs integration test: passed with same-title,
+  different-source, reciprocal-subscription fixture.
+- Complete Emacs integration suite: 34/34 passed.
+- Override-menu Neovim integration test: passed after updating its shared
+  fixture title assertion.
+- Rust nextest: 536/537 passed; the sole failure is the pre-existing
+  =override_menu::all_tests= herald assertion, because rendered
+  overriders lack expected =Oa= markers.  No Rust production file changed;
+  this independent failure is recorded in =TODO/problems.org=.
+* TODO code review
+Codex, please respond to each of the following by appending a subchild.
+The last of them can be half-executed; please execut that part of it.
+** (defvar-local skg-content-view-source nil
+This is ill-defined. A content root view *begins* its life with a single root,
+but the user can add a second to the view forest.
+Two things that *are* well-defined is the root that the user initial asked for,
+and the first root node in the buffer.
+Is one of those what you mean here?
+Does the fact that the user could add more roots,
+or (if it's a search buffer) the buffer might have begun life with many roots,
+throw a spanner into your work?
+** skg--allocate-content-view-buffer
+What do you mean by 'allocate'? Is this standard emacs terminology?
+** renames
+Let's rename
+  skg--finish-switch-to-content-view
+  -> skg--finish-switchToContentView.
+and skg-content-view-source
+  ->  skg-contentView-source
+Otherwise the grammatical binding order is not clear to a reader
+(they might be thinking
+"Finish-switch to the content view, whatever finish-switch menas?"
+"View the source of the content?").
+
+Except you're probably going to change the name of skg-content-view-source,
+per the first item in this document,
+so don't actually call it skg-contentView-source,
+but adhere to the principle.
+So that means you can't actually do this second rename yet;
+wait until I'm clear on the skg-content-view-source question.
