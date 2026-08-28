@@ -78,22 +78,20 @@ fn test_subscribee_col_appears_for_subscribers(
     // Nodes 11 and 12 subscribe to something, so they get SubscribeeCol children.
     // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
-    // The 11/12 -> *-sees edges are recorded in the (public) "home"
-    // section even though their target lives in the (private) "away"
-    // section -- older fixture data predating the privacy-telescope
-    // source model, which the telescope-validators leak warning already
-    // flags but tolerates. Since that recording source ("home") differs
-    // from the edge's DEFAULT (more_private_of(home, away) = "away"),
-    // render-and-gating's herald surfaces it: (relSource home).
+    // The 11/12 -> *-sees edges run from owned "home" nodes to foreign
+    // "away" nodes. Their default is the owner's home: that is writable
+    // and deliberately exposes the foreign ID/relationship there. Since
+    // the fixture records both edges at exactly that default, no
+    // (relSource ...) override appears.
     let expected = indoc! {
       "* (skg (node (id 1) (source home) (parentIs absent) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribes (out 1)) (birth contains)))) 11
       *** (skg subscribeeCol)
-      **** (skg (node (id 11-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (relSource home) (sourceHerald ⌂:away)))) 11-sees
+      **** (skg (node (id 11-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 111
       ** (skg (node (id 12) (source home) (rels (contains (in 1 (ancestors 1))) (subscribes (out 1)) (birth contains)))) 12
       *** (skg subscribeeCol)
-      **** (skg (node (id 12-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (relSource home) (sourceHerald ⌂:away)))) 12-sees
+      **** (skg (node (id 12-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
       ** (skg (node (id 14) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 14
       *** (skg (node (id 141) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 141
