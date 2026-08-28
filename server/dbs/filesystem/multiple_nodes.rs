@@ -3,7 +3,10 @@ use crate::telescope::types::{
   FoldWarning, Telescope, retain_owned_sections_when_pid_collides,
 };
 use crate::telescope::invariants::TelescopeViolation;
-use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_telescope};
+use crate::dbs::filesystem::one_node::{
+  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
+  read_nodecomplete, validate_pid_matches_filename,
+};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
@@ -387,27 +390,16 @@ pub fn write_all_nodes_to_fs (
   nodes  : Vec<NodeComplete>,
   config : SkgConfig,
 ) -> io  ::Result<usize> { // number of nodes written
-
-  // Collect unique source directories and ensure they exist
-  for source_name in {
-    let unique_sources : HashSet<&SourceName> =
-      nodes . iter()
-      . map( |node| &node . source )
-      . collect();
-    unique_sources } {
-    let source_config: &SkgfileSource =
-      config . sources . get (source_name)
-      . ok_or_else( || io::Error::new(
-        io::ErrorKind::NotFound,
-        format!("Source '{}' not found in config",
-                source_name)) )?;
-    fs::create_dir_all ( &source_config . path )?; }
-
-  let mut written : usize = 0;
-  for node in nodes {
-    write_nodecomplete_telescope ( & node, & config ) ?;
-    written += 1; }
-  Ok (written) }
+  let prepared : Vec<PreparedTelescopeWrite> =
+    nodes . iter ()
+    . map ( |node|
+      prepare_nodecomplete_telescope (node, &config, false) )
+    . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
+  for telescope in &prepared {
+    telescope . apply (&config) ?; }
+  for telescope in &prepared {
+    telescope . verify_hoist (&config) ?; }
+  Ok (prepared . len ()) }
 
 /// Deleting a node deletes its whole TELESCOPE: every owned
 /// section file of that pid, in whatever source. (The SourceName in

@@ -2,9 +2,11 @@ use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::multiple_nodes::{
   error_unless_each_id_names_one_node,
-  delete_all_nodes_from_fs,
   read_all_skg_files_from_sources,
-  write_all_nodes_to_fs};
+};
+use crate::dbs::filesystem::one_node::{
+  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
+};
 use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::telescope::invariants::telescope_violations_of;
 use crate::dbs::in_rust_graph::{
@@ -28,7 +30,7 @@ use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::apply_relationship_deltas_for_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
-use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -483,27 +485,61 @@ pub fn update_fs_from_saveinstructions (
   source_moves : &[SourceMove],
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
+  update_fs_from_saveinstructions_with_hoist_approval (
+    node_defs, source_moves, config, &HashSet::new () )
+}
+
+/// Save-only variant. Every delete target and every serialized telescope is
+/// prepared before the first filesystem mutation. The approval set is an
+/// explicit capability supplied only by the interactive Hoist retry; all
+/// ordinary callers use 'update_fs_from_saveinstructions' above and fail
+/// closed on ugly disk telescopes.
+pub(crate) fn update_fs_from_saveinstructions_with_hoist_approval (
+  node_defs             : &[DefineNode],
+  source_moves          : &[SourceMove],
+  config                : SkgConfig,
+  hoist_approved_pids   : &HashSet<ID>,
+) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = DefineNode::partition_save_and_delete (node_defs);
-  let deleted : usize = {
-    let delete_targets : Vec<(ID, SourceName)> =
-      to_delete . into_iter ()
-      . map ( |DeleteNode { id, source }| (id, source) )
-      . collect ();
-    if ! delete_targets . is_empty () {
-      delete_all_nodes_from_fs (
-        delete_targets, config . clone () ) ?
-    } else { 0 } };
-  let written : usize = {
-    let nodes_to_write : Vec<NodeComplete> =
-      to_save . into_iter ()
-      . map ( |SaveNode (node) | node )
-      . collect ();
-    if ! nodes_to_write . is_empty () {
-      write_all_nodes_to_fs (
-        nodes_to_write, config . clone() ) ?
-    } else { 0 } };
+  let prepared_writes : Vec<PreparedTelescopeWrite> =
+    to_save . iter ()
+    . map ( |SaveNode (node)|
+      prepare_nodecomplete_telescope (
+        node,
+        &config,
+        hoist_approved_pids . contains (&node . pid) ) )
+    . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
+
+  // Resolve every deletion path before applying either deletion or write.
+  // Only owned sections are eligible, exactly like the standalone deleter.
+  let mut prepared_deletions : Vec<String> = Vec::new ();
+  let mut deleted_pids : HashSet<ID> = HashSet::new ();
+  for DeleteNode { id, .. } in &to_delete {
+    for source in config . ordered_sources () {
+      if ! config . user_owns_source (&source) { continue; }
+      let path : String = crate::util::path_from_pid_and_source (
+        &config, &source, id . clone () )
+        . map_err ( |e| io::Error::new (io::ErrorKind::NotFound, e) ) ?;
+      if std::path::Path::new (&path) . is_file () {
+        deleted_pids . insert ( id . clone () ); }
+      prepared_deletions . push (path); }}
+
+  // Mutation starts only after the whole batch has passed ownership and
+  // serialization preflight.
+  for path in prepared_deletions {
+    match std::fs::remove_file (&path) {
+      Ok (( ))                                          => {},
+      Err (e) if e . kind () == io::ErrorKind::NotFound => {},
+      Err (e)                                           => return Err (e), } }
+  for telescope in &prepared_writes {
+    telescope . apply (&config) ?; }
+  for telescope in &prepared_writes {
+    telescope . verify_hoist (&config) ?; }
+
+  let deleted : usize = deleted_pids . len ();
+  let written : usize = prepared_writes . len ();
   let _ = source_moves;
   // Source moves need no file relocation of their own anymore: the
   // telescope write above places every section at its level and

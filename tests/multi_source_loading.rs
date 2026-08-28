@@ -545,7 +545,8 @@ fn test_unreadable_files_creates_org_file() {
   // No explicit cleanup: temp_dir's Drop handles it.
 }
 
-/// The two shapes 'write_nodecomplete_telescope' refuses. Neither
+/// The malformed scalar and foreign-home shapes
+/// 'write_nodecomplete_telescope' refuses. Neither
 /// arises from a skg save (every level is clamped to at least the
 /// owner's home); both arrive from hand-edited files or a pull.
 /// Writing either would publish the node's text or lose it.
@@ -610,4 +611,70 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
       &mut node, &SourceName::from ("public") );
     write_nodecomplete_to_source (&node, &config)
       . expect ("an owned titled home writes"); }
+}
+
+#[test]
+fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
+  use skg::dbs::filesystem::multiple_nodes::write_all_nodes_to_fs;
+  let temp_dir : TempDir = tempdir() . unwrap();
+  let public_path  : PathBuf = temp_dir . path() . join ("public");
+  let private_path : PathBuf = temp_dir . path() . join ("private");
+  let foreign_path : PathBuf = temp_dir . path() . join ("foreign");
+  for path in [&public_path, &private_path, &foreign_path] {
+    fs::create_dir_all (path) . unwrap (); }
+  let config : SkgConfig = {
+    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new ();
+    for (name, path, owned) in [
+      ("public",  public_path  . clone (), true),
+      ("private", private_path . clone (), true),
+      ("foreign", foreign_path . clone (), false),
+    ] {
+      sources . insert ( SourceName::from (name), SkgfileSource {
+        name         : SourceName::from (name),
+        abbreviation : None,
+        path,
+        user_owns_it : owned,
+      } ); }
+    let mut config : SkgConfig =
+      test_config (sources, temp_dir . path () . to_path_buf ());
+    config . source_order = ["public", "private", "foreign"]
+      . into_iter () . map (SourceName::from) . collect ();
+    config };
+
+  fs::write (
+    public_path . join ("B.skg"),
+    "title: visible title\npid: B\n" ) . unwrap ();
+  fs::write (
+    private_path . join ("B.skg"),
+    "pid: B\nbody: hidden body\n" ) . unwrap ();
+  let mut body_hoist : NodeComplete = empty_node_complete ();
+  body_hoist . pid = ID::new ("B");
+  body_hoist . title = "visible title" . to_string ();
+  body_hoist . body = Some ("hidden body" . to_string ());
+  set_source_retagging_levels (
+    &mut body_hoist, &SourceName::from ("public") );
+  let err : IoError = write_nodecomplete_to_source (&body_hoist, &config)
+    . expect_err ("a body below home requires interactive Hoist approval");
+  assert! (err . to_string () . contains ("would publish it"));
+  assert_eq! (
+    fs::read_to_string (private_path . join ("B.skg")) . unwrap (),
+    "pid: B\nbody: hidden body\n" );
+
+  let mut valid : NodeComplete = empty_node_complete ();
+  valid . pid = ID::new ("V");
+  valid . title = "valid" . to_string ();
+  set_source_retagging_levels (
+    &mut valid, &SourceName::from ("public") );
+  let mut invalid : NodeComplete = empty_node_complete ();
+  invalid . pid = ID::new ("X");
+  invalid . title = "invalid" . to_string ();
+  set_source_retagging_levels (
+    &mut invalid, &SourceName::from ("public") );
+  invalid . contains . push (
+    skg::types::misc::MemberAtSource::at_source (
+      SourceName::from ("foreign"), ID::new ("child") ));
+  write_all_nodes_to_fs (vec! [valid, invalid], config)
+    . expect_err ("a later foreign output rejects the entire batch");
+  assert! (! public_path . join ("V.skg") . exists (),
+           "the valid earlier node was not written before batch failure");
 }

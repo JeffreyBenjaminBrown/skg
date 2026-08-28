@@ -58,7 +58,7 @@ pub fn nodecomplete_from_pid_and_source (
 /// configured source (most public first), pid.skg if present. The
 /// order is what makes the first section the home, so it comes from
 /// 'ordered_sources' and nowhere else.
-fn telescope_from_disk (
+pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Option<Telescope>> {
@@ -139,8 +139,82 @@ pub fn write_nodecomplete_telescope (
   nodecomplete : &NodeComplete,
   config       : &SkgConfig,
 ) -> io::Result<()> {
+  let prepared : PreparedTelescopeWrite =
+    prepare_nodecomplete_telescope (nodecomplete, config, false) ?;
+  prepared . apply (config) ?;
+  prepared . verify_hoist (config)
+}
+
+/// A completely validated and serialized telescope rewrite. Constructing
+/// this value performs every fallible shape/ownership/serialization check;
+/// applying it is the filesystem-mutation phase.
+pub(crate) struct PreparedTelescopeWrite {
+  pid             : ID,
+  home            : SourceName,
+  writes          : Vec<(SourceName, String, String)>,
+  deletions       : Vec<String>,
+  verify_as_hoist : bool,
+}
+
+impl PreparedTelescopeWrite {
+  pub(crate) fn apply (
+    &self,
+    config : &SkgConfig,
+  ) -> io::Result<()> {
+    for (source, path, yaml) in &self . writes {
+      assert! ( config . user_owns_source (source),
+                "write preflight admitted non-owned source '{}'", source );
+      if let Some (parent) = Path::new (path) . parent () {
+        fs::create_dir_all (parent) ?; }
+      let unchanged : bool = // byte-stability
+        fs::read_to_string (path)
+        . map ( |old| old == *yaml )
+        . unwrap_or (false);
+      if ! unchanged {
+        fs::write (path, yaml) ?; }
+    }
+    for path in &self . deletions {
+      match fs::remove_file (path) {
+        Ok (( ))                                          => {},
+        Err (e) if e . kind () == io::ErrorKind::NotFound => {},
+        Err (e)                                           => return Err (e), } }
+    Ok (( ))
+  }
+
+  /// Hoist is not complete until a fresh disk fold proves that title and
+  /// body now select from home. This runs after filesystem writes and before
+  /// callers update the in-memory graph or either derived database.
+  pub(crate) fn verify_hoist (
+    &self,
+    config : &SkgConfig,
+  ) -> io::Result<()> {
+    if ! self . verify_as_hoist { return Ok (( )); }
+    let reread : NodeComplete =
+      nodecomplete_from_pid_and_source (
+        config, self . pid . clone (), &self . home ) ?;
+    if reread . ugly_telescope {
+      return Err ( io::Error::new (
+        io::ErrorKind::InvalidData,
+        format! (
+          "Hoist verification failed for '{}': its freshly reread telescope still selects title or body below home '{}'. The filesystem may have changed, but the in-memory graph and derived databases were not updated.",
+          self . pid, self . home ))); }
+    Ok (( ))
+  }
+}
+
+/// Prepare one telescope rewrite. 'allow_hoist' is deliberately a parameter
+/// of this crate-private preparation boundary, not of the ordinary public
+/// writer: only the interactive save pipeline may pass true after matching
+/// an exact PID approval.
+pub(crate) fn prepare_nodecomplete_telescope (
+  nodecomplete : &NodeComplete,
+  config       : &SkgConfig,
+  allow_hoist  : bool,
+) -> io::Result<PreparedTelescopeWrite> {
   let pid : &ID = &nodecomplete . pid;
-  error_unless_home_is_writable (nodecomplete, config) ?;
+  let verify_as_hoist : bool =
+    error_unless_home_is_writable (
+      nodecomplete, config, allow_hoist ) ?;
   let unfolded : UnfoldedTelescope =
     unfold_node (
       & UnfoldInput {
@@ -205,22 +279,13 @@ pub fn write_nodecomplete_telescope (
         io::ErrorKind::NotFound, e) ) ?;
     prepared_deletions . push (path); }
 
-  for (source, path, yaml) in prepared_writes {
-    assert! ( config . user_owns_source (&source),
-              "write preflight admitted non-owned source '{}'", source );
-    let unchanged : bool = // byte-stability
-    fs::read_to_string (&path)
-      . map ( |old| old == yaml )
-      . unwrap_or (false);
-    if ! unchanged {
-      fs::write ( &path, yaml ) ?; }
-  }
-  for path in prepared_deletions {
-    match fs::remove_file (&path) {
-      Ok (( ))                                          => {},
-      Err (e) if e . kind () == io::ErrorKind::NotFound => {},
-      Err (e)                                           => return Err (e), } }
-  Ok (( )) }
+  Ok ( PreparedTelescopeWrite {
+    pid             : pid . clone (),
+    home            : nodecomplete . source . clone (),
+    writes          : prepared_writes,
+    deletions       : prepared_deletions,
+    verify_as_hoist,
+  } ) }
 
 
 /// The two shapes 'write_nodecomplete_telescope' refuses, because
@@ -235,7 +300,8 @@ pub fn write_nodecomplete_telescope (
 fn error_unless_home_is_writable (
   nodecomplete : &NodeComplete,
   config       : &SkgConfig,
-) -> io::Result<()> {
+  allow_hoist  : bool,
+) -> io::Result<bool> {
   let home : &SourceName = &nodecomplete . source;
   if ! config . user_owns_source (home) {
     // FOREIGN HOME. Foreign sections are never written. Skipping
@@ -248,26 +314,27 @@ fn error_unless_home_is_writable (
       format! (
         "Refusing to write '{}': its home is '{}', which you do not own. Foreign sections are never written, so this node cannot be saved from here. See the foreign-overlay entry in telescope-warnings.org.",
         nodecomplete . pid, home ))); }
-  { // TITLE HOIST. The home exists on disk and carries no title,
-    // so the node's text lives at a more private level and this
-    // write would move it up into the home -- publishing it,
-    // silently, with no gesture from the user.
-    let Ok (home_path) : Result<String, _> =
-      path_from_pid_and_source (
-        config, home, nodecomplete . pid . clone () )
-      else { return Ok (( )); };
-    if ! Path::new (&home_path) . is_file () { return Ok (( )); }
-    let home_is_titleless : bool =
-      read_nodecomplete ( &home_path )
-      . map ( |section| section . title . is_none () )
-      . unwrap_or (false); // unreadable: a different error, reported elsewhere
-    if home_is_titleless && ! nodecomplete . title . is_empty () {
+  // SCALAR HOIST. Fold the current disk telescope with the same title/body
+  // selection used by load. Looking only for a titleless home misses the
+  // equally sensitive shape "title at home, body below home".
+  let disk_is_ugly : bool =
+    match telescope_from_disk (config, &nodecomplete . pid) ? {
+      None => false,
+      Some (telescope) => match
+        fold_telescope ( telescope, & |id : &ID| id . clone () ) {
+          Ok (disk_node) => disk_node . ugly_telescope,
+          Err (error) => return Err ( io::Error::new (
+            io::ErrorKind::InvalidData,
+            format! (
+              "Refusing to write '{}': its current disk telescope cannot select a title ({}), so writing the buffer's text at home '{}' would publish it without a verifiable Hoist candidate. Repair the .skg sections by hand. See telescope-warnings.org.",
+              nodecomplete . pid, error, home ))), }, };
+  if disk_is_ugly && ! allow_hoist {
       return Err ( io::Error::new (
         io::ErrorKind::InvalidData,
         format! (
-          "Refusing to write '{}': its home '{}' carries no title, so its text lives at a more private level and this save would publish it. Repair the files by hand -- move the title up to '{}', or delete the '{}' section if it holds nothing else. See telescope-warnings.org.",
-          nodecomplete . pid, home, home, home ))); }}
-  Ok (( )) }
+          "Refusing to write '{}': its current disk telescope selects title or body below home '{}', so this write would publish it. An interactive save must obtain explicit Hoist approval for this PID; otherwise repair the .skg sections by hand. See telescope-warnings.org.",
+          nodecomplete . pid, home ))); }
+  Ok (disk_is_ugly) }
 
 /// Checks that a node's primary ID matches the filename stem.
 /// This property is assumed by `path_from_pid_and_source` and
