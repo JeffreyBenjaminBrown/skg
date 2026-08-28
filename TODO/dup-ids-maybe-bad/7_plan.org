@@ -714,7 +714,24 @@
   restart the earlier product discussion unless it changes observable
   behavior.
 
-** Where the ugly boolean lives
+** what they do not change
+
+   None of the choices above changes these settled product rules:
+
+   - home is the most-public retained section;
+   - title and body are judged independently;
+   - the runtime policy is deliberately coarse;
+   - 'all' warns without asking, while a restricted set asks;
+   - search authorization precedes matching;
+   - owned data wins a same-pid collision with foreign data;
+   - Hoist is explicit and Abort is non-mutating;
+   - foreign sources are never written.
+
+   Those are Jeff's decisions. The preceding subsections describe the
+   architecture I chose to realize them, and are the places to challenge
+   before implementation begins.
+** a list of them
+*** Where the ugly boolean lives
 
    Settled beforehand: retain a coarse 'ugly telescope' boolean in the
    loaded snapshot, use the same snapshot for release decisions, and put
@@ -732,7 +749,7 @@
    save/rebuild and request would then have to keep that registry coherent
    with the graph and index.
 
-** One centralized scalar-release boundary
+*** One centralized scalar-release boundary
 
    Settled beforehand: challenge before releasing ugly text under a
    restricted set, batch affected pids, fail closed for callers that cannot
@@ -751,7 +768,7 @@
    used by fork confirmation. A connection-scoped cache would be less
    repetitive but would require a precise invalidation design.
 
-** The restricted-search handshake
+*** The restricted-search handshake
 
    Settled beforehand: an ugly document must be excluded before matching
    unless the user opts in before the query runs.
@@ -770,7 +787,7 @@
    persistent authorization state, at the price of an extra round trip
    while ugly data exists.
 
-** Foreign-pid handling as input normalization
+*** Foreign-pid handling as input normalization
 
    Settled beforehand: when the user's files and non-owned files share a
    pid, explain the collision, choose the user's data, leave the foreign
@@ -788,7 +805,7 @@
    and fallback paths is how this plan interprets "thereafter unreachable";
    limiting it to initialization would leave alternate semantic readers.
 
-** The exact save-side telescope type
+*** The exact save-side telescope type
 
    Settled beforehand: add a typed save-side boundary, and make it a
    separate commit from strengthening load-side 'Telescope'.
@@ -807,7 +824,7 @@
    input and a proposed disk output have different trust and ownership
    questions.
 
-** Preparing the whole write before mutating the filesystem
+*** Preparing the whole write before mutating the filesystem
 
    Settled beforehand: validate every proposed output source before the
    first write, and never write or delete a foreign source.
@@ -822,7 +839,7 @@
    make the multi-file update crash-transactional, which the plan leaves
    explicitly out of scope.
 
-** Generalizing the owned-to-foreign default
+*** Generalizing the owned-to-foreign default
 
    Settled beforehand through Jeff's example: a new relationship owned by
    an owned node and pointing to a foreign node defaults to the owner's
@@ -840,7 +857,7 @@
    the same 'relSource' and save-resolution machinery. A relation-specific
    exception would need a product reason that has not appeared.
 
-** Alias 'relSource' representation and gesture
+*** Alias 'relSource' representation and gesture
 
    Settled beforehand: make 'relSource' metadata work on aliases too.
 
@@ -864,7 +881,7 @@
    chosen 'relSource' atom, though the command's relationship-specific name
    is admittedly less elegant once it also handles aliases.
 
-*** TODO document the terminology abuse in COMMANDS.org
+**** DONE document the terminology abuse in COMMANDS.org
 Here's a verbatim passage to append there once the feature lands:
 
 "Note that the name 'skg-set-relationship-source' is somewhat misleading.
@@ -874,7 +891,7 @@ But for this command we need to broaden the definition to
 'a relationship from what this viewnode represents
 (which might be an alias) to what its parent represents (a node in the graph)'."
 
-** Protocol renames and client parity
+*** Protocol renames and client parity
 
    Settled beforehand: rename 'edge level' to 'edge source' everywhere and
    use no legacy support for the repo-only rename.
@@ -890,7 +907,7 @@ But for this command we need to broaden the definition to
    supported client cannot answer safely or a batch caller silently assumes
    approval.
 
-** Which textual outputs cross the release boundary
+*** Which textual outputs cross the release boundary
 
    Settled beforehand: direct views, title lookup, search, rerendering,
    export, and any API returning node text need the same decision.
@@ -908,7 +925,7 @@ But for this command we need to broaden the definition to
    protected-text wrapper; that would be harder to bypass but would spread
    authorization state through the rendering model.
 
-** Hoist protocol and ordering
+*** Hoist protocol and ordering
 
    Settled beforehand: on save, explain the publication, offer Abort or
    Hoist, reread disk for precise source facts, and preserve lower lists
@@ -928,20 +945,3 @@ But for this command we need to broaden the definition to
    snapshot to 'ugly_telescope = false' merely on the strength of intended
    output would recreate a disk/snapshot disagreement if the rewrite did
    not actually produce a clean telescope.
-
-** What these choices do not change
-
-   None of the choices above changes these settled product rules:
-
-   - home is the most-public retained section;
-   - title and body are judged independently;
-   - the runtime policy is deliberately coarse;
-   - 'all' warns without asking, while a restricted set asks;
-   - search authorization precedes matching;
-   - owned data wins a same-pid collision with foreign data;
-   - Hoist is explicit and Abort is non-mutating;
-   - foreign sources are never written.
-
-   Those are Jeff's decisions. The preceding subsections describe the
-   architecture I chose to realize them, and are the places to challenge
-   before implementation begins.
