@@ -1,3 +1,58 @@
+* Problems found while recapping dup-ids-maybe-bad (fixed 2026-08-28)
+  Planned in TODO/dup-ids-maybe-bad/7_plan.org and completed across the
+  incremental commits named below.
+** 'TitleBelowHome' can expose more-private text through a public source-set
+   The branch made the HOME the most public section even when that
+   section was titleless, then folded the title and body from a more-private
+   section into the resulting 'NodeComplete'. That node carried the public
+   home in 'source' and the private section's text in 'title' / 'body'.
+
+   Source-set filtering gated the node by 'source', not by the level from
+   which its scalar text came. The pure helper
+   'titles_for_source_set_for_test' demonstrated the path directly:
+   it called 'read_all_skg_files_from_sources', accepted the node because
+   its home was active, and returned the folded title. Production Tantivy
+   had the same shape: 'NodeTantivy::from' copied the public source and
+   the private title/body into one document. Search, direct views, titles
+   by ids, and org export could therefore reveal the private text.
+
+   FIXED: title and body now carry their independently folded source levels
+   and scalar ugliness is recorded in the node. Every textual release path
+   checks the exact ugly pids before returning text: direct views, search,
+   title lookup, org export, ordinary rerenders, source-set/diff rerenders,
+   and save collateral rerenders. The user may approve only the reported
+   pids and retry. Regression coverage includes the titleless-public,
+   titled-private shape. See commits 41e82de8, 3778bdd5, 22f15396,
+   13668a62, and 6a9b4116.
+** The telescope writer can still write a foreign non-home section
+   'error_unless_home_is_writable' checked only
+   'nodecomplete.source'. If the home was owned but a later telescope
+   section was foreign, the check passed; 'unfold_node' could reproduce
+   that foreign level, and the write loop wrote every returned section
+   without calling 'user_owns_source'. The delete loop had the ownership
+   check, but the write loop did not.
+
+   This was reachable for an owned-home/foreign-later same-pid telescope:
+   foreign-policy validation saw the folded node's owned home and kept the
+   save, while sticky edge levels preserved members contributed by the
+   foreign section. It contradicted the module's promise that foreign
+   sections are never written.
+
+   FIXED: unfolding returns a checked batch, and the complete batch is
+   validated for configured, owned output sources before any filesystem
+   mutation begins. The mirror-image foreign-later regression test is in
+   place. See commit 0e218ad0.
+** 'Telescope' documents but does not enforce its privacy-order invariant
+   'Telescope.sections' was public and the struct had no checked
+   constructor; 'fold_telescope' accepted the type directly and treated
+   the first section as home. Builders established privacy order only by
+   discipline, so an unordered caller could silently choose the wrong home.
+
+   FIXED: 'Telescope' and 'UnfoldedTelescope' hide their section storage
+   and can be constructed only through checked boundaries that validate
+   source membership, order, uniqueness, and the intended ownership
+   constraints. See commit 5bc332d3.
+
 * The unreadable-files report is not deleted after a successful boot (fixed 2026-07-29)
   Fixed with the duplicate-ids report, in the same change: each
   reporting function now removes a stale report when it has
