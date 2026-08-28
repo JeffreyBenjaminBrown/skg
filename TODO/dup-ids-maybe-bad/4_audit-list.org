@@ -127,3 +127,86 @@
 
   This list should still be extended, not retired: a type prevents
   the shape from being invisible, not from being written.
+
+* August 2026 follow-up: disk selection and response boundaries
+
+  This is a new pass prompted by the work planned in [[./7_plan.org]].
+  The July entries above remain the historical one-ID-one-file audit;
+  they are not being rewritten as if they had covered the later
+  owned-pid normalization and scalar-release questions.
+
+** Disk-selection inventory
+
+   The shared rule now runs before a telescope can become semantic
+   data: if a PID has at least one owned section, retain the complete
+   owned telescope and ignore every same-PID non-owned section; if it
+   has no owned section, retain the wholly foreign telescope. Ignored
+   files are warned about deterministically and left untouched. In
+   particular they cannot contribute title, body, aliases,
+   relationships, extra IDs, or ID-conflict claims.
+
+   Checked consumers:
+
+   - RESOLVED bulk live-disk reads:
+     'read_all_skg_files_from_sources_collecting_violations' normalizes
+     each same-PID group before constructing/folding a 'Telescope'.
+     Initialization, rebuild, and export inherit that boundary.
+   - RESOLVED one-PID reads: 'telescope_from_disk' applies the same
+     normalization before construction. Save preflight, Hoist rereads,
+     and single-node filesystem callers inherit it.
+   - RESOLVED home lookup: 'home_from_disk' chooses the most-public
+     RETAINED section after normalization, never a raw map entry.
+   - RESOLVED git snapshots: 'diff_analysis/snapshot.rs' normalizes
+     same-PID blobs independently at each endpoint before folding or
+     computing extra-ID claims. Both worktree/index reads and tree/blob
+     snapshots use the rule.
+   - BY CONSTRUCTION output writers receive checked, private
+     'Telescope'/'PreparedTelescopeWrite' values. Their fields cannot be
+     replaced with unchecked raw section vectors, and the batch
+     ownership preflight proves every destination writable before the
+     first mutation.
+
+** Scalar-response inventory
+
+   The positive inventory -- endpoints that can return a title, body,
+   alias, or view text -- is checked at its final response boundary:
+
+   - RESOLVED direct content views and override-choice menus
+     ('single_root_view');
+   - RESOLVED text search before its Tantivy query, with the explicit
+     include/exclude choice carried through asynchronous enrichment;
+   - RESOLVED readable-ID title lookup ('titles_by_ids'), including
+     titles recovered from git diffs;
+   - RESOLVED org export, both the interactive server endpoint and the
+     noninteractive CLI flag;
+   - RESOLVED diff analysis: restricted sets are refused, while 'all'
+     reports add the warning when their snapshots contain ugly nodes;
+   - RESOLVED rerender-all, source-set switching, and diff-mode
+     toggling: all output is staged in memory, authorized, and only then
+     installed/streamed; a challenge is followed by an empty rerender
+     stream to unwind client locks;
+   - RESOLVED save-result and collateral rerenders: the save can already
+     be committed, but text and open-view registry mutations remain
+     staged until the response is authorized.
+
+   A restricted direct response uses exact PID approval and carries no
+   authority into a later request. Search is deliberately different: it
+   asks include/exclude before matching and its challenge contains no
+   PIDs, because matching identities are themselves unreleased. The
+   reserved source-set 'all' releases ugly text with the same warning.
+
+   Negative inventory -- initialized endpoints that do not return graph
+   scalars -- needs no scalar-release challenge: verify/close/shutdown,
+   list/current source-set, edge-source-info, get-file-path, herald rules,
+   rebuild, strip-body-whitespace, and stage-moves. Their replies contain
+   status, source/path metadata, presentation rules, or a staging script,
+   not protected title/body text. Save lock messages and the Hoist and
+   release decisions are text-free too. Fork confirmation can contain
+   node text, but Hoist preflight precedes it, so an ugly disk input cannot
+   reach that response without its exact publication approval. The
+   pre-initialization busy signal contains only server status.
+
+   RESULT: no scalar-output path found in this audit knowingly bypasses
+   the central policy. Interactive clients retry with narrowly scoped
+   authority; maintenance paths fail closed, and the export CLI requires
+   its explicit inclusion flag.

@@ -14,7 +14,7 @@ One node can be recorded at several privacy levels at once: same-ID
 files is the node's **privacy telescope**; each file is one
 **telescope section** ("section" for short in code), holding the
 slice of the node recorded at its source's level. The **home** is
-the MOST PUBLIC section; it alone holds title, body, and extra
+the MOST PUBLIC RETAINED section; it alone holds title, body, and extra
 ids. That the home carries the title is an INVARIANT, not a
 search rule: a node's text always lives in its most public
 section, so a titleless section above the title is a violation
@@ -22,6 +22,11 @@ the fold reports (`FoldWarning::TitleBelowHome`), not a shape to
 look past. There is no linking relationship between sections —
 sharing an ID is being the same node. See `docs/telescopes.md`
 and `server/types/nodes/fs.rs`.
+
+Before folding, an owned-PID collision is normalized: if any owned
+section exists for a PID, the entire owned telescope is retained and all
+same-PID foreign sections are ignored (with a deterministic warning and no
+filesystem edit). A telescope with no owned section remains wholly foreign.
 
 ## privacy order and recording source
 

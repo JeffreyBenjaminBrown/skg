@@ -25,6 +25,20 @@ request is sent.
 ':w' is the BufWriteCmd on every skg view buffer, so plain saving
 works as expected; ':SkgSave' does the same thing as an explicit
 Ex command.
+
+If the current files for anything being saved select a title or body
+from below that node's home, Skg stops before every write and offers
+*Hoist* or *Abort*. Hoist publishes the selected text at home, removes
+lower title/body copies, and preserves lower relationships and aliases;
+the exact approved PIDs are reread and rechecked as one batch before the
+save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts
+and maintenance writers have no prompt and refuse this repair.
+
+That disk-publication choice is separate from displaying the result. If
+a successful save under a restricted source-set would rerender text from
+an ugly telescope, Skg asks for a second, request-scoped approval. Decline
+leaves the save committed but sends no new view text and changes no
+open-view registry entry.
 ** <localleader>dd : deletion
 ***     <localleader>dd : :SkgDelete
 Marks the node at point for deletion from the graph.
@@ -49,6 +63,13 @@ are bumped in the ranking via their context-origin multiplier.
 Prompts for search terms. All search axes take their conservative
 defaults: no per-token regex, titles only (no body), no Tantivy
 phrase and operator syntax.
+
+Under a restricted source-set, if the search index contains any ugly
+telescope (one whose selected title or body lies below home), Skg asks
+whether to include or exclude ugly telescopes before running the query.
+Exclude filters them in Tantivy before matching; Include is permission
+for this search only. Under source-set =all= they are included without a
+prompt and the result carries a warning.
 
 Run 'Goto' (<localleader>gg, below) from one of the links in the
 search results to open the view from that node.
@@ -462,6 +483,11 @@ If you use git to manage your data,
 enable this view to see what you've changed since your last commit,
 i.e. how your worktree differs from HEAD.
 Refuses while any skg buffer has unsaved edits.
+
+If toggling the mode would rerender ugly telescope text under a
+restricted source-set, Skg asks before changing the mode or any view.
+Declining leaves the mode and buffers unchanged; the protocol still sends
+an empty rerender stream so preemptive client locks are released.
 *** <localleader>ve : :SkgViewNewEmpty
 Asks you to pick a data source,
 and then provides a root node with that source.
@@ -481,10 +507,13 @@ Limits display and search to one configured source-set for this
 Neovim connection.
 
 The command asks which source-set to activate, with TAB completion
-and S-Left / S-Right cycling. It then closes open Skg
-buffers after confirmation, and tells the server to use that
-source-set for subsequent requests. Choose =all= to remove the
-limit.
+and S-Left / S-Right cycling. After confirmation it tells the server
+to use that source-set and rerenders open Skg buffers in place. Choose
+=all= to remove the limit.
+
+If the proposed set would rerender ugly telescope text, Skg asks before
+changing the active set or any view. Declining leaves both unchanged and
+an empty rerender stream releases the client's preemptive locks.
 *** <localleader>vm : :SkgViewMetadata
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
@@ -629,6 +658,13 @@ It asks two things:
   this prompt has no path completion. An absolute path is used
   as-is.
 
+If a restricted export would include ugly telescope text, Skg asks for
+request-scoped approval before writing any file. Source-set =all= exports
+it with a warning. The noninteractive form fails closed unless passed
+=--include-ugly-telescopes=:
+
+: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-ugly-telescopes]
+
 A node is exported when one of its children's title links to the
 export-instruction node and that child's body gives a
 =target_filepath= (TOML-ish: =target_filepath = docs/setup=,
@@ -644,9 +680,7 @@ is not exported under the chosen set points to a "some links
 might be broken" note.
 
 Existing files in the output dir are overwritten in place; other
-files there are left untouched. (The same export is available
-from the command line for scripting:
-=cargo run --bin skg -- export-org [config] [source-set] [output-dir]=.)
+files there are left untouched.
 ** connection, reload, rebuild dbs
 Unless you're coding or troubleshooting,
 you probably won't need these.

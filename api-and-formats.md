@@ -2,16 +2,34 @@
 
 Communication between Rust and Emacs is via TCP on port 1730, configurable in any skgconfig.toml. The connection is persistent.
 
+After initialization, every server response is length-prefixed as
+`Content-Length: LENGTH\r\n\r\nPAYLOAD`; `LENGTH` is the number of
+UTF-8 bytes in `PAYLOAD`. The exceptional busy-initializing signal is
+described below.
+
+The shared ugly-telescope release warning is
+`OPERATION includes title or body text selected below its node's home
+source for PID P.` (or `PIDs P1, P2, ...`). A restricted request that
+needs approval instead receives
+`((response-type ugly-telescope-confirmation) (operation OPERATION)
+(pids ("P" ...)) (prompt "..."))`; the response itself contains no
+protected title or body. Except for search's include/exclude choice,
+approval is always the exact request-local list
+`(allow-ugly-telescopes "P" ...)` and is never cached.
+
 Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not Rust-Emacs communication.
 
 So far there are these endpoints:
 
 ## Verify connection
   - Request: ((request . "verify connection"))
-  - Response: Plain text with newline termination: "This is the skg server verifying the connection."
+  - Response: LP `((response-type verify-connection) (content "This is the skg server verifying the connection."))`.
 
 ## Text search
-  - Request: ((request . "text search") (terms . "SEARCH_TERMS") (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))
+  - Request: `((request . "text search") (terms . "SEARCH_TERMS")
+    (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))`, plus
+    optional `(ugly-telescopes . "include")` or
+    `(ugly-telescopes . "exclude")`.
     - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link dests, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
     - `regex`, `body`, `operators` are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
@@ -21,8 +39,24 @@ So far there are these endpoints:
       alias/title selection, and display truncation. Inactive-source
       documents do not influence result order or which title/alias is
       shown for an active result.
+    - `ugly-telescopes` is normally absent on the first request. Under
+      a restricted source-set, if the index contains any telescope
+      whose selected title or body lies below home, the server does no
+      query and responds with LP
+      `((response-type ugly-telescope-confirmation)
+      (operation text-search) (pids ()) (prompt "..."))`. The empty PID
+      list is deliberate: a pre-query decision must not disclose which
+      ugly node might match. The retry uses `"include"` or `"exclude"`.
+      Exclusion is applied inside the Tantivy query, before matching,
+      and remains in force through asynchronous enrichment. The choice
+      is request-scoped. Source-set `all` needs no choice and returns a
+      warning if the results include ugly telescopes.
 
-  - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive non-content TrueNodes (not special scaffold types).
+  - Phase 1, immediate: Server sends LP `((response-type
+    search-results) (content "ORG") (warnings ("..." ...)))`.
+    Results are ordinary indefinitive non-content TrueNodes (not
+    special scaffold types). A no-match or error response has the same
+    response type and a single `content` field.
 
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
@@ -33,10 +67,21 @@ So far there are these endpoints:
       containers.
 
 ## Single root content tree view from ID
-  - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI") (override-choice . "CHOICE"))
+  - Request: `((request . "single root content view")
+    (id . "NODE_ID") (view-uri . "URI")
+    (override-choice . "CHOICE")
+    (allow-ugly-telescopes "PID" ...))`
     - `override-choice` is optional; values are "menu" (the default)
       and "bypass". See "the override-choice menu" below.
-  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The payload shape is `((content "...") (errors ("..." ...)) (warnings ("..." ...)))`. The document structure is detailed below, under `Single root content tree view`.
+  - Response: LP `((response-type content-view) (content "...")
+    (errors ("..." ...)) (warnings ("..." ...)))`. The document
+    structure is detailed below, under `Single root content tree view`.
+    Under a restricted source-set, a response involving an ugly
+    telescope instead returns LP `ugly-telescope-confirmation` with
+    `(operation single-root-view)` or `(operation override-menu)`, the
+    exact PIDs, and a text-free prompt. An approved retry carries those
+    exact PIDs in `allow-ugly-telescopes`; approval is not cached.
+    Source-set `all` returns the ordinary response with a warning.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
@@ -159,8 +204,11 @@ So far there are these endpoints:
 
 ## Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
-  - Response: Plain text with newline termination containing the file path relative to the skgconfig.toml directory, e.g. `skg/some-uuid.skg`.
-  - Errors: If the file does not exist on disk, responds with "File not found: <path>".
+  - Response: LP `((response-type get-file-path) (content "PATH"))`,
+    normally with `PATH` relative to the data root. Errors use the same
+    shape with human-readable `content` beginning `Error:`.
+  - The server deliberately returns the computed path when the file no
+    longer exists, so deleted nodes can still be located in a git diff.
   - Does not require TypeDB or Tantivy -- only the config.
   - If the requested source is inactive in the current connection's
     active source-set, the server refuses to expose the path. Direct
@@ -185,6 +233,13 @@ So far there are these endpoints:
     rerender-done with no errors or warnings), so the client's
     preemptive buffer locks and stream guard unwind. Nothing else
     changes. Disabling diff mode is always allowed.
+  - Before changing mode or streaming view text, a restricted request
+    that would rerender an ugly telescope instead receives LP
+    `ugly-telescope-confirmation` with
+    `(operation diff-mode-rerender)` and
+    the exact PIDs, followed by the same EMPTY rerender stream. A retry
+    adds `(allow-ugly-telescopes "PID" ...)`; declining leaves the mode
+    and open-view registry unchanged.
 
 ## Herald rules
   - Request: ((request . "herald rules"))
@@ -225,6 +280,9 @@ So far there are these endpoints:
     or contains an unreadable `.skg` blob in the selected snapshots.
   - Refuses to run unless the active source-set is `all`; restricted
     source-set diff reports are not defined yet.
+  - Because it runs only under `all`, a report involving an ugly
+    telescope is returned with the shared scalar-release warning; this
+    endpoint has no approval retry.
 
 ## Stage moves
   - Request: ((request . "stage moves"))
@@ -336,7 +394,8 @@ So far there are these endpoints:
     should show nothing.
 
 ## Export to org
-  - Request: ((request . "export to org") (source-set . "NAME") (output-dir . "PATH"))
+  - Request: `((request . "export to org") (source-set . "NAME")
+    (output-dir . "PATH") (allow-ugly-telescopes "PID" ...))`.
     - Both fields are required; a missing or blank `output-dir` is an
       error (the server applies no default -- the client supplies the
       user a default but always sends a value). `output-dir` is
@@ -359,6 +418,12 @@ So far there are these endpoints:
     `[[id:..][label]]` links rewritten to relative org links.
     Existing files are overwritten; others are left untouched. Needs
     neither TypeDB nor Tantivy.
+    Before writing anything, a restricted export involving ugly
+    telescopes returns LP `ugly-telescope-confirmation` with
+    `(operation export-to-org)` and the exact PIDs. An approved retry
+    carries those PIDs in `allow-ugly-telescopes`. An `all` export, or
+    an approved restricted export, returns the ordinary export response
+    with the shared warning.
   - An **export root** is a node one of whose `contains` children has
     a title linking to the instruction node
     `3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f` and a body yielding a
@@ -371,10 +436,14 @@ So far there are these endpoints:
     broken."); if that note is itself not exported, the link degrades
     to plain label text.
   - The same export is available as a CLI subcommand (no TypeDB):
-    `cargo run --bin skg -- export-org [config] [source-set]`.
+    `cargo run --bin skg -- export-org [config-path] [source-set]
+    [output-dir] [--include-ugly-telescopes]`. Under a restricted set it
+    fails closed before writing unless the flag is present; under `all`
+    (and on an approved restricted run) it prints the warning.
 
 ## Rerender all views
-  - Request: ((request . "rerender all views"))
+  - Request: `((request . "rerender all views")
+    (allow-ugly-telescopes "PID" ...))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Lock message:
        `Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("URI1" "URI2" ...)))`
@@ -389,6 +458,15 @@ So far there are these endpoints:
     applying diff annotations if diff mode is enabled.
     Does not save or modify the graph. Used after toggling
     git diff mode to refresh all views without requiring a save.
+  - All view text is prepared in memory before the release decision.
+    Under a restricted set, ugly content without exact approval returns
+    LP `ugly-telescope-confirmation` with
+    `(operation rerender-all-views)` and
+    the exact PIDs, followed by an EMPTY rerender stream
+    (`rerender-lock` with no URIs, then clean `rerender-done`). No view
+    text is sent and no open-view registry entry changes. A retry adds
+    `allow-ugly-telescopes`; `all` instead adds the shared warning to
+    `rerender-done`.
 
 ## Source sets
   - Source-sets are the prefixes of the config's privacy order (see
@@ -403,7 +481,8 @@ So far there are these endpoints:
   - Request: ((request . "active source set"))
   - Response: LP response-type "active-source-set" with
     `((active "NAME"))`.
-  - Request: ((request . "set active source set") (name . "NAME"))
+  - Request: `((request . "set active source set") (name . "NAME")
+    (allow-ugly-telescopes "PID" ...))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Source-set response:
        `Content-Length: N\r\n\r\n(("response-type" "active-source-set") ("active" "NAME") ("content" "Active source-set: NAME"))`
@@ -431,10 +510,19 @@ So far there are these endpoints:
     Switching TO `all` is always allowed. The resulting
     per-connection invariant: diff mode on implies active source-set
     `all`.
+  - Rerender authorization precedes both the set change and release of
+    view text. If the proposed set would render an ugly telescope, the
+    first reply is LP `ugly-telescope-confirmation` with
+    `(operation source-set-switch-rerender)` and exact PIDs, followed by an EMPTY
+    rerender stream. A retry adds `allow-ugly-telescopes`; declining
+    leaves the active set and open-view registry unchanged.
 
 ## Titles by ids
-  - Request: ((request . "titles by ids") (ids "uuid1" "uuid2" ...))
-  - Response: LP response-type "titles-by-ids" with `((response-type "titles-by-ids") (content ((uuid1 . "title1") (uuid2 . "title2") ...)))`.
+  - Request: `((request . "titles by ids") (ids "uuid1" "uuid2" ...)
+    (allow-ugly-telescopes "PID" ...))`.
+  - Response: LP `((response-type titles-by-ids)
+    (content (("uuid1" . "title1") ("uuid2" . "title2") ...))
+    (warnings ("..." ...)))`.
   - IDs not found in Tantivy are simply absent from the response, except
     that deleted `.skg` files visible in the current git diff can also
     supply titles.
@@ -443,21 +531,29 @@ So far there are these endpoints:
     shorten UUIDs uniformly, but it must not title-annotate inactive
     IDs.
   - Used by `skg-readable-ids-mode` to annotate UUIDs in magit buffers with their titles.
+  - Under a restricted source-set, requested titles involving ugly
+    telescopes instead return LP `ugly-telescope-confirmation` with
+    `(operation titles-by-ids)` and the exact PIDs. An approved retry
+    carries those PIDs in `allow-ugly-telescopes`; `all` returns the
+    ordinary map with the shared warning.
 
 ## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
-  - Response: "Server shutting down..."
+  - Response: LP `((response-type shutdown) (content "Server shutting down..."))`.
   - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 ## Busy-initializing signal
   - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
-  - Response: ((busy-initializing . "human-readable status message"))
+  - Response: the unprefixed, newline-terminated
+    `((busy-initializing . "human-readable status message"))`.
   - Emacs should display the message and retry the request (or let the user retry manually).
   - No request triggers this specifically; any request sent during initialization may receive it.
 
-Error responses are sent as simple text.
+Once initialization is complete, endpoint errors use that endpoint's
+normal tagged, length-prefixed response shape (or the shared
+`response-type error` dispatcher fallback); they are not bare text.
 
 # Single root content tree view
 

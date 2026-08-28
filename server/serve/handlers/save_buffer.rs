@@ -48,11 +48,11 @@ use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
 
-/// The terminal message in the save protocol.
-/// Sent after collateral-view updates (if there are any).
-/// Contains the re-rendered saved buffer and any warnings/errors.
+/// The ordinary terminal message in the save protocol. Hoist, fork, and
+/// scalar-release confirmations are alternative terminal messages.
+/// Contains the re-rendered saved buffer and any warnings/errors when sent.
 /// See <api-and-formats.md § Save buffer> for the full sequence:
-///   save-lock → collateral-view* → save-result.
+///   save-lock → save-relax-lock → collateral-view* → save-result.
 pub struct SaveResponse {
   pub saved_view          : String,
   pub errors              : Vec<String>,

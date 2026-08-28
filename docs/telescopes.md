@@ -22,7 +22,7 @@ ladder. Screen-sharing with a colleague, you might switch to the
 
 ## What lives where
 
-The node's **home** is its most public section. It holds the title,
+The node's **home** is its most public retained section. It holds the title,
 body, and extra IDs. That the home is the section with the title is
 an invariant rather than a definition: it would be silly to share a
 node without sharing its text, so a node's text always lives in its
@@ -50,6 +50,14 @@ survives without the public file recording anything. Saving unfolds
 the node back into sections, byte-stably: sections you did not
 affect do not change on disk, and foreign sections are never
 written.
+
+One normalization rule determines what "retained" means when raw
+repositories collide. If any owned section uses a PID, Skg keeps the
+complete owned telescope for that PID and ignores every same-PID foreign
+section before folding, ID-conflict checks, indexing, or any other semantic
+read. It emits a deterministic warning naming the ignored sources and never
+edits those files; their contents are visible only by inspecting the raw
+foreign repository. A wholly foreign telescope is retained normally.
 
 If folding has to select a title or body below home, Skg marks the
 whole telescope **ugly**. Source-set `all` displays that text with a
