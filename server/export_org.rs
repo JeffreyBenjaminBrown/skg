@@ -411,7 +411,7 @@ fn collect_events (
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
       if ! edge_active (member, active) { continue; } // the EDGE's
-        // level is inactive: the visible fold omits it, even when
+        // source is inactive: the visible fold omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
@@ -627,7 +627,7 @@ fn node_active (
   active . is_all () || active . contains_source (&node . source) }
 
 /// Whether an EDGE is visible under the active set: its recorded
-/// privacy level must be active. (The visible fold = active
+/// recording source must be active. (The visible fold = active
 /// sections' lists only.)
 fn edge_active (
   member : &MemberAtSource<ID>,

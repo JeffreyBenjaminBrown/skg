@@ -637,7 +637,7 @@ fn parse_viewstats_sexp (
             stats . overridesHere = Some ( ID::from (value)); },
           "relSource" => {
             // LOAD-BEARING (see ViewNodeStats::rel_source): the
-            // buffer's explicit privacy level for this position's
+            // buffer's explicit recording source for this position's
             // binding edge, round-tripped from
             // skg-set-relationship-source into save extraction,
             // which feeds save-leveling's sticky-else-default

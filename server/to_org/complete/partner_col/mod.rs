@@ -178,9 +178,9 @@ pub async fn maybe_add_subscribeeCol_branch (
     // hidden IDs that are outside all subscribee content. Read
     // edge-source-GATED from the in-Rust graph when the global
     // handle is present (production always; render-and-gating,
-    // 5_plan.org): hides and memberships recorded above the active
+    // 5_plan.org): hides and memberships recorded outside the active
     // prefix must not shape this derived col. TypeDB fallback is
-    // ungated (it stores no levels; harness-only).
+    // ungated (it stores no recording sources; harness-only).
     let r_hides : HashSet < ID > =
       match snapshot_global () {
         Some (snap) =>
@@ -408,10 +408,10 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = match snapshot_global () {
-      // Edge-level-GATED when the global handle is present
+      // Edge-source-GATED when the global handle is present
       // (production always; render-and-gating, 5_plan.org): hides
-      // and memberships above the active prefix must not shape
-      // this derived col. TypeDB fallback is ungated (no levels;
+      // and memberships outside the active prefix must not shape
+      // this derived col. TypeDB fallback is ungated (no recording sources;
       // harness-only).
       Some (snap) => {
         let subscriber_hides : HashSet<ID> =

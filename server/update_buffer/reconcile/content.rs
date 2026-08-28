@@ -217,8 +217,8 @@ fn reconcile_content_children (
   let content_ids : Vec<ID> =
     nodecomplete . contains . iter ()
     . filter ( |m| match active_source_set {
-      // Edge-level gating (render-and-gating, 5_plan.org): a
-      // membership whose LEVEL is inactive is invisible here even
+      // Edge-source gating (render-and-gating, 5_plan.org): a
+      // membership whose SOURCE is inactive is invisible here even
       // when the member node itself is active -- the private
       // reading-list case. Node-source omission still happens
       // below, in omit_inactive_members.
@@ -436,28 +436,28 @@ fn content_goal_list (
       ids . into_iter ()
         . map ( |id| graph_snap . pid_of (&id) . unwrap_or (id) )
         . collect () };
-    // Edge-level gating (render-and-gating, 5_plan.org): a member
-    // the grandparent-subscriber HIDES or CONTAINS only at a level
+    // Edge-source gating (render-and-gating, 5_plan.org): a member
+    // the grandparent-subscriber HIDES or CONTAINS only in a source
     // outside the active set must not subtract the subscribee's
     // content here -- else a privately-contained/-hidden member
     // would vanish from a public view even though no ACTIVE edge
     // explains its absence (leak by omission). Mirrors the
     // 'reconcile_content_children' gate on 'nodecomplete.contains'
     // just above.
-    let level_active = |level : &SourceName| match active_source_set {
+    let source_active = |source : &SourceName| match active_source_set {
       None      => true,
-      Some (a)  => a . is_all () || a . contains_source (level) };
+      Some (a)  => a . is_all () || a . contains_source (source) };
     let worktree_hidden : Vec<ID> =
       resolve_pids (
         grandparent_nodecomplete . hides_from_its_subscriptions
         . or_default () . iter ()
-        . filter ( |m| level_active (& m . source) )
+        . filter ( |m| source_active (& m . source) )
         . map ( |m| m . member . clone () )
         . collect () );
     let subscriber_contains : Vec<ID> =
       resolve_pids (
         grandparent_nodecomplete . contains . iter ()
-        . filter ( |m| level_active (& m . source) )
+        . filter ( |m| source_active (& m . source) )
         . map ( |m| m . member . clone () )
         . collect () );
     Ok ( setlike_vector_subtraction (

@@ -4,7 +4,7 @@
 ;;; skg-privatize-relationship, see
 ;;; BUG-and-fix_make-edge-more-public.org) classifies the edge the
 ;;; headline at point represents, asks the server for that edge's
-;;; (default, current) privacy levels, and offers the levels at least
+;;; (default, current) recording sources, and offers the sources at least
 ;;; as private as the default plus a no-override choice. These tests
 ;;; cover the pure pieces (edge classification, menu slicing, choice
 ;;; application) and the response handler with the network and
@@ -191,7 +191,7 @@ is offered; the server's save-time floor check backstops."
 
 (ert-deftest test-apply-relationship-source-removes-override ()
   "The no-override choice removes an existing (relSource ...) atom,
-and its message says the SAVED level survives (sticky), not that
+and its message says the SAVED source survives (sticky), not that
 anything resets to the default."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public) (viewStats (relSource private)))) x\n"
@@ -288,7 +288,7 @@ choice."
 (ert-deftest test-relationship-source-handler-slices-and-applies ()
   "A (default, current) reply offers the slice from the default plus
 the no-override entry, pre-fills the minibuffer with the current
-level, and applies the selection."
+source, and applies the selection."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
@@ -312,8 +312,8 @@ level, and applies the selection."
        (should (string-match-p "(relSource private)"
                                (test--buffer-line 2)))))))
 
-(ert-deftest test-relationship-source-handler-below-default-current-prefills-default ()
-  "A below-default CURRENT (the foreign shape) is not among the
+(ert-deftest test-relationship-source-handler-more-public-current-prefills-default ()
+  "A legacy CURRENT more public than the default is not among the
 choices, so the prompt pre-fills with the default instead."
   (test--with-skg-content-view
    (concat
@@ -582,7 +582,7 @@ does neither."
       (kill-buffer "*skg-relationship-kinds*"))))
 
 (ert-deftest test-set-relationship-source-recursive-end-to-end ()
-  "The full command: menu choice, level prompt, walk. Point and
+  "The full command: menu choice, source prompt, walk. Point and
 window plumbing are stubbed as in the other handler tests."
   (test--with-skg-content-view
    test--recursive-content-tree

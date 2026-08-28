@@ -237,9 +237,10 @@ So far there are these endpoints:
     from EXACTLY one source (titled in that source's git HEAD,
     absent or titleless in its worktree) and appeared in EXACTLY one
     other (titled in the worktree, absent or titleless in HEAD).
-    Titleless section creations and deletions are re-levelings of
-    individual relationships, not moves, and stage as ordinary
-    edits. An ID whose title vanished from, or appeared in, more
+    Titleless section creations and deletions move individual
+    relationships between recording sources; they are not node
+    moves, and stage as ordinary edits. An ID whose title vanished
+    from, or appeared in, more
     than one source has more than one candidate (old, new) pair and
     is skipped.
 
@@ -296,7 +297,7 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
-## Edge level info
+## Edge source info
   - Request: ((request . "edge source info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     `contains`, `subscribes_to`, `overrides_view_of`: the three
@@ -306,11 +307,11 @@ So far there are these endpoints:
     when the graph records no such edge (e.g. one typed into a
     buffer and not yet saved). On failure, `((error "..."))` — e.g.
     an endpoint the graph does not know.
-  - Behavior: `default` is the more private of the two endpoints'
-    homes; `current` is the edge's recorded level.
+  - Behavior: `default` is the applicable relationship default;
+    `current` is the edge's recording source.
     `skg-set-relationship-source` uses the reply to offer only
-    levels the save can accept. Advisory: the save-time floor check
-    in `apply_sticky_levels` stays load-bearing, since buffers go
+    sources the save can accept. Advisory: the save-time floor check
+    in `apply_sticky_sources` stays load-bearing, since buffers go
     stale and the atom is plain text.
 
 ## Strip body whitespace
@@ -590,17 +591,18 @@ under different parents):
 - `(sourceHerald ⌂:LABEL)` — the node sits at a source boundary (a
   root, or a source differing from its nearest truenode ancestor);
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
-  the ⌂ source herald; the privacy level of the RELATIONSHIP this
+  the ⌂ source herald; the recording source of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
   the col's relation for a PartnerCol member), when its privacy was
   deliberately raised above the edge's default. Emitted by render;
   written by `skg-set-relationship-source` (C-c s r); consumed at
-  save, where the server enforces the floor (an offered level less
-  private than the edge's default is a save error; a level at or
-  above the default is honored, which is how a stuck edge's privacy
-  is lowered; an edge whose DISK level sits below the default — the
-  foreign-endpoint shape — may be held or raised, never lowered
-  further). Absent means the edge sits at its default level.
+  save, where the server enforces the floor (an offered source more
+  public than the edge's default is a save error; a source at the
+  default or more private is honored, which is how a stuck edge's
+  privacy is lowered; a legacy or hand-authored edge whose DISK
+  source already sits more public than the default may be held or
+  made more private, never made still more public). Absent means the
+  edge sits at its default source.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 
@@ -783,11 +785,11 @@ Fields:
   Home section only, by convention.
 - `body`: An optional string, perhaps with newlines. Home only.
 - `aliases`: Optional list of strings. Each section may contribute
-  aliases; an alias's privacy level is its section's.
+  aliases; an alias's recording source is its section's source.
 - `contains`, `subscribes_to`: Ordered relations. ONE flat YAML
   sequence per relation, one entry per line:
-  - `- ID` — a member recorded at this section's level. Identical
-    syntax in every section, so a membership moving between levels
+  - `- ID` — a member recorded at this section's source. Identical
+    syntax in every section, so a membership moving between sources
     diffs as a clean one-line delete/add pair.
   - `- anchor: ID` — a placement anchor: the members after it (until
     the next anchor) insert immediately after the anchored ID, which
@@ -798,7 +800,8 @@ Fields:
     warning, and duplicate anchors concatenate in file order).
 - `hides_from_its_subscriptions`, `overrides_view_of`: Unordered
   relations; plain lists of IDs. The effective list is the union
-  across sections; each entry's privacy level is its section's.
+  across sections; each entry's recording source is its section's
+  source.
 
 The FOLD of all same-pid sections (most public first) yields the
 node; saving UNFOLDS the node back into sections, byte-stably, so

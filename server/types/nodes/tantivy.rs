@@ -15,7 +15,7 @@ pub struct NodeTantivy {
   pub title   : String,
   pub ugly_telescope : bool,
   // Aliases keep their PRIVACY LEVELS: each alias document's
-  // source field is the alias's level, not the node's home, so a
+  // source field is the alias's recording source, not the node's home, so a
   // restricted search cannot match a private alias of a public
   // node (dbs-and-search, 5_plan.org).
   pub aliases : MSV<MemberAtSource<String>>,
@@ -24,7 +24,7 @@ pub struct NodeTantivy {
 }
 
 impl From<&NodeComplete> for NodeTantivy {
-  /// Keep title, aliases (leveled), body, misc (Tantivy indexes
+  /// Keep title, aliases (with recording sources), body, misc (Tantivy indexes
   /// these). Drop relations.
   fn from (c: &NodeComplete) -> Self {
     NodeTantivy {

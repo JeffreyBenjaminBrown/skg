@@ -323,8 +323,8 @@ fn visit_overriddencol (
     &LocalContext::UnderVognode { parent_if_writeable : None },
     collected) }
 
-/// As 'dedup_vector', but dedups leveled members by ID ALONE (first
-/// occurrence wins) rather than by the full (ID, level) pair: a
+/// As 'dedup_vector', but dedups members carrying sources by ID ALONE
+/// (first occurrence wins) rather than by the full (ID, source) pair: a
 /// duplicate ID with a DIFFERENT '(relSource ...)' atom must still
 /// be silently dropped, matching the existing defining-col dedup
 /// policy ("duplicate defining-col members are silently deduped").
@@ -333,16 +333,16 @@ fn dedup_members_by_id (
 ) -> Vec<(ID, Option<SourceName>)> {
   let mut seen   : std::collections::HashSet<ID> = std::collections::HashSet::new();
   let mut result : Vec<(ID, Option<SourceName>)> = Vec::new();
-  for (id, level) in members {
+  for (id, source) in members {
     if seen . insert (id . clone()) {
-      result . push ((id, level)); }}
+      result . push ((id, source)); }}
   result }
 
 /// This returns the members of an OverriddenCol: its Active
 /// children that pass the PartnerCol membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
-/// explicit '(relSource NAME)' level, if any (see
+/// explicit '(relSource NAME)' source, if any (see
 /// 'ViewNodeStats::rel_source' and 'NodeIntent_Local').  (Inactive
 /// children are NOT members here: the overriddenCol omits inactive
 /// members from display, and the set-difference merge preserves
@@ -367,7 +367,7 @@ fn partnerCol_members (
 /// already restores invisible subscribees at their disk position, so
 /// a buffer-present inactive placeholder must not feed this list.
 /// Each member is paired with its headline's explicit
-/// '(relSource NAME)' level, if any.
+/// '(relSource NAME)' source, if any.
 #[allow(non_snake_case)]
 fn subscribeeCol_members (
   node_ref : NodeRef<ViewNode>,
@@ -385,7 +385,7 @@ fn subscribeeCol_members (
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
 /// already guarantees distinctness. Each member is paired with its
-/// headline's explicit '(relSource NAME)' level, if any (see
+/// headline's explicit '(relSource NAME)' source, if any (see
 /// 'ViewNodeStats::rel_source' and 'NodeIntent_Local').
 ///
 /// Inactive children contribute NOTHING here: an inactive node emits

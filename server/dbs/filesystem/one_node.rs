@@ -121,10 +121,10 @@ pub async fn fetch_aliases_from_file (
       members_msv ( & nodecomplete . aliases ) . into_vec(),
     _ => Vec::new(), }}
 
-/// Write a node as its telescope: unfold into per-level sections,
+/// Write a node as its telescope: unfold into per-source sections,
 /// write each section file only when its bytes changed
 /// (no-cosmetic-rewrites), and delete OWNED section files whose
-/// level lost its last member. Foreign sources are never written or
+/// source lost its last member. Foreign sources are never written or
 /// deleted -- 'error_unless_home_is_writable' refuses rather than
 /// skipping, so a foreign home cannot silently lose the title, and
 /// same-pid non-owned files are ignored when an owned telescope
@@ -290,8 +290,8 @@ pub(crate) fn prepare_nodecomplete_telescope (
 
 /// The two shapes 'write_nodecomplete_telescope' refuses, because
 /// writing either would publish or destroy the node's text. Both
-/// are unreachable through skg's own saves -- 'apply_sticky_levels'
-/// clamps every level to at least the owner's home, so no save
+/// are unreachable through skg's own saves -- 'apply_sticky_sources'
+/// clamps every recording source to at least the owner's home, so no save
 /// creates a section more public than the home -- and arrive only
 /// from hand-edited files, a pull, or a foreign overlay.
 ///

@@ -9,7 +9,7 @@ use tempfile::{tempdir, TempDir};
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
-use skg::test_utils::set_source_retagging_levels;
+use skg::test_utils::set_source_retagging_member_sources;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -47,7 +47,7 @@ fn test_load_from_single_source() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
-  set_source_retagging_levels ( &mut node, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -93,13 +93,13 @@ fn test_load_from_multiple_sources() {
   let mut node1 : NodeComplete = empty_node_complete();
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
-  set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
-  set_source_retagging_levels ( &mut node2, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node2, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   // Create a node in the shared source. Written RAW: 'shared' is
@@ -165,7 +165,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   // this dummy config: "main" precedes "shared"). The stray second
   // title is a fold warning, not an error. The section files are
   // written RAW: a whole-node write would (correctly) sweep the
-  // pid's sections at other levels, so two sequential
+  // pid's sections at other sources, so two sequential
   // write_nodecomplete_to_source calls cannot build a telescope.
   fs::write (
     config . sources . get (&SourceName::from ("main"))
@@ -193,12 +193,12 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
     node_a . pid = ID::new ("pid-a");
     node_a . title = "A" . to_string();
     node_a . extra_ids = vec! [ ID::new ("contested") ];
-    set_source_retagging_levels ( &mut node_a, &SourceName::from ("main") );
+    set_source_retagging_member_sources ( &mut node_a, &SourceName::from ("main") );
     let mut node_b : NodeComplete = empty_node_complete();
     node_b . pid = ID::new ("pid-b");
     node_b . title = "B" . to_string();
     node_b . extra_ids = vec! [ ID::new ("contested") ];
-    set_source_retagging_levels ( &mut node_b, &SourceName::from ("shared") );
+    set_source_retagging_member_sources ( &mut node_b, &SourceName::from ("shared") );
     let result : IoResult<()> =
       error_unless_each_id_names_one_node (
         & [ node_a, node_b ], &config . data_root);
@@ -245,7 +245,7 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   node1 . pid = ID::new ("id1");
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
-  set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID. Written RAW:
@@ -326,13 +326,13 @@ fn test_source_field_set_correctly() {
   let mut node_a : NodeComplete = empty_node_complete();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
-  set_source_retagging_levels ( &mut node_a, &SourceName::from ("source_a") );
+  set_source_retagging_member_sources ( &mut node_a, &SourceName::from ("source_a") );
   write_nodecomplete_to_source(&node_a, &config) . unwrap();
 
   let mut node_b : NodeComplete = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
-  set_source_retagging_levels ( &mut node_b, &SourceName::from ("source_b") );
+  set_source_retagging_member_sources ( &mut node_b, &SourceName::from ("source_b") );
   write_nodecomplete_to_source(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -400,8 +400,8 @@ fn test_many_id_conflicts_create_org_file() {
     node_b . extra_ids = vec![ID::new (&id)];
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
-    set_source_retagging_levels ( &mut node_a, &SourceName::from ("source_a") );
-    set_source_retagging_levels ( &mut node_b, &SourceName::from ("source_b") );
+    set_source_retagging_member_sources ( &mut node_a, &SourceName::from ("source_a") );
+    set_source_retagging_member_sources ( &mut node_b, &SourceName::from ("source_b") );
     nodes . push (node_a);
     nodes . push (node_b); }
 
@@ -478,7 +478,7 @@ fn test_unreadable_files_creates_org_file() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
-  set_source_retagging_levels ( &mut node, &SourceName::from ("source_good") );
+  set_source_retagging_member_sources ( &mut node, &SourceName::from ("source_good") );
   write_nodecomplete_to_source(&node, &write_config) . unwrap();
 
   // Create config with both sources for reading (including the bad one)
@@ -547,7 +547,7 @@ fn test_unreadable_files_creates_org_file() {
 
 /// The malformed scalar and foreign-home shapes
 /// 'write_nodecomplete_telescope' refuses. Neither
-/// arises from a skg save (every level is clamped to at least the
+/// arises from a skg save (every recording source is clamped to at least the
 /// owner's home); both arrive from hand-edited files or a pull.
 /// Writing either would publish the node's text or lose it.
 #[test]
@@ -578,7 +578,7 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
     let mut node : NodeComplete = empty_node_complete();
     node . pid   = ID::new ("F");
     node . title = "foreign-homed" . to_string();
-    set_source_retagging_levels (
+    set_source_retagging_member_sources (
       &mut node, &SourceName::from ("foreign") );
     let err : IoError =
       write_nodecomplete_to_source (&node, &config)
@@ -592,7 +592,7 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
     let mut node : NodeComplete = empty_node_complete();
     node . pid   = ID::new ("H");
     node . title = "private text" . to_string();
-    set_source_retagging_levels (
+    set_source_retagging_member_sources (
       &mut node, &SourceName::from ("public") );
     let err : IoError =
       write_nodecomplete_to_source (&node, &config)
@@ -607,7 +607,7 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
     let mut node : NodeComplete = empty_node_complete();
     node . pid   = ID::new ("N");
     node . title = "ordinary" . to_string();
-    set_source_retagging_levels (
+    set_source_retagging_member_sources (
       &mut node, &SourceName::from ("public") );
     write_nodecomplete_to_source (&node, &config)
       . expect ("an owned titled home writes"); }
@@ -651,7 +651,7 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
   body_hoist . pid = ID::new ("B");
   body_hoist . title = "visible title" . to_string ();
   body_hoist . body = Some ("hidden body" . to_string ());
-  set_source_retagging_levels (
+  set_source_retagging_member_sources (
     &mut body_hoist, &SourceName::from ("public") );
   let err : IoError = write_nodecomplete_to_source (&body_hoist, &config)
     . expect_err ("a body below home requires interactive Hoist approval");
@@ -663,12 +663,12 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
   let mut valid : NodeComplete = empty_node_complete ();
   valid . pid = ID::new ("V");
   valid . title = "valid" . to_string ();
-  set_source_retagging_levels (
+  set_source_retagging_member_sources (
     &mut valid, &SourceName::from ("public") );
   let mut invalid : NodeComplete = empty_node_complete ();
   invalid . pid = ID::new ("X");
   invalid . title = "invalid" . to_string ();
-  set_source_retagging_levels (
+  set_source_retagging_member_sources (
     &mut invalid, &SourceName::from ("public") );
   invalid . contains . push (
     skg::types::misc::MemberAtSource::at_source (

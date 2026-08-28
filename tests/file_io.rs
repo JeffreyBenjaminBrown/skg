@@ -11,7 +11,7 @@ use skg::dbs::filesystem::one_node::{
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_at_source_msv};
-use skg::test_utils::set_source_retagging_levels;
+use skg::test_utils::set_source_retagging_member_sources;
 use skg::test_utils::{run_with_test_db, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -33,7 +33,7 @@ fn test_node_io() {
 
   // Write the example node to a file
   let mut example : NodeComplete = nodecomplete_example();
-  set_source_retagging_levels ( &mut example, &SourceName::from ("output") );
+  set_source_retagging_member_sources ( &mut example, &SourceName::from ("output") );
   write_nodecomplete_to_source ( &example, &config )
     . unwrap ();
 
@@ -41,7 +41,7 @@ fn test_node_io() {
   let read_node : NodeComplete = nodecomplete_from_pid_and_source (
     &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
-  set_source_retagging_levels ( &mut reversed, &SourceName::from ("output") );
+  set_source_retagging_member_sources ( &mut reversed, &SourceName::from ("output") );
   reversed . pid = ID::new ("reversed");
 
   write_nodecomplete_to_source(&reversed, &config) . unwrap();
@@ -95,7 +95,7 @@ fn verify_body_not_needed() {
     "/tmp/file_io_test/example.skg" ) . unwrap();
   let mut node = nodecomplete_from_pid_and_source (
     &config, ID::new ("example"), &SourceName::from ("output") ) . unwrap();
-  set_source_retagging_levels ( &mut node, &SourceName::from ("output") );
+  set_source_retagging_member_sources ( &mut node, &SourceName::from ("output") );
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
   write_nodecomplete_to_source(

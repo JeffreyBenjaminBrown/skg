@@ -38,7 +38,7 @@ scalar-only edits in the `.skg` sections. Noninteractive and
 maintenance writers have no implicit Hoist answer and refuse. Every
 relationship edge (a `contains`
 membership, a subscription, a hide, an override) carries its own
-privacy level: the level of the section that records it.
+recording source: the source of the section that records it.
 
 Reading the node **folds** the sections, most public first, into one
 effective node. Under a restricted source-set you see the **visible
@@ -64,12 +64,12 @@ changed.
 
 ## Where new relationships land: the sticky-else-default rule
 
-When you save, each relationship edge keeps the level it already had
+When you save, each relationship edge keeps the source it already had
 on disk (**sticky**), unless a `(relSource ...)` atom explicitly
-names another level — anything at or above the edge's default. A NEW
-edge defaults to the more private of the two endpoints' homes — the
-most public level that leaks neither endpoint. Every level is
-clamped to be at least the owner's home (a section more public than
+names another source at least as private as the edge's default. A NEW
+edge normally defaults to the more private endpoint home — the most
+public source that leaks neither endpoint. Every recording source is
+clamped to be no more public than the owner's home (a section more public than
 the home would imply a title-less public face). Hides floor higher:
 a hide reveals that you hide something, so it must be at least as
 private as both endpoints and the most public subscription that
@@ -78,20 +78,20 @@ explains it.
 ## Setting a relationship's source
 
 `skg-set-relationship-source` (`C-c s r`, see `docs/COMMANDS.org`;
-formerly `skg-privatize-relationship`) sets the level of the
+formerly `skg-privatize-relationship`) sets the recording source of the
 relationship the headline at point represents. It asks the server
-for the edge's default and current levels (the "edge source info"
-endpoint, see `api-and-formats.md`) and offers the levels at least
+for the edge's default and current sources (the "edge source info"
+endpoint, see `api-and-formats.md`) and offers the sources at least
 as private as the default. An edge sitting above its default is
 marked with a red `~NAME` herald and a `(relSource NAME)` metadata
-atom; the server re-checks at save that any offered level is no
+atom; the server re-checks at save that any offered source is no
 more public than the edge's default. The canonical use: your public
 reading-list node contains a book you would rather not advertise —
 privatize the *membership* and the book stays public, the list
 stays public, but the edge between them lives in your private
 section.
 
-The same gesture lowers privacy: choose any level down to (but not
+The same gesture lowers privacy: choose any source down to (but not
 below) the default, and the next save moves the edge's membership
 line into the more public section. Below the default there is
 nothing to choose — an edge more public than the more-private of
@@ -100,13 +100,12 @@ relationship further, publicize the more private endpoint (move its
 home) first; the edge's default falls with it, and this gesture can
 then follow it down. Note that removing the atom (the gesture's
 no-override choice) is not a way down: no atom means "no opinion",
-so a saved edge keeps its sticky level.
+so a saved edge keeps its sticky source.
 
-One shape legitimately sits *below* its default: an edge whose more
-private endpoint is FOREIGN, since your telescope has no section at
-the foreign level to record it in. Such an edge renders with the
-atom (it is off-default), saves back unchanged, and can be raised —
-but never lowered further.
+A legacy or hand-authored edge can already sit *more public* than its
+default. Such an edge renders with the atom (it is off-default), saves
+back unchanged, and can be made more private — but never moved still
+more public.
 
 ## What cannot be expressed
 
@@ -114,10 +113,11 @@ Two things are documented inexpressibles, by design:
 
 - **Private textlinks.** A textlink lives in the body, and the body
   lives in the home section. A link in a public body is public;
-  there is no per-link level. Keep the sentence in a private child
-  instead.
-- **Publicizing below the default.** As above: a relationship's
-  privacy can be raised above the default, never lowered below it.
+  there is no per-link recording source. Keep the sentence in a
+  private child instead.
+- **Moving a relationship more public than its default.** As above:
+  a relationship may move to a more-private source, never to one
+  more public than its default.
 
 ## What leaks, and what repair fixes
 
@@ -126,7 +126,7 @@ membership". It can arrive from a hand edit or a pull, and it is what
 this model exists to prevent. The server warns about these
 (`telescope-warnings.org` in your data root) rather than erroring: a
 pull must never brick a source. Repair one with
-`skg-set-relationship-source` (`C-c s r`), which re-levels the
+`skg-set-relationship-source` (`C-c s r`), which moves the
 membership into the right section. What no repair can fix: if a
 public repo ever *committed* a leaked ID, its git history still holds
 it; rewriting history is manual.

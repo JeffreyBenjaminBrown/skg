@@ -125,23 +125,23 @@ fn read_hiddenin_context (
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
       tree, node, 2, kind . caller_label () ) ?;
-  // Edge-level gating (render-and-gating, 5_plan.org): these are the
+  // Edge-source gating (render-and-gating, 5_plan.org): these are the
   // subscribee's and subscriber's own outbound lists (contains,
   // hides_from_its_subscriptions), read here to compute a DERIVED
   // membership for a third node (the HiddenInSubscribeeCol) -- like
   // 'content_goal_list's grandparent subtrahends. A membership
-  // recorded at an inactive level must not participate, in either
+  // recorded in an inactive source must not participate, in either
   // direction, or a private containment/hide would leak by omission
   // or by appearance.
-  let level_active = |level : &SourceName| match active_source_set {
+  let source_active = |source : &SourceName| match active_source_set {
     None      => true,
-    Some (a)  => a . is_all () || a . contains_source (level) };
+    Some (a)  => a . is_all () || a . contains_source (source) };
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . iter ()
-      . filter ( |m| level_active (& m . source) )
+      . filter ( |m| source_active (& m . source) )
       . map ( |m| m . member . clone () )
       . collect () };
   let subscriber_hides : Vec<ID> = {
@@ -150,7 +150,7 @@ fn read_hiddenin_context (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
-      . filter ( |m| level_active (& m . source) )
+      . filter ( |m| source_active (& m . source) )
       . map ( |m| m . member . clone () )
       . collect () };
   Ok (HiddenInContext {
@@ -160,4 +160,3 @@ fn read_hiddenin_context (
     subscribee_source,
     subscribee_contains,
     subscriber_hides }) }
-

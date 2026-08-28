@@ -1,11 +1,11 @@
 //! Core values of the privacy telescope (in comments: "telescope" =
-//! privacy telescope, "section" = telescope section, "level" =
-//! privacy level; the short names are for code).
+//! privacy telescope and "section" = telescope section; recording
+//! positions are named by sources, ordered by privacy.
 //!
 //! One node = one ID = one telescope: a set of same-ID .skg files,
 //! at most one per source ("sections"). Every relationship instance
 //! is recorded in exactly one section, whose source is the edge's
-//! LEVEL. On disk each ordered relation is ONE flat sequence of
+//! recording source. On disk each ordered relation is ONE flat sequence of
 //! items -- members and anchors -- whose role (base list vs
 //! placement) follows from WHICH section holds it, not from its
 //! shape: the most public section mentioning a relation holds its
@@ -211,8 +211,8 @@ impl Telescope {
     self,
   ) -> Vec<(SourceName, SectionSlices)> {
     self . sections . into_iter ()
-      . map ( |(level, node_fs)|
-              (level, node_fs . into_section_slices ()) )
+      . map ( |(source, node_fs)|
+              (source, node_fs . into_section_slices ()) )
       . collect () }
 }
 
@@ -307,12 +307,12 @@ pub enum FoldWarning {
   /// the relation -- there is no more-public fold to anchor into.
   /// Handled exactly like a dangling anchor.
   AnchorInBase { anchor : ID },
-  /// The same member appeared at two levels; the more public
+  /// The same member appeared in two sources; the more public
   /// occurrence won.
   DuplicateMember { member : ID },
   /// The home -- the most public section -- carries no title, so
   /// the text sits at 'title_at', where a reader restricted to the
-  /// home's level cannot see it. Distinct from 'NonHomeTitle' (a
+  /// home source cannot see it. Distinct from 'NonHomeTitle' (a
   /// stray SECOND title) and 'MissingTitle' (no title anywhere).
   TitleBelowHome {
     home     : crate::types::misc::SourceName,
@@ -355,7 +355,7 @@ impl std::fmt::Display for FoldWarning {
           anchor ),
       FoldWarning::DuplicateMember { member } =>
         write! ( f,
-          "member '{}' appeared at two levels; the more public occurrence won",
+          "member '{}' appeared in two sources; the more public occurrence won",
           member ),
       FoldWarning::TitleBelowHome { home, title_at } =>
         write! ( f,

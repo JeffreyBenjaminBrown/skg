@@ -58,7 +58,7 @@ pub struct DefiningColOwner {
 /// 'skg-set-relationship-source' gesture -- see
 /// 'ViewNodeStats::rel_source'), None meaning "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
-/// validates the explicit levels against each edge's DEFAULT floor
+/// validates the explicit sources against each edge's DEFAULT floor
 /// at save time (render-and-gating, 5_plan.org;
 /// BUG-and-fix_make-edge-more-public.org).
 #[derive(Clone, Debug, PartialEq, Eq)]

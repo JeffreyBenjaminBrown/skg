@@ -6,7 +6,7 @@
 //! 'skg-set-relationship-source' gesture uses this to offer only
 //! sources the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
-//! 'apply_sticky_levels' stays load-bearing, since buffers go stale
+//! 'apply_sticky_sources' stays load-bearing, since buffers go stale
 //! and the '(relSource ...)' atom is plain text anyone can type.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;

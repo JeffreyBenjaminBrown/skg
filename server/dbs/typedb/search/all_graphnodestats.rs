@@ -95,11 +95,11 @@ pub async fn fetch_all_graphnodestats_with_source_set (
 /// In-Rust-graph implementation. Every field is computed from NodeRust
 /// and the inverse indexes -- no TypeDB round-trips.
 ///
-/// Edge-level gating (render-and-gating, 5_plan.org): counts and the
+/// Edge-source gating (render-and-gating, 5_plan.org): counts and the
 /// container/content maps use the gated accessors
 /// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
 /// not the raw NodeRust lists / inverse indexes -- a membership
-/// recorded at a level outside 'active' must not inflate a count or
+/// recorded at a source outside 'active' must not inflate a count or
 /// appear in these maps, in either direction, even when the member
 /// NODE itself is active (still checked separately via
 /// 'pid_source_is_active', matching every other render surface's

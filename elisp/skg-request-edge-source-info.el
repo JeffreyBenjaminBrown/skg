@@ -14,25 +14,25 @@
 
 With a prefix argument RECURSIVE, instead run
 `skg-set-relationship-source-recursive', which prompts for a
-relationship kind and a level and applies the level throughout the
+relationship kind and a source and applies the source throughout the
 subtree at point.
 
 The headline at point represents one edge: `contains' for a content
 child, the col's relation for a writable PartnerCol member. This
-command asks the server for the edge's DEFAULT level (the more
-private of the two endpoints' homes) and its CURRENT level, then
+command asks the server for the edge's DEFAULT source and its CURRENT
+source, then
 prompts -- with both tab-completion and S-left/S-right cycling,
-like the other source dialogs -- over the levels at least as
+like the other source dialogs -- over the sources at least as
 private as the default (more public ones could leak an endpoint's
 ID and would be rejected at save), plus a no-override choice. The
-minibuffer starts pre-filled with the current level when it is
+minibuffer starts pre-filled with the current source when it is
 offerable, else the default, so RET keeps the status quo.
 
-Choosing a level writes a `(relSource LEVEL)' metadata atom. The
+Choosing a source writes a `(relSource SOURCE)' metadata atom. The
 no-override choice removes the atom, which on save means the edge
-keeps its saved level (sticky), NOT that it resets to its default.
+keeps its saved source (sticky), NOT that it resets to its default.
 To lower an edge's privacy to its default (e.g. after making the
-more private endpoint's home more public), choose the default level
+more private endpoint's home more public), choose the default source
 itself; once saved at the default, the atom and its red ~herald
 stop being rendered.
 
@@ -40,7 +40,7 @@ Refuses on read-only col members (the edge belongs to the other
 end) and on root headlines (no edge). Like other metadata edits,
 this only modifies the buffer; it does NOT save. Call
 `skg-request-save-buffer' afterward. The server re-validates at
-save time, so a stale or hand-typed level more public than the
+save time, so a stale or hand-typed source more public than the
 edge's default is still rejected there."
   (interactive "P")
   (if recursive
@@ -49,7 +49,7 @@ edge's default is still rejected there."
 
 (defun skg--set-relationship-source-at-point ()
   "The single-edge path of `skg-set-relationship-source': classify
-the edge at point, ask the server for its (default, current) levels,
+the edge at point, ask the server for its (default, current) sources,
 and prompt from the reply."
   (let ((buffer (current-buffer))
         (marker (point-marker)))
@@ -110,15 +110,15 @@ opens outside the network process filter."
                     (choices (append (skg--relationship-source-choices
                                       ladder default)
                                      (list skg--relationship-source-no-override)))
-                    (prompt (concat "Relationship level (S-left/right cycle"
+                    (prompt (concat "Relationship source (S-left/right cycle"
                                     (when default
                                       (format "; default %s" default))
                                     (when current
                                       (format "; currently %s" current))
                                     "): "))
                     ;; Pre-fill so RET keeps the status quo and the
-                    ;; cycle starts from it. A below-default CURRENT
-                    ;; (the foreign shape) is not among the choices;
+                    ;; cycle starts from it. A legacy CURRENT more
+                    ;; public than the default is not among the choices;
                     ;; fall back to the default, then to empty.
                     (prefill (cond ((and current (member current choices))
                                     current)

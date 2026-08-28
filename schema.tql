@@ -77,10 +77,10 @@ define
     relates overridden;
 
   # This connects each node to its HOME: the most public source
-  # holding a titled section of its privacy telescope. A node's
+  # holding a retained section of its privacy telescope. A node's
   # other sections are not represented here, and relationship edges
-  # are stored UNLEVELED (their per-edge privacy levels live only in
-  # the .skg files and the in-Rust graph; TypeDB sees the full
+  # carry no recording-source attribute here (that source lives only
+  # in the .skg files and the in-Rust graph; TypeDB sees the full
   # fold's projection).
   relation has_source,
     relates node,

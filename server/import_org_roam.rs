@@ -73,8 +73,8 @@ pub fn import_org_roam_directory (
       parse::parse_org_file (path);
     for mut node in nodes {
       node . source = source . clone();
-      { // Re-tag the parse-time placeholder levels with the real
-        // source, so the levels are honest even before the FS
+      { // Re-tag the parse-time placeholder sources with the real
+        // source, so the sources are honest even before the FS
         // boundary drops them (see MemberAtSource's INTERIM note).
         for m in node . contains . iter_mut () {
           m . source = source . clone (); }

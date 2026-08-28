@@ -103,10 +103,10 @@ async fn supplement_saveintent_from_disk (
       config, driver, &pid) . await ?;
   match from_disk {
     None => {
-      // A brand-new node has no sticky levels (no disk edges to be
+      // A brand-new node has no sticky sources (no disk edges to be
       // sticky about), but an explicit '(relSource ...)' atom must
       // still be validated against the DEFAULT floor -- an empty
-      // disk stand-in reuses 'apply_sticky_levels' unchanged (its
+      // disk stand-in reuses 'apply_sticky_sources' unchanged (its
       // sticky lookups simply find nothing, falling through to
       // default every time).
       let explicit_sources : ExplicitSources =
@@ -118,7 +118,7 @@ async fn supplement_saveintent_from_disk (
         source : supplemented . source . clone (),
         .. empty_node_complete () };
       let supplemented : NodeComplete =
-        apply_sticky_levels (
+        apply_sticky_sources (
           supplemented, &empty_disk, &explicit_sources, config )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
@@ -148,7 +148,7 @@ async fn supplement_saveintent_from_disk (
             None => supplemented,
             Some (active) => preserve_invisible_members (
               supplemented, &disk_node, config, active ) };
-        apply_sticky_levels (
+        apply_sticky_sources (
           supplemented, &disk_node, &explicit_sources, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
@@ -204,7 +204,7 @@ fn preserve_invisible_members (
   supplemented }
 
 /// Deleting a node deletes its whole TELESCOPE, including sections
-/// the current level cannot see; refuse rather than silently
+/// the active source-set cannot see; refuse rather than silently
 /// destroy them. (The agreed small leak: the refusal reveals that
 /// inactive sections exist.)
 pub fn refuse_delete_with_inactive_sections (
@@ -230,22 +230,22 @@ pub fn refuse_delete_with_inactive_sections (
 /// - EXPLICIT: a member named in 'explicit' (the buffer headline's
 ///   '(relSource NAME)' atom, threaded in as a side-channel because
 ///   NodeComplete's 'MemberAtSource::source' carries no "was this
-///   explicit" flag) wins outright, PROVIDED it is at or above (at
-///   least as private as) the DEFAULT floor -- the more private of
-///   the two endpoints' homes, NOT the disk level. An explicit atom
-///   is therefore the one path that can LOWER an existing edge's
-///   privacy, down to but never below its default
+///   explicit" flag) wins outright, PROVIDED it is at least as
+///   private as the DEFAULT floor -- normally the more private of
+///   the two endpoints' homes, NOT the disk source. An explicit atom
+///   is therefore the one path that can make an existing edge more
+///   public, down to but never more public than its default
 ///   (BUG-and-fix_make-edge-more-public.org). One exception keeps
-///   the render->save round-trip lossless: when the DISK level
-///   already sits below the default (the shape of an edge whose
-///   more private endpoint is FOREIGN, since foreign sections are
-///   never written), the explicit floor relaxes to that disk
-///   level -- such an edge can be held or raised, never lowered
-///   further. Below its floor, the save fails with a validation
-///   error naming the member, the offered level, and the floor.
-/// - STICKY: absent an explicit level, an edge that already exists
+///   the render->save round-trip lossless: when the DISK source
+///   already sits more public than the default (a legacy or
+///   hand-authored shape), the explicit floor relaxes to that disk
+///   source -- such an edge can be held or made more private, never
+///   moved still more public. A choice more public than its floor
+///   fails with a validation error naming the member, offered source,
+///   and floor.
+/// - STICKY: absent an explicit source, an edge that already exists
 ///   on disk (same relation, same endpoints, through 'pid_of')
-///   keeps its DISK level. Renormalization never lowers an edge's
+///   keeps its DISK source. Renormalization never lowers an edge's
 ///   privacy silently; removing the atom means "no opinion", not
 ///   "reset to default".
 /// - DEFAULT: a new edge between owned nodes gets the more private
@@ -253,12 +253,12 @@ pub fn refuse_delete_with_inactive_sections (
 ///   the edge instead stays at the owner's home: the relationship
 ///   and foreign ID are intentionally shared with that source.
 /// - HIDES additionally floor at the most public EXPLAINING
-///   subscription (see 'hide_level'): a hide is only as public as
+///   subscription (see 'hide_source'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
 ///   inference that a private subscription exists. Hides carry no
-///   explicit-level path: the col that displays them is read-only
+///   explicit-source path: the col that displays them is read-only
 ///   (the set-relationship-source gesture refuses there).
-pub(crate) fn apply_sticky_levels (
+pub(crate) fn apply_sticky_sources (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
   explicit         : &ExplicitSources,
@@ -289,10 +289,10 @@ pub(crate) fn apply_sticky_levels (
         config . more_private_of (
           owner_home . clone (), target_home ),
       None => owner_home . clone (), }};
-  // The sticky-else-default level for one member -- what an ABSENT
+  // The sticky-else-default source for one member -- what an ABSENT
   // atom resolves to.
-  let sticky_level_for = |disk_list : &[MemberAtSource<ID>],
-                           member    : &ID|
+  let sticky_source_for = |disk_list : &[MemberAtSource<ID>],
+                            member    : &ID|
   -> SourceName {
     let key : ID = resolve (member);
     let unclamped : SourceName = 'unclamped : {
@@ -303,75 +303,73 @@ pub(crate) fn apply_sticky_levels (
     // Clamp: no section may be more public than the home (the
     // "extends on the other side" junk shape), so when a HOME MOVE
     // makes the node more private, its edges rise with it. (The
-    // converse move leaves old, more-private levels in place:
+    // converse move leaves old, more-private sources in place:
     // publicizing memberships takes the explicit gesture.)
     config . more_private_of (unclamped, owner_home . clone ()) };
-  // EXPLICIT wins at-or-above its floor: the more PUBLIC of the
-  // DEFAULT floor and the sticky level. Flooring at the default
+  // EXPLICIT wins when at least as private as its floor: the more PUBLIC of the
+  // DEFAULT floor and the sticky source. Flooring at the default
   // (not at sticky) is what lets an atom LOWER a stuck edge's
   // privacy back down to the default
   // (BUG-and-fix_make-edge-more-public.org); admitting the sticky
-  // level when IT sits below the default covers the edge whose
-  // more private endpoint is FOREIGN -- its level cannot rise to
-  // the foreign home (foreign sections are never written), the
-  // render emits the '(relSource ...)' atom for every off-default
-  // edge, and that atom must round-trip through save unchanged.
-  // Net: an edge's privacy never drops below the default, and a
-  // below-default edge can only be held or raised. Absent an atom,
-  // sticky-else-default.
-  let resolve_level = |disk_list      : &[MemberAtSource<ID>],
+  // source when IT sits more public than the default covers legacy
+  // or hand-authored data. Render emits the '(relSource ...)' atom
+  // for every off-default edge, and that atom must round-trip through
+  // save unchanged. Net: a normal edge never moves more public than
+  // the default, and a preexisting more-public edge can only be held
+  // or made more private. Absent an atom, sticky-else-default.
+  let resolve_source = |disk_list      : &[MemberAtSource<ID>],
                         member         : &ID,
                         explicit_here  : &HashMap<ID, SourceName>,
                         relation_label : &str|
   -> Result<SourceName, String> {
     match explicit_here . get (member) {
-      Some (level) => {
-        if config . source_position (level) . is_none () {
+      Some (source) => {
+        if config . source_position (source) . is_none () {
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested unconfigured source '{}'.",
-            owner_pid, relation_label, member, level )); }
-        if ! config . user_owns_source (level) {
+            owner_pid, relation_label, member, source )); }
+        if ! config . user_owns_source (source) {
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested non-owned source '{}'. Relationship sources must be owned.",
-            owner_pid, relation_label, member, level )); }
-        if config . is_strictly_more_public (level, &owner_home) {
+            owner_pid, relation_label, member, source )); }
+        if config . is_strictly_more_public (source, &owner_home) {
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested source '{}', which is more public than the owner's home '{}'.",
-            owner_pid, relation_label, member, level, owner_home )); }
+            owner_pid, relation_label, member, source, owner_home )); }
         let default : SourceName = default_floor_for (member);
         let sticky  : SourceName =
-          sticky_level_for (disk_list, member);
+          sticky_source_for (disk_list, member);
         let floor : SourceName = // the more PUBLIC of the two
           if config . is_strictly_more_public (&sticky, &default) {
             sticky } else { default };
-        if config . is_strictly_more_public (level, &floor) {
+        if config . is_strictly_more_public (source, &floor) {
           Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested \
-             level '{}', but this edge's floor is '{}'. An edge's \
-             privacy can never drop below its default (the more \
-             private of the two endpoints' homes), nor below its \
-             current level when that already sits below the \
-             default. To publicize the edge further, first \
+             source '{}', but this edge's floor is '{}'. An edge's \
+             privacy can never move more public than its applicable \
+             default, nor more public than its current source when \
+             that source already precedes the default. To publicize \
+             the edge further, first \
              publicize the more private endpoint's home.",
-            owner_pid, relation_label, member, level, floor ))
-        } else { Ok ( level . clone () ) } },
-      None => Ok ( sticky_level_for (disk_list, member) ), }};
+            owner_pid, relation_label, member, source, floor ))
+        } else { Ok ( source . clone () ) } },
+      None => Ok ( sticky_source_for (disk_list, member) ), }};
   { let disk : &[MemberAtSource<ID>] = &disk_node . contains;
     for m in supplemented . contains . iter_mut () {
-      m . source = resolve_level (
+      m . source = resolve_source (
         disk, &m . member, &explicit . contains, "contains") ?; }}
   { let disk : &[MemberAtSource<ID>] =
       disk_node . subscribes_to . or_default ();
     if let MSV::Specified (v) = &mut supplemented . subscribes_to {
       for m in v . iter_mut () {
-        m . source = resolve_level (
+        m . source = resolve_source (
           disk, &m . member, &explicit . subscribes_to,
           "subscribes_to") ?; }} }
   { let disk : &[MemberAtSource<ID>] =
       disk_node . overrides_view_of . or_default ();
     if let MSV::Specified (v) = &mut supplemented . overrides_view_of {
       for m in v . iter_mut () {
-        m . source = resolve_level (
+        m . source = resolve_source (
           disk, &m . member, &explicit . overrides_view_of,
           "overrides_view_of") ?; }} }
   { let disk : &[MemberAtSource<ID>] =
@@ -387,8 +385,8 @@ pub(crate) fn apply_sticky_levels (
           . find ( |d| resolve ( &d . member ) == key )
           . map ( |d| d . source . clone () );
         let unclamped : SourceName = match sticky {
-          Some (level) => level,
-          None => hide_level (
+          Some (source) => source,
+          None => hide_source (
             config, &owner_home, &m . member, &subscribes,
             &resolve ), };
         m . source = config . more_private_of (
@@ -425,16 +423,16 @@ pub(crate) fn apply_sticky_levels (
             sticky_or_default, owner_home . clone () ); } }} }
   Ok (supplemented) }
 
-/// A NEW hide's level: at least the more private of the endpoints'
+/// A NEW hide's recording source: at least the more private of the endpoints'
 /// homes, and at least the most PUBLIC subscription of the hider
 /// that explains it (one whose subscribee contains the hidden
 /// node). The most public explanation is the floor because the
 /// inference "the hider subscribes to something containing X" is
 /// innocent whenever any explanation is visible; with no
 /// explanation found, fall back to the most private subscription
-/// level, and with no subscriptions at all, to the endpoint rule
+/// source, and with no subscriptions at all, to the endpoint rule
 /// alone (junk-tolerant; the validators report residue).
-fn hide_level (
+fn hide_source (
   config     : &SkgConfig,
   owner_home : &SourceName,
   hidden     : &ID,
@@ -451,7 +449,7 @@ fn hide_level (
         owner_home . clone (), h ),
       None => owner_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
-  let explaining_levels : Vec<SourceName> = {
+  let explaining_sources : Vec<SourceName> = {
     let Some (snap) = snapshot_global () else {
       return endpoint_floor; };
     subscribes . iter ()
@@ -464,7 +462,7 @@ fn hide_level (
       . map ( |sub| sub . source . clone () )
       . collect () };
   let subscription_floor : Option<SourceName> =
-    explaining_levels . into_iter ()
+    explaining_sources . into_iter ()
     . reduce ( |a, b| // keep the more PUBLIC of the two
                if config . is_strictly_more_public (&a, &b) { a }
                else { b } );

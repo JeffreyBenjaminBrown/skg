@@ -366,13 +366,13 @@ Save the view afterward to apply the move.
 Two safeguards, shared with the recursive form below:
 
 - If the move would leave content relationships stuck at their old,
-  more private levels (the sticky rule never lowers an edge's
+  more-private sources (the sticky rule never moves an edge's
   privacy without an explicit gesture), the command says so and
   offers to publicize them in the same go, by writing the same
   =(relSource ...)= atoms 'skg-set-relationship-source' would.
   Declining leaves them and notes that =C-c s R= can publicize them
   later. Edges already carrying an explicit =(relSource ...)= atom
-  are considered deliberately leveled and are never touched.
+  already have a deliberate recording source and are never touched.
 - An indefinitive instance is NOT changed -- the save would
   silently ignore its source edit -- and produces a loud WARNING,
   with the full ID list written to =*Messages*=.
@@ -407,32 +407,32 @@ For a node-to-node edge, the command asks the server for its DEFAULT
 source and CURRENT source (the
 "edge source info" endpoint), then prompts -- with both
 tab-completion and S-left/S-right cycling, like the other source
-dialogs -- over the levels at least as private as the default (more
+dialogs -- over the sources at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at
 save), plus a no-override choice. The minibuffer starts pre-filled
-with the current level when it is offerable, else the default, so
+with the current source when it is offerable, else the default, so
 RET keeps the status quo. If the server cannot resolve the edge
 (e.g. a node not yet saved), every source is offered and the save's
 floor check backstops. For an alias, its default is its owner's home
 and the current source is read directly from the alias metadata, so
 no synthetic graph edge or broader endpoint is needed.
 
-Choosing a level writes a =(relSource LEVEL)= metadata atom. This
+Choosing a source writes a =(relSource SOURCE)= metadata atom. This
 both raises privacy above the default and lowers it back down to
 (never below) the default -- the way to publicize an edge stuck at
-an old, more private level after its endpoint's home moved. An edge
+an old, more private source after its endpoint's home moved. An edge
 sitting above its default is marked with a red =~NAME= herald
 immediately before the ⌂ source herald; once saved at its default,
 atom and herald disappear.
 
 The no-override choice removes the atom, which means "no opinion":
-a saved edge keeps its saved level (sticky). It does NOT reset the
+a saved edge keeps its saved source (sticky). It does NOT reset the
 edge to its default -- to reach the default, choose it.
 
 Refuses with an error when point is on a member of a read-only col
 (subscriberCol, overriderCol, hiderCol, hiddenCol,
 hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the
-relationship belongs to the other end there, so setting its level
+relationship belongs to the other end there, so setting its source
 from this side would be meaningless. Also refuses on a root
 headline, which represents no edge.
 
@@ -462,15 +462,15 @@ position -- =contained= (ordinary content), =subscribee= (a
 subscribeeCol member) and =overridden= (an overriddenCol member);
 RET on any other role explains why its edge cannot be set from
 there (read-only cols belong to the other end; textlinks carry no
-independent level; hide levels are derived at save). RET picks a
+independent source; hide sources are derived at save). RET picks a
 role; q aborts.
 
-It then prompts for a level over the whole ladder, plus the
+It then prompts for a source over the whole ladder, plus the
 no-override choice, which instead REMOVES existing =(relSource ...)=
 atoms throughout the subtree. Unlike the single-edge command, no
 per-edge default is fetched -- the subtree's edges have different
 defaults -- so every source is offered and the save's floor check
-validates each edge (an offered level more public than some edge's
+validates each edge (an offered source more public than some edge's
 default makes the save fail, naming that edge).
 
 The walk applies to, and recurses on, only viewchildren that affect
@@ -483,8 +483,8 @@ entirely.
 This is the gesture for republicizing a subtree's relationship
 edges after 'skg-set-source-recursive' moved its nodes to a more
 public source: the sticky rule keeps each edge at its old, more
-private level, so the contains edges stay behind until explicitly
-lowered to the new default (see
+private source, so the contains edges stay behind until explicitly
+moved to the new default (see
 =MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org=).
 
 The command only edits metadata in the current buffer.

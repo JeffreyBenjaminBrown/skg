@@ -43,14 +43,14 @@ fn node_at (
   n }
 
 fn pm (
-  level  : &str,
+  source : &str,
   member : &str,
 ) -> MemberAtSource<ID> {
   MemberAtSource::at_source (
-    SourceName::from (level), ID::new (member) ) }
+    SourceName::from (source), ID::new (member) ) }
 
 #[test]
-fn default_is_more_private_of_homes_and_current_is_the_recorded_level (
+fn default_is_more_private_of_homes_and_current_is_the_recorded_source (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -68,7 +68,7 @@ fn default_is_more_private_of_homes_and_current_is_the_recorded_level (
   assert_eq! ( default, SourceName::from ("trusted"),
                "default = more private of the endpoints' homes" );
   assert_eq! ( current, Some ( SourceName::from ("private") ),
-               "current = the level the graph records" );
+               "current = the source the graph records" );
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn only_atom_bearing_relations_are_accepted (
   assert! ( relation_from_client_string ("overrides_view_of") . is_ok () );
   assert! ( relation_from_client_string (
     "hides_from_its_subscriptions") . is_err (),
-    "hides have no explicit-level path" );
+    "hides have no explicit-source path" );
   assert! ( relation_from_client_string ("textlinks_to") . is_err () );
 }
 

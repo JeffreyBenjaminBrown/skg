@@ -97,12 +97,12 @@ impl From<SkgfileSourceToml> for SkgfileSource {
     }}}
 
 /// A member of a node's relationship list, tagged with the
-/// relationship instance's PRIVACY LEVEL: the source whose telescope
-/// section records this edge. The level is about the EDGE, not the
+/// relationship instance's recording SOURCE: the source whose telescope
+/// section records this edge. The source is about the EDGE, not the
 /// member node (a public node can be a private member). Default
-/// level = the more private of the two endpoints' homes
-/// ('SkgConfig::more_private_of'); 'skg-set-relationship-source'
-/// may move its privacy anywhere at or above that default;
+/// source comes from the applicable relationship-default rule;
+/// 'skg-set-relationship-source' may move its privacy anywhere at
+/// least as private as that default;
 /// renormalization never lowers its privacy (the sticky rule). See
 /// TODO/user-owned_autofork_chain/5_plan.org and
 /// BUG-and-fix_make-edge-more-public.org.
@@ -572,7 +572,7 @@ impl SkgConfig {
 
   /// The more private of the two (the later in the privacy order);
   /// 'b' on a tie. This is the edge-source default rule's core: a
-  /// relationship instance defaults to the level of the more private
+  /// relationship instance normally defaults to the source of the more private
   /// of its two endpoints' homes.
   pub fn more_private_of (
     &self,

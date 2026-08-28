@@ -47,7 +47,7 @@ pub struct NodeSaveIntent {
   // 'ViewNodeStats::rel_source', 'NodeIntent_Local'); None means
   // "derive" (sticky-else-default). 'explicit_sources' extracts the
   // Some entries into a side-channel BEFORE 'into_nodecomplete'
-  // discards them, for 'apply_sticky_levels' to validate against
+  // discards them, for 'apply_sticky_sources' to validate against
   // each edge's floor.
   pub contains          : MSV<(ID, Option<SourceName>)>,
   pub extra_ids         : Vec<ID>,
@@ -58,17 +58,17 @@ pub struct NodeSaveIntent {
   pub misc              : Vec<FileProperty>,
 }
 
-/// Levels the buffer explicitly requested via '(relSource NAME)'
+/// Sources the buffer explicitly requested via '(relSource NAME)'
 /// (server/heralds.rs; 'ViewNodeStats::rel_source'), keyed by member
-/// ID, one map per relation that carries per-member levels (hides is
+/// ID, one map per relation that carries per-member sources (hides is
 /// absent: it is inferred, and the col that shows it is read-only --
 /// the set-relationship-source gesture refuses there). Threaded
 /// separately from
-/// NodeComplete because NodeComplete's 'MemberAtSource::level' is a
+/// NodeComplete because NodeComplete's 'MemberAtSource::source' is a
 /// plain SourceName with no "was this explicit" flag, and gets
-/// unconditionally resolved by 'apply_sticky_levels' -- this is the
+/// unconditionally resolved by 'apply_sticky_sources' -- this is the
 /// side-channel that tells that pass which members carry a real,
-/// user-requested level to validate against the default
+/// user-requested source to validate against the default
 /// floor, rather than deriving normally (render-and-gating,
 /// TODO/user-owned_autofork_chain/5_plan.org).
 #[derive(Clone, Debug, Default)]
@@ -79,7 +79,7 @@ pub struct ExplicitSources {
   pub overrides_view_of : HashMap<ID, SourceName>,
 }
 
-/// Strip the per-member explicit-level payload down to plain IDs, by
+/// Strip the per-member explicit-source payload down to plain IDs, by
 /// reference (read-only consumers, e.g.
 /// 'save_intents_with_specified_contains').
 fn ids_only_msv_ref (
@@ -128,7 +128,7 @@ impl NodeIntent {
   pub fn graph_save_from_nodecomplete (
     node : NodeComplete,
   ) -> NodeIntent {
-    // No explicit levels: this seeds an intent straight from disk
+    // No explicit sources: this seeds an intent straight from disk
     // (a definitive rebuild for hide-delta application), not from a
     // buffer headline that could carry a '(relSource ...)' atom.
     // Preserves the MSV Unspecified/Specified distinction, unlike a
@@ -189,13 +189,13 @@ impl NodeSaveIntent {
     contains : &[ID],
   ) {
     if self . contains . is_unspecified() {
-      // Disk-derived filler: no per-member explicit level (that only
+      // Disk-derived filler: no per-member explicit source (that only
       // ever comes from a buffer headline's own '(relSource ...)').
       self . contains =
         MSV::Specified ( contains . iter () . cloned ()
                           . map ( |id| (id, None) ) . collect () ); }}
 
-  /// The levels the buffer explicitly requested (its headlines'
+  /// The sources the buffer explicitly requested (its headlines'
   /// '(relSource NAME)' atoms), read out BEFORE 'into_nodecomplete'
   /// discards the Option<SourceName> payload. See 'ExplicitSources'.
   pub fn explicit_sources (
@@ -205,8 +205,8 @@ impl NodeSaveIntent {
       list : &[(ID, Option<SourceName>)],
     ) -> HashMap<ID, SourceName> {
       list . iter ()
-        . filter_map ( |(id, lvl)| lvl . clone ()
-                       . map ( |l| (id . clone (), l) ) )
+        . filter_map ( |(id, source)| source . clone ()
+                       . map ( |s| (id . clone (), s) ) )
         . collect () }
     ExplicitSources {
       contains          : collect (self . contains . or_default ()),

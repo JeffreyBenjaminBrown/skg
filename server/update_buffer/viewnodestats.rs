@@ -192,8 +192,8 @@ fn active_vognode_pid (
 /// relation it is a member of on each side relative to 'node_pid'.
 /// Contains membership is read from the source-filtered containment
 /// maps; the other four relations from the in-Rust graph. Every flag
-/// is EDGE-LEVEL gated: an edge recorded above the active prefix
-/// must not tint an ancestor herald at a more public level (it would
+/// is EDGE-SOURCE gated: an edge recorded outside the active prefix
+/// must not tint an ancestor herald in a more public view (it would
 /// reveal the very relationship the user privatized). The contains
 /// gate needs the graph (the maps carry no levels); without one
 /// (some test paths, which never restrict) it degrades to ungated.
@@ -211,7 +211,7 @@ fn flag_ancestor_relations (
     match (graph, active) {
       (Some (g), Some (a)) if ! a . is_all () =>
         g . edge_source (owner, NodeRelation::Contains, target)
-          . map ( |level| a . contains_source (&level) )
+          . map ( |source| a . contains_source (&source) )
           . unwrap_or (false),
       _ => true }};
   // Contains, via the maps. inbound: ancestor contains node.
@@ -319,7 +319,7 @@ fn set_hidden_body (
 /// Gnode-parent content child; the col's relation for a simple
 /// PartnerCol member, oriented by which side owns the outbound edge
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
-/// actual level ('InRustGraph::edge_source') against its default (the
+/// actual source ('InRustGraph::edge_source') against its default (the
 /// more private of the two endpoints' homes). None on any of: no
 /// graph handle; parentIs != Affected or a backpath graft (not a
 /// genuine member here); a compound filter col
@@ -344,7 +344,7 @@ fn set_rel_source (
       || birth != Birth::Unremarkable {
       // Not a genuine member of the collection at this position (a
       // self-writer parked under a col, or a backpath graft): there
-      // is no binding edge here to have a level at all.
+      // is no binding edge here to have a source at all.
       break 'compute None; }
     let (owner_pid, relation, target_pid) : (ID, NodeRelation, ID) =
       match parent_kind_of (tree, treeid) {
@@ -368,7 +368,7 @@ fn set_rel_source (
             (anchor_pid, role . relation, node_pid . clone ())
           }},
         ParentKind::Other => break 'compute None, };
-    let level : SourceName =
+    let source : SourceName =
       match graph . edge_source (&owner_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
     let default : SourceName = {
@@ -379,7 +379,7 @@ fn set_rel_source (
       match (owner_home, target_home) {
         (Some (a), Some (b)) => config . more_private_of (a, b),
         _ => break 'compute None, }};
-    if level == default { None } else { Some (level) } };
+    if source == default { None } else { Some (source) } };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_source = rel_source; }}

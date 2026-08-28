@@ -198,8 +198,8 @@ pub const PARTNER_ROLE_VOCAB
 ];
 
 impl InRustGraph {
-  /// The LEVEL of the edge from OWNER to TARGET under RELATION, read
-  /// from the owner's outbound list (where every edge's level
+  /// The SOURCE of the edge from OWNER to TARGET under RELATION, read
+  /// from the owner's outbound list (where every edge's source
   /// lives). None when no such edge exists. This is how INBOUND
   /// surfaces gate: an inbound partner P of X is visible at the
   /// active set iff edge_source(P, R, X) is active -- private
@@ -214,7 +214,7 @@ impl InRustGraph {
   ) -> Option<SourceName> {
     let target_key : ID = self . pid_of (target) ? ;
     let node : &NodeRust = self . nodes . get (owner) ? ;
-    let leveled : Vec<MemberAtSource<ID>> = match relation {
+    let members_at_sources : Vec<MemberAtSource<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::Subscribes =>
@@ -225,15 +225,15 @@ impl InRustGraph {
         node . overrides_view_of . or_default () . to_vec (),
       NodeRelation::TextlinksTo =>
         // textlinks derive from the body, which is home-only, so
-        // their level is the owner's home by construction.
+        // their source is the owner's home by construction.
         return self . nodes . get (owner)
           . map ( |n| n . source . clone () ), };
-    leveled . iter ()
+    members_at_sources . iter ()
       . find ( |m| self . pid_of ( &m . member )
                . as_ref () == Some (&target_key) )
       . map ( |m| m . source . clone () ) }
 
-  /// Outbound members whose EDGE level is in the active set: the
+  /// Outbound members whose EDGE source is in the active set: the
   /// visible fold of one relation. Pass None for the full fold.
   pub fn outbound_pids_for_relation_gated (
     &self,
@@ -243,7 +243,7 @@ impl InRustGraph {
   ) -> Vec<ID> {
     let Some (node) = self . nodes . get (pid) else {
       return Vec::new (); };
-    let leveled : Vec<MemberAtSource<ID>> = match relation {
+    let members_at_sources : Vec<MemberAtSource<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::Subscribes =>
@@ -254,7 +254,7 @@ impl InRustGraph {
         node . overrides_view_of . or_default () . to_vec (),
       NodeRelation::TextlinksTo =>
         return self . outbound_pids_for_relation (pid, relation), };
-    leveled . iter ()
+    members_at_sources . iter ()
       . filter ( |m| match active {
         None => true,
         Some (a) => a . is_all ()
@@ -276,7 +276,7 @@ impl InRustGraph {
         None => true,
         Some (a) => a . is_all ()
           || self . edge_source (partner, relation, pid)
-             . map ( |level| a . contains_source (&level) )
+             . map ( |source| a . contains_source (&source) )
              . unwrap_or (false) } )
       . collect () }
 
@@ -350,7 +350,7 @@ impl InRustGraph {
       owner_pid, member_pid, member_role, None ) }
 
   /// 'relation_membership_is_real' with edge-source gating: an edge
-  /// whose recorded level is above the active prefix does not count
+  /// whose recording source is outside the active prefix does not count
   /// as a membership (see 'edge_source'). Pass None to ask about the
   /// full fold.
   pub fn relation_membership_is_visible (

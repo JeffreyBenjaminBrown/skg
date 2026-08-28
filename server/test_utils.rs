@@ -599,30 +599,30 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
     fork_approved,
     fork_sources ) . await }
 
-/// Move NODE to LEVEL: set its source AND retag every relationship
-/// member and alias to that level. Under degenerate leveling (work
-/// item leveled-lists) the invariant is levels == source, so any
+/// Move NODE to SOURCE: set its home AND retag every relationship
+/// member and alias to that source. Under the historical
+/// 'leveled-lists' work item, the invariant was member source == home, so any
 /// test that reassigns a node's source must go through this, or the
-/// telescope write would emit sections at the old level. The real
-/// source-move rule (which levels follow a home move) is owned by
+/// telescope write would emit sections at the old source. The real
+/// source-move rule (which member sources follow a home move) is owned by
 /// work item save-leveling.
-pub fn set_source_retagging_levels (
+pub fn set_source_retagging_member_sources (
   node  : &mut NodeComplete,
-  level : &SourceName,
+  source : &SourceName,
 ) {
-  node . source = level . clone ();
+  node . source = source . clone ();
   for m in node . contains . iter_mut () {
-    m . source = level . clone (); }
+    m . source = source . clone (); }
   let retag_msv = |msv : &mut MSV<MemberAtSource<ID>>| {
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
-        m . source = level . clone (); }} };
+        m . source = source . clone (); }} };
   retag_msv ( &mut node . subscribes_to );
   retag_msv ( &mut node . hides_from_its_subscriptions );
   retag_msv ( &mut node . overrides_view_of );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
-      m . source = level . clone (); }} }
+      m . source = source . clone (); }} }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture

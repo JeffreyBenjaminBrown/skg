@@ -94,7 +94,7 @@ Both =public= and =private= must be sources defined in your
 Under privacy telescopes (see =telescopes.md=), what moves is the
 node's HOME: its title, body and extra ids relocate to the new
 source's section. Sections of the node at other privacy levels stay
-where they are, and each relationship edge keeps its recorded level
+where they are, and each relationship edge keeps its recording source
 (edges are clamped to be at least as private as the new home).
 
 The buffer can reference a node by any of its IDs — primary or

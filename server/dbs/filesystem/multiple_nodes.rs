@@ -60,13 +60,13 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
       config . sources . get (&source_name) else { continue; };
     match read_skg_sections_from_folder (&source_name, config) {
       Ok (sections) => {
-        for (level, node_fs) in sections {
+        for (source, node_fs) in sections {
           let pid : ID = node_fs . pid . clone ();
           if ! sections_by_pid . contains_key (&pid) {
             pid_order . push ( pid . clone () ); }
           sections_by_pid . entry (pid)
             . or_insert_with (Vec::new)
-            . push ((level, node_fs)); }}
+            . push ((source, node_fs)); }}
       Err (e) => {
         load_errors . push ((
           source_name . to_string(),
@@ -242,7 +242,7 @@ pub fn read_skg_sections_from_folder (
 /// Like `read_all_skg_files_from_sources` but only for telescopes
 /// with at least one section file whose mtime is more recent than
 /// `since`. A touched SECTION reloads its WHOLE telescope (all its
-/// sections, however old), since the fold needs every level.
+/// sections, however old), since the fold needs every source.
 pub fn read_recently_modified_skgfiles_from_sources (
   config : &SkgConfig,
   since  : std::time::SystemTime,
@@ -384,7 +384,7 @@ fn report_load_errors(
 }
 
 /// Writes all given `NodeComplete`s to disk as telescopes: each
-/// node's sections land in their levels' source directories, named
+/// node's sections land in their source directories, named
 /// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
   nodes  : Vec<NodeComplete>,
@@ -404,7 +404,7 @@ pub fn write_all_nodes_to_fs (
 /// Deleting a node deletes its whole TELESCOPE: every owned
 /// section file of that pid, in whatever source. (The SourceName in
 /// each target is the caller's belief about the home; kept in the
-/// signature for its callers, but every owned level is swept.)
+/// signature for its callers, but every owned source is swept.)
 pub fn delete_all_nodes_from_fs (
   delete_targets : Vec<(ID, SourceName)>,
   config         : SkgConfig,
@@ -425,7 +425,7 @@ pub fn delete_all_nodes_from_fs (
         Ok ( () ) => {
           any_removed = true; },
         Err (e) if e . kind () == io::ErrorKind::NotFound => {
-          // No section at this level, which is fine.
+          // No section at this source, which is fine.
         },
         Err (e) => {
           // TODO : Should return a list of IDs not found.

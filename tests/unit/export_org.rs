@@ -255,13 +255,13 @@ fn marker_child_is_excluded_from_content () {
 }
 
 //
-// Edge-level gating (visible fold)
+// Edge-source gating (visible fold)
 //
 
 #[test]
-fn private_leveled_edge_is_omitted_from_restricted_export () {
+fn private_source_edge_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the edge to "priv"
-  // is RECORDED at level "private". A main-only export renders the
+  // is RECORDED in source "private". A main-only export renders the
   // visible fold: "pub" appears, "priv" does not -- even though
   // priv's home is active.
   let mut root : NodeComplete =
@@ -287,7 +287,7 @@ fn private_leveled_edge_is_omitted_from_restricted_export () {
     fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
   assert! ( content . contains ("Public child"), "{}", content );
   assert! ( ! content . contains ("Private child"),
-            "a private-leveled edge leaked into a main-only export:\n{}",
+            "an edge from a private source leaked into a main-only export:\n{}",
             content );
   { // Under "all", both children render.
     let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();

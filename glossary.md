@@ -23,12 +23,15 @@ look past. There is no linking relationship between sections —
 sharing an ID is being the same node. See `docs/telescopes.md`
 and `server/types/nodes/fs.rs`.
 
-## privacy level, or "level" in code
+## privacy order and recording source
 
 The position of a source in the config's privacy order (most public
-first). Every relationship edge carries a level: the source whose
-section records it. In code this is the `level` field of
-`MemberAtSource`. "More private" = later in the order.
+first) is its privacy level. Live code does not use "level" for the
+value carried by an edge: every relationship member carries its
+**recording source**, the source whose section records it. In code
+that is `MemberAtSource { source, member }`; a collection of them is
+a **list of members at sources**. "More private" = later in the
+privacy order.
 
 ## fold (visible vs full), unfold
 
@@ -51,18 +54,18 @@ never go stale in memory.
 
 ## sticky rule (sticky-else-default)
 
-Where a relationship edge's privacy level comes from at save time:
-an edge already on disk keeps its level (**sticky**); a new edge
-defaults to the more private of its two endpoints' homes; and every
-level is clamped to at least the owner's home. Hides floor higher
+Where a relationship edge's recording source comes from at save time:
+an edge already on disk keeps its source (**sticky**); a new edge
+normally defaults to the more private endpoint home. Every recording
+source is clamped to be no more public than the owner's home. Hides floor higher
 (at least the most public subscription explaining them). A
 `(relSource NAME)` atom (the `skg-set-relationship-source` gesture)
-overrides sticky with any level at or above the edge's DEFAULT —
-raising privacy, or lowering a stuck level back down to the
-default; below-default privacy is a save error. (Exception: an edge
-whose disk level already sits below its default — the
-foreign-endpoint shape — may be held or raised, never lowered
-further.) See `server/from_text/supplement_from_disk.rs`.
+overrides sticky with any source at least as private as the edge's
+DEFAULT — raising privacy, or moving a stuck source back to the
+default; a more-public choice is a save error. A legacy or
+hand-authored edge whose disk source already sits more public than
+its default may be held or made more private, never made still more
+public. See `server/from_text/supplement_from_disk.rs`.
 
 ## "buffer", or sometimes "forest"
 

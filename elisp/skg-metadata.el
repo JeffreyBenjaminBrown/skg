@@ -140,7 +140,7 @@ On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
 When the move would leave content relationships stuck at their old,
-more private levels (the sticky rule never lowers an edge's privacy
+more private sources (the sticky rule never lowers an edge's privacy
 without an explicit gesture; see
 TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
 offers to publicize them in the same go by writing `(relSource ...)'
@@ -178,7 +178,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 (defun skg--set-source-and-handle-stuck-edges (old-source new-source recursive)
   "The body of `skg-set-source' once a real move is requested:
 analyze which content edges the move would leave stuck at more
-private levels, retarget the sources (skipping indefinitive
+private sources, retarget the sources (skipping indefinitive
 instances), offer to publicize the stuck edges in the same go, and
 report -- loudly, when indefinitive instances were skipped."
   (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old sources
@@ -193,7 +193,7 @@ report -- loudly, when indefinitive instances were skipped."
          (fixed-count
           (when (and stuck
                      (y-or-n-p
-                      (format "This move would leave %d content relationship%s at their old, more private level%s. Publicize them too? "
+                      (format "This move would leave %d content relationship%s in their old, more private source%s. Publicize them too? "
                               (length stuck)
                               (if (= (length stuck) 1) "" "s")
                               (if (= (length stuck) 1) "" "s"))))
@@ -211,7 +211,7 @@ report -- loudly, when indefinitive instances were skipped."
                 (format " Also publicized %d relationship%s."
                         fixed-count (if (= fixed-count 1) "" "s")))
                (stuck
-                " Relationships kept their old, more private levels; C-c s R can publicize them later."))
+                " Relationships kept their old, more private sources; C-c s R can publicize them later."))
               (when indef-ids
                 (format "  WARNING: %d indefinitive node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
                         (length indef-ids)
@@ -220,9 +220,9 @@ report -- loudly, when indefinitive instances were skipped."
 (defun skg--analyze-move-stuck-edges (old-source new-source recursive)
   "With point on the node a `skg-set-source' move starts from, and
 BEFORE any source is rewritten: return the affected content edges
-the move would leave stuck at a more private level than their new
-default, as a list of (MARKER . LEVEL) -- MARKER at the child
-headline, LEVEL the edge's new default. Only edges without an
+the move would leave stuck in a more private source than their new
+default, as a list of (MARKER . SOURCE) -- MARKER at the child
+headline, SOURCE the edge's new default. Only edges without an
 existing `(relSource ...)' atom qualify: an atom-carrying edge was
 already leveled deliberately. The walk's root itself is always
 retargeted (unless indefinitive); its org-parent lies outside the
@@ -250,15 +250,15 @@ children's edges are examined."
                                        (equal source old-source))
                                   new-source
                                 source)))
-                       (level (skg--content-edge-stuck-level
+                       (source (skg--content-edge-stuck-source
                                parent-source
                                (funcall eff parent-source
                                         parent-retargets-p)
                                child-source
                                (funcall eff child-source child-moves))))
-                  (when level
+                  (when source
                     (push (cons (copy-marker (line-beginning-position))
-                                level)
+                                source)
                           stuck)))))))
       (funcall consider nil t) ;; the root's own inbound edge
       (outline-next-heading)
@@ -277,12 +277,12 @@ children's edges are examined."
             (outline-next-heading))))
       (nreverse stuck))))
 
-(defun skg--content-edge-stuck-level (parent-eff-old parent-eff-new
+(defun skg--content-edge-stuck-source (parent-eff-old parent-eff-new
                                       child-eff-old child-eff-new)
-  "The level to which the content edge at point (from its view-parent
+  "The source to which the content edge at point (from its view-parent
 to the headline at point) should be publicized after a source move,
 or nil when the move does not strand it: nil when the edge carries
-an explicit `(relSource ...)' atom (deliberately leveled), when a
+an explicit `(relSource ...)' atom (deliberately sourced), when a
 default cannot be computed (a source unknown to the config -- the
 save validates anyway), or when the edge's default does not become
 more public. The four arguments are the endpoints' sources before
@@ -298,7 +298,7 @@ and after the move."
         new-default))))
 
 (defun skg--apply-stuck-edge-sources (stuck)
-  "Write a `(relSource LEVEL)' atom at each (MARKER . LEVEL) in
+  "Write a `(relSource SOURCE)' atom at each (MARKER . SOURCE) in
 STUCK, then free the markers. Returns the number of atoms written."
   (save-excursion
     (dolist (entry stuck)
@@ -347,7 +347,7 @@ ReadOnlyFilter; see server/types/viewnode.rs PartnerCol::policy and
 the matching read-only detection in
 server/from_text/local_instruction_collection/traverse.rs).
 `skg-set-relationship-source' refuses on a member of one of these:
-the edge belongs to the other end, so setting its level here would
+the edge belongs to the other end, so setting its source here would
 be meaningless.")
 
 (defconst skg--writable-col-relations
@@ -441,7 +441,7 @@ headline at point, or nil when no such atom is present."
 (defun skg--relationship-source-choices (ladder default)
   "The source-name menu for `skg-set-relationship-source': the tail
 of LADDER (the configured sources, most public first) starting at
-DEFAULT -- exactly the levels the save's default floor can accept.
+DEFAULT -- exactly the sources the save's default floor can accept.
 When DEFAULT is nil or absent from LADDER, the whole LADDER (the
 server's save-time floor check backstops any stale offer)."
   (or (and default (member default ladder))
@@ -450,9 +450,9 @@ server's save-time floor check backstops any stale offer)."
 (defconst skg--relationship-source-no-override
   "(no override: follow sticky-else-default)"
   "The menu entry that REMOVES the `(relSource ...)' atom instead of
-setting one. For an edge already on disk this means the SAVED level
+setting one. For an edge already on disk this means the SAVED source
 survives (sticky); it does NOT mean \"reset to the default\". To
-lower an edge's privacy to its default, choose the default level
+lower an edge's privacy to its default, choose the default source
 explicitly.")
 
 (defun skg--apply-relationship-source-choice (choice)
@@ -488,27 +488,27 @@ next save will do with the edge."
      ("container" nil
       "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
      ("contained" contained
-      "The view-parent contains the node: ordinary content. Sets the level of each parent-contains-child edge."))
+      "The view-parent contains the node: ordinary content. Sets the source of each parent-contains-child edge."))
     ("textlinks_to"
      ("source" nil
-      "Textlinks are inferred from body text; they carry no independent privacy level, so there is nothing to set.")
+      "Textlinks are inferred from body text; they carry no independent recording source, so there is nothing to set.")
      ("dest" nil
-      "Textlinks are inferred from body text; they carry no independent privacy level, so there is nothing to set."))
+      "Textlinks are inferred from body text; they carry no independent recording source, so there is nothing to set."))
     ("subscribes"
      ("subscriber" nil
       "A subscriberCol member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
      ("subscribee" subscribee
-      "A member of the view-parent's subscribeeCol. Sets the level of each anchor-subscribes-to-member edge."))
+      "A member of the view-parent's subscribeeCol. Sets the source of each anchor-subscribes-to-member edge."))
     ("hides_from_its_subscriptions"
      ("hider" nil
-      "Hide levels are derived at save, floored at the most public explaining subscription; the hiderCol is read-only.")
+      "Hide sources are derived at save, floored at the most public explaining subscription; the hiderCol is read-only.")
      ("hidden" nil
-      "Hide levels are derived at save, floored at the most public explaining subscription; the hiddenCol is read-only."))
+      "Hide sources are derived at save, floored at the most public explaining subscription; the hiddenCol is read-only."))
     ("overrides_view_of"
      ("overrider" nil
       "An overriderCol member: the overrides edge belongs to the member (the overrider), not to the view-parent. Read-only from here.")
      ("overridden" overridden
-      "A member of the view-parent's overriddenCol. Sets the level of each anchor-overrides-view-of-member edge.")))
+      "A member of the view-parent's overriddenCol. Sets the source of each anchor-overrides-view-of-member edge.")))
   "The relationship-kind menu for
 `skg-set-relationship-source-recursive': one entry per node-node
 relation in schema.tql, each listing its two roles as
@@ -524,7 +524,7 @@ explains why the edge cannot be set from that position.")
 menu buffer, called with the chosen kind symbol.")
 
 (defun skg-set-relationship-source-recursive ()
-  "Set the privacy level of every matching relationship edge in the
+  "Set the recording source of every matching relationship edge in the
 subtree at point.
 
 First presents an org-menu of the schema's five node-node relations
@@ -535,11 +535,11 @@ position: `contained' (ordinary content), `subscribee' (a
 subscribeeCol member) and `overridden' (an overriddenCol member);
 RET on any other role explains why it cannot be set from there.
 
-Then prompts for a level over the whole ladder, plus the
+Then prompts for a source over the whole ladder, plus the
 no-override choice that instead REMOVES existing `(relSource ...)'
 atoms. Unlike `skg-set-relationship-source', no per-edge default is
 fetched: the subtree's edges have different defaults, so the save's
-floor check (see `apply_sticky_levels') is what validates each one.
+floor check (see `apply_sticky_sources') is what validates each one.
 
 The walk starts at the node at point (inclusive: its own edge to
 its view-parent counts when it matches) and recurses only on
@@ -559,7 +559,7 @@ NOT save. Call `skg-request-save-buffer' afterward."
     (skg--select-relationship-kind
      (lambda (kind)
        (unless (buffer-live-p buffer)
-         (user-error "skg: buffer vanished before the relationship-level prompt"))
+         (user-error "skg: buffer vanished before the relationship-source prompt"))
        (with-current-buffer buffer
          (save-excursion
            (goto-char marker)
@@ -567,7 +567,7 @@ NOT save. Call `skg-request-save-buffer' afterward."
                   (choices (append ladder
                                    (list skg--relationship-source-no-override)))
                   (choice (skg--completing-read-with-cycle
-                           (format "Level for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
+                           (format "Source for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
                                    kind)
                            choices nil t nil nil nil nil choices))
                   (count (skg--set-relationship-source-recursive-walk
@@ -575,7 +575,7 @@ NOT save. Call `skg-request-save-buffer' afterward."
              (message "%s"
                       (if (equal choice
                                  skg--relationship-source-no-override)
-                          (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) level, or its default if new. Save to apply."
+                          (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) source, or its default if new. Save to apply."
                                   count kind (if (= count 1) "" "s"))
                         (format "Relationship source set to '%s' on %d '%s' edge%s. Save to apply."
                                 choice count kind

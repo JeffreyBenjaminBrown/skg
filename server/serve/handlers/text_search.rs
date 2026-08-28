@@ -511,7 +511,7 @@ pub fn group_matches_by_id (
               . unwrap_or ("") );
         if let Some (a) = active {
           // Per-DOCUMENT source filtering, BEFORE grouping: an
-          // alias document carries the ALIAS's privacy level as
+          // alias document carries the ALIAS's recording source as
           // its source, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
           // nor shift ranking (dbs-and-search, 5_plan.org). The

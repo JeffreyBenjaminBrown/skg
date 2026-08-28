@@ -1,9 +1,9 @@
-//! The FOLD: sections (per-level slices, most public first) -> the
-//! node's effective leveled lists. Total and deterministic: junk
+//! The FOLD: sections (per-source slices, most public first) -> the
+//! node's effective lists of members at sources. Total and deterministic: junk
 //! degrades to 'FoldWarning's, never errors (see types.rs).
 //!
-//! Semantics, per ordered relation: the fold THROUGH level k is
-//! exactly what a level-k viewer sees. The most public section
+//! Semantics, per ordered relation: the fold THROUGH source k is
+//! exactly what a source-k viewer sees. The most public section
 //! mentioning the relation contributes the base list; each more
 //! private section's prepend lands at the front, and each of its
 //! runs lands immediately after its anchor -- an anchor being any
@@ -14,7 +14,7 @@
 //! prepend if it is first (Jeff's fallback, 4_discussion.org).
 //!
 //! Unordered relations (hides, overrides) and aliases: union in
-//! level order; a member repeated across levels keeps its most
+//! source order; a member repeated across sources keeps its most
 //! public occurrence, with a warning.
 
 use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
@@ -24,7 +24,7 @@ use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use std::collections::HashMap;
 use std::io;
 
-/// The fold of one node's sections, as effective leveled lists plus
+/// The fold of one node's sections, as effective lists of members at sources plus
 /// scalars. Field names mirror 'NodeComplete'.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
@@ -199,12 +199,12 @@ pub fn fold_sections (
       let mut seen : std::collections::HashSet<String> =
         std::collections::HashSet::new ();
       let mut out : Vec<MemberAtSource<String>> = Vec::new ();
-      for (level, s) in sections {
+      for (source, s) in sections {
         if let Some (aliases) = &s . aliases {
           for a in aliases {
             if seen . insert ( a . clone () ) {
               out . push ( MemberAtSource::at_source (
-                level . clone (), a . clone () )); }
+                source . clone (), a . clone () )); }
             else {
               // No per-alias id to report; reuse DuplicateMember with
               // a synthetic ID carrying the alias text.
@@ -223,7 +223,7 @@ fn fold_ordered (
 ) -> Vec<MemberAtSource<ID>> {
   let mut effective : Vec<MemberAtSource<ID>> = Vec::new ();
   let mut any_section_yet : bool = false;
-  for (level, s) in sections {
+  for (source, s) in sections {
     let Some (items) = slice_of (s) else { continue; };
     let is_base : bool = ! any_section_yet;
     any_section_yet = true;
@@ -284,7 +284,7 @@ fn fold_ordered (
     for id in prepend {
       if keep (&id, warnings) {
         next . push ( MemberAtSource::at_source (
-          level . clone (), id )); }}
+          source . clone (), id )); }}
     for m in effective {
       let key : ID = resolve ( &m . member );
       next . push (m);
@@ -292,11 +292,11 @@ fn fold_ordered (
         for id in queue {
           if keep (&id, warnings) {
             next . push ( MemberAtSource::at_source (
-              level . clone (), id )); }} }}
+              source . clone (), id )); }} }}
     effective = next; }
   effective }
 
-/// One unordered relation's fold: union in level order, most public
+/// One unordered relation's fold: union in source order, most public
 /// occurrence winning.
 fn fold_unordered (
   sections : &[(SourceName, SectionSlices)],
@@ -307,12 +307,12 @@ fn fold_unordered (
   let mut seen : std::collections::HashSet<ID> =
     std::collections::HashSet::new ();
   let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
-  for (level, s) in sections {
+  for (source, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
     for id in members {
       if seen . insert ( resolve (id) ) {
         out . push ( MemberAtSource::at_source (
-          level . clone (), id . clone () ));
+          source . clone (), id . clone () ));
       } else {
         warnings . push ( FoldWarning::DuplicateMember {
           member : id . clone () } ); }}}

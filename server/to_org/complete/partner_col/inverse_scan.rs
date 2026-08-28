@@ -43,12 +43,12 @@ use std::path::PathBuf;
 ///
 /// 'active': edge-source gating (render-and-gating, 5_plan.org). A
 /// Deleted/Added file's before/after NodeComplete carries full
-/// MemberAtSource levels, so those two stages gate on the specific
-/// edge's level -- a phantom "used to link here" must not surface
+/// MemberAtSource values, so those two stages gate on the specific
+/// edge's source -- a phantom "used to link here" must not surface
 /// from a membership recorded outside the active set. The Modified
-/// stage cannot: 'NodeChanges' diff lists are level-stripped
-/// (leveled-lists work item deferred this; still true here), so a
-/// Modified-file sign is emitted regardless of level. None = ungated
+/// stage cannot: 'NodeChanges' diff lists have their sources stripped
+/// (the historical 'leveled-lists' work item deferred this; still true
+/// here), so a Modified-file sign is emitted regardless of source. None = ungated
 /// (every stage counts), matching every other gated accessor here.
 pub fn inverse_scan_for_inbound_col (
   owner        : &ID,
@@ -78,14 +78,14 @@ pub fn inverse_scan_for_inbound_col (
     . filter ( |(_, axes)| ! axes . is_empty () )
     . collect () }
 
-/// Whether 'level' is visible under 'active' (None = ungated).
-fn level_is_active (
+/// Whether 'source' is visible under 'active' (None = ungated).
+fn source_is_active (
   active : Option<&ActiveSourceSet>,
-  level  : &SourceName,
+  source : &SourceName,
 ) -> bool {
   match active {
     None     => true,
-    Some (a) => a . is_all () || a . contains_source (level) } }
+    Some (a) => a . is_all () || a . contains_source (source) } }
 
 /// What one changed file says about its 'relation' edge to 'owner'
 /// in one stage, if anything.  The changed FILE is the member; the
@@ -112,27 +112,27 @@ fn member_and_sign_for_owner (
       Some ((member, sign)) },
     GitDiffStatus::Deleted => {
       let before : &NodeComplete = ncd . before_node . as_ref () ?;
-      match outbound_member_level_of_nodecomplete (before, relation, owner) {
-        Some (level) if level_is_active (active, &level) =>
+      match outbound_member_source_of_nodecomplete (before, relation, owner) {
+        Some (source) if source_is_active (active, &source) =>
           Some (( before . pid . clone (), Sign::Minus )),
         _ => None } },
     GitDiffStatus::Added => {
       let after : &NodeComplete = ncd . after_node . as_ref () ?;
-      match outbound_member_level_of_nodecomplete (after, relation, owner) {
-        Some (level) if level_is_active (active, &level) =>
+      match outbound_member_source_of_nodecomplete (after, relation, owner) {
+        Some (source) if source_is_active (active, &source) =>
           Some (( after . pid . clone (), Sign::Plus )),
         _ => None } } } }
 
-/// The LEVEL of nc's outbound 'relation' edge to 'target', if nc's
+/// The SOURCE of nc's outbound 'relation' edge to 'target', if nc's
 /// list names it. Sibling of 'outbound_ids_of_nodecomplete' below,
-/// but keeps the MemberAtSource's level instead of dropping it, so
+/// but keeps the MemberAtSource's source instead of dropping it, so
 /// Deleted/Added-stage signs can be edge-source gated.
-fn outbound_member_level_of_nodecomplete (
+fn outbound_member_source_of_nodecomplete (
   nc       : &NodeComplete,
   relation : NodeRelation,
   target   : &ID,
 ) -> Option<SourceName> {
-  let leveled : &[MemberAtSource<ID>] = match relation {
+  let members_at_sources : &[MemberAtSource<ID>] = match relation {
     NodeRelation::Contains =>
       & nc . contains,
     NodeRelation::Subscribes =>
@@ -146,7 +146,7 @@ fn outbound_member_level_of_nodecomplete (
       // (see 'outbound_ids_of_nodecomplete'); this scan never fires
       // for them from a Deleted/Added stage.
       return None, };
-  leveled . iter ()
+  members_at_sources . iter ()
     . find ( |m| & m . member == target )
     . map ( |m| m . source . clone () ) }
 

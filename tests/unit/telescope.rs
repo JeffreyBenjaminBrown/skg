@@ -1,12 +1,12 @@
 //! Property suite for the telescope fold/unfold pair. The
 //! load-bearing laws (5_plan.org, section-format-and-fold):
-//! - fold(unfold(x)) == x for every leveled list ("round-trip");
+//! - fold(unfold(x)) == x for every list of members at sources ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application
 //!   (unfold output is canonical);
-//! - every member's level survives both directions;
+//! - every member's source survives both directions;
 //! - dangling/duplicate-anchor junk folds totally and
 //!   deterministically;
-//! - the silent-leak guard: no member ever changes level.
+//! - the silent-leak guard: no member ever changes source.
 
 use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices};
@@ -20,13 +20,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// The test privacy order: S0 most public .. S3 most private.
-fn level_universe () -> Vec<SourceName> {
+fn source_universe () -> Vec<SourceName> {
   (0..4) . map ( |i| SourceName ( format! ("S{}", i) ))
     . collect () }
 
 fn telescope_config () -> SkgConfig {
   let sources : HashMap<SourceName, SkgfileSource> =
-    level_universe () . into_iter ()
+    source_universe () . into_iter ()
     . map ( |source| (
       source . clone (),
       SkgfileSource {
@@ -37,7 +37,7 @@ fn telescope_config () -> SkgConfig {
       } ))
     . collect ();
   let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
-  config . source_order = level_universe ();
+  config . source_order = source_universe ();
   config }
 
 fn unfold_sections (
@@ -54,23 +54,23 @@ fn identity_resolve (
 ) -> ID {
   id . clone () }
 
-/// An arbitrary leveled list with UNIQUE members: up to N members,
-/// each at a random level of the universe. Uniqueness matters
+/// An arbitrary list of members at sources with UNIQUE members: up to N
+/// members, each at a random source in the universe. Uniqueness matters
 /// because the fold dedups (with warnings), which round-trip inputs
 /// must not trigger.
-fn arb_leveled_list (
+fn arb_members_at_sources (
   max_len : usize,
 ) -> impl Strategy<Value = Vec<MemberAtSource<ID>>> {
   proptest::collection::vec ( 0usize..4, 0..max_len )
-    . prop_map ( |levels| {
-      let universe : Vec<SourceName> = level_universe ();
-      levels . into_iter () . enumerate ()
+    . prop_map ( |sources| {
+      let universe : Vec<SourceName> = source_universe ();
+      sources . into_iter () . enumerate ()
         . map ( |(i, l)| MemberAtSource::at_source (
           universe [l] . clone (),
           ID ( format! ("id{}", i) )))
         . collect () } ) }
 
-/// Wrap ordered leveled lists (and nothing else) into an
+/// Wrap ordered lists of members at sources (and nothing else) into an
 /// UnfoldInput-shaped FoldedNode for the round-trip tests.
 fn folded_from_lists (
   home     : &SourceName,
@@ -124,9 +124,9 @@ proptest! {
 
   #[test]
   fn round_trip_ordered_and_unordered (
-    contains in arb_leveled_list (12),
-    subs_raw in arb_leveled_list (6),
-    hides_raw in arb_leveled_list (6),
+    contains in arb_members_at_sources (12),
+    subs_raw in arb_members_at_sources (6),
+    hides_raw in arb_members_at_sources (6),
   ) {
     // distinct id spaces so the three lists cannot collide
     let subs : Vec<MemberAtSource<ID>> =
@@ -149,10 +149,10 @@ proptest! {
     prop_assert_eq! ( &refolded . subscribes_to,
                       &folded . subscribes_to );
     { // Unordered relations have no order to preserve: sections
-      // cannot express cross-level interleavings without anchors,
+      // cannot express cross-source interleavings without anchors,
       // which unordered relations deliberately lack, so the fold's
-      // output order is CANONICAL (level-major). The law is
-      // set-equality with levels intact.
+      // output order is CANONICAL (source-major). The law is
+      // set-equality with sources intact.
       let sort = |v : Option<&Vec<MemberAtSource<ID>>>|
       -> Vec<MemberAtSource<ID>> {
         let mut v : Vec<MemberAtSource<ID>> =
@@ -170,7 +170,7 @@ proptest! {
 
   #[test]
   fn unfold_is_canonical (
-    contains in arb_leveled_list (12),
+    contains in arb_members_at_sources (12),
   ) {
     // unfold . fold . unfold == unfold  (sections are a normal form)
     let home : SourceName = SourceName::from ("S0");
@@ -201,8 +201,8 @@ proptest! {
   }
 
   #[test]
-  fn no_member_ever_changes_level ( // the silent-leak guard
-    contains in arb_leveled_list (12),
+  fn no_member_ever_changes_source ( // the silent-leak guard
+    contains in arb_members_at_sources (12),
   ) {
     let home : SourceName = SourceName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
@@ -214,7 +214,7 @@ proptest! {
         . find ( |n| n . member == m . member );
       prop_assert_eq! (
         found . map ( |n| &n . source ), Some ( &m . source ),
-        "member {:?} changed level", m . member );
+        "member {:?} changed source", m . member );
     }
   }
 }

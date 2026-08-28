@@ -137,7 +137,7 @@ fn read_subscribee_col_context (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not an ActiveNode") ?;
   let worktree_subscribees : Vec<ID> =
-    // Edge-level gating (render-and-gating, 5_plan.org): this is the
+    // Edge-source gating (render-and-gating, 5_plan.org): this is the
     // OWNER's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
     // inactive level must not appear here even though the

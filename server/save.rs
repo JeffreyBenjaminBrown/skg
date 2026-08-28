@@ -597,8 +597,8 @@ fn prepare_fs_update (
 
   let _ = source_moves;
   // Source moves need no file relocation of their own anymore: the
-  // telescope write above places every section at its level and
-  // sweeps owned sections whose level lost its last member. An
+  // telescope write above places every section in its source and
+  // sweeps owned sections whose source lost its last member. An
   // explicit old-path delete here would even be WRONG for a
   // private->public home move, where the old (more private) source
   // legitimately retains a section holding the node's private

@@ -4,4 +4,4 @@
 1 telescope warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired -- each line says how.
 
 * P
-** leak-shaped contains member: edge at level 'owned' names 'N', whose home 'foreign' is more private. Re-level the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.
+** leak-shaped contains member: edge at source 'owned' names 'N', whose home 'foreign' is more private. Move the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.

@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc 61c060c18b9eac1c286a047825d3a9cae4997fd5b171500d7ee95c9ad6229ca3 # shrinks to contains = [], subs_raw = [], hides_raw = [MemberAtSource { level: SourceName("S2"), member: ID("id0") }, MemberAtSource { level: SourceName("S0"), member: ID("id1") }]
+cc 61c060c18b9eac1c286a047825d3a9cae4997fd5b171500d7ee95c9ad6229ca3 # shrinks to contains = [], subs_raw = [], hides_raw = [MemberAtSource { source: SourceName("S2"), member: ID("id0") }, MemberAtSource { source: SourceName("S0"), member: ID("id1") }]

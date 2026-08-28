@@ -81,8 +81,8 @@ fn test_subscribee_col_appears_for_subscribers(
     // The 11/12 -> *-sees edges are recorded in the (public) "home"
     // section even though their target lives in the (private) "away"
     // section -- older fixture data predating the privacy-telescope
-    // levels, which the telescope-validators leak warning already
-    // flags but tolerates. Since that recorded level ("home") differs
+    // source model, which the telescope-validators leak warning already
+    // flags but tolerates. Since that recording source ("home") differs
     // from the edge's DEFAULT (more_private_of(home, away) = "away"),
     // render-and-gating's herald surfaces it: (relSource home).
     let expected = indoc! {

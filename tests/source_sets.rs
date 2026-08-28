@@ -24,7 +24,7 @@ use skg::source_sets::{
   run_with_source_set_test_db};
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::test_utils::set_source_retagging_levels;
+use skg::test_utils::set_source_retagging_member_sources;
 use skg::test_utils::run_with_shared_test_db;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -774,7 +774,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     skg::types::nodes::complete::empty_node_complete ();
   result_node . pid = ID::from ("active-search-hit");
   result_node . title = "active search hit" . to_string ();
-  set_source_retagging_levels ( &mut result_node, &SourceName::from ("public") );
+  set_source_retagging_member_sources ( &mut result_node, &SourceName::from ("public") );
   result_node . aliases = members_at_source_msv (
     & result_node . source,
     MSV::Specified (vec!["search term" . to_string ()]) );
@@ -782,13 +782,13 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     skg::types::nodes::complete::empty_node_complete ();
   active_container . pid = ID::from ("active-container");
   active_container . title = "active-container" . to_string ();
-  set_source_retagging_levels ( &mut active_container, &SourceName::from ("public") );
+  set_source_retagging_member_sources ( &mut active_container, &SourceName::from ("public") );
   let mut private_container : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   private_container . pid = ID::from ("private-container");
   private_container . title =
     "private container title must not leak" . to_string ();
-  set_source_retagging_levels ( &mut private_container, &SourceName::from ("private") );
+  set_source_retagging_member_sources ( &mut private_container, &SourceName::from ("private") );
   let index_dir : &str =
     "/tmp/tantivy-test-source-sets-search-enrichment-truncation";
   let (tantivy, _count) =

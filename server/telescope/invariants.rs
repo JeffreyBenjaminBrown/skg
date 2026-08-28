@@ -24,26 +24,26 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// THE leak shape: a relationship instance recorded at a level
+  /// THE leak shape: a relationship instance recorded at a source
   /// more public than its target's home, so the (more public) file
   /// names an ID whose node is more private -- exactly what the
-  /// telescope exists to prevent. Repair: re-level the membership
+  /// telescope exists to prevent. Repair: move the membership's source
   /// to the target's home or beyond ('skg-set-relationship-source',
   /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
   /// bleeding.
   LeakShapedMember {
     relation    : &'static str,
-    level       : SourceName,
+    source      : SourceName,
     member      : ID,
     member_home : SourceName,
   },
-  /// An edge whose level names no configured source: its section
+  /// An edge whose source names no configured source: its section
   /// could never be written. Arises only from junk or a config
   /// that lost a source.
-  UnconfiguredLevel {
+  UnconfiguredSource {
     relation : &'static str,
-    level    : SourceName,
+    source   : SourceName,
     member   : ID,
   },
   /// Non-owned sections used the same pid as at least one owned
@@ -66,15 +66,15 @@ impl fmt::Display for TelescopeViolation {
   ) -> fmt::Result {
     match self {
       TelescopeViolation::LeakShapedMember {
-        relation, level, member, member_home } =>
+        relation, source, member, member_home } =>
         write! ( f,
-          "leak-shaped {} member: edge at level '{}' names '{}', whose home '{}' is more private. Re-level the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.",
-          relation, level, member, member_home ),
-      TelescopeViolation::UnconfiguredLevel {
-        relation, level, member } =>
+          "leak-shaped {} member: edge at source '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.",
+          relation, source, member, member_home ),
+      TelescopeViolation::UnconfiguredSource {
+        relation, source, member } =>
         write! ( f,
-          "{} member '{}' carries level '{}', which names no configured source",
-          relation, member, level ),
+          "{} member '{}' carries source '{}', which is not configured",
+          relation, member, source ),
       TelescopeViolation::IgnoredForeignPidCollision {
         ignored_sources } =>
         write! ( f,
@@ -100,9 +100,9 @@ pub fn telescope_violations_of (
                    members  : &[MemberAtSource<ID>]| {
     for m in members {
       if config . source_position ( &m . source ) . is_none () {
-        violations . push ( TelescopeViolation::UnconfiguredLevel {
+        violations . push ( TelescopeViolation::UnconfiguredSource {
           relation,
-          level  : m . source . clone (),
+          source : m . source . clone (),
           member : m . member . clone (), } );
         continue; }
       let target_home : Option<SourceName> =
@@ -116,7 +116,7 @@ pub fn telescope_violations_of (
         if config . is_strictly_more_public ( &m . source, &home ) {
           violations . push ( TelescopeViolation::LeakShapedMember {
             relation,
-            level       : m . source . clone (),
+            source      : m . source . clone (),
             member      : m . member . clone (),
             member_home : home, } ); }} }};
   check ("contains", &node . contains);

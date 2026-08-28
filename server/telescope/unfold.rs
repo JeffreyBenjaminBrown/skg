@@ -110,12 +110,12 @@ pub fn unfold_node (
 ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
   let mut sections : HashMap<SourceName, SectionSlices> =
     HashMap::new ();
-  let mut level_names : Vec<SourceName> = Vec::new ();
-  { let mut note = |level : &SourceName| {
-      if ! sections . contains_key (level) {
-        level_names . push ( level . clone () );
+  let mut source_names : Vec<SourceName> = Vec::new ();
+  { let mut note = |source : &SourceName| {
+      if ! sections . contains_key (source) {
+        source_names . push ( source . clone () );
         sections . insert (
-          level . clone (), SectionSlices::default () ); }};
+          source . clone (), SectionSlices::default () ); }};
     note ( input . home );
     for m in input . contains          { note ( &m . source ); }
     for m in input . subscribes_to     { note ( &m . source ); }
@@ -149,9 +149,9 @@ pub fn unfold_node (
         . map ( |m| m . member . clone () )
         . collect ();
       if mine . is_empty () { None } else { Some (mine) }}; }
-  { // Drop empty sections (a level with nothing left ceases to be),
+  { // Drop empty sections (a source with nothing left ceases to be),
     // except the home, which persists while the node exists.
-    level_names . retain ( |l| {
+    source_names . retain ( |l| {
       l == input . home
       || sections . get (l)
          . map ( |s| s . title . is_some ()
@@ -162,9 +162,9 @@ pub fn unfold_node (
                  || s . hides_from_its_subscriptions . is_some ()
                  || s . overrides_view_of . is_some () )
          . unwrap_or (false) } ); }
-  level_names . sort_by_key ( |source| rank (source) );
+  source_names . sort_by_key ( |source| rank (source) );
   let complete_sections : Vec<(SourceName, NodeFS)> =
-    level_names . into_iter ()
+    source_names . into_iter ()
     . map ( |source| {
       let slices : SectionSlices = sections . remove (&source)
         . expect ("section exists");
@@ -181,10 +181,10 @@ pub fn unfold_node (
 /// One ordered relation's slice for SOURCE: maximal streaks of
 /// members at that source, each anchored to the nearest preceding strictly
 /// more public member; a streak with none joins the prepend. The
-/// most public mentioning level yields an anchor-free base by
+/// most public source mentioning the relation yields an anchor-free base by
 /// construction (nothing precedes its members more publicly ONLY
-/// when it is first -- middle levels can and do anchor). Returns
-/// None when the level has no members of this relation.
+/// when it is first -- middle sources can and do anchor). Returns
+/// None when the source has no members of this relation.
 fn unfold_ordered (
   effective      : &[MemberAtSource<ID>],
   source         : &SourceName,
@@ -192,7 +192,7 @@ fn unfold_ordered (
 ) -> Option<Vec<ListItem>> {
   if ! effective . iter () . any ( |m| &m . source == source ) {
     return None; }
-  let is_base : bool = { // the most public mentioning level?
+  let is_base : bool = { // the most public source mentioning the relation?
     let mut most_public : Option<&SourceName> = None;
     for m in effective {
       match most_public {

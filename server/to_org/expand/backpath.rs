@@ -479,16 +479,16 @@ pub async fn prepend_indef_indep_child_with_source_set (
           child_skgid, &deleted_since_head_pid_src_map, None, config )
       { if ! active . contains_source (&source)
         { return Ok (None); }} }
-    // Edge-level gating (render-and-gating, 5_plan.org): the partner
+    // Edge-source gating (render-and-gating, 5_plan.org): the partner
     // NODE's source (above) is not enough -- the EDGE grafting it
-    // here can be recorded at a more private level than either
+    // here can be recorded in a more private source than either
     // endpoint's home (a private reading-list membership between two
     // public nodes). 'birth' names the role the partner plays toward
     // whatever sits at 'parent_treeid' (the origin, for the first
     // hop; a previously-grafted partner, for a later hop or an
     // ancestry step), so the edge and its owner are derivable.
     // Requires the in-Rust graph snapshot (the only place edge
-    // levels live); TypeDB-only callers have no level data yet
+    // recording sources live); TypeDB-only callers have no source data yet
     // (deferred to dbs-and-search), so this is skipped when no
     // snapshot is installed -- a graceful no-op, not a leak, since
     // that is also when 'edge_source' would be unavailable everywhere
@@ -496,18 +496,18 @@ pub async fn prepend_indef_indep_child_with_source_set (
     if let Birth::Backpath (role) = birth {
       if let Some (graph) = snapshot_global () {
         if let Ok (parent_pid) = get_id_from_treenode (tree, parent_treeid) {
-          let level_active : bool =
+          let source_active : bool =
             backpath_edge_source (&graph, &parent_pid, child_skgid, role)
-            . map ( |level| active . contains_source (&level) )
+            . map ( |source| active . contains_source (&source) )
             . unwrap_or (false);
-          if ! level_active { return Ok (None); }}}}}
+          if ! source_active { return Ok (None); }}}}}
   let new_child_treeid : NodeId =
     prepend_indef_indep_child (
       tree, parent_treeid, child_skgid, config, driver, birth )
     . await ?;
   Ok (Some (new_child_treeid)) }
 
-/// The level of the edge grafting 'partner' at backpath role 'role'
+/// The source of the edge grafting 'partner' at backpath role 'role'
 /// toward 'origin' (the node the partner is being attached under).
 /// 'role' names the role the PARTNER plays (per RelationRole's doc:
 /// "output_role is THIS (partner) role") -- the inverse of
