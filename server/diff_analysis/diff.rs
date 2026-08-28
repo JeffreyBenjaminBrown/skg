@@ -4,7 +4,7 @@ use crate::diff_analysis::types::{
   TextDiffLine, ValueSetDiff};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
-  ID, MSV, PrivaciedMember, SourceName, members_of, members_msv};
+  ID, MSV, MemberAtSource, SourceName, members_of, members_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::textlinks_from_node;
 
@@ -112,7 +112,7 @@ fn profile_log (
     duration . subsec_millis ()); }
 
 /// Shape-aware: an id present in several SOURCES is the normal
-/// telescope shape (one pid, sections at several levels), not a
+/// telescope shape (one pid, sections at several sources), not a
 /// duplicate. The VIOLATION is one id claimed by two distinct pids
 /// at either endpoint.
 fn duplicate_id_reports (
@@ -256,7 +256,7 @@ fn value_set_diffs (
 }
 
 fn strings_from_msv (
-  msv : Option<&MSV<PrivaciedMember<String>>>,
+  msv : Option<&MSV<MemberAtSource<String>>>,
 ) -> Vec<String> {
   msv . map ( |m| members_msv (m) . or_default () . to_vec () )
     . unwrap_or_default ()

@@ -222,7 +222,7 @@ fn test_stage_moves_title_presence_semantics() {
   let beta_repo : Repository =
     init_repo_with_user (&beta);
   { // 'releveled' lost its ALPHA FILE, but that file was titleless
-    // (a mere relationship record): a re-leveling, not a move.
+    // (a mere relationship record): a recording-source change, not a move.
     commit_file (&alpha_repo, &alpha, "releveled.skg",
                  "pid: releveled\ncontains:\n- x\n");
     fs::remove_file ( alpha . join ("releveled.skg") ) . unwrap(); }
@@ -250,7 +250,7 @@ fn test_stage_moves_title_presence_semantics() {
   let script : String =
     stage_moves_script (&config) . unwrap();
   assert! ( ! script . contains ("releveled"),
-            "titleless deletion is a re-leveling, not a move:\n{}",
+            "titleless deletion is a recording-source change, not a move:\n{}",
             script );
   assert! ( script . contains ("#   mixed : alpha -> beta"),
             "mixed-destination move should be reported:\n{}", script );

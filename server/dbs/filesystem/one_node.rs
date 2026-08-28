@@ -1,8 +1,12 @@
-use crate::telescope::fold::{fold_sections, nodecomplete_from_fold};
-use crate::telescope::types::SectionSlices;
-use crate::telescope::unfold::{UnfoldInput, unfold_node};
+use crate::telescope::fold::fold_telescope;
+use crate::telescope::types::{
+  Telescope, retain_owned_sections_when_pid_collides,
+};
+use crate::telescope::unfold::{
+  UnfoldInput, UnfoldedTelescope, unfold_node,
+};
 use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
-use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
@@ -32,8 +36,8 @@ pub async fn nodecomplete_from_id (
 /// TELESCOPE -- every same-pid section file across the configured
 /// sources, folded. The 'source' parameter survives only as the
 /// caller's belief about the home; the fold derives the true home
-/// (the most public titled section), so a stale belief cannot
-/// corrupt the read. Extra-id anchor resolution here is
+/// (the most public section), so a stale belief cannot corrupt the
+/// read. Extra-id anchor resolution here is
 /// identity-only (this telescope's own extra_ids are unknown until
 /// read; cross-node merges resolve at the graph layer).
 pub fn nodecomplete_from_pid_and_source (
@@ -41,51 +45,23 @@ pub fn nodecomplete_from_pid_and_source (
   pid    : ID,
   source : &SourceName,
 ) -> io::Result<NodeComplete> {
-  let sections : Vec<(SourceName, NodeFS)> =
-    read_telescope_sections (config, &pid) ?;
-  if sections . is_empty () {
+  let Some (telescope) : Option<Telescope> =
+    telescope_from_disk (config, &pid) ?
+  else {
     return Err ( io::Error::new (
       io::ErrorKind::NotFound,
       format! ("No .skg file for '{}' in any source (caller expected one in '{}')",
-               pid, source ))); }
-  let extra_ids : Vec<ID> = {
-    // gathered before folding, from every section
-    let mut extra_ids : Vec<ID> = Vec::new ();
-    for (_, node_fs) in &sections {
-      for e in &node_fs . extra_ids {
-        if ! extra_ids . contains (e) {
-          extra_ids . push ( e . clone () ); }} }
-    extra_ids };
-  let misc : Vec<crate::types::nodes::complete::FileProperty> = {
-    let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
-      Vec::new ();
-    for (_, node_fs) in &sections {
-      for m in &node_fs . misc {
-        if ! misc . contains (m) {
-          misc . push ( m . clone () ); }} }
-    misc };
-  let slices : Vec<(SourceName, SectionSlices)> =
-    sections . into_iter ()
-    . map ( |(level, node_fs)|
-            (level, node_fs . into_section_slices ()) )
-    . collect ();
-  let (folded, warnings) =
-    fold_sections ( &slices, & |id : &ID| id . clone () );
-  for w in &warnings {
-    tracing::warn! ( pid = %pid, warning = ?w,
-                     "telescope fold warning (single-node read)" ); }
-  nodecomplete_from_fold ( pid . clone (), extra_ids, misc, folded )
-    . ok_or_else ( || io::Error::new (
-      io::ErrorKind::InvalidData,
-      format! ("Telescope '{}' has no home: no section carries a title.",
-               pid ))) }
+               pid, source ))); };
+  fold_telescope ( telescope, & |id : &ID| id . clone () ) }
 
-/// Every section of PID's telescope, in privacy order: for each
-/// configured source (most public first), pid.skg if present.
-fn read_telescope_sections (
+/// PID's telescope as it sits on disk, in privacy order: for each
+/// configured source (most public first), pid.skg if present. The
+/// order is what makes the first section the home, so it comes from
+/// 'ordered_sources' and nowhere else.
+pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
-) -> io::Result<Vec<(SourceName, NodeFS)>> {
+) -> io::Result<Option<Telescope>> {
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   for source_name in config . ordered_sources () {
     let path : String =
@@ -96,7 +72,19 @@ fn read_telescope_sections (
     if ! Path::new (&path) . is_file () { continue; }
     let node_fs : NodeFS = read_nodecomplete (&path) ?;
     sections . push (( source_name, node_fs )); }
-  Ok (sections) }
+  if sections . is_empty () {
+    return Ok (None); }
+  let (sections, collision) =
+    retain_owned_sections_when_pid_collides (sections, config);
+  if let Some (collision) = collision {
+    tracing::warn! (
+      pid = %pid,
+      ignored_sources = ?collision . ignored_sources,
+      "owned telescope won a collision with non-owned files" ); }
+  Telescope::try_new ( pid . clone (), sections, config )
+    . map (Some)
+    . map_err ( |e| io::Error::new (
+      io::ErrorKind::InvalidData, e ) ) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
@@ -133,12 +121,14 @@ pub async fn fetch_aliases_from_file (
       members_msv ( & nodecomplete . aliases ) . into_vec(),
     _ => Vec::new(), }}
 
-/// Write a node as its telescope: unfold into per-level sections,
+/// Write a node as its telescope: unfold into per-source sections,
 /// write each section file only when its bytes changed
 /// (no-cosmetic-rewrites), and delete OWNED section files whose
-/// level lost its last member. Foreign sources are never written or
-/// deleted: a foreign same-pid file is the forbidden-overlay shape,
-/// left for the validators to report.
+/// source lost its last member. Foreign sources are never written or
+/// deleted -- 'error_unless_home_is_writable' refuses rather than
+/// skipping, so a foreign home cannot silently lose the title, and
+/// same-pid non-owned files are ignored when an owned telescope
+/// exists, so writes cannot absorb or delete their contents.
 pub fn write_nodecomplete_to_source (
   nodecomplete : &NodeComplete,
   config  : &SkgConfig,
@@ -149,10 +139,88 @@ pub fn write_nodecomplete_telescope (
   nodecomplete : &NodeComplete,
   config       : &SkgConfig,
 ) -> io::Result<()> {
+  let prepared : PreparedTelescopeWrite =
+    prepare_nodecomplete_telescope (nodecomplete, config, false) ?;
+  prepared . apply (config) ?;
+  prepared . verify_hoist (config)
+}
+
+/// A completely validated and serialized telescope rewrite. Constructing
+/// this value performs every fallible shape/ownership/serialization check;
+/// applying it is the filesystem-mutation phase.
+pub(crate) struct PreparedTelescopeWrite {
+  pid             : ID,
+  home            : SourceName,
+  writes          : Vec<(SourceName, String, String)>,
+  deletions       : Vec<String>,
+  verify_as_hoist : bool,
+}
+
+impl PreparedTelescopeWrite {
+  pub(crate) fn apply (
+    &self,
+    config : &SkgConfig,
+  ) -> io::Result<()> {
+    for (source, path, yaml) in &self . writes {
+      assert! ( config . user_owns_source (source),
+                "write preflight admitted non-owned source '{}'", source );
+      if let Some (parent) = Path::new (path) . parent () {
+        fs::create_dir_all (parent) ?; }
+      let unchanged : bool = // byte-stability
+        fs::read_to_string (path)
+        . map ( |old| old == *yaml )
+        . unwrap_or (false);
+      if ! unchanged {
+        fs::write (path, yaml) ?; }
+    }
+    for path in &self . deletions {
+      match fs::remove_file (path) {
+        Ok (( ))                                          => {},
+        Err (e) if e . kind () == io::ErrorKind::NotFound => {},
+        Err (e)                                           => return Err (e), } }
+    Ok (( ))
+  }
+
+  /// Hoist is not complete until a fresh disk fold proves that title and
+  /// body now select from home. This runs after filesystem writes and before
+  /// callers update the in-memory graph or either derived database.
+  pub(crate) fn verify_hoist (
+    &self,
+    config : &SkgConfig,
+  ) -> io::Result<()> {
+    if ! self . verify_as_hoist { return Ok (( )); }
+    let reread : NodeComplete =
+      nodecomplete_from_pid_and_source (
+        config, self . pid . clone (), &self . home ) ?;
+    if reread . ugly_telescope {
+      return Err ( io::Error::new (
+        io::ErrorKind::InvalidData,
+        format! (
+          "Hoist verification failed for '{}': its freshly reread telescope still selects title or body below home '{}'. The filesystem may have changed, but the in-memory graph and derived databases were not updated.",
+          self . pid, self . home ))); }
+    Ok (( ))
+  }
+}
+
+/// Prepare one telescope rewrite. 'allow_hoist' is deliberately a parameter
+/// of this crate-private preparation boundary, not of the ordinary public
+/// writer: only the interactive save pipeline may pass true after matching
+/// an exact PID approval.
+pub(crate) fn prepare_nodecomplete_telescope (
+  nodecomplete : &NodeComplete,
+  config       : &SkgConfig,
+  allow_hoist  : bool,
+) -> io::Result<PreparedTelescopeWrite> {
   let pid : &ID = &nodecomplete . pid;
-  let sections : Vec<(SourceName, SectionSlices)> =
+  let verify_as_hoist : bool =
+    error_unless_home_is_writable (
+      nodecomplete, config, allow_hoist ) ?;
+  let unfolded : UnfoldedTelescope =
     unfold_node (
       & UnfoldInput {
+        pid      : pid,
+        extra_ids : & nodecomplete . extra_ids,
+        misc      : & nodecomplete . misc,
         title    : Some ( & nodecomplete . title ),
         body     : nodecomplete . body . as_deref (),
         home     : & nodecomplete . source,
@@ -164,41 +232,109 @@ pub fn write_nodecomplete_telescope (
           nodecomplete . hides_from_its_subscriptions . or_default (),
         overrides_view_of :
           nodecomplete . overrides_view_of . or_default (), },
-      & |level : &SourceName| config . source_position (level) );
-  let mut levels_written : Vec<SourceName> = Vec::new ();
-  for (level, slices) in sections {
-    let is_home : bool = level == nodecomplete . source;
-    let node_fs : NodeFS = nodefs_from_section (
-      pid, & nodecomplete . extra_ids,
-      & nodecomplete . misc, is_home, slices );
+      config )
+    . map_err ( |e| io::Error::new (
+      io::ErrorKind::InvalidData, e ) ) ?;
+
+  let mut offending_sources : Vec<SourceName> = unfolded . sections ()
+    . iter ()
+    .map ( |(source, _)| source )
+    . filter ( |source| ! config . user_owns_source (source) )
+    . cloned ()
+    . collect ();
+  offending_sources . sort ();
+  offending_sources . dedup ();
+  if ! offending_sources . is_empty () {
+    return Err ( io::Error::new (
+      io::ErrorKind::PermissionDenied,
+      format! (
+        "Refusing to write '{}': proposed telescope section(s) belong to non-owned source(s) [{}]. No files were changed.",
+        pid,
+        offending_sources . iter ()
+          . map ( |source| format! ("'{}'", source) )
+          . collect::<Vec<String>> () . join (", ") ))); }
+
+  let mut prepared_writes : Vec<(SourceName, String, String)> =
+    Vec::new ();
+  for (source, node_fs) in unfolded . sections () {
     let path : String =
-      path_from_pid_and_source ( config, &level, pid . clone () )
+      path_from_pid_and_source ( config, source, pid . clone () )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
     let yaml : String =
       node_fs . to_yaml ()
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e . to_string () )) ?;
-    let unchanged : bool = // byte-stability
-      fs::read_to_string (&path)
-      . map ( |old| old == yaml )
-      . unwrap_or (false);
-    if ! unchanged {
-      fs::write ( &path, yaml ) ?; }
-    levels_written . push (level); }
-  for source_name in config . ordered_sources () {
-    // Remove OWNED sections this write emptied.
-    if levels_written . contains (&source_name) { continue; }
-    if ! config . user_owns_source (&source_name) { continue; }
-    if let Ok (path) = path_from_pid_and_source (
-      config, &source_name, pid . clone () ) {
-      match fs::remove_file (&path) {
-        Ok (( ))                                            => {},
-        Err (e) if e . kind () == io::ErrorKind::NotFound   => {},
-        Err (e)                                             =>
-          return Err (e), }} }
-  Ok (( )) }
+    prepared_writes . push (( source . clone (), path, yaml )); }
+  let written_sources : Vec<SourceName> = prepared_writes . iter ()
+    . map ( |(source, _, _)| source . clone () )
+    . collect ();
+  let mut prepared_deletions : Vec<String> = Vec::new ();
+  for source in config . ordered_sources () {
+    if written_sources . contains (&source) { continue; }
+    if ! config . user_owns_source (&source) { continue; }
+    let path : String = path_from_pid_and_source (
+      config, &source, pid . clone () )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::NotFound, e) ) ?;
+    prepared_deletions . push (path); }
 
+  Ok ( PreparedTelescopeWrite {
+    pid             : pid . clone (),
+    home            : nodecomplete . source . clone (),
+    writes          : prepared_writes,
+    deletions       : prepared_deletions,
+    verify_as_hoist,
+  } ) }
+
+
+/// The two shapes 'write_nodecomplete_telescope' refuses, because
+/// writing either would publish or destroy the node's text. Both
+/// are unreachable through skg's own saves -- 'apply_sticky_sources'
+/// clamps every recording source to at least the owner's home, so no save
+/// creates a section more public than the home -- and arrive only
+/// from hand-edited files, a pull, or a foreign overlay.
+///
+/// The nodes this blocks are already broken; the fold reports both
+/// shapes in telescope-warnings.org with their repairs.
+fn error_unless_home_is_writable (
+  nodecomplete : &NodeComplete,
+  config       : &SkgConfig,
+  allow_hoist  : bool,
+) -> io::Result<bool> {
+  let home : &SourceName = &nodecomplete . source;
+  if ! config . user_owns_source (home) {
+    // FOREIGN HOME. Foreign sections are never written. Skipping
+    // the home silently would drop the title on the floor, so
+    // refuse instead. (This function is what makes the promise in
+    // this module's write doc-comment true of the writer itself;
+    // it was previously kept only by the writer's callers.)
+    return Err ( io::Error::new (
+      io::ErrorKind::PermissionDenied,
+      format! (
+        "Refusing to write '{}': its home is '{}', which you do not own. Foreign sections are never written, so this node cannot be saved from here. See the foreign-overlay entry in telescope-warnings.org.",
+        nodecomplete . pid, home ))); }
+  // SCALAR HOIST. Fold the current disk telescope with the same title/body
+  // selection used by load. Looking only for a titleless home misses the
+  // equally sensitive shape "title at home, body below home".
+  let disk_is_ugly : bool =
+    match telescope_from_disk (config, &nodecomplete . pid) ? {
+      None => false,
+      Some (telescope) => match
+        fold_telescope ( telescope, & |id : &ID| id . clone () ) {
+          Ok (disk_node) => disk_node . ugly_telescope,
+          Err (error) => return Err ( io::Error::new (
+            io::ErrorKind::InvalidData,
+            format! (
+              "Refusing to write '{}': its current disk telescope cannot select a title ({}), so writing the buffer's text at home '{}' would publish it without a verifiable Hoist candidate. Repair the .skg sections by hand. See telescope-warnings.org.",
+              nodecomplete . pid, error, home ))), }, };
+  if disk_is_ugly && ! allow_hoist {
+      return Err ( io::Error::new (
+        io::ErrorKind::InvalidData,
+        format! (
+          "Refusing to write '{}': its current disk telescope selects title or body below home '{}', so this write would publish it. An interactive save must obtain explicit Hoist approval for this PID; otherwise repair the .skg sections by hand. See telescope-warnings.org.",
+          nodecomplete . pid, home ))); }
+  Ok (disk_is_ugly) }
 
 /// Checks that a node's primary ID matches the filename stem.
 /// This property is assumed by `path_from_pid_and_source` and

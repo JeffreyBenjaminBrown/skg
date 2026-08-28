@@ -1,5 +1,10 @@
 use crate::serve::ViewsState;
-use crate::serve::handlers::rerender_all_views::{ stream_empty_rerender, stream_rerender_views};
+use crate::serve::handlers::rerender_all_views::{
+  authorize_prepared_rerenders,
+  prepare_rerender_views,
+  stream_empty_rerender,
+  stream_prepared_rerenders};
+use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::handlers::text_search::SearchEnrichmentPayload;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
@@ -88,20 +93,26 @@ fn set_active_source_set (
       tracing::info! ( msg = %msg, "Source-set switch refused" );
       refuse_unwinding (stream, active_source_set, &msg);
       return; }}
+  let mut prepared =
+  { let target : ActiveSourceSet = active . clone ();
+    let prepass = |viewforest : &mut ViewForest|
+      -> Result<(), Box<dyn std::error::Error>> {
+      convert_and_prune_for_source_switch (
+        viewforest . as_internal_tree_mut (), &target ) };
+    prepare_rerender_views (
+      env, views_state, views_state . diff_mode_enabled,
+      Some (&target), Some (&prepass), true ) };
+  if ! authorize_prepared_rerenders (
+    stream, env, &mut prepared, Some (&active),
+    "source-set-switch-rerender",
+    &approved_pids_from_request (request) ) {
+    return; }
   search_cancelled . store (true, Ordering::SeqCst);
   if let Ok (mut slot) = enrichment_slot . lock () {
     *slot = None; }
   *active_source_set = active;
   send_active_source_set_response (stream, active_source_set);
-  { let active : ActiveSourceSet = active_source_set . clone ();
-    let prepass = |viewforest : &mut ViewForest|
-      -> Result<(), Box<dyn std::error::Error>> {
-      convert_and_prune_for_source_switch (
-        viewforest . as_internal_tree_mut (), &active ) };
-    stream_rerender_views (
-      stream, env, views_state, Some (active_source_set),
-      Some (&prepass),
-      true ); }}
+  stream_prepared_rerenders (stream, views_state, prepared); }
 
 fn send_source_sets_response (
   stream      : &mut TcpStream,

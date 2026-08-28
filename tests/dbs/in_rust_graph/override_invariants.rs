@@ -10,7 +10,7 @@ use skg::dbs::in_rust_graph::override_invariants::{
   validate_override_invariants,
   validate_touched_override_invariants,
 };
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, privacied_all};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, members_at_source};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::{HashMap, HashSet};
@@ -49,7 +49,7 @@ fn node (
       MSV::Unspecified
     } else {
       MSV::Specified (
-        privacied_all (
+        members_at_source (
           &node . source,
           overrides . iter ()
           . map ( |id| ID::from (*id) )

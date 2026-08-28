@@ -9,18 +9,60 @@ local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local save = require('skg.save')
+local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
 local M = {}
 
+M.ugly_retry = nil
+M.ugly_challenged = false
+
 ---Ask the server to re-render every open view: lock everything, then
 ---drive the streaming protocol.
 function M.request_rerender_all_views ()
+  return M.request_rerender_all_views_with_approval(nil)
+end
+
+function M.request_rerender_all_views_with_approval (approved_pids)
   lock.begin_stream('rerender')
   lock.lock_all_skg_buffers()
   M.register_rerender_stream_handlers()
+  M.register_ugly_confirmation(function (pids)
+    M.request_rerender_all_views_with_approval(pids)
+  end)
   state.lp_reset()
-  client.send_string('((request . "rerender all views"))\n')
+  local request = {
+    sexpr.pair(
+      sexpr.symbol('request'),
+      'rerender all views') }
+  if approved_pids and #approved_pids > 0 then
+    local approval = { sexpr.symbol('allow-ugly-telescopes') }
+    for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
+    table.insert(request, approval) end
+  client.send_string(sexpr.to_string(request) .. '\n')
+end
+
+---Register the alternative privacy challenge for a rerendering request.
+---The retry waits for the server's balanced empty unwind to finish.
+function M.register_ugly_confirmation (retry, unfired_response_type)
+  M.ugly_retry = nil
+  M.ugly_challenged = false
+  state.register_response_handler('ugly-telescope-confirmation',
+    function (_payload_text, response)
+      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      if unfired_response_type
+         and state.response_handler_map[unfired_response_type] then
+        state.response_handler_map[unfired_response_type] = nil
+        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+      end
+      M.ugly_challenged = true
+      local prompt = payload.field_text(response, 'prompt') or
+        'This rerender includes text selected below home. Include it?'
+      local pids = payload.string_list(payload.field(response, 'pids'))
+      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
+        M.ugly_retry = function () retry(pids) end
+      end
+    end, false)
 end
 
 ---Register the three handlers for streamed rerender responses.
@@ -28,6 +70,9 @@ end
 function M.register_rerender_stream_handlers ()
   state.register_response_handler('rerender-lock',
     function (_payload_text, response)
+      if not M.ugly_challenged then
+        state.response_handler_map['ugly-telescope-confirmation'] = nil
+      end
       local ok, err = pcall(function ()
         local lock_views = payload.field(response, 'lock-views')
         if lock_views ~= nil then
@@ -39,6 +84,10 @@ function M.register_rerender_stream_handlers ()
         log.log('error', 'rerender',
                 'rerender-lock handler error: %s', tostring(err))
       end
+      local retry = M.ugly_challenged and M.ugly_retry or nil
+      M.ugly_retry = nil
+      M.ugly_challenged = false
+      if retry then vim.schedule(retry) end
     end, true)
   state.register_response_handler('rerender-view',
     function (payload_text, response)

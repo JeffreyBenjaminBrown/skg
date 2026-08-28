@@ -21,6 +21,17 @@ field: the server defaults to offering the override-choice menu."
              (regexp-quote "(override-choice . \"bypass\")")
              request))))
 
+(ert-deftest test-single-root-request-carries-exact-ugly-approvals ()
+  "A confirmed retry names the approved PIDs; an ordinary request does not."
+  (let ((ordinary (skg--single-root-view-request-string
+                   "some-id" "some-uri" nil))
+        (approved (skg--single-root-view-request-string
+                   "some-id" "some-uri" nil '("pid-a" "pid-b"))))
+    (should-not (string-match-p "allow-ugly-telescopes" ordinary))
+    (should (equal
+             '("pid-a" "pid-b")
+             (cdr (assoc 'allow-ugly-telescopes (read approved)))))))
+
 (ert-deftest test-bypass-detection-in-magit-buffers ()
   "A goto from a magit buffer bypasses the menu; from other
 buffers it does not. Detection is by major-mode name, so magit

@@ -7,7 +7,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
@@ -217,14 +217,14 @@ fn reconcile_content_children (
   let content_ids : Vec<ID> =
     nodecomplete . contains . iter ()
     . filter ( |m| match active_source_set {
-      // Edge-level gating (render-and-gating, 5_plan.org): a
-      // membership whose LEVEL is inactive is invisible here even
+      // Edge-source gating (render-and-gating, 5_plan.org): a
+      // membership whose SOURCE is inactive is invisible here even
       // when the member node itself is active -- the private
       // reading-list case. Node-source omission still happens
       // below, in omit_inactive_members.
       None => true,
       Some (a) => a . is_all ()
-        || a . contains_source ( &m . level ) } )
+        || a . contains_source ( &m . source ) } )
     . map ( |m| graph_snap . pid_of ( &m . member )
                  . unwrap_or_else ( || m . member . clone () ))
     . collect ();
@@ -246,7 +246,7 @@ fn reconcile_content_children (
       apparent_content_ids, active_source_set,
       |id : &ID| graph_snap . pid_and_source (id)
                  . map ( |(_pid, src)| src )
-                 . or_else ( || source_from_disk (id, config) ));
+                 . or_else ( || home_from_disk (id, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_activeNode),
   // not per child, so a node either fully expands or is left indefinitive; we
@@ -436,28 +436,28 @@ fn content_goal_list (
       ids . into_iter ()
         . map ( |id| graph_snap . pid_of (&id) . unwrap_or (id) )
         . collect () };
-    // Edge-level gating (render-and-gating, 5_plan.org): a member
-    // the grandparent-subscriber HIDES or CONTAINS only at a level
+    // Edge-source gating (render-and-gating, 5_plan.org): a member
+    // the grandparent-subscriber HIDES or CONTAINS only in a source
     // outside the active set must not subtract the subscribee's
     // content here -- else a privately-contained/-hidden member
     // would vanish from a public view even though no ACTIVE edge
     // explains its absence (leak by omission). Mirrors the
     // 'reconcile_content_children' gate on 'nodecomplete.contains'
     // just above.
-    let level_active = |level : &SourceName| match active_source_set {
+    let source_active = |source : &SourceName| match active_source_set {
       None      => true,
-      Some (a)  => a . is_all () || a . contains_source (level) };
+      Some (a)  => a . is_all () || a . contains_source (source) };
     let worktree_hidden : Vec<ID> =
       resolve_pids (
         grandparent_nodecomplete . hides_from_its_subscriptions
         . or_default () . iter ()
-        . filter ( |m| level_active (& m . level) )
+        . filter ( |m| source_active (& m . source) )
         . map ( |m| m . member . clone () )
         . collect () );
     let subscriber_contains : Vec<ID> =
       resolve_pids (
         grandparent_nodecomplete . contains . iter ()
-        . filter ( |m| level_active (& m . level) )
+        . filter ( |m| source_active (& m . source) )
         . map ( |m| m . member . clone () )
         . collect () );
     Ok ( setlike_vector_subtraction (

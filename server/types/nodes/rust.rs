@@ -4,7 +4,7 @@
 //! derived fields), plus textlinks_to — derived from body parsing at
 //! NodeRust construction time, matching how NodeTypedb is built.
 
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::textlinks::textlinks_from_node;
 
@@ -14,12 +14,13 @@ pub struct NodeRust {
   pub source                       : SourceName,
   pub extra_ids                    : Vec<ID>,
   pub title                        : String,
-  pub aliases                      : MSV<PrivaciedMember<String>>,
+  pub ugly_telescope               : bool,
+  pub aliases                      : MSV<MemberAtSource<String>>,
   pub body                         : Option<String>,
-  pub contains                     : Vec<PrivaciedMember<ID>>,
-  pub subscribes_to                : MSV<PrivaciedMember<ID>>,
-  pub hides_from_its_subscriptions : MSV<PrivaciedMember<ID>>,
-  pub overrides_view_of            : MSV<PrivaciedMember<ID>>,
+  pub contains                     : Vec<MemberAtSource<ID>>,
+  pub subscribes_to                : MSV<MemberAtSource<ID>>,
+  pub hides_from_its_subscriptions : MSV<MemberAtSource<ID>>,
+  pub overrides_view_of            : MSV<MemberAtSource<ID>>,
   pub misc                         : Vec<FileProperty>,
   // PITFALL: derived from the text.
   // Parsed from title+body via 'textlinks_from_node' during
@@ -40,6 +41,7 @@ impl From<&NodeComplete> for NodeRust {
       source                       : c . source . clone (),
       extra_ids                    : c . extra_ids . clone (),
       title                        : c . title . clone (),
+      ugly_telescope               : c . ugly_telescope,
       aliases                      : c . aliases . clone (),
       body                         : c . body . clone (),
       contains                     : c . contains . clone (),

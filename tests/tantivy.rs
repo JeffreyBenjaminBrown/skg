@@ -10,9 +10,10 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::tantivy::title_and_source_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
-use skg::dbs::tantivy::search::{SearchOptions, search_index};
+use skg::dbs::tantivy::search::{
+  SearchOptions, has_ugly_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
-use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, privacied_msv};
+use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, members_at_source_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -182,17 +183,17 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
-    apple . aliases  = privacied_msv ( & apple . source, MSV::Specified(vec![    "munch apple" . to_string(),
+    apple . aliases  = members_at_source_msv ( & apple . source, MSV::Specified(vec![    "munch apple" . to_string(),
                                     "chomp apple" . to_string() ])); }
   let mut banana = empty_node . clone();
   { banana . pid     = ID::new ("banana");
     banana . title   =               "eat banana" . to_string();
-    banana . aliases = privacied_msv ( & banana . source, MSV::Specified(vec![    "chomp banana" . to_string(),
+    banana . aliases = members_at_source_msv ( & banana . source, MSV::Specified(vec![    "chomp banana" . to_string(),
                                     "throw banana" . to_string()])); }
   let mut kiwi   = empty_node . clone();
   { kiwi . pid       = ID::new ("kiwi");
     kiwi . title     =               "eat kiwi" . to_string();
-    kiwi . aliases   = privacied_msv ( & kiwi . source, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
+    kiwi . aliases   = members_at_source_msv ( & kiwi . source, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
@@ -413,6 +414,40 @@ fn test_search_body_axis (
     assert_eq! ( top_id, "recipe",
                  "body search should find the recipe node" ); }
   Ok (( )) }
+
+#[test]
+fn ugly_telescope_filter_runs_inside_the_search_query (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty : NodeComplete = empty_node_complete ();
+  let mut clean : NodeComplete = empty . clone ();
+  clean . pid = ID::new ("clean");
+  clean . title = "shared privacy term" . to_string ();
+  let mut ugly : NodeComplete = empty . clone ();
+  ugly . pid = ID::new ("ugly");
+  ugly . title = "shared privacy term" . to_string ();
+  ugly . ugly_telescope = true;
+  ugly . aliases = members_at_source_msv (
+    &SourceName::from ("main"),
+    MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[clean, ugly], Path::new ("/tmp/tantivy-test-ugly-filter") ) ?;
+  assert! ( has_ugly_telescope (&index) ? );
+  let opts : SearchOptions = SearchOptions {
+    exclude_ugly_telescope : true,
+    .. SearchOptions::default () };
+  for terms in ["shared privacy term", "dirty alias secret"] {
+    let (matches, searcher) = search_index (&index, terms, &opts) ?;
+    let ids : Vec<String> = matches . iter ()
+      . map ( |(_, address)|
+        searcher . doc::<TantivyDocument> (*address) . unwrap ()
+        . get_first (index . id_field) . unwrap ()
+        . as_str () . unwrap () . to_string () )
+      . collect ();
+    assert! ( ! ids . contains (&"ugly" . to_string ()),
+      "ugly title and alias docs are excluded before TopDocs: {:?}", ids );
+  }
+  Ok (( ))
+}
 
 /// Regex axis: patterns match on tokens, bypassing the QueryParser.
 #[test]
@@ -665,7 +700,7 @@ fn test_title_by_id_returns_title_not_alias (
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
-    node . aliases = privacied_msv ( & node . source, MSV::Specified (vec![   "Alias One" . to_string (),
+    node . aliases = members_at_source_msv ( & node . source, MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ])); }
   let nodes : Vec<NodeComplete> = vec![node];
   let index_dir : &str =
@@ -690,4 +725,29 @@ fn test_title_by_id_returns_title_not_alias (
   assert_eq! (missing, None,
     "title_and_source_by_id should return None for missing IDs");
   println! ("title_and_source_by_id test passed!");
+  Ok (( )) }
+
+#[test]
+fn ugly_telescope_flag_survives_index_build_and_update (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let mut node : NodeComplete = empty_node_complete ();
+  node . pid = ID::new ("ugly-indexed");
+  node . title = "uniquely ugly indexed title" . to_string ();
+  node . ugly_telescope = true;
+  let (tantivy_index, _) = wipe_then_init_tantivy_db (
+    &[node . clone ()], Path::new ("/tmp/tantivy-test-ugly-flag") )?;
+  let stored_flag = |index : &TantivyIndex| -> Result<String, Box<dyn std::error::Error>> {
+    let (matches, searcher) = search_index (
+      index, "uniquely ugly indexed title", &SearchOptions::default ())?;
+    let (_, address) = matches . first ()
+      .ok_or ("expected the indexed title")?;
+    let document : TantivyDocument = searcher . doc (*address)?;
+    Ok ( document . get_first (index . ugly_telescope_field)
+      .and_then ( |value| value . as_str ())
+      .unwrap_or ("") . to_string () ) };
+  assert_eq! (stored_flag (&tantivy_index)?, "true");
+  node . ugly_telescope = false;
+  update_index_with_nodes (
+    &[NodeTantivy::from (&node)], &tantivy_index )?;
+  assert_eq! (stored_flag (&tantivy_index)?, "false");
   Ok (( )) }

@@ -1,6 +1,8 @@
-use crate::diff_analysis::diff_analysis_report;
+use crate::diff_analysis::diff_analysis_report_with_ugly_pids;
 use crate::diff_analysis::types::DiffSelection;
 use crate::serve::protocol::TcpToClient;
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision, decide_for_ugly_pids};
 use crate::serve::util::{
   format_buffer_response_sexp,
   send_response_with_length_prefix,
@@ -10,6 +12,7 @@ use crate::source_sets::{ActiveSourceSet, SourceSetName};
 use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
+use std::collections::HashSet;
 
 pub fn handle_diff_analysis_request (
   stream  : &mut TcpStream,
@@ -30,22 +33,31 @@ pub fn handle_diff_analysis_request_with_source_set (
   config  : &SkgConfig,
   active  : &ActiveSourceSet,
 ) {
-  let result : Result<String, String> =
+  let result : Result<(String, Vec<String>), String> =
     if active . is_all () {
       parse_selection (request)
-      . and_then ( |selection| diff_analysis_report (config, selection) )
+      . and_then ( |selection|
+        diff_analysis_report_with_ugly_pids (config, selection) )
+      . map ( |(report, ugly_pids)| {
+        let warnings = match decide_for_ugly_pids (
+          "diff-analysis", active, ugly_pids, &HashSet::new () ) {
+          ScalarReleaseDecision::AllowWithWarning { warning } =>
+            vec! [warning],
+          _ => Vec::new (), };
+        (report, warnings) } )
     } else {
       Err (format! (
         "Diff analysis requires active source-set all; current active source-set is {}",
         active . name )) };
-  let (content, errors) : (String, Vec<String>) =
+  let (content, errors, warnings)
+    : (String, Vec<String>, Vec<String>) =
     match result {
-      Ok (report) => (report, Vec::new ()),
+      Ok ((report, warnings)) => (report, Vec::new (), warnings),
       Err (e) => (
         format! ("* diff analysis failed\n** {}\n", e),
-        vec! [e] ), };
+        vec! [e], Vec::new () ), };
   let response : String =
-    format_buffer_response_sexp (&content, &errors, &[]);
+    format_buffer_response_sexp (&content, &errors, &warnings);
   send_response_with_length_prefix (
     stream,
     &tag_sexp_response (TcpToClient::DiffAnalysis, &response) );

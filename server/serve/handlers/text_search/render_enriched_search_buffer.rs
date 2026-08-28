@@ -58,15 +58,15 @@ fn insert_containerward_ancestry_tree(
   active        : &ActiveSourceSet,
 ) {
   if ! active . is_all () {
-    // Edge-level gating (render-and-gating, 5_plan.org): a private
+    // Edge-source gating (render-and-gating, 5_plan.org): a private
     // MEMBERSHIP must not surface through enrichment ancestry even
     // when both nodes are public. The edge's owner is the
     // container (this ancestry step).
     let edge_visible : bool =
       snapshot_global ()
-      . and_then ( |snap| snap . edge_level (
+      . and_then ( |snap| snap . edge_source (
         node . id (), NodeRelation::Contains, contained_id ))
-      . map ( |level| active . contains_source (&level) )
+      . map ( |source| active . contains_source (&source) )
       . unwrap_or (true); // unknown edge: fall through to the
                           // node-source gate below, as before
     if ! edge_visible { return; }}
@@ -102,7 +102,7 @@ enum OverrideDir {
 /// its own one-directional chain hanging under the result, recursive
 /// and cycle-guarded. Reads the in-Rust graph (override edges are
 /// direct index lookups); a relative whose override EDGE is
-/// edge-level-hidden, or whose own source is inactive, is skipped.
+/// edge-source-hidden, or whose own source is inactive, is skipped.
 pub fn insert_override_ancestries_into_search_view (
   viewforest     : &mut Tree<ViewNode>,
   search_results : &[ID],

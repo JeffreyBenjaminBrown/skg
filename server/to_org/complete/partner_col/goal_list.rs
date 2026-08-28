@@ -12,7 +12,7 @@ use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -128,11 +128,11 @@ pub fn three_snapshots_of_relation_list (
       &index );
   [ head, index, worktree_list . to_vec () ] }
 
-/// The outbound list a NodeComplete holds for a relation, levels
+/// The outbound list a NodeComplete holds for a relation, sources
 /// dropped.  (The inverse scan has a private sibling; this one serves
 /// the three-snapshot reconstruction.)
-/// NOTE: was '&'a [ID]' before the leveled-list change; a borrow can
-/// no longer be returned once the levels must be stripped, so this
+/// NOTE: was '&'a [ID]' before the historical 'leveled-lists' change;
+/// a borrow can no longer be returned once the sources must be stripped, so this
 /// now returns an owned 'Vec<ID>' (its one caller already called
 /// '.to_vec()' on the result, so nothing downstream changed).
 fn relation_list_of_nodecomplete (
@@ -355,4 +355,4 @@ fn snapshot_global_source (
       . as_deref ()
       . and_then ( |g| g . pid_and_source (pid) . map ( |(_, s)| s ) )
   { return Some (s); }
-  source_from_disk (pid, config) }
+  home_from_disk (pid, config) }

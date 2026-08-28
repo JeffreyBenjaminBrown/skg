@@ -5,6 +5,7 @@
 (require 'skg-client)
 (require 'skg-buffer)
 (require 'skg-length-prefix)
+(require 'skg-request-save) ; Shared warning presentation.
 (require 'heralds-minor-mode)
 
 (defconst skg--project-root
@@ -64,7 +65,8 @@ headline documenting `skg-search-interactive'."
   "Serialize B as the wire-format \"true\" or \"false\"."
   (if b "true" "false"))
 
-(defun skg--request-text-search (search-terms regex body operators)
+(defun skg--request-text-search (search-terms regex body operators
+                                              &optional ugly-choice)
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
@@ -73,16 +75,22 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                         search-terms))
          (request-s-exp
           (concat (prin1-to-string
-                   `((request   . "text search")
-                     (terms     . ,clean-terms)
-                     (regex     . ,(skg--bool-to-string regex))
-                     (body      . ,(skg--bool-to-string body))
-                     (operators . ,(skg--bool-to-string operators))))
+                   (append
+                    `((request   . "text search")
+                      (terms     . ,clean-terms)
+                      (regex     . ,(skg--bool-to-string regex))
+                      (body      . ,(skg--bool-to-string body))
+                      (operators . ,(skg--bool-to-string operators)))
+                    (when ugly-choice
+                      `((ugly-telescopes . ,ugly-choice)))))
                   "\n")))
     (skg-register-response-handler
      ;; Register phase 1 handler (one-shot)
      'search-results
      (lambda (_tcp-proc payload)
+       (setq skg-response-handler-map
+             (assoc-delete-all 'ugly-telescope-confirmation
+                               skg-response-handler-map))
        (skg--display-search-phase1 payload clean-terms))
      t)
     (skg-register-response-handler
@@ -98,6 +106,31 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      (lambda (tcp-proc payload)
        (skg--handle-snapshot-request tcp-proc payload))
      nil) ;; persistent, not one-shot
+    (skg-register-response-handler
+     'ugly-telescope-confirmation
+     (lambda (_tcp-proc payload)
+       (setq skg-response-handler-map
+             (assoc-delete-all 'ugly-telescope-confirmation
+                               skg-response-handler-map))
+       (dolist (response-type '(search-results search-enrichment))
+         (when (assoc response-type skg-response-handler-map)
+           (setq skg-response-handler-map
+                 (assoc-delete-all response-type
+                                   skg-response-handler-map))
+           (setq skg-lp--pending-count
+                 (max 0 (1- skg-lp--pending-count)))))
+       (setq skg-response-handler-map
+             (assoc-delete-all 'request-snapshot
+                               skg-response-handler-map))
+       (let* ((response (read payload))
+              (prompt (format "%s" (cadr (assoc 'prompt response))))
+              (choice (if (y-or-n-p
+                           (concat prompt " (No means exclude.) "))
+                          "include"
+                        "exclude")))
+         (skg--request-text-search
+          clean-terms regex body operators choice)))
+     nil)
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)))
 
@@ -113,6 +146,7 @@ Sets skg-view-uri to \"search:TERMS\" and registers a
 kill-buffer-hook to send close-view to the server."
   (let* ((response (read payload))
          (content (skg--as-string (cadr (assoc 'content response))))
+         (warnings (cadr (assoc 'warnings response)))
          (view-uri (concat "search:" search-terms)))
     (when content
       (with-current-buffer
@@ -125,7 +159,12 @@ kill-buffer-hook to send close-view to the server."
         (setq skg-view-uri view-uri)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)
-        (switch-to-buffer (current-buffer)) ))))
+        (switch-to-buffer (current-buffer)) ))
+    (when warnings
+      (skg-big-nonfatal-message
+       "*SKG Search Warnings*"
+       "Search completed with warnings"
+       (skg-errors-and-warnings-to-org-string nil warnings)))))
 
 (defun skg--as-string (value)
   "Convert VALUE to a string. Symbols become their name."
@@ -141,7 +180,8 @@ PAYLOAD contains response-type, terms, and content.
 Exits readonly after replacing content."
   (let* ((response (read payload))
          (terms   (skg--as-string (cadr (assoc 'terms   response))))
-         (content (skg--as-string (cadr (assoc 'content response)))))
+         (content (skg--as-string (cadr (assoc 'content response))))
+         (warnings (cadr (assoc 'warnings response))))
     (when (and terms content)
       (let ((buf (get-buffer (skg-search-buffer-name terms))))
         (when (buffer-live-p buf)
@@ -150,7 +190,12 @@ Exits readonly after replacing content."
               (skg--replace-search-content content)
               (goto-char (min old-point (point-max))))
             (setq buffer-read-only nil)
-            (message "Search results enriched.") )) ))))
+            (message "Search results enriched.") )) ))
+    (when warnings
+      (skg-big-nonfatal-message
+       "*SKG Search Warnings*"
+       "Search enrichment completed with warnings"
+       (skg-errors-and-warnings-to-org-string nil warnings)))))
 
 (defun skg--handle-snapshot-request (tcp-proc payload)
   "Handle a request from the server for a snapshot of a search buffer.

@@ -52,6 +52,10 @@ path = "$TEST_DIR/data/owned/skg"
 [[sources]]
 name = "Cheese"
 path = "$TEST_DIR/data/cheese"
+
+[[sources]]
+name = "private"
+path = "$TEST_DIR/data/owned/private"
 EOF
 
 start_skg_server

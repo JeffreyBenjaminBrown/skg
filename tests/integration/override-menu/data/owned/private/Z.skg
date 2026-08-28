@@ -1,0 +1,3 @@
+pid: Z
+subscribes_to:
+  - R

@@ -282,7 +282,7 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("overridesHere"),
           // relSource is ALSO load-bearing (see ViewNodeStats::rel_source),
           // but unlike overridesHere it echoes its own value directly:
-          // "~" + the level name, red, immediately before the ⌂
+          // "~" + the source name, red, immediately before the ⌂
           // sourceHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).

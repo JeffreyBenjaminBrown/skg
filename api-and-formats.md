@@ -2,16 +2,34 @@
 
 Communication between Rust and Emacs is via TCP on port 1730, configurable in any skgconfig.toml. The connection is persistent.
 
+After initialization, every server response is length-prefixed as
+`Content-Length: LENGTH\r\n\r\nPAYLOAD`; `LENGTH` is the number of
+UTF-8 bytes in `PAYLOAD`. The exceptional busy-initializing signal is
+described below.
+
+The shared ugly-telescope release warning is
+`OPERATION includes title or body text selected below its node's home
+source for PID P.` (or `PIDs P1, P2, ...`). A restricted request that
+needs approval instead receives
+`((response-type ugly-telescope-confirmation) (operation OPERATION)
+(pids ("P" ...)) (prompt "..."))`; the response itself contains no
+protected title or body. Except for search's include/exclude choice,
+approval is always the exact request-local list
+`(allow-ugly-telescopes "P" ...)` and is never cached.
+
 Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not Rust-Emacs communication.
 
 So far there are these endpoints:
 
 ## Verify connection
   - Request: ((request . "verify connection"))
-  - Response: Plain text with newline termination: "This is the skg server verifying the connection."
+  - Response: LP `((response-type verify-connection) (content "This is the skg server verifying the connection."))`.
 
 ## Text search
-  - Request: ((request . "text search") (terms . "SEARCH_TERMS") (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))
+  - Request: `((request . "text search") (terms . "SEARCH_TERMS")
+    (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))`, plus
+    optional `(ugly-telescopes . "include")` or
+    `(ugly-telescopes . "exclude")`.
     - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link dests, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
     - `regex`, `body`, `operators` are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
@@ -21,8 +39,24 @@ So far there are these endpoints:
       alias/title selection, and display truncation. Inactive-source
       documents do not influence result order or which title/alias is
       shown for an active result.
+    - `ugly-telescopes` is normally absent on the first request. Under
+      a restricted source-set, if the index contains any telescope
+      whose selected title or body lies below home, the server does no
+      query and responds with LP
+      `((response-type ugly-telescope-confirmation)
+      (operation text-search) (pids ()) (prompt "..."))`. The empty PID
+      list is deliberate: a pre-query decision must not disclose which
+      ugly node might match. The retry uses `"include"` or `"exclude"`.
+      Exclusion is applied inside the Tantivy query, before matching,
+      and remains in force through asynchronous enrichment. The choice
+      is request-scoped. Source-set `all` needs no choice and returns a
+      warning if the results include ugly telescopes.
 
-  - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive non-content TrueNodes (not special scaffold types).
+  - Phase 1, immediate: Server sends LP `((response-type
+    search-results) (content "ORG") (warnings ("..." ...)))`.
+    Results are ordinary indefinitive non-content TrueNodes (not
+    special scaffold types). A no-match or error response has the same
+    response type and a single `content` field.
 
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
@@ -33,10 +67,21 @@ So far there are these endpoints:
       containers.
 
 ## Single root content tree view from ID
-  - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI") (override-choice . "CHOICE"))
+  - Request: `((request . "single root content view")
+    (id . "NODE_ID") (view-uri . "URI")
+    (override-choice . "CHOICE")
+    (allow-ugly-telescopes "PID" ...))`
     - `override-choice` is optional; values are "menu" (the default)
       and "bypass". See "the override-choice menu" below.
-  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The payload shape is `((content "...") (errors ("..." ...)) (warnings ("..." ...)))`. The document structure is detailed below, under `Single root content tree view`.
+  - Response: LP `((response-type content-view) (content "...")
+    (errors ("..." ...)) (warnings ("..." ...)))`. The document
+    structure is detailed below, under `Single root content tree view`.
+    Under a restricted source-set, a response involving an ugly
+    telescope instead returns LP `ugly-telescope-confirmation` with
+    `(operation single-root-view)` or `(operation override-menu)`, the
+    exact PIDs, and a text-free prompt. An approved retry carries those
+    exact PIDs in `allow-ugly-telescopes`; approval is not cached.
+    Source-set `all` returns the ordinary response with a warning.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
@@ -75,6 +120,17 @@ So far there are these endpoints:
       `(fork-sources ((N . SOURCE) ...))` pairs each forked node's id
       N with the owned source chosen for its clone. Both are absent on
       an ordinary save.
+    - `(hoist-approved-pids "PID" ...)` is present only on a retry
+      after `telescope-hoist-confirmation`. It is the exact list the
+      user approved for scalar publication; it is not a boolean and
+      does not authorize any other PID or bypass ordinary save
+      validation.
+    - `(allow-ugly-telescopes "PID" ...)` is the shared scalar-release
+      approval field. On save it appears only when retrying a
+      `save-rerender` `ugly-telescope-confirmation`, and authorizes
+      those exact PIDs for that response attempt. It is independent of
+      Hoist authority: viewing text and publishing it on disk are
+      different decisions.
     - `point-lines-below-focused-headline` is global to the buffer save: the number of text lines from the focused headline to point before save.
     - `point-column` is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
     - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
@@ -91,7 +147,23 @@ So far there are these endpoints:
     4. Final save response:
        `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))`
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of failure-explaining strings. `warnings` is a list of nonfatal messages. Both lists are present and empty if none.
-  - The ALTERNATIVE terminal message: a save that detects forks
+  - The first ALTERNATIVE terminal message: after validation, a save
+    rereads every telescope it will write. If any currently selects a
+    title or body below home and lacks exact approval, nothing is
+    committed and the server replies, in place of save-result,
+    `((response-type telescope-hoist-confirmation) (telescopes
+    (((pid "P") (home "SOURCE")) ...)) (prompt "..."))`.
+    This response contains no title or body. The prompt explains that
+    Hoist publishes the selected scalars at home and removes lower
+    scalar copies while retaining lower relationships and aliases;
+    Abort writes nothing and requires manual `.skg` repair. Hoist
+    re-issues the SAME save with `(hoist-approved-pids "P" ...)`.
+    The server rereads and reclassifies on that retry, so newly dirty
+    PIDs produce another batch confirmation. Each attempt still sends
+    `save-lock` first, and the confirmation is terminal for that
+    attempt: neither `save-relax-lock`, `collateral-view`, nor
+    `save-result` follows it.
+  - The second ALTERNATIVE terminal message: a save that detects forks
     (edited foreign nodes, or explicit fork requests) and does NOT
     carry `(fork-approved . "true")` commits nothing and replies, in
     place of save-result,
@@ -102,8 +174,27 @@ So far there are these endpoints:
     placeholder under a `# Suggested source ...` comment). The client
     shows it, collects a source per placeholder, and on approval
     re-issues the SAME save with `(fork-approved . "true")` and
-    `(fork-sources ...)`. Exactly one of save-result and
-    fork-confirmation is sent.
+    `(fork-sources ...)`. Hoist is decided first: when a save needs
+    both decisions, its approved Hoist retry then returns the fork
+    confirmation, and neither attempt writes.
+  - The third ALTERNATIVE terminal message protects the saved and
+    collateral rerenders. After a valid save has updated disk and the
+    derived stores, the server renders every affected view in memory.
+    Under a restricted source-set, if the staged forests contain ugly
+    telescopes without exact scalar-release approval, it changes no
+    open-view registry entry, streams no content, and sends
+    `((response-type ugly-telescope-confirmation)
+    (operation save-rerender) (pids ("P" ...)) (prompt "..."))`.
+    The save itself has succeeded; only its updated text is withheld.
+    The client may retry the SAME save with
+    `(allow-ugly-telescopes "P" ...)`. Under source-set `all`, or on an
+    approved retry, the ordinary save-result carries the shared ugly-
+    telescope warning. Declining leaves current client buffers and the
+    server's open-view registry unchanged.
+  - Exactly one of `save-result`, `telescope-hoist-confirmation`,
+    `fork-confirmation`, and the save-rerender
+    `ugly-telescope-confirmation` is sent as the terminal response to
+    one save attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Text search" above)
@@ -113,8 +204,11 @@ So far there are these endpoints:
 
 ## Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
-  - Response: Plain text with newline termination containing the file path relative to the skgconfig.toml directory, e.g. `skg/some-uuid.skg`.
-  - Errors: If the file does not exist on disk, responds with "File not found: <path>".
+  - Response: LP `((response-type get-file-path) (content "PATH"))`,
+    normally with `PATH` relative to the data root. Errors use the same
+    shape with human-readable `content` beginning `Error:`.
+  - The server deliberately returns the computed path when the file no
+    longer exists, so deleted nodes can still be located in a git diff.
   - Does not require TypeDB or Tantivy -- only the config.
   - If the requested source is inactive in the current connection's
     active source-set, the server refuses to expose the path. Direct
@@ -139,6 +233,13 @@ So far there are these endpoints:
     rerender-done with no errors or warnings), so the client's
     preemptive buffer locks and stream guard unwind. Nothing else
     changes. Disabling diff mode is always allowed.
+  - Before changing mode or streaming view text, a restricted request
+    that would rerender an ugly telescope instead receives LP
+    `ugly-telescope-confirmation` with
+    `(operation diff-mode-rerender)` and
+    the exact PIDs, followed by the same EMPTY rerender stream. A retry
+    adds `(allow-ugly-telescopes "PID" ...)`; declining leaves the mode
+    and open-view registry unchanged.
 
 ## Herald rules
   - Request: ((request . "herald rules"))
@@ -179,6 +280,9 @@ So far there are these endpoints:
     or contains an unreadable `.skg` blob in the selected snapshots.
   - Refuses to run unless the active source-set is `all`; restricted
     source-set diff reports are not defined yet.
+  - Because it runs only under `all`, a report involving an ugly
+    telescope is returned with the shared scalar-release warning; this
+    endpoint has no approval retry.
 
 ## Stage moves
   - Request: ((request . "stage moves"))
@@ -191,9 +295,10 @@ So far there are these endpoints:
     from EXACTLY one source (titled in that source's git HEAD,
     absent or titleless in its worktree) and appeared in EXACTLY one
     other (titled in the worktree, absent or titleless in HEAD).
-    Titleless section creations and deletions are re-levelings of
-    individual relationships, not moves, and stage as ordinary
-    edits. An ID whose title vanished from, or appeared in, more
+    Titleless section creations and deletions move individual
+    relationships between recording sources; they are not node
+    moves, and stage as ordinary edits. An ID whose title vanished
+    from, or appeared in, more
     than one source has more than one candidate (old, new) pair and
     is skipped.
 
@@ -250,37 +355,25 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
-## Migrate to telescopes
-  - Request: ((request . "migrate to telescopes"))
-  - Response: LP response-type "migrate-to-telescopes" with
-    `((content "..."))` describing the outcome.
-  - Behavior: For every owned node, raises each relationship edge's
-    privacy level to at least its DEFAULT (the more private of the
-    two endpoints' homes), never lowering any edge's privacy. This lifts
-    leak-shaped memberships — a public file naming a more private
-    node's ID — into their proper telescope sections. Changed
-    telescopes are rewritten byte-stably; if anything changed, the
-    databases are rebuilt as in "rebuild dbs".
-  - Refusal: requires the active source-set `all` (migration must
-    see and rewrite every level).
-  - What it cannot fix: a public repo's git HISTORY keeps any IDs it
-    leaked before migration; repairing that is manual.
-
-## Edge level info
-  - Request: ((request . "edge level info") (owner . "ID")
+## Edge source info
+  - Request: ((request . "edge source info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     `contains`, `subscribes_to`, `overrides_view_of`: the three
     relations an explicit `(relSource ...)` atom can name.
-  - Response: LP response-type "edge-level-info" with
+  - Response: LP response-type "edge-source-info" with
     `((default "NAME") (current "NAME"))`. `(current ...)` is absent
     when the graph records no such edge (e.g. one typed into a
     buffer and not yet saved). On failure, `((error "..."))` — e.g.
     an endpoint the graph does not know.
-  - Behavior: `default` is the more private of the two endpoints'
-    homes; `current` is the edge's recorded level.
+  - Behavior: between owned endpoints, `default` is the more-private
+    home. From an owned owner to a foreign member, `default` is the
+    owner's home regardless of privacy order; this deliberately
+    exposes the member ID and relationship to that owned source's
+    readers, while avoiding any proposed foreign write. `current` is
+    the edge's recording source.
     `skg-set-relationship-source` uses the reply to offer only
-    levels the save can accept. Advisory: the save-time floor check
-    in `apply_sticky_levels` stays load-bearing, since buffers go
+    sources the save can accept. Advisory: the save-time floor check
+    in `apply_sticky_sources` stays load-bearing, since buffers go
     stale and the atom is plain text.
 
 ## Strip body whitespace
@@ -301,7 +394,8 @@ So far there are these endpoints:
     should show nothing.
 
 ## Export to org
-  - Request: ((request . "export to org") (source-set . "NAME") (output-dir . "PATH"))
+  - Request: `((request . "export to org") (source-set . "NAME")
+    (output-dir . "PATH") (allow-ugly-telescopes "PID" ...))`.
     - Both fields are required; a missing or blank `output-dir` is an
       error (the server applies no default -- the client supplies the
       user a default but always sends a value). `output-dir` is
@@ -324,6 +418,12 @@ So far there are these endpoints:
     `[[id:..][label]]` links rewritten to relative org links.
     Existing files are overwritten; others are left untouched. Needs
     neither TypeDB nor Tantivy.
+    Before writing anything, a restricted export involving ugly
+    telescopes returns LP `ugly-telescope-confirmation` with
+    `(operation export-to-org)` and the exact PIDs. An approved retry
+    carries those PIDs in `allow-ugly-telescopes`. An `all` export, or
+    an approved restricted export, returns the ordinary export response
+    with the shared warning.
   - An **export root** is a node one of whose `contains` children has
     a title linking to the instruction node
     `3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f` and a body yielding a
@@ -336,10 +436,14 @@ So far there are these endpoints:
     broken."); if that note is itself not exported, the link degrades
     to plain label text.
   - The same export is available as a CLI subcommand (no TypeDB):
-    `cargo run --bin skg -- export-org [config] [source-set]`.
+    `cargo run --bin skg -- export-org [config-path] [source-set]
+    [output-dir] [--include-ugly-telescopes]`. Under a restricted set it
+    fails closed before writing unless the flag is present; under `all`
+    (and on an approved restricted run) it prints the warning.
 
 ## Rerender all views
-  - Request: ((request . "rerender all views"))
+  - Request: `((request . "rerender all views")
+    (allow-ugly-telescopes "PID" ...))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Lock message:
        `Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("URI1" "URI2" ...)))`
@@ -354,6 +458,15 @@ So far there are these endpoints:
     applying diff annotations if diff mode is enabled.
     Does not save or modify the graph. Used after toggling
     git diff mode to refresh all views without requiring a save.
+  - All view text is prepared in memory before the release decision.
+    Under a restricted set, ugly content without exact approval returns
+    LP `ugly-telescope-confirmation` with
+    `(operation rerender-all-views)` and
+    the exact PIDs, followed by an EMPTY rerender stream
+    (`rerender-lock` with no URIs, then clean `rerender-done`). No view
+    text is sent and no open-view registry entry changes. A retry adds
+    `allow-ugly-telescopes`; `all` instead adds the shared warning to
+    `rerender-done`.
 
 ## Source sets
   - Source-sets are the prefixes of the config's privacy order (see
@@ -368,7 +481,8 @@ So far there are these endpoints:
   - Request: ((request . "active source set"))
   - Response: LP response-type "active-source-set" with
     `((active "NAME"))`.
-  - Request: ((request . "set active source set") (name . "NAME"))
+  - Request: `((request . "set active source set") (name . "NAME")
+    (allow-ugly-telescopes "PID" ...))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Source-set response:
        `Content-Length: N\r\n\r\n(("response-type" "active-source-set") ("active" "NAME") ("content" "Active source-set: NAME"))`
@@ -396,10 +510,19 @@ So far there are these endpoints:
     Switching TO `all` is always allowed. The resulting
     per-connection invariant: diff mode on implies active source-set
     `all`.
+  - Rerender authorization precedes both the set change and release of
+    view text. If the proposed set would render an ugly telescope, the
+    first reply is LP `ugly-telescope-confirmation` with
+    `(operation source-set-switch-rerender)` and exact PIDs, followed by an EMPTY
+    rerender stream. A retry adds `allow-ugly-telescopes`; declining
+    leaves the active set and open-view registry unchanged.
 
 ## Titles by ids
-  - Request: ((request . "titles by ids") (ids "uuid1" "uuid2" ...))
-  - Response: LP response-type "titles-by-ids" with `((response-type "titles-by-ids") (content ((uuid1 . "title1") (uuid2 . "title2") ...)))`.
+  - Request: `((request . "titles by ids") (ids "uuid1" "uuid2" ...)
+    (allow-ugly-telescopes "PID" ...))`.
+  - Response: LP `((response-type titles-by-ids)
+    (content (("uuid1" . "title1") ("uuid2" . "title2") ...))
+    (warnings ("..." ...)))`.
   - IDs not found in Tantivy are simply absent from the response, except
     that deleted `.skg` files visible in the current git diff can also
     supply titles.
@@ -408,21 +531,29 @@ So far there are these endpoints:
     shorten UUIDs uniformly, but it must not title-annotate inactive
     IDs.
   - Used by `skg-readable-ids-mode` to annotate UUIDs in magit buffers with their titles.
+  - Under a restricted source-set, requested titles involving ugly
+    telescopes instead return LP `ugly-telescope-confirmation` with
+    `(operation titles-by-ids)` and the exact PIDs. An approved retry
+    carries those PIDs in `allow-ugly-telescopes`; `all` returns the
+    ordinary map with the shared warning.
 
 ## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
-  - Response: "Server shutting down..."
+  - Response: LP `((response-type shutdown) (content "Server shutting down..."))`.
   - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 ## Busy-initializing signal
   - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
-  - Response: ((busy-initializing . "human-readable status message"))
+  - Response: the unprefixed, newline-terminated
+    `((busy-initializing . "human-readable status message"))`.
   - Emacs should display the message and retry the request (or let the user retry manually).
   - No request triggers this specifically; any request sent during initialization may receive it.
 
-Error responses are sent as simple text.
+Once initialization is complete, endpoint errors use that endpoint's
+normal tagged, length-prefixed response shape (or the shared
+`response-type error` dispatcher fallback); they are not bare text.
 
 # Single root content tree view
 
@@ -560,17 +691,18 @@ under different parents):
 - `(sourceHerald ⌂:LABEL)` — the node sits at a source boundary (a
   root, or a source differing from its nearest truenode ancestor);
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
-  the ⌂ source herald; the privacy level of the RELATIONSHIP this
+  the ⌂ source herald; the recording source of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
   the col's relation for a PartnerCol member), when its privacy was
   deliberately raised above the edge's default. Emitted by render;
   written by `skg-set-relationship-source` (C-c s r); consumed at
-  save, where the server enforces the floor (an offered level less
-  private than the edge's default is a save error; a level at or
-  above the default is honored, which is how a stuck edge's privacy
-  is lowered; an edge whose DISK level sits below the default — the
-  foreign-endpoint shape — may be held or raised, never lowered
-  further). Absent means the edge sits at its default level.
+  save, where the server enforces the floor (an offered source more
+  public than the edge's default is a save error; a source at the
+  default or more private is honored, which is how a stuck edge's
+  privacy is lowered; a legacy or hand-authored edge whose DISK
+  source already sits more public than the default may be held or
+  made more private, never made still more public). Absent means the
+  edge sits at its default source.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 
@@ -736,10 +868,13 @@ Each file is one **telescope section**: the slice of one node
 recorded at one privacy level (see `docs/telescopes.md`). One node =
 one ID = same-ID `.skg` files across sources, at most one per
 source; the filename is the node's primary ID followed by `.skg` in
-every source. The most public section carrying a `title` is the
-node's **home**. A field a section omits is a field that section has
-no opinion about. Pre-telescope single-file nodes parse unchanged
-(one section, title present, no anchors).
+every source. The node's **home** is its MOST PUBLIC section, and
+that section carries the `title` — an invariant, not a search rule.
+A titleless section more public than the title still loads (the
+fold reports it) but cannot be rewritten by a save. A field a
+section omits is a field that section has no opinion about.
+Pre-telescope single-file nodes parse unchanged (one section, title
+present, no anchors).
 
 Fields:
 
@@ -750,11 +885,11 @@ Fields:
   Home section only, by convention.
 - `body`: An optional string, perhaps with newlines. Home only.
 - `aliases`: Optional list of strings. Each section may contribute
-  aliases; an alias's privacy level is its section's.
+  aliases; an alias's recording source is its section's source.
 - `contains`, `subscribes_to`: Ordered relations. ONE flat YAML
   sequence per relation, one entry per line:
-  - `- ID` — a member recorded at this section's level. Identical
-    syntax in every section, so a membership moving between levels
+  - `- ID` — a member recorded at this section's source. Identical
+    syntax in every section, so a membership moving between sources
     diffs as a clean one-line delete/add pair.
   - `- anchor: ID` — a placement anchor: the members after it (until
     the next anchor) insert immediately after the anchored ID, which
@@ -765,7 +900,8 @@ Fields:
     warning, and duplicate anchors concatenate in file order).
 - `hides_from_its_subscriptions`, `overrides_view_of`: Unordered
   relations; plain lists of IDs. The effective list is the union
-  across sections; each entry's privacy level is its section's.
+  across sections; each entry's recording source is its section's
+  source.
 
 The FOLD of all same-pid sections (most public first) yields the
 node; saving UNFOLDS the node back into sections, byte-stably, so

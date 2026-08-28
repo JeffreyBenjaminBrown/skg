@@ -372,9 +372,9 @@ pub struct ViewNodeStats {
   /// binding edge to its org-parent represents (=contains= for an
   /// ordinary content child; the col's relation for a simple
   /// PartnerCol member -- see 'PartnerCol::relation_member_role')
-  /// is recorded at a level that DIFFERS from that edge's DEFAULT
-  /// (the more private of the two endpoints' homes -- see
-  /// 'SkgConfig::more_private_of'). None when equal to the default:
+  /// is recorded in a source that DIFFERS from that edge's DEFAULT
+  /// (see the relationship-default policy in 'SkgConfig'). None when
+  /// equal to the default:
   /// the suppression is deliberate (render-and-gating,
   /// TODO/user-owned_autofork_chain/5_plan.org) -- the herald marks
   /// exactly the deliberately privatized edges. Also None: without a
@@ -382,13 +382,13 @@ pub struct ViewNodeStats {
   /// (parentIs != Affected, or a backpath graft); and for the two
   /// compound filter cols (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
-  /// 'relation_member_role' to read a level from.
+  /// 'relation_member_role' to read a source from.
   /// LOAD-BEARING, unlike the other view stats (like
   /// 'overridesHere'): 'skg-set-relationship-source' sets this
   /// value client-side, and save extraction reads it back as the
-  /// user's explicit level, feeding save-leveling's
+  /// user's explicit source, feeding save-leveling's
   /// sticky-else-default resolution, floored at the edge's default
-  /// ('server/from_text/supplement_from_disk.rs' 'apply_sticky_levels').
+  /// ('server/from_text/supplement_from_disk.rs' 'apply_sticky_sources').
   /// Herald: red "~NAME" immediately before the ⌂ sourceHerald
   /// (server/heralds.rs).
   pub rel_source            : Option<SourceName>,
@@ -403,6 +403,7 @@ pub enum QualCol {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Qual {
   Alias { text: String, // an alias for the node's grandparent
+          rel_source: Option<SourceName>,
           membership: MembershipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },

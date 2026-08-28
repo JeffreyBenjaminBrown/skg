@@ -1,13 +1,16 @@
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::titles_by_ids::{
   add_deleted_node_titles_by_ids,
-  handle_titles_by_ids_request};
+  handle_titles_by_ids_request,
+  handle_titles_by_ids_request_with_source_set};
+use skg::source_sets::ActiveSourceSet;
+use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
 use skg::types::git::SourceDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, TantivyIndex, privacied_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, SourceSetName, TantivyIndex, members_at_source_msv};
 use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::fs;
 use std::net::{TcpListener, TcpStream};
@@ -26,7 +29,7 @@ fn titles_by_ids_handler_sends_parseable_titles (
   node . source =
     SourceName::from ("main");
   node . aliases =
-    privacied_msv ( & node . source, MSV::Specified (vec!["Alias One" . to_string ()]) );
+    members_at_source_msv ( & node . source, MSV::Specified (vec!["Alias One" . to_string ()]) );
   let mut spaced_title_node : NodeComplete =
     empty_node_complete ();
   spaced_title_node . pid =
@@ -83,6 +86,52 @@ fn titles_by_ids_handler_sends_parseable_titles (
     "response should preserve titles with spaces: {}",
     response_text );
   Ok (( )) }
+
+#[test]
+fn restricted_title_lookup_challenges_without_releasing_text (
+) -> Result<(), Box<dyn Error>> {
+  let source : SourceName = SourceName::from ("main");
+  let mut node : NodeComplete = empty_node_complete ();
+  node . pid = ID::new ("ugly-title-id");
+  node . source = source . clone ();
+  node . title = "UNIQUE TITLE SECRET" . to_string ();
+  node . ugly_telescope = true;
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (&[node . clone ()]);
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[node], Path::new ("/tmp/tantivy-test-title-release") ) ?;
+  let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::from ([
+    (source . clone (), SkgfileSource {
+      name         : source . clone (),
+      abbreviation : None,
+      path         : Path::new ("/tmp") . to_path_buf (),
+      user_owns_it : true,
+    })
+  ]));
+  let active = ActiveSourceSet {
+    name    : SourceSetName::from ("public"),
+    sources : BTreeSet::from ([source]),
+  };
+  let respond = |request : &str| -> Result<String, Box<dyn Error>> {
+    let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")?;
+    let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
+    let (mut server, _) = listener . accept ()?;
+    handle_titles_by_ids_request_with_source_set (
+      &mut server, request, &index, &config, false, &active, &graph );
+    drop (server);
+    Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
+  };
+  let challenged : String = respond (
+    "((request . \"titles by ids\") (ids \"ugly-title-id\"))" )?;
+  assert! ( challenged . contains ("ugly-telescope-confirmation") );
+  assert! ( ! challenged . contains ("UNIQUE TITLE SECRET") );
+  let approved : String = respond (
+    "((request . \"titles by ids\") (ids \"ugly-title-id\") \
+      (allow-ugly-telescopes \"ugly-title-id\"))" )?;
+  assert! ( approved . contains ("UNIQUE TITLE SECRET") );
+  assert! ( approved . contains ("selected below") );
+  Ok (( ))
+}
 
 #[test]
 fn deleted_titles_supplement_tantivy_title_map (

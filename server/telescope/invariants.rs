@@ -14,7 +14,8 @@
 //! hard-error, and those live in the parser, not here.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName};
+use crate::telescope::types::FoldWarning;
+use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName};
 use crate::types::nodes::rust::NodeRust;
 
 use std::fmt;
@@ -23,28 +24,39 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// THE leak shape: a relationship instance recorded at a level
+  /// THE leak shape: a relationship instance recorded at a source
   /// more public than its target's home, so the (more public) file
   /// names an ID whose node is more private -- exactly what the
-  /// telescope exists to prevent. Repair: re-level the membership
-  /// to the target's home or beyond ('skg-migrate-to-telescopes'
-  /// does this wholesale). NOTE the git caveat: the leaking file's
+  /// telescope exists to prevent. Repair: move the membership's source
+  /// to the target's home or beyond ('skg-set-relationship-source',
+  /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
   /// bleeding.
   LeakShapedMember {
     relation    : &'static str,
-    level       : SourceName,
+    source      : SourceName,
     member      : ID,
     member_home : SourceName,
   },
-  /// An edge whose level names no configured source: its section
+  /// An edge whose source names no configured source: its section
   /// could never be written. Arises only from junk or a config
   /// that lost a source.
-  UnconfiguredLevel {
+  UnconfiguredSource {
     relation : &'static str,
-    level    : SourceName,
+    source   : SourceName,
     member   : ID,
   },
+  /// Non-owned sections used the same pid as at least one owned
+  /// section. The owned telescope won and these sources were
+  /// ignored before folding or id-claim collection.
+  IgnoredForeignPidCollision {
+    ignored_sources : Vec<SourceName>,
+  },
+  /// Anything the FOLD noticed while combining a node's sections
+  /// (a dangling anchor, a title below the home, a stray second
+  /// title, ...). These were logged and dropped before; they
+  /// belong in the report with the rest.
+  Fold ( FoldWarning ),
 }
 
 impl fmt::Display for TelescopeViolation {
@@ -54,15 +66,24 @@ impl fmt::Display for TelescopeViolation {
   ) -> fmt::Result {
     match self {
       TelescopeViolation::LeakShapedMember {
-        relation, level, member, member_home } =>
+        relation, source, member, member_home } =>
         write! ( f,
-          "leak-shaped {} member: edge at level '{}' names '{}', whose home '{}' is more private. Re-level the membership (skg-migrate-to-telescopes repairs these wholesale). The leaking file's git history already contains the ID.",
-          relation, level, member, member_home ),
-      TelescopeViolation::UnconfiguredLevel {
-        relation, level, member } =>
+          "leak-shaped {} member: edge at source '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.",
+          relation, source, member, member_home ),
+      TelescopeViolation::UnconfiguredSource {
+        relation, source, member } =>
         write! ( f,
-          "{} member '{}' carries level '{}', which names no configured source",
-          relation, member, level ), }}}
+          "{} member '{}' carries source '{}', which is not configured",
+          relation, member, source ),
+      TelescopeViolation::IgnoredForeignPidCollision {
+        ignored_sources } =>
+        write! ( f,
+          "non-owned source(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
+          ignored_sources . iter ()
+            . map ( |source| format! ("'{}'", source) )
+            . collect::<Vec<String>> () . join (", ") ),
+      TelescopeViolation::Fold (w) =>
+        write! ( f, "{}", w ), }}}
 
 /// THE PRIMITIVE both gates call: one node's telescope violations,
 /// judged against the whole graph (targets' homes) and the config
@@ -76,12 +97,12 @@ pub fn telescope_violations_of (
     graph . nodes . get (pid) else { return Vec::new (); };
   let mut violations : Vec<TelescopeViolation> = Vec::new ();
   let mut check = |relation : &'static str,
-                   members  : &[PrivaciedMember<ID>]| {
+                   members  : &[MemberAtSource<ID>]| {
     for m in members {
-      if config . source_position ( &m . level ) . is_none () {
-        violations . push ( TelescopeViolation::UnconfiguredLevel {
+      if config . source_position ( &m . source ) . is_none () {
+        violations . push ( TelescopeViolation::UnconfiguredSource {
           relation,
-          level  : m . level . clone (),
+          source : m . source . clone (),
           member : m . member . clone (), } );
         continue; }
       let target_home : Option<SourceName> =
@@ -92,14 +113,14 @@ pub fn telescope_violations_of (
         // A dangling member (no node) is a different, pre-existing
         // problem (TODO/problems.org, the dangling-reference audit
         // gap); not this validator's to report.
-        if config . is_strictly_more_public ( &m . level, &home ) {
+        if config . is_strictly_more_public ( &m . source, &home ) {
           violations . push ( TelescopeViolation::LeakShapedMember {
             relation,
-            level       : m . level . clone (),
+            source      : m . source . clone (),
             member      : m . member . clone (),
             member_home : home, } ); }} }};
   check ("contains", &node . contains);
-  let msv = |m : &MSV<PrivaciedMember<ID>>| -> Vec<PrivaciedMember<ID>> {
+  let msv = |m : &MSV<MemberAtSource<ID>>| -> Vec<MemberAtSource<ID>> {
     m . or_default () . to_vec () };
   check ("subscribes_to",
          & msv ( &node . subscribes_to ));
@@ -124,6 +145,29 @@ pub fn validate_all_telescopes (
   all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
   all }
 
+/// The whole init/rebuild report: what the graph shows
+/// ('validate_all_telescopes') plus what the LOAD saw that the
+/// graph cannot show -- fold complaints and ignored foreign pid
+/// collisions, which
+/// need a node's section list rather than its fold. Reporting
+/// failures are logged, not propagated: a report we could not write
+/// is no reason to refuse to start.
+pub fn report_all_telescope_violations (
+  config           : &SkgConfig,
+  graph            : &InRustGraph,
+  load_violations  : Vec<(ID, TelescopeViolation)>,
+) {
+  let all : Vec<(ID, TelescopeViolation)> = {
+    let mut all : Vec<(ID, TelescopeViolation)> =
+      validate_all_telescopes (config, graph);
+    all . extend (load_violations);
+    all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
+    all };
+  if let Err (e) = report_telescope_violations (
+    &all, &config . data_root ) {
+    tracing::warn! ( error = %e,
+                     "could not write the telescope report" ); }}
+
 /// Write the aggregated init report (one line per violation,
 /// grouped by node; a count up top) to
 /// DATA_ROOT/telescope-warnings.org, and log a summary. Removes a
@@ -146,7 +190,7 @@ pub fn report_telescope_violations (
   content . push_str ("#+title: Telescope warnings\n");
   content . push_str ("#+date: <generated at initialization>\n\n");
   content . push_str ( & format! (
-    "{} telescope warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired (see each line; skg-migrate-to-telescopes repairs leak-shaped memberships wholesale).\n\n",
+    "{} telescope warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired -- each line says how.\n\n",
     violations . len () ));
   let mut current : Option<&ID> = None;
   for (pid, v) in violations {

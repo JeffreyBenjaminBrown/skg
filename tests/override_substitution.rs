@@ -410,7 +410,9 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
-              &mut server, &env, views_state,
+              &mut server,
+              "((request . \"git diff mode toggle\"))",
+              &env, views_state,
               & ActiveSourceSet::named (
                   config, SourceSetName ("all" . to_string ()))
                 . expect ("set all resolves") ); } ); } );

@@ -52,6 +52,83 @@
     (should (equal (cadr entry)
                    '(("N" . "owned2") ("M" . "owned"))))))
 
+(ert-deftest test-save-request-sexp-carries-exact-hoist-pids ()
+  "Hoist authority is a proper PID list, never a broad boolean."
+  (let* ((sexp (skg--save-request-sexp
+                "uri-1"
+                '(:point-lines-below-focused-headline 0
+                  :point-column 0
+                  :point-screen-lines-below-window-start 0)
+                nil nil '("A" "B")))
+         (entry (assoc 'hoist-approved-pids sexp)))
+    (should (equal entry '(hoist-approved-pids "A" "B")))))
+
+(ert-deftest test-hoist-confirmation-balances-save-and-retries-exact-pids ()
+  "Approving Hoist terminates the first save and preserves fork authority."
+  (let ((origin (generate-new-buffer "*hoist-origin*"))
+        (skg-response-handler-map
+         '((save-result ignore . t)
+           (collateral-view ignore)
+           (save-relax-lock ignore)
+           (fork-confirmation ignore)
+           (telescope-hoist-confirmation ignore)))
+        (skg-lp--pending-count 1)
+        called)
+    (unwind-protect
+        (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
+                  ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
+                  ((symbol-function 'yes-or-no-p) (lambda (_) t))
+                  ((symbol-function 'skg-request-save-buffer)
+                   (lambda (&rest args) (setq called args))))
+          (let ((noninteractive nil))
+            (skg--telescope-hoist-confirmation-handler
+             origin
+             "((response-type telescope-hoist-confirmation) (telescopes (((pid \"A\") (home \"public\")) ((pid \"B\") (home \"private\")))) (prompt \"Hoist?\"))"
+             t '(("N" . "owned")))))
+      (kill-buffer origin))
+    (should (equal called
+                   '(t (("N" . "owned")) ("A" "B") nil)))
+    (should (= skg-lp--pending-count 0))
+    (should-not (assoc 'save-result skg-response-handler-map))))
+
+(ert-deftest test-save-request-sexp-carries-scalar-release-pids ()
+  "Saved/collateral rerender authority uses the shared release field."
+  (let* ((sexp (skg--save-request-sexp
+                "uri-1"
+                '(:point-lines-below-focused-headline 0
+                  :point-column 0
+                  :point-screen-lines-below-window-start 0)
+                nil nil nil '("U1" "U2")))
+         (entry (assoc 'allow-ugly-telescopes sexp)))
+    (should (equal entry '(allow-ugly-telescopes "U1" "U2")))))
+
+(ert-deftest test-save-scalar-release-balances-and-retries-exact-pids ()
+  "The save is committed, but no staged text is adopted before approval."
+  (let ((origin (generate-new-buffer "*save-release-origin*"))
+        (skg-response-handler-map
+         '((save-result ignore . t)
+           (collateral-view ignore)
+           (save-relax-lock ignore)
+           (ugly-telescope-confirmation ignore)))
+        (skg-lp--pending-count 1)
+        called)
+    (unwind-protect
+        (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
+                  ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
+                  ((symbol-function 'yes-or-no-p) (lambda (_) t))
+                  ((symbol-function 'skg-request-save-buffer)
+                   (lambda (&rest args) (setq called args))))
+          (let ((noninteractive nil))
+            (skg--save-scalar-release-confirmation-handler
+             origin
+             "((response-type ugly-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\"))"
+             t '(("N" . "owned")) '("H"))))
+      (kill-buffer origin))
+    (should (equal called
+                   '(t (("N" . "owned")) ("H") ("U1" "U2"))))
+    (should (= skg-lp--pending-count 0))
+    (should-not (assoc 'save-result skg-response-handler-map))))
+
 (ert-deftest test-fork-sources-from-confirmation-buffer-walks-two-levels ()
   "skg--fork-sources-from-confirmation-buffer pairs each clone-to-be
 parent's (source X) with each child's (id N)."

@@ -5,7 +5,7 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
-use skg::types::misc::{SkgConfig, SourceName, TantivyIndex, privacied_all};
+use skg::types::misc::{SkgConfig, SourceName, TantivyIndex, members_at_source};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -158,7 +158,7 @@ async fn delta_writes_only_the_changed_edges (
         n . pid = ID::from (pid);
         n . title = pid . to_string ();
         n . source = SourceName::from ("main");
-        n . contains = privacied_all (
+        n . contains = members_at_source (
           & n . source,
           contains . iter () . map ( |c| ID::from (*c) ) . collect () );
         n };
@@ -219,7 +219,7 @@ async fn delta_with_empty_in_rust_graph_clears_stale_edges (
         n . pid = ID::from (pid);
         n . title = pid . to_string ();
         n . source = SourceName::from ("main");
-        n . contains = privacied_all (
+        n . contains = members_at_source (
           & n . source,
           contains . iter () . map ( |c| ID::from (*c) ) . collect () );
         n };

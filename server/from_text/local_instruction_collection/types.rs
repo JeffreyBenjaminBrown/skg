@@ -58,7 +58,7 @@ pub struct DefiningColOwner {
 /// 'skg-set-relationship-source' gesture -- see
 /// 'ViewNodeStats::rel_source'), None meaning "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
-/// validates the explicit levels against each edge's DEFAULT floor
+/// validates the explicit sources against each edge's DEFAULT floor
 /// at save time (render-and-gating, 5_plan.org;
 /// BUG-and-fix_make-edge-more-public.org).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -68,7 +68,7 @@ pub enum NodeIntent_Local {
                     title  : String,
                     body   : Option<String>, },
   SetContains     (Vec<(ID, Option<SourceName>)>),
-  SetAliases      (Vec<String>),
+  SetAliases      (Vec<(String, Option<SourceName>)>),
   SetSubscribesTo (Vec<(ID, Option<SourceName>)>),
   SetOverrides    (Vec<(ID, Option<SourceName>)>),
   Delete          { source : SourceName },
@@ -110,7 +110,7 @@ pub struct IntentsForOneId {
   pub source         : Option<SourceName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
   pub title_and_body : Option<(String, Option<String>)>,
   pub contains       : Option<Vec<(ID, Option<SourceName>)>>,
-  pub aliases        : Option<Vec<String>>,
+  pub aliases        : Option<Vec<(String, Option<SourceName>)>>,
   pub subscribes_to  : Option<Vec<(ID, Option<SourceName>)>>,
   pub overrides      : Option<Vec<(ID, Option<SourceName>)>>,
   pub delete         : bool,

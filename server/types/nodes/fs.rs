@@ -25,7 +25,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::telescope::types::{ListItem, SectionSlices};
-use crate::types::misc::{ID, MSV, SourceName, privacied_all, privacied_msv};
+use crate::types::misc::{ID, MSV, SourceName, members_at_source, members_at_source_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::complete::FileProperty;
 
@@ -110,21 +110,22 @@ impl NodeFS {
     NodeComplete {
       title                        :
         self . title . unwrap_or_default (),
-      aliases                      : privacied_msv (
+      ugly_telescope               : false,
+      aliases                      : members_at_source_msv (
         &source,
         if self . aliases . is_empty () { MSV::Unspecified }
         else { MSV::Specified ( self . aliases ) } ),
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         : self . body,
-      contains                     : privacied_all (
+      contains                     : members_at_source (
         &source, members_only ( self . contains ) ),
-      subscribes_to                : privacied_msv (
+      subscribes_to                : members_at_source_msv (
         &source, msv_ids ( members_only ( self . subscribes_to ) ) ),
-      hides_from_its_subscriptions : privacied_msv (
+      hides_from_its_subscriptions : members_at_source_msv (
         &source,
         msv_ids ( self . hides_from_its_subscriptions ) ),
-      overrides_view_of            : privacied_msv (
+      overrides_view_of            : members_at_source_msv (
         &source, msv_ids ( self . overrides_view_of ) ),
       misc                         : self . misc,
       source,

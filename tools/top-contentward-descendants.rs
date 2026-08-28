@@ -12,7 +12,7 @@
  */
 
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::types::misc::{ID, SkgConfig, members_of};
 use skg::types::nodes::complete::NodeComplete;
@@ -32,7 +32,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   let config : SkgConfig = load_config (config_path) ?;
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) ?;
-  check_for_duplicate_ids_across_sources (
+  error_unless_each_id_names_one_node (
     &nodes, &config . data_root) ?;
   // Adjacency: pid -> list of pids it contains.
   let adj : HashMap<ID, Vec<ID>> =

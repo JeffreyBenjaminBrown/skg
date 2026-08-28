@@ -83,13 +83,14 @@
                  (setq visible (apply #'format format-string args)))))
       (skg-handle-content-view-sexp
        'test-tcp "((switch-to-view stale-uri))" "unused-uri"
-       "node-x" t nil)
+       "node-x" t '("approved-pid") nil)
       (should (equal closed '(test-tcp "stale-uri")))
-      (should (equal retried '("node-x" test-tcp t t)))
+      (should (equal retried
+                     '("node-x" test-tcp t ("approved-pid") nil t)))
       (setq closed nil retried nil)
       (skg-handle-content-view-sexp
        'test-tcp "((switch-to-view still-stale))" "unused-uri"
-       "node-x" t t)
+       "node-x" t nil t)
       (should-not closed)
       (should-not retried)
       (should (string-match-p

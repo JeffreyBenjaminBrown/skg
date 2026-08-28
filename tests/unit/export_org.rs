@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::source_sets::{ActiveSourceSet, SourceSetName};
-use crate::types::misc::{ID, SourceName, privacied_all};
+use crate::types::misc::{ID, SourceName, members_at_source};
 use crate::types::nodes::complete::empty_node_complete;
 
 use std::collections::BTreeSet;
@@ -23,7 +23,7 @@ fn node (
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
   n . source   = SourceName::from ("main");
-  n . contains = privacied_all (
+  n . contains = members_at_source (
     & n . source,
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
@@ -100,6 +100,18 @@ fn sample_nodes () -> Vec<NodeComplete> {
     node ("ms", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = broken"), &[]),
   ] }
+
+#[test]
+fn export_preflight_names_rendered_nodes_and_markers_only () {
+  let mut nodes : Vec<NodeComplete> = sample_nodes ();
+  nodes . push (node ("unrelated", "not exported", None, &[]));
+  let candidates : Vec<ID> = export_candidate_pids (&active_all (), &nodes);
+  assert! ( candidates . contains (&ID::from ("a")) );
+  assert! ( candidates . contains (&ID::from ("b")) );
+  assert! ( candidates . contains (&ID::from ("ma")),
+    "marker bodies determine output paths and cross the release boundary" );
+  assert! ( ! candidates . contains (&ID::from ("unrelated")) );
+}
 
 #[test]
 fn export_writes_expected_files_and_links () {
@@ -243,20 +255,20 @@ fn marker_child_is_excluded_from_content () {
 }
 
 //
-// Edge-level gating (visible fold)
+// Edge-source gating (visible fold)
 //
 
 #[test]
-fn private_leveled_edge_is_omitted_from_restricted_export () {
+fn private_source_edge_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the edge to "priv"
-  // is RECORDED at level "private". A main-only export renders the
+  // is RECORDED in source "private". A main-only export renders the
   // visible fold: "pub" appears, "priv" does not -- even though
   // priv's home is active.
   let mut root : NodeComplete =
     node ("r", "Root", None, &["ma"]);
-  root . contains . push ( PrivaciedMember::at (
+  root . contains . push ( MemberAtSource::at_source (
     SourceName::from ("main"), ID::from ("pub") ));
-  root . contains . push ( PrivaciedMember::at (
+  root . contains . push ( MemberAtSource::at_source (
     SourceName::from ("private"), ID::from ("priv") ));
   let nodes : Vec<NodeComplete> = vec! [
     root,
@@ -275,7 +287,7 @@ fn private_leveled_edge_is_omitted_from_restricted_export () {
     fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
   assert! ( content . contains ("Public child"), "{}", content );
   assert! ( ! content . contains ("Private child"),
-            "a private-leveled edge leaked into a main-only export:\n{}",
+            "an edge from a private source leaked into a main-only export:\n{}",
             content );
   { // Under "all", both children render.
     let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();

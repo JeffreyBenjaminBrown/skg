@@ -1,12 +1,12 @@
 // cargo nextest run --test grouped_sources -E 'test(leak_battery::)'
 //
 // THE LEAK BATTERY (TODO/user-owned_autofork_chain/5_plan.org, work
-// item render-and-gating): a membership's EDGE LEVEL, not just the
+// item render-and-gating): a membership's EDGE SOURCE, not just the
 // member node's own source, gates whether it renders. Fixtures pin
 // the shape the sweep exists to close: a PUBLIC node (N) whose
 // PRIVATE section privately contains/subscribes-to another PUBLIC
 // node (C) -- a private reading-list entry between two nodes that
-// are each individually visible at every level. Without edge-level
+// are each individually visible at every source. Without edge-source
 // gating this leaks by omission (a public session would still show
 // the private membership) or by appearance (inbound surfaces would
 // reveal N/S even though the content direction hides them).
@@ -117,8 +117,8 @@ fn inbound_containerward_data_hides_N_at_public (
 
       // Unit-style pin: the gated in-Rust-graph accessor directly.
       // C's containerward data (who contains C) must not name N at
-      // "public" -- the edge's LEVEL (private) is what gates it, not
-      // N's own (public) source.
+      // "public" -- the edge's recording source (private) is what
+      // gates it, not N's own (public) source.
       let nodes : Vec<NodeComplete> =
         read_all_skg_files_from_sources (config)?;
       let graph : InRustGraph =
@@ -280,12 +280,12 @@ fn a_lowered_edge_is_governed_by_its_new_level (
 ) {
   // BUG-and-fix_make-edge-more-public.org: after the explicit
   // gesture lowers an edge's privacy to its default, the gated
-  // surfaces follow the NEW level -- the edge appears under sets
-  // that include that level, while a sibling edge still above its
+  // surfaces follow the NEW source -- the edge appears under sets
+  // that include that source, while a sibling edge still more private than its
   // default stays hidden. Lowering to the default cannot leak: by
   // definition both endpoints' homes are at least as public as it.
   use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
-  use skg::types::misc::{PrivaciedMember, SourceName};
+  use skg::types::misc::{MemberAtSource, SourceName};
   use skg::types::nodes::complete::empty_node_complete;
   let node_at = |pid : &str, source : &str| -> NodeComplete {
     let mut n : NodeComplete = empty_node_complete ();
@@ -295,9 +295,9 @@ fn a_lowered_edge_is_governed_by_its_new_level (
     n };
   let mut owner : NodeComplete = node_at ("owner", "public");
   owner . contains = vec! [
-    PrivaciedMember::at ( // as if just lowered to its default
+    MemberAtSource::at_source ( // as if just lowered to its default
       SourceName::from ("public"), ID::from ("lowered") ),
-    PrivaciedMember::at ( // deliberately above its default
+    MemberAtSource::at_source ( // deliberately above its default
       SourceName::from ("private"), ID::from ("kept") ) ];
   let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [
     owner,

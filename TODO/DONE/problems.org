@@ -1,4 +1,4 @@
-** Same-title Skg views overwrote each other and left stale server URIs (fixed 2026-08-24)
+* Same-title Skg views overwrote each other and left stale server URIs (fixed 2026-08-24)
    'skg-open-org-buffer-from-text' used 'get-buffer-create' with a name
    derived only from the first headline's title. Opening a distinct
    same-titled view erased and reused that buffer, replacing its
@@ -12,6 +12,155 @@
    display outside the process filter, and stale server URIs are closed and
    retried once. Diagnosis, implementation, and verification:
    [[../refer-to-ids-not-buffer-names/it.org]].
+* override_menu::all_tests expected a rendered Oa herald (resolved 2026-08-28)
+  Noticed while running the full suite during the dup-ids work and
+  verified to be pre-existing. The test asserted that each overrider's
+  server-rendered line carried the blue "Oa" presentation token.
+
+  RESOLVED: the menu was already emitting the correct semantic fact,
+  '(overrides ... (out 1 (ancestors 1)))'. Since the July semantic-wire
+  change, rendering that fact as "Oa" belongs to each client, not to this
+  server-generated view. The golden test now asserts the semantic wire
+  and the full Rust suite passes. See commit aa19e2db and the
+  TODO/dup-ids-maybe-bad/7_plan.org section "Verification while
+  implementing".
+
+* Problems found while recapping dup-ids-maybe-bad (fixed 2026-08-28)
+  Planned in TODO/dup-ids-maybe-bad/7_plan.org and completed across the
+  incremental commits named below.
+** 'TitleBelowHome' can expose more-private text through a public source-set
+   The branch made the HOME the most public section even when that
+   section was titleless, then folded the title and body from a more-private
+   section into the resulting 'NodeComplete'. That node carried the public
+   home in 'source' and the private section's text in 'title' / 'body'.
+
+   Source-set filtering gated the node by 'source', not by the level from
+   which its scalar text came. The pure helper
+   'titles_for_source_set_for_test' demonstrated the path directly:
+   it called 'read_all_skg_files_from_sources', accepted the node because
+   its home was active, and returned the folded title. Production Tantivy
+   had the same shape: 'NodeTantivy::from' copied the public source and
+   the private title/body into one document. Search, direct views, titles
+   by ids, and org export could therefore reveal the private text.
+
+   FIXED: title and body now carry their independently folded source levels
+   and scalar ugliness is recorded in the node. Every textual release path
+   checks the exact ugly pids before returning text: direct views, search,
+   title lookup, org export, ordinary rerenders, source-set/diff rerenders,
+   and save collateral rerenders. The user may approve only the reported
+   pids and retry. Regression coverage includes the titleless-public,
+   titled-private shape. See commits 41e82de8, 3778bdd5, 22f15396,
+   13668a62, and 6a9b4116.
+** The telescope writer can still write a foreign non-home section
+   'error_unless_home_is_writable' checked only
+   'nodecomplete.source'. If the home was owned but a later telescope
+   section was foreign, the check passed; 'unfold_node' could reproduce
+   that foreign level, and the write loop wrote every returned section
+   without calling 'user_owns_source'. The delete loop had the ownership
+   check, but the write loop did not.
+
+   This was reachable for an owned-home/foreign-later same-pid telescope:
+   foreign-policy validation saw the folded node's owned home and kept the
+   save, while sticky edge levels preserved members contributed by the
+   foreign section. It contradicted the module's promise that foreign
+   sections are never written.
+
+   FIXED: unfolding returns a checked batch, and the complete batch is
+   validated for configured, owned output sources before any filesystem
+   mutation begins. The mirror-image foreign-later regression test is in
+   place. See commit 0e218ad0.
+** 'Telescope' documents but does not enforce its privacy-order invariant
+   'Telescope.sections' was public and the struct had no checked
+   constructor; 'fold_telescope' accepted the type directly and treated
+   the first section as home. Builders established privacy order only by
+   discipline, so an unordered caller could silently choose the wrong home.
+
+   FIXED: 'Telescope' and 'UnfoldedTelescope' hide their section storage
+   and can be constructed only through checked boundaries that validate
+   source membership, order, uniqueness, and the intended ownership
+   constraints. See commit 5bc332d3.
+
+* The unreadable-files report is not deleted after a successful boot (fixed 2026-07-29)
+  Fixed with the duplicate-ids report, in the same change: each
+  reporting function now removes a stale report when it has
+  nothing to say, so a report file's presence is meaningful.
+  (telescope-warnings.org already did this, and is what the
+  other two were made to imitate.) Original entry:
+** (as filed) The unreadable-files report is not deleted after a successful boot
+   data/initialization-error_unreadable-skg-files.org survives from the
+   failed run into the healthy one, so a stale "Found 1 unreadable
+   file(s)" sits in the data root claiming a problem that no longer
+   exists. Suggested fix: remove it at the top of a successful init
+   (same for telescope-warnings.org when the warning count is 0).
+
+* Fallout from "duplicate ids across sources" (fixed 2026-07-29)
+  Investigation, plan and audit list: TODO/dup-ids-maybe-bad/.
+  All five below were fixed. The check
+  'check_for_duplicate_ids_across_sources' was CORRECT -- it flagged
+  only ids claimed by two distinct pids, and every call site passed
+  post-fold nodes -- but its name and all its user-facing strings
+  described the privacy telescope, which is the feature. It is
+  'error_unless_each_id_names_one_node' now, and the home is
+  definitionally the most public section, so no read path has to
+  guess which of a node's sections it means.
+** 'source_from_disk' returns an arbitrary section, not the home
+   server/types/phantom.rs:106 iterates 'config . sources' (a HashMap)
+   and returns the first directory holding '<id>.skg'. Pre-telescope
+   there was at most one; now any node with a privatized edge has
+   several, so the answer is chosen by randomized hash order. It also
+   breaks the "no other code may compare source positions" rule at
+   server/types/misc.rs:191-201. Consumers read the result as the HOME:
+   'home_of' in supplement_from_disk.rs:275 (which sets a new edge's
+   default privacy floor, and the level is sticky once written),
+   'member_is_visible' in weave.rs:42, and several render paths.
+   Latent -- it is the last fallback, and the in-Rust graph normally
+   answers first -- but nondeterministic by construction on the path
+   that decides how public an edge gets written.
+   Fix: iterate 'ordered_sources ()' and return the most public
+   TITLED section.
+** The duplicate-id report discards the pids
+   multiple_nodes.rs:162-164 maps the pid away before reporting, so
+   'report_duplicate_ids' can only print sources. Post-telescope the
+   sources are the uninformative half (both claimants can be in one
+   source, which prints it twice); the two pids are what you need to
+   open and repair.
+** 'initialization-error_duplicate-ids.org' is never deleted
+   The empty-set early return at multiple_nodes.rs:166 precedes the
+   report writer, so a stale copy survives a clean boot -- same defect
+   already filed below for the unreadable-files report, but worse here:
+   a stale pre-telescope copy names id/source pairs that are now
+   healthy, inviting the reader to "repair" a valid telescope.
+   'report_telescope_violations' (telescope/invariants.rs:135) shows
+   the fix.
+** Init checks ids only after TypeDB and Tantivy are populated
+   server/main.rs:130-144 runs 'initialize_dbs' (which populates both,
+   exiting on failure at init.rs:309-313) and checks afterward. Given
+   'extra_id owns id @key' (schema.tql:112), a real conflict may die
+   inside TypeDB with a raw driver message and never reach the readable
+   report. 'rebuild_dbs_in_place' already gets this order right.
+   NOT yet confirmed -- see the experiment in dup-ids-maybe-bad.org.
+** A forbidden-overlay promise no validator keeps
+   server/dbs/filesystem/one_node.rs:139-141 says a foreign same-pid
+   file is "left for the validators to report", but 'TelescopeViolation'
+   (telescope/invariants.rs:26-49) has only 'LeakShapedMember' and
+   'UnconfiguredLevel'. Add the variant or drop the claim.
+** where the fixes differ from what was filed above
+   - The 'source_from_disk' entry proposed returning the most public
+     TITLED section. What landed is simpler: the HOME became
+     definitionally the most public section (Jeff's rule -- it would
+     be silly to share a node without sharing its text), so
+     'home_from_disk' is one 'exists()' walk and a title below the
+     home is a reported violation rather than a shape to search past.
+   - The init-ordering entry was unconfirmed when filed. Confirmed by
+     experiment: an extra_id/extra_id conflict is rejected by TypeDB
+     with a '[CNT9]' key violation naming the contested value and
+     neither claimant; a pid/extra_id conflict is accepted silently
+     ('@key' uniqueness is per owner type). Both argue for checking
+     first, for different reasons.
+   - 'ForeignOverlay' was added rather than the claim dropped, and
+     'write_nodecomplete_telescope' now enforces its own ownership
+     promise instead of leaving it to callers.
+
 ** start-servers.sh could not kill the cargo-watch it was trying to kill (fixed 2026-07-26)
    Found while cleaning up stray processes: two cargo-watch processes
    were alive, and the newer run's skg had exited with

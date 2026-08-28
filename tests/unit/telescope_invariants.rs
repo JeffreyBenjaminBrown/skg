@@ -5,8 +5,8 @@
 use super::{TelescopeViolation, telescope_violations_of, validate_all_telescopes};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{
-  ID, MSV, PrivaciedMember, SkgConfig, SkgfileSource, SourceName,
-  privacied_all};
+  ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
+  members_at_source};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ use std::path::PathBuf;
 /// public < private, per source_order (dummy configs otherwise fall
 /// back to ALPHABETICAL order, where "private" < "public" would
 /// invert the ladder).
-fn two_level_config () -> SkgConfig {
+fn two_source_config () -> SkgConfig {
   let mut sources : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();
   for name in ["public", "private"] {
@@ -46,16 +46,16 @@ fn node_at (
 #[test]
 fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
 ) {
-  let config : SkgConfig = two_level_config ();
+  let config : SkgConfig = two_source_config ();
   let mut container : NodeComplete = node_at ("container", "public");
   let private_child : NodeComplete = node_at ("secret", "private");
   let public_child  : NodeComplete = node_at ("open", "public");
   container . contains = vec! [
-    // honest: public member at public level
-    PrivaciedMember::at ( SourceName::from ("public"),
+    // honest: public member in the public source
+    MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("open") ),
-    // THE LEAK: private-homed member recorded at public level
-    PrivaciedMember::at ( SourceName::from ("public"),
+    // THE LEAK: private-homed member recorded in the public source
+    MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("secret") ) ];
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
@@ -73,11 +73,11 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
 #[test]
 fn private_membership_of_a_public_member_is_fine (
 ) { // the private-reading-list shape: MORE private than the target
-  let config : SkgConfig = two_level_config ();
+  let config : SkgConfig = two_source_config ();
   let mut container : NodeComplete = node_at ("container", "private");
   let public_child  : NodeComplete = node_at ("open", "public");
   container . contains = vec! [
-    PrivaciedMember::at ( SourceName::from ("private"),
+    MemberAtSource::at_source ( SourceName::from ("private"),
                           ID::new ("open") ) ];
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
@@ -89,12 +89,12 @@ fn private_membership_of_a_public_member_is_fine (
 #[test]
 fn leak_check_resolves_extra_ids (
 ) { // an edge naming a merged-away extra id judges the OWNER's home
-  let config : SkgConfig = two_level_config ();
+  let config : SkgConfig = two_source_config ();
   let mut container : NodeComplete = node_at ("container", "public");
   let mut private_child : NodeComplete = node_at ("secret", "private");
   private_child . extra_ids = vec! [ ID::new ("old-name") ];
   container . contains = vec! [
-    PrivaciedMember::at ( SourceName::from ("public"),
+    MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("old-name") ) ];
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
@@ -106,17 +106,17 @@ fn leak_check_resolves_extra_ids (
 }
 
 #[test]
-fn unconfigured_level_and_msv_relations_are_covered (
+fn unconfigured_source_and_msv_relations_are_covered (
 ) {
-  let config : SkgConfig = two_level_config ();
+  let config : SkgConfig = two_source_config ();
   let mut node : NodeComplete = node_at ("n", "public");
   let target : NodeComplete = node_at ("t", "private");
   node . subscribes_to = MSV::Specified ( vec! [
     // leak via a non-contains relation
-    PrivaciedMember::at ( SourceName::from ("public"),
+    MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("t") ) ] );
   node . hides_from_its_subscriptions = MSV::Specified (
-    privacied_all ( & SourceName::from ("nonexistent-source"),
+    members_at_source ( & SourceName::from ("nonexistent-source"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ node, target ] );
@@ -128,5 +128,5 @@ fn unconfigured_level_and_msv_relations_are_covered (
     v, TelescopeViolation::LeakShapedMember {
       relation : "subscribes_to", .. } )));
   assert! ( violations . iter () . any ( |v| matches! (
-    v, TelescopeViolation::UnconfiguredLevel { .. } )));
+    v, TelescopeViolation::UnconfiguredSource { .. } )));
 }

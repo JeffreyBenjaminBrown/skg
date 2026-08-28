@@ -1,6 +1,12 @@
-use crate::telescope::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
-use crate::telescope::types::SectionSlices;
-use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_telescope};
+use crate::telescope::fold::fold_telescope_collecting_warnings;
+use crate::telescope::types::{
+  FoldWarning, Telescope, retain_owned_sections_when_pid_collides,
+};
+use crate::telescope::invariants::TelescopeViolation;
+use crate::dbs::filesystem::one_node::{
+  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
+  read_nodecomplete, validate_pid_matches_filename,
+};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
@@ -14,9 +20,34 @@ use std::fs::{self, DirEntry, ReadDir};
 /// Sets each node's source field to the appropriate source name.
 /// If any files fail to load, writes a detailed report to an
 /// org file in the config's data_root and returns a summary error.
+///
+/// Load-time telescope violations are LOGGED here and dropped.
+/// Callers that report them to the user (init and rebuild) take
+/// 'read_all_skg_files_from_sources_collecting_violations' instead.
 pub fn read_all_skg_files_from_sources (
   config: &SkgConfig
 ) -> io::Result<Vec<NodeComplete>> {
+  let (nodes, violations)
+    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    read_all_skg_files_from_sources_collecting_violations (config) ?;
+  for (pid, v) in &violations {
+    tracing::warn! ( pid = %pid, violation = %v,
+                     "telescope violation found at load" ); }
+  Ok (nodes) }
+
+/// As 'read_all_skg_files_from_sources', but hands back the
+/// load-time telescope violations rather than logging them, so
+/// init and rebuild can report them alongside the graph-level ones
+/// in DATA_ROOT/telescope-warnings.org.
+///
+/// Two kinds arise here and nowhere else, because only here are a
+/// node's SECTION LIST and the config both in hand:
+/// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
+/// - 'IgnoredForeignPidCollision', where owned and non-owned files
+///   use the same pid. The owned telescope wins before folding.
+pub fn read_all_skg_files_from_sources_collecting_violations (
+  config: &SkgConfig
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
     : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
   let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
@@ -29,26 +60,60 @@ pub fn read_all_skg_files_from_sources (
       config . sources . get (&source_name) else { continue; };
     match read_skg_sections_from_folder (&source_name, config) {
       Ok (sections) => {
-        for (level, node_fs) in sections {
+        for (source, node_fs) in sections {
           let pid : ID = node_fs . pid . clone ();
           if ! sections_by_pid . contains_key (&pid) {
             pid_order . push ( pid . clone () ); }
           sections_by_pid . entry (pid)
             . or_insert_with (Vec::new)
-            . push ((level, node_fs)); }}
+            . push ((source, node_fs)); }}
       Err (e) => {
         load_errors . push ((
           source_name . to_string(),
           source . path . display() . to_string(),
           e . to_string()
         )); }} }
+  report_load_errors (&load_errors, &config . data_root) ?;
   if ! load_errors . is_empty() {
-    report_load_errors (&load_errors, &config . data_root) ?;
     return Err (io::Error::new (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
                load_errors . len() ))); }
-  fold_grouped_sections (sections_by_pid, pid_order) }
+  let collision_violations : Vec<(ID, TelescopeViolation)> =
+    retain_owned_telescopes (
+      &mut sections_by_pid, &pid_order, config );
+  let (nodes, fold_violations)
+    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    fold_grouped_sections (sections_by_pid, pid_order, config) ?;
+  Ok (( nodes,
+        { let mut all : Vec<(ID, TelescopeViolation)> =
+            collision_violations;
+          all . extend (fold_violations);
+          all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
+          all } )) }
+
+/// When owned and non-owned files use one pid, retain only the
+/// owned files before folding or building the extra-id map. A pid
+/// represented entirely by non-owned files remains readable.
+fn retain_owned_telescopes (
+  sections_by_pid : &mut HashMap<ID, Vec<(SourceName, NodeFS)>>,
+  pid_order       : &[ID],
+  config          : &SkgConfig,
+) -> Vec<(ID, TelescopeViolation)> {
+  let mut violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
+  for pid in pid_order {
+    let Some (sections) = sections_by_pid . remove (pid)
+      else { continue; };
+    let (retained, collision) =
+      retain_owned_sections_when_pid_collides (sections, config);
+    sections_by_pid . insert (pid . clone (), retained);
+    if let Some (collision) = collision {
+      violations . push ((
+        pid . clone (),
+        TelescopeViolation::IgnoredForeignPidCollision {
+          ignored_sources : collision . ignored_sources,
+        } )); }}
+  violations }
 
 /// One telescope, read fresh from disk by pid (all its sections,
 /// folded). Errors if no section exists or no section has a title.
@@ -63,14 +128,15 @@ pub fn nodecomplete_from_telescope_on_disk (
 /// Fold each telescope (already grouped by pid; sections arrive in
 /// privacy order because the caller iterated 'ordered_sources').
 /// Anchors resolve through the extra-id map built from every
-/// section, so a nodeMerge cannot dangle an anchor. A titleless
-/// telescope (no home) is a hard load error; fold warnings are
-/// logged for now (the telescope validators, next work item,
-/// formalize their reporting).
+/// section, so a nodeMerge cannot dangle an anchor. A telescope
+/// with no title in any section is a hard load error; every other
+/// fold complaint comes back as a violation for the caller to
+/// report.
 fn fold_grouped_sections (
   mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
   pid_order           : Vec<ID>,
-) -> io::Result<Vec<NodeComplete>> {
+  config              : &SkgConfig,
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {
@@ -82,66 +148,36 @@ fn fold_grouped_sections (
     pid_of . get (id) . cloned ()
       . unwrap_or_else ( || id . clone () ) };
   let mut all_nodes : Vec<NodeComplete> = Vec::new ();
+  let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
-    let sections : Vec<(SourceName, NodeFS)> =
+    let telescope : Telescope = Telescope::try_new (
+      pid . clone (),
       sections_by_pid . remove (&pid)
-      . expect ("pid_order tracks sections_by_pid");
-    all_nodes . push (
-      fold_one_telescope ( &pid, sections, &resolve ) ? ); }
-  Ok (all_nodes) }
+        . expect ("pid_order tracks sections_by_pid"),
+      config )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::InvalidData, e ) ) ?;
+    let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+      fold_telescope_collecting_warnings ( telescope, &resolve ) ?;
+    all_nodes . push (node);
+    for w in warnings {
+      all_violations . push (
+        ( pid . clone (), TelescopeViolation::Fold (w) )); }}
+  Ok (( all_nodes, all_violations )) }
 
-/// Fold ONE telescope's sections (in privacy order) into a
-/// NodeComplete. 'resolve' maps extra ids to pids for anchor
-/// resolution and must be built from the whole corpus, not just
-/// this telescope. A titleless telescope (no home) is a hard error;
-/// fold warnings are logged.
-pub fn fold_one_telescope (
-  pid      : &ID,
-  sections : Vec<(SourceName, NodeFS)>,
-  resolve  : &dyn Fn (&ID) -> ID,
-) -> io::Result<NodeComplete> {
-  let extra_ids : Vec<ID> = {
-    let mut extra_ids : Vec<ID> = Vec::new ();
-    for (_, node_fs) in &sections {
-      for e in &node_fs . extra_ids {
-        if ! extra_ids . contains (e) {
-          extra_ids . push ( e . clone () ); }} }
-    extra_ids };
-  let misc : Vec<crate::types::nodes::complete::FileProperty> = {
-    // home-section data, like extra_ids; unioned defensively
-    let mut misc : Vec<crate::types::nodes::complete::FileProperty> =
-      Vec::new ();
-    for (_, node_fs) in &sections {
-      for m in &node_fs . misc {
-        if ! misc . contains (m) {
-          misc . push ( m . clone () ); }} }
-    misc };
-  let slices : Vec<(SourceName, SectionSlices)> =
-    sections . into_iter ()
-    . map ( |(level, node_fs)|
-            (level, node_fs . into_section_slices ()) )
-    . collect ();
-  let (folded, warnings) : (FoldedNode, _) =
-    fold_sections ( &slices, resolve );
-  for w in &warnings {
-    tracing::warn! ( pid = %pid, warning = ?w,
-                     "telescope fold warning" ); }
-  nodecomplete_from_fold (
-    pid . clone (), extra_ids, misc, folded )
-    . ok_or_else ( || io::Error::new (
-      io::ErrorKind::InvalidData,
-      format! ("Telescope '{}' has no home: no section carries a title.",
-               pid ))) }
-
-/// Same-ID files across sources are no longer duplicates -- they
-/// are the sections of one privacy telescope, grouped and folded at
-/// load. What remains a CONFLICT is one id claimed by two DIFFERENT
-/// nodes: an id (primary or extra) appearing among the all_ids() of
-/// two nodes with distinct pids. If any exists, writes a detailed
+/// NOT AN ERROR: same-id files across sources. Those are the
+/// SECTIONS of one privacy telescope, grouped and folded at load,
+/// and they are the feature -- see docs/telescopes.md. Sections of
+/// one telescope share a pid, so they can never trip this check.
+///
+/// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
+/// (primary or extra) appearing among the all_ids() of two nodes
+/// with distinct pids. Nothing about it is cross-source; both
+/// claimants can sit in one source. If any exists, writes a detailed
 /// report (to stderr for ≤10, to an org file otherwise) and returns
 /// a summary error. (Callers pass post-fold nodes, one per
 /// telescope.)
-pub fn check_for_duplicate_ids_across_sources (
+pub fn error_unless_each_id_names_one_node (
   nodes     : &[NodeComplete],
   data_root : &Path,
 ) -> io::Result<()> {
@@ -153,30 +189,28 @@ pub fn check_for_duplicate_ids_across_sources (
       claimants . entry (id . clone())
         . or_insert_with (Vec::new)
         . push ((node . pid . clone(), node . source . clone())); }}
-  let duplicate_ids: HashMap<ID, Vec<SourceName>> =
+  let contested: HashMap<ID, Vec<(ID, SourceName)>> =
     claimants . into_iter()
     . filter ( |(_, owners)| {
       let distinct_pids : HashSet<&ID> =
         owners . iter() . map ( |(pid, _)| pid ) . collect();
       distinct_pids . len() > 1 } )
-    . map ( |(id, owners)|
-            (id, owners . into_iter()
-                 . map ( |(_, src)| src ) . collect()) )
     . collect();
-  if duplicate_ids . is_empty() {
+  report_ids_claimed_by_two_nodes (&contested, data_root) ?;
+  if contested . is_empty() {
     return Ok (( )); }
-  report_duplicate_ids (&duplicate_ids, data_root) ?;
   let msg: String =
-    if duplicate_ids . len() <= 10 {
+    if contested . len() <= 10 {
       // Include details in error message for small numbers
-      let ids_list: Vec<String> = duplicate_ids . keys()
+      let ids_list: Vec<String> = contested . keys()
         . map ( |id| format! ("'{}'", id) )
         . collect();
-      format! ("Duplicate ID(s) found: {}",
+      format! ("{} id(s) claimed by more than one node: {}",
+               contested . len(),
                ids_list . join (", "))
     } else {
-      format! ("{} duplicate IDs found (see org file)",
-               duplicate_ids . len() ) };
+      format! ("{} id(s) claimed by more than one node (see org file)",
+               contested . len() ) };
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
 
@@ -208,7 +242,7 @@ pub fn read_skg_sections_from_folder (
 /// Like `read_all_skg_files_from_sources` but only for telescopes
 /// with at least one section file whose mtime is more recent than
 /// `since`. A touched SECTION reloads its WHOLE telescope (all its
-/// sections, however old), since the fold needs every level.
+/// sections, however old), since the fold needs every source.
 pub fn read_recently_modified_skgfiles_from_sources (
   config : &SkgConfig,
   since  : std::time::SystemTime,
@@ -241,58 +275,79 @@ pub fn read_recently_modified_skgfiles_from_sources (
       nodecomplete_from_telescope_on_disk (config, &pid) ? ); }
   Ok (all_nodes) }
 
-/// Reports duplicate IDs found across sources.
-/// If there are errors, writes a detailed report to an org file.
-/// For ≤10 duplicates, also lists each one on stderr.
-/// For >10 duplicates, logs only the count and the file path.
-fn report_duplicate_ids(
-  duplicates : &HashMap<ID, Vec<SourceName>>,
-  data_root  : &Path,
+/// Reports each id claimed by more than one node, naming every
+/// CLAIMANT as "pid (home)" -- the pids are what the reader must
+/// open to repair the conflict, and both claimants can share one
+/// home, so the homes alone identify nothing.
+/// If there are none, removes a stale report, so the file's
+/// presence is meaningful.
+/// Otherwise writes a detailed report to an org file, and for ≤10
+/// also lists each conflict on stderr; for >10, logs the count and
+/// the file path.
+fn report_ids_claimed_by_two_nodes(
+  contested : &HashMap<ID, Vec<(ID, SourceName)>>,
+  data_root : &Path,
 ) -> io::Result<()> {
-  let count: usize = duplicates . len();
+  let count: usize = contested . len();
   // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
   let report_path: PathBuf = data_root . join (
-    "initialization-error_duplicate-ids.org");
-  let mut content: String = String::new();
-  content . push_str ("#+title: Duplicate IDs Across Sources\n");
-  content . push_str ("#+date: <generated at initialization>\n\n");
-  content . push_str(
-    &format!("Found {} duplicate IDs across sources.\n\n",
-             count));
-
-  let mut sorted_ids: Vec<(&ID, &Vec<SourceName>)> =
-    // for deterministic output
-    duplicates . iter() . collect();
-  sorted_ids . sort_by_key(|(id, _)| *id);
-
-  for (id, sources) in sorted_ids {
-    content . push_str(&format!("* {}\n", id));
-    let mut sorted_sources: Vec<SourceName> =
+    "initialization-error_ids-claimed-by-two-nodes.org");
+  if count == 0 {
+    return remove_stale_report (&report_path); }
+  let claimant_lines = | claimants : &Vec<(ID, SourceName)> |
+                       -> Vec<String> {
+    let mut lines : Vec<String> = // for deterministic output
+      claimants . iter ()
+      . map ( |(pid, home)| format! ("{} ({})", pid, home) )
+      . collect ();
+    lines . sort ();
+    lines . dedup ();
+    lines };
+  let content: String = {
+    let mut content: String = String::new();
+    content . push_str ("#+title: IDs claimed by more than one node\n");
+    content . push_str ("#+date: <generated at initialization>\n\n");
+    content . push_str( &format!(
+      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
+      count));
+    let mut sorted_ids: Vec<(&ID, &Vec<(ID, SourceName)>)> =
       // for deterministic output
-      sources . clone();
-    sorted_sources . sort();
-    for source in sorted_sources {
-      content . push_str(&format!("** {}\n", source)); }}
-
-  if count > 0 { // otherwise nothing to report
-    fs::write(&report_path, content)?;
-    if count <= 10 {
-      tracing::error!("Found {} duplicate ID(s) across sources:",
-                count);
-      for (id, sources) in duplicates . iter() {
-        let names : Vec<String> =
-          sources . iter () . map (|s| s . to_string ()) . collect ();
-        tracing::error!("  - ID '{}' in sources: {}",
-                  id, names . join (", ")); }
-    } else {
-      tracing::error!("Found {} duplicate ID(s) across sources.",
-                count);
-      tracing::error!("Details written to: {}",
-                report_path . display()); }}
+      contested . iter() . collect();
+    sorted_ids . sort_by_key(|(id, _)| *id);
+    for (id, claimants) in sorted_ids {
+      content . push_str(&format!("* {}\n", id));
+      for line in claimant_lines (claimants) {
+        content . push_str(&format!("** {}\n", line)); }}
+    content };
+  fs::write(&report_path, content)?;
+  if count <= 10 {
+    tracing::error!("{} id(s) claimed by more than one node:",
+              count);
+    for (id, claimants) in contested . iter() {
+      tracing::error!("  - ID '{}' claimed by: {}",
+                id, claimant_lines (claimants) . join (", ")); }
+  } else {
+    tracing::error!("{} id(s) claimed by more than one node.",
+              count);
+    tracing::error!("Details written to: {}",
+              report_path . display()); }
   Ok (( )) }
 
+/// Delete a report whose condition no longer holds, so that a
+/// report file left on disk always describes the LAST run rather
+/// than some earlier one.
+fn remove_stale_report (
+  report_path : &Path,
+) -> io::Result<()> {
+  match fs::remove_file (report_path) {
+    Ok (( ))                                          => Ok (( )),
+    Err (e) if e . kind () == io::ErrorKind::NotFound => Ok (( )),
+    Err (e)                                           => Err (e), } }
+
 /// Reports file loading errors.
-/// Always writes to org file and reports count to stderr.
+/// If there are none, removes a stale report, so the file's
+/// presence is meaningful. Otherwise writes to an org file and
+/// reports the count to stderr.
 fn report_load_errors(
   errors    : &[(String, String, String)],
   data_root : &Path,
@@ -301,6 +356,8 @@ fn report_load_errors(
   let report_path: PathBuf = data_root . join ( // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
 
     "initialization-error_unreadable-skg-files.org");
+  if count == 0 {
+    return remove_stale_report (&report_path); }
 
   let mut content: String = String::new();
   content . push_str ("#+title: Unreadable SKG Files\n");
@@ -327,38 +384,27 @@ fn report_load_errors(
 }
 
 /// Writes all given `NodeComplete`s to disk as telescopes: each
-/// node's sections land in their levels' source directories, named
+/// node's sections land in their source directories, named
 /// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
   nodes  : Vec<NodeComplete>,
   config : SkgConfig,
 ) -> io  ::Result<usize> { // number of nodes written
-
-  // Collect unique source directories and ensure they exist
-  for source_name in {
-    let unique_sources : HashSet<&SourceName> =
-      nodes . iter()
-      . map( |node| &node . source )
-      . collect();
-    unique_sources } {
-    let source_config: &SkgfileSource =
-      config . sources . get (source_name)
-      . ok_or_else( || io::Error::new(
-        io::ErrorKind::NotFound,
-        format!("Source '{}' not found in config",
-                source_name)) )?;
-    fs::create_dir_all ( &source_config . path )?; }
-
-  let mut written : usize = 0;
-  for node in nodes {
-    write_nodecomplete_telescope ( & node, & config ) ?;
-    written += 1; }
-  Ok (written) }
+  let prepared : Vec<PreparedTelescopeWrite> =
+    nodes . iter ()
+    . map ( |node|
+      prepare_nodecomplete_telescope (node, &config, false) )
+    . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
+  for telescope in &prepared {
+    telescope . apply (&config) ?; }
+  for telescope in &prepared {
+    telescope . verify_hoist (&config) ?; }
+  Ok (prepared . len ()) }
 
 /// Deleting a node deletes its whole TELESCOPE: every owned
 /// section file of that pid, in whatever source. (The SourceName in
 /// each target is the caller's belief about the home; kept in the
-/// signature for its callers, but every owned level is swept.)
+/// signature for its callers, but every owned source is swept.)
 pub fn delete_all_nodes_from_fs (
   delete_targets : Vec<(ID, SourceName)>,
   config         : SkgConfig,
@@ -379,7 +425,7 @@ pub fn delete_all_nodes_from_fs (
         Ok ( () ) => {
           any_removed = true; },
         Err (e) if e . kind () == io::ErrorKind::NotFound => {
-          // No section at this level, which is fine.
+          // No section at this source, which is fine.
         },
         Err (e) => {
           // TODO : Should return a list of IDs not found.

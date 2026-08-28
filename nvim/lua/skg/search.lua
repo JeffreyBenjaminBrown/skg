@@ -6,6 +6,7 @@
 local buffer = require('skg.buffer')
 local client = require('skg.client')
 local heralds = require('skg.heralds')
+local messages = require('skg.messages')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
@@ -79,16 +80,22 @@ end
 ---@param regex boolean
 ---@param body boolean
 ---@param operators boolean
-function M.request_text_search (search_terms, regex, body, operators)
-  local request = sexpr.to_string({
+function M.request_text_search (search_terms, regex, body, operators,
+                                ugly_choice)
+  local request_form = {
     sexpr.pair(sexpr.symbol('request'), 'text search'),
     sexpr.pair(sexpr.symbol('terms'), search_terms),
     sexpr.pair(sexpr.symbol('regex'), M.bool_to_string(regex)),
     sexpr.pair(sexpr.symbol('body'), M.bool_to_string(body)),
     sexpr.pair(sexpr.symbol('operators'),
-               M.bool_to_string(operators)) }) .. '\n'
+               M.bool_to_string(operators)) }
+  if ugly_choice then
+    table.insert(request_form,
+      sexpr.pair(sexpr.symbol('ugly-telescopes'), ugly_choice)) end
+  local request = sexpr.to_string(request_form) .. '\n'
   state.register_response_handler('search-results',
     function (_payload_text, response)
+      state.response_handler_map['ugly-telescope-confirmation'] = nil
       M.display_search_phase1(response, search_terms)
     end, true)
   state.register_response_handler('search-enrichment',
@@ -101,6 +108,24 @@ function M.request_text_search (search_terms, regex, body, operators)
       -- can integrate ancestry without losing user edits.
       M.handle_snapshot_request(response)
     end, false) -- persistent, not one-shot
+  state.register_response_handler('ugly-telescope-confirmation',
+    function (_payload_text, response)
+      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      for _, response_type in ipairs(
+          { 'search-results', 'search-enrichment' }) do
+        if state.response_handler_map[response_type] then
+          state.response_handler_map[response_type] = nil
+          state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+        end
+      end
+      state.response_handler_map['request-snapshot'] = nil
+      local prompt = payload.field_text(response, 'prompt') or
+        'Include ugly telescopes in this search?'
+      local choice = vim.fn.confirm(
+        prompt, '&Include\n&Exclude', 2) == 1 and 'include' or 'exclude'
+      M.request_text_search(
+        search_terms, regex, body, operators, choice)
+    end, false)
   state.lp_reset()
   client.send_string(request)
 end
@@ -120,6 +145,7 @@ function M.display_search_phase1 (response, search_terms)
   for _, hook in ipairs(M.search_buffer_setup_hooks) do
     pcall(hook)
   end
+  M.display_warnings(response, 'Search completed with warnings')
 end
 
 ---Replace the search buffer with the enriched results and exit
@@ -151,6 +177,17 @@ function M.display_search_enrichment (response)
   buffer.arm_first_change_warning(buf)
   heralds.enable(buf)
   vim.notify('Search results enriched.')
+  M.display_warnings(
+    response, 'Search enrichment completed with warnings')
+end
+
+function M.display_warnings (response, headline)
+  local warnings = payload.string_list(payload.field(response, 'warnings'))
+  if #warnings > 0 then
+    messages.big_nonfatal_message(
+      'skg://messages/search', headline,
+      messages.errors_and_warnings_to_org_string({}, warnings))
+  end
 end
 
 ---Freeze the search buffer read-only and send its text back for

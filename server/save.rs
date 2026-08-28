@@ -1,10 +1,12 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::multiple_nodes::{
-  check_for_duplicate_ids_across_sources,
-  delete_all_nodes_from_fs,
+  error_unless_each_id_names_one_node,
   read_all_skg_files_from_sources,
-  write_all_nodes_to_fs};
+};
+use crate::dbs::filesystem::one_node::{
+  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
+};
 use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::telescope::invariants::telescope_violations_of;
 use crate::dbs::in_rust_graph::{
@@ -19,7 +21,6 @@ use crate::dbs::in_rust_graph::{
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
-use crate::nodeMerge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
@@ -28,7 +29,7 @@ use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::apply_relationship_deltas_for_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
-use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -50,12 +51,26 @@ use typedb_driver::TypeDBDriver;
 /// Returns `None` when all three stores updated normally.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_nodeMerges (
+  node_defs     : Vec<DefineNode>,
+  source_moves  : &[SourceMove],
+  config        : SkgConfig,
+  tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
+  graph         : &InRustGraphHandle,
+) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  update_graph_minus_nodeMerges_with_hoist_approval (
+    node_defs, source_moves, config, tantivy_index, driver, graph,
+    &HashSet::new () ) . await
+}
+
+async fn update_graph_minus_nodeMerges_with_hoist_approval (
   mut node_defs : Vec<DefineNode>,
   source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -68,7 +83,8 @@ pub async fn update_graph_minus_nodeMerges (
                                  config,
                                  tantivy_index,
                                  driver,
-                                 graph ). await }
+                                 graph,
+                                 hoist_approved_pids ). await }
 
 async fn apply_define_nodes_to_stores (
   node_defs     : Vec<DefineNode>,
@@ -77,6 +93,7 @@ async fn apply_define_nodes_to_stores (
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   let db_name : &str = &config . db_name;
   let old_graph_snap : Arc<InRustGraph> = // pre-apply state, for edge deltas
@@ -90,9 +107,9 @@ async fn apply_define_nodes_to_stores (
     let (deleted_count, written_count) : (usize, usize) =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_fs_from_savenode_defs") . entered ();
-        update_fs_from_saveinstructions (
+        update_fs_from_saveinstructions_with_hoist_approval (
           &node_defs, source_moves,
-          config . clone () ) } ?;
+          config . clone (), hoist_approved_pids ) } ?;
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
@@ -129,7 +146,7 @@ async fn apply_define_nodes_to_stores (
         . map_err (|e2| -> Box<dyn Error> {
           format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
           . into () }) ?;
-      check_for_duplicate_ids_across_sources (
+      error_unless_each_id_names_one_node (
         &nodes, &config . data_root)
         . map_err (|e2| -> Box<dyn Error> {
           format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
@@ -167,6 +184,7 @@ pub async fn update_graph_including_nodeMerges (
   tantivy_index      : &mut TantivyIndex,
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "validate_override_invariants_after_save" ). entered();
@@ -187,17 +205,19 @@ pub async fn update_graph_including_nodeMerges (
   let save_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_graph_minus_nodeMerges" ). entered();
-      update_graph_minus_nodeMerges (
+      update_graph_minus_nodeMerges_with_hoist_approval (
         save_instructions, source_moves, config . clone(),
-        tantivy_index, driver, graph ) . await } ?;
+        tantivy_index, driver, graph,
+        hoist_approved_pids ) . await } ?;
   if let Some (new_index) = save_replacement {
     *tantivy_index = new_index; }
   let nodeMerge_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "merge_nodes" ). entered();
-      merge_nodes (
+      crate::nodeMerge::merge_nodes_with_hoist_approval (
         nodeMerge_instructions, config,
-        tantivy_index, driver, graph ) . await } ?;
+        tantivy_index, driver, graph,
+        hoist_approved_pids ) . await } ?;
   if let Some (new_index) = nodeMerge_replacement {
     *tantivy_index = new_index; }
   { // The save-side telescope warning gate: same primitive as the
@@ -385,7 +405,7 @@ pub async fn update_typedb_from_saveinstructions (
 /// - textlinks_to: lives in body text; stripping requires body
 ///   rewriting. Dangling textlink targets render as PhantomUnknown
 ///   placeholders when followed, so this is non-fatal.
-fn apply_delete_propagation_cleanup (
+pub(crate) fn apply_delete_propagation_cleanup (
   node_defs  : &mut Vec<DefineNode>,
   graph_snap : &Arc<InRustGraph>,
 ) {
@@ -456,6 +476,7 @@ fn nodecomplete_from_noderust (
     source                       : rust . source . clone (),
     extra_ids                    : rust . extra_ids . clone (),
     title                        : rust . title . clone (),
+    ugly_telescope               : rust . ugly_telescope,
     aliases                      : rust . aliases . clone (),
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),
@@ -466,9 +487,9 @@ fn nodecomplete_from_noderust (
   }}
 
 fn remove_from_msv (
-  msv : &MSV<PrivaciedMember<ID>>,
+  msv : &MSV<MemberAtSource<ID>>,
   exclude : &HashSet<ID>
-) -> MSV<PrivaciedMember<ID>> {
+) -> MSV<MemberAtSource<ID>> {
   match msv {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
@@ -482,37 +503,112 @@ pub fn update_fs_from_saveinstructions (
   source_moves : &[SourceMove],
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
+  update_fs_from_saveinstructions_with_hoist_approval (
+    node_defs, source_moves, config, &HashSet::new () )
+}
+
+/// Save-only variant. Every delete target and every serialized telescope is
+/// prepared before the first filesystem mutation. The approval set is an
+/// explicit capability supplied only by the interactive Hoist retry; all
+/// ordinary callers use 'update_fs_from_saveinstructions' above and fail
+/// closed on ugly disk telescopes.
+pub(crate) fn update_fs_from_saveinstructions_with_hoist_approval (
+  node_defs             : &[DefineNode],
+  source_moves          : &[SourceMove],
+  config                : SkgConfig,
+  hoist_approved_pids   : &HashSet<ID>,
+) -> io::Result<(usize, usize)> { // (deleted, written)
+  prepare_fs_update (
+    node_defs, source_moves, &config, hoist_approved_pids ) ?
+  . apply (&config)
+}
+
+/// Validate and serialize a prospective filesystem batch, then discard the
+/// prepared bytes. The interactive save handler uses this on the union of its
+/// ordinary and nodeMerge outputs before either phase is allowed to mutate.
+pub(crate) fn preflight_fs_from_saveinstructions_with_hoist_approval (
+  node_defs           : &[DefineNode],
+  source_moves        : &[SourceMove],
+  config              : &SkgConfig,
+  hoist_approved_pids : &HashSet<ID>,
+) -> io::Result<()> {
+  prepare_fs_update (
+    node_defs, source_moves, config, hoist_approved_pids ) ?;
+  Ok (( ))
+}
+
+struct PreparedFilesystemUpdate {
+  writes       : Vec<PreparedTelescopeWrite>,
+  deletions    : Vec<String>,
+  deleted_pids : HashSet<ID>,
+}
+
+impl PreparedFilesystemUpdate {
+  fn apply (
+    self,
+    config : &SkgConfig,
+  ) -> io::Result<(usize, usize)> {
+    // Mutation starts only after the whole batch has passed ownership and
+    // serialization preflight.
+    for path in self . deletions {
+      match std::fs::remove_file (&path) {
+        Ok (( ))                                          => {},
+        Err (e) if e . kind () == io::ErrorKind::NotFound => {},
+        Err (e)                                           => return Err (e), } }
+    for telescope in &self . writes {
+      telescope . apply (config) ?; }
+    for telescope in &self . writes {
+      telescope . verify_hoist (config) ?; }
+    Ok (( self . deleted_pids . len (), self . writes . len () ))
+  }
+}
+
+fn prepare_fs_update (
+  node_defs           : &[DefineNode],
+  source_moves        : &[SourceMove],
+  config              : &SkgConfig,
+  hoist_approved_pids : &HashSet<ID>,
+) -> io::Result<PreparedFilesystemUpdate> {
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = DefineNode::partition_save_and_delete (node_defs);
-  let deleted : usize = {
-    let delete_targets : Vec<(ID, SourceName)> =
-      to_delete . into_iter ()
-      . map ( |DeleteNode { id, source }| (id, source) )
-      . collect ();
-    if ! delete_targets . is_empty () {
-      delete_all_nodes_from_fs (
-        delete_targets, config . clone () ) ?
-    } else { 0 } };
-  let written : usize = {
-    let nodes_to_write : Vec<NodeComplete> =
-      to_save . into_iter ()
-      . map ( |SaveNode (node) | node )
-      . collect ();
-    if ! nodes_to_write . is_empty () {
-      write_all_nodes_to_fs (
-        nodes_to_write, config . clone() ) ?
-    } else { 0 } };
+  let prepared_writes : Vec<PreparedTelescopeWrite> =
+    to_save . iter ()
+    . map ( |SaveNode (node)|
+      prepare_nodecomplete_telescope (
+        node,
+        config,
+        hoist_approved_pids . contains (&node . pid) ) )
+    . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
+
+  // Resolve every deletion path before applying either deletion or write.
+  // Only owned sections are eligible, exactly like the standalone deleter.
+  let mut prepared_deletions : Vec<String> = Vec::new ();
+  let mut deleted_pids : HashSet<ID> = HashSet::new ();
+  for DeleteNode { id, .. } in &to_delete {
+    for source in config . ordered_sources () {
+      if ! config . user_owns_source (&source) { continue; }
+      let path : String = crate::util::path_from_pid_and_source (
+        config, &source, id . clone () )
+        . map_err ( |e| io::Error::new (io::ErrorKind::NotFound, e) ) ?;
+      if std::path::Path::new (&path) . is_file () {
+        deleted_pids . insert ( id . clone () ); }
+      prepared_deletions . push (path); }}
+
   let _ = source_moves;
   // Source moves need no file relocation of their own anymore: the
-  // telescope write above places every section at its level and
-  // sweeps owned sections whose level lost its last member. An
+  // telescope write above places every section in its source and
+  // sweeps owned sections whose source lost its last member. An
   // explicit old-path delete here would even be WRONG for a
   // private->public home move, where the old (more private) source
   // legitimately retains a section holding the node's private
   // memberships. (source_moves still matter to TypeDB/Tantivy,
   // handled elsewhere.)
-  Ok ( (deleted, written) ) }
+  Ok ( PreparedFilesystemUpdate {
+    writes       : prepared_writes,
+    deletions    : prepared_deletions,
+    deleted_pids,
+  } ) }
 
 
 /// Updates the index with the provided DefineNodes.
