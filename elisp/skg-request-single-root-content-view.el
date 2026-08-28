@@ -7,7 +7,8 @@
 (require 'skg-buffer)
 (require 'skg-request-save) ; For message formatting/display helpers
 
-(defun skg--single-root-view-request-string (clean-id view-uri bypass-override)
+(defun skg--single-root-view-request-string (clean-id view-uri bypass-override
+                                                      &optional approved-pids)
   "The request sexp string for a single root content view of CLEAN-ID.
 When BYPASS-OVERRIDE is non-nil, the request carries
 \(override-choice . \"bypass\")."
@@ -17,10 +18,13 @@ When BYPASS-OVERRIDE is non-nil, the request carries
               (id . ,clean-id)
               (view-uri . ,view-uri))
             (when bypass-override
-              '((override-choice . "bypass")))))
+              '((override-choice . "bypass")))
+            (when approved-pids
+              `((allow-ugly-telescopes ,@approved-pids)))))
           "\n"))
 
-(defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc bypass-override)
+(defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc bypass-override
+                                                             approved-pids view-uri)
   "Ask Rust for an single root content view view of NODE-ID.
 Registers a response handler in the dispatch map.
 Optional TCP-PROC allows reusing an existing connection.
@@ -30,19 +34,44 @@ server opens the node itself instead of the override-choice menu.
 \(Recursive content beneath the root still substitutes.)"
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
-         (view-uri (org-id-uuid))
+         (view-uri (or view-uri (org-id-uuid)))
          (clean-id (if (stringp node-id)
                        (substring-no-properties node-id)
                      node-id))
          (request-s-exp
           (skg--single-root-view-request-string
-           clean-id view-uri bypass-override)))
+           clean-id view-uri bypass-override approved-pids)))
     ;; Register handler in dispatch map (one-shot)
     (skg-register-response-handler
      'content-view
      (lambda (tcp-proc payload)
+       (setq skg-response-handler-map
+             (assoc-delete-all 'ugly-telescope-confirmation
+                               skg-response-handler-map))
        (skg-handle-content-view-sexp tcp-proc payload view-uri))
      t)
+    ;; Alternative to content-view. Keep it non-one-shot so only the
+    ;; content-view branch contributes to the pending-response count.
+    (skg-register-response-handler
+     'ugly-telescope-confirmation
+     (lambda (tcp-proc payload)
+       (setq skg-response-handler-map
+             (assoc-delete-all 'ugly-telescope-confirmation
+                               skg-response-handler-map))
+       (when (assoc 'content-view skg-response-handler-map)
+         (setq skg-response-handler-map
+               (assoc-delete-all 'content-view
+                                 skg-response-handler-map))
+         (setq skg-lp--pending-count
+               (max 0 (1- skg-lp--pending-count))))
+       (let* ((response (read payload))
+              (prompt (format "%s" (cadr (assoc 'prompt response))))
+              (pids (mapcar (lambda (pid) (format "%s" pid))
+                            (cadr (assoc 'pids response)))))
+         (when (y-or-n-p (concat prompt " "))
+           (skg-request-single-root-content-view-from-id
+            clean-id tcp-proc bypass-override pids view-uri))))
+     nil)
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)) )
 
