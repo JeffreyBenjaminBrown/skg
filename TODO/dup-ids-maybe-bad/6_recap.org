@@ -1,0 +1,1033 @@
+#+title: Recap of dup-ids-maybe-bad
+#+date: <2026-08-27 Thu>
+
+* Bottom line
+
+  This branch is mostly done. The work described by
+  [[./3_plan.org]] was completed on <2026-07-29 Wed>: all twelve planned
+  items landed, plus one more one-file assumption found by the audit.
+  [[./5_progress.org]] is an accurate account of that implementation and
+  its July test run.
+
+  It is nevertheless not ready to merge unchanged. This review found two
+  safety gaps in the result, the more important of which is a read-time
+  privacy leak for malformed telescopes: a title/body stored below a
+  titleless public home can be exposed under the public source-set. The
+  writer's new ownership guard also checks only the home and can still
+  write a foreign non-home section. Both are now filed in
+  [[../problems.org]], together with a smaller architectural weakness in
+  the new 'Telescope' type.
+
+  So the useful mental model is:
+
+  - The ORIGINAL PLAN is done.
+  - The branch has two newly discovered correctness follow-ups before it
+    should merge.
+  - There is also an explicit product-policy decision that was left at a
+    safe interim answer, plus known test/data cleanup.
+
+* What prompted the branch
+
+  The phrase "duplicate IDs across sources" had become dangerously
+  backwards after privacy telescopes were introduced.
+
+  A privacy telescope is one logical node represented by same-pid '.skg'
+  sections at several privacy levels. Therefore the same pid appearing in
+  several sources is normal and is the feature.
+
+  The actual error is an ID CONFLICT: one id, whether a primary id or an
+  extra id, is claimed by two DIFFERENT pids. Such a conflict need not span
+  sources at all.
+
+  The existing check already made that distinction correctly, but its
+  name, messages, report filename, tests, and surrounding comments said
+  "duplicate IDs across sources". That had misled two readers and left a
+  stale generated report in real data describing nine healthy telescopes
+  as errors.
+
+  The investigation then found a real bug hidden by the same old mental
+  model: 'source_from_disk' walked 'config.sources', a randomized HashMap,
+  and returned the first source containing '<pid>.skg'. That was harmless
+  when one pid meant one file. With telescopes it returned an arbitrary
+  section, while every caller interpreted the answer as the node's HOME.
+  Some callers use that home to choose the privacy floor at which a new
+  relationship is written, so this was latent nondeterminism on a
+  privacy-sensitive path.
+
+  The deeper goal consequently became more than a rename:
+
+  - separate the valid telescope shape from a two-node ID conflict;
+  - make HOME mean one deterministic thing everywhere;
+  - surface malformed telescope shapes without bricking a pull;
+  - reject unsafe writes;
+  - move ID-conflict detection ahead of database population;
+  - represent "several files, one node" with a named type so the old
+    one-file assumption is harder to repeat;
+  - audit the known sites where that assumption might survive.
+
+  The full reasoning, including the TypeDB experiment, is in
+  [[./1_discussion.org]].
+
+* Branch and history
+
+** Base
+
+   As seen from the local refs on <2026-08-27 Thu>:
+
+   - 'main' and 'origin/main' are both
+     '3ddf0d89efc859a24b3dbe007652d257149082a6',
+     "Make bash/start-servers.sh more robust."
+   - That commit is also 'git merge-base main HEAD'.
+   - HEAD is 'afd3a28c0aa304390001273e2a1018470386b83e'.
+   - The branch is twelve commits ahead of that base.
+   - The local 'origin/dup-ids-maybe-bad' ref currently matches HEAD.
+
+   Thus the local repository shows no intervening main-line changes and
+   no merge/rebase conflict to solve. This says nothing about commits not
+   fetched into the local refs; I performed no fetch because the project
+   orientation forbids git writes.
+
+** The commit story, oldest first
+
+   - '8799b700' recorded the investigation and initial problem notes.
+   - '58b73655' renamed and reworded the ID-conflict check, retained the
+     claimant pids in its report, and made both initialization-error
+     reports remove stale copies on a clean run.
+   - '7abee844' replaced the randomized 'source_from_disk' fallback with
+     deterministic 'home_from_disk', walking the privacy order.
+   - '5d2cb614' made HOME definitionally the most public section and added
+     'FoldWarning::TitleBelowHome'.
+   - '6f1d4b04' carried fold/load warnings into
+     'telescope-warnings.org', added 'ForeignOverlay', and moved the
+     full-init ID check before TypeDB/Tantivy population.
+   - '379db56c' added writer refusals for a foreign home and for silently
+     hoisting private text into a titleless public home.
+   - '1b15f989' made the TypeDB id resolver prefer the primary-id node,
+     agreeing with the in-Rust graph in a degraded ambiguous database.
+   - '6796eff1' removed 'skg-migrate-to-telescopes' from live Rust,
+     Emacs, API, and command wiring and buried it under
+     '_burying/not_using/obsolete/migrate-to-telescopes/'. It also added
+     the final [[./3_plan.org]].
+   - '6f9f0108' introduced the load-side 'Telescope' type and centralized
+     its fold entry points.
+   - 'f10951b8' fixed the extra audit finding:
+     'deleted_ids_to_source' had also selected a deleted telescope's home
+     by HashMap order; it now keeps the most public section.
+   - 'd92e0fb6' wrote [[./4_audit-list.org]], moved the problems this arc
+     closed to 'TODO/DONE/problems.org', and filed the unrelated red
+     override-menu test.
+   - 'afd3a28c' wrote [[./5_progress.org]].
+
+   Relative to main, the branch touches 51 files, with 2,341 insertions
+   and 376 deletions. Much of that is the four documents in this folder;
+   the implementation is concentrated in filesystem loading/writing,
+   telescope fold/invariants/types, initialization, the TypeDB resolver,
+   source lookup, and their tests.
+
+* What is done
+
+** The vocabulary now says what the code means
+
+   'check_for_duplicate_ids_across_sources' became
+   'error_unless_each_id_names_one_node'. User-facing messages and the
+   generated report consistently say "id(s) claimed by more than one
+   node". The report is now
+   'initialization-error_ids-claimed-by-two-nodes.org', and each conflict
+   names its claimant pids as well as their homes.
+
+   The important negative fact remains tested: same-pid sections in two
+   sources fold into one telescope and are not an ID conflict.
+
+** Stale generated reports are removed
+
+   A clean run removes the new ID-conflict report and
+   'initialization-error_unreadable-skg-files.org', matching the existing
+   behavior of 'telescope-warnings.org'. Therefore the presence of any of
+   the current report filenames describes the most recent run.
+
+   One deliberate exception is the RETIRED filename
+   'data/initialization-error_duplicate-ids.org'. The new code neither
+   writes nor removes that old name. See "Data cleanup" below.
+
+** Home selection is deterministic
+
+   'home_from_disk' walks 'SkgConfig::ordered_sources' from most public to
+   most private and returns the first existing section. The fold uses the
+   same definition: the first, most-public section is the home, whether or
+   not it contains the title.
+
+   A title below home is no longer silently searched past. It produces a
+   'TitleBelowHome' fold warning; no title anywhere remains a hard load
+   error, unchanged from before this branch.
+
+** Load-time warnings reach the user-visible report
+
+   The new
+   'read_all_skg_files_from_sources_collecting_violations' returns fold
+   warnings and foreign-overlay warnings to init/rebuild. They are merged
+   with graph-level telescope invariants and written to
+   'telescope-warnings.org'. This generalized the plan slightly: every
+   'FoldWarning' is reported, not only the two newly interesting shapes.
+
+** Full initialization rejects ID conflicts before populating databases
+
+   This matters because the TypeDB experiment found two different failure
+   modes:
+
+   - two 'extra_id' entities claiming the same value make TypeDB fail first
+     with a raw uniqueness error that names neither claimant;
+   - one node's pid equaling another node's extra id is accepted by TypeDB,
+     even though id resolution becomes ambiguous.
+
+   Full init now runs the readable Rust check before writing either TypeDB
+   or Tantivy. Rebuild already had the safe ordering. The incremental path
+   caveat remains below.
+
+** Unsafe text placement is refused at write time
+
+   The writer refuses a node whose home is foreign, rather than dropping
+   the title or trying to modify a foreign home. It also refuses a write
+   that would put the folded title into an already-existing titleless home,
+   because that would silently publish text from a more-private section.
+
+   This is the safe interim REFUSE policy. It is intentionally not an
+   automatic repair.
+
+** The two id resolvers agree in degraded state
+
+   A pid/extra-id collision is now refused before normal startup, but if a
+   database somehow contains one, 'pid_and_source_from_id' prefers the row
+   whose primary id is the queried id. That matches 'InRustGraph::pid_of'
+   instead of accepting TypeDB row order as an answer.
+
+** The obsolete migration is out of the live product
+
+   'skg-migrate-to-telescopes' was a one-user, one-time migration and had
+   already served its purpose. Its code is preserved in the graveyard with
+   resurrection notes; the live protocol/client/docs no longer advertise
+   it. Per-edge repair now points to 'skg-set-relationship-source'.
+
+** The load boundary has a 'Telescope' value and an audit artifact
+
+   Same-pid files are grouped into 'Telescope { pid, sections }' before
+   folding, replacing anonymous vectors at the main load sites. The type
+   supplies home/extra-id/misc helpers and makes the many-file shape
+   visible to callers.
+
+   [[./4_audit-list.org]] records every one-ID-one-file assumption checked
+   during the arc. It marks none still assumed and found the separate
+   'deleted_ids_to_source' HashMap-order bug, which was fixed.
+
+* Verification status
+
+** The July completion run
+
+   [[./5_progress.org]] records:
+
+   - Rust: 540 of 541 passed. The sole failure was
+     'override_menu::all_tests', reproduced with this arc removed and thus
+     judged pre-existing. It is still open in [[../problems.org]].
+   - Emacs: 295 of 295 passed.
+   - Integration: 26 of 26 passed.
+
+** This recap's checks
+
+   On <2026-08-27 Thu>, I ran the seven focused tests for the renamed
+   conflict check/report, deterministic home lookup, home folding, and
+   writer refusals. All seven passed:
+
+   #+begin_example
+   7 tests run: 7 passed, 534 skipped
+   #+end_example
+
+   'git diff --check main...HEAD' also passed.
+
+   I did not rerun the full suite: neither TypeDB nor an Skg server was
+   listening, and the project test instructions say the Rust/Emacs/
+   integration suites require those services. The July full-suite result
+   should therefore be treated as historical evidence, not a fresh green
+   run.
+
+* What remains before merge
+
+** ONGOING Blocker: prevent read-time leakage from 'TitleBelowHome'
+discussion, flattened
+*** Codex explains the problem
+   Current folding gives a malformed telescope both:
+
+   - 'source = public-home', and
+   - 'title/body = text read from a more-private section'.
+
+   Source-set filtering then considers the node public. At least the
+   direct-view gate, title lookup, Tantivy search, and org export operate on
+   that public source plus the fully folded private text. The warning and
+   save refusal do not protect reads.
+
+   This contradicts both the source-set privacy promise and the warning's
+   own statement that a reader restricted to the home's level cannot see
+   the text. It is latent unless malformed data is pulled or hand-written;
+   today's real 'telescope-warnings.org' contains no 'TitleBelowHome'. But
+   malformed cross-file input is explicitly supposed to load with a
+   warning rather than brick the server, so it still needs safe rendering.
+
+   The fix needs a policy: omit/quarantine such a node below 'title_at',
+   retain the title/body's provenance and build a genuine visible scalar
+   fold, or strengthen this particular violation into a load refusal. A
+   source-set regression test must accompany it.
+
+*** J to C : Should the title not be in the most public layer?
+I thought that was an invariant. If not, I suspect it needs to be,
+because otherwise a subscriber who only has that public layer
+won't have a title for the node.
+If I have somehow misunderstood, please explain;
+if not, please talk about what, if anything remains to be done on this front.
+
+*** (C to J)
+
+Yes. You understood it correctly: in a well-formed telescope, the title
+and body live in its most-public existing section. This branch calls that
+section the 'home'. The ordinary save path already creates that shape.
+
+The complication is damaged or externally supplied data. A hand edit,
+pull, or foreign overlay can leave, for example, a titleless public section
+and put the text in a private section. A subscriber with only the public
+source would indeed have no title on disk, so that telescope violates the
+invariant and must not be treated as ordinary data.
+
+The branch detects that shape as 'TitleBelowHome', reports it, and refuses
+to save it (because an automatic save would hoist and publish its private
+text). What remains is a read-side bug: the fold still combines the public
+section with the private title/body, and source-set filtering gates the
+result only by the public home. Thus a public-only view can currently see
+the private text despite the warning. We need a safe policy and a
+regression test for malformed on-disk input -- probably omit or quarantine
+the node below the level containing its title, retain scalar provenance so
+we can make a genuinely source-filtered fold, or refuse this particular
+node at load time. That read-side repair is needed even if save-time REFUSE
+remains the permanent policy.
+
+*** J to C : buffer or skg files?
+Are we talking about protection from invalid buffer text,
+or from invalid .skg files?
+
+*** (C to J)
+
+Invalid '.skg' files. More exactly, this is protection from a telescope
+whose files disagree about where its scalar text lives: a titleless
+most-public section exists on disk, while a more-private section contains
+the title/body. A buffer cannot directly express that split because it
+contains one folded title/body and one node source, not a separate title
+for each telescope section.
+
+The existing malformed-buffer pipeline is discussed separately below.
+*** ONGOING J to C
+Okay. If the telescope has a title below home, let's ingest it into
+TypeDB etc. normally, but warn the user.
+Then, if they ask for a view that would include that node,
+we ask them before presenting the view:
+"The text of the node with ID <ID> is defined in a .skg file that is more private than its home. (That is ugly data, which Skg itself cannot create, but Skg can handle it.) Rrender the node nonetheless?"
+And if they then save such a node, similarly explain that it was loaded from "ugly" data with a telescope with title under home, and offer to abort. if they proceed, clobber the bad telescope with a good one ("hoisting" the text).
+
+Note that it's not just the title that could be above home.
+The title *and* the body both could be.
+If either of them is below home, that's ugly data.
+
+If you see problems with what I'm asking for,
+please append a sibling to this node explaining them.
+
+*** TODO (C to J)
+
+The policy is workable, and I read "above home" in the penultimate
+paragraph as "below home" (more private than home). I see four design
+requirements rather than a reason to reject it.
+
+**** First, the fact needed for the prompt currently disappears after load.
+'fold_sections' returns the folded text and a 'TitleBelowHome' warning;
+initialization writes the warning to 'telescope-warnings.org', then builds
+'NodeRust' values containing only home, title, and body. TypeDB, Tantivy,
+and the live graph therefore cannot later distinguish an ugly node from a
+normal one. We need to retain scalar provenance at runtime -- at least
+'title_at' and 'body_at', or an equivalent per-pid record -- rather than
+treating the load warning as report-only information.
+***** ONGOING J to C
+How about keeping an 'ugly telescope' boolean field?
+If we need to see where things came from, we can look at the .skg files again.
+***** TODO (C to J)
+
+Yes, a boolean is enough if the runtime policy is deliberately coarse:
+
+- 'ugly_telescope = false': render normally;
+- 'ugly_telescope = true' under 'all': warn but render, per your decision
+  below;
+- 'ugly_telescope = true' under any restricted source set: require
+  confirmation before releasing its text.
+
+That policy does not need to know whether the title came from R and the
+body from S. The fold still has to inspect title and body independently in
+order to compute the boolean correctly, but it can discard their precise
+origins afterward. We can reread the telescope at save time, when we need
+the actual files in order to offer and perform a hoist.
+
+I would not reread '.skg' files during ordinary view or search requests.
+Besides adding filesystem work to hot paths, the files could have changed
+since the graph and search index were loaded, making the decision describe
+different data from the text about to be shown. Put the boolean in the
+loaded graph, and in the Tantivy document or equivalent search-side filter,
+so every request judges the same snapshot it is querying.
+
+One consequence is intentional overprotection: a restricted source set
+that actually includes the lower scalar source still prompts, because the
+boolean cannot prove that. If "the active set suggests the user doesn't
+care" specifically means the special 'all' set, the boolean is sufficient.
+If it means any set containing the real scalar origins, we need to retain
+those origins after all.
+
+Search also needs a slightly different confirmation flow from a direct
+view. Under a restricted set it must exclude ugly documents before
+matching; prompting afterward would reveal that the private query text
+matched. The user can opt into "search ugly telescopes too" before the
+query is run. Direct views, title lookups, and exports already know their
+candidate IDs independently of the hidden text and can challenge for those
+specific IDs.
+***** TODO J to C : I like it. Coarse it is.
+**** Second, I agree that title and body must be judged independently.
+Current
+folding does not quite do that. It records 'title_at', and it copies a body
+when that body accompanies the selected title. But if the home has the
+title and a lower section alone has the body, that lower body is not folded
+into the node or reliably represented as "body below home". To implement
+your rule, the fold should select the most-public title and most-public
+body independently, retain each source, and classify the telescope as ugly
+when either present scalar's source differs from home. Extra titles or
+bodies below the selected ones remain separate duplicate/stray warnings.
+
+**** Third, the confirmation must guard every way text leaves the server,
+not only the ordinary single-root view. Title lookup, search, rerendering,
+exports, and any API that returns node text all need the same decision
+point. Search is the subtle case: if Tantivy matches a private body word
+and only then returns a challenge naming the matching ID, the fact that
+the query matched has already leaked. We therefore need one centralized
+scalar-visibility rule and search behavior that does not reveal a match
+before authorization. A good protocol shape is:
+
+1. The server returns a typed "ugly telescope requires confirmation"
+   response containing the pid and scalar source(s), but no title/body.
+2. Emacs presents your explanation and retries the request with an
+   explicit per-request allowlist of confirmed pids.
+3. Batch views prompt once for all affected pids. Noninteractive callers
+   such as export must either supply the same explicit override or fail
+   closed.
+***** TODO J to C : Let's do it.
+**** We should decide whether to prompt for every view of ugly data,
+as your
+wording says, or only when the active source set excludes 'title_at' or
+'body_at'. The latter is the privacy-critical case; the former also makes
+the data-quality warning impossible to miss. Any remembered approval
+should at most be scoped to the source set and a fingerprint of the
+current telescope, so a later pull or source-set change cannot inherit a
+stale authorization.
+***** TODO J to C
+If the active set suggests the user doesn't care,
+let's warn but display without asking for confirmation.
+**** Fourth, confirmed hoisting can make an all-owned telescope well formed,
+but it cannot always "clobber" a telescope containing foreign sections.
+The save flow should first preflight every affected section. If home and
+all scalar-bearing sections to repair are owned, it can ask the user,
+write both title and body to home, remove their lower owned copies while
+preserving those sections' relationships/aliases, and then verify the
+result. If home or a lower scalar-bearing section is foreign, Skg must not
+overwrite or delete it. Hoisting into an owned home could leave the
+foreign duplicate behind, so it would not actually produce a clean
+telescope; that case still needs manual/source-owner repair and a refusal.
+***** TODO I realize now I'm makig this too annoying.
+If a foreign writer who I subscribe to has .skg files with the same pid
+as some of mine, there are three plausible explanations:
+- they or we cloned my data by hand in their repo, ineptly or maliciously
+- mine has a UUID collision with theirs, about something unrelated
+- mine has a UUID collision with theirs, about the same topic
+The collision cases are so unlikely that we can ignore them.
+In the other case, I don't want Skg to assume I did something wrong.
+It should just explain at load that non-owned fiels use the same PID
+as one of my files, list the offending PID(s), and explain that it ignored them.
+That foreign data is thereafter unreachable within Skg.
+I can look at the raw .skg files if I need to know.
+**** On an ordinary all-owned ugly telescope, the save choice can now be just
+what you requested: explain that saving will publish the lower text at
+home; offer Abort (with manual '.skg' repair instructions) or Hoist; and,
+after explicit confirmation, perform the complete preflighted rewrite.
+The read/presentation gate remains necessary until that repair succeeds.
+** ONGOING Blocker: enforce ownership for every section before writing
+discussion, flattened
+*** Codex explains
+   'error_unless_home_is_writable' checks only the home. If an owned-home
+   telescope has a foreign section later in the privacy order, sticky edge
+   levels can preserve that section and the write loop will write it,
+   because the loop has no per-level 'user_owns_source' check.
+
+   The writer should validate every output level before writing the first
+   file, then reject or otherwise preserve foreign sections without
+   mutation. A test should mirror the existing foreign-home test with an
+   owned home and a foreign non-home section.
+
+*** DONE (J to C)
+Suppose a user has sources U (public), R (private) and F (foreign),
+and let nodes u, r and f have their home in each respectively.
+If the user saves a buffer in which r is an ordinary content child of u,
+and the user does not explicitly set a different relationship source,
+am I correct that the u-contains-r relationship
+is stored in the R layer of the representation of u?
+If not, what happens?
+
+If so, then that same idiom won't work if we substitute f for r,
+because there can be no F layer of U.
+So I believe the rule should be that if a user makes a non-owned node
+content of an owned node,
+that relationship belongs in the home layer of the owned node,
+unless the user explicitly makes the relationship more private.
+
+(Also, am I correct that 'home' means 'most public'?)
+
+Does this child response entirely cover how to handle
+the problem described in its parent?
+
+*** ONGOING (C to J)
+
+For u containing r: yes, provided the edge is new, the sources are ordered
+U then R then F, and the buffer has no explicit '(relSource ...)'. The
+default is the more-private of the two endpoint homes, hence R. The R
+section of u's telescope -- 'R/u.pid.skg', not r's file -- records the
+contains member. Someone with only U therefore does not learn r's ID or
+the relationship.
+
+There are two qualifications. If that edge already exists, its disk level
+is sticky in the absence of an explicit level, so it retains that level
+rather than necessarily moving to R. An explicit relationship source can
+move it, subject to the privacy floor.
+
+For u containing foreign f, current code does not implement your proposed
+exception for a new edge. It computes the more-private of U and F without
+regard to ownership. If F is later in the privacy order, the default is F,
+so unfolding makes an F section of u and the writer then attempts to write
+it. (If F is earlier than U, the default is U and this particular problem
+does not arise.) The F-default case is precisely the newly found ownership
+hole. Existing below-default edges to foreign nodes are already treated
+specially so that their owned-source representation can round-trip, which
+supports the rule you propose: a new owned-to-foreign edge needs an owned
+default, plausibly u's home, and an explicit gesture may place it in a
+more-private owned source. This is necessarily an exception to the usual
+endpoint privacy rule: recording it at U reveals f's ID and the
+relationship to a U-only reader even when f's home is more private. If
+that is intended for references to shared foreign material, the code and
+documentation should name the exception explicitly.
+
+And yes: on this branch, 'home' means the most-public existing section of
+the telescope, whether that section is owned or foreign. In well-formed
+data it is also the section that contains title and body.
+
+Your proposed edge-default rule does not entirely cover the parent
+writer problem. It prevents this particular kind of newly created edge
+from producing an F section, but a sticky old edge, a hand-authored
+explicit level, an alias or other future levelled datum, or already
+malformed disk data can still leave a foreign non-home section. The writer
+therefore still needs to preflight every output section and refuse before
+writing anything if any output level is unowned. That independent guard
+makes the ownership promise true for every caller and avoids partial
+writes.
+
+*** ONGOING J to C
+"but a sticky old edge,
+a hand-authored explicit level,
+an alias or other future levelled datum
+... can still leave a foreign non-home section"
+
+Please walk me through what you mean by each of those three cases.
+
+*** TODO (C to J)
+
+All three begin with an owned node u whose home is U and some foreign
+source F. The writer unfolds each levelled member into the section named
+by that member's level. At present it validates only u's home, so anything
+that survives with level F sends the write loop to F/u.pid.skg.
+
+1. Sticky old edge. Suppose u's on-disk telescope already says, in its F
+   section, that u contains x. That file might have arrived in a pull or
+   hand edit, or survived from older behavior. The buffer does not ask to
+   move the edge. 'apply_sticky_levels' therefore preserves its disk level
+   F. Unfolding puts it back in F and the writer attempts to rewrite that
+   foreign file. "Old" means already on disk; it does not mean that age
+   itself makes the edge dangerous.
+
+2. Hand-authored explicit level. '(relSource F)' is load-bearing buffer
+   text. A user can type it rather than choosing a source through the
+   Emacs gesture. Save-time validation checks its privacy floor but does
+   not currently check ownership. When F is an acceptable privacy level,
+   the edge is assigned F and the same foreign write follows. This is why
+   the server must validate the atom even if the UI normally emits it --
+   and why privacy validation alone is not enough.
+
+3. Alias (or a future levelled field). Aliases have levels too, but no
+   '(relSource ...)' gesture. An alias already read from u's F section is
+   sticky by its text, so an otherwise unrelated save of u preserves the
+   alias at F and unfolds it back into that foreign section. "Future
+   levelled datum" means any later field that can carry a section level
+   could repeat this route if its own code forgets ownership checking.
+
+The first and third cases require pre-existing malformed/foreign overlay
+data; the second can be requested by buffer text today. A single preflight
+over every unfolded output section covers all three, plus future fields,
+without relying on each levelling rule to remember ownership separately.
+
+*** DONE J to C
+I didn't understand the first paragraph:
+"All three begin with an owned node u whose home is U and some foreign
+source F. The writer unfolds each levelled member into the section named
+by that member's level. At present it validates only u's home, so anything
+that survives with level F sends the write loop to F/u.pid.skg."
+
+Please define 'unfold', 'levelled member', and 'survive'.
+
+*** DONE (C to J)
+
+'Fold' and 'unfold' are the two directions between disk and memory:
+
+- To fold is to read all of one node's section files and combine them into
+  one in-memory node. For example, U/u.pid.skg plus R/u.pid.skg become one
+  'NodeComplete' for u.
+- To unfold is the reverse operation used when saving: take that one
+  in-memory node and split its data by privacy source, producing the
+  section contents to write back to U/u.pid.skg, R/u.pid.skg, and so on.
+
+A 'levelled member' is one item that carries both its value and the source
+where it belongs. In the Rust type 'PrivaciedMember<T>', 'member' is the
+value -- for example, child x's ID in u's contains list, or an alias string
+-- and 'level' is a source name such as U, R, or F. During unfold, level R
+means "put this item in u's R section."
+
+'Survive' was vague shorthand and I should not have used it. I meant that,
+after buffer parsing, supplementation from disk, sticky/default level
+resolution, and validation, the item still has level F when the writer
+starts. Nothing dropped it, moved it to an owned level, or rejected the
+save. The problematic sequence is therefore:
+
+1. u is an owned node whose home is U.
+2. One of u's members reaches the writer tagged 'level = F'.
+3. Unfold places that member in the proposed F section of u.
+4. The current writer checks that U is owned, but not that F is owned, and
+   attempts to write F/u.pid.skg.
+
+The proposed all-output preflight rejects at step 4 before writing any
+section.
+
+*** ONGOING J to C : levelled member feels like bad language
+'Level' could mean way too many things.
+Is that in the repo already?
+Wouldn't 'sourced member' be better?
+If so, let's change it everywhere to that.
+
+*** ONGOING (C to J)
+
+The exact phrase "levelled member" was not established vocabulary before
+this recap; I introduced it here. There is one pre-existing code comment
+saying "leveled members," but the repository normally says "leveled
+list," "edge level," or "relationship source." The Rust type itself is
+'PrivaciedMember<T> { level, member }'. In fact,
+[[../DONE/privacy-telescope/5_plan.org]] records an earlier deliberate
+rename from 'LeveledMember' to 'PrivaciedMember'. The glossary nevertheless
+defines "privacy level" and the 'level' field, so "leveled" is widespread
+in comments, documentation, locals, and tests even though it is not the
+type's name.
+
+"Sourced member" is better than "levelled member" in ordinary discussion,
+especially because the user-facing metadata is already 'relSource'. My
+only reservation is that "sourced" can sound like the source/home of the
+member node, whereas this value names the source that records the
+relationship instance. "Member at source" or "source-tagged member" is
+unambiguous in prose.
+
+A genuine everywhere-change should be explicit about whether it is only
+terminology or also Rust vocabulary. The internally consistent code rename
+would be something like:
+
+  'PrivaciedMember<T> { level, member }'
+  -> 'MemberAtSource<T> { source, member }'
+
+and would update helpers, variables, comments, the glossary, docs, and
+tests. I prefer 'MemberAtSource' to 'SourcedMember' because it states
+exactly what the pair means. It is a broad but mostly mechanical rename and
+should be its own commit; it should not be mixed with the behavioral task
+of adding alias 'relSource' metadata. I have not performed either task.
+
+*** ONGOING J to C
+I agree, MemberAtSource is better yet.
+Let's also rename
+'edge level' -> 'edge source',
+and maybe 'leveled list' -> 'list of sourced pairs'.
+I'm not sure about that second one, though.
+Can you provide here a list of links (formatted so I can follow them from Emacs)
+to places that say some variant of 'leveled list'?
+
+*** TODO (C to J)
+
+Yes. I searched case-insensitively for singular, plural, and hyphenated
+American/British spellings of "leveled list," excluding this recap. There
+are 23 occurrences in 11 files. These are Org 'file:' links with line
+searches, so 'org-open-at-point' should follow them from Emacs.
+
+**** Live Rust comments
+
+- [[file:../../server/nodeMerge/nodeMergeInstructionTriple.rs::183][server/nodeMerge/nodeMergeInstructionTriple.rs:183]] -- "Combining LEVELED lists".
+- [[file:../../server/test_utils.rs::604][server/test_utils.rs:604]] -- the historical 'leveled-lists' work-item name.
+- [[file:../../server/telescope/fold.rs::2][server/telescope/fold.rs:2]] and
+  [[file:../../server/telescope/fold.rs::27][server/telescope/fold.rs:27]] -- "effective leveled lists".
+- [[file:../../server/telescope/unfold.rs::1][server/telescope/unfold.rs:1]],
+  [[file:../../server/telescope/unfold.rs::10][server/telescope/unfold.rs:10]], and
+  [[file:../../server/telescope/unfold.rs::18][server/telescope/unfold.rs:18]] -- the unfold and round-trip descriptions.
+- [[file:../../server/to_org/complete/partner_col/goal_list.rs::134][server/to_org/complete/partner_col/goal_list.rs:134]] -- "leveled-list change".
+- [[file:../../server/to_org/complete/partner_col/inverse_scan.rs::50][server/to_org/complete/partner_col/inverse_scan.rs:50]] -- the 'leveled-lists' work item.
+- [[file:../../server/types/misc.rs::110][server/types/misc.rs:110]] and
+  [[file:../../server/types/misc.rs::138][server/types/misc.rs:138]] -- the work-item name and "members of a leveled list".
+
+**** Tests
+
+- [[file:../../tests/unit/telescope.rs::3][tests/unit/telescope.rs:3]],
+  [[file:../../tests/unit/telescope.rs::33][tests/unit/telescope.rs:33]], and
+  [[file:../../tests/unit/telescope.rs::49][tests/unit/telescope.rs:49]] -- round-trip/property-test descriptions.
+
+**** Historical privacy-telescope records
+
+- [[file:../DONE/privacy-telescope/progress.org::11][TODO/DONE/privacy-telescope/progress.org:11]] and
+  [[file:../DONE/privacy-telescope/progress.org::31][TODO/DONE/privacy-telescope/progress.org:31]].
+- [[file:../DONE/privacy-telescope/4_discussion.org::412][TODO/DONE/privacy-telescope/4_discussion.org:412]].
+- [[file:../DONE/privacy-telescope/5_plan.org::46][TODO/DONE/privacy-telescope/5_plan.org:46]],
+  [[file:../DONE/privacy-telescope/5_plan.org::136][line 136]],
+  [[file:../DONE/privacy-telescope/5_plan.org::228][line 228]],
+  [[file:../DONE/privacy-telescope/5_plan.org::316][line 316]],
+  [[file:../DONE/privacy-telescope/5_plan.org::518][line 518]], and
+  [[file:../DONE/privacy-telescope/5_plan.org::768][line 768]].
+
+After seeing the inventory, I would use "source-tagged member list" or
+"list of members at sources," not "list of sourced pairs." The latter
+loses the important fact that each pair is one relationship/alias member.
+I would update the live comments and tests, but preserve the literal
+'leveled-lists' labels in the DONE records where they name a historical
+work item and commit. A short parenthetical can give the new term there
+without rewriting the project history.
+
+*** TODO J to C : let's go with 'list of members at sources'
+*** TODO J to C : Let's make the relSource metadata work on aliases, too.
+
+** Product choice: REFUSE, HOIST, or COLLAPSE
+discussion, flattened
+*** Codex explains
+   For an owned, titleless public section above a titled private section,
+   the plan considered:
+
+   - REFUSE the save until a human repairs it;
+   - HOIST the title/body into the public home, silently publishing it;
+   - COLLAPSE the public section downward, silently deleting/re-homing it.
+
+   The branch implements REFUSE because it neither publishes nor destroys.
+   That is a reasonable safe default. Jeff can leave it as the permanent
+   policy or choose another deliberate gesture later, but the read-time
+   leak above has to be solved even if REFUSE stays.
+
+*** DONE (J to C) please elaborate on this
+(I didn't read your whole report; if I'm asking you to repeat yourself,
+I apologize, but still, please repeat yourself here.)
+First of all are we talking about what to do when reading malformed .skg files,
+or about what to do when trying to read a malformed buffer?
+
+*** DONE (C to J)
+
+Malformed '.skg' files on disk, not a malformed Emacs buffer.
+
+The concrete disk shape is that U/N.skg exists but has no title (perhaps it
+only contains an edge), while R/N.skg has N's title and body. Normal saves
+do not create this; a hand edit, pull, or foreign overlay can. During
+startup, the reader currently folds both files, calls U the home, takes the
+text from R, and emits a 'TitleBelowHome' warning. The read-time leak above
+happens at that point.
+
+REFUSE, HOIST, and COLLAPSE describe what to do later if the user tries to
+save N from a buffer:
+
+- REFUSE, the current behavior, makes no disk change and asks a human to
+  repair the telescope.
+- HOIST writes the title/body into U, silently publishing text that had
+  been private.
+- COLLAPSE moves U's contributions down to R and removes U/N.skg,
+  preserving the text's privacy but silently deleting/re-homing data.
+
+Malformed-buffer validation is a separate subject. Here we need two
+policies: safe behavior while reading the malformed disk telescope, and
+what a later save attempt may do to repair it. The save policy can remain
+REFUSE, but that alone does not solve the read-time exposure.
+
+*** TODO J to C : let's offer to hoist
+and explain that otherwise they'll have to repair the .skg files themselves.
+
+*** DONE J to C : Have we also covered the malformed buffer text case?
+
+*** DONE (C to J)
+
+Yes as a separate save pipeline, with one important distinction: it is
+not part of the REFUSE/HOIST/COLLAPSE choice, and this branch did not need
+to invent it.
+
+Before any filesystem write, 'buffer_to_validated_saveplan' validates the
+buffer in stages. The raw parser rejects malformed or unclosed metadata,
+unknown metadata forms, illegal internal markers, and impossible Org
+headline jumps. Tree validation then checks structural and semantic
+claims such as contradictory definitions/sources, illegal column shapes,
+tampered IDs and override markers, and invalid view requests. Later stages
+validate relationship-source floors, foreign-node edits/creation, source
+moves, forks, and override invariants. An error aborts plan construction;
+the write phase is not entered.
+
+The specific 'TitleBelowHome' shape cannot be authored solely in a buffer:
+the buffer format has no way to say "put this title in R but keep a
+titleless section in U." It arises in the '.skg' telescope. A perfectly
+parseable buffer rendered from that bad telescope can nevertheless be
+dangerous to save because folding has erased the title's provenance; that
+is why the disk-shape guard refuses the implicit hoist. If we implement
+your offer-to-hoist choice, hoisting should require an explicit
+confirmation and the refusal message should explain the manual repair
+alternative.
+
+There is no credible claim that every conceivable malicious buffer has
+been proved safe, but there is a substantial tested validation boundary.
+The foreign-section case above is a known hole after that boundary: the
+buffer can be syntactically valid yet yield an output level the user does
+not own. The proposed writer preflight closes that hole independently of
+buffer validation.
+
+** Known limitation: incremental init checks too late
+
+   Full init checks before database population. Incremental init applies
+   its changed-file deltas first, then performs the full read and conflict
+   check. Moving the check ahead would erase much of incremental init's
+   purpose, and the path is already marked "DEAD ?" in 'server/dbs/init.rs'.
+   [[./5_progress.org]] treats the exposure as small, but it remains real:
+   an edited file can introduce a conflict after TypeDB/Tantivy were
+   touched.
+
+** Known architectural debt
+
+*** 'Telescope' is load-side only.
+discussion, flattened
+**** Codex explains
+unfold still returns a bare vector of
+sections. It cannot yet express 'fold(unfold(x)) == x' at the type
+boundary.
+
+**** ONGOING J to C : please elaborate
+**** TODO (C to J)
+
+On the load side, the named type makes the operation look roughly like:
+
+  'fold_telescope(Telescope) -> NodeComplete'
+
+Even before we strengthen its private fields and constructor, the type
+communicates that the input is one pid's complete collection of sections,
+in privacy order. After the approved invariant work, the compiler will
+also prevent callers from manufacturing an unchecked or reordered
+'Telescope'.
+
+The save side currently looks roughly like:
+
+  'unfold_node(UnfoldInput) -> Vec<(SourceName, SectionSlices)>'
+
+That return value is only a generic vector. Its type does not say that the
+sources are configured, unique, ordered, or owned; that the first section
+is home; or even which pid the collection belongs to. The writer supplies
+the pid and other file fields separately and trusts the vector's shape.
+Thus the privacy-telescope abstraction protects the disk-to-memory
+direction more strongly than the memory-to-disk direction.
+
+'fold(unfold(x)) == x' names the round-trip law we want: take a valid
+in-memory node x, split it into telescope sections, then fold those
+sections again, and recover the same effective node (allowing only
+deliberately irrelevant serialization distinctions). Today tests can
+check examples of that property, but the boundary types do not make an
+invalid unfold result difficult to represent.
+
+This debt is related to, but not solved by, making 'Telescope' fields
+private. That approved change secures values constructed for the load-side
+fold. A later save-side change could make 'unfold_node' return a checked
+'UnfoldedTelescope' (or a full checked 'Telescope' once pid, extra IDs, and
+misc file properties are supplied) instead of a bare vector. The writer
+would then accept only that type. I suggested keeping it separate because
+it changes the unfold/writer boundary and its round-trip tests, whereas
+the private-field change is a small encapsulation repair at four existing
+construction sites.
+**** J to C
+Let's include that in the plan we're about to write next (the 7th doc)
+but plan to make it a separate commit.
+*** TODO make the Telescope type enforce its invariants
+discussion, flattened
+**** Codex explains
+'Telescope.sections' is public and the constructor does not validate
+privacy order. Current builders establish the order by convention,
+so the type makes the shape visible but does not enforce the invariant
+that its documentation claims.
+**** DONE (J to C)
+What would validation cost in terms of CPU?
+Would it make loading the graph much slower?
+Loading a view?
+**** DONE (C to J)
+Very little. Checking that one telescope's sections are in privacy order
+is O(k), where k is that node's number of existing sections -- normally
+one or a small handful. It happens while constructing telescopes during a
+disk load and is dwarfed by directory traversal, YAML parsing, and database
+work. Sorting defensively would be O(k log k) and would also be tiny, though
+a checked constructor is clearer because silently sorting can hide a bad
+caller.
+
+It should add no recurring cost to loading ordinary views: those views use
+the already-loaded in-Rust graph/database. A path that falls back to
+reading one node from disk would pay the same tiny one-telescope check,
+again much less than file I/O.
+
+The stronger design is to make 'sections' private and permit construction
+only through routines that already walk 'ordered_sources'. A cheap check
+can then defend that boundary (or be an assertion in tests) rather than
+being repeated at every consumer.
+
+**** DONE J to C : I like the stronger design idea.
+But please spell it out in detail before I sign off.
+
+**** DONE (C to J)
+
+The invariant I would put in the type is narrow: a 'Telescope' is a
+nonempty collection of sections for one pid, with each source configured,
+no source repeated, and the sections strictly ordered from most public to
+most private according to this 'SkgConfig'. If a value exists, 'home()' is
+therefore unambiguously its first section. Content problems such as
+'TitleBelowHome' and dangling anchors remain fold violations; the
+constructor should not conflate those with structural ordering.
+
+Concretely:
+
+1. Make both fields (PID and sections) private.
+   Expose 'pid()', 'home()', 'sections()' as an
+   immutable slice if inspection is needed, and a crate-private consuming
+   'into_parts()' for the fold. Do not expose a mutable section vector or
+   permit struct literals outside 'telescope::types'. This makes it
+   impossible for later code to reorder or append sections behind the
+   type's back.
+
+2. Add a checked constructor along the lines of
+   'Telescope::try_new(pid, sections, config)'. It returns a typed error,
+   rather than panicking, if a section's embedded 'NodeFS.pid' differs
+   from the telescope pid, a source is absent from the config, a source is
+   duplicated, the order is not strictly increasing, or the vector is
+   empty.
+
+3. Stop using an empty 'Telescope' to mean "not found". The single-node
+   disk reader should return 'Option<Telescope>' internally and translate
+   'None' into its existing NotFound result. That lets nonemptiness be a
+   real type invariant rather than a comment that most consumers must
+   remember.
+
+4. Route all four current construction sites through the constructor: the
+   one-node disk reader, bulk initialization's grouped-section fold, the
+   normal diff snapshot fold, and the diff snapshot's titleless fallback.
+   The latter two need 'SkgConfig' threaded into their grouping helpers;
+   they currently discard it before constructing the value. The titleless
+   retry would construct a fresh checked telescope after changing only the
+   first section's placeholder title.
+
+5. Compute source positions once per construction (or once per load) from
+   'ordered_sources', then scan sections once. That makes validation
+   O(S + k), for S configured sources and k sections. My earlier shorthand
+   "O(k)" assumed this position lookup. Calling the current
+   'source_position' afresh for every section would instead do avoidable
+   repeated scans and clones, O(kS), though the absolute numbers would
+   still be small.
+
+6. Add constructor tests that accept a valid telescope and reject: reversed
+   order, duplicate source, unknown source, mixed pid, and empty input.
+   Existing fold tests then continue to establish semantic behavior. A
+   focused disk-reader test should show that a missing pid still reports
+   NotFound after the 'Option' change.
+
+This closes the present encapsulation hole with a small surface change:
+there are only four struct-literal construction sites, and external code
+does not currently read 'sections' directly. It does not solve the other
+debt noted just above -- 'unfold_node' still returns a bare vector. A later
+step could make unfold produce a checked telescope-shaped output too, but
+I would keep that separate from this load-side invariant change.
+
+**** TODO J to C : sounds good, let's do it
+
+*** The audit list is documentation, not a regression test.
+**** DONE (J to C) What's the audit list?
+
+***** DONE (C to J)
+It is [[./4_audit-list.org]]. When the privacy-telescope work invalidated
+the old assumption that one ID meant one file, we needed a semantic sweep:
+the compiler cannot find every place where code still assumes that shape.
+The list records each suspected read, write, lookup, delete, diff, init,
+and TypeDB site, what was inspected, and whether it was resolved or safe
+by construction. Its July conclusion was that none of the known sites
+still relied on the old assumption.
+
+Calling it documentation rather than a regression test means no automated
+test fails merely because future code introduces a fresh one-ID-one-file
+assumption. The 'Telescope' type provides some structural protection; the
+audit list is the human-readable record of the review, not executable
+enforcement.
+*** The 'home_from_disk' test repeats lookup twenty times on the SAME
+     HashMap. HashMap iteration order is stable within one map, so the loop
+     does not amplify detection of the former randomized-order bug as its
+     comment claims. Rebuilding the map/config per iteration would.
+**** TODO (J to C) this seems worth fixing now
+** Known unrelated red test
+
+   'override_menu::all_tests' expected an 'Oa' herald that was missing.
+   It was the only Rust failure in July and was proved pre-existing then.
+   It should be resolved or explicitly re-blessed before using a full green
+   suite as the merge gate.
+
+* Data cleanup still waiting for Jeff
+
+** Repair the two current telescope warnings
+
+   'data/telescope-warnings.org' currently reports:
+
+   - node '33d5cd4e-8a0c-48f0-85c2-467db86e1862' contains the alias
+     "shows-because (relationship)" twice in its public file. One duplicate
+     alias can be removed.
+   - node '6652685e-472e-4c07-a456-fbc3432b1dbf' records a 'contains' edge
+     at 'pers-p' to node
+     'f0a77ca4-2371-423b-af9c-c07d2cfae4f2', whose home is the more-private
+     'pers-m'. Re-level that edge to at least 'pers-m', preferably through
+     'skg-set-relationship-source' so the normal save rules do the work.
+
+   I did not edit either data file.
+
+*** TODO (J to C) please do
+
+* Suggested way to resume
+
+  In order: fix and test the 'TitleBelowHome' source-set leak; make the
+  telescope writer preflight ownership for every output section; decide
+  whether REFUSE is the permanent malformed-title policy; repair the two
+  real-data warnings and remove the retired report if desired; start the
+  required services and run the full Rust, Emacs, and integration suites;
+  resolve or explicitly adjudicate 'override_menu::all_tests'; then review
+  the branch for merge and move this task directory under 'TODO/DONE/' if
+  that is the local closeout convention desired here.
+
+* Reading map
+
+  - [[./1_discussion.org]]: original investigation, TypeDB experiment,
+    decisions, and open questions.
+  - [[./3_plan.org]]: the twelve intended work items and the
+    REFUSE/HOIST/COLLAPSE complication.
+  - [[./4_audit-list.org]]: the one-ID-one-file assumption audit.
+  - [[./5_progress.org]]: what actually landed, deviations from the plan,
+    and July test counts.
+  - [[../../docs/telescopes.md]]: current user-facing telescope model.
+  - [[../problems.org]]: open problems, including the three findings from
+    this recap and the pre-existing override-menu failure.
