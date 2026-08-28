@@ -42,8 +42,8 @@ fn all_tests
   run_with_shared_test_db (
     "skg-test-override-menu",
     |s| Box::pin ( async move {
-      s . reset ("menu_shows_all_edges_with_op_heralds", fixtures) . await ?;
-      menu_shows_all_edges_with_op_heralds (
+      s . reset ("menu_shows_all_edges_with_override_ancestor_facts", fixtures) . await ?;
+      menu_shows_all_edges_with_override_ancestor_facts (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("menu_appears_for_foreign_only_overriders", fixtures) . await ?;
       menu_appears_for_foreign_only_overriders (
@@ -89,7 +89,7 @@ fn line_with_id<'a> (
     . find ( |l| l . contains (&needle) )
     . map ( |l| (org_depth (l), l) ) }
 
-async fn menu_shows_all_edges_with_op_heralds (
+async fn menu_shows_all_edges_with_override_ancestor_facts (
   config  : &SkgConfig,
   driver  : &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
@@ -120,16 +120,18 @@ async fn menu_shows_all_edges_with_op_heralds (
         assert! ( line . contains ("(parentIs independent)"),
           "a menu child must not read as content (saving the menu \
            must not edit Z's contains):\n{}", menu );
-        // Since uniform-heralds the Op herald is the blue token "Oa"
-        // (this overrider overrides its visible parent a = Z), inside
-        // (rels "...").
-        assert! ( line . contains ("Oa"),
-          "the Oa (Op) herald marks each overrider:\n{}", menu ); }
+        // The semantic herald wire says that the visible parent
+        // (generation 1) is an outbound override target. Presentation
+        // as the blue "Oa" token belongs to each client.
+        assert! ( line . contains ("(overrides ")
+                  && line . contains ("(out 1 (ancestors 1))"),
+          "the override ancestor fact marks each overrider:\n{}", menu ); }
       { let (f2_depth, f2_line) =
           line_with_id (&menu, "F2")
           . expect ("the foreign chain continues: F2 overrides F");
         assert_eq! ( f2_depth, 3, "{}", menu );
-        assert! ( f2_line . contains ("Oa"),
+        assert! ( f2_line . contains ("(overrides ")
+                  && f2_line . contains ("(out 1 (ancestors 1))"),
                   "{}", menu ); }
       Ok (( )) }
 
