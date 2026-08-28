@@ -319,13 +319,13 @@ fn set_hidden_body (
 /// Gnode-parent content child; the col's relation for a simple
 /// PartnerCol member, oriented by which side owns the outbound edge
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
-/// actual source ('InRustGraph::edge_source') against its default (the
-/// more private of the two endpoints' homes). None on any of: no
+/// actual source ('InRustGraph::edge_source') against its applicable
+/// relationship default. None on any of: no
 /// graph handle; parentIs != Affected or a backpath graft (not a
 /// genuine member here); a compound filter col
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
-/// or the level equalling the default.
+/// or the source equalling the default.
 fn set_rel_source (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
@@ -377,12 +377,74 @@ fn set_rel_source (
       let target_home : Option<SourceName> =
         graph . pid_and_source (&target_pid) . map ( |(_, s)| s );
       match (owner_home, target_home) {
-        (Some (a), Some (b)) => config . more_private_of (a, b),
+        (Some (a), Some (b)) =>
+          config . relationship_default_source (&a, &b),
         _ => break 'compute None, }};
     if source == default { None } else { Some (source) } };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_source = rel_source; }}
+
+#[cfg(test)]
+mod relationship_default_tests {
+  use super::*;
+  use crate::types::misc::{MemberAtSource, SkgfileSource};
+  use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
+  use crate::types::viewnode::{
+    mk_definitive_viewnode, viewforest_root_viewnode};
+  use std::path::PathBuf;
+
+  #[test]
+  fn owned_to_foreign_owner_home_edge_has_no_override_herald () {
+    let mut config : SkgConfig = {
+      let mut sources : HashMap<SourceName, SkgfileSource> =
+        HashMap::new ();
+      for (name, owned) in
+          [("public", true), ("foreign", false), ("private", true)] {
+        sources . insert (
+          SourceName::from (name),
+          SkgfileSource {
+            name         : SourceName::from (name),
+            abbreviation : None,
+            path         : PathBuf::from (name),
+            user_owns_it : owned, } ); }
+      SkgConfig::dummyFromSources (sources) };
+    config . source_order = ["public", "foreign", "private"]
+      . into_iter () . map (SourceName::from) . collect ();
+
+    let mut owner : NodeComplete = empty_node_complete ();
+    owner . pid = ID::new ("owner");
+    owner . title = "owner" . to_string ();
+    owner . source = SourceName::from ("public");
+    owner . contains = vec! [ MemberAtSource::at_source (
+      SourceName::from ("public"), ID::new ("member") ) ];
+    let mut member : NodeComplete = empty_node_complete ();
+    member . pid = ID::new ("member");
+    member . title = "member" . to_string ();
+    member . source = SourceName::from ("foreign");
+    let graph : InRustGraph =
+      InRustGraph::from_nodecompletes (&[owner, member]);
+
+    let mut tree : Tree<ViewNode> =
+      Tree::new (viewforest_root_viewnode ());
+    let owner_treeid : NodeId = tree . root_mut () . append (
+      mk_definitive_viewnode (
+        ID::new ("owner"), SourceName::from ("public"),
+        "owner" . to_string (), None ) ) . id ();
+    let member_treeid : NodeId = tree . get_mut (owner_treeid)
+      . unwrap () . append ( mk_definitive_viewnode (
+        ID::new ("member"), SourceName::from ("foreign"),
+        "member" . to_string (), None ) ) . id ();
+
+    set_rel_source (
+      &mut tree, member_treeid, Some (&graph), &config );
+    let ViewNodeKind::Vognode (Vognode::Active (rendered_member)) =
+      & tree . get (member_treeid) . unwrap () . value () . kind
+    else { panic! ("member should be active"); };
+    assert_eq! ( rendered_member . viewStats . rel_source, None,
+      "the owner-home default must not render a fake relSource override" );
+  }
+}
 
 /// Sets sourceAtBoundary on the active vognode at treeid.
 /// True if no active vognode ancestor exists (i.e. a root),

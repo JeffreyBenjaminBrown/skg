@@ -56,9 +56,12 @@ never go stale in memory.
 
 Where a relationship edge's recording source comes from at save time:
 an edge already on disk keeps its source (**sticky**); a new edge
-normally defaults to the more private endpoint home. Every recording
-source is clamped to be no more public than the owner's home. Hides floor higher
-(at least the most public subscription explaining them). A
+between owned nodes defaults to the more-private endpoint home. A new
+edge from an owned owner to a foreign member defaults to the owner's
+home, deliberately making the foreign ID and relationship visible at
+that owned source without proposing a foreign write. Every recording
+source is clamped to be no more public than the owner's home. Hides
+floor higher (at least the most public subscription explaining them). A
 `(relSource NAME)` atom (the `skg-set-relationship-source` gesture)
 overrides sticky with any source at least as private as the edge's
 DEFAULT — raising privacy, or moving a stuck source back to the

@@ -424,6 +424,37 @@ fn owned_to_foreign_new_edges_default_to_the_owner_home (
 }
 
 #[test]
+fn owned_to_foreign_explicit_owned_source_is_allowed_and_foreign_refused (
+) {
+  let mut config : SkgConfig =
+    config_with_order (&["public", "foreign", "private"]);
+  config . sources . get_mut (&SourceName::from ("foreign"))
+    . unwrap () . user_owns_it = false;
+  let mut owner : NodeComplete = node_at ("owner", "public");
+  let member : NodeComplete = node_at ("member", "foreign");
+  install_graph (&[owner . clone (), member]);
+
+  let disk : NodeComplete = owner . clone ();
+  owner . contains = vec! [pm ("public", "member")];
+  let allowed : ExplicitSources = ExplicitSources {
+    contains : HashMap::from ([
+      (ID::new ("member"), SourceName::from ("private")) ]),
+    .. ExplicitSources::default () };
+  let resolved : NodeComplete = apply_sticky_sources (
+    owner . clone (), &disk, &allowed, &config ) . unwrap ();
+  assert_eq! (resolved . contains [0] . source,
+              SourceName::from ("private"));
+
+  let refused : ExplicitSources = ExplicitSources {
+    contains : HashMap::from ([
+      (ID::new ("member"), SourceName::from ("foreign")) ]),
+    .. ExplicitSources::default () };
+  let error : String = apply_sticky_sources (
+    owner, &disk, &refused, &config ) . unwrap_err ();
+  assert! (error . contains ("non-owned source 'foreign'"), "{}", error);
+}
+
+#[test]
 fn explicit_alias_source_is_load_bearing_and_validated (
 ) {
   let config : SkgConfig =

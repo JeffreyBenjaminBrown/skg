@@ -581,6 +581,23 @@ impl SkgConfig {
   ) -> SourceName {
     if self . is_strictly_more_public (&b, &a) { a } else { b }}
 
+  /// The default recording source for a writable node-to-node
+  /// relationship. Between owned nodes, use the more-private home.
+  /// From an owned owner to a foreign member, use the owner's home:
+  /// Skg may expose the foreign ID there, but never proposes writing
+  /// a relationship into the foreign source.
+  pub fn relationship_default_source (
+    &self,
+    owner_home : &SourceName,
+    member_home : &SourceName,
+  ) -> SourceName {
+    if ( self . user_owns_source (owner_home) &&
+         ! self . user_owns_source (member_home) ) {
+      owner_home . clone ()
+    } else {
+      self . more_private_of (
+        owner_home . clone (), member_home . clone () ) }}
+
   /// The prefix of the privacy order through 'source', inclusive:
   /// that source and everything more public. Errors if the source is
   /// not configured.

@@ -307,8 +307,12 @@ So far there are these endpoints:
     when the graph records no such edge (e.g. one typed into a
     buffer and not yet saved). On failure, `((error "..."))` — e.g.
     an endpoint the graph does not know.
-  - Behavior: `default` is the applicable relationship default;
-    `current` is the edge's recording source.
+  - Behavior: between owned endpoints, `default` is the more-private
+    home. From an owned owner to a foreign member, `default` is the
+    owner's home regardless of privacy order; this deliberately
+    exposes the member ID and relationship to that owned source's
+    readers, while avoiding any proposed foreign write. `current` is
+    the edge's recording source.
     `skg-set-relationship-source` uses the reply to offer only
     sources the save can accept. Advisory: the save-time floor check
     in `apply_sticky_sources` stays load-bearing, since buffers go

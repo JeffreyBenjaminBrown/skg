@@ -417,11 +417,16 @@ floor check backstops. For an alias, its default is its owner's home
 and the current source is read directly from the alias metadata, so
 no synthetic graph edge or broader endpoint is needed.
 
+For an edge from an owned owner to a foreign member, the default is
+the owner's home regardless of privacy order. That choice deliberately
+shares the foreign ID and relationship with readers of the owned
+source; Skg never offers the foreign source as a write destination.
+
 Choosing a source writes a =(relSource SOURCE)= metadata atom. This
 both raises privacy above the default and lowers it back down to
 (never below) the default -- the way to publicize an edge stuck at
 an old, more private source after its endpoint's home moved. An edge
-sitting above its default is marked with a red =~NAME= herald
+sitting more private than its default is marked with a red =~NAME= herald
 immediately before the ⌂ source herald; once saved at its default,
 atom and herald disappear.
 

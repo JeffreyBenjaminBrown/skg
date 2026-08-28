@@ -281,13 +281,9 @@ pub(crate) fn apply_sticky_sources (
   // An unknown target also falls back to the owner's home.
   let default_floor_for = |member : &ID| -> SourceName {
     match home_of (member) {
-      Some (target_home)
-        if ( config . user_owns_source (&owner_home) &&
-             ! config . user_owns_source (&target_home) ) =>
-        owner_home . clone (),
       Some (target_home) =>
-        config . more_private_of (
-          owner_home . clone (), target_home ),
+        config . relationship_default_source (
+          &owner_home, &target_home ),
       None => owner_home . clone (), }};
   // The sticky-else-default source for one member -- what an ABSENT
   // atom resolves to.

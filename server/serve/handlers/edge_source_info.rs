@@ -1,8 +1,7 @@
 //! 'edge source info' (BUG-and-fix_make-edge-more-public.org): given
 //! one relationship edge -- owner id, member id, and the relation
-//! between them -- reply with the edge's DEFAULT source (the more
-//! private of the two endpoints' homes) and its CURRENT source (when
-//! the graph records the edge). The client's
+//! between them -- reply with the edge's DEFAULT source and its
+//! CURRENT source (when the graph records the edge). The client's
 //! 'skg-set-relationship-source' gesture uses this to offer only
 //! sources the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
@@ -79,12 +78,8 @@ pub fn edge_source_info (
     . map ( |(_pid, src)| src )
     . ok_or_else ( || format! (
       "member '{}' is not in the graph", member )) ?;
-  let default : SourceName =
-    if ( config . user_owns_source (&owner_home) &&
-         ! config . user_owns_source (&member_home) ) {
-      owner_home
-    } else {
-      config . more_private_of (owner_home, member_home) };
+  let default : SourceName = config . relationship_default_source (
+    &owner_home, &member_home );
   let current : Option<SourceName> =
     graph . edge_source ( &owner_pid, relation, member );
   Ok (( default, current )) }
