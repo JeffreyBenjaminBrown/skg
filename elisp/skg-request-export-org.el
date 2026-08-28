@@ -12,7 +12,7 @@
                               ; skg-errors-and-warnings-to-org-string
 (require 'skg-state)
 
-(defun skg-export-some-to-org (source-set output-dir)
+(defun skg-export-some-to-org (source-set output-dir &optional approved-pids)
   "Export Skg data to .org files under OUTPUT-DIR.
 Prompts for a SOURCE-SET (S-left/S-right cycle, tab completion);
 only nodes from that set are included, so choose a public-facing
@@ -44,16 +44,42 @@ untouched."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg-register-response-handler
      'export-to-org
-     #'skg--export-to-org-handler
+     (lambda (tcp-proc payload)
+       (setq skg-response-handler-map
+             (assoc-delete-all 'ugly-telescope-confirmation
+                               skg-response-handler-map))
+       (skg--export-to-org-handler tcp-proc payload))
      t)
+    (skg-register-response-handler
+     'ugly-telescope-confirmation
+     (lambda (_tcp-proc payload)
+       (setq skg-response-handler-map
+             (assoc-delete-all 'ugly-telescope-confirmation
+                               skg-response-handler-map))
+       (when (assoc 'export-to-org skg-response-handler-map)
+         (setq skg-response-handler-map
+               (assoc-delete-all 'export-to-org
+                                 skg-response-handler-map))
+         (setq skg-lp--pending-count
+               (max 0 (1- skg-lp--pending-count))))
+       (let* ((response (read payload))
+              (prompt (format "%s" (cadr (assoc 'prompt response))))
+              (pids (mapcar (lambda (pid) (format "%s" pid))
+                            (cadr (assoc 'pids response)))))
+         (when (y-or-n-p (concat prompt " "))
+           (skg-export-some-to-org source-set output-dir pids))))
+     nil)
     (skg-lp-reset)
     (process-send-string
      tcp-proc
      (concat
       (prin1-to-string
-       `((request . "export to org")
-         (source-set . ,source-set)
-         (output-dir . ,output-dir)))
+       (append
+        `((request . "export to org")
+          (source-set . ,source-set)
+          (output-dir . ,output-dir))
+        (when approved-pids
+          `((allow-ugly-telescopes ,@approved-pids)))))
       "\n"))))
 
 (defun skg--export-to-org-handler (_tcp-proc payload)

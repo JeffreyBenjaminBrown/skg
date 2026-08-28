@@ -309,7 +309,9 @@ async fn open_menu_survives_diff_mode_toggle (
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
-              &mut server, &env, views_state, &active ); } ); } );
+              &mut server,
+              "((request . \"git diff mode toggle\"))",
+              &env, views_state, &active ); } ); } );
         drop (server);
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);

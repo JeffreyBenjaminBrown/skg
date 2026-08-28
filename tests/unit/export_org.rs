@@ -102,6 +102,18 @@ fn sample_nodes () -> Vec<NodeComplete> {
   ] }
 
 #[test]
+fn export_preflight_names_rendered_nodes_and_markers_only () {
+  let mut nodes : Vec<NodeComplete> = sample_nodes ();
+  nodes . push (node ("unrelated", "not exported", None, &[]));
+  let candidates : Vec<ID> = export_candidate_pids (&active_all (), &nodes);
+  assert! ( candidates . contains (&ID::from ("a")) );
+  assert! ( candidates . contains (&ID::from ("b")) );
+  assert! ( candidates . contains (&ID::from ("ma")),
+    "marker bodies determine output paths and cross the release boundary" );
+  assert! ( ! candidates . contains (&ID::from ("unrelated")) );
+}
+
+#[test]
 fn export_writes_expected_files_and_links () {
   let nodes : Vec<NodeComplete> = sample_nodes ();
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();

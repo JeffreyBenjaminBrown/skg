@@ -10,7 +10,8 @@ use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::export_org::{export_to_org, ExportReport};
+use skg::export_org::{
+  export_candidate_pids, export_to_org, ExportReport};
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic;
@@ -355,28 +356,53 @@ fn run_import (
 /// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
 /// subcommand runs the same core for scripting and testing.
 ///
-/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir]
+/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-ugly-telescopes]
 /// (source-set defaults to "all", output-dir to "org-exports").
 /// output-dir is resolved against the current working directory; an
 /// absolute path is used as-is.
 fn run_export_org (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
+  let include_ugly_telescopes : bool =
+    args . iter () . any ( |arg| arg == "--include-ugly-telescopes" );
+  let positional : Vec<&String> = args . iter () . skip (2)
+    . filter ( |arg| arg . as_str () != "--include-ugly-telescopes" )
+    . collect ();
   let config_path : String =
-    if args . len() > 2 { args[2] . clone() }
+    if ! positional . is_empty () { positional[0] . clone () }
     else { "data/skgconfig.toml" . to_string() };
   let config : SkgConfig =
     load_config (&config_path) ?;
   let set_name : SourceSetName =
-    if args . len() > 3 { SourceSetName::from (args[3] . as_str()) }
+    if positional . len () > 1 {
+      SourceSetName::from (positional[1] . as_str()) }
     else { SourceSetName::from ("all") };
   let output_dir : String =
-    if args . len() > 4 { args[4] . clone() }
+    if positional . len () > 2 { positional[2] . clone () }
     else { "org-exports" . to_string() };
   let active : ActiveSourceSet =
     ActiveSourceSet::named (&config, set_name) ?;
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) ?;
+  let candidates : HashSet<ID> =
+    export_candidate_pids (&active, &nodes) . into_iter () . collect ();
+  let mut ugly_pids : Vec<ID> = nodes . iter ()
+    . filter ( |node| node . ugly_telescope
+      && candidates . contains (&node . pid) )
+    . map ( |node| node . pid . clone () )
+    . collect ();
+  ugly_pids . sort ();
+  if ! ugly_pids . is_empty () {
+    let pids : String = ugly_pids . iter ()
+      . map ( |pid| pid . as_str () )
+      . collect::<Vec<&str>> () . join (", ");
+    if ! active . is_all () && ! include_ugly_telescopes {
+      return Err (format! (
+        "export-org would release title or body selected below home for PIDs {} under source-set {}; rerun with --include-ugly-telescopes to approve",
+        pids, active . name ) . into ()); }
+    eprintln! (
+      "Warning: export-org includes title or body selected below home for PIDs {}.",
+      pids ); }
   let output_base : PathBuf =
     std::env::current_dir () ? . join (output_dir);
   let report : ExportReport =

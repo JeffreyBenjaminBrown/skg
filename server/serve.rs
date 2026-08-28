@@ -222,6 +222,7 @@ fn handle_emacs (
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_toggle_and_rerender (
               &mut stream,
+              &request_header,
               &env,
               &mut views_state,
               &active_source_set ),
@@ -239,6 +240,7 @@ fn handle_emacs (
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
               &mut stream,
+              &request_header,
               &env,
               &mut views_state,
               &active_source_set ),

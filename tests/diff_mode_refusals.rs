@@ -101,7 +101,9 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             handle_git_diff_toggle_and_rerender (
-              &mut server, &env, views_state, active ); } ); } );
+              &mut server,
+              "((request . \"git diff mode toggle\"))",
+              &env, views_state, active ); } ); } );
         drop (server);
         let mut reader : BufReader<TcpStream> =
           BufReader::new (client);
@@ -294,7 +296,9 @@ async fn refusal_first_messages_parse_and_read_as_documented (
       std::thread::scope ( |scope| {
         scope . spawn ( || {
           handle_git_diff_toggle_and_rerender (
-            &mut server, &env, &mut views_state, &restricted ); } ); } );
+            &mut server,
+            "((request . \"git diff mode toggle\"))",
+            &env, &mut views_state, &restricted ); } ); } );
       drop (server);
       let mut reader : BufReader<TcpStream> =
         BufReader::new (client);

@@ -185,6 +185,40 @@ pub fn export_to_org (
   report . files_written . sort ();
   Ok (report) }
 
+/// PIDs whose scalar data can affect an export: every rendered event and
+/// every marker whose title/body can determine whether a root exists and
+/// where its file is written. This performs discovery only; it writes no
+/// files and is therefore safe to use at the release preflight.
+pub fn export_candidate_pids (
+  active : &ActiveSourceSet,
+  nodes  : &[NodeComplete],
+) -> Vec<ID> {
+  let by_pid : HashMap<ID, &NodeComplete> =
+    nodes . iter ()
+    . map ( |node| (node . pid . clone (), node) )
+    . collect ();
+  let alias_to_pid : HashMap<ID, ID> = {
+    let mut aliases : HashMap<ID, ID> = HashMap::new ();
+    for node in nodes {
+      for extra in &node . extra_ids {
+        aliases . insert (extra . clone (), node . pid . clone ()); }}
+    aliases };
+  let mut ignored_warnings : Vec<String> = Vec::new ();
+  let (roots_by_pid, marker_pids) = discover_roots (
+    nodes, &alias_to_pid, active, &mut ignored_warnings );
+  let mut candidates : HashSet<ID> = marker_pids . clone ();
+  for root in roots_by_pid . values () {
+    candidates . extend (
+      collect_events (
+        &root . root_pid, &by_pid, &alias_to_pid,
+        &roots_by_pid, &marker_pids, active )
+      . into_iter ()
+      . map ( |event| event . pid ) ); }
+  let mut candidates : Vec<ID> = candidates . into_iter () . collect ();
+  candidates . sort ();
+  candidates
+}
+
 fn write_export_file (
   path    : &Path,
   content : &str,

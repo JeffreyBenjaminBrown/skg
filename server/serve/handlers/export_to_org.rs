@@ -1,5 +1,11 @@
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use crate::export_org::{export_to_org, ExportReport};
+use crate::export_org::{
+  export_candidate_pids, export_to_org, ExportReport};
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision,
+  approved_pids_from_request,
+  challenge_response,
+  decide_for_ugly_pids};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   format_buffer_response_sexp,
@@ -29,7 +35,8 @@ pub fn handle_export_to_org_request (
   config  : &SkgConfig,
   request : &str,
 ) {
-  let result : Result<(String, Vec<String>), String> = ( || {
+  let prepared : Result<
+    (ActiveSourceSet, Vec<NodeComplete>, PathBuf), String> = ( || {
     let name : String =
       value_from_request_sexp ("source-set", request) ?;
     let active : ActiveSourceSet =
@@ -47,10 +54,42 @@ pub fn handle_export_to_org_request (
       std::env::current_dir ()
       . map_err ( |e| format! ("current_dir: {}", e) ) ?
       . join (&output_dir); // join with an absolute PATH yields PATH
-    let report : ExportReport =
-      export_to_org (&active, &nodes, &output_base)
-      . map_err ( |e| format! ("Export failed: {}", e) ) ?;
-    Ok (( report . summary (), report . warnings )) } ) ();
+    Ok ((active, nodes, output_base)) } ) ();
+  let (active, nodes, output_base) = match prepared {
+    Ok (prepared) => prepared,
+    Err (error) => {
+      send_export_result (stream, Err (error));
+      return; }};
+  let candidate_pids = export_candidate_pids (&active, &nodes);
+  let ugly_pids = candidate_pids . into_iter ()
+    . filter ( |pid| nodes . iter () . any (
+      |node| node . pid == *pid && node . ugly_telescope ) )
+    . collect ();
+  let release = decide_for_ugly_pids (
+    "export-to-org", &active, ugly_pids,
+    &approved_pids_from_request (request) );
+  if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+    send_response_with_length_prefix (
+      stream, &challenge_response (&release) . unwrap () );
+    return; }
+  let release_warning : Option<String> = match release {
+    ScalarReleaseDecision::AllowWithWarning { warning } => Some (warning),
+    _ => None, };
+  let result : Result<(String, Vec<String>), String> =
+    export_to_org (&active, &nodes, &output_base)
+    . map ( |report : ExportReport| {
+      let summary : String = report . summary ();
+      let mut warnings = report . warnings;
+      if let Some (warning) = release_warning {
+        warnings . insert (0, warning); }
+      (summary, warnings) } )
+    . map_err ( |error| format! ("Export failed: {}", error) );
+  send_export_result (stream, result); }
+
+fn send_export_result (
+  stream : &mut TcpStream,
+  result : Result<(String, Vec<String>), String>,
+) {
   let (content, errors, warnings)
     : (String, Vec<String>, Vec<String>) =
     match result {
