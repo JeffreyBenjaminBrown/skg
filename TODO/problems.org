@@ -3,28 +3,6 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* override_menu::all_tests fails: the Oa herald is missing (2026-07-29)
-  Noticed while running the full suite during the dup-ids work
-  (TODO/dup-ids-maybe-bad/); NOT caused by it -- verified by stashing
-  those changes and re-running, which fails identically.
-  It is the only failing test: 540/541 pass.
-  'tests/override_menu.rs:126' asserts each overrider's line carries
-  the blue "Oa" token (Op: this overrider overrides its visible
-  parent). The menu the server produces has the relationship counts
-  but no Oa:
-  : ** (skg (node (id F) (source foreign) (parentIs independent) indef (rels (overrides (in 1) (out 1 (ancestors 1)))) ...)) F
-  : ** (skg (node (id R) (source main) (parentIs independent) indef (rels (overrides (out 1 (ancestors 1)))))) R
-  So either the override-choice menu stopped emitting the herald or
-  the test was blessed to a format the menu never produced. The
-  suspects are the 2026-07-21 heralds arc (relationship facts moved
-  to a semantic wire, presentation to the clients) and
-  '31e9cbc0 uniform-heralds step 7: bless golden tests to the new
-  herald format' -- if the menu path was missed when the golden
-  tests were blessed, this has been red since then.
-  Whoever fixes it should decide which side is right before editing
-  either: the herald table (server/heralds.rs) is meant to be the
-  single home of the vocabulary, so a menu that cannot emit Oa is a
-  gap in that table's coverage, not just a stale assertion.
 * Problems noted while cleaning up stray servers (2026-07-26)
   Context: two cargo-watch processes and one skg were alive at once;
   the newer skg had died with 'Address already in use'. Root cause is

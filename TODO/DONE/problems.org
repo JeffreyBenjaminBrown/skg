@@ -1,3 +1,16 @@
+* override_menu::all_tests expected a rendered Oa herald (resolved 2026-08-28)
+  Noticed while running the full suite during the dup-ids work and
+  verified to be pre-existing. The test asserted that each overrider's
+  server-rendered line carried the blue "Oa" presentation token.
+
+  RESOLVED: the menu was already emitting the correct semantic fact,
+  '(overrides ... (out 1 (ancestors 1)))'. Since the July semantic-wire
+  change, rendering that fact as "Oa" belongs to each client, not to this
+  server-generated view. The golden test now asserts the semantic wire
+  and the full Rust suite passes. See commit aa19e2db and the
+  TODO/dup-ids-maybe-bad/7_plan.org section "Verification while
+  implementing".
+
 * Problems found while recapping dup-ids-maybe-bad (fixed 2026-08-28)
   Planned in TODO/dup-ids-maybe-bad/7_plan.org and completed across the
   incremental commits named below.
