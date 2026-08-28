@@ -135,6 +135,8 @@ fn create_documents_from_node (
             title_or_alias ),
         tantivy_index . raw_title_field =>
           raw_title_for_this_doc,
+        tantivy_index . ugly_telescope_field =>
+          if node . ugly_telescope { "true" } else { "false" },
         tantivy_index . source_field =>
           doc_source . as_str(),
         tantivy_index . context_origin_type_field =>

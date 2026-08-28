@@ -456,6 +456,7 @@ fn nodecomplete_from_noderust (
     source                       : rust . source . clone (),
     extra_ids                    : rust . extra_ids . clone (),
     title                        : rust . title . clone (),
+    ugly_telescope               : rust . ugly_telescope,
     aliases                      : rust . aliases . clone (),
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),

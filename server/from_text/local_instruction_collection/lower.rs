@@ -224,6 +224,7 @@ impl NodeSaveIntent {
     let source : SourceName = self . source . clone();
     NodeComplete {
       title                        : self . title,
+      ugly_telescope               : false,
       aliases                      :
         members_at_source_msv (
           &source,

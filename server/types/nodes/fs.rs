@@ -110,6 +110,7 @@ impl NodeFS {
     NodeComplete {
       title                        :
         self . title . unwrap_or_default (),
+      ugly_telescope               : false,
       aliases                      : members_at_source_msv (
         &source,
         if self . aliases . is_empty () { MSV::Unspecified }

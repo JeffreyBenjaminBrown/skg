@@ -13,6 +13,7 @@ pub struct NodeTantivy {
   pub source  : SourceName, // the home; each alias doc instead
                             // carries ITS OWN level (see 'aliases')
   pub title   : String,
+  pub ugly_telescope : bool,
   // Aliases keep their PRIVACY LEVELS: each alias document's
   // source field is the alias's level, not the node's home, so a
   // restricted search cannot match a private alias of a public
@@ -30,6 +31,7 @@ impl From<&NodeComplete> for NodeTantivy {
       pid     : c . pid . clone (),
       source  : c . source . clone (),
       title   : c . title . clone (),
+      ugly_telescope : c . ugly_telescope,
       aliases : c . aliases . clone (),
       body    : c . body . clone (),
       misc    : c . misc . clone (),

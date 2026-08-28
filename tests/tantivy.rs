@@ -691,3 +691,28 @@ fn test_title_by_id_returns_title_not_alias (
     "title_and_source_by_id should return None for missing IDs");
   println! ("title_and_source_by_id test passed!");
   Ok (( )) }
+
+#[test]
+fn ugly_telescope_flag_survives_index_build_and_update (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let mut node : NodeComplete = empty_node_complete ();
+  node . pid = ID::new ("ugly-indexed");
+  node . title = "uniquely ugly indexed title" . to_string ();
+  node . ugly_telescope = true;
+  let (tantivy_index, _) = wipe_then_init_tantivy_db (
+    &[node . clone ()], Path::new ("/tmp/tantivy-test-ugly-flag") )?;
+  let stored_flag = |index : &TantivyIndex| -> Result<String, Box<dyn std::error::Error>> {
+    let (matches, searcher) = search_index (
+      index, "uniquely ugly indexed title", &SearchOptions::default ())?;
+    let (_, address) = matches . first ()
+      .ok_or ("expected the indexed title")?;
+    let document : TantivyDocument = searcher . doc (*address)?;
+    Ok ( document . get_first (index . ugly_telescope_field)
+      .and_then ( |value| value . as_str ())
+      .unwrap_or ("") . to_string () ) };
+  assert_eq! (stored_flag (&tantivy_index)?, "true");
+  node . ugly_telescope = false;
+  update_index_with_nodes (
+    &[NodeTantivy::from (&node)], &tantivy_index )?;
+  assert_eq! (stored_flag (&tantivy_index)?, "false");
+  Ok (( )) }

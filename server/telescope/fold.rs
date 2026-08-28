@@ -29,7 +29,9 @@ use std::io;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
   pub title                        : Option<String>,
+  pub title_source                 : Option<SourceName>,
   pub body                         : Option<String>,
+  pub body_source                  : Option<SourceName>,
   pub home                         : Option<SourceName>,
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
@@ -93,6 +95,11 @@ pub fn nodecomplete_from_fold (
   folded    : FoldedNode,
 ) -> Option<NodeComplete> {
   let home : SourceName = folded . home ?;
+  let ugly_telescope : bool =
+    folded . title_source . as_ref () != Some (&home)
+    || folded . body_source . as_ref ()
+       .map ( |source| source != &home )
+       .unwrap_or (false);
   let msv = |o : Option<Vec<MemberAtSource<ID>>>|
   -> MSV<MemberAtSource<ID>> {
     match o {
@@ -100,6 +107,7 @@ pub fn nodecomplete_from_fold (
       Some (v) => MSV::Specified (v), }};
   Some ( NodeComplete {
     title                        : folded . title ?,
+    ugly_telescope,
     aliases                      : match folded . aliases {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), },
@@ -124,36 +132,40 @@ pub fn fold_sections (
 ) -> (FoldedNode, Vec<FoldWarning>) {
   let mut warnings : Vec<FoldWarning> = Vec::new ();
   let mut folded : FoldedNode = FoldedNode::default ();
-  { // scalars: the home is THE MOST PUBLIC SECTION, full stop.
+  { // Scalars select independently: the first title and first body
+    // in privacy order win. The home remains the first section,
+    // whether or not it carries either scalar.
     folded . home = sections . first ()
-      . map ( |(level, _)| level . clone () );
-    for (level, s) in sections {
-      match (&folded . title, &s . title) {
-        (None, Some (t)) => {
-          folded . title = Some ( t . clone () );
-          if let Some (home) = &folded . home {
-            if home != level {
-              // The home carries no title, so the text sits at a
-              // more private level, where a reader restricted to
-              // the home's level cannot see it.
+      . map ( |(source, _)| source . clone () );
+    for (source, section) in sections {
+      if let Some (title) = &section . title {
+        match &folded . title_source {
+          None => {
+            folded . title = Some (title . clone ());
+            folded . title_source = Some (source . clone ());
+            if folded . home . as_ref () != Some (source) {
               warnings . push ( FoldWarning::TitleBelowHome {
-                home     : home  . clone (),
-                title_at : level . clone () } ); }}
-          if let Some (b) = &s . body {
-            folded . body = Some ( b . clone () ); }}
-        (Some (_), Some (_)) => {
-          warnings . push ( FoldWarning::NonHomeTitle {
-            level : level . clone () } );
-          if s . body . is_some ()
-          && folded . body . is_none () {
-            // A stray body rides its stray title's warning.
+                home : folded . home . clone ()
+                  . expect ("a section establishes the home"),
+                title_at : source . clone (), } ); }}
+          Some (selected_at) =>
+            warnings . push ( FoldWarning::NonHomeTitle {
+              source      : source . clone (),
+              selected_at : selected_at . clone (), } ), }}
+      if let Some (body) = &section . body {
+        match &folded . body_source {
+          None => {
+            folded . body = Some (body . clone ());
+            folded . body_source = Some (source . clone ());
+            if folded . home . as_ref () != Some (source) {
+              warnings . push ( FoldWarning::BodyBelowHome {
+                home : folded . home . clone ()
+                  . expect ("a section establishes the home"),
+                body_at : source . clone (), } ); }}
+          Some (selected_at) =>
             warnings . push ( FoldWarning::NonHomeBody {
-              level : level . clone () } ); }}
-        _ => {
-          if s . body . is_some () && folded . title . is_none () {
-            // body at a level that does not hold the title
-            warnings . push ( FoldWarning::NonHomeBody {
-              level : level . clone () } ); }} }}
+              source      : source . clone (),
+              selected_at : selected_at . clone (), } ), }} }
     if folded . title . is_none () {
       warnings . push ( FoldWarning::MissingTitle ); }}
   folded . contains = fold_ordered (

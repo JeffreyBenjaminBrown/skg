@@ -1020,6 +1020,7 @@ pub fn nodecomplete_example () -> NodeComplete {
   let source : SourceName = SourceName::from ("main");
   NodeComplete {
     title: "This text gets indexed." . to_string(),
+    ugly_telescope: false,
     aliases: MSV::Unspecified,
     source: source . clone (),
     pid: ID::new ("example"),

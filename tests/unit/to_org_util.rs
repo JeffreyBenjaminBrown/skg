@@ -21,6 +21,7 @@ fn mk_node (
     source:       src (),
     extra_ids:    extra_ids . iter () . map ( |s| id (s) ) . collect (),
     title:        pid . to_string (),
+    ugly_telescope: false,
     aliases:      MSV::Unspecified,
     body:         None,
     contains:     members_at_source (

@@ -318,11 +318,23 @@ pub enum FoldWarning {
     home     : crate::types::misc::SourceName,
     title_at : crate::types::misc::SourceName,
   },
+  /// The selected body is below the home. Title and body select
+  /// independently, so this may occur with a title at home.
+  BodyBelowHome {
+    home    : crate::types::misc::SourceName,
+    body_at : crate::types::misc::SourceName,
+  },
   /// A section below the one holding the title carried a title too;
   /// the more public one won.
-  NonHomeTitle { level : crate::types::misc::SourceName },
-  /// A non-home section carried a body; the home's won.
-  NonHomeBody { level : crate::types::misc::SourceName },
+  NonHomeTitle {
+    source      : crate::types::misc::SourceName,
+    selected_at : crate::types::misc::SourceName,
+  },
+  /// A later section carried a body; the more-public selected body won.
+  NonHomeBody {
+    source      : crate::types::misc::SourceName,
+    selected_at : crate::types::misc::SourceName,
+  },
   /// No section carried a title.
   MissingTitle,
 }
@@ -349,14 +361,18 @@ impl std::fmt::Display for FoldWarning {
         write! ( f,
           "title below the home: the home '{}' carries no title, so this node's text sits at '{}', invisible to anyone reading at '{}'. A node's text belongs in its most public section. A save of this node is refused until the files are repaired by hand: either move the title up to '{}', or delete the '{}' section if it holds nothing else.",
           home, title_at, home, home, home ),
-      FoldWarning::NonHomeTitle { level } =>
+      FoldWarning::BodyBelowHome { home, body_at } =>
         write! ( f,
-          "section '{}' carried a second title; the more public one won",
-          level ),
-      FoldWarning::NonHomeBody { level } =>
+          "body below the home: the home is '{}', but the selected body sits at '{}'; restricted readers at '{}' cannot see it",
+          home, body_at, home ),
+      FoldWarning::NonHomeTitle { source, selected_at } =>
         write! ( f,
-          "section '{}' carried a body at a level that does not hold the title",
-          level ),
+          "section '{}' carried a later title; the more public title selected from '{}' won",
+          source, selected_at ),
+      FoldWarning::NonHomeBody { source, selected_at } =>
+        write! ( f,
+          "section '{}' carried a later body; the more public body selected from '{}' won",
+          source, selected_at ),
       FoldWarning::MissingTitle =>
         write! ( f, "no section carried a title" ), }}}
 

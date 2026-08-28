@@ -8,7 +8,7 @@
 //!   deterministically;
 //! - the silent-leak guard: no member ever changes level.
 
-use super::fold::{FoldedNode, fold_sections};
+use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices};
 use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
@@ -80,7 +80,9 @@ fn folded_from_lists (
 ) -> FoldedNode {
   FoldedNode {
     title                        : Some ("t" . to_string ()),
+    title_source                 : Some (home . clone ()),
     body                         : None,
+    body_source                  : None,
     home                         : Some ( home . clone () ),
     aliases                      : None,
     contains,
@@ -390,4 +392,87 @@ fn a_titled_most_public_section_raises_no_title_warning (
                  | FoldWarning::MissingTitle )),
             "the ordinary telescope shape warns about nothing: {:?}",
             warnings );
+}
+
+fn scalar_node (
+  sections : Vec<(SourceName, SectionSlices)>,
+) -> (crate::types::nodes::complete::NodeComplete, Vec<FoldWarning>) {
+  let (folded, warnings) = fold_sections (&sections, &identity_resolve);
+  let node = nodecomplete_from_fold (
+    ID::new ("scalar-node"), Vec::new (), Vec::new (), folded )
+    .expect ("test cases carry a title");
+  (node, warnings) }
+
+#[test]
+fn title_and_body_select_independently_and_mark_ugliness (
+) {
+  let public = SourceName::from ("public");
+  let private = SourceName::from ("private");
+
+  let (clean, _) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        title : Some ("home title" . to_string ()),
+        body  : Some ("home body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (clean . title, "home title");
+  assert_eq! (clean . body . as_deref (), Some ("home body"));
+  assert! (!clean . ugly_telescope);
+
+  let (lower_title, warnings) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        body : Some ("home body" . to_string ()),
+        .. SectionSlices::default () } ),
+    ( private . clone (), SectionSlices {
+        title : Some ("lower title" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (lower_title . title, "lower title");
+  assert_eq! (lower_title . body . as_deref (), Some ("home body"));
+  assert! (lower_title . ugly_telescope);
+  assert! (warnings . iter () . any ( |warning| matches! (
+    warning, FoldWarning::TitleBelowHome { title_at, .. }
+      if title_at == &private )));
+
+  let (lower_body, warnings) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        title : Some ("home title" . to_string ()),
+        .. SectionSlices::default () } ),
+    ( private . clone (), SectionSlices {
+        body : Some ("lower body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (lower_body . title, "home title");
+  assert_eq! (lower_body . body . as_deref (), Some ("lower body"));
+  assert! (lower_body . ugly_telescope);
+  assert! (warnings . iter () . any ( |warning| matches! (
+    warning, FoldWarning::BodyBelowHome { body_at, .. }
+      if body_at == &private )));
+
+  let (both_lower, _) = scalar_node (vec! [
+    ( public, SectionSlices::default () ),
+    ( private, SectionSlices {
+        title : Some ("lower title" . to_string ()),
+        body  : Some ("lower body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (both_lower . title, "lower title");
+  assert_eq! (both_lower . body . as_deref (), Some ("lower body"));
+  assert! (both_lower . ugly_telescope);
+}
+
+#[test]
+fn later_scalars_report_the_source_that_actually_won (
+) {
+  let public = SourceName::from ("public");
+  let private = SourceName::from ("private");
+  let (_node, warnings) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        title : Some ("winner" . to_string ()),
+        body  : Some ("winner body" . to_string ()),
+        .. SectionSlices::default () } ),
+    ( private . clone (), SectionSlices {
+        title : Some ("later" . to_string ()),
+        body  : Some ("later body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert! (warnings . contains (&FoldWarning::NonHomeTitle {
+    source : private . clone (), selected_at : public . clone () }));
+  assert! (warnings . contains (&FoldWarning::NonHomeBody {
+    source : private, selected_at : public }));
 }

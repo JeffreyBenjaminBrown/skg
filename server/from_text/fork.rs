@@ -346,6 +346,7 @@ pub fn build_fork_clone (
     members_of (& buffer_node . contains);
   let clone : NodeComplete = NodeComplete {
     title         : buffer_node . title . clone (),
+    ugly_telescope : false,
     aliases       : MSV::Unspecified,
     pid           : ID ( uuid::Uuid::new_v4 () . to_string () ),
     extra_ids     : Vec::new (),
