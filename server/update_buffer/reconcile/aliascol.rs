@@ -50,6 +50,10 @@ pub fn reconcile_alias_col_children (
     nodecomplete_rustFirst_by_pid_and_source (
       config, &parent_pid, &parent_source )
     . map_err ( |_| "reconcile_alias_col_children: parent NodeComplete not found" ) ?;
+  let alias_sources : HashMap<String, SourceName> =
+    parent_nodecomplete . aliases . or_default () . iter ()
+    .map ( |alias| (alias . member . clone (), alias . source . clone ()) )
+    .collect ();
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
@@ -88,6 +92,11 @@ pub fn reconcile_alias_col_children (
       folded      : false,
       body_folded : false,
       kind : ViewNodeKind::Qual (Qual::Alias { text : text . clone(),
+                                               rel_source : alias_sources
+                                                 . get (text)
+                                                 . and_then ( |source|
+                                                   if source == &parent_nodecomplete . source { None }
+                                                   else { Some (source . clone ()) } ),
                                                membership } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,

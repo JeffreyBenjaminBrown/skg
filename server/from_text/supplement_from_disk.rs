@@ -10,12 +10,12 @@
 
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::{
-  ExplicitLevels, NodeIntent, NodeSaveIntent };
+  ExplicitSources, NodeIntent, NodeSaveIntent };
 use crate::from_text::weave::{member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::snapshot_global;
-use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, members_of, privacied_all};
+use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_of, members_at_source};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
@@ -109,8 +109,8 @@ async fn supplement_saveintent_from_disk (
       // disk stand-in reuses 'apply_sticky_levels' unchanged (its
       // sticky lookups simply find nothing, falling through to
       // default every time).
-      let explicit_levels : ExplicitLevels =
-        from_buffer . explicit_levels ();
+      let explicit_sources : ExplicitSources =
+        from_buffer . explicit_sources ();
       let supplemented : NodeComplete =
         from_buffer . into_nodecomplete ();
       let empty_disk : NodeComplete = NodeComplete {
@@ -119,7 +119,7 @@ async fn supplement_saveintent_from_disk (
         .. empty_node_complete () };
       let supplemented : NodeComplete =
         apply_sticky_levels (
-          supplemented, &empty_disk, &explicit_levels, config )
+          supplemented, &empty_disk, &explicit_sources, config )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -129,8 +129,8 @@ async fn supplement_saveintent_from_disk (
       let mut from_buffer : NodeSaveIntent = from_buffer;
       from_buffer . fill_unspecified_contains (
         &members_of (&disk_node . contains));
-      let explicit_levels : ExplicitLevels =
-        from_buffer . explicit_levels ();
+      let explicit_sources : ExplicitSources =
+        from_buffer . explicit_sources ();
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
@@ -149,7 +149,7 @@ async fn supplement_saveintent_from_disk (
             Some (active) => preserve_invisible_members (
               supplemented, &disk_node, config, active ) };
         apply_sticky_levels (
-          supplemented, &disk_node, &explicit_levels, config )
+          supplemented, &disk_node, &explicit_sources, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -180,7 +180,7 @@ fn preserve_invisible_members (
       &disk_contains, &is_visible,
       &buffer_contains );
     supplemented . contains =
-      privacied_all (&owner_source, merged); }
+      members_at_source (&owner_source, merged); }
   { let disk_subscribes : Vec<ID> =
       members_of (disk_node . subscribes_to . or_default ());
     let buffer_subscribes : Vec<ID> =
@@ -190,7 +190,7 @@ fn preserve_invisible_members (
       &buffer_subscribes );
     if merged != buffer_subscribes {
       supplemented . subscribes_to =
-        MSV::Specified (privacied_all (&owner_source, merged)); }}
+        MSV::Specified (members_at_source (&owner_source, merged)); }}
   { let disk_overrides : Vec<ID> =
       members_of (disk_node . overrides_view_of . or_default ());
     let buffer_overrides : Vec<ID> =
@@ -200,7 +200,7 @@ fn preserve_invisible_members (
       &buffer_overrides );
     if merged != buffer_overrides {
       supplemented . overrides_view_of =
-        MSV::Specified (privacied_all (&owner_source, merged)); }}
+        MSV::Specified (members_at_source (&owner_source, merged)); }}
   supplemented }
 
 /// Deleting a node deletes its whole TELESCOPE, including sections
@@ -226,10 +226,10 @@ pub fn refuse_delete_with_inactive_sections (
 /// save-leveling), extended by an EXPLICIT third path (work item
 /// render-and-gating). The lowering stages tag every edge with the
 /// node's own source (a placeholder); this pass resolves the real
-/// levels:
+/// recording sources:
 /// - EXPLICIT: a member named in 'explicit' (the buffer headline's
 ///   '(relSource NAME)' atom, threaded in as a side-channel because
-///   NodeComplete's 'PrivaciedMember::level' carries no "was this
+///   NodeComplete's 'MemberAtSource::source' carries no "was this
 ///   explicit" flag) wins outright, PROVIDED it is at or above (at
 ///   least as private as) the DEFAULT floor -- the more private of
 ///   the two endpoints' homes, NOT the disk level. An explicit atom
@@ -248,8 +248,10 @@ pub fn refuse_delete_with_inactive_sections (
 ///   keeps its DISK level. Renormalization never lowers an edge's
 ///   privacy silently; removing the atom means "no opinion", not
 ///   "reset to default".
-/// - DEFAULT: a new edge (no explicit level, no disk level) gets the
-///   more private of its two endpoints' homes.
+/// - DEFAULT: a new edge between owned nodes gets the more private
+///   endpoint home. If the member is foreign and the owner is owned,
+///   the edge instead stays at the owner's home: the relationship
+///   and foreign ID are intentionally shared with that source.
 /// - HIDES additionally floor at the most public EXPLAINING
 ///   subscription (see 'hide_level'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
@@ -259,7 +261,7 @@ pub fn refuse_delete_with_inactive_sections (
 pub(crate) fn apply_sticky_levels (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
-  explicit         : &ExplicitLevels,
+  explicit         : &ExplicitSources,
   config           : &SkgConfig,
 ) -> Result<NodeComplete, String> {
   let owner_pid  : ID         = supplemented . pid    . clone ();
@@ -273,26 +275,30 @@ pub(crate) fn apply_sticky_levels (
       . and_then ( |snap| snap . pid_and_source (id)
                    . map ( |(_pid, src)| src ))
       . or_else ( || home_from_disk (id, config) ) };
-  // The DEFAULT floor for one member: the more private of the two
-  // endpoints' homes (the owner's home alone when the target's home
-  // is unknown). By construction at least the owner's home, so the
-  // owner-home clamp is subsumed.
+  // The DEFAULT floor for one member. Owned-to-owned edges use the
+  // more private endpoint home. An owned-to-foreign edge stays at
+  // the owner's home; Skg never proposes writing a foreign section.
+  // An unknown target also falls back to the owner's home.
   let default_floor_for = |member : &ID| -> SourceName {
     match home_of (member) {
+      Some (target_home)
+        if ( config . user_owns_source (&owner_home) &&
+             ! config . user_owns_source (&target_home) ) =>
+        owner_home . clone (),
       Some (target_home) =>
         config . more_private_of (
           owner_home . clone (), target_home ),
       None => owner_home . clone (), }};
   // The sticky-else-default level for one member -- what an ABSENT
   // atom resolves to.
-  let sticky_level_for = |disk_list : &[PrivaciedMember<ID>],
+  let sticky_level_for = |disk_list : &[MemberAtSource<ID>],
                            member    : &ID|
   -> SourceName {
     let key : ID = resolve (member);
     let unclamped : SourceName = 'unclamped : {
       for d in disk_list { // sticky
         if resolve ( &d . member ) == key {
-          break 'unclamped d . level . clone (); }}
+          break 'unclamped d . source . clone (); }}
       default_floor_for (member) };
     // Clamp: no section may be more public than the home (the
     // "extends on the other side" junk shape), so when a HOME MOVE
@@ -313,13 +319,25 @@ pub(crate) fn apply_sticky_levels (
   // Net: an edge's privacy never drops below the default, and a
   // below-default edge can only be held or raised. Absent an atom,
   // sticky-else-default.
-  let resolve_level = |disk_list      : &[PrivaciedMember<ID>],
+  let resolve_level = |disk_list      : &[MemberAtSource<ID>],
                         member         : &ID,
                         explicit_here  : &HashMap<ID, SourceName>,
                         relation_label : &str|
   -> Result<SourceName, String> {
     match explicit_here . get (member) {
       Some (level) => {
+        if config . source_position (level) . is_none () {
+          return Err ( format! (
+            "Cannot save {} (relation '{}'): member '{}' requested unconfigured source '{}'.",
+            owner_pid, relation_label, member, level )); }
+        if ! config . user_owns_source (level) {
+          return Err ( format! (
+            "Cannot save {} (relation '{}'): member '{}' requested non-owned source '{}'. Relationship sources must be owned.",
+            owner_pid, relation_label, member, level )); }
+        if config . is_strictly_more_public (level, &owner_home) {
+          return Err ( format! (
+            "Cannot save {} (relation '{}'): member '{}' requested source '{}', which is more public than the owner's home '{}'.",
+            owner_pid, relation_label, member, level, owner_home )); }
         let default : SourceName = default_floor_for (member);
         let sticky  : SourceName =
           sticky_level_for (disk_list, member);
@@ -338,27 +356,27 @@ pub(crate) fn apply_sticky_levels (
             owner_pid, relation_label, member, level, floor ))
         } else { Ok ( level . clone () ) } },
       None => Ok ( sticky_level_for (disk_list, member) ), }};
-  { let disk : &[PrivaciedMember<ID>] = &disk_node . contains;
+  { let disk : &[MemberAtSource<ID>] = &disk_node . contains;
     for m in supplemented . contains . iter_mut () {
-      m . level = resolve_level (
+      m . source = resolve_level (
         disk, &m . member, &explicit . contains, "contains") ?; }}
-  { let disk : &[PrivaciedMember<ID>] =
+  { let disk : &[MemberAtSource<ID>] =
       disk_node . subscribes_to . or_default ();
     if let MSV::Specified (v) = &mut supplemented . subscribes_to {
       for m in v . iter_mut () {
-        m . level = resolve_level (
+        m . source = resolve_level (
           disk, &m . member, &explicit . subscribes_to,
           "subscribes_to") ?; }} }
-  { let disk : &[PrivaciedMember<ID>] =
+  { let disk : &[MemberAtSource<ID>] =
       disk_node . overrides_view_of . or_default ();
     if let MSV::Specified (v) = &mut supplemented . overrides_view_of {
       for m in v . iter_mut () {
-        m . level = resolve_level (
+        m . source = resolve_level (
           disk, &m . member, &explicit . overrides_view_of,
           "overrides_view_of") ?; }} }
-  { let disk : &[PrivaciedMember<ID>] =
+  { let disk : &[MemberAtSource<ID>] =
       disk_node . hides_from_its_subscriptions . or_default ();
-    let subscribes : Vec<PrivaciedMember<ID>> =
+    let subscribes : Vec<MemberAtSource<ID>> =
       supplemented . subscribes_to . or_default () . to_vec ();
     if let MSV::Specified (v) =
       &mut supplemented . hides_from_its_subscriptions {
@@ -367,28 +385,44 @@ pub(crate) fn apply_sticky_levels (
         let sticky : Option<SourceName> =
           disk . iter ()
           . find ( |d| resolve ( &d . member ) == key )
-          . map ( |d| d . level . clone () );
+          . map ( |d| d . source . clone () );
         let unclamped : SourceName = match sticky {
           Some (level) => level,
           None => hide_level (
             config, &owner_home, &m . member, &subscribes,
             &resolve ), };
-        m . level = config . more_private_of (
+        m . source = config . more_private_of (
           unclamped, owner_home . clone () ); }} }
-  { // Aliases have no target to inherit a level from; sticky by
-    // alias text, else the owner's home. No explicit-level path:
-    // the atom names an EDGE (contains / subscribes_to /
-    // overrides_view_of), not an alias.
-    let disk : &[PrivaciedMember<String>] =
+  { // Aliases are members at sources too: explicit request, then
+    // sticky source by alias text, then the owner's home. Their
+    // floor is always the owner home because aliases have no target.
+    let disk : &[MemberAtSource<String>] =
       disk_node . aliases . or_default ();
     if let MSV::Specified (v) = &mut supplemented . aliases {
       for m in v . iter_mut () {
-        let unclamped : SourceName = disk . iter ()
-          . find ( |d| d . member == m . member )
-          . map ( |d| d . level . clone () )
-          . unwrap_or_else ( || owner_home . clone () );
-        m . level = config . more_private_of (
-          unclamped, owner_home . clone () ); }} }
+        let explicit_source : Option<&SourceName> =
+          explicit . aliases . get (&m . member);
+        if let Some (source) = explicit_source {
+          if config . source_position (source) . is_none () {
+            return Err ( format! (
+              "Cannot save {} (alias '{}'): requested unconfigured source '{}'.",
+              owner_pid, m . member, source )); }
+          if ! config . user_owns_source (source) {
+            return Err ( format! (
+              "Cannot save {} (alias '{}'): requested non-owned source '{}'. Alias sources must be owned.",
+              owner_pid, m . member, source )); }
+          if config . is_strictly_more_public (source, &owner_home) {
+            return Err ( format! (
+              "Cannot save {} (alias '{}'): requested source '{}' is more public than the owner's home '{}'.",
+              owner_pid, m . member, source, owner_home )); }
+          m . source = source . clone ();
+        } else {
+          let sticky_or_default : SourceName = disk . iter ()
+            . find ( |d| d . member == m . member )
+            . map ( |d| d . source . clone () )
+            . unwrap_or_else ( || owner_home . clone () );
+          m . source = config . more_private_of (
+            sticky_or_default, owner_home . clone () ); } }} }
   Ok (supplemented) }
 
 /// A NEW hide's level: at least the more private of the endpoints'
@@ -404,7 +438,7 @@ fn hide_level (
   config     : &SkgConfig,
   owner_home : &SourceName,
   hidden     : &ID,
-  subscribes : &[PrivaciedMember<ID>],
+  subscribes : &[MemberAtSource<ID>],
   resolve    : &dyn Fn (&ID) -> ID,
 ) -> SourceName {
   let endpoint_floor : SourceName = {
@@ -427,7 +461,7 @@ fn hide_level (
           . map ( |subscribee| subscribee . contains . iter ()
                   . any ( |c| resolve ( &c . member ) == hidden_key ))
           . unwrap_or (false) } )
-      . map ( |sub| sub . level . clone () )
+      . map ( |sub| sub . source . clone () )
       . collect () };
   let subscription_floor : Option<SourceName> =
     explaining_levels . into_iter ()

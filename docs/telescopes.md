@@ -62,7 +62,7 @@ explains it.
 `skg-set-relationship-source` (`C-c s r`, see `docs/COMMANDS.org`;
 formerly `skg-privatize-relationship`) sets the level of the
 relationship the headline at point represents. It asks the server
-for the edge's default and current levels (the "edge level info"
+for the edge's default and current levels (the "edge source info"
 endpoint, see `api-and-formats.md`) and offers the levels at least
 as private as the default. An edge sitting above its default is
 marked with a red `~NAME` herald and a `(relSource NAME)` metadata

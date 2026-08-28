@@ -101,8 +101,10 @@ pub fn phantom_axes (
 
   (existence, membership) }
 
-/// A node's HOME read from disk: the MOST PUBLIC source holding a
-/// section of its telescope. Returns None if no source holds one.
+/// A node's HOME read from disk. When owned and non-owned files use
+/// the same pid, the owned telescope wins; otherwise the home is
+/// the most public source holding a section. Returns None if no
+/// source holds one.
 ///
 /// Walks 'ordered_sources' (the privacy order, most public first),
 /// never 'config.sources' -- that is a HashMap, whose iteration
@@ -117,13 +119,17 @@ pub fn home_from_disk (
   config : &SkgConfig,
 ) -> Option<SourceName> {
   let filename : String = format!( "{}.skg", id . 0 );
-  for source_name in config . ordered_sources () {
-    let Some (source_config) : Option<&SkgfileSource> =
-      config . sources . get (&source_name) else { continue; };
-    let path : PathBuf =
-      PathBuf::from( &source_config . path ) . join (&filename);
-    if path . exists() {
-      return Some( source_name ); }}
+  let ordered_sources : Vec<SourceName> = config . ordered_sources ();
+  for owned_only in [true, false] {
+    for source_name in &ordered_sources {
+      if config . user_owns_source (source_name) != owned_only {
+        continue; }
+      let Some (source_config) : Option<&SkgfileSource> =
+        config . sources . get (source_name) else { continue; };
+      let path : PathBuf =
+        PathBuf::from( &source_config . path ) . join (&filename);
+      if path . exists() {
+        return Some( source_name . clone () ); }} }
   None }
 
 #[cfg(test)]

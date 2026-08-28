@@ -48,13 +48,13 @@ use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, DefiningColOwner, LocalContext, NodeIntent_Local,
   SubscribeeTextClaim, SubscribeeVisibility };
 use crate::types::misc::{ID, SourceName};
-use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   EditRequest, ParentIs, Qual, QualCol, PartnerCol, ActiveNode, ViewNode,
   ViewNodeKind, Vognode };
 
 use ego_tree::NodeRef;
+use std::collections::HashSet;
 
 pub fn collect_instructions_locally (
   forest : &ViewForest,
@@ -255,22 +255,23 @@ fn visit_aliascol (
 ) -> Result<(), String> {
   if let LocalContext::UnderDefiningCol (owner) = context {
     if owner . is_saveEligible {
-      let texts : Vec<String> = {
-        let mut texts : Vec<String> = Vec::new();
+      let aliases : Vec<(String, Option<SourceName>)> = {
+        let mut aliases : Vec<(String, Option<SourceName>)> = Vec::new();
+        let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
-          if let ViewNodeKind::Qual (Qual::Alias { text, .. })
+          if let ViewNodeKind::Qual (Qual::Alias {
+            text, rel_source, .. })
             = &child . value() . kind
-          { texts . push (text . clone()); }}
-        // Dedup is silent and preserves first-occurrence order:
-        // aliases are unordered, and repeating oneself is not an
-        // error.
-        dedup_vector (texts) };
+          { if seen . insert (text . clone ()) {
+              aliases . push (( text . clone (),
+                                rel_source . clone () )); }} }
+        aliases };
       // The MSV semantics are: an absent col emits no intent, which
       // lowers to Unspecified, while a present-but-empty col emits
       // Specified(vec![]).
       collected . instructionMerge_intent (
         owner . id . clone(),
-        NodeIntent_Local::SetAliases (texts) ) ?; }}
+        NodeIntent_Local::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderReadOnlyCol, collected) }
 

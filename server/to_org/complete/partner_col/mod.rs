@@ -176,7 +176,7 @@ pub async fn maybe_add_subscribeeCol_branch (
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
-    // edge-level-GATED from the in-Rust graph when the global
+    // edge-source-GATED from the in-Rust graph when the global
     // handle is present (production always; render-and-gating,
     // 5_plan.org): hides and memberships recorded above the active
     // prefix must not shape this derived col. TypeDB fallback is

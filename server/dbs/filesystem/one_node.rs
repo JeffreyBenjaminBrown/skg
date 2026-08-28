@@ -1,8 +1,12 @@
 use crate::telescope::fold::fold_telescope;
-use crate::telescope::types::{SectionSlices, Telescope};
-use crate::telescope::unfold::{UnfoldInput, unfold_node};
+use crate::telescope::types::{
+  Telescope, retain_owned_sections_when_pid_collides,
+};
+use crate::telescope::unfold::{
+  UnfoldInput, UnfoldedTelescope, unfold_node,
+};
 use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
-use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
@@ -41,13 +45,13 @@ pub fn nodecomplete_from_pid_and_source (
   pid    : ID,
   source : &SourceName,
 ) -> io::Result<NodeComplete> {
-  let telescope : Telescope =
-    telescope_from_disk (config, &pid) ?;
-  if telescope . is_empty () {
+  let Some (telescope) : Option<Telescope> =
+    telescope_from_disk (config, &pid) ?
+  else {
     return Err ( io::Error::new (
       io::ErrorKind::NotFound,
       format! ("No .skg file for '{}' in any source (caller expected one in '{}')",
-               pid, source ))); }
+               pid, source ))); };
   fold_telescope ( telescope, & |id : &ID| id . clone () ) }
 
 /// PID's telescope as it sits on disk, in privacy order: for each
@@ -57,7 +61,7 @@ pub fn nodecomplete_from_pid_and_source (
 fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
-) -> io::Result<Telescope> {
+) -> io::Result<Option<Telescope>> {
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   for source_name in config . ordered_sources () {
     let path : String =
@@ -68,7 +72,19 @@ fn telescope_from_disk (
     if ! Path::new (&path) . is_file () { continue; }
     let node_fs : NodeFS = read_nodecomplete (&path) ?;
     sections . push (( source_name, node_fs )); }
-  Ok ( Telescope { pid : pid . clone (), sections } ) }
+  if sections . is_empty () {
+    return Ok (None); }
+  let (sections, collision) =
+    retain_owned_sections_when_pid_collides (sections, config);
+  if let Some (collision) = collision {
+    tracing::warn! (
+      pid = %pid,
+      ignored_sources = ?collision . ignored_sources,
+      "owned telescope won a collision with non-owned files" ); }
+  Telescope::try_new ( pid . clone (), sections, config )
+    . map (Some)
+    . map_err ( |e| io::Error::new (
+      io::ErrorKind::InvalidData, e ) ) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
@@ -111,7 +127,8 @@ pub async fn fetch_aliases_from_file (
 /// level lost its last member. Foreign sources are never written or
 /// deleted -- 'error_unless_home_is_writable' refuses rather than
 /// skipping, so a foreign home cannot silently lose the title, and
-/// the load reports that shape as 'TelescopeViolation::ForeignOverlay'.
+/// same-pid non-owned files are ignored when an owned telescope
+/// exists, so writes cannot absorb or delete their contents.
 pub fn write_nodecomplete_to_source (
   nodecomplete : &NodeComplete,
   config  : &SkgConfig,
@@ -124,9 +141,12 @@ pub fn write_nodecomplete_telescope (
 ) -> io::Result<()> {
   let pid : &ID = &nodecomplete . pid;
   error_unless_home_is_writable (nodecomplete, config) ?;
-  let sections : Vec<(SourceName, SectionSlices)> =
+  let unfolded : UnfoldedTelescope =
     unfold_node (
       & UnfoldInput {
+        pid      : pid,
+        extra_ids : & nodecomplete . extra_ids,
+        misc      : & nodecomplete . misc,
         title    : Some ( & nodecomplete . title ),
         body     : nodecomplete . body . as_deref (),
         home     : & nodecomplete . source,
@@ -138,39 +158,68 @@ pub fn write_nodecomplete_telescope (
           nodecomplete . hides_from_its_subscriptions . or_default (),
         overrides_view_of :
           nodecomplete . overrides_view_of . or_default (), },
-      & |level : &SourceName| config . source_position (level) );
-  let mut levels_written : Vec<SourceName> = Vec::new ();
-  for (level, slices) in sections {
-    let is_home : bool = level == nodecomplete . source;
-    let node_fs : NodeFS = nodefs_from_section (
-      pid, & nodecomplete . extra_ids,
-      & nodecomplete . misc, is_home, slices );
+      config )
+    . map_err ( |e| io::Error::new (
+      io::ErrorKind::InvalidData, e ) ) ?;
+
+  let mut offending_sources : Vec<SourceName> = unfolded . sections ()
+    . iter ()
+    .map ( |(source, _)| source )
+    . filter ( |source| ! config . user_owns_source (source) )
+    . cloned ()
+    . collect ();
+  offending_sources . sort ();
+  offending_sources . dedup ();
+  if ! offending_sources . is_empty () {
+    return Err ( io::Error::new (
+      io::ErrorKind::PermissionDenied,
+      format! (
+        "Refusing to write '{}': proposed telescope section(s) belong to non-owned source(s) [{}]. No files were changed.",
+        pid,
+        offending_sources . iter ()
+          . map ( |source| format! ("'{}'", source) )
+          . collect::<Vec<String>> () . join (", ") ))); }
+
+  let mut prepared_writes : Vec<(SourceName, String, String)> =
+    Vec::new ();
+  for (source, node_fs) in unfolded . sections () {
     let path : String =
-      path_from_pid_and_source ( config, &level, pid . clone () )
+      path_from_pid_and_source ( config, source, pid . clone () )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
     let yaml : String =
       node_fs . to_yaml ()
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e . to_string () )) ?;
+    prepared_writes . push (( source . clone (), path, yaml )); }
+  let written_sources : Vec<SourceName> = prepared_writes . iter ()
+    . map ( |(source, _, _)| source . clone () )
+    . collect ();
+  let mut prepared_deletions : Vec<String> = Vec::new ();
+  for source in config . ordered_sources () {
+    if written_sources . contains (&source) { continue; }
+    if ! config . user_owns_source (&source) { continue; }
+    let path : String = path_from_pid_and_source (
+      config, &source, pid . clone () )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::NotFound, e) ) ?;
+    prepared_deletions . push (path); }
+
+  for (source, path, yaml) in prepared_writes {
+    assert! ( config . user_owns_source (&source),
+              "write preflight admitted non-owned source '{}'", source );
     let unchanged : bool = // byte-stability
-      fs::read_to_string (&path)
+    fs::read_to_string (&path)
       . map ( |old| old == yaml )
       . unwrap_or (false);
     if ! unchanged {
       fs::write ( &path, yaml ) ?; }
-    levels_written . push (level); }
-  for source_name in config . ordered_sources () {
-    // Remove OWNED sections this write emptied.
-    if levels_written . contains (&source_name) { continue; }
-    if ! config . user_owns_source (&source_name) { continue; }
-    if let Ok (path) = path_from_pid_and_source (
-      config, &source_name, pid . clone () ) {
-      match fs::remove_file (&path) {
-        Ok (( ))                                            => {},
-        Err (e) if e . kind () == io::ErrorKind::NotFound   => {},
-        Err (e)                                             =>
-          return Err (e), }} }
+  }
+  for path in prepared_deletions {
+    match fs::remove_file (&path) {
+      Ok (( ))                                          => {},
+      Err (e) if e . kind () == io::ErrorKind::NotFound => {},
+      Err (e)                                           => return Err (e), } }
   Ok (( )) }
 
 

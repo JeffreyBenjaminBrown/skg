@@ -17,7 +17,7 @@ use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, privacied_all, privacied_msv, PrivaciedMember};
+use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, members_at_source, members_at_source_msv, MemberAtSource};
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
@@ -612,17 +612,17 @@ pub fn set_source_retagging_levels (
 ) {
   node . source = level . clone ();
   for m in node . contains . iter_mut () {
-    m . level = level . clone (); }
-  let retag_msv = |msv : &mut MSV<PrivaciedMember<ID>>| {
+    m . source = level . clone (); }
+  let retag_msv = |msv : &mut MSV<MemberAtSource<ID>>| {
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
-        m . level = level . clone (); }} };
+        m . source = level . clone (); }} };
   retag_msv ( &mut node . subscribes_to );
   retag_msv ( &mut node . hides_from_its_subscriptions );
   retag_msv ( &mut node . overrides_view_of );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
-      m . level = level . clone (); }} }
+      m . source = level . clone (); }} }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture
@@ -1026,11 +1026,11 @@ pub fn nodecomplete_example () -> NodeComplete {
     extra_ids: vec![],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: privacied_all ( &source,
+    contains: members_at_source ( &source,
                     vec![ ID::new ("1"),
                           ID::new ("2"),
                           ID::new ("3")] ),
-    subscribes_to: privacied_msv ( &source,
+    subscribes_to: members_at_source_msv ( &source,
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),

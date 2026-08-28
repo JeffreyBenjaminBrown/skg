@@ -197,7 +197,7 @@ report -- loudly, when indefinitive instances were skipped."
                               (length stuck)
                               (if (= (length stuck) 1) "" "s")
                               (if (= (length stuck) 1) "" "s"))))
-            (skg--apply-stuck-edge-levels stuck))))
+            (skg--apply-stuck-edge-sources stuck))))
     (dolist (id indef-ids)
       (message "skg-set-source: indefinitive instance NOT changed (the save would ignore it): %s"
                id))
@@ -297,7 +297,7 @@ and after the move."
                                                      old-default))
         new-default))))
 
-(defun skg--apply-stuck-edge-levels (stuck)
+(defun skg--apply-stuck-edge-sources (stuck)
   "Write a `(relSource LEVEL)' atom at each (MARKER . LEVEL) in
 STUCK, then free the markers. Returns the number of atoms written."
   (save-excursion
@@ -422,11 +422,21 @@ member of a read-only col, or with an ID missing."
 (defun skg--relationship-source-current-value ()
   "Return the current `(relSource NAME)' value (a string) for the
 headline at point, or nil when no such atom is present."
-  (let ((values (skg-sexp-cdr-at-path
-                 (or (skg--metadata-sexp-at-point-or-nil) '(skg))
-                 '(skg node viewStats relSource))))
+  (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
+         (alias-p (memq 'alias (cdr metadata)))
+         (values (skg-sexp-cdr-at-path
+                  metadata
+                  (if alias-p
+                      '(skg relSource)
+                    '(skg node viewStats relSource)))))
     (when values
       (format "%s" (car values)))))
+
+(defun skg--alias-headline-p ()
+  "Return non-nil when point is on an alias scaffold headline."
+  (and (org-at-heading-p)
+       (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
+         (and metadata (memq 'alias (cdr metadata))))))
 
 (defun skg--relationship-source-choices (ladder default)
   "The source-name menu for `skg-set-relationship-source': the tail
@@ -453,21 +463,23 @@ next save will do with the edge."
   (if (equal choice skg--relationship-source-no-override)
       (if (skg--relationship-source-current-value)
           (progn
-            ;; A relSource atom exists, so viewStats is present and
-            ;; the DELETE can find it.
-            (skg-edit-metadata-at-point
-             '(skg (node (viewStats (DELETE (relSource))))))
-            "Override removed: on save the edge keeps its saved (sticky) level, or its default if new. Save to apply.")
+            (if (skg--alias-headline-p)
+                (skg-edit-metadata-at-point
+                 '(skg (DELETE (relSource))))
+              ;; An edge relSource atom lives under viewStats.
+              (skg-edit-metadata-at-point
+               '(skg (node (viewStats (DELETE (relSource)))))))
+            "Override removed: on save the member keeps its saved (sticky) source, or its default if new. Save to apply.")
         "No override present; nothing to remove.")
     (progn
-      ;; Two-step dance (mirrors `skg--change-source-at-point'):
-      ;; the DSL's merge operation appends an unprocessed literal
-      ;; when no existing (viewStats ...) form is found, so an
-      ;; empty (viewStats) placeholder must exist FIRST, in its
-      ;; own edit, before the ENSURE can find and recurse into it.
-      (skg-edit-metadata-at-point '(skg (node (viewStats))))
-      (skg-edit-metadata-at-point
-       `(skg (node (viewStats (ENSURE (relSource ,(intern choice)))))))
+      (if (skg--alias-headline-p)
+          (skg-edit-metadata-at-point
+           `(skg (ENSURE (relSource ,(intern choice)))))
+        ;; Two-step dance (mirrors `skg--change-source-at-point'):
+        ;; create viewStats before recursing into it.
+        (skg-edit-metadata-at-point '(skg (node (viewStats))))
+        (skg-edit-metadata-at-point
+         `(skg (node (viewStats (ENSURE (relSource ,(intern choice))))))))
       (format "Relationship source set to '%s'. Save to apply."
               choice))))
 

@@ -149,7 +149,7 @@ fn read_subscribee_col_context (
               . filter ( |m| match active_source_set {
                   None      => true,
                   Some (a)  => a . is_all ()
-                    || a . contains_source (& m . level) } )
+                    || a . contains_source (& m . source) } )
               . map ( |m| m . member . clone () )
               . collect () )
       . unwrap_or_default ();

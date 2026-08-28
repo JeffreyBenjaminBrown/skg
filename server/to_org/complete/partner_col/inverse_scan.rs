@@ -27,7 +27,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MemberAtSource, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashMap;
@@ -41,9 +41,9 @@ use std::path::PathBuf;
 /// goal list as a phantom; a present member's Plus signs become its
 /// 'newM' marks.
 ///
-/// 'active': edge-level gating (render-and-gating, 5_plan.org). A
+/// 'active': edge-source gating (render-and-gating, 5_plan.org). A
 /// Deleted/Added file's before/after NodeComplete carries full
-/// PrivaciedMember levels, so those two stages gate on the specific
+/// MemberAtSource levels, so those two stages gate on the specific
 /// edge's level -- a phantom "used to link here" must not surface
 /// from a membership recorded outside the active set. The Modified
 /// stage cannot: 'NodeChanges' diff lists are level-stripped
@@ -125,14 +125,14 @@ fn member_and_sign_for_owner (
 
 /// The LEVEL of nc's outbound 'relation' edge to 'target', if nc's
 /// list names it. Sibling of 'outbound_ids_of_nodecomplete' below,
-/// but keeps the PrivaciedMember's level instead of dropping it, so
-/// Deleted/Added-stage signs can be edge-level gated.
+/// but keeps the MemberAtSource's level instead of dropping it, so
+/// Deleted/Added-stage signs can be edge-source gated.
 fn outbound_member_level_of_nodecomplete (
   nc       : &NodeComplete,
   relation : NodeRelation,
   target   : &ID,
 ) -> Option<SourceName> {
-  let leveled : &[PrivaciedMember<ID>] = match relation {
+  let leveled : &[MemberAtSource<ID>] = match relation {
     NodeRelation::Contains =>
       & nc . contains,
     NodeRelation::Subscribes =>
@@ -148,7 +148,7 @@ fn outbound_member_level_of_nodecomplete (
       return None, };
   leveled . iter ()
     . find ( |m| & m . member == target )
-    . map ( |m| m . level . clone () ) }
+    . map ( |m| m . source . clone () ) }
 
 /// Plus-only -> Plus; Minus-only -> Minus; both -> None (the
 /// cross-source-move cancellation); no signs -> None.

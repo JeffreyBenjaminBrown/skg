@@ -1,4 +1,4 @@
-use crate::types::misc::{MSV, privacied_all};
+use crate::types::misc::{MSV, members_at_source};
 use crate::types::viewnode::{ mk_indefinitive_viewnode, mk_indefinitive_viewnode_with_birth };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::dbs::in_rust_graph::add_to_inverse_indexes;
@@ -23,7 +23,7 @@ fn mk_node (
     title:        pid . to_string (),
     aliases:      MSV::Unspecified,
     body:         None,
-    contains:     privacied_all (
+    contains:     members_at_source (
       & src (),
       contains . iter () . map ( |s| id (s) ) . collect () ),
     subscribes_to:                MSV::Unspecified,

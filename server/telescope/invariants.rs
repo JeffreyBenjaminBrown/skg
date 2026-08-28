@@ -15,7 +15,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::FoldWarning;
-use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName};
 use crate::types::nodes::rust::NodeRust;
 
 use std::fmt;
@@ -46,15 +46,11 @@ pub enum TelescopeViolation {
     level    : SourceName,
     member   : ID,
   },
-  /// A source the user does NOT own holds the node's most public
-  /// section -- its HOME -- while the user owns some other section
-  /// of the same pid. The forbidden OVERLAY shape: you cannot
-  /// write the home (foreign sections are never written), so you
-  /// cannot repair it; a save of this node is refused rather than
-  /// allowed to lose or publish its text. Arises from a pull whose
-  /// source happens to hold a same-pid file.
-  ForeignOverlay {
-    home : SourceName,
+  /// Non-owned sections used the same pid as at least one owned
+  /// section. The owned telescope won and these sources were
+  /// ignored before folding or id-claim collection.
+  IgnoredForeignPidCollision {
+    ignored_sources : Vec<SourceName>,
   },
   /// Anything the FOLD noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
@@ -79,10 +75,13 @@ impl fmt::Display for TelescopeViolation {
         write! ( f,
           "{} member '{}' carries level '{}', which names no configured source",
           relation, member, level ),
-      TelescopeViolation::ForeignOverlay { home } =>
+      TelescopeViolation::IgnoredForeignPidCollision {
+        ignored_sources } =>
         write! ( f,
-          "foreign overlay: source '{}', which you do not own, holds this node's most public section -- its home -- while you own another section of it. You cannot write that home, so this cannot be repaired from here, and a save of this node is refused. Either drop your own section, or ask the source's owner about the id collision.",
-          home ),
+          "non-owned source(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
+          ignored_sources . iter ()
+            . map ( |source| format! ("'{}'", source) )
+            . collect::<Vec<String>> () . join (", ") ),
       TelescopeViolation::Fold (w) =>
         write! ( f, "{}", w ), }}}
 
@@ -98,12 +97,12 @@ pub fn telescope_violations_of (
     graph . nodes . get (pid) else { return Vec::new (); };
   let mut violations : Vec<TelescopeViolation> = Vec::new ();
   let mut check = |relation : &'static str,
-                   members  : &[PrivaciedMember<ID>]| {
+                   members  : &[MemberAtSource<ID>]| {
     for m in members {
-      if config . source_position ( &m . level ) . is_none () {
+      if config . source_position ( &m . source ) . is_none () {
         violations . push ( TelescopeViolation::UnconfiguredLevel {
           relation,
-          level  : m . level . clone (),
+          level  : m . source . clone (),
           member : m . member . clone (), } );
         continue; }
       let target_home : Option<SourceName> =
@@ -114,14 +113,14 @@ pub fn telescope_violations_of (
         // A dangling member (no node) is a different, pre-existing
         // problem (TODO/problems.org, the dangling-reference audit
         // gap); not this validator's to report.
-        if config . is_strictly_more_public ( &m . level, &home ) {
+        if config . is_strictly_more_public ( &m . source, &home ) {
           violations . push ( TelescopeViolation::LeakShapedMember {
             relation,
-            level       : m . level . clone (),
+            level       : m . source . clone (),
             member      : m . member . clone (),
             member_home : home, } ); }} }};
   check ("contains", &node . contains);
-  let msv = |m : &MSV<PrivaciedMember<ID>>| -> Vec<PrivaciedMember<ID>> {
+  let msv = |m : &MSV<MemberAtSource<ID>>| -> Vec<MemberAtSource<ID>> {
     m . or_default () . to_vec () };
   check ("subscribes_to",
          & msv ( &node . subscribes_to ));
@@ -148,7 +147,8 @@ pub fn validate_all_telescopes (
 
 /// The whole init/rebuild report: what the graph shows
 /// ('validate_all_telescopes') plus what the LOAD saw that the
-/// graph cannot show -- fold complaints and foreign overlays, which
+/// graph cannot show -- fold complaints and ignored foreign pid
+/// collisions, which
 /// need a node's section list rather than its fold. Reporting
 /// failures are logged, not propagated: a report we could not write
 /// is no reason to refuse to start.

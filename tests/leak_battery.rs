@@ -6,7 +6,7 @@
 // the shape the sweep exists to close: a PUBLIC node (N) whose
 // PRIVATE section privately contains/subscribes-to another PUBLIC
 // node (C) -- a private reading-list entry between two nodes that
-// are each individually visible at every level. Without edge-level
+// are each individually visible at every level. Without edge-source
 // gating this leaks by omission (a public session would still show
 // the private membership) or by appearance (inbound surfaces would
 // reveal N/S even though the content direction hides them).
@@ -285,7 +285,7 @@ fn a_lowered_edge_is_governed_by_its_new_level (
   // default stays hidden. Lowering to the default cannot leak: by
   // definition both endpoints' homes are at least as public as it.
   use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
-  use skg::types::misc::{PrivaciedMember, SourceName};
+  use skg::types::misc::{MemberAtSource, SourceName};
   use skg::types::nodes::complete::empty_node_complete;
   let node_at = |pid : &str, source : &str| -> NodeComplete {
     let mut n : NodeComplete = empty_node_complete ();
@@ -295,9 +295,9 @@ fn a_lowered_edge_is_governed_by_its_new_level (
     n };
   let mut owner : NodeComplete = node_at ("owner", "public");
   owner . contains = vec! [
-    PrivaciedMember::at ( // as if just lowered to its default
+    MemberAtSource::at_source ( // as if just lowered to its default
       SourceName::from ("public"), ID::from ("lowered") ),
-    PrivaciedMember::at ( // deliberately above its default
+    MemberAtSource::at_source ( // deliberately above its default
       SourceName::from ("private"), ID::from ("kept") ) ];
   let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [
     owner,

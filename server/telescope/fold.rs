@@ -18,7 +18,7 @@
 //! public occurrence, with a warning.
 
 use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
@@ -34,11 +34,11 @@ pub struct FoldedNode {
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
   // NodeComplete's.
-  pub aliases                      : Option<Vec<PrivaciedMember<String>>>,
-  pub contains                     : Vec<PrivaciedMember<ID>>,
-  pub subscribes_to                : Option<Vec<PrivaciedMember<ID>>>,
-  pub hides_from_its_subscriptions : Option<Vec<PrivaciedMember<ID>>>,
-  pub overrides_view_of            : Option<Vec<PrivaciedMember<ID>>>,
+  pub aliases                      : Option<Vec<MemberAtSource<String>>>,
+  pub contains                     : Vec<MemberAtSource<ID>>,
+  pub subscribes_to                : Option<Vec<MemberAtSource<ID>>>,
+  pub hides_from_its_subscriptions : Option<Vec<MemberAtSource<ID>>>,
+  pub overrides_view_of            : Option<Vec<MemberAtSource<ID>>>,
 }
 
 /// THE fold entry point: one telescope on disk -> the effective
@@ -54,7 +54,7 @@ pub fn fold_telescope_collecting_warnings (
   telescope : Telescope,
   resolve   : &dyn Fn (&ID) -> ID,
 ) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
-  let pid       : ID                = telescope . pid . clone ();
+  let pid       : ID                = telescope . pid () . clone ();
   let extra_ids : Vec<ID>           = telescope . extra_ids ();
   let misc      : Vec<FileProperty> = telescope . misc ();
   let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
@@ -73,7 +73,7 @@ pub fn fold_telescope (
   telescope : Telescope,
   resolve   : &dyn Fn (&ID) -> ID,
 ) -> io::Result<NodeComplete> {
-  let pid : ID = telescope . pid . clone ();
+  let pid : ID = telescope . pid () . clone ();
   let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
     fold_telescope_collecting_warnings ( telescope, resolve ) ?;
   for w in &warnings {
@@ -93,8 +93,8 @@ pub fn nodecomplete_from_fold (
   folded    : FoldedNode,
 ) -> Option<NodeComplete> {
   let home : SourceName = folded . home ?;
-  let msv = |o : Option<Vec<PrivaciedMember<ID>>>|
-  -> MSV<PrivaciedMember<ID>> {
+  let msv = |o : Option<Vec<MemberAtSource<ID>>>|
+  -> MSV<MemberAtSource<ID>> {
     match o {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), }};
@@ -186,12 +186,12 @@ pub fn fold_sections (
       // but members are strings, deduped verbatim.
       let mut seen : std::collections::HashSet<String> =
         std::collections::HashSet::new ();
-      let mut out : Vec<PrivaciedMember<String>> = Vec::new ();
+      let mut out : Vec<MemberAtSource<String>> = Vec::new ();
       for (level, s) in sections {
         if let Some (aliases) = &s . aliases {
           for a in aliases {
             if seen . insert ( a . clone () ) {
-              out . push ( PrivaciedMember::at (
+              out . push ( MemberAtSource::at_source (
                 level . clone (), a . clone () )); }
             else {
               // No per-alias id to report; reuse DuplicateMember with
@@ -208,8 +208,8 @@ fn fold_ordered (
   slice_of : impl Fn (&SectionSlices) -> Option<&[ListItem]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
-) -> Vec<PrivaciedMember<ID>> {
-  let mut effective : Vec<PrivaciedMember<ID>> = Vec::new ();
+) -> Vec<MemberAtSource<ID>> {
+  let mut effective : Vec<MemberAtSource<ID>> = Vec::new ();
   let mut any_section_yet : bool = false;
   for (level, s) in sections {
     let Some (items) = slice_of (s) else { continue; };
@@ -266,12 +266,12 @@ fn fold_ordered (
         warnings . push ( FoldWarning::DuplicateMember {
           member : id . clone () } );
         false }};
-    let mut next : Vec<PrivaciedMember<ID>> =
+    let mut next : Vec<MemberAtSource<ID>> =
       Vec::with_capacity ( effective . len ()
                            + prepend . len () );
     for id in prepend {
       if keep (&id, warnings) {
-        next . push ( PrivaciedMember::at (
+        next . push ( MemberAtSource::at_source (
           level . clone (), id )); }}
     for m in effective {
       let key : ID = resolve ( &m . member );
@@ -279,7 +279,7 @@ fn fold_ordered (
       if let Some (queue) = queues . remove (&key) {
         for id in queue {
           if keep (&id, warnings) {
-            next . push ( PrivaciedMember::at (
+            next . push ( MemberAtSource::at_source (
               level . clone (), id )); }} }}
     effective = next; }
   effective }
@@ -291,15 +291,15 @@ fn fold_unordered (
   slice_of : impl Fn (&SectionSlices) -> Option<&[ID]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
-) -> Vec<PrivaciedMember<ID>> {
+) -> Vec<MemberAtSource<ID>> {
   let mut seen : std::collections::HashSet<ID> =
     std::collections::HashSet::new ();
-  let mut out : Vec<PrivaciedMember<ID>> = Vec::new ();
+  let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
   for (level, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
     for id in members {
       if seen . insert ( resolve (id) ) {
-        out . push ( PrivaciedMember::at (
+        out . push ( MemberAtSource::at_source (
           level . clone (), id . clone () ));
       } else {
         warnings . push ( FoldWarning::DuplicateMember {

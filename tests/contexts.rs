@@ -15,7 +15,7 @@ use skg::context::{
 };
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName, privacied_all};
+use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName, members_at_source};
 use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 
@@ -102,7 +102,7 @@ fn in_rust_context_types_for_saved_nodes () {
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n . source = SourceName::from ("main");
-    n . contains = privacied_all (
+    n . contains = members_at_source (
       &n . source,
       contains . iter () . map ( |c| ID::new (*c) ) . collect () );
     if had_id { n . misc = vec![FileProperty::Had_ID_Before_Import]; }

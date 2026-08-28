@@ -5,7 +5,7 @@ use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, PrivaciedMember, SkgConfig, SourceName, ID, members_of, privacied_all};
+use crate::types::misc::{MSV, MemberAtSource, SkgConfig, SourceName, ID, members_of, members_at_source};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
@@ -188,19 +188,19 @@ fn three_nodeMerged_nodecompletes(
   // the acquirer's home, since no section may be more public than
   // its home.
   let combine_leveled =
-    |lists : &[&[PrivaciedMember<ID>]]| -> Vec<PrivaciedMember<ID>> {
+    |lists : &[&[MemberAtSource<ID>]]| -> Vec<MemberAtSource<ID>> {
       let home : &SourceName = & updated_acquirer . source;
-      let mut out : Vec<PrivaciedMember<ID>> = Vec::new ();
+      let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
       for list in lists {
         for m in *list {
           let level : SourceName = config . more_private_of (
-            m . level . clone (), home . clone () );
+            m . source . clone (), home . clone () );
           match out . iter_mut ()
             . find ( |o| o . member == m . member ) {
             Some (existing) => {
-              existing . level = config . more_private_of (
-                existing . level . clone (), level ); }
-            None => out . push ( PrivaciedMember::at (
+              existing . source = config . more_private_of (
+                existing . source . clone (), level ); }
+            None => out . push ( MemberAtSource::at_source (
               level, m . member . clone () )), }} }
       out };
   let new_contains : Vec<ID> = {
@@ -213,8 +213,8 @@ fn three_nodeMerged_nodecompletes(
       members_of (& acquiree_from_disk . contains) );
     dedup_vector (combined) };
   updated_acquirer . contains = {
-    let mut combined : Vec<PrivaciedMember<ID>> = combine_leveled (
-      & [ & privacied_all ( & updated_acquirer . source,
+    let mut combined : Vec<MemberAtSource<ID>> = combine_leveled (
+      & [ & members_at_source ( & updated_acquirer . source,
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
           & acquirer_from_disk . contains,
           & acquiree_from_disk . contains ] );
@@ -225,19 +225,19 @@ fn three_nodeMerged_nodecompletes(
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
-    let mut combined : Vec<PrivaciedMember<String>> = Vec::new ();
+    let mut combined : Vec<MemberAtSource<String>> = Vec::new ();
     for list in [ acquirer_from_disk . aliases . or_default (),
                   acquiree_from_disk . aliases . or_default () ] {
       for m in list {
         let level : SourceName = config . more_private_of (
-          m . level . clone (),
+          m . source . clone (),
           updated_acquirer . source . clone () );
         match combined . iter_mut ()
           . find ( |o| o . member == m . member ) {
           Some (existing) => {
-            existing . level = config . more_private_of (
-              existing . level . clone (), level ); }
-          None => combined . push ( PrivaciedMember::at (
+            existing . source = config . more_private_of (
+              existing . source . clone (), level ); }
+          None => combined . push ( MemberAtSource::at_source (
             level, m . member . clone () )), }} }
     updated_acquirer . aliases =
       MSV::Specified (combined); }
@@ -254,7 +254,7 @@ fn three_nodeMerged_nodecompletes(
     // member's hide never silences the other's view. ("Something
     // like the intersection": exactly the intersection when both
     // members could see the id through some subscribee.)
-    let mut combined : Vec<PrivaciedMember<ID>> = combine_leveled (
+    let mut combined : Vec<MemberAtSource<ID>> = combine_leveled (
       & [ acquirer_from_disk . hides_from_its_subscriptions
             . or_default (),
           acquiree_from_disk . hides_from_its_subscriptions

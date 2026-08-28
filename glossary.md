@@ -28,7 +28,7 @@ and `server/types/nodes/fs.rs`.
 The position of a source in the config's privacy order (most public
 first). Every relationship edge carries a level: the source whose
 section records it. In code this is the `level` field of
-`PrivaciedMember`. "More private" = later in the order.
+`MemberAtSource`. "More private" = later in the order.
 
 ## fold (visible vs full), unfold
 

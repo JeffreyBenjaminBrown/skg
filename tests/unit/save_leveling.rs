@@ -6,10 +6,10 @@
 
 use super::{apply_sticky_levels, refuse_delete_with_inactive_sections};
 use crate::dbs::in_rust_graph::{InRustGraph, install_or_swap_global_handle, new_handle};
-use crate::from_text::local_instruction_collection::lower::ExplicitLevels;
+use crate::from_text::local_instruction_collection::lower::ExplicitSources;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{
-  ID, MSV, PrivaciedMember, SkgConfig, SkgfileSource, SourceName,
+  ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
   SourceSetName};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -54,8 +54,8 @@ fn install_graph (
 fn pm (
   level  : &str,
   member : &str,
-) -> PrivaciedMember<ID> {
-  PrivaciedMember::at (
+) -> MemberAtSource<ID> {
+  MemberAtSource::at_source (
     SourceName::from (level), ID::new (member) ) }
 
 #[test]
@@ -76,7 +76,7 @@ fn sticky_preserves_disk_levels_and_default_takes_more_private_home (
     pm ("public", "fresh") ]; // new edge to a private-homed target
   let leveled : NodeComplete =
     apply_sticky_levels (
-      buffer, &disk, &ExplicitLevels::default (), &config) . unwrap ();
+      buffer, &disk, &ExplicitSources::default (), &config) . unwrap ();
   assert_eq! ( leveled . contains, vec! [
     pm ("private", "old"),    // STICKY: the disk's privatization survives
     pm ("private", "fresh") ] ); // DEFAULT: more private of the homes
@@ -97,7 +97,7 @@ fn home_move_to_more_private_clamps_levels_up (
   buffer . contains = vec! [ pm ("private", "child") ];
   let leveled : NodeComplete =
     apply_sticky_levels (
-      buffer, &disk, &ExplicitLevels::default (), &config) . unwrap ();
+      buffer, &disk, &ExplicitSources::default (), &config) . unwrap ();
   assert_eq! ( leveled . contains, vec! [
     pm ("private", "child") ],
     "the sticky public level rises to the new, more private home" );
@@ -132,7 +132,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
       pm ("public", "victim") ] ); // degenerate tag
     let leveled : NodeComplete =
       apply_sticky_levels (
-        buffer, &disk, &ExplicitLevels::default (), &config) . unwrap ();
+        buffer, &disk, &ExplicitSources::default (), &config) . unwrap ();
     assert_eq! (
       leveled . subscribes_to . or_default (),
       & [ pm ("private", "expl-a") ] );
@@ -153,7 +153,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
       pm ("public", "victim") ] );
     let leveled : NodeComplete =
       apply_sticky_levels (
-        buffer, &disk, &ExplicitLevels::default (), &config) . unwrap ();
+        buffer, &disk, &ExplicitSources::default (), &config) . unwrap ();
     assert_eq! (
       leveled . hides_from_its_subscriptions . or_default (),
       & [ pm ("public", "victim") ] ); }
@@ -174,10 +174,10 @@ fn explicit_level_at_or_above_floor_is_honored (
   disk . contains = vec! [ pm ("public", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : ExplicitLevels = ExplicitLevels {
+  let explicit : ExplicitSources = ExplicitSources {
     contains : HashMap::from ([
       ( ID::new ("child"), SourceName::from ("trusted") ) ]),
-    .. ExplicitLevels::default () };
+    .. ExplicitSources::default () };
   let leveled : NodeComplete =
     apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
   assert_eq! ( leveled . contains, vec! [
@@ -199,10 +199,10 @@ fn explicit_level_below_floor_is_rejected (
   let disk : NodeComplete = owner_before; // no sticky entry for "child"
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : ExplicitLevels = ExplicitLevels {
+  let explicit : ExplicitSources = ExplicitSources {
     contains : HashMap::from ([
       ( ID::new ("child"), SourceName::from ("public") ) ]), // below the "private" floor
-    .. ExplicitLevels::default () };
+    .. ExplicitSources::default () };
   let err : String =
     apply_sticky_levels (buffer, &disk, &explicit, &config)
     . unwrap_err ();
@@ -227,10 +227,10 @@ fn explicit_level_lowers_a_sticky_edge_to_its_default (
     pm ("private", "child") ]; // stuck above its default
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : ExplicitLevels = ExplicitLevels {
+  let explicit : ExplicitSources = ExplicitSources {
     contains : HashMap::from ([
       ( ID::new ("child"), SourceName::from ("public") ) ]), // = default
-    .. ExplicitLevels::default () };
+    .. ExplicitSources::default () };
   let leveled : NodeComplete =
     apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
   assert_eq! ( leveled . contains, vec! [
@@ -250,10 +250,10 @@ fn explicit_level_between_default_and_sticky_is_accepted (
   disk . contains = vec! [ pm ("private", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : ExplicitLevels = ExplicitLevels {
+  let explicit : ExplicitSources = ExplicitSources {
     contains : HashMap::from ([
       ( ID::new ("child"), SourceName::from ("trusted") ) ]),
-    .. ExplicitLevels::default () };
+    .. ExplicitSources::default () };
   let leveled : NodeComplete =
     apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
   assert_eq! ( leveled . contains, vec! [
@@ -276,10 +276,10 @@ fn explicit_below_default_is_rejected_and_the_error_names_the_default (
     pm ("private", "child") ]; // sticky sits above the default
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : ExplicitLevels = ExplicitLevels {
+  let explicit : ExplicitSources = ExplicitSources {
     contains : HashMap::from ([
       ( ID::new ("child"), SourceName::from ("public") ) ]), // below default
-    .. ExplicitLevels::default () };
+    .. ExplicitSources::default () };
   let err : String =
     apply_sticky_levels (buffer, &disk, &explicit, &config)
     . unwrap_err ();
@@ -310,10 +310,10 @@ fn explicit_at_a_below_default_disk_level_round_trips (
   { // Holding the disk level round-trips.
     let mut buffer : NodeComplete = node_at ("owner", "public");
     buffer . contains = vec! [ pm ("public", "child") ];
-    let explicit : ExplicitLevels = ExplicitLevels {
+    let explicit : ExplicitSources = ExplicitSources {
       contains : HashMap::from ([
         ( ID::new ("child"), SourceName::from ("public") ) ]),
-      .. ExplicitLevels::default () };
+      .. ExplicitSources::default () };
     let leveled : NodeComplete =
       apply_sticky_levels (
         buffer, &disk, &explicit, &config ) . unwrap ();
@@ -322,10 +322,10 @@ fn explicit_at_a_below_default_disk_level_round_trips (
   { // Raising it partway (still below the default) is accepted.
     let mut buffer : NodeComplete = node_at ("owner", "public");
     buffer . contains = vec! [ pm ("public", "child") ];
-    let explicit : ExplicitLevels = ExplicitLevels {
+    let explicit : ExplicitSources = ExplicitSources {
       contains : HashMap::from ([
         ( ID::new ("child"), SourceName::from ("trusted") ) ]),
-      .. ExplicitLevels::default () };
+      .. ExplicitSources::default () };
     let leveled : NodeComplete =
       apply_sticky_levels (
         buffer, &disk, &explicit, &config ) . unwrap ();
@@ -368,10 +368,10 @@ fn explicit_lowering_moves_the_edge_between_section_files (
             "before: no trusted section yet" );
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : ExplicitLevels = ExplicitLevels {
+  let explicit : ExplicitSources = ExplicitSources {
     contains : HashMap::from ([
       ( ID::new ("child"), SourceName::from ("trusted") ) ]), // the new default
-    .. ExplicitLevels::default () };
+    .. ExplicitSources::default () };
   let leveled : NodeComplete =
     apply_sticky_levels (buffer, &disk, &explicit, &config) . unwrap ();
   assert_eq! ( leveled . contains, vec! [ pm ("trusted", "child") ] );
@@ -386,6 +386,75 @@ fn explicit_lowering_moves_the_edge_between_section_files (
   assert! ( ! std::fs::read_to_string (&public_file) . unwrap ()
             . contains ("child"),
             "after: the home section does not name the child" );
+}
+
+#[test]
+fn owned_to_foreign_new_edges_default_to_the_owner_home (
+) {
+  for relation in ["contains", "subscribes_to", "overrides_view_of"] {
+    for (owner_home, member_home) in
+        [("public", "private"), ("private", "public")] {
+      let mut config : SkgConfig =
+        config_with_order (&["public", "private"]);
+      config . sources . get_mut (&SourceName::from (member_home))
+        . unwrap () . user_owns_it = false;
+      config . sources . get_mut (&SourceName::from (owner_home))
+        . unwrap () . user_owns_it = true;
+      let owner : NodeComplete = node_at ("owner", owner_home);
+      let member : NodeComplete = node_at ("member", member_home);
+      install_graph (&[owner . clone (), member]);
+      let disk : NodeComplete = owner;
+      let mut buffer : NodeComplete = node_at ("owner", owner_home);
+      match relation {
+        "contains" => buffer . contains = vec! [pm (owner_home, "member")],
+        "subscribes_to" => buffer . subscribes_to =
+          MSV::Specified (vec! [pm (owner_home, "member")]),
+        "overrides_view_of" => buffer . overrides_view_of =
+          MSV::Specified (vec! [pm (owner_home, "member")]),
+        _ => unreachable! (), }
+      let resolved : NodeComplete = apply_sticky_levels (
+        buffer, &disk, &ExplicitSources::default (), &config ) . unwrap ();
+      let source : &SourceName = match relation {
+        "contains" => &resolved . contains [0] . source,
+        "subscribes_to" =>
+          &resolved . subscribes_to . or_default () [0] . source,
+        "overrides_view_of" =>
+          &resolved . overrides_view_of . or_default () [0] . source,
+        _ => unreachable! (), };
+      assert_eq! (source, &SourceName::from (owner_home),
+                  "relation {}", relation); }}
+}
+
+#[test]
+fn explicit_alias_source_is_load_bearing_and_validated (
+) {
+  let config : SkgConfig =
+    config_with_order (&["public", "trusted", "private"]);
+  let disk : NodeComplete = node_at ("owner", "public");
+  let mut buffer : NodeComplete = disk . clone ();
+  buffer . aliases = MSV::Specified (vec! [
+    crate::types::misc::MemberAtSource::at_source (
+      SourceName::from ("public"), "nickname" . to_string ()) ]);
+  let explicit : ExplicitSources = ExplicitSources {
+    aliases : HashMap::from ([
+      ("nickname" . to_string (), SourceName::from ("private")) ]),
+    .. ExplicitSources::default () };
+  let resolved : NodeComplete = apply_sticky_levels (
+    buffer, &disk, &explicit, &config ) . unwrap ();
+  assert_eq! (
+    resolved . aliases . or_default () [0] . source,
+    SourceName::from ("private") );
+
+  let mut foreign_config : SkgConfig = config;
+  foreign_config . sources . get_mut (&SourceName::from ("private"))
+    . unwrap () . user_owns_it = false;
+  let mut buffer : NodeComplete = disk . clone ();
+  buffer . aliases = MSV::Specified (vec! [
+    crate::types::misc::MemberAtSource::at_source (
+      SourceName::from ("public"), "nickname" . to_string ()) ]);
+  let error : String = apply_sticky_levels (
+    buffer, &disk, &explicit, &foreign_config ) . unwrap_err ();
+  assert! (error . contains ("non-owned source 'private'"), "{}", error);
 }
 
 #[test]

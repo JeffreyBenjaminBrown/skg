@@ -60,6 +60,7 @@ pub struct ViewnodeMetadata {
   pub activeNode_membership : MembershipAxes,
   pub activeNode_not_in_git : bool,
   pub scaffold_membership : MembershipAxes,
+  pub scaffold_rel_source : Option<SourceName>,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
   // When true, this is a PhantomDeleted (id and source are used).
@@ -98,6 +99,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     activeNode_membership : MembershipAxes::default(),
     activeNode_not_in_git : false,
     scaffold_membership : MembershipAxes::default(),
+    scaffold_rel_source : None,
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
@@ -171,6 +173,8 @@ pub fn viewnode_from_metadata (
           MpViewnodeKind::Qual (Qual::Alias { .. }) =>
             MpViewnodeKind::Qual (Qual::Alias {
                               text: title . clone (),
+                              rel_source:
+                                metadata . scaffold_rel_source . clone (),
                               membership: metadata . scaffold_membership }),
           MpViewnodeKind::Qual (Qual::ID { .. }) =>
             MpViewnodeKind::Qual (Qual::ID {
@@ -323,6 +327,13 @@ pub fn parse_metadata_to_viewnodemd (
               &items[1..],
               false, // unstaged
               &mut result . scaffold_membership ) ?; },
+          "relSource" => {
+            if items . len () != 2 {
+              return Err (
+                "relSource requires exactly one source name"
+                . to_string () ); }
+            result . scaffold_rel_source = Some ( SourceName::from (
+              atom_to_string (&items [1]) ? )); },
           "textChanged" => {
             // (textChanged STAGE_TAGS) for the TextChanged qual.
             result . non_vognode = Some (
@@ -365,7 +376,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), membership: MembershipAxes::default() } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), rel_source: None, membership: MembershipAxes::default() } ) ),
           "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeCol" =>

@@ -491,13 +491,13 @@ pub async fn prepend_indef_indep_child_with_source_set (
     // levels live); TypeDB-only callers have no level data yet
     // (deferred to dbs-and-search), so this is skipped when no
     // snapshot is installed -- a graceful no-op, not a leak, since
-    // that is also when 'edge_level' would be unavailable everywhere
+    // that is also when 'edge_source' would be unavailable everywhere
     // else in the render path.
     if let Birth::Backpath (role) = birth {
       if let Some (graph) = snapshot_global () {
         if let Ok (parent_pid) = get_id_from_treenode (tree, parent_treeid) {
           let level_active : bool =
-            backpath_edge_level (&graph, &parent_pid, child_skgid, role)
+            backpath_edge_source (&graph, &parent_pid, child_skgid, role)
             . map ( |level| active . contains_source (&level) )
             . unwrap_or (false);
           if ! level_active { return Ok (None); }}}}}
@@ -516,14 +516,14 @@ pub async fn prepend_indef_indep_child_with_source_set (
 /// FIRST position (e.g. CONTAINER), the partner owns the edge (an
 /// inbound partner of origin, in the "someone else's outbound list
 /// names me" sense); otherwise origin owns it.
-fn backpath_edge_level (
+fn backpath_edge_source (
   graph   : &InRustGraph,
   origin  : &ID,
   partner : &ID,
   role    : RelationRole,
 ) -> Option<SourceName> {
   if role . is_first_role () {
-    graph . edge_level ( partner, role . relation, origin )
+    graph . edge_source ( partner, role . relation, origin )
   } else {
-    graph . edge_level ( origin, role . relation, partner )
+    graph . edge_source ( origin, role . relation, partner )
   } }

@@ -4,7 +4,7 @@
 //! Includes 'misc' because 'Had_ID_Before_Import' feeds the
 //! context-ranking score multiplier (see [[../../../server/context.rs][context.rs]]).
 
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -17,7 +17,7 @@ pub struct NodeTantivy {
   // source field is the alias's level, not the node's home, so a
   // restricted search cannot match a private alias of a public
   // node (dbs-and-search, 5_plan.org).
-  pub aliases : MSV<PrivaciedMember<String>>,
+  pub aliases : MSV<MemberAtSource<String>>,
   pub body    : Option<String>,
   pub misc    : Vec<FileProperty>,
 }

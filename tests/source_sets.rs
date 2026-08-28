@@ -35,7 +35,7 @@ use skg::to_org::expand::backpath::{
 use skg::to_org::render::content_view::multi_root_view_with_source_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, privacied_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, members_at_source_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
@@ -774,7 +774,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   result_node . pid = ID::from ("active-search-hit");
   result_node . title = "active search hit" . to_string ();
   set_source_retagging_levels ( &mut result_node, &SourceName::from ("public") );
-  result_node . aliases = privacied_msv (
+  result_node . aliases = members_at_source_msv (
     & result_node . source,
     MSV::Specified (vec!["search term" . to_string ()]) );
   let mut active_container : NodeComplete =

@@ -395,16 +395,17 @@ and edits the acquirer's metadata to request a merge.
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
 *** C-c s r : skg-set-relationship-source
-Sets the privacy level of the relationship instance the headline at
+Sets the recording source of the relationship instance the headline at
 point represents -- =contains= for a content child, the col's
-relation for a writable PartnerCol member. (Formerly
+relation for a writable PartnerCol member, or the alias membership
+for an alias headline. (Formerly
 =skg-privatize-relationship=; renamed because the gesture now moves
 privacy in both directions, see
 =BUG-and-fix_make-edge-more-public.org=.)
 
-The command asks the server for the edge's DEFAULT level (the more
-private of the two endpoints' homes) and its CURRENT level (the
-"edge level info" endpoint), then prompts -- with both
+For a node-to-node edge, the command asks the server for its DEFAULT
+source and CURRENT source (the
+"edge source info" endpoint), then prompts -- with both
 tab-completion and S-left/S-right cycling, like the other source
 dialogs -- over the levels at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at
@@ -412,7 +413,9 @@ save), plus a no-override choice. The minibuffer starts pre-filled
 with the current level when it is offerable, else the default, so
 RET keeps the status quo. If the server cannot resolve the edge
 (e.g. a node not yet saved), every source is offered and the save's
-floor check backstops.
+floor check backstops. For an alias, its default is its owner's home
+and the current source is read directly from the alias metadata, so
+no synthetic graph edge or broader endpoint is needed.
 
 Choosing a level writes a =(relSource LEVEL)= metadata atom. This
 both raises privacy above the default and lowers it back down to
@@ -435,6 +438,13 @@ headline, which represents no edge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the change.
+
+Note that the name 'skg-set-relationship-source' is somewhat misleading.
+Normally, by 'relationship' we mean
+'a relationship between two nodes in the graph'.
+But for this command we need to broaden the definition to
+'a relationship from what this viewnode represents
+(which might be an alias) to what its parent represents (a node in the graph)'.
 
 With a prefix argument (=C-u C-c s r=) it instead runs
 'skg-set-relationship-source-recursive', described next.

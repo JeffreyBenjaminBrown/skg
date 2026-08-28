@@ -28,7 +28,7 @@ use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::apply_relationship_deltas_for_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
-use crate::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -466,9 +466,9 @@ fn nodecomplete_from_noderust (
   }}
 
 fn remove_from_msv (
-  msv : &MSV<PrivaciedMember<ID>>,
+  msv : &MSV<MemberAtSource<ID>>,
   exclude : &HashSet<ID>
-) -> MSV<PrivaciedMember<ID>> {
+) -> MSV<MemberAtSource<ID>> {
   match msv {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (

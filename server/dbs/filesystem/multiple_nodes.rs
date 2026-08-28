@@ -1,5 +1,7 @@
 use crate::telescope::fold::fold_telescope_collecting_warnings;
-use crate::telescope::types::{FoldWarning, Telescope};
+use crate::telescope::types::{
+  FoldWarning, Telescope, retain_owned_sections_when_pid_collides,
+};
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete_telescope};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
@@ -38,8 +40,8 @@ pub fn read_all_skg_files_from_sources (
 /// Two kinds arise here and nowhere else, because only here are a
 /// node's SECTION LIST and the config both in hand:
 /// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
-/// - 'ForeignOverlay', where an unowned source holds the node's
-///   most public section while the user owns another.
+/// - 'IgnoredForeignPidCollision', where owned and non-owned files
+///   use the same pid. The owned telescope wins before folding.
 pub fn read_all_skg_files_from_sources_collecting_violations (
   config: &SkgConfig
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
@@ -74,39 +76,41 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
                load_errors . len() ))); }
-  let overlays : Vec<(ID, TelescopeViolation)> =
-    foreign_overlays (&sections_by_pid, &pid_order, config);
+  let collision_violations : Vec<(ID, TelescopeViolation)> =
+    retain_owned_telescopes (
+      &mut sections_by_pid, &pid_order, config );
   let (nodes, fold_violations)
     : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-    fold_grouped_sections (sections_by_pid, pid_order) ?;
+    fold_grouped_sections (sections_by_pid, pid_order, config) ?;
   Ok (( nodes,
-        { let mut all : Vec<(ID, TelescopeViolation)> = overlays;
+        { let mut all : Vec<(ID, TelescopeViolation)> =
+            collision_violations;
           all . extend (fold_violations);
           all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
           all } )) }
 
-/// The nodes whose HOME -- most public section -- sits in a source
-/// the user does not own, while the user owns some other section of
-/// the same pid. Sections arrive in privacy order, so the home is
-/// simply the first.
-fn foreign_overlays (
-  sections_by_pid : &HashMap<ID, Vec<(SourceName, NodeFS)>>,
+/// When owned and non-owned files use one pid, retain only the
+/// owned files before folding or building the extra-id map. A pid
+/// represented entirely by non-owned files remains readable.
+fn retain_owned_telescopes (
+  sections_by_pid : &mut HashMap<ID, Vec<(SourceName, NodeFS)>>,
   pid_order       : &[ID],
   config          : &SkgConfig,
 ) -> Vec<(ID, TelescopeViolation)> {
-  let mut overlays : Vec<(ID, TelescopeViolation)> = Vec::new ();
+  let mut violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
-    let Some (sections) : Option<&Vec<(SourceName, NodeFS)>> =
-      sections_by_pid . get (pid) else { continue; };
-    let Some ((home, _)) : Option<&(SourceName, NodeFS)> =
-      sections . first () else { continue; };
-    if config . user_owns_source (home) { continue; }
-    if sections . iter () . skip (1) . any (
-      |(level, _)| config . user_owns_source (level) ) {
-      overlays . push (( pid . clone (),
-                         TelescopeViolation::ForeignOverlay {
-                           home : home . clone () } )); }}
-  overlays }
+    let Some (sections) = sections_by_pid . remove (pid)
+      else { continue; };
+    let (retained, collision) =
+      retain_owned_sections_when_pid_collides (sections, config);
+    sections_by_pid . insert (pid . clone (), retained);
+    if let Some (collision) = collision {
+      violations . push ((
+        pid . clone (),
+        TelescopeViolation::IgnoredForeignPidCollision {
+          ignored_sources : collision . ignored_sources,
+        } )); }}
+  violations }
 
 /// One telescope, read fresh from disk by pid (all its sections,
 /// folded). Errors if no section exists or no section has a title.
@@ -128,6 +132,7 @@ pub fn nodecomplete_from_telescope_on_disk (
 fn fold_grouped_sections (
   mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
   pid_order           : Vec<ID>,
+  config              : &SkgConfig,
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
@@ -142,10 +147,13 @@ fn fold_grouped_sections (
   let mut all_nodes : Vec<NodeComplete> = Vec::new ();
   let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
-    let telescope : Telescope = Telescope {
-      sections : sections_by_pid . remove (&pid)
+    let telescope : Telescope = Telescope::try_new (
+      pid . clone (),
+      sections_by_pid . remove (&pid)
         . expect ("pid_order tracks sections_by_pid"),
-      pid      : pid . clone (), };
+      config )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::InvalidData, e ) ) ?;
     let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
       fold_telescope_collecting_warnings ( telescope, &resolve ) ?;
     all_nodes . push (node);

@@ -251,11 +251,11 @@ So far there are these endpoints:
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
 ## Edge level info
-  - Request: ((request . "edge level info") (owner . "ID")
+  - Request: ((request . "edge source info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     `contains`, `subscribes_to`, `overrides_view_of`: the three
     relations an explicit `(relSource ...)` atom can name.
-  - Response: LP response-type "edge-level-info" with
+  - Response: LP response-type "edge-source-info" with
     `((default "NAME") (current "NAME"))`. `(current ...)` is absent
     when the graph records no such edge (e.g. one typed into a
     buffer and not yet saved). On failure, `((error "..."))` — e.g.

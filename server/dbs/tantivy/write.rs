@@ -114,7 +114,7 @@ fn create_documents_from_node (
   titles_and_aliases . extend (
     node . aliases . or_default () . iter ()
     . map ( |a| ( a . member . clone (),
-                  a . level . clone () )));
+                  a . source . clone () )));
   for (i, (title_or_alias, doc_source)) in
     titles_and_aliases . iter() . enumerate()
   { let is_title : bool = i == 0;

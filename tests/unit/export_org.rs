@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::source_sets::{ActiveSourceSet, SourceSetName};
-use crate::types::misc::{ID, SourceName, privacied_all};
+use crate::types::misc::{ID, SourceName, members_at_source};
 use crate::types::nodes::complete::empty_node_complete;
 
 use std::collections::BTreeSet;
@@ -23,7 +23,7 @@ fn node (
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
   n . source   = SourceName::from ("main");
-  n . contains = privacied_all (
+  n . contains = members_at_source (
     & n . source,
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
@@ -254,9 +254,9 @@ fn private_leveled_edge_is_omitted_from_restricted_export () {
   // priv's home is active.
   let mut root : NodeComplete =
     node ("r", "Root", None, &["ma"]);
-  root . contains . push ( PrivaciedMember::at (
+  root . contains . push ( MemberAtSource::at_source (
     SourceName::from ("main"), ID::from ("pub") ));
-  root . contains . push ( PrivaciedMember::at (
+  root . contains . push ( MemberAtSource::at_source (
     SourceName::from ("private"), ID::from ("priv") ));
   let nodes : Vec<NodeComplete> = vec! [
     root,

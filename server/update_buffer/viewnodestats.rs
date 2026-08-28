@@ -210,7 +210,7 @@ fn flag_ancestor_relations (
   let contains_edge_visible = |owner : &ID, target : &ID| -> bool {
     match (graph, active) {
       (Some (g), Some (a)) if ! a . is_all () =>
-        g . edge_level (owner, NodeRelation::Contains, target)
+        g . edge_source (owner, NodeRelation::Contains, target)
           . map ( |level| a . contains_source (&level) )
           . unwrap_or (false),
       _ => true }};
@@ -319,7 +319,7 @@ fn set_hidden_body (
 /// Gnode-parent content child; the col's relation for a simple
 /// PartnerCol member, oriented by which side owns the outbound edge
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
-/// actual level ('InRustGraph::edge_level') against its default (the
+/// actual level ('InRustGraph::edge_source') against its default (the
 /// more private of the two endpoints' homes). None on any of: no
 /// graph handle; parentIs != Affected or a backpath graft (not a
 /// genuine member here); a compound filter col
@@ -369,7 +369,7 @@ fn set_rel_source (
           }},
         ParentKind::Other => break 'compute None, };
     let level : SourceName =
-      match graph . edge_level (&owner_pid, relation, &target_pid) {
+      match graph . edge_source (&owner_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
     let default : SourceName = {
       let owner_home : Option<SourceName> =

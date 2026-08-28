@@ -132,13 +132,13 @@ fn read_hiddenoutside_context (
   let wt_subscriber_hides : Vec<ID> =
     wt_subscriber_nodecomplete . hides_from_its_subscriptions
     . or_default () . iter ()
-    . filter ( |m| level_active (& m . level) )
+    . filter ( |m| level_active (& m . source) )
     . map ( |m| m . member . clone () )
     . collect ();
   let wt_subscribees : Vec<ID> =
     wt_subscriber_nodecomplete . subscribes_to
     . or_default () . iter ()
-    . filter ( |m| level_active (& m . level) )
+    . filter ( |m| level_active (& m . source) )
     . map ( |m| m . member . clone () )
     . collect ();
   Ok (HiddenOutsideContext {

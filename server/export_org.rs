@@ -14,7 +14,7 @@
 //! subcommand both call it.
 
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, PrivaciedMember};
+use crate::types::misc::{ID, MemberAtSource};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
@@ -596,10 +596,10 @@ fn node_active (
 /// privacy level must be active. (The visible fold = active
 /// sections' lists only.)
 fn edge_active (
-  member : &PrivaciedMember<ID>,
+  member : &MemberAtSource<ID>,
   active : &ActiveSourceSet,
 ) -> bool {
-  active . is_all () || active . contains_source (&member . level) }
+  active . is_all () || active . contains_source (&member . source) }
 
 fn anchor_text (
   node : &NodeComplete,

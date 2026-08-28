@@ -17,7 +17,7 @@
 (require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-config)
-(require 'skg-request-edge-level-info)
+(require 'skg-request-edge-source-info)
 
 (defvar test--config-public-private-trusted
   (concat "[[sources]]\n"
@@ -216,6 +216,56 @@ anything resets to the default."
        (should (string-match-p "nothing to remove" msg))
        (should (equal (test--buffer-line 1) before))))))
 
+(ert-deftest test-apply-relationship-source-on-alias-uses-flat-metadata ()
+  "Alias relSource is a flat scaffold atom, not fake node viewStats."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id owner) (source public))) owner\n"
+    "** (skg aliasCol)\n"
+    "*** (skg alias) nickname\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (forward-line 2)
+     (skg--apply-relationship-source-choice "trusted")
+     (should (string-match-p
+              "(skg alias (relSource trusted))"
+              (test--buffer-line 3)))
+     (should-not (string-match-p "viewStats" (test--buffer-line 3)))
+     (should (equal (skg--relationship-source-current-value) "trusted"))
+     (skg--apply-relationship-source-choice
+      skg--relationship-source-no-override)
+     (should (equal (test--buffer-line 3)
+                    "*** (skg alias) nickname")))))
+
+(ert-deftest test-alias-command-derives-default-locally ()
+  "The alias gesture uses its owning node's home without an edge-info request."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id owner) (source private))) owner\n"
+    "** (skg aliasCol)\n"
+    "*** (skg alias) nickname\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (forward-line 2)
+     (let (seen-choices)
+       (cl-letf (((symbol-function 'run-at-time)
+                  (lambda (_secs _repeat fn &rest args) (apply fn args)))
+                 ((symbol-function 'completing-read)
+                  (lambda (_prompt choices &rest _)
+                    (setq seen-choices choices)
+                    "trusted"))
+                 ((symbol-function 'process-send-string)
+                  (lambda (&rest _)
+                    (ert-fail "alias command must not contact edge endpoint"))))
+         (skg--set-relationship-source-at-point))
+       (should (equal seen-choices
+                      (list "private" "trusted"
+                            skg--relationship-source-no-override)))
+       (should (string-match-p "(relSource trusted)"
+                               (test--buffer-line 3)))))))
+
 ;; --- The response handler, network and minibuffer stubbed ---
 
 (defun test--run-info-handler (payload choice-fn)
@@ -250,7 +300,7 @@ level, and applies the selection."
      (beginning-of-line)
      (let (seen-choices seen-prefill)
        (test--run-info-handler
-        "((response-type edge-level-info) (default \"private\") (current \"trusted\"))"
+        "((response-type edge-source-info) (default \"private\") (current \"trusted\"))"
         (lambda (_prompt choices prefill)
           (setq seen-choices choices
                 seen-prefill prefill)
@@ -276,7 +326,7 @@ choices, so the prompt pre-fills with the default instead."
      (beginning-of-line)
      (let (seen-prefill)
        (test--run-info-handler
-        "((response-type edge-level-info) (default \"private\") (current \"public\"))"
+        "((response-type edge-source-info) (default \"private\") (current \"public\"))"
         (lambda (_prompt _choices prefill)
           (setq seen-prefill prefill)
           skg--relationship-source-no-override))
@@ -295,7 +345,7 @@ choices, so the prompt pre-fills with the default instead."
      (beginning-of-line)
      (let (seen-choices)
        (test--run-info-handler
-        "((response-type edge-level-info) (error \"member 'kid' is not in the graph\"))"
+        "((response-type edge-source-info) (error \"member 'kid' is not in the graph\"))"
         (lambda (_prompt choices _def)
           (setq seen-choices choices)
           skg--relationship-source-no-override))

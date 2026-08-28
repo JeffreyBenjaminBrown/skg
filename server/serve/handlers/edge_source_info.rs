@@ -1,10 +1,10 @@
-//! 'edge level info' (BUG-and-fix_make-edge-more-public.org): given
+//! 'edge source info' (BUG-and-fix_make-edge-more-public.org): given
 //! one relationship edge -- owner id, member id, and the relation
-//! between them -- reply with the edge's DEFAULT level (the more
-//! private of the two endpoints' homes) and its CURRENT level (when
+//! between them -- reply with the edge's DEFAULT source (the more
+//! private of the two endpoints' homes) and its CURRENT source (when
 //! the graph records the edge). The client's
 //! 'skg-set-relationship-source' gesture uses this to offer only
-//! levels the save's default floor can accept, instead of the whole
+//! sources the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
 //! 'apply_sticky_levels' stays load-bearing, since buffers go stale
 //! and the '(relSource ...)' atom is plain text anyone can type.
@@ -19,26 +19,26 @@ use crate::types::misc::{ID, SourceName};
 
 use std::net::TcpStream;
 
-pub fn handle_edge_level_info_request (
+pub fn handle_edge_source_info_request (
   stream  : &mut TcpStream,
   request : &str,
   env     : &SkgEnv,
 ) {
   let response : String =
-    match edge_level_info_response_body (request, env) {
+    match edge_source_info_response_body (request, env) {
       Ok  (body) => body,
       Err (msg)  => format! (
         "(error {})", quoted (&msg) ) };
   send_response_with_length_prefix ( stream, & format! (
     "((response-type {}) {})",
-    TcpToClient::EdgeLevelInfo . repr_in_client (),
+    TcpToClient::EdgeSourceInfo . repr_in_client (),
     response )); }
 
 /// The payload fields of a successful reply:
 /// '(default "NAME") (current "NAME")', with '(current ...)' absent
 /// when the graph records no such edge (e.g. one just typed into a
 /// buffer and not yet saved).
-fn edge_level_info_response_body (
+fn edge_source_info_response_body (
   request : &str,
   env     : &SkgEnv,
 ) -> Result<String, String> {
@@ -49,21 +49,21 @@ fn edge_level_info_response_body (
   let relation : NodeRelation = relation_from_client_string (
     & value_from_request_sexp ("relation", request) ? ) ?;
   let (default, current) : (SourceName, Option<SourceName>) =
-    edge_level_info (
+    edge_source_info (
       & env . in_rust_graph_snapshot (), & env . config,
       &owner, &member, relation ) ?;
   let mut body : String = format! (
     "(default {})", quoted ( & default . 0 ));
-  if let Some (level) = current {
+  if let Some (source) = current {
     body . push_str ( & format! (
-      " (current {})", quoted ( & level . 0 ))); }
+      " (current {})", quoted ( & source . 0 ))); }
   Ok (body) }
 
-/// One edge's (default level, current level). The default is the
-/// more private of the two endpoints' homes; the current level is
-/// None when the graph records no such edge (e.g. one just typed
-/// into a buffer and not yet saved).
-pub fn edge_level_info (
+/// One edge's (default source, current source). Between owned nodes,
+/// the default is the more private endpoint home. From an owned
+/// owner to a foreign member, it is the owner's home. The current
+/// source is None when the graph records no such edge.
+pub fn edge_source_info (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &crate::types::misc::SkgConfig,
   owner    : &ID,
@@ -79,15 +79,19 @@ pub fn edge_level_info (
     . map ( |(_pid, src)| src )
     . ok_or_else ( || format! (
       "member '{}' is not in the graph", member )) ?;
-  let default : SourceName = config . more_private_of (
-    owner_home, member_home );
+  let default : SourceName =
+    if ( config . user_owns_source (&owner_home) &&
+         ! config . user_owns_source (&member_home) ) {
+      owner_home
+    } else {
+      config . more_private_of (owner_home, member_home) };
   let current : Option<SourceName> =
-    graph . edge_level ( &owner_pid, relation, member );
+    graph . edge_source ( &owner_pid, relation, member );
   Ok (( default, current )) }
 
 /// The three relations an explicit '(relSource ...)' atom can name
-/// (matching 'ExplicitLevels'). Hides and textlinks have no
-/// explicit-level path, so asking about them is an error.
+/// (matching 'ExplicitSources'). Hides and textlinks have no
+/// explicit-source path, so asking about them is an error.
 fn relation_from_client_string (
   s : &str,
 ) -> Result<NodeRelation, String> {
@@ -96,7 +100,7 @@ fn relation_from_client_string (
     "subscribes_to"     => Ok (NodeRelation::Subscribes),
     "overrides_view_of" => Ok (NodeRelation::OverridesViewOf),
     other => Err ( format! (
-      "unsupported relation '{}': the explicit-level path covers \
+      "unsupported relation '{}': the explicit-source path covers \
        contains, subscribes_to and overrides_view_of", other )), }}
 
 fn quoted (
@@ -113,5 +117,5 @@ fn quoted (
   result }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/edge_level_info.rs"]
+#[path = "../../../tests/unit/edge_source_info.rs"]
 mod tests;

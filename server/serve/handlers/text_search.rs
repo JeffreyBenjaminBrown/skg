@@ -466,7 +466,7 @@ pub fn group_matches_by_id (
 /// (TODO/override-ancestry-in-search-results.org, "Suppression"). A
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
-/// the node it overrides. Reachability follows edge-level-visible
+/// the node it overrides. Reachability follows edge-source-visible
 /// outbound overrides, matching what the graft will actually draw.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
 /// user-owned overrider that matched the query but ranks past the
@@ -563,5 +563,6 @@ pub fn build_search_viewforest (
             body_folded : false,
             kind        : ViewNodeKind::Qual (Qual::Alias {
                 text       : title . clone (),
+                rel_source : None,
                 membership : MembershipAxes::default () } ) } ); }} }
   (viewforest, search_results) }

@@ -224,7 +224,7 @@ fn reconcile_content_children (
       // below, in omit_inactive_members.
       None => true,
       Some (a) => a . is_all ()
-        || a . contains_source ( &m . level ) } )
+        || a . contains_source ( &m . source ) } )
     . map ( |m| graph_snap . pid_of ( &m . member )
                  . unwrap_or_else ( || m . member . clone () ))
     . collect ();
@@ -451,13 +451,13 @@ fn content_goal_list (
       resolve_pids (
         grandparent_nodecomplete . hides_from_its_subscriptions
         . or_default () . iter ()
-        . filter ( |m| level_active (& m . level) )
+        . filter ( |m| level_active (& m . source) )
         . map ( |m| m . member . clone () )
         . collect () );
     let subscriber_contains : Vec<ID> =
       resolve_pids (
         grandparent_nodecomplete . contains . iter ()
-        . filter ( |m| level_active (& m . level) )
+        . filter ( |m| level_active (& m . source) )
         . map ( |m| m . member . clone () )
         . collect () );
     Ok ( setlike_vector_subtraction (

@@ -107,57 +107,51 @@ impl From<SkgfileSourceToml> for SkgfileSource {
 /// TODO/user-owned_autofork_chain/5_plan.org and
 /// BUG-and-fix_make-edge-more-public.org.
 ///
-/// INTERIM (work item leveled-lists): every consumer currently runs
-/// DEGENERATE semantics -- level := the owning node's (home) source
-/// at load, levels dropped at the FS boundary -- so behavior is
-/// unchanged until the fold lands (work item section-format-and-fold).
+/// Every value records the source whose section contains it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct PrivaciedMember<T> {
-  pub level  : SourceName,
+pub struct MemberAtSource<T> {
+  pub source : SourceName,
   pub member : T,
 }
 
-impl<T> PrivaciedMember<T> {
-  pub fn at (
-    level  : SourceName,
+impl<T> MemberAtSource<T> {
+  pub fn at_source (
+    source : SourceName,
     member : T,
-  ) -> PrivaciedMember<T> {
-    PrivaciedMember { level, member }}}
+  ) -> MemberAtSource<T> {
+    MemberAtSource { source, member }}}
 
-/// Tag every member of a list with one level. The degenerate-load
-/// helper (level := home source), and later the natural constructor
-/// for a single telescope section's slice.
-pub fn privacied_all<T> (
-  level   : &SourceName,
+/// Tag every member of a list with one recording source.
+pub fn members_at_source<T> (
+  source  : &SourceName,
   members : Vec<T>,
-) -> Vec<PrivaciedMember<T>> {
+) -> Vec<MemberAtSource<T>> {
   members . into_iter ()
-    . map ( |m| PrivaciedMember::at ( level . clone (), m ) )
+    . map ( |m| MemberAtSource::at_source (
+      source . clone (), m ) )
     . collect () }
 
-/// The members of a leveled list, levels dropped. The FS-boundary
-/// projection, and the adapter for consumers that only care WHO is
-/// related, not at what level.
+/// The values in a list of members at sources, sources dropped.
 pub fn members_of<T : Clone> (
-  list : &[PrivaciedMember<T>],
+  list : &[MemberAtSource<T>],
 ) -> Vec<T> {
   list . iter ()
     . map ( |m| m . member . clone () )
     . collect () }
 
-/// 'privacied_all' lifted over MSV.
-pub fn privacied_msv<T> (
-  level : &SourceName,
-  msv   : MSV<T>,
-) -> MSV<PrivaciedMember<T>> {
+/// 'members_at_source' lifted over MSV.
+pub fn members_at_source_msv<T> (
+  source : &SourceName,
+  msv    : MSV<T>,
+) -> MSV<MemberAtSource<T>> {
   match msv {
     MSV::Unspecified     => MSV::Unspecified,
     MSV::Specified (v)   =>
-      MSV::Specified ( privacied_all (level, v) ), }}
+      MSV::Specified ( members_at_source (source, v) ), }}
 
 /// 'members_of' lifted over MSV.
 pub fn members_msv<T : Clone> (
-  msv : &MSV<PrivaciedMember<T>>,
+  msv : &MSV<MemberAtSource<T>>,
 ) -> MSV<T> {
   match msv {
     MSV::Unspecified     => MSV::Unspecified,
@@ -192,7 +186,7 @@ pub struct SkgConfig {
   // which loses it). Filled at parse time by the config loaders; empty
   // for dummy/test configs, where the config-order helpers fall back to
   // alphabetical. LOAD-BEARING: declaration order is the privacy order
-  // (most public first); the fold, the edge-level defaults, the
+  // (most public first); the fold, the edge-source defaults, the
   // validators, and prefix source-sets all read it, through the
   // comparison chokepoint methods below ('ordered_sources',
   // 'source_position', 'is_strictly_more_public', 'more_private_of',
@@ -576,7 +570,7 @@ impl SkgConfig {
       _                      => false, }}
 
   /// The more private of the two (the later in the privacy order);
-  /// 'b' on a tie. This is the edge-level default rule's core: a
+  /// 'b' on a tie. This is the edge-source default rule's core: a
   /// relationship instance defaults to the level of the more private
   /// of its two endpoints' homes.
   pub fn more_private_of (

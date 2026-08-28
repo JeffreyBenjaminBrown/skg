@@ -17,9 +17,12 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::fs::NodeFS;
+
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 /// ONE NODE, as it sits on disk: its sections, in privacy order,
 /// most public first.
@@ -35,27 +38,147 @@ use crate::types::nodes::fs::NodeFS;
 /// TODO/dup-ids-maybe-bad/1_discussion.org). New code meets a
 /// 'Telescope' and has to choose.
 ///
-/// The privacy order is the CALLER's to establish (both builders
-/// walk 'SkgConfig::ordered_sources'), because only the config knows
-/// it. Given that, the HOME is simply the first section.
+/// Construction is checked against the config, so a value is always
+/// nonempty, contains only same-pid sections at configured unique
+/// sources, and is ordered most public first. The HOME is therefore
+/// unambiguously the first section.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Telescope {
-  pub pid      : ID,
-  pub sections : Vec<(SourceName, NodeFS)>,
+  pid      : ID,
+  sections : Vec<(SourceName, NodeFS)>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TelescopeConstructionError {
+  Empty {
+    pid : ID,
+  },
+  MixedPid {
+    expected : ID,
+    actual   : ID,
+    source   : SourceName,
+  },
+  UnknownSource {
+    source : SourceName,
+  },
+  DuplicateSource {
+    source : SourceName,
+  },
+  OutOfOrder {
+    previous : SourceName,
+    next     : SourceName,
+  },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IgnoredForeignPidCollision {
+  pub ignored_sources : Vec<SourceName>,
+}
+
+/// If a pid has any owned section, its owned sections are the
+/// telescope and every non-owned same-pid section is ignored. A pid
+/// with no owned section remains an ordinary foreign telescope.
+/// Input order is preserved.
+pub fn retain_owned_sections_when_pid_collides (
+  sections : Vec<(SourceName, NodeFS)>,
+  config   : &SkgConfig,
+) -> ( Vec<(SourceName, NodeFS)>,
+       Option<IgnoredForeignPidCollision> ) {
+  let has_owned : bool = sections . iter ()
+    . any ( |(source, _)| config . user_owns_source (source) );
+  if ! has_owned {
+    return (sections, None); }
+  let mut retained : Vec<(SourceName, NodeFS)> = Vec::new ();
+  let mut ignored_sources : Vec<SourceName> = Vec::new ();
+  for (source, node_fs) in sections {
+    if config . user_owns_source (&source) {
+      retained . push (( source, node_fs )); }
+    else {
+      ignored_sources . push (source); }}
+  let warning : Option<IgnoredForeignPidCollision> =
+    if ignored_sources . is_empty () { None }
+    else { Some ( IgnoredForeignPidCollision { ignored_sources } ) };
+  (retained, warning) }
+
+impl fmt::Display for TelescopeConstructionError {
+  fn fmt (
+    &self,
+    f : &mut fmt::Formatter<'_>,
+  ) -> fmt::Result {
+    match self {
+      TelescopeConstructionError::Empty { pid } =>
+        write! ( f, "Telescope '{}' has no sections.", pid ),
+      TelescopeConstructionError::MixedPid {
+        expected, actual, source } =>
+        write! ( f,
+          "Telescope '{}' contains a section from source '{}' whose embedded pid is '{}'.",
+          expected, source, actual ),
+      TelescopeConstructionError::UnknownSource { source } =>
+        write! ( f,
+          "Telescope contains a section from unconfigured source '{}'.",
+          source ),
+      TelescopeConstructionError::DuplicateSource { source } =>
+        write! ( f,
+          "Telescope contains more than one section from source '{}'.",
+          source ),
+      TelescopeConstructionError::OutOfOrder { previous, next } =>
+        write! ( f,
+          "Telescope sections are out of privacy order: '{}' precedes '{}'.",
+          previous, next ), }} }
+
+impl std::error::Error for TelescopeConstructionError {
 }
 
 impl Telescope {
-  /// The most public section's level. None iff there are no
-  /// sections, which callers reject.
+  pub fn try_new (
+    pid      : ID,
+    sections : Vec<(SourceName, NodeFS)>,
+    config   : &SkgConfig,
+  ) -> Result<Telescope, TelescopeConstructionError> {
+    if sections . is_empty () {
+      return Err ( TelescopeConstructionError::Empty { pid } ); }
+    let positions : HashMap<SourceName, usize> =
+      config . ordered_sources () . into_iter () . enumerate ()
+      . map ( |(position, source)| (source, position) )
+      . collect ();
+    let mut seen_sources : HashSet<SourceName> = HashSet::new ();
+    let mut previous : Option<(usize, SourceName)> = None;
+    for (source, node_fs) in &sections {
+      if node_fs . pid != pid {
+        return Err ( TelescopeConstructionError::MixedPid {
+          expected : pid,
+          actual   : node_fs . pid . clone (),
+          source   : source . clone (), } ); }
+      let position : usize = * positions . get (source)
+        . ok_or_else ( || TelescopeConstructionError::UnknownSource {
+          source : source . clone (), } ) ?;
+      if ! seen_sources . insert ( source . clone () ) {
+        return Err ( TelescopeConstructionError::DuplicateSource {
+          source : source . clone (), } ); }
+      if let Some ((previous_position, previous_source)) = &previous {
+        if *previous_position >= position {
+          return Err ( TelescopeConstructionError::OutOfOrder {
+            previous : previous_source . clone (),
+            next     : source . clone (), } ); }}
+      previous = Some (( position, source . clone () )); }
+    Ok ( Telescope { pid, sections } ) }
+
+  pub fn pid (
+    &self,
+  ) -> &ID {
+    &self . pid }
+
+  /// The most public section's source.
   pub fn home (
     &self,
-  ) -> Option<&SourceName> {
-    self . sections . first () . map ( |(level, _)| level ) }
+  ) -> &SourceName {
+    & self . sections . first ()
+      . expect ("Telescope construction guarantees a section") . 0 }
 
-  pub fn is_empty (
+  pub fn sections (
     &self,
-  ) -> bool {
-    self . sections . is_empty () }
+  ) -> &[(SourceName, NodeFS)] {
+    &self . sections }
 
   /// Every extra id any section claims, first occurrence first.
   /// Unioned across sections rather than read from the home alone:
@@ -236,3 +359,96 @@ impl std::fmt::Display for FoldWarning {
           level ),
       FoldWarning::MissingTitle =>
         write! ( f, "no section carried a title" ), }}}
+
+#[cfg(test)]
+mod telescope_construction_tests {
+  use super::{Telescope, TelescopeConstructionError};
+  use crate::types::misc::{
+    ID, SkgConfig, SkgfileSource, SourceName};
+  use crate::types::nodes::fs::NodeFS;
+
+  use std::collections::HashMap;
+  use std::path::PathBuf;
+
+  fn source (
+    name : &str,
+  ) -> SourceName {
+    SourceName::from (name) }
+
+  fn node_fs (
+    pid : &str,
+  ) -> NodeFS {
+    NodeFS {
+      title                        : Some ("title" . to_string ()),
+      aliases                      : Vec::new (),
+      pid                          : ID::from (pid),
+      extra_ids                    : Vec::new (),
+      body                         : None,
+      contains                     : Vec::new (),
+      subscribes_to                : Vec::new (),
+      hides_from_its_subscriptions : Vec::new (),
+      overrides_view_of            : Vec::new (),
+      misc                         : Vec::new (), } }
+
+  fn config () -> SkgConfig {
+    let ordered : Vec<SourceName> =
+      ["public", "trusted", "private"] . into_iter ()
+      . map (source) . collect ();
+    let sources : HashMap<SourceName, SkgfileSource> =
+      ordered . iter () . cloned ()
+      . map ( |name| {
+        ( name . clone (),
+          SkgfileSource {
+            path         : PathBuf::from ( &name . 0 ),
+            name,
+            abbreviation : None,
+            user_owns_it : true, } ) } )
+      . collect ();
+    let mut config : SkgConfig =
+      SkgConfig::dummyFromSources (sources);
+    config . source_order = ordered;
+    config }
+
+  #[test]
+  fn checked_constructor_accepts_only_the_documented_shape () {
+    let config : SkgConfig = config ();
+    let valid : Telescope = Telescope::try_new (
+      ID::from ("N"),
+      vec! [ (source ("public"), node_fs ("N")),
+             (source ("private"), node_fs ("N")) ],
+      &config ) . unwrap ();
+    assert_eq! ( valid . pid (), &ID::from ("N") );
+    assert_eq! ( valid . home (), &source ("public") );
+    assert_eq! ( valid . sections () . len (), 2 );
+
+    assert! ( matches! (
+      Telescope::try_new ( ID::from ("N"), Vec::new (), &config ),
+      Err (TelescopeConstructionError::Empty { .. }) ));
+    assert! ( matches! (
+      Telescope::try_new (
+        ID::from ("N"),
+        vec! [ (source ("private"), node_fs ("N")),
+               (source ("public"), node_fs ("N")) ],
+        &config ),
+      Err (TelescopeConstructionError::OutOfOrder { .. }) ));
+    assert! ( matches! (
+      Telescope::try_new (
+        ID::from ("N"),
+        vec! [ (source ("public"), node_fs ("N")),
+               (source ("public"), node_fs ("N")) ],
+        &config ),
+      Err (TelescopeConstructionError::DuplicateSource { .. }) ));
+    assert! ( matches! (
+      Telescope::try_new (
+        ID::from ("N"),
+        vec! [ (source ("unknown"), node_fs ("N")) ],
+        &config ),
+      Err (TelescopeConstructionError::UnknownSource { .. }) ));
+    assert! ( matches! (
+      Telescope::try_new (
+        ID::from ("N"),
+        vec! [ (source ("public"), node_fs ("other")) ],
+        &config ),
+      Err (TelescopeConstructionError::MixedPid { .. }) ));
+  }
+}

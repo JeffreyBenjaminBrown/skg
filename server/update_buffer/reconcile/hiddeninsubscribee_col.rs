@@ -141,7 +141,7 @@ fn read_hiddenin_context (
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . iter ()
-      . filter ( |m| level_active (& m . level) )
+      . filter ( |m| level_active (& m . source) )
       . map ( |m| m . member . clone () )
       . collect () };
   let subscriber_hides : Vec<ID> = {
@@ -150,7 +150,7 @@ fn read_hiddenin_context (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
-      . filter ( |m| level_active (& m . level) )
+      . filter ( |m| level_active (& m . source) )
       . map ( |m| m . member . clone () )
       . collect () };
   Ok (HiddenInContext {

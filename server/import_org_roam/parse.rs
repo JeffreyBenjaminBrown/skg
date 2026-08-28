@@ -36,7 +36,7 @@
 ///    its children by ID.
 
 use crate::types::misc::{
-  ID, MSV, PrivaciedMember, SourceName, privacied_all, privacied_msv};
+  ID, MSV, MemberAtSource, SourceName, members_at_source, members_at_source_msv};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::path::Path;
@@ -307,10 +307,10 @@ fn nodecomplete_from_section_tree (
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,
       Some(v) => MSV::Specified(v) };
-  let aliases : MSV<PrivaciedMember<String>> =
-    privacied_msv (&source, aliases_msv);
-  let contains : Vec<PrivaciedMember<ID>> =
-    privacied_all (&source, contained_ids);
+  let aliases : MSV<MemberAtSource<String>> =
+    members_at_source_msv (&source, aliases_msv);
+  let contains : Vec<MemberAtSource<ID>> =
+    members_at_source (&source, contained_ids);
   NodeComplete {
     title    : tree . section . headline . clone(),
     aliases,

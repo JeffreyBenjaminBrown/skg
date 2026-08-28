@@ -20,8 +20,8 @@
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, IntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
-  ID, MSV, PrivaciedMember, SourceName, members_msv, members_of,
-  privacied_all, privacied_msv };
+  ID, MSV, MemberAtSource, SourceName, members_msv, members_of,
+  members_at_source, members_at_source_msv };
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -45,13 +45,13 @@ pub struct NodeSaveIntent {
   // with an Option<SourceName>: Some when the buffer's headline
   // carried an explicit '(relSource NAME)' atom (see
   // 'ViewNodeStats::rel_source', 'NodeIntent_Local'); None means
-  // "derive" (sticky-else-default). 'explicit_levels' extracts the
+  // "derive" (sticky-else-default). 'explicit_sources' extracts the
   // Some entries into a side-channel BEFORE 'into_nodecomplete'
   // discards them, for 'apply_sticky_levels' to validate against
   // each edge's floor.
   pub contains          : MSV<(ID, Option<SourceName>)>,
   pub extra_ids         : Vec<ID>,
-  pub aliases           : MSV<String>,
+  pub aliases           : MSV<(String, Option<SourceName>)>,
   pub subscribes_to     : MSV<(ID, Option<SourceName>)>,
   pub hides_from_its_subscriptions : MSV<ID>,
   pub overrides_view_of : MSV<(ID, Option<SourceName>)>,
@@ -64,7 +64,7 @@ pub struct NodeSaveIntent {
 /// absent: it is inferred, and the col that shows it is read-only --
 /// the set-relationship-source gesture refuses there). Threaded
 /// separately from
-/// NodeComplete because NodeComplete's 'PrivaciedMember::level' is a
+/// NodeComplete because NodeComplete's 'MemberAtSource::level' is a
 /// plain SourceName with no "was this explicit" flag, and gets
 /// unconditionally resolved by 'apply_sticky_levels' -- this is the
 /// side-channel that tells that pass which members carry a real,
@@ -72,8 +72,9 @@ pub struct NodeSaveIntent {
 /// floor, rather than deriving normally (render-and-gating,
 /// TODO/user-owned_autofork_chain/5_plan.org).
 #[derive(Clone, Debug, Default)]
-pub struct ExplicitLevels {
+pub struct ExplicitSources {
   pub contains          : HashMap<ID, SourceName>,
+  pub aliases           : HashMap<String, SourceName>,
   pub subscribes_to     : HashMap<ID, SourceName>,
   pub overrides_view_of : HashMap<ID, SourceName>,
 }
@@ -133,7 +134,7 @@ impl NodeIntent {
     // Preserves the MSV Unspecified/Specified distinction, unlike a
     // plain 'or_default()' round-trip.
     fn no_explicit_msv (
-      msv : &MSV<PrivaciedMember<ID>>,
+      msv : &MSV<MemberAtSource<ID>>,
     ) -> MSV<(ID, Option<SourceName>)> {
       match msv {
         MSV::Unspecified   => MSV::Unspecified,
@@ -148,7 +149,12 @@ impl NodeIntent {
         node . contains . iter ()
         . map ( |m| (m . member . clone (), None) ) . collect () ),
       extra_ids                    : node . extra_ids,
-      aliases                      : members_msv (&node . aliases),
+      aliases                      : match node . aliases {
+        MSV::Unspecified => MSV::Unspecified,
+        MSV::Specified (aliases) => MSV::Specified (
+          aliases . into_iter ()
+          . map ( |alias| (alias . member, None) )
+          . collect () ), },
       subscribes_to                : no_explicit_msv (&node . subscribes_to),
       hides_from_its_subscriptions :
         members_msv (&node . hides_from_its_subscriptions),
@@ -191,10 +197,10 @@ impl NodeSaveIntent {
 
   /// The levels the buffer explicitly requested (its headlines'
   /// '(relSource NAME)' atoms), read out BEFORE 'into_nodecomplete'
-  /// discards the Option<SourceName> payload. See 'ExplicitLevels'.
-  pub fn explicit_levels (
+  /// discards the Option<SourceName> payload. See 'ExplicitSources'.
+  pub fn explicit_sources (
     &self,
-  ) -> ExplicitLevels {
+  ) -> ExplicitSources {
     fn collect (
       list : &[(ID, Option<SourceName>)],
     ) -> HashMap<ID, SourceName> {
@@ -202,8 +208,12 @@ impl NodeSaveIntent {
         . filter_map ( |(id, lvl)| lvl . clone ()
                        . map ( |l| (id . clone (), l) ) )
         . collect () }
-    ExplicitLevels {
+    ExplicitSources {
       contains          : collect (self . contains . or_default ()),
+      aliases           : self . aliases . or_default () . iter ()
+        . filter_map ( |(text, source)| source . clone ()
+          . map ( |source| (text . clone (), source) ) )
+        . collect (),
       subscribes_to     : collect (self . subscribes_to . or_default ()),
       overrides_view_of : collect (self . overrides_view_of . or_default ()),
     }}
@@ -215,21 +225,27 @@ impl NodeSaveIntent {
     NodeComplete {
       title                        : self . title,
       aliases                      :
-        privacied_msv (&source, self . aliases),
+        members_at_source_msv (
+          &source,
+          match self . aliases {
+            MSV::Unspecified => MSV::Unspecified,
+            MSV::Specified (aliases) => MSV::Specified (
+              aliases . into_iter ()
+              . map ( |(text, _)| text ) . collect () ), } ),
       source                       : self . source,
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         :
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
-        privacied_all (
+        members_at_source (
           &source, ids_only (self . contains . or_default ()) ),
       subscribes_to                :
-        privacied_msv (&source, ids_only_msv (self . subscribes_to)),
+        members_at_source_msv (&source, ids_only_msv (self . subscribes_to)),
       hides_from_its_subscriptions :
-        privacied_msv (&source, self . hides_from_its_subscriptions),
+        members_at_source_msv (&source, self . hides_from_its_subscriptions),
       overrides_view_of            :
-        privacied_msv (&source, ids_only_msv (self . overrides_view_of)),
+        members_at_source_msv (&source, ids_only_msv (self . overrides_view_of)),
       misc                         : self . misc,
     }}
 

@@ -210,8 +210,10 @@ fn qual_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match qual {
-    Qual::Alias { membership, .. } => {
+    Qual::Alias { rel_source, membership, .. } => {
       parts . push ( "alias" . to_string () );
+      if let Some (source) = rel_source {
+        parts . push ( format! ("(relSource {})", source) ); }
       append_membership_stage_forms (&mut parts, membership); }
     Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();

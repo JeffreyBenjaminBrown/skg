@@ -403,6 +403,7 @@ pub enum QualCol {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Qual {
   Alias { text: String, // an alias for the node's grandparent
+          rel_source: Option<SourceName>,
           membership: MembershipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },

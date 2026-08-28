@@ -13,7 +13,7 @@
 //! 'source'), then serialize the 'NodeFS'. This way the type
 //! system enforces that 'source' never appears in YAML.
 
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
@@ -30,18 +30,18 @@ pub struct NodeComplete {
   // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges leveled at it -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
 
   pub title: String,
-  pub aliases: MSV<PrivaciedMember<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the privacy level of the telescope section that records it.
+  pub aliases: MSV<MemberAtSource<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the privacy level of the telescope section that records it.
   pub source: SourceName, // source name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   // Each relationship member carries the privacy LEVEL of the edge
-  // (see 'PrivaciedMember'). List order is fold order.
-  pub contains                     : Vec<PrivaciedMember<ID>>, // See schema.tql.
-  pub subscribes_to                : MSV<PrivaciedMember<ID>>, // See schema.tql.
-  pub hides_from_its_subscriptions : MSV<PrivaciedMember<ID>>, // See schema.tql.
-  pub overrides_view_of            : MSV<PrivaciedMember<ID>>, // See schema.tql.
+  // (see 'MemberAtSource'). List order is fold order.
+  pub contains                     : Vec<MemberAtSource<ID>>, // See schema.tql.
+  pub subscribes_to                : MSV<MemberAtSource<ID>>, // See schema.tql.
+  pub hides_from_its_subscriptions : MSV<MemberAtSource<ID>>, // See schema.tql.
+  pub overrides_view_of            : MSV<MemberAtSource<ID>>, // See schema.tql.
 
   pub misc: Vec<FileProperty>,
 }

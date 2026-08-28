@@ -5,7 +5,7 @@ use std::error::Error;
 use skg::dbs::filesystem::one_node::optnodecomplete_from_id;
 use skg::from_text::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use skg::test_utils::run_with_shared_test_db;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_msv, privacied_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_msv, members_at_source_msv};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::SourceMove;
 
@@ -97,7 +97,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
   { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . aliases = privacied_msv (
+      user_node . aliases = members_at_source_msv (
         & SourceName::from ("main"),
         MSV::Specified ( vec![ "new alias" . to_string () ] ) ); }
     let result : NodeComplete =
@@ -152,7 +152,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
   { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . subscribes_to = privacied_msv (
+      user_node . subscribes_to = members_at_source_msv (
         & SourceName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_sub") ] ) ); }
     let result : NodeComplete =
@@ -206,7 +206,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
   { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . hides_from_its_subscriptions = privacied_msv (
+      user_node . hides_from_its_subscriptions = members_at_source_msv (
         & SourceName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_hide") ] ) ); }
     let result : NodeComplete =
@@ -262,7 +262,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
   { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
-      user_node . overrides_view_of = privacied_msv (
+      user_node . overrides_view_of = members_at_source_msv (
         & SourceName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_override") ] ) ); }
     let result : NodeComplete =
