@@ -80,6 +80,12 @@ So far there are these endpoints:
       user approved for scalar publication; it is not a boolean and
       does not authorize any other PID or bypass ordinary save
       validation.
+    - `(allow-ugly-telescopes "PID" ...)` is the shared scalar-release
+      approval field. On save it appears only when retrying a
+      `save-rerender` `ugly-telescope-confirmation`, and authorizes
+      those exact PIDs for that response attempt. It is independent of
+      Hoist authority: viewing text and publishing it on disk are
+      different decisions.
     - `point-lines-below-focused-headline` is global to the buffer save: the number of text lines from the focused headline to point before save.
     - `point-column` is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
     - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
@@ -126,9 +132,24 @@ So far there are these endpoints:
     `(fork-sources ...)`. Hoist is decided first: when a save needs
     both decisions, its approved Hoist retry then returns the fork
     confirmation, and neither attempt writes.
-  - Exactly one of `save-result`, `telescope-hoist-confirmation`, and
-    `fork-confirmation` is sent as the terminal response to one save
-    attempt.
+  - The third ALTERNATIVE terminal message protects the saved and
+    collateral rerenders. After a valid save has updated disk and the
+    derived stores, the server renders every affected view in memory.
+    Under a restricted source-set, if the staged forests contain ugly
+    telescopes without exact scalar-release approval, it changes no
+    open-view registry entry, streams no content, and sends
+    `((response-type ugly-telescope-confirmation)
+    (operation save-rerender) (pids ("P" ...)) (prompt "..."))`.
+    The save itself has succeeded; only its updated text is withheld.
+    The client may retry the SAME save with
+    `(allow-ugly-telescopes "P" ...)`. Under source-set `all`, or on an
+    approved retry, the ordinary save-result carries the shared ugly-
+    telescope warning. Declining leaves current client buffers and the
+    server's open-view registry unchanged.
+  - Exactly one of `save-result`, `telescope-hoist-confirmation`,
+    `fork-confirmation`, and the save-rerender
+    `ugly-telescope-confirmation` is sent as the terminal response to
+    one save attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Text search" above)

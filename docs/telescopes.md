@@ -51,6 +51,17 @@ the node back into sections, byte-stably: sections you did not
 affect do not change on disk, and foreign sections are never
 written.
 
+If folding has to select a title or body below home, Skg marks the
+whole telescope **ugly**. Source-set `all` displays that text with a
+warning. A restricted source-set asks before releasing it, using an
+approval scoped to the exact PIDs and the single request; search asks
+whether to include or exclude ugly telescopes before it matches. This
+release approval does not authorize Hoist. Conversely, approving
+Hoist does not become a standing permission to display unrelated ugly
+text. Saved and collateral views are rendered in memory and checked
+before their text is streamed or their open-view registry entries are
+changed.
+
 ## Where new relationships land: the sticky-else-default rule
 
 When you save, each relationship edge keeps the level it already had

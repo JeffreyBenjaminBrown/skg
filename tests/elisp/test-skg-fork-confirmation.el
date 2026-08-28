@@ -87,7 +87,45 @@
              t '(("N" . "owned")))))
       (kill-buffer origin))
     (should (equal called
-                   '(t (("N" . "owned")) ("A" "B"))))
+                   '(t (("N" . "owned")) ("A" "B") nil)))
+    (should (= skg-lp--pending-count 0))
+    (should-not (assoc 'save-result skg-response-handler-map))))
+
+(ert-deftest test-save-request-sexp-carries-scalar-release-pids ()
+  "Saved/collateral rerender authority uses the shared release field."
+  (let* ((sexp (skg--save-request-sexp
+                "uri-1"
+                '(:point-lines-below-focused-headline 0
+                  :point-column 0
+                  :point-screen-lines-below-window-start 0)
+                nil nil nil '("U1" "U2")))
+         (entry (assoc 'allow-ugly-telescopes sexp)))
+    (should (equal entry '(allow-ugly-telescopes "U1" "U2")))))
+
+(ert-deftest test-save-scalar-release-balances-and-retries-exact-pids ()
+  "The save is committed, but no staged text is adopted before approval."
+  (let ((origin (generate-new-buffer "*save-release-origin*"))
+        (skg-response-handler-map
+         '((save-result ignore . t)
+           (collateral-view ignore)
+           (save-relax-lock ignore)
+           (ugly-telescope-confirmation ignore)))
+        (skg-lp--pending-count 1)
+        called)
+    (unwind-protect
+        (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
+                  ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
+                  ((symbol-function 'yes-or-no-p) (lambda (_) t))
+                  ((symbol-function 'skg-request-save-buffer)
+                   (lambda (&rest args) (setq called args))))
+          (let ((noninteractive nil))
+            (skg--save-scalar-release-confirmation-handler
+             origin
+             "((response-type ugly-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\"))"
+             t '(("N" . "owned")) '("H"))))
+      (kill-buffer origin))
+    (should (equal called
+                   '(t (("N" . "owned")) ("H") ("U1" "U2"))))
     (should (= skg-lp--pending-count 0))
     (should-not (assoc 'save-result skg-response-handler-map))))
 

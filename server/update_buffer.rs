@@ -18,6 +18,9 @@ use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision, challenge_response, decide,
+};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
@@ -123,6 +126,7 @@ pub async fn update_views_after_save (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
   active_source_set           : Option<&ActiveSourceSet>,
+  scalar_approved_pids        : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
@@ -139,6 +143,34 @@ pub async fn update_views_after_save (
       "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
     rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       &mut saved_view_mut, &context . graph_snap ) ? };
+  let collateral_uris : Vec<ViewUri> =
+    if let Ok (uri) = viewuri_from_request_result {
+      find_collateral_view_uris (uri, &define_nodes, views_state)
+    } else { Vec::new () };
+  // Gate the forests' existing active nodes before rendering, so even a
+  // rendering error cannot echo protected scalar text. A second decision
+  // below covers nodes introduced by completion/expansion.
+  if let Some (active) = active_source_set {
+    let mut input_candidates : Vec<ID> =
+      active_ids_in_viewforest (&saved_view_mut);
+    for uri in &collateral_uris {
+      if let Some (viewforest) = views_state . open_views
+          . viewuri_to_view (uri) {
+        input_candidates . extend (
+          active_ids_in_viewforest (viewforest) ); }}
+    let release : ScalarReleaseDecision = decide (
+      "save-rerender", active, &input_candidates,
+      &context . graph_snap, scalar_approved_pids );
+    if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+      return Ok ( SaveResponse {
+        saved_view          : String::new (),
+        errors              : Vec::new (),
+        warnings            : Vec::new (),
+        save_point_position : None,
+        fork_confirmation   : None,
+        hoist_confirmation  : None,
+        scalar_release_confirmation : challenge_response (&release),
+      } ); }}
   let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
   let saved_text : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -152,12 +184,42 @@ pub async fn update_views_after_save (
     // Repairs the completion pass made to read-only PartnerCols in
     // the saved view, batched per (col, owner).
     render_completion_warnings (&repair_warnings) );
+  let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
+  for curi in &collateral_uris {
+    match rerender_collateral_view (
+      curi . clone (), views_state, &mut context ) . await
+    { Ok (rendered) => collateral_views . push (rendered),
+      Err (e) => context . errors . push (e), }}
+
+  // Everything textual is now staged in memory. Decide before changing the
+  // open-view registry, narrowing locks, or streaming the first view.
+  let mut release_candidates : Vec<ID> =
+    active_ids_in_viewforest (&saved_view_mut);
+  for collateral in &collateral_views {
+    release_candidates . extend (
+      active_ids_in_viewforest (&collateral . viewforest) ); }
+  if let Some (active) = active_source_set {
+    let release : ScalarReleaseDecision = decide (
+      "save-rerender", active, &release_candidates,
+      &context . graph_snap, scalar_approved_pids );
+    match release {
+      decision @ ScalarReleaseDecision::Challenge { .. } => {
+        return Ok ( SaveResponse {
+          saved_view          : String::new (),
+          errors              : Vec::new (),
+          warnings            : Vec::new (),
+          save_point_position : None,
+          fork_confirmation   : None,
+          hoist_confirmation  : None,
+          scalar_release_confirmation : challenge_response (&decision),
+        } ); }
+      ScalarReleaseDecision::AllowWithWarning { warning } =>
+        context . warnings . push (warning),
+      ScalarReleaseDecision::Allow => {}, }}
+
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
       uri, saved_view_mut);
-    let collateral_uris : Vec<ViewUri> =
-      find_collateral_view_uris (
-        uri, &define_nodes, views_state);
     // TODO/DONE/local-view-update/plan_v2.org §8.1 step 3: relax the early (broad) lock to the EXACT collateral
     // set now that the SavePlan is known. Emacs keeps saved + these locked and
     // unlocks everything else it locked early, so the user can edit truly-
@@ -177,19 +239,15 @@ pub async fn update_views_after_save (
         collateral_uris . iter ()
           . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
-    for curi in collateral_uris {
-      match rerender_collateral_view (
-        curi, views_state, &mut context ) . await
-      { Ok (rendered) => {
-          views_state . open_views . update_view (
-            &rendered . uri, rendered . viewforest);
-          send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::CollateralView,
-              & format_single_view_sexp (
-                &rendered . uri, &rendered . text) )); },
-        Err (e) => { context . errors . push (e); }} }}
+    for rendered in collateral_views {
+      views_state . open_views . update_view (
+        &rendered . uri, rendered . viewforest);
+      send_response_with_length_prefix (
+        stream,
+        & tag_sexp_response (
+          TcpToClient::CollateralView,
+          & format_single_view_sexp (
+            &rendered . uri, &rendered . text) )); }}
   if let Some (w) = take_pending_audit_warning () {
     context . warnings . insert (0, w); }
   Ok ( SaveResponse {
@@ -198,7 +256,20 @@ pub async fn update_views_after_save (
     warnings            : context . warnings,
     save_point_position : None,
     fork_confirmation   : None,
-    hoist_confirmation  : None, } ) }
+    hoist_confirmation  : None,
+    scalar_release_confirmation : None, } ) }
+
+fn active_ids_in_viewforest (
+  viewforest : &ViewForest,
+) -> Vec<ID> {
+  viewforest . nodes ()
+    .filter_map ( |node| match &node . value () . kind {
+      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+        Some ( active . id . clone () ),
+      _ => None,
+    } )
+    .collect ()
+}
 
 async fn rerender_collateral_view (
   uri         : ViewUri,
@@ -238,7 +309,7 @@ async fn rerender_collateral_view (
 /// return the URIs of other views whose viewforests
 /// contain any changed PID. Includes search views --
 /// they are just as editable as other kinds.
-fn find_collateral_view_uris (
+pub(crate) fn find_collateral_view_uris (
   saved_uri    : &ViewUri,
   define_nodes : &[DefineNode],
   views_state  : &ViewsState,

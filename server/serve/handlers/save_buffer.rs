@@ -18,6 +18,9 @@ use crate::serve::handlers::telescope_hoist::{
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
 };
+use crate::serve::handlers::scalar_release::{
+  approved_pids_from_request as scalar_approved_pids_from_request,
+};
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp,
@@ -65,6 +68,9 @@ pub struct SaveResponse {
   /// exact publication approval. This is checked before fork confirmation;
   /// nothing was committed and the response contains no scalar text.
   pub hoist_confirmation  : Option<Vec<HoistCandidate>>,
+  /// Fully tagged ugly-telescope-confirmation response produced after the
+  /// save's rerenders have been staged but before text or view-state release.
+  pub scalar_release_confirmation : Option<String>,
 }
 
 #[derive(Clone)]
@@ -122,6 +128,8 @@ pub fn handle_save_buffer_request (
     fork_sources_from_request (request);
   let hoist_approved_pids : HashSet<ID> =
     hoist_approved_pids_from_request (request);
+  let scalar_approved_pids : HashSet<ID> =
+    scalar_approved_pids_from_request (request);
   { // Send the early broad lock BEFORE reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -141,7 +149,7 @@ pub fn handle_save_buffer_request (
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
-          update_from_and_rerender_buffer_with_hoist_approval (
+          update_from_and_rerender_buffer_with_approvals (
             stream,
             & initial_buffer_content,
             env,
@@ -151,19 +159,21 @@ pub fn handle_save_buffer_request (
             Some (active_source_set),
             fork_approved,
             &fork_sources,
-            &hoist_approved_pids ))
+            &hoist_approved_pids,
+            &scalar_approved_pids ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
             match (&save_response . hoist_confirmation,
-                   &save_response . fork_confirmation) {
-              (Some (candidates), _) =>
+                   &save_response . fork_confirmation,
+                   &save_response . scalar_release_confirmation) {
+              (Some (candidates), _, _) =>
                 send_response_with_length_prefix (
                   stream,
                   & tag_sexp_response (
                     TcpToClient::TelescopeHoistConfirmation,
                     &hoist_confirmation_response (candidates) )),
-              (None, Some (to_minibuffer)) =>
+              (None, Some (to_minibuffer), _) =>
                 // A save that found forks and was not approved: nothing
                 // committed; send the confirmation buffer instead of a
                 // save-result.
@@ -173,7 +183,9 @@ pub fn handle_save_buffer_request (
                     TcpToClient::ForkConfirmation,
                     & format_fork_confirmation_response_sexp (
                       & save_response . saved_view, to_minibuffer ))),
-              (None, None) =>
+              (None, None, Some (confirmation)) =>
+                send_response_with_length_prefix (stream, confirmation),
+              (None, None, None) =>
                 send_response_with_length_prefix (
                   stream,
                   & tag_sexp_response (
@@ -405,6 +417,26 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
   fork_sources                 : &HashMap<ID, SourceName>,
   hoist_approved_pids         : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  update_from_and_rerender_buffer_with_approvals (
+    stream, org_buffer_text, env, diff_mode_enabled,
+    viewuri_from_request_result, views_state, active_source_set,
+    fork_approved, fork_sources, hoist_approved_pids,
+    &HashSet::new () ) . await
+}
+
+pub async fn update_from_and_rerender_buffer_with_approvals (
+  stream                      : &mut TcpStream,
+  org_buffer_text             : &str,
+  env                         : &mut SkgEnv,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                  : &mut ViewsState,
+  active_source_set            : Option<&ActiveSourceSet>,
+  fork_approved                : bool,
+  fork_sources                 : &HashMap<ID, SourceName>,
+  hoist_approved_pids         : &HashSet<ID>,
+  scalar_approved_pids        : &HashSet<ID>,
+) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
       env . config . sources . keys() . cloned() . collect();
@@ -448,6 +480,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
       save_point_position : None,
       fork_confirmation   : None,
       hoist_confirmation  : Some (hoist_candidates),
+      scalar_release_confirmation : None,
     } ); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
@@ -469,7 +502,8 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
         format! ( "{} node(s) will be forked. Save again to approve, \
                    or kill this buffer to decline.",
                   fork_specs . len () )),
-      hoist_confirmation  : None, } ); }
+      hoist_confirmation  : None,
+      scalar_release_confirmation : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C commits with the rest of the
   // save -- its 'overrides_view_of = [N]' edge rides in the same
@@ -543,7 +577,8 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
         env,
         viewuri_from_request_result,
         views_state,
-        active_source_set ) . await ?;
+        active_source_set,
+        scalar_approved_pids ) . await ?;
     { // Nonfatal parse warnings (e.g. discarded col headline text)
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
