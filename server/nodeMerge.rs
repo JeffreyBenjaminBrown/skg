@@ -7,11 +7,12 @@ use crate::dbs::filesystem::multiple_nodes::{
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
 use crate::nodeMerge::nodeMergeInstructionTriple::neighbor_savenodes_for_nodeMerges;
-use crate::save::{ update_fs_from_saveinstructions, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
-use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::save::{ update_fs_from_saveinstructions_with_hoist_approval, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
+use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, NodeMerge, SaveNode};
 use std::error::Error;
+use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
 
 /// Applies NodeMerges by fanning a single 'Vec<DefineNode>' through the
@@ -41,8 +42,35 @@ pub async fn merge_nodes (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  merge_nodes_with_hoist_approval (
+    nodeMerge_instructions, config, tantivy_index, driver, graph,
+    &HashSet::new () ) . await
+}
+
+pub(crate) async fn merge_nodes_with_hoist_approval (
+  nodeMerge_instructions : &[NodeMerge],
+  config             : SkgConfig,
+  tantivy_index      : &TantivyIndex,
+  driver             : &TypeDBDriver,
+  graph              : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
+) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   if nodeMerge_instructions . is_empty () {
     return Ok (None); }
+  // A direct/noninteractive merge gets the empty approval set from the public
+  // wrapper above. Refuse if it would copy text out of an ugly acquiree. The
+  // interactive save path first inserts and verifies an acquiree Hoist repair,
+  // so a fresh reread here finds no remaining candidate.
+  let candidates =
+    crate::serve::handlers::telescope_hoist::candidates_from_disk (
+      &[], nodeMerge_instructions, &config ) ?;
+  if crate::serve::handlers::telescope_hoist::needs_confirmation (
+      &candidates, hoist_approved_pids ) {
+    return Err (format! (
+      "Refusing node merge: it would consume title/body selected below home for {} without exact interactive Hoist approval.",
+      candidates . iter ()
+        . map ( |candidate| candidate . pid . as_str () )
+        . collect::<Vec<&str>> () . join (", ") ) . into ()); }
   tracing::info!(
     "Merging nodes in FS, in-Rust graph, TypeDB, and Tantivy, in that order ..." );
   let db_name : &str = &config . db_name;
@@ -57,10 +85,11 @@ pub async fn merge_nodes (
 
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
-    update_fs_from_saveinstructions (
+    update_fs_from_saveinstructions_with_hoist_approval (
       &primary_definenodes,
       &[], // No source-moves during a merge.
-      config . clone () ) ?;
+      config . clone (),
+      hoist_approved_pids ) ?;
     tracing::info!("   Filesystem merge complete."); }
 
   { // In-Rust graph.

@@ -69,7 +69,9 @@ end
 ---each forked node's id with the owned source chosen for its clone.
 ---@param fork_approved boolean|nil
 ---@param fork_sources table[]|nil {{id, source}, ...}
-function M.request_save_buffer (fork_approved, fork_sources)
+---@param hoist_approved_pids string[]|nil
+function M.request_save_buffer (fork_approved, fork_sources,
+                                hoist_approved_pids)
   local save_buf = vim.api.nvim_get_current_buf()
   M.confirm_save_despite_other_unsaved(save_buf)
   local saved_uri = vim.b[save_buf].skg_view_uri
@@ -89,7 +91,8 @@ function M.request_save_buffer (fork_approved, fork_sources)
     vim.api.nvim_buf_get_lines(save_buf, 0, -1, false), '\n')
   local request_line =
     M.save_request_string(saved_uri, save_point_position,
-                          fork_approved, fork_sources)
+                          fork_approved, fork_sources,
+                          hoist_approved_pids)
   do -- The server needs these markers, but the user doesn't.
     focus.remove_focused_marker()
     folds.remove_folded_markers()
@@ -130,6 +133,11 @@ function M.request_save_buffer (fork_approved, fork_sources)
     function (_payload_text, response)
       M.fork_confirmation_handler(save_buf, response)
     end, false)
+  state.register_response_handler('telescope-hoist-confirmation',
+    function (_payload_text, response)
+      M.telescope_hoist_confirmation_handler(
+        save_buf, response, fork_approved, fork_sources)
+    end, false)
   state.lp_reset()
   client.send_string(request_line)
   client.send_string(string.format('Content-Length: %d\r\n\r\n',
@@ -142,9 +150,10 @@ end
 ---@param position table
 ---@param fork_approved boolean|nil
 ---@param fork_sources table[]|nil
+---@param hoist_approved_pids string[]|nil
 ---@return string
 function M.save_request_string (view_uri, position, fork_approved,
-                                fork_sources)
+                                fork_sources, hoist_approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-uri'), view_uri),
@@ -163,6 +172,11 @@ function M.save_request_string (view_uri, position, fork_approved,
       table.insert(pairs_sexp, sexpr.pair(pair[1], pair[2])) end
     table.insert(request,
       { sexpr.symbol('fork-sources'), pairs_sexp }) end
+  if hoist_approved_pids then
+    local field = { sexpr.symbol('hoist-approved-pids') }
+    for _, pid in ipairs(hoist_approved_pids) do
+      table.insert(field, pid) end
+    table.insert(request, field) end
   return sexpr.to_string(request) .. '\n'
 end
 
@@ -246,6 +260,7 @@ function M.save_result_handler (save_buf, response)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
+  state.response_handler_map['telescope-hoist-confirmation'] = nil
   lock.end_stream()
   lock.unlock_all_save_locked()
   local ok, err = pcall(M.handle_save_response, save_buf, response)
@@ -421,6 +436,7 @@ function M.fork_confirmation_handler (save_buf, response)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
+  state.response_handler_map['telescope-hoist-confirmation'] = nil
   if state.response_handler_map['save-result'] then
     state.response_handler_map['save-result'] = nil
     state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
@@ -456,6 +472,57 @@ function M.fork_confirmation_handler (save_buf, response)
       else
         M.decline_fork() end
     end)
+  end
+end
+
+---Handle the text-free terminal Hoist challenge. Nothing was committed.
+---An interactive approval reissues the same save with the exact PIDs; Abort
+---and headless operation leave the buffer and disk untouched.
+---@param save_buf integer
+---@param response any
+---@param fork_approved boolean|nil
+---@param fork_sources table[]|nil
+function M.telescope_hoist_confirmation_handler (
+    save_buf, response, fork_approved, fork_sources)
+  state.response_handler_map['collateral-view'] = nil
+  state.response_handler_map['save-relax-lock'] = nil
+  state.response_handler_map['fork-confirmation'] = nil
+  state.response_handler_map['telescope-hoist-confirmation'] = nil
+  if state.response_handler_map['save-result'] then
+    state.response_handler_map['save-result'] = nil
+    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+  end
+  lock.end_stream()
+  lock.unlock_all_save_locked()
+  local ok, err = pcall(function ()
+    local approved_pids = {}
+    local telescopes = payload.field(response, 'telescopes') or {}
+    if sexpr.is_list(telescopes) then
+      for _, telescope in ipairs(telescopes) do
+        local pid = payload.field_text(telescope, 'pid')
+        if pid then table.insert(approved_pids, pid) end
+      end
+    end
+    local prompt = payload.field_text(response, 'prompt')
+      or 'Hoist lower title/body text to home?'
+    if #vim.api.nvim_list_uis() == 0 then
+      vim.notify('Hoist required for ' .. table.concat(approved_pids, ', ')
+                 .. '; nothing was saved')
+      return
+    end
+    if vim.fn.confirm(prompt, '&Hoist\n&Abort', 2) == 1 then
+      vim.api.nvim_set_current_buf(save_buf)
+      M.request_save_buffer(
+        fork_approved, fork_sources, approved_pids)
+    else
+      vim.notify('Hoist aborted; nothing was saved. Repair the .skg'
+                 .. ' sections manually.')
+    end
+  end)
+  if not ok then
+    log.log('error', 'save',
+            'telescope-hoist-confirmation handler error: %s',
+            tostring(err))
   end
 end
 

@@ -75,6 +75,11 @@ So far there are these endpoints:
       `(fork-sources ((N . SOURCE) ...))` pairs each forked node's id
       N with the owned source chosen for its clone. Both are absent on
       an ordinary save.
+    - `(hoist-approved-pids "PID" ...)` is present only on a retry
+      after `telescope-hoist-confirmation`. It is the exact list the
+      user approved for scalar publication; it is not a boolean and
+      does not authorize any other PID or bypass ordinary save
+      validation.
     - `point-lines-below-focused-headline` is global to the buffer save: the number of text lines from the focused headline to point before save.
     - `point-column` is global to the buffer save: the column of point within its line, echoed back so the client can restore the exact cursor position.
     - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes all three point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
@@ -91,7 +96,23 @@ So far there are these endpoints:
     4. Final save response:
        `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))`
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of failure-explaining strings. `warnings` is a list of nonfatal messages. Both lists are present and empty if none.
-  - The ALTERNATIVE terminal message: a save that detects forks
+  - The first ALTERNATIVE terminal message: after validation, a save
+    rereads every telescope it will write. If any currently selects a
+    title or body below home and lacks exact approval, nothing is
+    committed and the server replies, in place of save-result,
+    `((response-type telescope-hoist-confirmation) (telescopes
+    (((pid "P") (home "SOURCE")) ...)) (prompt "..."))`.
+    This response contains no title or body. The prompt explains that
+    Hoist publishes the selected scalars at home and removes lower
+    scalar copies while retaining lower relationships and aliases;
+    Abort writes nothing and requires manual `.skg` repair. Hoist
+    re-issues the SAME save with `(hoist-approved-pids "P" ...)`.
+    The server rereads and reclassifies on that retry, so newly dirty
+    PIDs produce another batch confirmation. Each attempt still sends
+    `save-lock` first, and the confirmation is terminal for that
+    attempt: neither `save-relax-lock`, `collateral-view`, nor
+    `save-result` follows it.
+  - The second ALTERNATIVE terminal message: a save that detects forks
     (edited foreign nodes, or explicit fork requests) and does NOT
     carry `(fork-approved . "true")` commits nothing and replies, in
     place of save-result,
@@ -102,8 +123,12 @@ So far there are these endpoints:
     placeholder under a `# Suggested source ...` comment). The client
     shows it, collects a source per placeholder, and on approval
     re-issues the SAME save with `(fork-approved . "true")` and
-    `(fork-sources ...)`. Exactly one of save-result and
-    fork-confirmation is sent.
+    `(fork-sources ...)`. Hoist is decided first: when a save needs
+    both decisions, its approved Hoist retry then returns the fork
+    confirmation, and neither attempt writes.
+  - Exactly one of `save-result`, `telescope-hoist-confirmation`, and
+    `fork-confirmation` is sent as the terminal response to one save
+    attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Text search" above)

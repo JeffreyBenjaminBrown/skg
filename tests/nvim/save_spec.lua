@@ -47,6 +47,17 @@ describe('skg.save request strings', function ()
       '(fork-sources (("id-a" . "src-1") ("id-b" . "src-2")))',
       1, true))
   end)
+
+  it('adds exact hoist-approved pids when given', function ()
+    local line = save.save_request_string('uri-1', {
+      lines_below_focused_headline = 0,
+      column = 0,
+      screen_lines_below_window_start = 0 },
+      nil, nil, { 'pid-a', 'pid-b' })
+    assert.is_truthy(line:find(
+      '(hoist-approved-pids "pid-a" "pid-b")', 1, true))
+    assert.is_falsy(line:find('hoist-approved . "true"', 1, true))
+  end)
 end)
 
 describe('skg.save pipeline', function ()

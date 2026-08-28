@@ -12,5 +12,6 @@ pub mod single_root_view;
 pub mod source_sets;
 pub mod stage_moves;
 pub mod strip_body_whitespace;
+pub mod telescope_hoist;
 pub mod text_search;
 pub mod titles_by_ids;

@@ -2,10 +2,22 @@ use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
 use crate::from_text::buffer_to_validated_saveplan_with_fork_sources;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
-use crate::save::update_graph_including_nodeMerges;
+use crate::save::{
+  apply_delete_propagation_cleanup,
+  preflight_fs_from_saveinstructions_with_hoist_approval,
+  update_graph_including_nodeMerges,
+};
 use crate::serve::ViewsState;
 use crate::source_sets::ActiveSourceSet;
 use crate::serve::protocol::TcpToClient;
+use crate::serve::handlers::telescope_hoist::{
+  HoistCandidate,
+  approved_pids_from_request as hoist_approved_pids_from_request,
+  candidates_from_disk as hoist_candidates_from_disk,
+  confirmation_response as hoist_confirmation_response,
+  needs_confirmation as hoist_needs_confirmation,
+  repair_saves_for_unwritten_candidates,
+};
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp,
@@ -49,6 +61,10 @@ pub struct SaveResponse {
   /// prompt. The handler then sends a 'fork-confirmation' message rather
   /// than 'save-result'. None for an ordinary save.
   pub fork_confirmation   : Option<String>,
+  /// Some when this save found an ugly current disk telescope without an
+  /// exact publication approval. This is checked before fork confirmation;
+  /// nothing was committed and the response contains no scalar text.
+  pub hoist_confirmation  : Option<Vec<HoistCandidate>>,
 }
 
 #[derive(Clone)]
@@ -104,6 +120,8 @@ pub fn handle_save_buffer_request (
     // The per-fork clone sources the user chose in the confirmation
     // buffer, riding back on the approve re-save. Empty otherwise.
     fork_sources_from_request (request);
+  let hoist_approved_pids : HashSet<ID> =
+    hoist_approved_pids_from_request (request);
   { // Send the early broad lock BEFORE reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -123,7 +141,7 @@ pub fn handle_save_buffer_request (
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
-          update_from_and_rerender_buffer (
+          update_from_and_rerender_buffer_with_hoist_approval (
             stream,
             & initial_buffer_content,
             env,
@@ -132,12 +150,20 @@ pub fn handle_save_buffer_request (
             views_state,
             Some (active_source_set),
             fork_approved,
-            &fork_sources ))
+            &fork_sources,
+            &hoist_approved_pids ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
-            match & save_response . fork_confirmation {
-              Some (to_minibuffer) =>
+            match (&save_response . hoist_confirmation,
+                   &save_response . fork_confirmation) {
+              (Some (candidates), _) =>
+                send_response_with_length_prefix (
+                  stream,
+                  & tag_sexp_response (
+                    TcpToClient::TelescopeHoistConfirmation,
+                    &hoist_confirmation_response (candidates) )),
+              (None, Some (to_minibuffer)) =>
                 // A save that found forks and was not approved: nothing
                 // committed; send the confirmation buffer instead of a
                 // save-result.
@@ -147,7 +173,7 @@ pub fn handle_save_buffer_request (
                     TcpToClient::ForkConfirmation,
                     & format_fork_confirmation_response_sexp (
                       & save_response . saved_view, to_minibuffer ))),
-              None =>
+              (None, None) =>
                 send_response_with_length_prefix (
                   stream,
                   & tag_sexp_response (
@@ -360,6 +386,25 @@ pub async fn update_from_and_rerender_buffer (
   fork_approved                : bool, // true once the user has approved the forks (a re-issued save); false on the first save, which returns a fork-confirmation instead of committing.
   fork_sources                 : &HashMap<ID, SourceName>, // per-fork clone sources the user chose in the confirmation buffer (keyed by N's pid); empty otherwise.
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  let no_hoist_approvals : HashSet<ID> = HashSet::new ();
+  update_from_and_rerender_buffer_with_hoist_approval (
+    stream, org_buffer_text, env, diff_mode_enabled,
+    viewuri_from_request_result, views_state, active_source_set,
+    fork_approved, fork_sources, &no_hoist_approvals ) . await
+}
+
+pub async fn update_from_and_rerender_buffer_with_hoist_approval (
+  stream                      : &mut TcpStream,
+  org_buffer_text             : &str,
+  env                         : &mut SkgEnv,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                  : &mut ViewsState,
+  active_source_set            : Option<&ActiveSourceSet>,
+  fork_approved                : bool,
+  fork_sources                 : &HashMap<ID, SourceName>,
+  hoist_approved_pids         : &HashSet<ID>,
+) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
       env . config . sources . keys() . cloned() . collect();
@@ -380,11 +425,35 @@ pub async fn update_from_and_rerender_buffer (
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
   let SavePlan {
-    define_nodes       : nonmerge_defineNodes,
+    define_nodes       : mut nonmerge_defineNodes,
     nodeMerge_instructions : nodeMerges,
     source_moves,
     fork_specs }
     = save_plan;
+  { // Delete propagation adds collateral writes. Derive them before the
+    // disk Hoist classification so "touched pids" means every telescope
+    // this save will actually rewrite, not only what appeared in the buffer.
+    let graph_snap = env . in_rust_graph . load_full ();
+    apply_delete_propagation_cleanup (
+      &mut nonmerge_defineNodes, &graph_snap ); }
+  let hoist_candidates : Vec<HoistCandidate> =
+    hoist_candidates_from_disk (
+      &nonmerge_defineNodes, &nodeMerges, &env . config ) ?;
+  if hoist_needs_confirmation (
+      &hoist_candidates, hoist_approved_pids ) {
+    return Ok ( SaveResponse {
+      saved_view          : String::new (),
+      errors              : Vec::new (),
+      warnings            : parse_warnings,
+      save_point_position : None,
+      fork_confirmation   : None,
+      hoist_confirmation  : Some (hoist_candidates),
+    } ); }
+  // In particular, make a dirty nodeMerge acquiree clean before the merge
+  // copies its text into a fresh preservation node and deletes it.
+  nonmerge_defineNodes . extend (
+    repair_saves_for_unwritten_candidates (
+      &hoist_candidates, &nonmerge_defineNodes, &env . config ) ? );
   if ! fork_specs . is_empty () && ! fork_approved {
     // A save that found forks but was not pre-approved commits NOTHING.
     // Return a read-only fork-confirmation buffer; the client shows it,
@@ -399,7 +468,8 @@ pub async fn update_from_and_rerender_buffer (
       fork_confirmation   : Some (
         format! ( "{} node(s) will be forked. Save again to approve, \
                    or kill this buffer to decline.",
-                  fork_specs . len () )), } ); }
+                  fork_specs . len () )),
+      hoist_confirmation  : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C commits with the rest of the
   // save -- its 'overrides_view_of = [N]' edge rides in the same
@@ -410,6 +480,20 @@ pub async fn update_from_and_rerender_buffer (
     for spec in &fork_specs {
       nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
     nodes };
+
+  { // The ordinary-save and nodeMerge phases execute separately, but their
+    // filesystem validity is one save-level decision. Check their union now,
+    // before either phase writes or deletes anything.
+    let all_filesystem_outputs : Vec<DefineNode> =
+      nonmerge_defineNodes . iter () . cloned ()
+      .chain ( nodeMerges . iter ()
+               . flat_map ( |node_merge| node_merge . to_vec () ) )
+      .collect ();
+    preflight_fs_from_saveinstructions_with_hoist_approval (
+      &all_filesystem_outputs,
+      &source_moves,
+      &env . config,
+      hoist_approved_pids ) ?; }
 
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
@@ -423,7 +507,8 @@ pub async fn update_from_and_rerender_buffer (
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
-      &env . in_rust_graph ) . await
+      &env . in_rust_graph,
+      hoist_approved_pids ) . await
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.

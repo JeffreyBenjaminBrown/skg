@@ -69,6 +69,7 @@ pub enum TcpToClient {
   SaveRelaxLock, // Sent after the SavePlan is computed and the graph updated, before the collateral-view stream. Lists the now-narrowed still-locked set (the EXACT collateral set), symmetric with SaveLock, so Emacs unlocks every buffer it locked early that turned out not to be collateral. Lets the user edit those during the rest of the pipeline (TODO/DONE/local-view-update/plan_v2.org §8.1).
   SaveResult,
   ForkConfirmation, // Terminal message of a save that found fork candidates and was not pre-approved: a read-only buffer listing the foreign nodes about to be forked, for the user to approve (re-issue the save with (fork-approved . "true")) or decline. Sent after SaveLock, in place of SaveResult; nothing is committed.
+  TelescopeHoistConfirmation, // Terminal message of a save whose current disk inputs select title/body below home. Carries only pid/home pairs and a publication warning; an approved retry carries the exact pids. Nothing is committed.
   UglyTelescopeConfirmation, // A textual response would expose title/body selected below home under a restricted source-set. Carries only the operation, affected pids, and a prompt; the client may retry with an explicit per-pid approval.
   CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
   CloseView,
@@ -105,6 +106,8 @@ impl TcpToClient {
       TcpToClient::SaveRelaxLock    => "save-relax-lock",
       TcpToClient::SaveResult       => "save-result",
       TcpToClient::ForkConfirmation => "fork-confirmation",
+      TcpToClient::TelescopeHoistConfirmation =>
+        "telescope-hoist-confirmation",
       TcpToClient::UglyTelescopeConfirmation =>
         "ugly-telescope-confirmation",
       TcpToClient::CollateralView   => "collateral-view",

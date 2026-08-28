@@ -26,10 +26,17 @@ The node's **home** is its most public section. It holds the title,
 body, and extra IDs. That the home is the section with the title is
 an invariant rather than a definition: it would be silly to share a
 node without sharing its text, so a node's text always lives in its
-most public section. Data that breaks the rule — a titleless
-section more public than the title — still loads, but the fold
-reports it, and a save refuses to rewrite such a node rather than
-silently publish the text. Every relationship edge (a `contains`
+most public section. Data that breaks the rule — a title or body
+selected below the home section — still loads, but the fold reports
+it. An interactive save offers Abort or Hoist before changing
+anything. Hoist explicitly publishes the selected title and body at
+home, removes lower scalar copies, preserves lower relationships and
+aliases, then rereads the files and requires the telescope to be
+clean before updating the in-memory graph or derived databases.
+Abort leaves every file alone; manual repair requires making the same
+scalar-only edits in the `.skg` sections. Noninteractive and
+maintenance writers have no implicit Hoist answer and refuse. Every
+relationship edge (a `contains`
 membership, a subscription, a hide, an override) carries its own
 privacy level: the level of the section that records it.
 
