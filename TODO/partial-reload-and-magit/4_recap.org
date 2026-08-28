@@ -1,0 +1,1547 @@
+* partial reload and magit -- recap
+
+This branch has a useful, tested partial-reload core, but it is not yet
+safe to merge as the finished feature.  The ordinary successful path is
+present: Emacs notices changed '.skg' files, Rust folds the affected
+privacy telescopes from disk, the three derived stores are updated without
+rewriting the filesystem, and some affected open views are rerendered.  The
+recovery promised in the design has not been started.  Review also exposed
+correctness holes on both sides of the protocol: the server can apply a
+stale pre-lock disk read, the client can forget unacknowledged changes and
+can overwrite unsaved view edits, concurrent request streams are not safe,
+and partial folding still differs from a full rebuild around cross-node
+extra-id anchors.
+
+This branch has not yet incorporated the much newer local 'main': its HEAD is
+still 'c24e8e65', while 'main' now ends at merge '971e17b5'.  This recap was
+rechecked against that merge.  It removes or narrows several findings, but
+also adds a privacy-sensitive integration requirement for reload rerenders,
+described below.
+
+* Goal
+
+Keep a running Skg process coherent with out-of-band changes to '.skg'
+files, especially worktree changes made by Magit.  The worktree remains the
+source of truth.  A reload reads all sections of every touched node's
+privacy telescope, folds them, updates the in-Rust graph, TypeDB and
+Tantivy, and rerenders open views containing changed nodes.  Automatic
+reload itself must never write '.skg' files.
+
+Most states which motivated the original request are legal.  In particular,
+a relationship may name a node which does not exist; the view layer renders
+an unknown-node scaffold.  The exceptional states which matter are failures
+to parse or fold a telescope, a filename/pid disagreement, an ID claimed by
+nodes with distinct pids, and user-owned override invariant violations.
+
+The newer 'main' makes two further distinctions load-bearing.  If owned and
+non-owned sections have the same pid, that is not an ID conflict: the owned
+telescope is retained and all same-pid non-owned sections become unreachable
+inside Skg, with a warning.  Also, a title or body selected below the most
+public section is an "ugly telescope", not necessarily a fatal telescope.
+It may exist in the graph, but its scalar text must pass the explicit
+scalar-release policy before crossing a restricted source-set boundary.
+
+For an unloadable post-incident worktree, the agreed recovery behavior is
+offer-and-confirm, not automatic reversal.  Recovery preserves three views
+of the incident in every affected repository, using one cross-repository
+incident number:
+
+- 'oops-N_1-pre-incident': the last-good graph before the reload;
+- 'oops-N_2-with-only-legal-changes-from-incident': legal reload results,
+  with fatal telescopes still at their last-good state;
+- 'oops-N_3-with-all-changes-from-incident': the worktree exactly as the
+  incident left it.
+
+The refs are to be built with git plumbing without checking anything out.
+After they exist, only Skg-owned '.skg' files for fatal telescopes are
+restored in the user's current worktree.  Detached HEADs and repositories in
+a sequencer operation fall back to warning only.  Unrelated dirty files and
+the index are never swept into the operation.
+
+* What is done
+
+** The design was settled
+
+'1_vision.org' states the motivating problem.  '2_discussion.org' corrects
+the mistaken assumption that dangling references are invalid and settles
+reload-after plus explicit recovery.  '3_plan.org' turns that agreement into
+a server, client, concurrency, recovery and testing design.
+
+The branch history since its merge base with today's 'main', '9ac27d0d', is
+a clean progression from those documents: protocol skeleton, telescope
+classification, store-application refactor, store commit, writer
+serialization, progress report, collateral rerender, Emacs triggers, and the
+latest progress report.  No recovery implementation is hidden in later
+commits.
+
+** Newer main supplies foundations which should survive integration
+
+Merge '971e17b5' and the commits leading to it change the target under this
+branch in several relevant ways:
+
+- 'Telescope::try_new' is now the checked boundary for one-pid and bulk disk
+  reads.  It closes this branch's scoped filename/pid validation hole for
+  retained sections.  One edge case remains: the one-pid reader discards a
+  colliding foreign section before the checked constructor, whereas bulk
+  load validates each file before collision normalization.  A foreign
+  'X.skg' containing 'pid: Y' can therefore be ignored by the former when an
+  owned 'X.skg' exists but rejected by the latter.
+- Both bulk and one-pid reads call
+  'retain_owned_sections_when_pid_collides'.  Partial reload should therefore
+  inherit the new owned-telescope-wins rule rather than treating same-pid
+  foreign files as more telescope sections.
+- 'PreparedTelescopeWrite' now preflights serialization, destinations,
+  ownership and deletions before mutation.  It is most of the recovery
+  plan's desired bytes-without-writing boundary, although its byte/path data
+  is private and it currently exposes mutation through 'apply'.
+- Scalar text from an ugly telescope is now guarded across direct views,
+  search, titles, export, save collateral views and whole-view rerenders.
+  The partial-reload collateral stream did not exist on 'main' and therefore
+  was not included in that audit.
+- The old telescope-migration endpoint was buried, eliminating the migration
+  half of the writer-lock problem recorded in the first version of this
+  recap.
+- Commit 'aa19e2db' updates the stale override-menu assertion which stopped
+  my earlier full-suite run; 'main''s recorded completion run is 561/561.
+
+This is not a mechanical fast-forward.  The histories overlap in save,
+protocol, server dispatch, view rerendering and client stream lifecycle.  In
+particular, retaining 'rerender_views_after_reload' without adapting it to
+the new scalar-release and staged-rerender machinery would be unsafe.
+
+** The server request and reload core exist
+
+'RequestType::ReloadPaths' and 'TcpToClient::ReloadPaths' are wired through
+the persistent protocol.  'classify_touched_telescopes' resolves changed
+paths, deduplicates them by pid, and freshly folds the whole telescope.  It
+classifies the result as Save, Delete or Fatal.  A missing telescope becomes
+a deletion; a fatal fold is omitted from the applied definitions so the
+last-good graph state survives.
+
+'apply_define_nodes_to_stores' now accepts 'write_fs'.  The ordinary save
+path passes true.  Reload passes false and calls this lower-level function
+directly, thereby avoiding both direct filesystem writes and save's
+delete-propagation cleanup.  The survivors update the in-Rust graph and
+TypeDB synchronously and enqueue the Tantivy update.
+
+Before applying a batch, the handler tests it against a clone of the live
+graph and rejects the whole batch if it would violate the user-owned
+override invariants.  This is intentionally safe but coarse.
+
+** Store writers are serialized
+
+'server/write_lock.rs' adds one process-global async mutex.  Save, partial
+reload and full rebuild hold it while mutating the derived stores.  This
+closes the original ArcSwap load/clone/store lost-update race between those
+mutations, subject to the pre-lock disk-read problem described below.
+
+** Open views are refreshed
+
+'rerender_views_after_reload' finds open views containing an applied pid,
+rerenders them after the store update, streams each as a 'collateral-view',
+and updates server-side view memory.  Diff-mode and restricted-source-set
+render context is passed through.  This describes the pre-'971e17b5'
+implementation; merely passing that context is no longer sufficient because
+the newer scalar-release decision must precede changing 'ViewsState' or
+sending rendered text.  Rendering may be staged privately first so the
+decision covers every pid introduced during completion.
+
+** Emacs has three triggers
+
+'elisp/skg-request-reload-paths.el' maintains a path-to-(mtime,size)
+snapshot and sends absolute changed paths.  A global
+'magit-post-refresh-hook' scans after Magit refreshes.  A buffer-local
+'after-save-hook' reloads a plainly edited '.skg' file.  The interactive
+'skg-reload-changed' command covers external edits.  Trigger errors are
+caught so they do not break Magit or saving.
+
+** The implemented happy path passes its tests
+
+The branch contains two database-backed parity tests: an out-of-band title
+change and deletion of a node's only section.  Each compares the resulting
+in-Rust graph with a fresh load and checks that an untouched node survives.
+On 2026-08-28 I ran 'cargo check --lib', the two reload tests, and all 109
+tests in 'grouped_saves'; all passed.  The new Emacs files also load cleanly
+in batch Emacs.
+
+A full 'cargo nextest run' on this branch did not pass: it stopped after 186 passes at
+'override_menu::all_tests'.  The renderer produced the structured
+'(rels (overrides ... (ancestors 1)))' form while the test expects the
+literal substring 'Oa'.  This was not a partial-reload regression.  Newer
+'main' resolves that stale expectation in 'aa19e2db' and records a complete
+561-test Nextest pass.  This branch still needs to integrate 'main' and rerun
+the combined tree; the earlier fail-fast run left 355 branch tests
+unexecuted.
+
+* What remains
+
+** Finish the fatal-incident recovery
+
+This is the largest planned body of work and none of it exists yet:
+
+- retain a per-connection pending incident, including immutable pre- and
+  post-reload graph snapshots, touched telescopes, incident-time worktree
+  bytes and base commits;
+- add the 'reload recover' request and the Emacs confirmation flow;
+- adapt 'main''s 'PreparedTelescopeWrite' into an immutable path/bytes/delete
+  manifest which recovery can inspect without calling 'apply';
+- group paths by repository and enforce detached/sequencer guards;
+- choose one unused positive 'N' across every participating repository;
+- construct and name all three commit trees without moving HEAD;
+- decide whether those trees are complete '.skg' snapshots or HEAD plus
+  incident-local overlays, and describe the refs accordingly;
+- define and create the base/main commit needed for non-git or unborn
+  repositories where initialization was agreed;
+- restore only fatal Skg files from the legal-only graph state; and
+- report branches, commits, initialized repositories, restored telescopes
+  and warning-only repositories to the user.
+
+The earlier plan proposed factoring this primitive from
+'write_nodecomplete_telescope'.  Newer 'main' has already done the hard part
+inside 'prepare_nodecomplete_telescope': it unfolds, validates, serializes and
+resolves deletions before writing.  Recovery should extend that boundary with
+read-only accessors or a separate manifest type, not build a second serializer.
+
+** Close known gaps in the reload core
+
+- Integrate 'main' through '971e17b5' while preserving reload's protocol,
+  write lock and selective rerender.  Resolve the semantic overlaps in save
+  confirmation, checked telescope construction, scalar release, source
+  terminology and response-stream cleanup rather than choosing either side
+  wholesale.
+- Reconcile '3_plan.org' with the new telescope model before treating it as
+  an implementation spec.  Its fatal list still says "duplicate IDs across
+  sources" and "sections but no home", names the retired duplicate-ID
+  checker, and predates owned-pid selection, ugly scalars and scalar-release
+  confirmation.
+- Move fresh folding/classification under the same writer critical section
+  as validation and application, or revalidate under the lock.  Recovery's
+  'g_pre' snapshot must be captured there too.
+- Make reload-driven view replacement obey the existing unsaved-buffer and
+  streaming safeguards: do not overwrite a modified Skg view without the
+  same loud confirmation used by save, lock affected buffers while the
+  response is in flight, and serialize or coalesce automatic reloads with
+  saves and rerenders.
+- Keep changed paths pending until a successful terminal response.  A failed
+  connection, validation, store update or rerender must be retryable rather
+  than absorbed into the local snapshot.
+- Stage reload rerenders and apply 'main''s scalar-release decision before
+  changing 'ViewsState' or sending any text.  The request/client needs an
+  ugly-telescope confirmation and retry path which does not reapply an
+  already committed graph change.
+- Run 'main''s 'error_unless_each_id_names_one_node' policy against the whole
+  candidate graph before applying it.  Extract or reuse a pure validator;
+  the existing wrapper writes a fixed report file and should not do that
+  inside speculative validation.  This check concerns a primary or extra id
+  claimed by nodes with distinct pids; same-pid sections across sources are
+  one telescope, and an owned/non-owned collision is normalized by the
+  checked reader instead.
+- Preserve 'main''s checked one-pid reader and owned-telescope-wins
+  normalization.  Make validation-versus-normalization order agree with bulk
+  load, propagate ignored-foreign-collision and fold warnings into the reload
+  response/report, and make placement anchors resolve through the graph-wide
+  extra-id map as they do during a full rebuild.
+- Decide whether one fatal telescope should coexist with applied legal
+  telescopes in the same incident, then make pending-incident snapshots and
+  messaging match that decision.  Override failure currently rejects the
+  whole batch, whereas ordinary fold failures reject individual telescopes.
+- Rerender views affected only through an inverse relationship, not merely
+  views which already contain an applied pid.  A newly added subscriber,
+  overrider, hider, container or link source can change a target's view even
+  when that view did not previously contain the changed owner.
+- Implement the agreed index-only Magit behavior: staging or unstaging does
+  not reload the graph, but it must rerender diff-mode views so their staged
+  and unstaged annotations remain current.
+- Put every whole-graph writer under the writer lock.  In particular,
+  'strip_body_whitespace_and_refresh_caches' currently replaces the live
+  graph without it.  Newer 'main' has removed the live migration endpoint,
+  so that part of the earlier finding is obsolete after integration.
+- Add an open-view integration test which observes the streamed
+  'collateral-view'; current reload tests register no views.
+- Add tests for invalid YAML, checked filename/pid disagreement, no-title
+  telescopes, cross-node extra-id anchors, distinct-node ID claims,
+  owned/non-owned same-pid selection and warning, ugly-telescope release,
+  override rejection, multi-section folds, modified-buffer protection, retry
+  after failure, and simultaneous save/reload attempts.
+- Runtime-test the Emacs/Magit path against a live server.  Byte compilation
+  does not exercise hook timing, response-handler lifetime or retries.
+- Document the 'reload paths' endpoint in 'api-and-formats.md' and the manual
+  command in the user command documentation.
+
+* Problems recognized on review
+Codex and Jeff negotiated these in the CLI;
+the plans below are the result.
+** Classification outside the writer lock permits a stale reload
+
+'handle_reload_paths_request' calls 'classify_touched_telescopes' before
+'reload_touched_telescopes' acquires the global lock.  Therefore a reload
+can fold disk state A, wait while a save writes newer disk/store state B,
+then acquire the lock and apply A to the derived stores.  The mutex prevents
+simultaneous ArcSwap stores but does not make the disk read and store update
+one serial operation.  This recreates filesystem/store disagreement in the
+feature intended to eliminate it.
+
+*** plan: lock the transaction and commit only a stable byte snapshot
+
+Resolve request paths to pids first; that step reads no telescope content.
+Then acquire the process-global graph writer lock and keep it across the
+entire state transition:
+
+1. capture 'g_pre';
+2. for each touched pid, derive its possible section path in every configured
+   source and capture an ordered map from source to either absent or exact
+   file bytes;
+3. parse and fold from those captured bytes, rather than reopening the files
+   inside the telescope reader;
+4. construct and validate the complete candidate graph, including override
+   invariants and distinct-node ID claims;
+5. reread the same possible paths and compare the ordered byte maps, including
+   absence/presence; and
+6. only if they are identical, commit the definitions to the three stores and
+   capture 'g_post'.
+
+The writer lock prevents a Skg save or rebuild from changing disk or stores
+between those steps.  Git and other external editors do not take that lock,
+so the final byte comparison is still necessary.  If it differs, do not
+commit or acknowledge the paths; release the lock and leave the incident
+pending for a fresh reload attempt.  Prefer that bounded, retriable result to
+spinning under the lock while an external operation remains active.
+
+Retain the first byte map with any 'PendingIncident'.  It is both the exact
+input which classification judged and the incident-time material needed for
+the all-changes recovery ref.  Release the writer lock before streaming
+views or waiting for recovery confirmation.
+
+** Reload can erase unsaved edits in an open Skg view
+
+Save and rerender operations call 'skg--begin-stream', lock Skg buffers, and
+for save explicitly warn about other modified buffers before accepting that
+collateral replacement may overwrite them.  'skg-reload-paths' does none of
+those things.  Its 'collateral-view' handler calls
+'skg-replace-buffer-with-new-content', which unconditionally erases and
+replaces the buffer and clears its modified flag.  A user who edits an
+affected view between the Magit refresh and the reload response can silently
+lose those edits.
+
+*** plan: prevent client-created conflicts; preserve and explicitly reconcile external ones
+
+Use a conservative client-side preflight for changes Skg controls.  If any
+Skg view has unsaved changes, refuse a raw-file save to a configured '.skg'
+source and refuse any Magit operation which can change the worktree of a
+configured source repository.  Name the dirty buffers, explain the risk, and
+ask the user to save or close them before retrying.  Read-only and index-only
+Magit operations remain allowed.  This deliberately over-approximates which
+nodes could affect which views; inverse relations make a narrower client-side
+test both expensive and easy to get wrong.
+
+That guard cannot cover a shell, another editor, another Skg client, or an
+external Git process.  For every reload, therefore, call 'skg--begin-stream',
+lock all Skg buffers before recording which are dirty, and send the dirty view
+URIs with the request.  Keep every buffer locked until the terminal response.
+The server updates the graph and databases, computes all affected views, and
+streams replacements only for affected clean buffers.  It must not replace a
+dirty buffer or advance that view's ordinary save baseline.  Mark each dirty
+affected view as belonging to a persistent, generation-identified disk-client
+conflict incident; both client and server must refuse an ordinary save of it.
+Unlock those buffers after the terminal response so the user's text remains
+editable, but leave the conflict marker in force.
+
+Make the claim that all databases were updated true before reporting the
+incident: in particular, wait for the reload's queued Tantivy write to become
+idle.  Then play 'beep-harsh' once and display or refresh a dedicated,
+persistent Org buffer such as '*SKG Disk-Client Conflicts*'.  Closing that
+window does not clear any conflict.  Its shape should be:
+
+#+begin_example
+  * WARNING: Disk-client conflict(s)
+  Skg detected changes to the .skg filestore made outside of Skg.
+  ** buffers with unsaved changes that cannot be automatically updated
+  Other dirty Skg buffers, if any, are unaffected and hence omitted here.
+  *** buffer name
+  Affected by these changed nodes:
+  **** path/id.skg
+  ** buffers that have been updated
+  *** buffer name
+  Affected by these changed nodes:
+  **** path/id.skg
+  ** changed nodes affecting more than one conflicted buffer
+  *** path/id.skg
+  **** buffer name
+  **** buffer name
+  ** files affected
+  *** path/id.skg
+  ** what it means, and what to do about it
+  ...
+#+end_example
+
+Say "affected by" rather than "contains": a change can alter a view through
+an inverse relationship even when the changed pid was not rendered there.
+Include every shared changed node explicitly, because duplicate appearances
+under separate buffer headings do not adequately warn that resolving one
+buffer changes the baseline for another.
+
+Provide an explicit conflict-resolution command rather than allowing the
+user to edit until satisfied and invoke ordinary save.  The command presents
+a three-way comparison, preferably through Ediff:
+
+1. base -- the last rendered view from which the dirty buffer was edited;
+2. local -- the user's preserved unsaved text; and
+3. incoming -- the same view freshly rendered from the current, disk-backed
+   graph.
+
+The user reviews the merged result, which then goes through the normal parse,
+validation and save pipeline.  Immediately before commit, verify that its
+conflict generation and graph/disk snapshot are still current; otherwise
+regenerate the incoming side and ask for reconciliation again.  After one
+resolved buffer commits, regenerate the incoming side for every remaining
+buffer in the incident while preserving each one's original base and local
+text.  A later resolution therefore sees the earlier one: disjoint local
+edits merge onto it, while edits to the same material become an explicit
+conflict instead of silently reverting it.  Clear a buffer's marker only
+after its resolved save succeeds, and retire the incident only when none
+remain.
+
+** The client acknowledges changes before the server does
+
+'skg--reload-scan-changed' replaces the snapshot before sending its request;
+the plain-file save hook also records the new stamp immediately.  A
+connection error, server error, failed invariant check or store-update
+failure therefore consumes the change locally.  A later Magit refresh or
+'skg-reload-changed' sees no difference and does not retry it.
+
+*** plan: distinguish acknowledged, pending and reported-failed generations
+
+Replace the single eagerly-mutated snapshot with three states keyed by path:
+
+- 'acknowledged' is the exact file generation known to have been committed
+  to the server stores;
+- 'pending' records the exact generation detected and the incident/request to
+  which it belongs, with queued and in-flight substates; and
+- 'reported-failed' records an unapplied generation and its already-displayed
+  reason.
+
+A generation should be a content digest, with an explicit absent tombstone
+for deletion, rather than only the current '(mtime . size)' stamp.  The stamp
+can remain a cheap first-pass change detector, but it is not a commit token:
+different bytes can have the same stamp.  Neither scanning nor the raw-file
+after-save hook advances 'acknowledged'.  They only create or replace a
+pending generation; a newer observation while an older one is in flight is
+coalesced for a subsequent request.
+
+Return structured outcomes per requested path/telescope, tied to the request
+id and to the exact stable byte generation from the server transaction.  An
+applied or removed outcome promotes precisely that returned generation to
+'acknowledged'.  It must not blindly snapshot whatever is on disk when the
+response arrives: if disk changed again in flight, the committed generation
+becomes the acknowledged baseline and the newer one remains pending.  A
+whole-batch invariant or store failure promotes nothing.  A mixed response
+can promote successful telescopes while retaining the unsuccessful ones,
+provided the server transaction really has that per-telescope boundary.
+
+Transport and other transient failures leave the generation pending for an
+idempotent retry.  Deterministically unloadable input, such as invalid YAML,
+remains divergent but moves to 'reported-failed' after its warning is shown;
+do not retry and repeat the warning on every Magit refresh.  Retry it when
+the bytes change or the user explicitly requests another attempt.  Thus
+"reported" never masquerades as "applied", while a persistent bad file does
+not create a warning loop.
+
+The acknowledgement point is the server's explicit statement that this
+generation reached the derived stores, not merely that the request received
+a response.  If scalar-release authorization or conflict presentation must
+continue after that commit, represent it as committed-but-awaiting-
+presentation under the same incident.  Retrying that stage must finish
+presentation, not apply the disk generation again.
+
+** Concurrent reload requests do not fit the response-handler model
+
+Client response handlers are keyed only by response type.  Registering a
+second 'reload-paths' one-shot replaces the first handler while incrementing
+the pending count again.  The first response then removes the replacement;
+the second has no handler, and the pending count can remain wrong.  Reload
+also shares the global non-one-shot 'collateral-view' key with save.  Rapid
+Magit refreshes, a plain-file save, a manual reload and a content-view save
+can therefore interfere even though the server processes their bytes in
+order.
+
+There is an even lower-level version of the same problem: every reload calls
+'skg-lp-reset' before sending.  If a save, rerender or earlier reload has a
+partially received length-prefixed message, that reset discards the receiver
+state.  The existing 'skg--stream-in-progress' guard was created precisely
+to keep streaming requests from overlapping, but reload neither consults nor
+sets it.
+
+*** plan: ID every stream, serialize requests and coalesce reloads by incident
+
+Give every wire operation a fresh 'request-id', and give every logical
+out-of-band reconciliation episode a durable 'incident-id'.  Put both in the
+request and echo both on every response frame -- locks, collateral views,
+warnings, scalar-release challenges, errors and terminal results included.
+A retry or continuation gets a new request id but retains the incident id.
+Key client request state and handlers by request id, not response type; the
+incident record owns the longer-lived changed generations, acknowledgements,
+presentation work and buffer conflicts.
+
+Do not implement true multiplexing.  Use one client request coordinator and
+permit only one streaming request on a connection at a time, matching the
+server's already-serial processing.  A terminal frame cleans up exactly that
+request's handlers, buffer locks and pending count, then dispatches the next
+operation.  Keep one length-prefix parser alive across requests; reset it
+only when establishing or abandoning a connection, never at the start of an
+ordinary request.  A disconnect fails the active request by id and returns
+its unacknowledged reload generations to the incident for retry.
+
+Accumulate detected reload work in a map from path to its newest generation.
+Repeated observations replace the queued generation for that path instead
+of enqueueing another request.  All changes collected before dispatch form
+one incident and one stable reload transaction.  Changes arriving while an
+unrelated request is active join that still-unstarted incident.  Once a
+reload has begun against a stable generation, later disk changes ordinarily
+form a successor incident; retries, authorization continuations and conflict
+resolution for the original generations retain the original incident id.
+
+A short quiet-period debounce is useful for bursts, but it is not a reliable
+boundary for 'data/bash/pull-all.sh': that script pulls repositories
+serially, and network or password delays between repositories can be long.
+Give multi-repository drivers an explicit begin/end reload-batch bracket.
+'pull-all.sh' should open the bracket before its loop and close it from an
+exit trap, including after a partial failure.  While the bracket is open,
+scans may update the collecting path-generation map but must not dispatch
+it.  Closing the outermost bracket performs one final scan and dispatches the
+whole batch as one incident.  Use tokens or nesting depth so overlapping or
+nested drivers cannot close each other's batch.  If no bracket is active,
+ordinary Magit, raw-file and manual triggers use the quiet-period behavior.
+
+Test at least two rapid reload triggers, a reload queued behind save, a new
+generation observed during an in-flight reload, a response error, a dropped
+connection, a scalar-release continuation, and a deliberately slow
+multi-repository batch.  Each frame must reach only its request, every lock
+and pending count must balance once, and every path generation must end in
+exactly one of the acknowledgement states described above.
+
+** Error replies bypass the only handler the client registers
+
+The server tags parse, extraction, invariant and store failures as the
+generic 'error' response.  'skg-reload-paths' registers only 'reload-paths'
+and 'collateral-view'.  Thus exactly the failures which should keep paths
+pending for retry can be reduced to an unhandled-response log, with no
+reload-specific user warning or cleanup.
+
+*** plan: make errors request-scoped terminal outcomes
+
+Do not add another temporary global 'error' handler or invent a separate
+'reload-paths-error' response type.  Under the request coordinator above,
+every length-prefixed response message carries its 'request-id' and
+'incident-id', and every request concludes with exactly one request-scoped
+terminal outcome.  Useful terminal statuses include 'complete',
+'complete-with-rejected-files', 'failed' and 'needs-authorization'.  The
+coordinator routes that outcome by request id and performs that request's
+handler removal, buffer unlocking and pending-count decrement exactly once.
+The incident consumes the structured result and remains alive whenever
+retry, authorization, presentation or conflict resolution is still needed.
+
+Distinguish item outcomes from request failures.  Invalid YAML or another
+unloadable telescope in a mixed reload is a structured outcome for that
+telescope; successful telescope generations in the same committed batch can
+still be acknowledged if the server actually provides that transaction
+boundary.  An invariant violation which rejects the whole candidate or a
+store failure is a terminal 'failed' outcome and acknowledges none of it.  A
+scalar-release challenge ends the present request as
+'needs-authorization', but its follow-up request retains the incident id and
+continues presentation without applying committed generations again.
+
+Reserve connection-level failure for cases which cannot be attributed to a
+request, such as an outer envelope too malformed to recover its request id,
+or for a dropped connection which supplies no terminal response.  In the
+latter case the client sentinel synthesizes a failed outcome for the active
+request, balances its locks and counters, and returns unacknowledged
+generations to their incident.  An unsolicited or stale response id is a
+protocol error; it must not be delivered to whichever handler happens to be
+registered for that response type.
+
+With this envelope the generic server 'error' response type should disappear
+from normal application control flow.  Expected errors are data in the
+originating request's one terminal result; unassignable errors terminate or
+reset the connection.  Tests should assert one and only one terminal outcome
+and one cleanup for every success, partial result, rejection, authorization
+challenge, disconnect and malformed-request path.
+
+** Reload rerenders would bypass main's scalar-release boundary
+
+Newer 'main' stages textual responses and challenges before revealing an
+ugly telescope through a restricted source-set.  The branch's
+'rerender_views_after_reload' instead renders, mutates 'ViewsState' and
+immediately streams 'collateral-view' text.  It accepts the active source set
+as rendering context but has no approved-pid input and makes no
+'ScalarReleaseDecision'.  Keeping that function as-is during the merge would
+create the one textual exit absent from 'main''s audit and could reveal a
+title or body selected below home.
+
+The graph mutation has already succeeded by the time a collateral release
+challenge becomes necessary.  In the current request shape, retrying the
+operation risks applying the same disk incident a second time, while treating
+the first response as complete risks acknowledging changes whose presentation
+never finished.
+
+*** plan: stage, gate and present the committed incident without reloading it
+
+Reuse 'main''s shared 'ScalarReleaseDecision' and approval parser; do not add
+a reload-specific privacy test.  Once the stable disk generation has reached
+the graph and databases, record the incident as committed and determine the
+affected views, split according to the clean/conflicted-buffer plan above.
+The writer lock need not and must not remain held while waiting for a human
+release decision.
+
+Mirror both gates in 'main''s save rerender path:
+
+1. Before rendering, collect active pids already present in every affected
+   safe view and call the shared decision against the post-reload graph.  This
+   early gate prevents a renderer failure from echoing protected input text.
+2. If the first gate allows rendering, prepare every safe replacement
+   entirely in memory.  Do not mutate 'ViewsState', narrow client locks or
+   send any rendered text yet.
+3. Collect active pids from the completed output forests and call the decision
+   again.  Completion, expansion or override substitution can introduce an
+   ugly telescope which was absent from the input forests.
+4. On 'Allow', install the prepared forests in 'ViewsState' and stream them.
+   On 'AllowWithWarning', do the same and attach the shared warning to the
+   incident's terminal result.  Only these branches may expose the text.
+5. On 'Challenge' at either gate, discard or retain the prepared rendering as
+   an optimization, but expose none of it and leave 'ViewsState' unchanged.
+   Return the deliberately text-free challenge as the request's
+   'needs-authorization' terminal outcome and mark the incident
+   committed-but-awaiting-presentation.
+
+Every affected client buffer withheld by a challenge is now older than the
+server graph.  Mark it presentation-pending and refuse ordinary save even
+after its request lock is released.  Approval starts a new request with a
+new request id, the same incident id and the explicitly approved pids.  That
+request performs only prepare/gate/present for the already-committed
+incident; it must not reread disk, reapply definitions or advance database
+acknowledgement a second time.  Declining leaves the views textually
+unchanged but stale and save-blocked until the user approves, closes them, or
+chooses a future text-free replacement operation.  Do not inherit a plain
+"decline and silently unlock the stale collateral views" behavior.
+
+Treat approvals as authority for the challenged pids in that incident and
+presentation generation, not as durable permission.  Retain the affected-
+view recipe and the committed graph revision in the incident.  A cached text
+render may be reused only while that revision is still current; if another
+write advanced the graph, recompute the prepared views and both release
+decisions.  Any newly introduced ugly pid requires a new challenge.
+
+Dirty affected buffers receive no automatic replacement.  Their base and
+incoming renderings may be held internally, but the incoming text must pass
+the same two gates before it is exposed through the three-way conflict UI.
+Authorization to display that incoming side does not authorize saving the
+user's merge; the conflict-generation and stable-snapshot checks remain
+separate.
+
+Add restricted-source-set tests for challenge at the input gate, an ugly pid
+introduced only by completion, allow-with-warning under the all source-set,
+approval continuation without a second graph mutation, decline leaving
+views save-blocked, graph advancement before approval, and an Ediff incoming
+side containing an ugly telescope.  Assert that every challenge precedes
+the first 'ViewsState' mutation and the first textual response.
+
+** Reload's owned/foreign normalization still differs from bulk load
+
+Newer 'main''s one-pid reader correctly discards every same-pid non-owned
+section when at least one owned section exists.  It performs that selection
+before 'Telescope::try_new', however, while the bulk loader parses and
+validates every file before selection.  Thus a foreign 'X.skg' containing
+'pid: Y' is silently discarded by the one-pid read when owned 'X.skg'
+exists, but a full rebuild rejects the mismatch.
+
+The one-pid path also writes an ordinary tracing warning and drops the
+'IgnoredForeignPidCollision' value which bulk load carries into
+'telescope-warnings.org'.  A pull which changes a well-formed colliding
+foreign file can therefore yield an apparently ordinary "reloaded" summary
+even though the pulled content is deliberately unreachable in Skg.
+
+*** plan: select the owned telescope from path inventory before parsing
+
+Make "owned wins" a shared pre-parse normalization rule.  First inventory
+'.skg' paths in every configured source and group them by the pid claimed by
+their filename stem.  If a group contains at least one path from a source the
+user owns, retain all owned paths in that group and discard all non-owned
+paths from the load input before reading their bytes as YAML.  Then parse and
+validate only the retained paths, group their sections and fold normally.
+Use all configured sources for this decision, not merely the active
+source-set.
+
+Ignored means opaque.  Thus foreign 'X.skg' containing invalid YAML or
+'pid: Y' is ignored when an owned 'X.skg' exists, while the same file is a
+load error when no owned 'X.skg' exists.  A malformed owned 'X.skg' remains
+an error.  This rule concerns primary pid/filename collisions only; a
+foreign node whose pid or extra id conflicts with another node's extra-id
+claim still reaches the distinct-node ID validator and is not hidden by this
+normalization.
+
+Replace the post-parse 'retain_owned_sections_when_pid_collides' split with
+one path-level selection primitive used by full initialization, rebuild,
+one-pid reads, partial reload and semantic diff snapshots.  It returns both
+the retained paths and structured 'IgnoredForeignPidCollision' records,
+including the pid, winning owned paths/sources and ignored foreign
+paths/sources.  Build extra-id maps, validate filenames and construct
+'Telescope' values only from the retained set, so every reader sees the same
+corpus.
+
+Treat an ignored foreign generation as a successful, deliberate outcome,
+not an unapplied failure.  Partial reload returns
+'ignored-foreign-collision' for the exact stable generation; after its
+warning has been accepted for display, the client acknowledges that
+generation so every Magit refresh does not reload it again.  The ignored
+bytes never reach the graph or databases.  If the last owned 'X.skg' is
+later deleted, the next whole-telescope inventory no longer selects an
+owned winner and therefore activates, parses and validates the foreign
+sections before replacing the graph state.
+
+Reporting the selection is part of correctness.  Continue maintaining the
+aggregate 'telescope-warnings.org', but do not rely on that file or a tracing
+line to notify the user.  Carry collision records in the structured terminal
+outcome of reload and rebuild requests.  The Emacs client must automatically
+display or refresh them in a persistent Org warning buffer, using the
+existing big-nonfatal-warning presentation, and issue a prominent minibuffer
+message naming that buffer.  Each entry should say that the owned telescope
+won, list both winning and ignored paths, explain that the ignored contents
+are unreachable in Skg and untouched on disk, and suggest inspecting the raw
+files if their contents matter.  Initial-load collisions, which have no
+originating request, must be queued for the client's connection handshake or
+returned by an automatic post-connect warning query and shown through the
+same UI.  Deduplicate display by collision generation within an incident,
+but show a later changed generation again.
+
+Test parity across full initialization, interactive rebuild, one-pid reload
+and diff snapshots for well-formed, invalid-YAML and filename/pid-mismatched
+foreign losers; invalid owned winners; foreign-only telescopes; multiple
+owned and foreign sections; extra-ID conflicts; and deletion of the final
+owned section.  End-to-end client tests must observe the Org warning buffer,
+not merely a report file or captured log, and must also prove that an
+acknowledged ignored generation does not produce a refresh loop.
+
+** Candidate validation omits main's distinct-node ID-claim check
+
+Newer 'main' defines 'error_unless_each_id_names_one_node' and runs it on
+full initialization and rebuild inputs.  Partial reload's validation of the
+tentative post-reload graph checks only the override invariants before
+applying its definitions.  An edited telescope can therefore claim another
+node's primary or extra id and reach the store update before the conflict is
+diagnosed, possibly through a TypeDB constraint failure after the in-Rust
+graph has already changed.
+This is deliberately not a check for same-pid files across sources: those
+are one telescope, with the newer owned-versus-foreign selection rule applied
+before folding.
+
+*** plan: validate every ID claim on the tentative graph before committing
+
+After stable-byte capture, owned/foreign selection and folding, clone the
+current in-Rust graph and apply every proposed save and deletion to that
+clone.  This complete tentative graph -- untouched nodes plus the final state
+of every touched telescope -- is the only state the validators should judge.
+Run both the override-invariant policy and the distinct-node ID-claim policy
+against it while still holding the writer lock and before mutating the live
+in-Rust graph, TypeDB or Tantivy.
+
+Refactor 'error_unless_each_id_names_one_node' into a pure primitive which
+maps every primary and extra id to the distinct pids claiming it and returns
+structured conflicts.  Keep thin init/rebuild wrappers responsible for
+writing their reports; partial reload formats the same conflicts in its
+request-scoped terminal failure.  Do not let a TypeDB constraint be the first
+validator: by then the in-Rust graph may already have advanced and the three
+derived stores can disagree.
+
+Judge the final batch, not instructions independently.  Assigning an id in
+the same batch which deletes its former claimant is valid; two touched
+telescopes claiming it, or one touched telescope claiming an id retained by
+an untouched node, is not.  Reject the whole reload transaction on any
+conflict, acknowledge none of its generations, leave every store unchanged,
+and keep the incident in its deterministic reported-failed state until its
+bytes change or the user explicitly retries.
+
+Run this after telescope normalization.  Same-pid section files are one
+folded node and cannot be reported as distinct claimants, and foreign
+sections discarded by the owned-wins rule contribute no claims.  This check
+does not replace filename/pid validation within a retained section or the
+graph-wide extra-id resolver needed during folding.
+
+Test a touched extra id colliding with an untouched primary, with an
+untouched extra id and with another touched telescope; transfer of an id away
+from a telescope deleted in the same batch; same-pid multi-section input;
+an ignored foreign loser; and rollback on rejection.  The rollback test must
+inspect all three stores and client acknowledgement, not only the returned
+error.
+
+** Partial folding can disagree with a full rebuild around extra-id anchors
+
+The full loader builds a graph-wide map from every extra id to its owning pid
+and gives that resolver to 'fold_one_telescope', because a private placement
+anchor may name a merged-away id from another telescope.  The single-node
+reader used by reload supplies only identity resolution.  Such an anchor can
+therefore be treated as dangling during partial reload and place its run
+differently from a restart/full rebuild.  The existing happy-path parity
+tests have no telescope sections, anchors or extra ids, so they cannot catch
+this disagreement.  Newer 'main' explicitly documents the one-pid reader as
+identity-only, so its checked 'Telescope' boundary does not close this gap.
+
+*** plan: fold against the tentative corpus-wide ID resolver
+
+Extract the full loader's ID-claim and resolver construction into a shared
+pure helper.  Its input is the retained telescope corpus after owned/foreign
+normalization; its claim table maps every primary and extra id to the
+distinct pids claiming it.  Reject an ambiguous table with the structured
+ID-conflict result from the preceding plan instead of letting 'HashMap'
+insertion order choose a claimant.  For a valid table, expose the same
+'id -> primary pid' resolver to full initialization, rebuild and partial
+folding.
+
+For an ordinary partial batch, construct the tentative resolver rather than
+using identity resolution or the current graph unchanged:
+
+1. start with every primary and extra-id claim in the pre-reload graph;
+2. remove all old claims belonging to every touched pid, including deleted
+   telescopes;
+3. add every claim in each touched telescope's retained, stable section
+   bytes; and
+4. fold every touched telescope with the resulting unambiguous resolver.
+
+This lets one touched telescope anchor to an extra id newly introduced by
+another telescope in the same batch, and lets a deletion or transfer stop
+resolving an id through its former owner.  The completed folds then feed the
+tentative graph and the post-fold ID validator described above.
+
+An extra-id mapping change has a wider dependency than the initially touched
+telescopes.  The fold compares both anchors and relationship members through
+the resolver, so adding, removing or transferring an extra id can change the
+fold of an otherwise untouched telescope which mentions that id.  For the
+first correct implementation, if the tentative resolver differs from the
+pre-reload resolver, fall back to a stable full-corpus inventory and fold,
+then derive the store changes by comparing that result with the pre-reload
+graph.  Include every file read by that fallback in the transaction's exact
+byte snapshot and final revalidation.  This remains a partial store update
+when the comparison is small; only the read/fold pass becomes global in the
+rare resolver-changing case.
+
+A later optimization may maintain a reverse index from every ID mentioned by
+a stored anchor or relationship member to the telescope pids whose folds
+depend on it.  Then the reload can refold only the transitive dependent set,
+but that index must itself be built from the normalized disk corpus and
+updated transactionally.  Do not introduce it until profiling shows the
+correctness-first full-corpus fallback is material.
+
+Return fold warnings from every refolded telescope in the incident's
+structured outcome and show them through the client warning UI; partial
+reload must not demote dangling-anchor or duplicate-member warnings to
+tracing.  Test unchanged resolvers, same-batch new and removed extra IDs,
+transfer between touched nodes, an untouched telescope whose anchor names a
+changed extra ID, an untouched telescope whose relationship member names
+one, ambiguous claims, owned/foreign filtering before resolver construction,
+and byte changes during the full-corpus fallback.  In each valid case,
+compare the resulting graph and warnings with a fresh full rebuild.
+
+** Recovery does not snapshot the broken worktree bytes at incident time
+
+The proposed 'PendingIncident' retains graphs, touched telescopes and base
+commits, but not the bytes which produced the fatal result.  The recovery
+algorithm instead says to read the "current worktree bytes" while building
+the third branch, after the user confirms.  If the user edits or repairs a
+file between the warning and that confirmation, the all-changes branch
+archives the later edit rather than the incident, and the subsequent restore
+can overwrite it.
+
+*** plan: make the stable incident byte map the sole recovery input
+
+Reuse the exact byte map captured by the locked, stable reload transaction;
+do not perform a second "incident" read when recovery is confirmed.  Before
+releasing the writer lock or warning the user, attach an immutable
+'IncidentDiskSnapshot' to 'PendingIncident'.  Group it by repository and
+reuse the transaction's bytes for the touched telescopes.  If classification
+finds any fatal result, expand the snapshot before releasing the lock to the
+complete '.skg' overlay of every participating repository: the union of
+'.skg' paths in its incident-time worktree and base commit tree, plus every
+possible section path of each touched telescope.  Do not descend into nested
+repositories.  Record source and ownership where configured, absolute and
+repository-relative paths, and either exact raw bytes or an explicit absent
+tombstone.  Store a content digest alongside the bytes for comparison and
+reporting, but retain the bytes themselves so invalid YAML, untracked files
+and non-UTF-8 input can be archived exactly.
+
+Create the snapshot only for a generation which passed the transaction's
+final reread comparison over that complete path set.  It must cover legal,
+fatal and deleted telescopes in a mixed incident, along with unrelated
+modified, added and deleted '.skg' paths in each participating repository.
+The incident's graph snapshots and Git base commits must name the same stable
+disk generation.
+
+Build 'oops-N_3-with-all-changes-from-incident' from these stored bytes and
+tombstones.  Never reopen the worktree to obtain blob content for that ref.
+Build the legal-only manifest from the incident's graph snapshots and
+'PreparedTelescopeWrite' data, likewise without treating later worktree bytes
+as incident input.  Git plumbing may materialize blobs and trees from the
+snapshot, but it must not alter the index, checkout or user branches.
+
+Immediately before creating recovery refs or restoring any fatal owned
+file, capture the same path set from the live worktree and compare exact
+bytes plus presence/absence with 'IncidentDiskSnapshot'.  If any path was
+edited, created or deleted, perform no recovery mutation under the old
+confirmation.  Keep the old snapshot as evidence, rescan the newer state as
+a successor generation, and present a fresh decision which states which
+paths changed while recovery was pending.  Never silently widen the old
+incident to include those later bytes.
+
+The comparison is required even though Skg still holds the writer lock for
+its own mutation phase: an editor, shell or Git process does not share that
+lock.  Recheck again at the last safe point before worktree restoration if
+ref construction took appreciable time.  Use the conservative result on an
+uncertain read or metadata change: no restore and no claim that the refs
+represent the current worktree.
+
+Test an edit, creation and deletion between warning and confirmation; a
+change during ref construction; malformed and non-UTF-8 bytes; absent
+sections; multiple sections and repositories; and a mixed legal/fatal
+incident.  Failure tests must prove that refs, index and worktree remain
+untouched and that the original snapshot is still available for reporting;
+success must prove byte-for-byte equality between the incident snapshot and
+the blobs in the all-changes ref.
+
+** The planned recovery refs are not necessarily the states their names claim
+
+'3_plan.org' builds each commit tree from the incident's base commit and
+replaces only the touched telescope paths.  Pre-existing uncommitted '.skg'
+changes elsewhere in the repository are therefore absent from all three
+recovery refs, although the selective restore leaves them in the live
+worktree.  The named refs are consequently not complete pre-incident,
+legal-only or all-incident snapshots; they are the old committed tree plus
+incident-local overlays.
+
+The same algorithm assumes a base commit 'C'.  A source directory which is
+not already a repository, or a repository with unborn HEAD, has no such
+commit; 'git init' alone does not create one.  Its branch topology is
+therefore undefined in those cases.  Fatal files in foreign sources also
+cannot be restored under the no-foreign-writes rule.
+
+*** plan: preserve the complete Skg overlay in a branched recovery history
+
+Use the complete 'IncidentDiskSnapshot' above as the common overlay for all
+three recovery states.  Begin each participating existing repository with
+its incident-time base commit 'C'.  Overlay every snapshotted '.skg' path,
+including unrelated modified, added and deleted files, onto 'C''s tree.
+Leave every non-'.skg' entry exactly as 'C' records it; unrelated live
+non-'.skg' changes remain untouched in the worktree and outside the recovery
+commits.
+
+From that common overlay construct three complete file snapshots:
+
+- 'P' replaces every incident-touched telescope path with the pre-incident
+  graph manifest;
+- 'L' replaces those paths with the committed post-reload manifest, so legal
+  results are present and rejected telescopes remain last-good; and
+- 'A' retains the exact incident-time worktree bytes and tombstones,
+  including the rejected data.
+
+Use this commit topology, not three siblings directly parented by 'C':
+
+#+begin_example
+base commit C
+      |
+      P  oops-N_1-pre-incident
+     / \
+    L   A
+    |   |
+    |   oops-N_3-with-all-changes-from-incident
+    |
+    oops-N_2-with-only-legal-changes-from-incident
+#+end_example
+
+'P' is a child of 'C'; 'L' and 'A' are children of 'P'.  Point the three
+named refs at those commits without moving HEAD or checking anything out.
+This makes 'P..L' the committed reload result, 'P..A' every incident change,
+and 'L..A' the rejected or otherwise unapplied portion.  Put this diagram,
+with the meanings of 'P', 'L' and 'A', in a code comment immediately beside
+the commit-construction implementation and keep a topology assertion in its
+tests; the recovery history is too easy to flatten accidentally during a
+later refactor.
+
+For an owned source directory which is not a Git repository, initialize it
+only after explicit recovery confirmation, with symbolic HEAD naming
+'main'.  Create 'P' as a root commit, point both 'main' and
+'oops-N_1-pre-incident' at it, then create 'L' and 'A' as its children.  Do
+not perform a checkout: leave 'main' at 'P' and restore only the fatal owned
+paths from 'L', so the committed reload results remain ordinary uncommitted
+worktree changes.  Leave unrelated files untouched and untracked.  An
+existing unborn repository follows the same root-commit construction but
+keeps its current symbolic branch name rather than being renamed to 'main'.
+
+Do not initialize, create refs in, or restore a repository which participates
+only through non-owned sources; report those fatal paths as warning-only.
+Keep the existing detached-HEAD and sequencer guards.  Choose the shared
+incident number 'N' across every repository which will actually receive
+refs, preflight every ref name and every tree/blob/commit before publishing
+any ref, and roll back newly published refs if the multi-repository publish
+cannot complete.
+
+Before building any object, compare the full live '.skg' overlay with the
+incident snapshot as required above.  Build blobs and trees exclusively from
+the snapshot and graph-derived manifests, then restore only fatal Skg-owned
+paths; never stage, checkout or overwrite an unrelated path.  The client
+report names 'C' when it exists, all three commits and refs, every initialized
+repository, every restored path, every preserved unrelated '.skg' overlay,
+and every warning-only source.
+
+Test the topology and the three diffs in an ordinary dirty repository; an
+untracked and a deleted unrelated '.skg' file; dirty non-'.skg' files and
+index entries; multiple repositories sharing 'N'; a non-Git owned source;
+an unborn repository with a non-'main' symbolic HEAD; detached and sequencer
+states; foreign-only participation; ref-name collision; and failure midway
+through multi-repository publication.  Compare every committed blob with its
+specified byte source and assert that HEAD, index and unrelated worktree
+paths never move.
+
+** The shared store helper's failure recovery assumes valid disk
+
+'apply_define_nodes_to_stores' mutates the in-Rust graph before updating
+TypeDB.  If TypeDB fails, it attempts a full rebuild from disk.  That is a
+reasonable save-path recovery because save has just written validated disk,
+but reload can deliberately be operating while fatal files remain on disk.
+The rebuild can then fail too, after the graph has already changed, leaving
+the stores inconsistent.
+
+*** plan: recover TypeDB by reconstructing complete graph snapshots
+
+Treat this as bounded snapshot recovery, not as a request for compensating
+undo.  While holding the graph-writer lock, retain the complete pre-reload
+graph 'G0' and the complete, invariant-checked candidate graph 'G1'.  'G1'
+contains every accepted reload result, every unaffected node, and the
+last-good version of every node whose disk telescope was fatal.  Before the
+first TypeDB mutation, ensure that both snapshots can be projected
+deterministically to the complete 'NodeComplete' input needed by the TypeDB
+rebuild.  Extract and reuse the existing 'NodeRust' to 'NodeComplete'
+projection rather than introducing a second conversion.
+
+Keep the normal incremental TypeDB update as the fast path.  If it fails,
+do not read the filestore: TypeDB might already be partially changed and the
+reload incident might contain known-fatal disk bytes.  First wipe and rebuild
+TypeDB from 'G1'.  If that succeeds, retain/publish 'G1', enqueue the Tantivy
+delta only then, and complete the reload with a prominent warning that
+TypeDB was reconstructed.  This is roll-forward and preserves all accepted
+changes.
+
+If reconstruction from 'G1' fails, wipe and rebuild TypeDB from 'G0'.  If
+that succeeds, restore/preserve 'G0', enqueue no Tantivy work for the failed
+reload, and return a loud client-visible failure explaining that no reload
+changes were applied to the databases, the user's disk changes remain in
+place, and the reload can be retried.  This is rollback by complete
+reconstruction, never by guessing which incremental transactions committed
+and issuing inverse node, extra-ID, relationship or source-move operations.
+
+If reconstruction from 'G0' also fails, mark the store state poisoned and
+fail closed: do not acknowledge the reload or permit another operation that
+would read or mutate the incoherent stores.  Send the client a durable,
+prominent error directing the user to repair/restart TypeDB; do not continue
+as though merely retrying the disk scan could help.  Preserve both graph
+snapshots and the reload incident's recovery material for diagnosis.  Keep
+the save path's validated-disk recovery distinct, rather than letting the
+shared helper silently choose one recovery source for both callers.
+
+Add fault-injection tests at every independently committed TypeDB phase.
+Cover successful roll-forward with an unloadable fatal telescope still on
+disk; failed 'G1' reconstruction followed by successful 'G0'
+reconstruction; failure of both reconstructions and rejection of subsequent
+store-dependent requests; and the ordinary save recovery path.  After every
+case compare the entire in-Rust graph and TypeDB contents with the selected
+snapshot, assert that reload never changes filestore bytes, and assert that
+Tantivy receives a delta exactly when 'G1' becomes the selected state.
+
+** The writer mutex does not cover every graph writer
+
+The new mutex covers save, partial reload and the explicit full rebuild, but
+'strip_body_whitespace_and_refresh_caches' still replaces the whole
+'ArcSwap' graph without taking it.  It can race a save or reload and win with
+a snapshot that omits the other operation.  Newer 'main' buries the old
+telescope-migration endpoint, so the migration race from the first review
+will disappear on integration; the whitespace writer race remains.
+
+*** plan: serialize whitespace normalization as one store transition
+
+Acquire the existing process-global graph-writer mutex at the beginning of
+'strip_body_whitespace_and_refresh_caches', before reading any source file,
+using the same synchronous 'block_on' bridge as the explicit rebuild
+handler.  Hold it across the complete operation: the all-source read, every
+owned-file rewrite, construction and publication of the replacement graph,
+the Tantivy refresh, and all error handling.  The no-change path must perform
+its scan under the lock as well.  Do not introduce a whitespace-specific
+mutex: save, merge, reload, rebuild and whitespace normalization must exclude
+one another through the same lock.
+
+Immediately after acquiring the writer mutex, wait for the background
+Tantivy queue to become idle before reading or writing.  This establishes
+the ordering boundary with saves that acquired the mutex earlier but whose
+index work was deliberately queued: without the drain, an older save task
+could run after the direct whitespace index update and restore its stale
+body text.  While the writer guard remains held no later store writer can
+enqueue work, so the direct Tantivy update then corresponds to the graph and
+disk state being published.
+
+Keep the pure text transformation and disk-only test helper free of locking;
+the orchestration function which performs the multi-store transition owns
+the guard.  Document this requirement beside that function and audit the
+remaining direct 'ArcSwap::store' and 'apply_definenodes' call sites so the
+lock's stated coverage matches reality after integration with 'main'.
+
+Add deterministic concurrency tests with barriers around the whitespace
+scan.  Pause it after acquiring the lock and prove that a save, reload and
+explicit rebuild cannot enter their mutation phases; then release it and
+assert that the final graph equals a checked fold of disk and contains both
+operations' changes in serialization order.  Also queue an earlier save's
+Tantivy task before starting whitespace normalization and assert that the
+final indexed body is the stripped one, not the older queued text.
+
+** Collateral selection misses inverse-only effects
+
+'rerender_views_after_reload' selects only views which already contain a pid
+in the applied definitions.  Changing node A's outbound relationships can
+also change a view of B which did not previously contain A: for example, A
+newly subscribes to, overrides, hides or links to B, and B's inbound col or
+stats should gain A.  Save uses the same pid-overlap criterion, so either kind
+of graph transition can leave an open view rendered against an older graph.
+
+*** plan: make every non-saved view a low-priority generational refresh
+
+Solve this at the shared post-mutation view boundary, not in partial reload.
+After any successful graph transition, the saved view (when there is one) is
+completed and returned in the foreground exactly as today.  Every other open
+view on that client connection becomes a collateral view whose target is the
+new render generation; reload has no saved view, so all its open views are
+collateral.  Do not attempt to enumerate a graph-theoretic affected closure:
+compound Hidden* collections, inverse relationships and override substitution
+make that criterion easy to under-approximate as rendering evolves.  Multiple
+client connections remain outside this work.
+
+Use the existing completion framework rather than regenerate content views
+de novo.  Completion takes the extant viewforest as its substrate and already
+preserves independent branches, ordering, focus, folding and hand-curated
+structure while reconciling graph-managed content.  Existing collection
+viewnodes reconcile normally.  Do not simply enable the broad
+'create_partnerCols' flag on collateral buffers: for each absent read-only or
+generated collection, compare its source-set-visible membership in the
+pre-transition graph 'G0' and post-transition graph 'G1'.  Create it through
+the existing idempotent 'maybe_add_*' seam only when it was empty in 'G0' and
+became nonempty in 'G1'.  If it already had visible members in 'G0' but is
+absent from the forest, preserve that as the user's omission.  Apply no such
+creation rule to the saved buffer, whose authored shape must round-trip.
+There is no persistent "never show this collection in the future" preference.
+
+Return the foreground save/reload result without waiting for collateral
+completion.  Maintain a connection-local, single-worker priority queue which
+stores view URIs rather than cloned forests.  Emacs supplies a monotonically
+increasing last-visit sequence for each URI (on a cheap debounced visit event
+or piggybacked on ordinary requests); choose the greatest sequence first and
+reprioritize a pending view when it is visited.  Clone only the one forest
+whose job is starting, which bounds memory and TypeDB pressure as the data and
+number of buffers grow.
+
+Foreground work always outranks this queue.  An interactive save or search
+preempts the in-flight collateral job before doing its own work.  A search, or
+a save which fails without committing a graph transition, requeues that job
+against the same render generation.  A successful later save advances the
+generation, discards the entire older pending queue, makes any older in-flight
+result obsolete, and enqueues every then-open non-saved view afresh; views
+which already received the intermediate generation are included because they
+too now need the latest one.  Closing a view removes its job.  Source-set,
+diff-mode and other presentation-wide changes likewise advance a presentation
+component of the render generation rather than allowing results prepared
+under old rendering context to land.
+
+Implement preemption cooperatively.  Give each job an immutable ticket
+containing its render generation and a monotonically increasing cancellation
+epoch; do not reuse a resettable boolean, which permits an old worker to
+mistake a later reset for renewed authority.  Check the ticket between BFS
+viewnodes; before and after TypeDB calls; between completion, whole-view stats,
+source-set application and text rendering; and before returning the result.
+Cancellation is a quiet 'Preempted' or 'Obsolete' outcome, not a rendering
+error.  A query already executing might finish, but its result is discarded
+and no later low-priority query begins.  Permit only one collateral TypeDB
+transaction at a time and preserve foreground transaction capacity; if
+measurement finds a single whole-view query can still noticeably contend
+with save or search, chunk it and check cancellation between chunks.
+
+Keep ownership actor-like.  The worker receives an immutable graph snapshot
+and a clone of one viewforest, and sends a structured result over a channel;
+it never writes the TCP stream or mutates 'ViewsState'.  The connection loop
+alone interleaves request-scoped frames and owns the live view registry.  This
+depends on the planned request-ID/frame protocol: background refresh frames
+are tagged with request/incident identity when applicable, render generation
+and view URI, and do not occupy the client's old global "stream in progress"
+guard.  The scalar-release gate remains before either textual output or a
+'ViewsState' change; a view awaiting approval stays stale without blocking
+other eligible queue entries.
+
+Add a monotonically increasing 'viewforest_revision' to each registered view.
+A worker captures that revision when it clones the forest and returns it as
+the result's base revision.  Install/offer the result only if the URI remains
+open, its desired render generation is still the ticket's generation, and its
+server-side viewforest revision has not changed; otherwise discard and, when
+still needed, requeue from the newer forest.  This is separate from the render
+generation: the former protects hand-curated buffer structure, while the
+latter protects graph and presentation data.
+
+Do not lock every buffer for the lifetime of the background queue.  Track
+'rendered_generation' and 'target_generation' in both server and client, and
+show queued buffers as stale.  A visit promotes a buffer.  Before the first
+edit or save of a stale buffer, reject that attempted edit and promote its
+refresh to foreground priority; the user can edit once current.  When a
+background result arrives, Emacs applies it atomically only if the buffer is
+still unmodified and its local modification token matches the result's base;
+it then acknowledges application.  Only that acknowledgement advances the
+server's viewforest and revision.  A dirty/mismatched buffer or a render error
+remains explicitly stale and save-blocked with a durable client-visible
+explanation, never silently current.  Adjust the old save-lock/relax-lock
+lifecycle to cover only the foreground transaction and these short apply
+handshakes, rather than the whole collateral queue.
+
+Treat search views as live view recipes.  Existing result nodes can be
+completed from the graph immediately, but membership and ranking are rerun
+only after the corresponding Tantivy generation reports successful commit.
+A not-yet-ready search job must not head-of-line-block ready content views.
+Report a failed index generation and leave the search view stale rather than
+interpreting queue-idle as successful indexing.  Foreground searches and
+their user-visible enrichment outrank collateral refresh jobs.
+
+Regularize the nomenclature in the same change.  'Collateral' henceforth
+means any open view other than the view being saved, regardless of PID overlap
+or whether analysis predicts different output; in an operation with no saved
+view, every open view is collateral.  Use 'overlapping', 'affected' or
+'selected by changed PID' only for those narrower facts.  Add this definition
+to the glossary and protocol documentation, and audit Rust, Elisp, comments
+and current TODO prose which still define collateral through shared PIDs or an
+"exact affected set".  Remove the overlap selector
+'find_collateral_view_uris'; retain the 'collateral-view' wire name only with
+its new explicit definition, or rename it as part of the request-scoped frame
+migration if that yields a cleaner compatibility boundary.
+
+Test semantics, scheduling and races separately.  Semantic cases include a
+new subscriber appearing in a view of the subscribee which did not contain
+the subscriber; inverse herald/stat changes; containment changes affecting
+HiddenIn and HiddenOutside collections; override-chain effects; reconciliation
+of an existing col; creation on empty-to-nonempty membership; preservation of
+an absent col whose old membership was already nonempty; and exact saved-view
+round-trip.  Assert the same behavior for save and reload.
+
+Scheduler tests use barriers and deterministic visit sequence numbers.  Pin
+MRU order, dynamic promotion, search preemption and resume, failed-save resume,
+successful-save queue replacement, close-view removal, stale in-flight result
+discard, and one-worker resource bounds.  Race the result with a newer graph
+generation, a newer viewforest revision, a local edit and a scalar-release
+challenge; assert that neither client text nor 'ViewsState' advances without
+the matching acknowledgement.  Finally, change a node into and out of a live
+search query, prove no membership refresh precedes its Tantivy generation,
+and prove an index failure leaves an actionable stale view while foreground
+save and search responses never wait for the collateral queue.
+
+** The agreed stage/unstage refresh is absent
+
+'2_discussion.org' explicitly distinguishes worktree edits from index-only
+stage/unstage operations and records the decision that index changes should
+rerender diff-mode views without reloading the graph.  The implemented Magit
+hook compares only worktree file stamps.  A pure stage or unstage therefore
+does nothing, leaving open diff-mode buffers stale.
+
+*** plan: fingerprint Git presentation inputs and enqueue a render generation
+
+Extend the connection/config-scoped change snapshot with a deterministic Git
+presentation signature for the '.skg' paths in each participating repository.
+The signature contains, for every direct '.skg' child of an exact configured
+source, the HEAD entry (mode and blob oid, or absence) and every index entry
+(stage, mode and blob oid).  Resolve and deduplicate repository roots and use
+Git's NUL-delimited plumbing output rather than parsing a Magit display.  An
+unborn HEAD is an empty HEAD tree; a non-Git source contributes no Git
+signature.  Including HEAD as well as the index catches a commit, reset or
+branch movement which changes staged/unstaged presentation without changing
+worktree bytes, while unchanged '.skg' blobs avoid refreshes for unrelated
+commits elsewhere in the repository.
+
+On each global 'magit-post-refresh-hook', observe the worktree-content and Git
+presentation snapshots together and classify the transition once:
+
+1. If relevant worktree bytes changed, create/coalesce the ordinary reload
+   incident.  Carry the newest presentation signature with that incident so
+   its eventual render generation uses the current HEAD/index/worktree split;
+   do not also request a redundant index-only rerender.
+2. If worktree bytes did not change but the Git presentation signature did,
+   mutate no graph store.  When diff mode is enabled, advance only the
+   presentation component of the render generation and replace the pending
+   collateral queue under the MRU, cancellation and stale-buffer rules above.
+3. When diff mode is disabled, record the new signature but schedule nothing;
+   enabling diff mode later already renders from the then-current Git state.
+4. If neither changed, do nothing.
+
+This is state detection, not command advice: stage, unstage, commit, reset,
+checkout and conflict-stage changes all follow the same rule.  Ignore Git
+changes outside configured direct '.skg' paths.  Multiple configured sources
+inside one repository share one repository observation with exact relative
+path scopes; nested repositories are observed independently.  Reuse the
+durable acknowledgement rules already planned for reload detection: do not
+forget an unhandled signature merely because the client sent a request, and
+coalesce rapid Magit refreshes to the newest presentation generation.
+
+Route the refresh through the new low-priority generational scheduler, not
+the old synchronous 'skg-request-rerender-all-views' stream.  Every open view
+is collateral because there is no saved view.  Foreground save/search still
+preempts it, a newer presentation or graph generation replaces its remaining
+queue, and completion recomputes the per-source diffs without touching the
+in-Rust graph, TypeDB, Tantivy or the filestore.  Preserve the scalar-release,
+viewforest-revision, dirty-buffer and apply-acknowledgement gates from that
+shared scheduler.
+
+Test index-only staging and unstaging of text, membership, addition and
+deletion; conflicted index stages; an unborn repository; and HEAD-only commit,
+reset and branch transitions.  Assert that diff-mode heralds, phantoms and
+collection membership move between staged and unstaged exactly, while all
+four graph stores remain byte/semantically unchanged.  Also cover simultaneous
+worktree and index changes (one reload/render generation), diff mode disabled
+(baseline advances, no request), a non-'.skg' index change (no request),
+multiple sources in one repository, nested and non-Git sources, rapid
+stage/unstage coalescing, a failed/unhandled request remaining pending, and
+foreground preemption of the resulting queue.
+
+** Stamp-only scanning has smaller blind spots
+
+Worktree discovery records only each path's '(mtime . size)' in one
+process-global snapshot.  An equal-size rewrite within the filesystem's
+timestamp resolution is invisible.  The first Magit refresh after loading the
+module deliberately adopts the then-current disk as its baseline, even if
+that refresh followed the change which needed reloading.  Reconnecting or
+changing configurations can instead compare unrelated global baselines.
+
+The client's hand-written config readers also disagree with the server.
+'skg-source-paths-from-toml' and 'skg-source-names-from-toml' omit a source
+whose mandatory 'path' is present but whose optional 'name' is absent; the
+Rust parser defaults that name to the raw path.  Rust's separate
+'source_order_from_toml' repeats the same mistake: a mixture of named and
+unnamed sources omits the latter from the load-bearing privacy order, while
+an entirely unnamed list falls back to alphabetical rather than declaration
+order.
+
+Finally, Emacs recursively walks each configured source, although Skg's
+filestore is flat: full load and save recognize only direct
+'SOURCE/PID.skg' children.  The reload endpoint nevertheless accepts every
+descendant of a source path and chooses the first matching source from
+unordered map iteration.  A '.skg' file in an arbitrary repository
+subdirectory, or in a separately configured nested source, can consequently
+be discovered or attributed as though it belonged to an ancestor source.
+
+*** plan: discover candidates cheaply and verify them against accepted bytes
+
+Make config loading produce one normalized, ordered source inventory.  A
+source must have 'path'; its effective name is its explicit 'name' or,
+otherwise, the raw path string.  Preserve TOML declaration order through the
+Rust 'source_order' and every Emacs name/path consumer.  Have the server send
+this authoritative inventory during connection setup so reload discovery
+does not scrape TOML independently; keep any pre-connection Emacs parser on
+the same rule and test it against the Rust result.  Each entry carries the
+configured path and an exact normalized directory identity.  Reject two
+source entries which resolve to the same directory, since one physical file
+cannot have two source identities.
+
+Define source membership by exact parent, not ancestry: a filestore path is a
+regular direct '.skg' child of exactly one configured source directory.
+Normalize a requested path and require its parent to equal that directory
+before deriving the pid from its filename.  A repository may contain any
+other folders, a source may be a folder within a larger repository, and
+sources or their Git repositories may be nested in any arrangement.  None of
+those layouts is ambiguous under exact-parent matching.  A '.skg' file in a
+subfolder is ignored unless that subfolder is itself a configured source.
+Discover the repository containing each exact source independently, as in
+the Git-presentation plan above; do not infer source membership from a
+repository root.
+
+Retain, with each committed graph generation, an accepted path-digest
+manifest: for every present direct source file, its normalized path and the
+BLAKE3 digest of the exact raw bytes incorporated into the graph.  Compute
+the digest while full load already has those bytes in memory.  Publish the
+new manifest only with a successful full graph commit.  A partial reload
+promotes only the stable input generation which its terminal result says was
+applied, removes an accepted entry only for an applied deletion, and leaves
+the old accepted digest for a fatal or rejected path.  Thus the manifest
+means "these bytes are in the derived stores," not merely "these bytes were
+once seen on disk."  Seed the earlier acknowledged/pending/reported-failed
+state from this server manifest when a client connects; never initialize it
+by adopting the client's then-current disk.  A full comparison on connection
+therefore detects even a disk change made after server load but before the
+client existed.
+
+Keep candidate discovery separate from byte identity.  Install an Emacs
+non-recursive filesystem watch on each exact source directory; its callbacks
+only enqueue direct additions, removals and writes.  A raw-buffer save already
+names its exact candidate, while a Magit refresh enqueues one coalescible Git
+observation.  Emacs's callbacks and hooks never read or hash file content.
+Perform digesting and full sweeps in a low-priority server-side observation
+worker against the accepted manifest.  For Git-backed sources, that worker
+reuses the scoped previous and current HEAD/index observations from the
+presentation plan plus Git's worktree status to find candidates.  Comparing
+the two HEAD observations is essential: after a clean pull, HEAD, index and
+worktree can all move together, so current 'git status' alone reports nothing.
+A pure stage or unstage names no changed worktree bytes and remains only a
+presentation refresh.
+
+Hash only candidate worktree files on the ordinary happy path and compare
+those digests with their accepted or pending generations.  An event whose
+bytes still equal the accepted digest needs no reload; changed metadata is
+therefore harmless.  Metadata such as mtime, size and file identity may cache
+or prioritize work, but may never acknowledge a generation or suppress a
+candidate known from Git or a filesystem event.  Coalesce repeated
+observations per path and feed actual digest differences into the durable
+incident/request machinery already planned above.
+
+Use a low-priority full manifest sweep as the safety net for events which
+cannot be trusted to be complete: on connection, configuration change,
+watcher startup or overflow, explicit 'skg-reload-changed', completion of an
+explicit multi-repository batch, and periodically while idle.  The sweep
+enumerates only exact direct children but hashes all of them, so set
+difference detects additions and deletions and content comparison detects a
+same-size, same-timestamp rewrite.  It must not block a foreground save or
+search.  Its candidates still enter the stable-byte transaction and
+revalidation plan; a sweep does not itself advance the accepted manifest.
+
+Test a same-size rewrite with restored timestamps; a change before the first
+Magit refresh; a change between server load and client connection; reconnect
+and config switching; a metadata-only touch; event coalescing and watcher
+overflow; and additions and deletions in Git and non-Git sources.  Include a
+clean pull which changes committed '.skg' bytes, pure stage/unstage, and a
+missed event recovered by the full sweep.  Assert that only candidate files
+are hashed on the event/Git happy path and that foreground work preempts a
+full sweep.
+
+For source rules, cover named, unnamed and mixed TOML entries and preserve
+their declaration order identically in Rust and Emacs.  Put irrelevant
+subfolders and nested '.skg' files inside a repository; configure nested
+source directories both in one repository and in nested repositories; and
+exercise relative paths, symlinked directories and exact duplicate source
+directories.  Assert that only direct files in an exact configured source
+are loaded, watched, fingerprinted and resolved, and that ambiguous duplicate
+directory identities fail during config validation.
+
+** The partial reload inherits incremental context-ranking limits
+
+Tantivy context-origin labels are recomputed only for saved definitions;
+deletions produce no context-label update, and containment/link changes can
+alter whether other nodes are roots, multiply contained or link destinations.
+This behavior predates this branch's extraction of the store helper, but
+partial reload makes it another route to stale search ranking.
+
+The current 'CycleMember' name also overstates what full initialization
+computes.  It first grows content contexts from already recognizable origins,
+then searches containerward from the nodes left uncovered.  The resulting
+labels identify rootlike cycles, not every node which graph theory would call
+a member of a containment cycle.  Save-time code uses a different
+best-effort test which asks whether each saved node is in any containerward
+cycle, so incremental and full-build meanings can already disagree.
+
+*** plan: update the one-hop label closure; refresh cyclic roots only on demand
+
+Rename 'ContextOriginType::CycleMember' to 'CyclicRoot' and the stored label
+from 'CycleMember' to 'CyclicRoot'.  Rename its multiplier constant and all
+comments, logs, tests and user documentation, including Emacs and Neovim
+command documentation and the glossary.  Describe a cyclic root as a
+rootlike containment cycle: an ordinary cycle which is itself reached as
+content from outside is cyclic, but is not a cyclic root.  Preserve the full
+initialization algorithm as the authoritative operational definition: grow
+from the obvious context origins, then climb containerward from everything
+left uncovered.  Retire the save-time "is this touched node in any cycle?"
+shortcut rather than carrying two meanings forward.  Migrate existing
+Tantivy documents explicitly--a legacy 'CycleMember' string must be rewritten
+to 'CyclicRoot' or cleared, not merely accepted forever as a parser alias.
+
+For every committed save or reload batch, retain the immutable old and new
+in-Rust graph snapshots.  Let 'S' be its saved, deleted or reloaded pids and
+form the union of the closed one-hop neighborhoods of 'S' in both snapshots,
+using canonical 'contains' and text-link edges in either direction.  The old
+half is load-bearing for removed edges and deletions.  If an extra-ID claim
+change redirects a canonical edge without changing its referring file, add
+the old and new canonical endpoints of that edge as well.  This set is
+conservative--the exact endpoints of changed outbound edges would be
+smaller--but remains bounded by local graph degree and is easier to audit.
+
+Recompute 'Root', 'MultiContained', 'Dest' and 'HadID' for that candidate set
+from the new graph and touched file properties.  Keep the last fully computed
+'CyclicRoot' membership as an independent cached bit and apply the ordinary
+priority rule around it; automatic save/reload must neither discover a new
+cyclic root nor clear an old one.  Compare each candidate's final label,
+including the empty label, with the prior label map.  Give saved documents
+their final label in their ordinary Tantivy write and enqueue context-only
+rewrites for the other changed labels in the same Tantivy generation.  A
+deletion removes its document and cached entries.  Searches wait for that
+generation as already planned, while labels outside the candidate set remain
+untouched.
+
+Compute the complete cyclic-root cache at server initialization and full
+rebuild, and expose an interactive Emacs command
+'skg-recompute-cyclicroots'.  The command takes an immutable graph snapshot,
+runs the authoritative whole-graph uncovered-context algorithm in a
+background worker, and compares the resulting cyclic-root set with the
+cache.  For every membership difference, recompute the node's final
+prioritized context label and update only changed Tantivy documents.  Tag the
+work with its graph generation; if the graph advances before publication,
+discard the result and retry against the newer snapshot rather than installing
+an already stale cache.  Publish the replacement cache only with its successful
+Tantivy commit; on index failure retain the old cache and show an actionable
+client error.  Once that generation commits, use the planned live-search
+refresh path to rerun open search buffers whose ordering or top-N membership
+can change, and report how many cyclic-root labels changed.
+
+At the shared cyclic-root cache/refresh chokepoint, put a substantial code
+comment recording the deliberate tradeoff.  It must explain:
+
+1. The whole-graph algorithm: grow content contexts from obvious origins,
+   then search containerward from the uncovered remainder for cyclic roots.
+2. Why an ordinary cycle reached as external content is not a 'CyclicRoot',
+   despite every node on it being a cycle member in ordinary English.
+3. The rejected automatic alternative: recompute over the whole graph in the
+   background after every relevant mutation, let searches initially use old
+   ranks, then rerun affected search buffers.  This preserves eventual
+   accuracy but repeatedly pays a growing whole-graph cost for a ranking-only
+   distinction; the current corpus measured about 100 ms for classification,
+   and an older roughly 60,000-node corpus measured about 200--230 ms before
+   Tantivy work.
+4. The rejected dynamic alternative: maintain and incrementally repair the
+   connected/context components needed to know which cycles are rootlike.
+   That introduces substantial persistent state and invalidation complexity
+   for a deliberately discouraged graph shape.
+5. The chosen policy: cyclic-root ranking may remain stale after ordinary
+   saves and reloads; startup, full rebuild and
+   'skg-recompute-cyclicroots' repair it.  Matching semantics remain correct;
+   only score, ordering and therefore a bounded result set's cutoff can be
+   stale.  Skg already warns users that 'contains' is not intended to be
+   cyclic.
+
+Test the old/new one-hop union with added and removed containment and
+text-link edges, deletion, transitions among zero/one/multiple containers,
+'HadID' changes and canonical endpoints redirected by extra IDs.  Assert that
+an ordinary save or reload visits no unrelated graph node and performs no
+whole-graph cyclic-root pass, while every non-cycle label matches a fresh
+classification.
+
+For cyclic roots, cover an isolated long cycle, a cycle reached as external
+content and transitions between those states.  Assert that ordinary mutation
+intentionally leaves the cached 'CyclicRoot' labels unchanged, that the
+manual command and a restart/full rebuild repair every member, and that the
+command clears labels as well as adding them.  Test the legacy-label
+migration, a graph generation advancing during the command, Tantivy failure,
+and an open search which initially retains the old ranking and refreshes only
+after the repaired Tantivy generation commits.
+
+* Suggested order from here
+
+First make reload detection durable, protect modified view buffers, and
+serialize/coalesce client requests with the other response streams.  Then
+integrate newer 'main', adapt reload rerenders to its scalar-release boundary,
+and preserve its checked telescope normalization.  Move classification and
+incident snapshot capture under the writer lock; add graph-wide anchor
+resolution and distinct-node ID-claim validation; and pin those behaviors
+with failure and concurrency tests.  Broaden collateral selection and
+implement the index-only diff-mode rerender before calling the Magit
+integration complete.
+With trustworthy graph and byte snapshots in hand, settle the recovery refs'
+snapshot scope and non-git base semantics, then implement the three-branch
+recovery.  Finish with live Emacs/Magit testing, full test suites, and
+protocol/user docs.

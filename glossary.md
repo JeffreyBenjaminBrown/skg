@@ -35,6 +35,31 @@ sections active under the current source-set, and is what a
 restricted view renders. **Unfold** is the save-side inverse:
 splitting the effective node back into sections, byte-stably.
 
+## scalar, scalar text, ugly telescope, and scalar-release boundary
+
+A **scalar** is one value, as opposed to a collection of values. In
+Skg's telescope and privacy code, the node's **scalar text** means its
+`title` and `body`. They differ from aliases and relationship lists:
+list members from several telescope sections can be combined by the
+fold, whereas the fold selects one effective title and one effective
+body. A multiline body is still one scalar value; YAML may encode it as
+a block scalar.
+
+A conforming telescope supplies its scalar text at its home. If the
+fold must select a title or body from a section below the home, the
+result is an **ugly telescope** (`NodeComplete::ugly_telescope`). Skg
+may hold that result internally, but a restricted source-set must not
+receive its title or body without explicit approval for the affected
+PID. The **scalar-release boundary** is the shared policy enforcing
+that distinction. `ScalarReleaseDecision` either allows release,
+allows it with a warning, or returns a deliberately text-free
+challenge; the decision must precede changing client-visible view
+state or sending the rendered text.
+
+Elsewhere, such as YAML parsing and serialization, **scalar** retains
+its ordinary broader meaning: any single YAML value rather than a
+sequence or mapping.
+
 ## placement, anchor
 
 How a more private section orders its members into a more public

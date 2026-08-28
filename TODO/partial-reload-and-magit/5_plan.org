@@ -1,0 +1,1206 @@
+* partial reload and Magit -- implementation plan
+
+This is the implementation plan which supersedes '3_plan.org'.
+'4_recap.org' remains the rationale and decision record; this document
+turns its settled 'plan:' children into one dependency-ordered build.
+Where the two disagree, this document follows the later decisions in
+'4_recap.org' and the behavior on 'main' through '971e17b5'.
+
+The current feature branch already contains a useful happy path: a
+'reload paths' request, Save/Delete/Fatal classification, derived-store
+application without filesystem writes, a graph-writer mutex, selective
+view rerendering, and three Emacs triggers.  Preserve tests which prove
+that core, but expect much of its orchestration to be replaced.  In
+particular, the eager mtime snapshot, response-type handler registration,
+pre-lock fold, immediate collateral stream and identity-only one-pid fold
+are not foundations to build around.
+
+Implement the work in the order of the top-level headings below.  Within a
+heading, keep edits small and run its narrow tests as soon as they compile.
+Record deviations in 'progress.org' without rewriting this plan.  Stop for
+an architectural decision or a genuine stumper, as described in
+'coding-advice/when-to-stop.org'; otherwise continue through the next
+work item.
+
+* Definition of done
+
+An out-of-band change to any direct '.skg' file in a configured source is
+eventually compared by exact bytes with the generation accepted by the
+running server.  A stable, valid change updates the in-Rust graph, TypeDB
+and Tantivy without reload itself writing a '.skg' file.  Worktree changes
+made together are coalesced into one incident, including the serial pulls
+performed by 'data/bash/pull-all.sh'.
+
+The feature is not done merely when the graph changes.  It is done when all
+of these invariants hold:
+
+- A configured source is an ordered, normalized identity shared by every
+  Rust and client consumer.  Only direct '.skg' children belong to it.
+- If an owned and a foreign source contain the same filename pid, the owned
+  telescope wins before either file is parsed.  The ignored foreign bytes
+  are never loaded, but their collision is shown prominently in the client.
+- The user can explicitly choose an arbitrary partial-reload set from the ID
+  stack by marking nodes 'TO-RELOAD'.  Each marked node selects its complete
+  cross-source telescope; it does not select only one privacy section.
+- Detection never means acknowledgement.  Selecting bytes into the graph and
+  TypeDB is also not yet client acknowledgement: a path generation is
+  acknowledged only when the server names those exact bytes and their exact
+  Tantivy generation as committed.
+- The disk byte snapshot, graph snapshot, validation, store transition and
+  graph-selected-manifest update form one graph-writer transaction.  External
+  writers are caught by exact final-byte revalidation.
+- Every graph writer uses the same mutex.  A TypeDB failure selects a whole,
+  known graph snapshot by reconstruction; it never attempts a guessed
+  inverse update or rebuilds a reload from known-bad disk.
+- A wire request has one identity and exactly one terminal outcome.  A
+  logical reconciliation incident keeps its identity across retries,
+  authorization and conflict resolution.  Response-type names describe
+  frames; they no longer identify handler ownership.
+- No automatic reload or rerender overwrites a modified view.  Client-made
+  worktree mutations are prevented while a view is dirty; truly external
+  changes produce an explicit, persistent three-way conflict workflow.
+- Scalar text from an ugly telescope crosses a restricted source-set only
+  after the shared scalar-release decision.  No 'ViewsState' mutation and no
+  textual frame precedes that decision.
+- 'Collateral' means every open view other than the view being saved.  Those
+  views refresh in the background, most-recently-visited first, and never
+  make a foreground save or search wait.
+- Index-only Git changes advance presentation, not graph state.  Diff-mode
+  views eventually reflect the exact HEAD/index/worktree split.
+- Fatal disk bytes remain untouched until the user confirms recovery.
+  Recovery preserves complete Skg overlays at the three agreed refs, never
+  moves HEAD or the index, and restores only fatal files in owned sources.
+- Ordinary mutations repair locally affected non-cycle search context
+  labels.  Cyclic-root rank is explicitly allowed to remain stale until
+  startup, rebuild or 'skg-recompute-cyclicroots'.
+
+The dependency shape is:
+
+#+begin_example
+integrate main
+  |
+  +-- normalized sources and exact selected/acknowledged generations
+  +-- request / incident / index-generation infrastructure
+          |
+          +-- stable reload transaction
+                  |
+                  +-- safe foreground presentation and conflicts
+                  +-- low-priority collateral and Git presentation
+                  +-- fatal-incident recovery
+                  +-- local context labels and cyclic-root repair
+#+end_example
+
+* Integrate newer main without resurrecting obsolete branch behavior
+
+Merge 'main' through '971e17b5' into the feature branch before extending
+the implementation.  Treat this as a semantic integration, not a choice of
+one side of each conflict.
+
+Preserve from main:
+
+- 'Telescope::try_new' as the checked telescope boundary;
+- ownership derived from source location and prefix source-sets;
+- the owned/foreign same-pid policy, subject to the shared pre-parse
+  normalization below;
+- 'PreparedTelescopeWrite' and the scalar-hoist preflight;
+- 'error_unless_each_id_names_one_node', after making its core pure;
+- 'ScalarReleaseDecision' and both pre-render and post-completion gates;
+- the staged save/rerender behavior and the current completion driver; and
+- every newer Emacs and Neovim confirmation path.
+
+Preserve from this branch:
+
+- the generic 'ReloadPaths' endpoint name and its tested happy-path intent;
+- the rule that reload calls the derived-store boundary directly and never
+  save's delete-propagation filesystem cleanup;
+- the process-global graph-writer mutex;
+- the existing title-change and only-section-deletion parity fixtures; and
+- the Magit, raw-file and manual trigger entry points, while replacing their
+  bookkeeping and dispatch internals later in this plan.
+
+Resolve the main overlaps deliberately:
+
+- In 'server/save.rs', do not restore the old boolean 'write_fs' seam on top
+  of main's hoist-aware code.  Separate preparation/application of a save's
+  filesystem manifest from application of an already-prepared graph
+  transition.  Save uses both; reload uses only the latter.
+- In 'server/update_buffer.rs', do not retain the branch's immediate
+  'rerender_views_after_reload'.  Reload presentation will use main's scalar
+  gate and the generational scheduler below.
+- In 'server/serve.rs' and 'server/serve/protocol.rs', port the request name
+  into the request-coordinator work rather than adding another global
+  response-type handler.
+- In 'elisp/skg-request-reload-paths.el', retain user commands and hook
+  registration but discard the eager snapshot and direct
+  'process-send-string' stream setup.
+
+Before further behavior changes, run 'cargo check --lib', the reload tests,
+'grouped_saves', the main scalar-release/telescope tests, the Emacs suite and
+the Neovim suite.  Then run the full Rust suite with TypeDB available.  Any
+failure introduced solely by integration is repaired here; do not let later
+work hide it.
+
+Exit condition: the combined tree builds, main's privacy behavior remains
+covered, and the old reload parity tests still pass even though view refresh
+may temporarily be disabled behind the forthcoming coordinator.
+
+* Establish one ordered source inventory and one normalized disk corpus
+
+Make config loading produce a single authoritative source inventory.  Each
+entry contains the effective source name, abbreviation, ownership, privacy
+position, configured path, absolute normalized directory and exact directory
+identity.  'path' remains mandatory.  If 'name' is absent, its effective
+value is the raw path string, exactly as 'SkgfileSourceToml' already intends.
+
+Eliminate independent interpretations of the TOML:
+
+- Fix 'source_order_from_toml' so unnamed and mixed named/unnamed entries
+  retain declaration order.
+- Route 'SkgConfig::ordered_sources' and every Rust source traversal through
+  the normalized inventory.
+- Send the inventory to each client during connection setup.  Emacs and
+  Neovim use it instead of scraping source names and paths independently.
+- Keep a pre-connection Emacs TOML reader only where startup requires one,
+  and make it implement the same optional-name rule with parity tests.
+- After owned directories have been created and foreign paths validated,
+  resolve directory identities and reject two configured sources naming the
+  same physical directory.  Report both source entries in the error.
+
+Define source membership once: a source file is a regular direct child
+'SOURCE/PID.skg' whose normalized parent is exactly the source directory.
+Nested folders in a repository are fine.  A nested '.skg' file is ignored
+unless its parent is itself a configured source.  Nested source directories
+and nested Git repositories are resolved independently; ancestry never
+decides source ownership.
+
+Move owned/foreign normalization in front of YAML parsing.  A shared path
+inventory groups possible direct files by filename pid across all configured
+sources.  When any owned path exists for a pid, retain all owned paths and
+discard every foreign path in that pid group before reading bytes as YAML.
+Otherwise retain all foreign paths.  Return retained paths and structured
+'IgnoredForeignPidCollision' records containing winners and losers.
+
+Use that primitive in:
+
+- initialization and explicit rebuild;
+- stable full-corpus reads;
+- one-pid reads and partial reload;
+- semantic diff snapshots; and
+- any recovery or observation code which needs to know a telescope's
+  possible paths.
+
+After selection, parse each retained file, validate filename/pid agreement,
+construct checked 'Telescope' values and fold.  An ignored foreign file is
+opaque: invalid YAML or 'pid: Y' inside an ignored foreign 'X.skg' is not an
+error.  The same bytes are an error if no owned 'X.skg' exists.  Extra-ID
+claims remain subject to the distinct-node validator and are not hidden by
+this rule.
+
+Keep 'telescope-warnings.org' as an aggregate artifact, but also carry every
+collision and fold warning as structured request data.  Queue initialization
+warnings for the connection handshake.  Emacs and Neovim show a persistent
+warning buffer and a prominent message; an ignored generation is accepted
+after its warning is presented so it does not loop on every observation.
+
+Tests cover named, unnamed and mixed configs; declaration order; relative
+and symlinked source directories; duplicate physical directories; irrelevant
+subfolders; nested sources and repositories; owned winners; malformed
+foreign losers; malformed owned winners; foreign-only telescopes; deletion
+of the last owned section; extra-ID conflicts; and parity among initialization,
+rebuild, one-pid load and diff snapshots.
+
+* Give graph, filestore, Tantivy and views explicit generations
+
+Introduce a process-shared store state beside the in-Rust graph handle.  At
+minimum it owns:
+
+- a monotonic graph generation;
+- the graph-selected path-digest manifest for that generation;
+- path outcomes which distinguish selected-awaiting-index from acknowledged;
+- the last completely computed cyclic-root set;
+- the health of TypeDB and Tantivy; and
+- the next Tantivy generation and its completion records.
+
+Do not scatter independent atomics for values which must describe the same
+commit.  Publish a graph snapshot, graph generation and graph-selected
+manifest as one selected store state under the graph-writer mutex.  Lock-free
+renderers may continue cloning the immutable graph snapshot.
+
+The graph-selected manifest maps every present direct source path to BLAKE3
+of the exact raw bytes incorporated into the selected graph and TypeDB.
+Absence is represented explicitly when carried in a request or incident.
+Build the initial manifest while initialization already holds file bytes.
+Update it from exact prepared bytes after every successful Skg save, node
+merge, reload, whitespace normalization and rebuild; never restat the live
+worktree after a commit and call that selected.  A rejected or fatal path
+retains its earlier selected digest.  An applied deletion removes the present
+entry.
+
+Keep client acknowledgement as a later state transition.  Associate each
+newly selected path outcome with the Tantivy generation which represents it,
+and promote that exact path generation to acknowledged only when the exact
+index generation commits.  A failed index leaves it
+'selected-awaiting-index' under the incident: observation must not reapply it
+to the graph, but the client must not be told that every derived store
+accepted it.  Initialization sends an acknowledged baseline only after its
+index is ready; a reconnect also sends any selected-awaiting-index incidents.
+
+Strengthen 'server/dbs/tantivy/background_writer.rs':
+
+- Assign each queued batch a monotonic 'TantivyGeneration'.
+- Return that generation to the graph transition which enqueued it.
+- Record 'Pending', 'Committed' or 'Failed(reason)' for each generation,
+  rather than only an undifferentiated in-flight count.
+- Provide waits for one exact generation and for all work through a captured
+  generation.  Keep 'wait_for_tantivy_writes_idle' only as a thin convenience
+  where global idleness is genuinely intended.
+- Make enqueue failure a reported failed generation, not only a log line.
+- Retain enough immutable graph/index input for the failure policy under
+  'Apply reload as a recoverable store transition'.
+
+Add presentation identities separately from graph identity:
+
+- a presentation generation changes when source-set, diff mode or relevant
+  Git HEAD/index state changes;
+- a render generation is the pair of graph and presentation generations;
+- each registered server view has a monotonic 'viewforest_revision'; and
+- each client buffer has a local modification/application token.
+
+Those four values solve different races.  Never substitute one for another.
+Include them in diagnostic formatting and deterministic scheduler tests.
+
+Exit condition: initialization and every existing writer publish a selected
+manifest with the graph they selected; Tantivy callers can prove whether a
+particular generation committed; client acknowledgement cannot outrun it;
+and views can distinguish obsolete graph, presentation, server-forest and
+client-text results.
+
+* Replace response-type dispatch with a request coordinator
+
+Migrate the protocol in one coordinated cut; do not leave compatibility
+aliases for the old response-type handler map.  Update the Rust server, Emacs
+client, Neovim client, protocol documentation and their tests together.
+
+Use one envelope with four deliberately different identities:
+
+- Emacs or Neovim assigns a fresh connection-local 'request-id' to a
+  client-originated operation.
+- Work belonging to a longer reconciliation episode also carries a durable
+  'incident-id'.  Use an opaque random identifier so it remains unique across
+  retries and reconnects; ordinary unrelated requests may omit it.
+- A background offer which outlives its originating request carries a fresh
+  server-issued 'operation-id' and may also carry 'origin-request-id' for
+  diagnosis.  It never reopens that request.
+- Every frame carries its applicable identities and a frame kind.
+- Every request ends in exactly one terminal frame with status 'complete',
+  'complete-with-rejected-files', 'failed' or 'needs-authorization'.
+- Item outcomes are data inside the terminal frame.  Invalid input for one
+  telescope is not a generic transport error.
+
+A server-push operation remains registered until the client applies or
+rejects its offered result.  Its apply ACK names the operation id, view URI,
+render generation, viewforest base revision and client token.  Losing the
+connection abandons the offer without pretending it was applied.  Search's
+snapshot/enrichment exchange is instead an explicit continuation inside its
+still-live search operation; do not model it as an unrelated push.
+
+Keep a single length-prefix parser alive for the connection.  Reset it only
+when opening or abandoning a connection.  Remove ordinary-request calls to
+'skg-lp-reset'.
+
+In each client, replace 'skg-response-handler-map' and its Neovim equivalent
+with request records keyed by request id.  A record owns its frame handlers,
+terminal handler, buffer locks and cleanup guard.  Cleanup is idempotent and
+runs once even when a handler raises.  The connection sentinel synthesizes a
+failed terminal outcome for the active request, releases its short-lived
+locks and returns unacknowledged generations to their incident.
+
+Do not implement client-request multiplexing.  A connection-local coordinator
+queues foreground operations and dispatches one at a time, matching the
+server's serial reader.  Save, search, authorization continuation and
+explicit conflict resolution outrank observation and collateral work.  A
+request which has not been sent can be replaced or coalesced according to its
+kind.
+
+Convert expected failures into the originating request's terminal result.
+The generic 'error' frame remains only for an envelope so malformed that no
+request id can be recovered, or another connection-level protocol failure.
+An unknown/stale id never falls through to the handler for a coincidentally
+matching response type.
+
+Cancelled search work must still produce or synthesize exactly one cleanup
+for its operation.
+
+Keep a longer-lived incident registry above request records.  It owns path
+generations, warnings already shown, committed-but-unpresented work, scalar
+approvals and disk-client conflicts.  A retry or continuation uses a new
+request id and the same incident id.
+
+Tests fragment and concatenate LP messages, fire two like-typed requests,
+queue reload behind save, disconnect at every frame boundary, raise inside a
+handler, return every terminal status, send an unsolicited id, and exercise
+search's server-initiated snapshot continuation.  Assert one terminal result,
+one cleanup and balanced locks/counters in each case in both clients.
+
+* Discover disk and Git changes without acknowledging them
+
+Seed each client's observation state from the server's acknowledged manifest,
+selected-awaiting-index outcomes and source inventory at connection time.
+The client keeps, per normalized path:
+
+- 'acknowledged': the exact generation the server says reached the stores;
+- 'pending': newest queued or in-flight bytes, digest/absence and incident,
+  including a selected-awaiting-index substate which must not be reapplied;
+  and
+- 'reported-failed': a deterministic rejected generation whose explanation
+  has already been shown.
+
+The server is authoritative for acknowledgement.  A client stamp may help
+discover candidates, but cannot advance any of these states by itself.
+
+Use cheap candidate producers:
+
+- one non-recursive Emacs 'file-notify' watch per exact source directory;
+- the exact path from a raw-file save;
+- one coalescible Git observation after Magit refresh; and
+- the interactive 'skg-reload-changed' command.
+
+Add a separate interactive command, 'skg-reload-from-id-stack', for an
+explicit user-chosen set.  It opens the ID stack through a reload-selection
+entry path.  Only that entry path installs a buffer-local Org TODO vocabulary
+whose sole marker is 'TO-RELOAD'; ordinary 'skg-view-id-stack' continues to
+show an ordinary ID-stack editing buffer with no reload marker.  Leave
+'S-left' and 'S-right' bound to Org's standard TODO cycling, so the user marks
+or unmarks any stack headline without learning a special selection gesture.
+
+Make reload selection transient rather than part of 'skg-id-stack'.  Render
+the buffer afresh from the canonical stack on entry, keep each entry's ID as
+structured buffer-local data, and never persist 'TO-RELOAD' into its title.
+The ordinary ID-stack save validator must not see the selection markers or
+turn them into labels.  Closing or cancelling the selection buffer sends no
+request and changes neither the stack nor disk.  Override 'C-x C-s' in this
+mode with a short explanation pointing to 'C-c C-c'; never let the ordinary
+ID-stack save binding consume a selection buffer.
+
+Bind 'C-c C-c' in reload-selection mode to submit all marked entries.  Parse
+the headlines with Org and test their TODO keyword; do not recognize a bare
+title string beginning with 'TO-RELOAD'.  With no marks, explain that nothing
+was requested.  Otherwise send the marked IDs as one explicit foreground
+reload incident, deduplicating repeated IDs/telescopes.  An explicit
+selection bypasses changed-file discovery and retries even a previously
+reported-failed unchanged generation, but it still uses byte stability,
+validation, dirty-buffer, scalar-release and acknowledgement machinery.
+If a reload-batch token is open, report visible deferral and retain the
+selection until the closing sweep supplies a stable transaction.  Report,
+per marked ID, the primary pid and source paths actually considered.  After
+a terminal result, clear only marks whose exact generations were
+acknowledged; leave rejected or failed entries marked and annotate their
+reasons with transient overlays, not stack text, so the user can fix disk and
+submit them again.
+
+Callbacks do not read or hash content.  They enqueue normalized candidate
+paths or a repository observation.  Echoes of Skg's own writes are harmless:
+the selected or acknowledged digest proves they are already current.
+
+Put hashing and sweeps in a low-priority server observation worker.  On the
+ordinary path, hash only candidates and compare them with acknowledged,
+selected-awaiting-index and pending digests.  A disk generation which already
+matches a selected-awaiting-index outcome rejoins its index-repair incident;
+it does not repeat the graph mutation.  Metadata may prioritize work but may
+never suppress a candidate known from a watcher or Git.  Run an exact full
+manifest sweep on connection, config change, watcher startup/overflow,
+explicit manual reload, the end of a multi-repository batch, and periodically
+while idle.  The sweep enumerates only direct children and yields additions,
+deletions and changed BLAKE3 digests.  Foreground save/search preempts it.
+
+Coalesce observations in a path-to-newest-generation map.  Use a brief quiet
+period only when no explicit batch is open.  Paths collected before dispatch
+form one incident.  A newer generation which arrives while its predecessor is
+in flight remains queued for a successor incident; a retry of the same exact
+generation retains the original incident id.
+
+Add process-global, tokenized 'begin reload batch' and 'end reload batch'
+control requests.  Nesting tokens cannot close each other.  Modify
+'data/bash/pull-all.sh' to open one small persistent TCP control connection,
+begin a token before its repo loop, end it from an exit trap and then close
+the connection.  Server connection cleanup releases that connection's token
+and requests a final full sweep, so ordinary errors and signals do not leave
+the bracket open.  If no Skg server is reachable, pulling still proceeds.
+While any token is open, the observation coordinator collects but does not
+start a reload incident.  An Emacs request arriving early receives a
+non-acknowledging deferred result and remains pending; the final sweep after
+the last token closes supplies one stable incident.
+
+On a server terminal result, promote only the exact returned generation.
+If the worktree changed again, the returned digest becomes the acknowledged
+baseline while the newer generation remains pending.  Transient transport,
+stability or store failures stay pending.  Invalid YAML and other stable
+deterministic failures become 'reported-failed' after display and retry only
+on new bytes or explicit command.  An ignored foreign collision is a
+successful acknowledged outcome after its warning is displayed.
+
+Tests include a same-size rewrite with restored mtime; a change before the
+first Magit refresh; a change between server load and client connection;
+metadata-only touch; addition/deletion; atomic rename; watcher overflow;
+reconnect/config switch; a clean pull where HEAD/index/worktree move together;
+missed-event sweep recovery; event coalescing; foreground preemption; and a
+slow multi-repository pull with failure midway.  Instrument hashing to prove
+that the happy path hashes candidates only.  Emacs tests also distinguish
+ordinary and reload-selection ID-stack entry, cycle 'TO-RELOAD' in both
+directions, submit zero/one/duplicate/multiple marks, preserve stack labels
+and order, cancel without a request, and retry an unchanged reported failure.
+
+* Put every graph writer inside one complete transition
+
+Audit direct 'ArcSwap::store', 'apply_definenodes' and whole-graph replacement
+call sites after integrating main.  Save, node merge, reload, explicit
+rebuild, initialization-time replacement and whitespace normalization must
+all route through one graph transition abstraction or demonstrably acquire
+the same process-global writer mutex around their complete mutation.
+
+The mutex boundary begins before a writer takes the graph or disk snapshot
+on which its decision depends.  It ends after TypeDB has selected the same
+new graph state, the selected manifest and graph generation have been
+published, and any Tantivy task has captured immutable input.  It does not
+remain held while waiting for scalar authorization, client application,
+background collateral rendering or recovery confirmation.
+
+Refactor store application around immutable 'G0' and checked 'G1':
+
+- Build 'G1' by applying final definitions to a clone of 'G0'.
+- Validate all graph invariants before the first store mutation.
+- Give TypeDB updates both snapshots and the final definitions.
+- Publish the in-Rust graph only after TypeDB has selected 'G1'.
+- Enqueue Tantivy with the same selected graph generation.
+- Return a structured store outcome, never an optional replacement index
+  whose meaning depends on the caller.
+
+Keep save and reload recovery policies distinct.  Save writes a completely
+preflighted, validated filesystem state first, so its reconstruction source
+is that new disk/G1 state.  Reload never writes disk and may know that disk is
+invalid, so its reconstruction source is the in-memory snapshots described
+below.
+
+Bring 'strip_body_whitespace_and_refresh_caches' under the mutex before its
+first source read.  Hold it across scan, owned-file writes, replacement graph,
+Tantivy refresh and failure handling, including the no-change path.  Drain
+all Tantivy work through the generation captured on lock acquisition before
+performing its direct index update; otherwise an older queued save can later
+restore unstripped text.  Leave pure transformation and disk-only test
+helpers lock-free.
+
+Add barrier tests which pause each whole-graph writer after lock acquisition
+and prove that save, reload and rebuild cannot enter.  Queue an older Tantivy
+save before whitespace normalization and prove the stripped text is final.
+After each serialization order, compare the live graph with a checked disk
+fold where disk is meant to be authoritative.
+
+* Apply reload as a stable, recoverable store transition
+
+Parse request paths and explicitly selected IDs before taking the writer
+mutex.  Resolve paths to exact source identities and candidate pids without
+reading telescope content.  Then acquire the mutex and perform one bounded
+attempt:
+
+- Capture 'G0' and its graph-selected manifest.
+- Resolve every selected primary or extra ID against 'G0' to its primary pid;
+  return a structured rejection for an unknown ID and continue with the
+  others.  Deduplicate these pids with those selected by paths.
+- For every touched pid, enumerate its possible direct path in every
+  configured source and capture an ordered source-to-(bytes or absent) map.
+- Run owned-wins path selection on that inventory before parsing.
+- Parse checked sections and collect fold/collision warnings.
+- Build a tentative graph-wide ID claim table and resolver.
+- Fold the necessary telescopes, construct final definitions and 'G1'.
+- Run pure distinct-node ID-claim and owned-override validators on 'G1'.
+- Reread every path in the transaction snapshot and compare exact bytes and
+  presence/absence.
+- Commit only if the maps are identical.
+
+One unloadable telescope does not discard unrelated legal telescope changes.
+Well-formed telescopes and deletions enter 'G1'; a telescope with invalid
+retained bytes keeps its 'G0' node and receives a per-item fatal outcome.  A
+whole-graph ID-claim or override invariant failure rejects the complete
+candidate and acknowledges none, because its validity is inherently joint.
+
+Make ID validation pure.  The primitive maps every primary and extra id to
+the distinct pids which claim it and returns structured conflicts.  Full
+load/rebuild wrappers may write reports; speculative reload does not.  Judge
+the final batch so an ID transferred from a telescope deleted in the same
+batch is legal.
+
+Share full-loader extra-ID resolution.  Start the tentative resolver with
+all claims in 'G0', remove every old claim of each touched pid, add claims
+from retained stable touched sections, reject ambiguity, and fold with the
+result.  If that resolver differs from 'G0', inventory and fold the complete
+normalized corpus under the same stable-byte transaction, then derive the
+smallest store delta by graph comparison.  This correctness fallback covers
+untouched telescopes whose placement anchor or relationship member names a
+changed extra id.  Do not add a reverse dependency index until profiling
+justifies it.
+
+If final bytes differ, mutate no store and acknowledge nothing.  Release the
+mutex and leave the newest generations pending for one later attempt; do not
+spin while Git is still writing.
+
+For TypeDB:
+
+- Try the normal incremental update to 'G1'.
+- On failure, wipe and reconstruct from a deterministic complete projection
+  of 'G1', never from disk.  If successful, select/publish 'G1' and attach a
+  loud reconstruction warning.
+- If that fails, wipe and reconstruct 'G0'.  If successful, retain/publish
+  'G0', enqueue no reload Tantivy delta and return a failure which states that
+  disk is untouched and no reload change reached the databases.
+- If both fail, mark store state poisoned.  Refuse later store-dependent
+  operations until repair/restart, retain both snapshots and show a durable
+  client error.
+
+Extract the existing 'NodeRust' to 'NodeComplete' projection for complete
+reconstruction; do not create a second conversion.
+
+For Tantivy, associate the reload with the exact generation enqueued from
+'G1' and wait outside the writer mutex before claiming success.  On an
+incremental commit failure, have the single writer reconstruct the index from
+the complete immutable 'G1' projection at that generation, then continue
+later queued deltas in order.  If reconstruction also fails, mark Tantivy
+poisoned and return a committed-but-index-failed incident state; do not rerun
+the graph mutation.  A repair/rebuild continuation uses the same incident id
+and completes acknowledgement only after the index generation succeeds.
+
+Return structured per-path/telescope outcomes containing request id,
+incident id, stable digest/absence, applied/deleted/ignored/fatal status,
+warnings and selected graph/Tantivy generations.  Presentation may continue
+after this commit, but a retry of presentation never repeats this transition.
+
+Tests cover invalid YAML, filename/pid mismatch, no home/title, multi-section
+folds, owned/foreign selection and warnings, touched/untouched ID conflicts,
+same-batch ID transfer, override rejection, same-batch new/removed extra IDs,
+primary/extra/duplicate/unknown explicitly selected IDs, an untouched anchor
+and relation member affected by resolver change, bytes changing during local
+and full-corpus passes, mixed legal/fatal input and two simultaneous writers.
+Fault-inject each TypeDB and Tantivy phase and compare the entire selected
+graph/database/index, selected manifest, client acknowledgement and unchanged
+filestore.
+
+* Prevent client-created conflicts and preserve external ones
+
+Before a client-controlled worktree mutation, apply the agreed conservative
+rule.  If any Skg view buffer is modified:
+
+- a 'before-save-hook' refuses saving a direct raw '.skg' source file; and
+- Magit refuses an operation which might change the worktree of a repository
+  containing a configured source.
+
+Name every dirty view and ask the user to save or close it first.  Read-only
+and provably index-only Magit operations remain allowed.  Implement the Magit
+gate at its central synchronous/asynchronous Git process seams so aliases,
+transients and less common entry points do not bypass it.  Classify with a
+conservative allowlist: an unknown command is worktree-capable and refused.
+Test the installed Magit version's discard, checkout, reset, stash, pull,
+merge, rebase, stage, unstage, commit/status/diff and async paths.
+
+Out-of-band writers cannot be prevented.  Before dispatching a reload, the
+request coordinator briefly locks all open Skg views, captures their dirty
+state and local modification token, and sends dirty URIs/revisions.  Keep the
+locks through the terminal foreground request only.  The server commits the
+graph/databases, prepares every view's target generation, and sends automatic
+replacement only for buffers reported clean.  It neither replaces a dirty
+buffer nor advances that view's save baseline.
+
+Mark every dirty affected view with a persistent, generation-identified
+disk-client conflict.  Unlock it after the request so its local text remains
+editable, but refuse ordinary save until explicit resolution.  Dirty but
+unaffected buffers do not appear in this incident.
+
+Only after the reload's exact Tantivy generation succeeds, play
+'/home/sound/beep-harsh.wav' once and display or refresh
+'*SKG Disk-Client Conflicts*' as:
+
+#+begin_example
+,* WARNING: Disk-client conflict(s)
+Skg detected changes to the .skg filestore made outside of Skg.
+,** buffers with unsaved changes that cannot be automatically updated
+Other dirty Skg buffers, if any, are unaffected and hence omitted here.
+,*** buffer name
+Affected by these changed nodes:
+,**** path/id.skg
+,** buffers that have been updated
+,*** buffer name
+Affected by these changed nodes:
+,**** path/id.skg
+,** changed nodes affecting more than one conflicted buffer
+,*** path/id.skg
+,**** buffer name
+,** files affected
+,*** path/id.skg
+,** what it means, and what to do about it
+Skg applied the disk changes to its graph, databases and the buffers where
+doing so was safe.  It did not update the conflicted buffers above because
+they contain unsaved edits.  Saving them normally could clobber the external
+changes, so ordinary save is blocked.  Resolve each with
+'skg-resolve-disk-client-conflict', reviewing base, local and incoming text.
+After one resolution, Skg will update the incoming side of the others.  Skg
+cannot infer why the out-of-band changes happened or safely choose a merge;
+review and repair them manually with caution.
+#+end_example
+
+The leading comma before each example heading is Org's source escape and is
+not present in the generated conflict buffer.  The buffer's headings begin
+in column zero, with no leading spaces or punctuation.
+
+Factor main's ready-sound launcher into a small Rust helper and invoke the
+harsh sound from the conflict result.  Missing sound or playback failure is
+nonfatal but logged.  Use 'beep-harsh', never 'beep-glorious', here.
+
+If the exact Tantivy generation fails, do not postpone the safety warning
+until repair.  Play the same one harsh beep and open the conflict buffer
+immediately, but replace the success claim with the exact partial state:
+graph and TypeDB committed, Tantivy failed, search is stale and repair is
+pending.  Keep ordinary conflict saves blocked while the index is poisoned.
+When repair commits, update the same buffer to the normal wording without
+pretending the disk incident happened twice.
+
+Add an explicit conflict-resolution command.  For one buffer it presents,
+preferably through Ediff:
+
+- base: the last rendered view from which local edits began;
+- local: the preserved unsaved buffer text; and
+- incoming: the same view freshly rendered from the current disk-backed
+  graph.
+
+The merged text enters the normal parse, validation and save pipeline.  At
+commit, verify conflict incident, graph generation, disk generation and local
+token.  If any advanced, regenerate incoming and reconcile again.  After one
+buffer resolves, regenerate incoming for every remaining buffer while
+preserving each original base and local text, so a later resolution sees the
+earlier commit instead of reverting it.  Clear a marker only after its save
+succeeds and retire an incident only when no conflicted view remains.
+
+Tests exercise a clean update, one and several dirty buffers, one changed
+node shared by several conflicts, a later external edit, two resolutions
+which touch the same node, stale generation at commit, ordinary-save refusal,
+warning-buffer persistence, one harsh beep and exact Tantivy success before
+the message claims all databases were updated.
+
+* Gate and present the committed reload without applying it twice
+
+After the stable store transition, determine every collateral view and split
+clean/safe views from dirty conflict views.  Use main's shared scalar-release
+decision and approval parser.
+
+For every safe view batch:
+
+- Collect active pids in the input forests and run the release decision
+  against the committed graph before rendering.
+- If allowed, complete every replacement entirely in memory.  Do not mutate
+  'ViewsState' or send text.
+- Collect active pids from the completed forests and run the decision again.
+- On 'Allow' or 'AllowWithWarning', make the prepared results eligible for
+  client application and include the shared warning where required.
+- On 'Challenge', expose no prepared text and leave server/client view state
+  unchanged.
+
+A challenge terminates that request as 'needs-authorization' and leaves the
+incident committed-but-awaiting-presentation.  Mark withheld buffers stale
+and save-blocked after their short request lock is released.  Approval sends
+a new request id with the same incident id and explicitly approved pids; it
+performs only prepare/gate/present.  Decline leaves the view unchanged and
+blocked until approval, closure or a future text-free replacement action.
+
+Approval is scoped to incident and presentation generation.  If the graph or
+presentation advances, rerender and run both gates again; newly introduced
+ugly pids require a new challenge.  Never treat approval as a persistent
+privacy preference.
+
+The incoming side of a dirty-buffer conflict passes both gates before Ediff
+or any other UI receives it.  Authority to display incoming does not
+authorize the user's eventual save.
+
+Tests cover input-gate challenge, an ugly pid introduced only by completion,
+'AllowWithWarning' under 'all', approval without a second graph mutation,
+decline, graph advancement before approval, and a gated conflict incoming
+side.  Assert that challenge precedes the first text frame and first
+'ViewsState' change.
+
+* Replace synchronous collateral selection with a low-priority scheduler
+
+At the shared post-transition boundary, redefine collateral as every open
+view except the view being saved.  Reload, source-set changes and Git-only
+presentation changes have no saved view, so every open view is collateral.
+Remove 'find_collateral_view_uris' and PID overlap as selection policy.
+
+Keep the saved view foreground.  Return a successful save/reload foreground
+result without waiting for other views.  Put collateral work in a
+connection-local single-worker priority queue containing view URIs, desired
+render generation and visit sequence, not cloned forests.  Clone only the
+forest whose job starts.
+
+Emacs and Neovim report a monotonic last-visit sequence, debounced or
+piggybacked on ordinary requests.  Render greatest sequence first and
+reprioritize a queued view when visited.  Save, search, conflict resolution
+and authorization outrank the queue.
+
+Use the extant completion framework on the old forest so hand-curated
+branches, ordering, focus and folding survive.  Existing generated
+collections reconcile normally.  For an absent generated/read-only
+collection, compare source-set-visible membership in 'G0' and 'G1' and create
+it through the existing 'maybe_add_*' seam only when it was empty in 'G0' and
+became nonempty in 'G1'.  If old membership was already nonempty, preserve
+the user's omission.  Apply no such creation rule to the saved view.  Store
+no persistent negative preference.
+
+Give each job an immutable cancellation ticket containing render generation
+and cancellation epoch.  Check it between completion BFS viewnodes; before
+and after TypeDB queries; between completion, graph stats, source-set, diff
+and text rendering; and before result return.  One already-running query may
+finish, but an obsolete job starts no further expensive work.  Permit only
+one collateral TypeDB transaction at once.  Chunk any single query which
+measurement shows can still make foreground work wait noticeably.
+
+A successful later graph transition discards the remaining older queue,
+obsoletes its in-flight result and enqueues every then-open collateral view
+for the newest generation, including views which received an intermediate
+one.  A search or failed save preempts and then requeues the same job.  A
+closed view disappears.  Presentation changes advance the presentation half
+of the render generation and replace stale work likewise.
+
+The worker receives immutable graph/context and one cloned forest and returns
+a result over a channel.  Only the connection loop writes TCP or mutates
+'ViewsState'.  Install or offer a result only if the URI is open, desired
+render generation matches, server 'viewforest_revision' still equals the
+job's base and scalar release allows it.
+
+Do not lock buffers for the queue lifetime.  Client and server track rendered
+and target generations.  A queued buffer is visibly stale.  Before its first
+edit or save, reject that attempt and promote its refresh to foreground; edit
+is allowed once current.  Apply a background result only if the buffer is
+unmodified and its local token matches.  Offer the result under the
+server-issued operation id.  The client then sends an apply ACK; only an ACK
+which names that operation and all its generation/revision fields advances
+server 'ViewsState' and 'viewforest_revision'.  A dirty or mismatched buffer
+becomes a durable stale/conflict state, never silently current.
+
+Treat search buffers as stored query recipes.  Completion may refresh nodes
+already present, but membership and ranking rerun only after the corresponding
+Tantivy generation reports successful commit.  A not-ready search does not
+head-of-line-block content views.  Failed indexing leaves the search view
+actionably stale.  Foreground search and enrichment always outrank collateral
+work.
+
+Regularize nomenclature in Rust, Emacs, Neovim, API docs, glossary, comments
+and live TODO text: 'collateral' means any non-saved open view.  Use
+'overlapping', 'affected' or 'selected by changed pid' for narrower facts.
+Keep or rename the 'collateral-view' wire frame during the protocol cut only
+if its new meaning is documented unambiguously.
+
+Semantic tests cover inverse subscriber/overrider/hider/link/container
+effects, Hidden* collections, override chains, existing collection
+reconciliation, empty-to-nonempty creation, preservation of an already-
+omitted nonempty collection and exact saved-view round trip.  Scheduler tests
+pin MRU order, promotion, preemption/resume, successful-save queue replacement,
+close, stale result discard, resource bounds, newer view revision, client
+edit, scalar challenge, apply ACK and live-search/Tantivy ordering.
+
+* Observe Git presentation separately from worktree content
+
+For each repository containing an exact configured source, compute a
+deterministic presentation signature limited to direct source '.skg' paths.
+For each path include HEAD mode/blob or absence and all index stages with
+mode/blob.  Use NUL-delimited Git plumbing, not Magit display text.  An
+unborn HEAD is empty; a non-Git source has no signature.  Deduplicate one
+repository observation while retaining exact relative scopes for multiple
+sources.  Discover nested repositories independently.
+
+At Magit post-refresh, observe worktree candidates and presentation together:
+
+- Relevant worktree bytes changed: create/coalesce the ordinary reload
+  incident and carry the newest presentation signature into its render
+  generation.  Do not enqueue a second Git-only refresh.
+- Worktree bytes unchanged, signature changed, diff mode enabled: advance
+  presentation generation and replace the collateral queue without touching
+  graph, TypeDB, Tantivy or filestore.
+- Worktree bytes unchanged, signature changed, diff mode disabled: accept the
+  new signature and schedule nothing.
+- Neither changed: do nothing.
+
+Including previous/current HEAD catches a clean pull where status is empty;
+including index stages catches conflict state.  Ignore commits and index
+changes outside configured direct source paths.  Apply the same durable
+pending/acknowledged rules to a presentation signature; sending a request
+does not consume it.
+
+Tests cover stage/unstage of text, membership, addition and deletion;
+conflicted stages; unborn and non-Git repositories; commit/reset/branch HEAD
+movement; simultaneous worktree/index change; diff mode disabled; irrelevant
+repo paths; multiple and nested sources; rapid coalescing; request failure;
+foreground preemption; and exact herald/phantom/collection movement with all
+graph stores unchanged.
+
+* Preserve fatal incidents and implement the three recovery refs
+
+When a stable reload attempt contains any fatal telescope, expand its exact
+transaction byte map before releasing the writer mutex into an immutable
+'IncidentDiskSnapshot'.  For each participating repository, snapshot the
+union of:
+
+- every '.skg' path present in the incident-time worktree;
+- every '.skg' path present in the base commit tree; and
+- every possible section path of every touched telescope.
+
+Do not descend into nested repositories.  Record absolute and repo-relative
+paths, source/ownership where configured, raw bytes or absent tombstone and
+digest.  Include malformed and non-UTF-8 bytes exactly.  Final-reread this
+complete set before accepting the incident.
+
+Store with the pending incident:
+
+- 'G0' and 'G1' or immutable manifests sufficient to render their touched
+  telescopes;
+- the complete disk snapshot;
+- touched legal/fatal/deleted outcomes;
+- incident-time base commits and repository states;
+- selected graph/index generations; and
+- any presentation/conflict state still owed.
+
+Extend 'PreparedTelescopeWrite' into or expose an immutable
+path/bytes/tombstone manifest.  Save application and recovery consume that
+one serializer; do not create a recovery-specific unfold/YAML path.
+
+Add 'reload recover' as a request continuation.  Emacs presents fatal paths
+and reasons and asks explicitly before any Git ref, repository initialization
+or worktree restoration.  Neovim receives an equivalent confirmation path
+or an explicit client-visible unsupported action until it implements the UI;
+the server must not recover merely because one client lacks the prompt.
+
+Immediately before mutation, compare the complete live '.skg' overlay with
+the incident snapshot.  If any path changed, create no ref and restore
+nothing.  Preserve the old incident as evidence, enqueue the new disk state
+as a successor incident and ask again naming changed paths.  Recheck at the
+last safe point before restoration if object construction was appreciable.
+
+For each existing repository, begin from its incident base commit 'C' and
+overlay every snapshotted '.skg' path, including unrelated dirty, untracked
+and deleted '.skg' files.  Leave non-'.skg' entries as 'C' records them.
+Construct:
+
+- 'P': replace incident-touched telescope paths with the pre-incident graph
+  manifest;
+- 'L': replace them with the legal post-reload manifest; and
+- 'A': retain the incident worktree bytes/tombstones.
+
+Use this topology:
+
+#+begin_example
+base commit C
+      |
+      P  oops-N_1-pre-incident
+     / \
+    L   A
+    |   |
+    |   oops-N_3-with-all-changes-from-incident
+    |
+    oops-N_2-with-only-legal-changes-from-incident
+#+end_example
+
+Put that diagram and meanings beside the commit-construction code.  Assert
+topology in tests.  'P..L' is the accepted reload, 'P..A' the complete
+incident, and 'L..A' the unapplied part.
+
+Choose the smallest positive 'N' for which all three refs are absent in every
+repository which will receive refs.  Preflight repository state, names,
+blobs, trees and commits everywhere before publishing any ref.  Publish
+without checkout or index mutation.  If multi-repository publication fails,
+remove only refs newly published by this attempt and report failure.
+
+Keep detached-HEAD and sequencer repositories warning-only.  A repository
+which participates only through foreign sources is warning-only.  Do not
+initialize, create refs in or restore those repositories.
+
+For an owned non-Git source, initialize only after confirmation with symbolic
+HEAD 'main'.  Create 'P' as a root commit and point both 'main' and the first
+oops ref at it; create 'L' and 'A' as children.  An existing unborn repo keeps
+its current symbolic branch name and follows the same root construction.
+Perform no checkout.  Leave main/that branch at 'P'.
+
+After every required ref exists, restore only fatal paths in owned sources
+from 'L'.  Legal paths already match 'G1'.  Never stage, run checkout, write
+foreign files or touch unrelated paths.  The report names bases, commits,
+refs, initialized repos, preserved overlay paths, restored paths and every
+warning-only repo/source.
+
+Tests compare every committed blob byte-for-byte with its source and cover an
+ordinary dirty repo, unrelated modified/untracked/deleted '.skg', dirty
+non-'.skg' and index entries, multiple repos sharing 'N', non-Git owned,
+unborn non-main branch, detached/sequencer, foreign-only, name collision,
+failure midway through publication, worktree edit/create/delete before
+confirmation and a change during construction.  Assert HEAD, index and
+unrelated worktree paths never move.
+
+* Repair local search context and rename cyclic roots honestly
+
+Rename 'ContextOriginType::CycleMember' to 'CyclicRoot', its stored Tantivy
+label to 'CyclicRoot', and its multiplier constant accordingly.  Update
+Rust, Emacs, Neovim, docs, glossary, logs and tests.  Do not retain a parser
+alias forever: explicitly rewrite or clear old 'CycleMember' documents during
+index migration/rebuild.
+
+Define a cyclic root operationally as the existing full algorithm does:
+grow content contexts from obvious origins, then search containerward from
+the uncovered remainder.  An ordinary containment cycle reached as content
+from outside is cyclic but is not a cyclic root.
+
+For each committed save/reload, let 'S' be saved, deleted or reloaded pids.
+Build the union of closed one-hop neighborhoods of 'S' in 'G0' and 'G1' along
+canonical contains and text-link edges in either direction.  Include old and
+new endpoints when an extra-ID claim redirects a canonical edge.  Recompute
+'Root', 'MultiContained', 'Dest' and 'HadID' for only that set.  Compare final
+labels, including empty, with the prior label map.  Give saved documents their
+label in their ordinary write and place context-only rewrites for other
+changed labels in the same Tantivy generation.  Deletion removes document and
+cached entries.
+
+Keep the last fully computed cyclic-root bit independently and reuse it in
+the priority decision.  Ordinary save/reload neither discovers nor clears
+cyclic roots.
+
+Compute the full cache at startup and rebuild.  Add interactive
+'skg-recompute-cyclicroots'.  It runs the authoritative whole-graph algorithm
+on an immutable snapshot in a background worker, tagged with graph generation.
+If graph advances, discard and retry.  Update only documents whose final
+label changes; publish the cache only with successful Tantivy commit.  On
+failure retain the old cache and show an actionable error.  After commit,
+rerun live search views whose order or top-N membership might change and
+report the count.
+
+At the cache/refresh chokepoint, add the agreed substantial code comment:
+
+- describe the grow-obvious-contexts then search-uncovered-containerward
+  algorithm;
+- explain why a cycle reached as external content is not a cyclic root;
+- record the rejected automatic whole-graph pass, including roughly 100 ms
+  for the current corpus and 200--230 ms for the former roughly 60,000-node
+  corpus before Tantivy work;
+- record the rejected dynamically maintained connected/context components;
+  and
+- state that stale cyclic-root data affects score/order/top-N cutoff, never
+  matching semantics, and is acceptable because containment cycles are
+  discouraged.
+
+Tests cover old/new one-hop union, added/removed containment and text links,
+deletion, zero/one/multiple containers, 'HadID', redirected extra IDs and no
+unrelated node visits.  Cyclic tests cover an isolated long cycle, a cycle
+reached from outside and transitions between them; ordinary staleness; manual
+and restart repair; clearing; legacy-label migration; graph advancement;
+Tantivy failure; and live search refresh only after commit.
+
+* Finish documentation, migration and end-to-end verification
+
+Update 'api-and-formats.md' for the request envelope, terminal outcomes,
+server-push/background frames, normalized source inventory, reload/recovery
+requests including path and ID target forms, observation batching, view
+application ACK and new collateral definition.  Remove the old statement that
+errors are simple unscoped text.
+
+Update 'docs/COMMANDS.org' for:
+
+- automatic reload and its warnings;
+- 'skg-reload-changed';
+- the Emacs-only 'skg-reload-from-id-stack', 'TO-RELOAD' and 'C-c C-c' UI
+  (the underlying request remains client-neutral);
+- disk-client conflict resolution;
+- fatal recovery confirmation;
+- 'skg-recompute-cyclicroots'; and
+- 'CyclicRoot' search ranking.
+
+Mirror the applicable protocol and user workflows in 'docs/COMMANDS-nvim.org'.
+The ID-stack selection surface is Emacs-only; the underlying explicit-ID
+request remains client-neutral rather than baking an Org UI into the server.
+
+Update 'glossary.md' with incident, request, server operation, selected and
+acknowledged path generations, graph/render/presentation/Tantivy generation,
+viewforest revision, disk-client conflict, new collateral meaning and cyclic
+root.  Keep 'scalar' and the scalar-release entry already added.
+
+Delete obsolete mtime snapshot code, response-type handler ownership, PID-
+overlap collateral selector, old cycle label and tracing-only collision paths.
+Audit comments for the old meanings rather than leaving historical commentary
+in production code.  Move each resolved partial-reload entry from
+'TODO/problems.org' to 'TODO/DONE/problems.org' only when its test and user
+path are complete.
+
+Run, in addition to each work item's focused tests:
+
+- 'cargo check --lib';
+- 'cargo test --doc';
+- 'cargo nextest run' with TypeDB available;
+- 'bash/emacs-tests.sh';
+- the Neovim test suite;
+- targeted reload/recovery integration tests; and
+- 'bash/all-tests.sh' in the configured isolated test environment.
+
+Then dogfood with a live server and real Emacs/Magit session: raw save,
+ID-stack-selected reload, discard, checkout, stage/unstage, clean pull, slow
+'pull-all.sh', simultaneous dirty views, scalar challenge, transport drop,
+fatal YAML and confirmed recovery across more than one repository.  Capture
+timing for candidate hashing, reload lock hold, foreground response and
+collateral queue drain.
+The feature is complete only when the user can keep saving/searching while a
+large collateral queue drains and every warning/recovery state is visible and
+actionable in the client.
+
+* problems
+
+These are additional lacunae discovered while turning the recap's separate
+plans into one execution order.  Each includes a recommendation.  The main
+plan incorporates the recommendations which are mechanical consequences of
+settled decisions; durable incident storage and server-triggered reload
+ownership still deserve confirmation before implementation.
+
+** DONE Background frames outlive the request ID which supposedly owns them
+
+The recap gives every response frame a request id and gives each request one
+terminal outcome.  It also ends the foreground save/reload before the new
+collateral queue finishes.  A background view result therefore cannot both
+belong to that already-terminal request and be rejected as a stale response
+id.  Search's server-initiated snapshot exchange is a related inversion.
+
+Recommendation: make the envelope distinguish a client request from a
+server-push operation.  A push gets its own server-issued operation id and
+may retain 'origin-request-id' plus incident/render/view identities for
+diagnosis; it never reopens the completed request.  Apply ACK refers to the
+push operation id.  Treat search snapshot as an explicit continuation inside
+its still-live search operation.  This is slightly more vocabulary than just
+request/incident ids, but preserves the one-terminal invariant honestly.
+
+** DONE Tantivy idleness is not Tantivy success
+
+The current worker decrements an in-flight count even when a commit fails and
+only logs the error.  Waiting for idle can therefore make reload claim all
+databases were updated, advance client acknowledgement, or rerun a live search
+against a failed index generation.
+
+Recommendation: implement the generation result registry and immutable
+snapshot reconstruction specified above.  A reload remains committed-but-
+index-failed until that exact generation or its repair commits; neither path
+acknowledgement nor search refresh treats queue idleness as success.  Keep its
+graph-selected manifest separate from the client-acknowledged manifest so
+observation neither repeats the graph mutation nor falsely reports complete
+store success.  A disk-client conflict still gets its harsh warning
+immediately, with accurate partial-failure wording.
+
+** DONE In-memory recovery evidence can vanish before the user confirms
+
+The older plan made 'PendingIncident' per connection.  The recap strengthens
+its bytes but still leaves them in memory.  A dropped client connection loses
+the handle; a server crash loses the last-good graph bytes entirely while the
+fatal worktree remains.  That is exactly the restart-loss scenario which made
+recovery part of this feature.
+
+Recommendation: make incidents process-owned rather than connection-owned,
+and persist a small immutable recovery journal before warning the user.  The
+journal needs the incident disk snapshot, P/L touched-telescope manifests,
+base commits, digests and outcome metadata, not a second copy of the whole
+graph.  Store it outside configured source repositories, atomically; reload it
+at startup/reconnect; retire it only after successful recovery or an explicit
+user dismissal which explains the loss of automatic recovery.  Bound and
+document retention, create it with user-only permissions and treat it as
+filestore-sensitive because it duplicates private and possibly ugly scalar
+bytes.  This is an automatic non-'.skg' write, so it preserves the no-
+automatic-filestore-write invariant, but it is new durable state and deserves
+explicit approval before implementation.
+
+** DONE The shell batch bracket has no existing control channel
+
+A reload batch bracket is a time interval during which Skg may notice many
+worktree changes but deliberately does not reload any of them.  'begin reload
+batch' opens the interval; the matching 'end reload batch' closes it.  The
+point is to make all the serial pulls performed by 'pull-all.sh' count as one
+logical incident even when a slow network or password prompt creates a long
+quiet gap between repositories.
+
+Here, dispatch means Emacs sending its accumulated candidate paths to the
+server to begin a reload.  Emacs can observe candidates through a
+'file-notify' event, a raw '.skg' save or a Magit refresh.  Those observations
+say only that a path might now differ from the server's selected bytes; they
+do not say that the new bytes have reached the graph or databases.
+
+Merely adding commands named 'begin reload batch' and 'end reload batch' to
+the protocol is insufficient.  'pull-all.sh' and Emacs are separate processes.
+Unless the script actually sends 'begin' to the same server-side coordinator
+which receives Emacs's observations, Emacs has no way to know that the loop is
+still running.  Its ordinary quiet-period timer can expire between two pulls
+and dispatch a premature reload, then do so again after the next repository.
+
+Recommendation: 'pull-all.sh' opens a small TCP control connection directly
+to the Skg server and sends 'begin reload batch' before its loop.  The server
+returns an opaque batch token: a unique handle identifying this particular
+open bracket.  The server keeps the active-token set process-wide, rather than
+inside one Emacs request, and associates this token with the script's control
+connection.  Only 'end' carrying the same token, or loss of that connection,
+can remove it.  Thus overlapping or nested batch drivers cannot accidentally
+close one another's brackets.
+
+While any batch token remains active, the server records the newest observed
+generation of each candidate path but starts no reload.  An early observation
+remains unacknowledged in a precise sense: the client keeps that path in its
+'pending' state, and the server sends no terminal result claiming that those
+exact bytes committed to the graph, TypeDB and Tantivy.  The observation is
+not discarded; it participates in the one incident assembled when the last
+token closes.
+
+A sweep is a server-side comparison of disk with its manifests.  A full sweep
+enumerates every direct '.skg' child of every configured source, hashes its
+exact bytes, represents missing formerly selected paths as absent, and
+compares those generations with selected, pending and acknowledged state.  It
+therefore catches additions, deletions and changes even if a filesystem event
+was missed.  A candidate-only comparison hashes only paths already named by an
+event and is the cheaper ordinary case.  The final sweep is the full sweep run
+after the last active batch token closes; it establishes the complete stable
+change set which becomes the batch's single reload incident.
+
+The intended sequence is:
+
+#+begin_example
+pull-all.sh          Emacs                         server
+    |                  |                              |
+    |-- begin --------------------------------------→ open token T
+    |-- pull repo A    |-- observe changed A -----→ record A; do not reload
+    |   long pause     |                              | T is still open
+    |-- pull repo B    |-- observe changed B -----→ record B; do not reload
+    |-- end T --------------------------------------→ close T; full sweep
+    |                  |←-- reconciliation ready ----- one incident for A + B
+    |                  |-- reload continuation -----→ commit exact bytes
+    |                  |←-- terminal exact outcome ---|
+#+end_example
+
+The script closes the control connection from its exit trap.  If it exits
+without successfully sending 'end', EOF removes its token and requests the
+same final sweep.  This avoids requiring an Emacs daemon and avoids a lock or
+marker file which could remain on disk after the script is interrupted.
+
+** DONE A server-owned sweep has no dirty-buffer census
+
+The plan moves hashing and full sweeps into the server, and the shell batch
+connection requests a final sweep.  The conservative dirty-buffer preflight,
+however, lives in an interactive client.  If the server turns its discovered
+diff directly into a reload, it has no current buffer tokens to classify safe
+and conflicted presentation.  If it waits for the client to originate a new
+request, closing the bracket opened by 'pull-all.sh' does not itself guarantee
+dispatch.
+A transport loss creates the same gap for buffers which survive in Emacs and
+reconnect to a graph which advanced while they were offline.
+
+Recommendation: let the process-owned observation coordinator create the
+incident, then send a 'reconciliation-ready' server operation to the one
+active interactive client.  That client briefly locks its views, returns the
+dirty/token/revision census and starts the foreground reload continuation.
+If no client is connected, the server may update graph stores because no
+client text can be overwritten, but it must retain presentation debt.  At the
+next handshake, the client sends each surviving buffer's base render
+generation, local token and dirty state: clean buffers refresh, dirty stale
+buffers become explicit disk-client conflicts.  This stays within the agreed
+single-client scope; multi-client propagation remains out of scope.  The
+alternative is to keep all reload dispatch client-owned and make the server's
+final sweep only a pending notification, which is simpler but weakens the
+promise that closing the batch performs the reload.
