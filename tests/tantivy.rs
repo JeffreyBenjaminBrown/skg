@@ -10,7 +10,8 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::tantivy::title_and_source_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
-use skg::dbs::tantivy::search::{SearchOptions, search_index};
+use skg::dbs::tantivy::search::{
+  SearchOptions, has_ugly_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, members_at_source_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
@@ -413,6 +414,40 @@ fn test_search_body_axis (
     assert_eq! ( top_id, "recipe",
                  "body search should find the recipe node" ); }
   Ok (( )) }
+
+#[test]
+fn ugly_telescope_filter_runs_inside_the_search_query (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty : NodeComplete = empty_node_complete ();
+  let mut clean : NodeComplete = empty . clone ();
+  clean . pid = ID::new ("clean");
+  clean . title = "shared privacy term" . to_string ();
+  let mut ugly : NodeComplete = empty . clone ();
+  ugly . pid = ID::new ("ugly");
+  ugly . title = "shared privacy term" . to_string ();
+  ugly . ugly_telescope = true;
+  ugly . aliases = members_at_source_msv (
+    &SourceName::from ("main"),
+    MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[clean, ugly], Path::new ("/tmp/tantivy-test-ugly-filter") ) ?;
+  assert! ( has_ugly_telescope (&index) ? );
+  let opts : SearchOptions = SearchOptions {
+    exclude_ugly_telescope : true,
+    .. SearchOptions::default () };
+  for terms in ["shared privacy term", "dirty alias secret"] {
+    let (matches, searcher) = search_index (&index, terms, &opts) ?;
+    let ids : Vec<String> = matches . iter ()
+      . map ( |(_, address)|
+        searcher . doc::<TantivyDocument> (*address) . unwrap ()
+        . get_first (index . id_field) . unwrap ()
+        . as_str () . unwrap () . to_string () )
+      . collect ();
+    assert! ( ! ids . contains (&"ugly" . to_string ()),
+      "ugly title and alias docs are excluded before TopDocs: {:?}", ids );
+  }
+  Ok (( ))
+}
 
 /// Regex axis: patterns match on tokens, bypassing the QueryParser.
 #[test]

@@ -12,7 +12,8 @@ use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
-use crate::dbs::tantivy::search::{SearchOptions, search_index};
+use crate::dbs::tantivy::search::{
+  SearchOptions, has_ugly_telescope, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -23,6 +24,12 @@ use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision,
+  SearchUglinessChoice,
+  decide as decide_scalar_release,
+  search_challenge_response,
+  search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::MembershipAxes;
@@ -107,6 +114,9 @@ pub struct SearchEnrichmentPayload {
   pub search_results : Vec<ID>,
   pub ancestry_by_id : HashMap<ID, AncestryTree>,
   pub graphnodestats : AllGraphNodeStats,
+  /// Load-bearing across the asynchronous snapshot exchange: enrichment
+  /// must not broaden a preflight decision to exclude ugly telescopes.
+  pub include_ugly_telescopes : bool,
 }
 
 /// Provides two responses, one fast and one slow.
@@ -137,16 +147,44 @@ pub fn handle_text_search_request (
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
-  let search_opts : SearchOptions =
-    SearchOptions {
-      regex     : bool_key ( &sexp, "regex" ),
-      body      : bool_key ( &sexp, "body" ),
-      operators : bool_key ( &sexp, "operators" ), };
+  let search_choice : Option<SearchUglinessChoice> =
+    match search_choice_from_request (&sexp) {
+      Ok (choice) => choice,
+      Err (error) => {
+        send_response_with_length_prefix (
+          stream,
+          & tag_text_response (TcpToClient::SearchResults, &error) );
+        return; }};
   match search_terms {
     Ok (search_terms) => {
       // Wait for any in-flight background save-index writes to commit, so
       // the search reflects every save issued so far (read-your-writes).
       wait_for_tantivy_writes_idle ();
+      let index_has_ugly : bool =
+        match has_ugly_telescope (&env . tantivy_index) {
+          Ok (has_ugly) => has_ugly,
+          Err (error) => {
+            send_response_with_length_prefix (
+              stream,
+              & tag_text_response (
+                TcpToClient::SearchResults,
+                &format! ("Error checking search privacy: {}", error) ) );
+            return; }};
+      if ! active . is_all ()
+         && index_has_ugly
+         && search_choice . is_none () {
+        send_response_with_length_prefix (
+          stream, &search_challenge_response () );
+        return; }
+      let include_ugly_telescopes : bool =
+        active . is_all ()
+        || search_choice == Some (SearchUglinessChoice::Include);
+      let search_opts : SearchOptions = SearchOptions {
+        regex     : bool_key ( &sexp, "regex" ),
+        body      : bool_key ( &sexp, "body" ),
+        operators : bool_key ( &sexp, "operators" ),
+        exclude_ugly_telescope : ! include_ugly_telescopes,
+      };
       // --- Phase 1: immediate results without paths ---
       match search_index ( &env . tantivy_index,
                            &search_terms,
@@ -187,6 +225,22 @@ pub fn handle_text_search_request (
               &search_terms,
               &matches_by_id,
               &suppressed );
+          let approved : HashSet<ID> =
+            if include_ugly_telescopes {
+              search_results . iter () . cloned () . collect ()
+            } else { HashSet::new () };
+          let release = decide_scalar_release (
+            "text-search", active, &search_results,
+            &env . in_rust_graph_snapshot (), &approved );
+          if matches! (
+            release, ScalarReleaseDecision::Challenge { .. } ) {
+            send_response_with_length_prefix (
+              stream, &search_challenge_response () );
+            return; }
+          let warnings : Vec<String> = match release {
+            ScalarReleaseDecision::AllowWithWarning { warning } =>
+              vec! [warning],
+            _ => Vec::new (), };
           let rendered : String =
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &env . config )
@@ -201,13 +255,13 @@ pub fn handle_text_search_request (
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,
-            & tag_text_response (
-              TcpToClient::SearchResults, &rendered ));
+            & mk_search_results_sexp (&rendered, &warnings) );
           spawn_enrichment_thread (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
             &env . driver, &env . config,
-            &search_terms, &search_results, active ); },
+            &search_terms, &search_results, active,
+            include_ugly_telescopes ); },
         Err (e) => {
           send_response_with_length_prefix (
             stream,
@@ -257,6 +311,7 @@ fn spawn_enrichment_thread (
   search_terms     : &str,
   search_results   : &[ID],
   active           : &ActiveSourceSet,
+  include_ugly_telescopes : bool,
 ) {
   { // Clear stale enrichment before spawning.
     // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
@@ -319,9 +374,10 @@ fn spawn_enrichment_thread (
       slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
       terms          : terms_clone,
-      search_results     : ids_clone,
+      search_results : ids_clone,
       ancestry_by_id,
-      graphnodestats } ); } ); }
+      graphnodestats,
+      include_ugly_telescopes } ); } ); }
 
 fn collect_ids_from_ancestry_node(
   node   : &AncestryTree,
@@ -336,8 +392,9 @@ fn collect_ids_from_ancestry_node(
 /// Format: (("response-type" "search-enrichment")
 ///          ("terms" "TERMS") ("content" "ORG") ("warnings" ()))
 pub fn mk_search_enrichment_sexp (
-  terms   : &str,
-  content : &str,
+  terms    : &str,
+  content  : &str,
+  warnings : &[String],
 ) -> String {
   Sexp::List ( vec! [
     Sexp::List ( vec! [
@@ -352,8 +409,37 @@ pub fn mk_search_enrichment_sexp (
       Sexp::Atom ( Atom::S ( content   . to_string () )), ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "warnings" . to_string () )),
-      Sexp::List ( vec! [] ), ] ),
+      Sexp::List (
+        warnings . iter ()
+        . map ( |warning|
+          Sexp::Atom ( Atom::S (warning . clone ()) ) )
+        . collect () ), ] ),
   ] ) . to_string () }
+
+fn mk_search_results_sexp (
+  content  : &str,
+  warnings : &[String],
+) -> String {
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ("response-type" . to_string ()) ),
+      Sexp::Atom ( Atom::S (
+        TcpToClient::SearchResults . repr_in_client () . to_string ()) ),
+    ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ("content" . to_string ()) ),
+      Sexp::Atom ( Atom::S (content . to_string ()) ),
+    ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ("warnings" . to_string ()) ),
+      Sexp::List (
+        warnings . iter ()
+        . map ( |warning|
+          Sexp::Atom ( Atom::S (warning . clone ()) ) )
+        . collect () ),
+    ] ),
+  ] ) . to_string ()
+}
 
 /// Groups raw Tantivy results by ID, applying score adjustments
 /// in this order:

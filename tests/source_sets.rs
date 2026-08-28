@@ -346,7 +346,8 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           terms          : "shared ranking term" . to_string (),
           search_results : vec![ID::from ("active-search-hit")],
           ancestry_by_id : HashMap::new (),
-          graphnodestats : AllGraphNodeStats::empty (), })));
+          graphnodestats : AllGraphNodeStats::empty (),
+          include_ugly_telescopes : false, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
       let (mut server_stream, _client_stream) =

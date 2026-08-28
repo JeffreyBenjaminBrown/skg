@@ -10,7 +10,10 @@ use crate::serve::protocol::TcpToClient;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
+use crate::types::viewnode::{
+  ViewNode, ViewNodeKind, Vognode, mk_inactive_viewnode};
 
+use ego_tree::{NodeId, NodeMut, Tree};
 use sexp::{Atom, Sexp};
 use std::collections::HashSet;
 
@@ -25,6 +28,12 @@ pub enum ScalarReleaseDecision {
     pids      : Vec<ID>,
     prompt    : String,
   },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SearchUglinessChoice {
+  Include,
+  Exclude,
 }
 
 /// Parse the optional per-request approval list.
@@ -45,6 +54,36 @@ pub fn approved_pids_from_request (
     . collect ()
 }
 
+pub fn search_choice_from_request (
+  parsed : &Sexp,
+) -> Result<Option<SearchUglinessChoice>, String> {
+  use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
+  match extract_v_from_kv_pair_in_sexp (parsed, "ugly-telescopes") {
+    Ok (choice) => match choice . as_str () {
+      "include" => Ok (Some (SearchUglinessChoice::Include)),
+      "exclude" => Ok (Some (SearchUglinessChoice::Exclude)),
+      other => Err (format! (
+        "Unknown ugly-telescopes choice: {} (expected include or exclude)",
+        other )), },
+    Err (_) => Ok (None), }
+}
+
+/// A search challenge intentionally has no PIDs: even the identity of a
+/// matching ugly telescope is part of what the search has not been allowed
+/// to reveal. The retry must choose inclusion or exclusion before querying.
+pub fn search_challenge_response () -> String {
+  Sexp::List ( vec! [
+    pair (
+      "response-type",
+      TcpToClient::UglyTelescopeConfirmation . repr_in_client () ),
+    pair ("operation", "text-search"),
+    Sexp::List ( vec! [ atom ("pids"), Sexp::List (Vec::new ()) ] ),
+    pair (
+      "prompt",
+      "Some indexed nodes have title or body text selected below home. Include or exclude those telescopes from this search?" ),
+  ] ) . to_string ()
+}
+
 /// Decide whether a response involving 'candidate_pids' may cross the
 /// release boundary. IDs are canonicalized before checking ugliness so an
 /// extra ID cannot evade the telescope-coarse policy.
@@ -57,6 +96,20 @@ pub fn decide (
 ) -> ScalarReleaseDecision {
   let ugly_pids : Vec<ID> =
     canonical_ugly_pids (candidate_pids, graph);
+  decide_for_ugly_pids (
+    operation, active, ugly_pids, approved_pids )
+}
+
+/// Apply the shared policy when a caller has classified ugliness from a
+/// source other than the live graph, such as deleted-node diff data.
+pub fn decide_for_ugly_pids (
+  operation     : &str,
+  active        : &ActiveSourceSet,
+  mut ugly_pids : Vec<ID>,
+  approved_pids : &HashSet<ID>,
+) -> ScalarReleaseDecision {
+  ugly_pids . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
+  ugly_pids . dedup ();
   if ugly_pids . is_empty () {
     return ScalarReleaseDecision::Allow; }
   let warning : String = warning_for (operation, &ugly_pids);
@@ -93,6 +146,33 @@ pub fn challenge_response (
         . collect () ) ] ),
     pair ("prompt", prompt),
   ] ) . to_string () )
+}
+
+/// Replace ugly active nodes with text-free inactive placeholders. Search
+/// exclusion uses this after enrichment so ancestry and override grafting
+/// cannot broaden the choice made before the Tantivy query.
+pub fn exclude_ugly_nodes_from_viewforest (
+  viewforest : &mut Tree<ViewNode>,
+  graph      : &InRustGraph,
+) {
+  let node_ids : Vec<NodeId> =
+    viewforest . root () . descendants ()
+    . map ( |node| node . id () )
+    . collect ();
+  for node_id in node_ids {
+    let should_convert : bool =
+      viewforest . get (node_id)
+      . and_then ( |node| match &node . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Active (active_node)) =>
+          graph . pid_of (&active_node . id),
+        _ => None, } )
+      . and_then ( |pid| graph . get (&pid) )
+      . map ( |node| node . ugly_telescope )
+      . unwrap_or (false);
+    if should_convert {
+      let mut node : NodeMut<crate::types::viewnode::ViewNode> =
+        viewforest . get_mut (node_id) . unwrap ();
+      node . value () . kind = mk_inactive_viewnode () . kind; }}
 }
 
 fn canonical_ugly_pids (

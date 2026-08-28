@@ -312,7 +312,8 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       // factor is computed from how many regexes match the doc's
       // title. Behaviour should be analogous to the literal case.
       let regex_opts : SearchOptions = SearchOptions {
-        regex: true, body: false, operators: false };
+        regex: true, body: false, operators: false,
+        exclude_ugly_telescope : false };
       let ( best_matches_re, searcher_re ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &regex_opts ) ?;
