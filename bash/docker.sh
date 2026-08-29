@@ -15,6 +15,15 @@ SKG_PORT="$(grep -m1 '^[[:space:]]*port' "$SKG_CONFIG" \
 HOST="$(pwd)"
 CONTAINER_NAME="$(basename "$HOST")"
 
+# Codex normally writes all user state under /home/ubuntu/.codex.
+# The 'homestate' dance moves it from there to /home/ubuntu/host/.codex/homestate,
+# and symlinks the old /home/ubuntu to that.
+# This enables exporting codex state when switching docekr images.
+# Rebuilt images install code to export it that way,
+# at /home/ubuntu/export-codex-sessions.sh.
+CODEX_HOMESTATE="$HOST/.codex/homestate"
+mkdir -p "$CODEX_HOMESTATE"
+
 # Claude Code state (the session transcripts `--resume` reads, prompt history,
 # OAuth credentials, config) AND our shared user-level config both live in
 # my-dot-claude -- a small git repo that sits INSIDE the project tree at
@@ -30,6 +39,7 @@ CONTAINER_NAME="$(basename "$HOST")"
 
 docker run --name "$CONTAINER_NAME" -it -d                 \
   -v /run/user/1000/pipewire-0:/run/user/1000/pipewire-0   \
+  -v "$CODEX_HOMESTATE":/home/ubuntu/.codex               \
   -p "$SKG_PORT:$SKG_PORT"                                 \
   --platform linux/amd64                                   \
   --user 1000:1000                                         \
@@ -47,6 +57,9 @@ docker run --name "$CONTAINER_NAME" -it -d                 \
   #   so history/credentials persist there across rebuilds.
   #   (Verified earlier: with CLAUDE_CONFIG_DIR set, Claude writes
   #   .claude.json, projects/, sessions/, and credentials all under that dir.)
+  # Codex state DOES have its own narrow mount: the host-backed "homestate"
+  #   directory is mounted at /home/ubuntu/.codex. This preserves all Codex
+  #   state without hiding the rest of the image-provided /home/ubuntu tree.
   # --ulimit raises the file-descriptor cap for every process in the
   #   container. The default of 1024 is too low for TypeDB under
   #   concurrent test load: each RocksDB database opens many handles,
