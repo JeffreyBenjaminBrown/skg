@@ -27,6 +27,7 @@ use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_root
 use crate::serve::handlers::reload_batch::{
   handle_begin_reload_batch_request,
   handle_end_reload_batch_request,
+  reconciliation_generation,
   release_connection_reload_batches,
 };
 use crate::serve::handlers::reload_paths::handle_reload_paths_request;
@@ -49,7 +50,7 @@ use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
-use crate::serve::util::{ begin_request_context, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
+use crate::serve::util::{ begin_request_context, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_server_push_sexp_response, tag_text_response, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
@@ -147,6 +148,8 @@ fn handle_emacs (
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
+  let mut interactive_verified = false;
+  let mut seen_reconciliation_generation = reconciliation_generation ();
   let mut collateral_scheduler = CollateralScheduler::new ();
   if let Err (error) = collateral_scheduler . seed_presentation (&env) {
     tracing::warn! (%error, "could not seed Git presentation signature"); }
@@ -227,9 +230,10 @@ fn handle_emacs (
               &search_cancelled,
               &mut views_state,
               &active_source_set ); }
-          Ok (RequestType::VerifyConnection) =>
+          Ok (RequestType::VerifyConnection) => {
+            interactive_verified = true;
             handle_verify_connection_request (
-              &mut stream, &env ),
+              &mut stream, &env ); },
           Ok (RequestType::Shutdown) =>
             // Never returns - exits process
             handle_shutdown_request ( &mut stream, &env ),
@@ -384,6 +388,29 @@ fn handle_emacs (
                   &terms ));
               snapshot_requested = true; }}}
         if ! request_context_active () {
+          let reconciliation = reconciliation_generation ();
+          if interactive_verified
+             && reconciliation > seen_reconciliation_generation
+          {
+            let payload = Sexp::List (vec![
+              Sexp::List (vec![
+                Sexp::Atom (Atom::S ("content" . into ())),
+                Sexp::Atom (Atom::S (
+                  "External reload batch closed; run one exact full manifest sweep"
+                    . into ())),
+              ]),
+              Sexp::List (vec![
+                Sexp::Atom (Atom::S ("sweep-generation" . into ())),
+                Sexp::Atom (Atom::I (reconciliation as i64)),
+              ]),
+            ]) . to_string ();
+            send_response_with_length_prefix (
+              &mut stream, &tag_server_push_sexp_response (
+                TcpToClient::ReconciliationReady,
+                &format! ("reconciliation-{}", reconciliation),
+                &payload));
+            seen_reconciliation_generation = reconciliation;
+          }
           collateral_scheduler . pump (&mut stream, &views_state); }
       }
       Err (_) => break, // real error

@@ -681,6 +681,21 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
   (skg--request-reload-full-sweep)
   (message "skg: queued a complete .skg manifest comparison"))
 
+(defun skg--reconciliation-ready-handler (_tcp-proc payload)
+  "Turn a server-owned end-of-batch notice into a dirty-aware full sweep."
+  (let* ((response (read payload))
+         (generation (cadr (assoc 'sweep-generation response))))
+    (skg-log 'info 'reload
+             "server requested post-batch full sweep generation %s"
+             generation)
+    ;; `skg-reload-paths' takes the current dirty-buffer census immediately
+    ;; before dispatch. Thus the shell control connection never needs access
+    ;; to client-local buffer state.
+    (skg--request-reload-full-sweep)))
+
+(skg-register-server-push-handler
+ 'reconciliation-ready #'skg--reconciliation-ready-handler)
+
 ;; Global hook: fires on every magit refresh regardless of any minor
 ;; mode. Mirrors the top-level find-file-hook registration style.
 (add-hook 'magit-post-refresh-hook #'skg--reload-on-magit-refresh)

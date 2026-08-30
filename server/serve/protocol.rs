@@ -116,6 +116,7 @@ pub enum TcpToClient {
   CollateralApplied,
   ViewVisited,
   PresentationObserved,
+  ReconciliationReady,
   Error,
 }
 
@@ -162,4 +163,5 @@ impl TcpToClient {
       TcpToClient::CollateralApplied => "collateral-applied",
       TcpToClient::ViewVisited => "view-visited",
       TcpToClient::PresentationObserved => "presentation-observed",
+      TcpToClient::ReconciliationReady => "reconciliation-ready",
       TcpToClient::Error            => "error", }} }

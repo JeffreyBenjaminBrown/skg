@@ -16,6 +16,7 @@ use sexp::{Atom, Sexp};
 use std::collections::HashSet;
 use std::net::TcpStream;
 use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicU64, Ordering};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -38,6 +39,7 @@ impl ReloadBatchRegistry {
 }
 
 static RELOAD_BATCHES : OnceLock<Mutex<ReloadBatchRegistry>> = OnceLock::new ();
+static RECONCILIATION_GENERATION : AtomicU64 = AtomicU64::new (0);
 
 fn registry () -> &'static Mutex<ReloadBatchRegistry> {
   RELOAD_BATCHES . get_or_init (|| Mutex::new (ReloadBatchRegistry::default ()))
@@ -46,6 +48,17 @@ fn registry () -> &'static Mutex<ReloadBatchRegistry> {
 pub fn reload_batch_active () -> bool {
   registry () . lock () . expect ("reload-batch mutex poisoned")
     . active_count () > 0
+}
+
+/// Monotonic notice that the last process-wide batch bracket closed. Active
+/// interactive connections turn a new value into a server-push full sweep;
+/// a client which connects later already performs a handshake sweep.
+pub fn reconciliation_generation () -> u64 {
+  RECONCILIATION_GENERATION . load (Ordering::Acquire)
+}
+
+fn request_reconciliation () {
+  RECONCILIATION_GENERATION . fetch_add (1, Ordering::AcqRel);
 }
 
 pub fn handle_begin_reload_batch_request (
@@ -85,6 +98,7 @@ pub fn handle_end_reload_batch_request (
       . expect ("reload-batch mutex poisoned");
     state . end (&token);
     state . active_count () };
+  if active_count == 0 { request_reconciliation (); }
   send_batch_response (
     stream, &token, active_count,
     if active_count == 0 {
@@ -98,8 +112,11 @@ pub fn release_connection_reload_batches (owned_tokens : &mut HashSet<String>) {
   if owned_tokens . is_empty () { return; }
   let mut state = registry () . lock ()
     . expect ("reload-batch mutex poisoned");
+  let was_active = state . active_count () > 0;
   for token in owned_tokens . drain () {
     state . end (&token); }
+  if was_active && state . active_count () == 0 {
+    request_reconciliation (); }
   tracing::warn! (
     active_reload_batches = state . active_count (),
     "reload-batch control connection closed; released its tokens");

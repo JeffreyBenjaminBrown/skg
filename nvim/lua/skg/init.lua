@@ -42,6 +42,9 @@ function M.init (config_toml_path)
   state.register_server_push_handler(
     'collateral-view',
     require('skg.save').background_collateral_offer_handler)
+  state.register_server_push_handler(
+    'reconciliation-ready',
+    require('skg.misc_requests').reconciliation_ready_handler)
   client.port = config.port_from_toml(absolute)
   client.connect()
   require('skg.misc_requests').connection_verify()
