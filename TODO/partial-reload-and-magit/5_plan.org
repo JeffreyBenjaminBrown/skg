@@ -331,10 +331,13 @@ matching response type.
 Cancelled search work must still produce or synthesize exactly one cleanup
 for its operation.
 
-Keep a longer-lived incident registry above request records.  It owns path
-generations, warnings already shown, committed-but-unpresented work, scalar
-approvals and disk-client conflicts.  A retry or continuation uses a new
-request id and the same incident id.
+Keep a process-owned incident registry above per-connection request records.
+It owns path generations, warnings already shown, committed-but-unpresented
+work, scalar approvals and disk-client conflicts.  A retry or continuation
+uses a new request id and the same incident id.  Disconnecting abandons
+connection-scoped requests and server-push offers, but does not discard an
+incident; a reconnecting client can reattach by incident id and learn what
+application, authorization, repair or recovery remains.
 
 Tests fragment and concatenate LP messages, fire two like-typed requests,
 queue reload behind save, disconnect at every frame boundary, raise inside a
@@ -420,16 +423,53 @@ in flight remains queued for a successor incident; a retry of the same exact
 generation retains the original incident id.
 
 Add process-global, tokenized 'begin reload batch' and 'end reload batch'
-control requests.  Nesting tokens cannot close each other.  Modify
-'data/bash/pull-all.sh' to open one small persistent TCP control connection,
-begin a token before its repo loop, end it from an exit trap and then close
-the connection.  Server connection cleanup releases that connection's token
-and requests a final full sweep, so ordinary errors and signals do not leave
-the bracket open.  If no Skg server is reachable, pulling still proceeds.
-While any token is open, the observation coordinator collects but does not
-start a reload incident.  An Emacs request arriving early receives a
-non-acknowledging deferred result and remains pending; the final sweep after
-the last token closes supplies one stable incident.
+control requests.  A reload batch bracket is the time interval between those
+requests: Skg may observe worktree changes during it, but deliberately starts
+no reload.  This makes all serial pulls performed by
+'data/bash/pull-all.sh' one logical incident even when a network or password
+delay creates a long quiet gap between repositories.
+
+The script and Emacs are separate processes, so naming the requests alone is
+insufficient: Emacs's quiet-period timer would otherwise expire between pulls
+and dispatch its accumulated candidate paths prematurely.  Modify
+'pull-all.sh' to open a small persistent TCP control connection directly to
+the server and send 'begin reload batch' before its repo loop.  The server
+returns an opaque batch token, a unique handle for that bracket, stores it in
+a process-wide active-token set and associates it with the control connection.
+Only a matching 'end' or loss of that connection removes it; overlapping or
+nested drivers therefore cannot close each other's brackets.
+
+While any token is active, client observations from 'file-notify', raw
+'.skg' saves or Magit refreshes only update the newest pending generation of
+each candidate path.  The server returns a visible deferred result, not a
+terminal claim that those bytes reached the graph, TypeDB and Tantivy, so the
+client does not promote them to acknowledged.  The observation is retained
+for the incident assembled when the last token closes.
+
+A candidate comparison hashes only paths named by an observation.  A full
+sweep enumerates every direct '.skg' child of every configured source, hashes
+its bytes, represents missing formerly selected paths as absent and compares
+the result with selected, pending and acknowledged manifests.  It catches
+additions, deletions and changes even if an event was missed.  Closing the
+last token requests this full final sweep; its complete stable change set
+becomes one reload incident.
+
+'pull-all.sh' sends 'end' from its exit trap and then closes the connection.
+If it exits without successfully sending 'end', EOF removes its token and
+requests the same final sweep.  If no server is reachable, pulling still
+proceeds.  This requires neither an Emacs daemon nor a disk marker which could
+survive an interrupted script.
+
+Let the process-owned observation coordinator create the incident, then send
+a 'reconciliation-ready' server operation to the active interactive client.
+The client briefly locks its views, returns each view's dirty state, local
+token and base revision, and starts the foreground reload continuation.  If
+no client is connected, the server may safely update graph stores because it
+cannot overwrite client text, but it retains presentation debt.  At the next
+handshake, a surviving client reports each buffer's base render generation,
+local token and dirty state: clean stale buffers refresh, while dirty stale
+buffers become explicit disk-client conflicts.  This is reconnect handling
+for the agreed single-client model, not multi-client propagation.
 
 On a server terminal result, promote only the exact returned generation.
 If the worktree changed again, the returned digest becomes the acknowledged
@@ -863,6 +903,22 @@ Store with the pending incident:
 - selected graph/index generations; and
 - any presentation/conflict state still owed.
 
+Make this incident process-owned, not a value stored only on the interactive
+connection.  Before warning the user, persist an immutable recovery journal
+containing the incident disk snapshot, the P/L touched-telescope manifests,
+base commits, digests, outcomes and outstanding presentation state.  It need
+not duplicate the complete in-memory graph: the exact touched manifests and
+complete incident overlay are the durable recovery inputs.
+
+Write the journal atomically outside every configured source repository with
+user-only permissions.  Treat it as filestore-sensitive because it duplicates
+private and possibly ugly scalar bytes.  Load it at server startup and client
+reconnect.  Retire it only after successful recovery or an explicit dismissal
+which explains that automatic recovery will no longer be possible.  Bound
+retention by documented count/age limits, but never evict an unresolved
+incident silently.  This automatic non-'.skg' write does not violate reload's
+no-automatic-filestore-write invariant.
+
 Extend 'PreparedTelescopeWrite' into or expose an immutable
 path/bytes/tombstone manifest.  Save application and recovery consume that
 one serializer; do not create a recovery-specific unfold/YAML path.
@@ -934,8 +990,10 @@ ordinary dirty repo, unrelated modified/untracked/deleted '.skg', dirty
 non-'.skg' and index entries, multiple repos sharing 'N', non-Git owned,
 unborn non-main branch, detached/sequencer, foreign-only, name collision,
 failure midway through publication, worktree edit/create/delete before
-confirmation and a change during construction.  Assert HEAD, index and
-unrelated worktree paths never move.
+confirmation, disconnect/reconnect, server restart with an unresolved journal,
+explicit dismissal, retention pressure and a change during construction.
+Assert journal permissions, HEAD, index and unrelated worktree paths never
+move.
 
 * Repair local search context and rename cyclic roots honestly
 
@@ -1048,159 +1106,3 @@ collateral queue drain.
 The feature is complete only when the user can keep saving/searching while a
 large collateral queue drains and every warning/recovery state is visible and
 actionable in the client.
-
-* problems
-
-These are additional lacunae discovered while turning the recap's separate
-plans into one execution order.  Each includes a recommendation.  The main
-plan incorporates the recommendations which are mechanical consequences of
-settled decisions; durable incident storage and server-triggered reload
-ownership still deserve confirmation before implementation.
-
-** DONE Background frames outlive the request ID which supposedly owns them
-
-The recap gives every response frame a request id and gives each request one
-terminal outcome.  It also ends the foreground save/reload before the new
-collateral queue finishes.  A background view result therefore cannot both
-belong to that already-terminal request and be rejected as a stale response
-id.  Search's server-initiated snapshot exchange is a related inversion.
-
-Recommendation: make the envelope distinguish a client request from a
-server-push operation.  A push gets its own server-issued operation id and
-may retain 'origin-request-id' plus incident/render/view identities for
-diagnosis; it never reopens the completed request.  Apply ACK refers to the
-push operation id.  Treat search snapshot as an explicit continuation inside
-its still-live search operation.  This is slightly more vocabulary than just
-request/incident ids, but preserves the one-terminal invariant honestly.
-
-** DONE Tantivy idleness is not Tantivy success
-
-The current worker decrements an in-flight count even when a commit fails and
-only logs the error.  Waiting for idle can therefore make reload claim all
-databases were updated, advance client acknowledgement, or rerun a live search
-against a failed index generation.
-
-Recommendation: implement the generation result registry and immutable
-snapshot reconstruction specified above.  A reload remains committed-but-
-index-failed until that exact generation or its repair commits; neither path
-acknowledgement nor search refresh treats queue idleness as success.  Keep its
-graph-selected manifest separate from the client-acknowledged manifest so
-observation neither repeats the graph mutation nor falsely reports complete
-store success.  A disk-client conflict still gets its harsh warning
-immediately, with accurate partial-failure wording.
-
-** DONE In-memory recovery evidence can vanish before the user confirms
-
-The older plan made 'PendingIncident' per connection.  The recap strengthens
-its bytes but still leaves them in memory.  A dropped client connection loses
-the handle; a server crash loses the last-good graph bytes entirely while the
-fatal worktree remains.  That is exactly the restart-loss scenario which made
-recovery part of this feature.
-
-Recommendation: make incidents process-owned rather than connection-owned,
-and persist a small immutable recovery journal before warning the user.  The
-journal needs the incident disk snapshot, P/L touched-telescope manifests,
-base commits, digests and outcome metadata, not a second copy of the whole
-graph.  Store it outside configured source repositories, atomically; reload it
-at startup/reconnect; retire it only after successful recovery or an explicit
-user dismissal which explains the loss of automatic recovery.  Bound and
-document retention, create it with user-only permissions and treat it as
-filestore-sensitive because it duplicates private and possibly ugly scalar
-bytes.  This is an automatic non-'.skg' write, so it preserves the no-
-automatic-filestore-write invariant, but it is new durable state and deserves
-explicit approval before implementation.
-
-** DONE The shell batch bracket has no existing control channel
-
-A reload batch bracket is a time interval during which Skg may notice many
-worktree changes but deliberately does not reload any of them.  'begin reload
-batch' opens the interval; the matching 'end reload batch' closes it.  The
-point is to make all the serial pulls performed by 'pull-all.sh' count as one
-logical incident even when a slow network or password prompt creates a long
-quiet gap between repositories.
-
-Here, dispatch means Emacs sending its accumulated candidate paths to the
-server to begin a reload.  Emacs can observe candidates through a
-'file-notify' event, a raw '.skg' save or a Magit refresh.  Those observations
-say only that a path might now differ from the server's selected bytes; they
-do not say that the new bytes have reached the graph or databases.
-
-Merely adding commands named 'begin reload batch' and 'end reload batch' to
-the protocol is insufficient.  'pull-all.sh' and Emacs are separate processes.
-Unless the script actually sends 'begin' to the same server-side coordinator
-which receives Emacs's observations, Emacs has no way to know that the loop is
-still running.  Its ordinary quiet-period timer can expire between two pulls
-and dispatch a premature reload, then do so again after the next repository.
-
-Recommendation: 'pull-all.sh' opens a small TCP control connection directly
-to the Skg server and sends 'begin reload batch' before its loop.  The server
-returns an opaque batch token: a unique handle identifying this particular
-open bracket.  The server keeps the active-token set process-wide, rather than
-inside one Emacs request, and associates this token with the script's control
-connection.  Only 'end' carrying the same token, or loss of that connection,
-can remove it.  Thus overlapping or nested batch drivers cannot accidentally
-close one another's brackets.
-
-While any batch token remains active, the server records the newest observed
-generation of each candidate path but starts no reload.  An early observation
-remains unacknowledged in a precise sense: the client keeps that path in its
-'pending' state, and the server sends no terminal result claiming that those
-exact bytes committed to the graph, TypeDB and Tantivy.  The observation is
-not discarded; it participates in the one incident assembled when the last
-token closes.
-
-A sweep is a server-side comparison of disk with its manifests.  A full sweep
-enumerates every direct '.skg' child of every configured source, hashes its
-exact bytes, represents missing formerly selected paths as absent, and
-compares those generations with selected, pending and acknowledged state.  It
-therefore catches additions, deletions and changes even if a filesystem event
-was missed.  A candidate-only comparison hashes only paths already named by an
-event and is the cheaper ordinary case.  The final sweep is the full sweep run
-after the last active batch token closes; it establishes the complete stable
-change set which becomes the batch's single reload incident.
-
-The intended sequence is:
-
-#+begin_example
-pull-all.sh          Emacs                         server
-    |                  |                              |
-    |-- begin --------------------------------------→ open token T
-    |-- pull repo A    |-- observe changed A -----→ record A; do not reload
-    |   long pause     |                              | T is still open
-    |-- pull repo B    |-- observe changed B -----→ record B; do not reload
-    |-- end T --------------------------------------→ close T; full sweep
-    |                  |←-- reconciliation ready ----- one incident for A + B
-    |                  |-- reload continuation -----→ commit exact bytes
-    |                  |←-- terminal exact outcome ---|
-#+end_example
-
-The script closes the control connection from its exit trap.  If it exits
-without successfully sending 'end', EOF removes its token and requests the
-same final sweep.  This avoids requiring an Emacs daemon and avoids a lock or
-marker file which could remain on disk after the script is interrupted.
-
-** DONE A server-owned sweep has no dirty-buffer census
-
-The plan moves hashing and full sweeps into the server, and the shell batch
-connection requests a final sweep.  The conservative dirty-buffer preflight,
-however, lives in an interactive client.  If the server turns its discovered
-diff directly into a reload, it has no current buffer tokens to classify safe
-and conflicted presentation.  If it waits for the client to originate a new
-request, closing the bracket opened by 'pull-all.sh' does not itself guarantee
-dispatch.
-A transport loss creates the same gap for buffers which survive in Emacs and
-reconnect to a graph which advanced while they were offline.
-
-Recommendation: let the process-owned observation coordinator create the
-incident, then send a 'reconciliation-ready' server operation to the one
-active interactive client.  That client briefly locks its views, returns the
-dirty/token/revision census and starts the foreground reload continuation.
-If no client is connected, the server may update graph stores because no
-client text can be overwritten, but it must retain presentation debt.  At the
-next handshake, the client sends each surviving buffer's base render
-generation, local token and dirty state: clean buffers refresh, dirty stale
-buffers become explicit disk-client conflicts.  This stays within the agreed
-single-client scope; multi-client propagation remains out of scope.  The
-alternative is to keep all reload dispatch client-owned and make the server's
-final sweep only a pending notification, which is simpler but weakens the
-promise that closing the batch performs the reload.
