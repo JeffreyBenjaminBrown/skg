@@ -100,3 +100,15 @@
         (should-not (gethash request-id skg--request-records))
         (should-not skg--active-request-id)
         (should (= 0 skg-lp--pending-count))))))
+
+(ert-deftest test-skg-server-push-dispatches-without-request-id ()
+  (let ((skg--server-push-handlers (make-hash-table :test #'equal))
+        seen)
+    (skg-register-server-push-handler
+     'collateral-view
+     (lambda (_tcp-proc payload) (setq seen payload)))
+    (skg-lp--dispatch-frame
+     nil
+     "((response-type collateral-view) (frame-kind collateral-view) (server-push true) (operation-id background-1) (content fresh))")
+    (should seen)
+    (should (string-match-p "background-1" seen))))

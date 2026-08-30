@@ -183,6 +183,24 @@ pub fn tag_terminal_sexp_response (
   Sexp::List (fields) . to_string ()
 }
 
+/// Mark an unsolicited, server-owned operation frame. Server pushes do not
+/// borrow the currently active client request: they carry their own
+/// operation-id and are dispatched through the client's push registry.
+pub fn tag_server_push_sexp_response (
+  response_type : TcpToClient,
+  operation_id  : &str,
+  sexp_payload  : &str,
+) -> String {
+  let Ok (Sexp::List (mut fields)) = sexp::parse (
+    &tag_sexp_response (response_type, sexp_payload))
+  else { unreachable! () };
+  fields . push (sexp_field (
+    "frame-kind", response_type . repr_in_client ()));
+  fields . push (sexp_field ("server-push", "true"));
+  fields . push (sexp_field ("operation-id", operation_id));
+  Sexp::List (fields) . to_string ()
+}
+
 pub fn request_type_from_request (
   request : &str
 ) -> Result<RequestType, String> {

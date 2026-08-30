@@ -86,7 +86,7 @@ impl RenderCancellationTicket {
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
-  fn for_save (
+  pub(crate) fn for_save (
     env               : &'a SkgEnv,
     diff_mode_enabled : bool,
     define_nodes      : &[DefineNode],
@@ -128,6 +128,29 @@ impl<'a> RerenderAfterSaveContext<'a> {
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save (
       env, diff_mode_enabled, &[], active_source_set ) }
+}
+
+/// Render one cloned open-view forest for the low-priority worker.  The
+/// caller owns generation/revision validation and client application; this
+/// function performs no registry or wire mutation.
+pub(crate) async fn render_background_view (
+  mut viewforest        : ViewForest,
+  define_nodes          : &[DefineNode],
+  env                   : &SkgEnv,
+  diff_mode_enabled     : bool,
+  active_source_set     : Option<&ActiveSourceSet>,
+  cancellation          : RenderCancellationTicket,
+) -> Result<(ViewForest, String, Vec<String>), String> {
+  let mut context = RerenderAfterSaveContext::for_save (
+    env, diff_mode_enabled, define_nodes, active_source_set);
+  context . cancellation = Some (cancellation);
+  rewriteInPlace_viewnodes_whose_id_is_newly_extra (
+    &mut viewforest, &context . graph_snap)
+    . map_err (|error| error . to_string ())?;
+  let text = rerender_view (
+    &mut viewforest, &mut context, None, false)
+    . await . map_err (|error| error . to_string ())?;
+  Ok ((viewforest, text, context . warnings))
 }
 
 struct RenderedCollateralView {

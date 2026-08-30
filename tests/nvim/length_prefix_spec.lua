@@ -137,6 +137,18 @@ describe('skg.length_prefix dispatch', function ()
     assert.is_nil(state.active_request_id)
   end)
 
+  it('dispatches a server push without a request ID', function ()
+    local seen = nil
+    state.register_server_push_handler('collateral-view',
+      function (payload_text) seen = payload_text end)
+    local pushed = '((response-type collateral-view)'
+      .. ' (frame-kind collateral-view) (server-push true)'
+      .. ' (operation-id background-1) (content fresh))'
+    length_prefix.dispatch_frame(pushed)
+    assert.are.equal(pushed, seen)
+    state.remove_server_push_handler('collateral-view')
+  end)
+
   it('errors on a malformed header and resets', function ()
     assert.has_error(function ()
       length_prefix.handle_generic_chunk(

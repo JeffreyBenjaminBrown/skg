@@ -40,6 +40,9 @@ pub struct ViewState {
   pub pids   : HashSet<ID>, // the Active (Normal) vognodes in the buffer (the
                             // kind this view renders meaningfully; see
                             // pids_from_viewforest)
+  /// Monotonic server-side base revision. Background render offers name the
+  /// revision they cloned and cannot replace a view which advanced meanwhile.
+  pub revision : u64,
 }
 
 //
@@ -114,8 +117,11 @@ impl OpenViews {
           rid . clone (), uri . clone () ); }
       let pids : HashSet<ID> =
         pids . iter () . cloned () . collect ();
+      let revision = self . views . get (&uri)
+        . map (|state| state . revision . saturating_add (1))
+        . unwrap_or (0);
       let state : ViewState =
-        ViewState { viewforest, pids };
+        ViewState { viewforest, pids, revision };
       self . views . insert ( uri, state ); }
 
   pub fn update_view (
@@ -135,11 +141,30 @@ impl OpenViews {
       if let Some (vs)
         = self . views . get_mut (uri)
         { vs . viewforest = new_viewforest;
-          vs . pids = pids; }
+          vs . pids = pids;
+          vs . revision = vs . revision . saturating_add (1); }
       else { self . views . insert (
                uri . clone (),
                ViewState { viewforest : new_viewforest,
-                           pids } ); }}
+                           pids,
+                           revision: 0 } ); }}
+
+  pub fn view_revision (&self, uri : &ViewUri) -> Option<u64> {
+    self . views . get (uri) . map (|state| state . revision)
+  }
+
+  /// Apply one client-acknowledged background result only if its cloned base
+  /// is still current.
+  pub fn update_view_if_revision (
+    &mut self,
+    uri           : &ViewUri,
+    base_revision : u64,
+    viewforest    : impl Into<ViewForest>,
+  ) -> bool {
+    if self . view_revision (uri) != Some (base_revision) { return false; }
+    self . update_view (uri, viewforest);
+    true
+  }
 
   pub fn unregister_view (
     &mut self,

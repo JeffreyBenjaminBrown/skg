@@ -17,6 +17,17 @@ M.active_request_id = nil
 M.dispatching_request_id = nil
 M.next_request_number = 0
 
+---Handlers for unsolicited server-owned operation frames, keyed by kind.
+M.server_push_handlers = {}
+
+function M.register_server_push_handler (frame_kind, handler)
+  M.server_push_handlers[frame_kind] = handler
+end
+
+function M.remove_server_push_handler (frame_kind)
+  M.server_push_handlers[frame_kind] = nil
+end
+
 local function fresh_request_id ()
   M.next_request_number = M.next_request_number + 1
   return string.format('nvim-%d-%d', vim.fn.getpid(), M.next_request_number)

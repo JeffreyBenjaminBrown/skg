@@ -4,6 +4,7 @@ use super::{
   envelope_response,
   format_buffer_response_sexp,
   format_errors_warnings_sexp,
+  tag_server_push_sexp_response,
   tag_sexp_response,
   TcpToClient,
 };
@@ -97,4 +98,17 @@ fn tagged_structured_response_keeps_warning_channel () {
   assert_eq!(
     response,
     "((response-type save-result) (content ) (errors ()) (warnings (\"non fatal\")))" );
+}
+
+#[test]
+fn server_push_has_operation_identity_but_no_request_identity () {
+  clear_request_context ();
+  let response = tag_server_push_sexp_response (
+    TcpToClient::CollateralView,
+    "background-19",
+    "((view-uri view-a) (content fresh))");
+  assert! (response . contains ("(server-push true)"));
+  assert! (response . contains ("(operation-id background-19)"));
+  assert! (response . contains ("(frame-kind collateral-view)"));
+  assert! (! response . contains ("request-id"));
 }

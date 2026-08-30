@@ -23,6 +23,17 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
 (defvar skg--dispatching-request-id nil)
 (defvar skg--next-request-number 0)
 
+(defvar skg--server-push-handlers (make-hash-table :test #'equal)
+  "Handlers for unsolicited server-owned operation frames, keyed by kind.")
+
+(defun skg-register-server-push-handler (frame-kind handler)
+  "Register HANDLER for unsolicited FRAME-KIND frames."
+  (puthash (format "%s" frame-kind) handler skg--server-push-handlers))
+
+(defun skg-remove-server-push-handler (frame-kind)
+  "Stop handling unsolicited FRAME-KIND frames."
+  (remhash (format "%s" frame-kind) skg--server-push-handlers))
+
 (defun skg--fresh-request-id ()
   (format "emacs-%d-%d" (emacs-pid) (cl-incf skg--next-request-number)))
 

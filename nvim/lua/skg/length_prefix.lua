@@ -56,7 +56,21 @@ function M.dispatch_frame (payload)
   local frame_kind = M.field_atom(response, 'frame-kind')
     or M.field_atom(response, 'response-type')
   local terminal_status = M.field_atom(response, 'terminal-status')
+  local server_push = M.field_atom(response, 'server-push')
   if not request_id then
+    if server_push == 'true' then
+      local handler = state.server_push_handlers[frame_kind]
+      if handler then
+        local handler_ok, handler_error = pcall(handler, payload, response)
+        if not handler_ok then
+          log.log('error', 'dispatch',
+                  'server-push dispatch error: %s for payload: %s',
+                  tostring(handler_error), payload:sub(1, 80)) end
+      else
+        log.log('warn', 'dispatch',
+                'no server-push handler for frame %s',
+                tostring(frame_kind)) end
+      return end
     log.log('warn', 'dispatch', 'response missing request-id: %s',
             payload:sub(1, 80))
     return end

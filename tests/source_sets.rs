@@ -165,7 +165,8 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
       views_state . open_views . views . insert (
         uri . clone (),
         ViewState { viewforest : tree_all . into (),
-                    pids       : HashSet::new () });
+                    pids       : HashSet::new (),
+                    revision   : 0 });
       let enrichment_slot
         : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (None));
@@ -340,7 +341,8 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         uri . clone (),
         ViewState {
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
-          pids       : HashSet::from ([ID::from ("active-search-hit")]), });
+          pids       : HashSet::from ([ID::from ("active-search-hit")]),
+          revision   : 0, });
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           terms          : "shared ranking term" . to_string (),

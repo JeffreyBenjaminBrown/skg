@@ -55,11 +55,19 @@ If there is buffered data and a handler matched, continues the loop."
              (incident-id (cadr (assoc 'incident-id response)))
              (frame-kind (or (cadr (assoc 'frame-kind response))
                              (cadr (assoc 'response-type response))))
+             (server-push (cadr (assoc 'server-push response)))
              (terminal-status (cadr (assoc 'terminal-status response)))
              (record (and request-id
                           (gethash (format "%s" request-id)
                                    skg--request-records))))
         (cond
+         ((and (not request-id) server-push)
+          (if-let ((handler
+                    (gethash (format "%s" frame-kind)
+                             skg--server-push-handlers)))
+              (funcall handler tcp-proc payload)
+            (skg-log 'warn 'dispatch
+                     "no server-push handler for frame %s" frame-kind)))
          ((not request-id)
           (skg-log 'warn 'dispatch "response missing request-id: %s"
                    (substring payload 0 (min 80 (length payload)))))
