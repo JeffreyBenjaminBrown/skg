@@ -16,7 +16,7 @@ what's imperfect about what's done; choices determining the future.
   Neovim suite passed after the merge.  The two TypeDB-backed reload parity
   tests passed once the standard development servers were running.
 
-** authoritative source inventory and pre-parse selection (in progress)
+** authoritative source inventory and pre-parse selection (complete)
 - Replaced the independently mutable source 'HashMap' and 'source_order'
   with 'SourceCatalog': one ordered lookup catalog which retains each raw
   configured path and resolved physical-directory identity.  Mixed named
@@ -48,7 +48,7 @@ what's imperfect about what's done; choices determining the future.
   state when run in one process pass under the repository's required nextest
   process isolation.)
 
-** selected-store and index generations (in progress)
+** selected-store and index generations (complete)
 - Replaced the graph-only 'ArcSwap' payload with one immutable
   'SelectedStoreState': graph snapshot, monotonic graph generation, BLAKE3
   selected-path manifest, per-path index state, cyclic-root slot and derived
@@ -79,7 +79,7 @@ what's imperfect about what's done; choices determining the future.
   poisons search; later queued deltas remain FIFO after the repair.  Reload
   acknowledgement reports that fallback prominently.
 
-** stable reload transaction (in progress)
+** stable reload transaction (complete)
 - Path parsing before the writer lock resolves identifiers only.  Under the
   lock, reload captures every possible section path as exact bytes or absence,
   applies owned/foreign selection, parses/folds, and rereads every captured
@@ -96,7 +96,7 @@ what's imperfect about what's done; choices determining the future.
   135 save/source integration tests, all 312 Emacs tests and the complete
   Neovim suite pass.
 
-** request-scoped response protocol (in progress)
+** request-scoped response protocol (complete)
 - Every foreground operation now receives a fresh connection-local request
   ID.  The server echoes it on every frame, names the frame kind independently
   of its payload type, and marks exactly one terminal frame.  Search's snapshot
@@ -115,7 +115,7 @@ what's imperfect about what's done; choices determining the future.
   tests in one serial process, all 314 Emacs tests and the complete Neovim
   suite pass; =git diff --check= is clean.
 
-** durable incident identity and explicit ID selection (in progress)
+** durable incident identity and explicit ID selection (complete)
 - Request records can now carry a durable incident UUID.  Both clients copy
   it into the request, the server echoes it on every frame and clients reject
   a frame whose incident identity differs.  Search continuations retain it;
@@ -135,7 +135,7 @@ what's imperfect about what's done; choices determining the future.
   Validation after this slice: 184/184 serial Rust library tests, all 318
   Emacs tests and the complete Neovim suite pass.
 
-** candidate observation and reload-batch brackets (in progress)
+** candidate observation and reload-batch brackets (complete)
 - Replaced stamp-based discovery with one nonrecursive Emacs file-notify watch
   per normalized source.  Watch callbacks and raw-file saves enqueue path
   names only.  A sequence-tagged path map coalesces events, preserves a newer
@@ -156,7 +156,7 @@ what's imperfect about what's done; choices determining the future.
 - Validation: =bash -n= is clean, all 186 serial Rust library tests and
   321 Emacs tests pass, and the complete Neovim suite passes.
 
-** dirty-view safety and scalar-gated reload presentation (in progress)
+** dirty-view safety and scalar-gated reload presentation (complete)
 - Added a conservative client worktree gate. A raw direct-source =.skg= save
   or a Magit command which may write a repository containing a configured
   source is refused while any Skg view is dirty, naming every such view.
@@ -187,7 +187,7 @@ what's imperfect about what's done; choices determining the future.
   serial Rust library tests, 329 Emacs tests, the complete Neovim suite, and
   compilation of every Rust integration-test target pass.
 
-** local context repair and cyclic-root terminology (in progress)
+** local context repair and cyclic-root terminology (complete)
 - Renamed the search-rank type and stored index label from =CycleMember= to
   =CyclicRoot=, including its multiplier, both clients, command references,
   fixtures and glossary.  Full startup/rebuild passes now write an explicit
@@ -213,7 +213,7 @@ what's imperfect about what's done; choices determining the future.
   later presentation scheduler: rerun live search views after an explicit
   repair commits, without clobbering edited search buffers.
 
-** low-priority collateral scheduler (in progress)
+** low-priority collateral scheduler (complete)
 - Added immutable render cancellation tickets backed by a monotonic epoch.
   View completion checks between BFS viewnodes and around its expensive async
   seams; the finishing pass checks before and after ancestry/graph-stat
@@ -221,105 +221,94 @@ what's imperfect about what's done; choices determining the future.
   already-running query but starts no later expensive stage.  Foreground and
   de-novo renders carry no ticket and retain their prior behavior.
 
-* what's done and went well
-- Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
-- Feature branch =partial-reload-and-magit=; design docs committed.
-- Compile baseline established (=cargo check --lib= clean).
-- *Component 1 (reload-paths request), through store commit -- DONE + tested.*
-  - Protocol wiring: =RequestType::ReloadPaths= ("reload paths"),
-    =TcpToClient::ReloadPaths= ("reload-paths"), module registered,
-    dispatch arm added. (Skeleton commit.)
-  - Classification: =classify_touched_telescopes= resolves each path to
-    (source, pid) by matching configured source dirs (pid = file stem),
-    dedups to telescopes in first-seen order, and classifies each via a
-    fresh fold: Ok -> Save, NotFound -> Delete, other io::Err -> Fatal.
-    Unit tests cover path resolution.
-  - Reuse without FS writes: =apply_define_nodes_to_stores= gained a
-    =write_fs= flag; save passes true, reload false. Reload routes here
-    directly, so =apply_delete_propagation_cleanup= (which rewrites other
-    files) never runs.
-  - Store commit: =reload_touched_telescopes= (async) builds Save/Delete
-    DefineNodes, rejects the batch if it would break override invariants
-    (keeping last-good), then applies to graph+TypeDB+Tantivy with
-    write_fs=false. Fatal telescopes keep last-good and are reported.
-  - DB-backed parity tests (=tests/reload/=): an out-of-band edit and a
-    section deletion each leave the graph identical to a full rebuild,
-    untouched telescopes undisturbed. 2/2 green.
-  - Collateral re-render: =rerender_views_after_reload= (in
-    =update_buffer.rs=, reusing the save path's =rerender_collateral_view=
-    / =RerenderAfterSaveContext=) re-streams every open view containing a
-    changed pid as a CollateralView, diff-mode views included.
-    =reload_touched_telescopes= now returns the applied DefineNodes so the
-    handler can drive it.
-- *Component 2 (write mutex) -- DONE + regression-checked.*
-  - =server/write_lock.rs=: process-global tokio async Mutex serialising
-    every graph read-modify-write. Acquired in the save entry
-    (=update_graph_including_nodeMerges=), reload, and rebuild. Reads
-    stay lock-free. Full =grouped_saves= suite (109 tests) green.
-- *Component 3 (Emacs triggers) -- DONE + byte-compiled clean.*
-  - =elisp/skg-request-reload-paths.el=: mtime+size snapshot change
-    detection over the =.skg= source dirs; the "reload paths" request
-    (reusing =skg--collateral-view-handler= to refresh open buffers); a
-    GLOBAL =magit-post-refresh-hook= (no minor mode required; first
-    refresh only baselines); =M-x skg-reload-changed=. Hooks wrapped in
-    =condition-case= so a bug can never break magit refresh / saving.
-  - =skg-file-minor-mode= gains an =after-save-hook= so a plain save of a
-    =.skg= buffer notifies the server. Required from =skg-init.el=.
-  - Byte-compiles clean under Emacs 30.2 (one benign "not known to be
-    defined" for =skg-tcp-connect-to-rust=, same as rebuild-dbs.el). NOT
-    runtime-verified: no live magit/server in this environment.
-- TypeDB was started locally (port 1729) to run the DB-backed tests.
+* completion pass
 
-* Component 4 (recovery) -- NOT STARTED; assessed, no stumper
-The three-=oops-N_*=-branch recovery (plan Component 4) is the remaining
-work. The one flagged risk -- rendering a telescope from an in-memory
-graph snapshot to its on-disk BYTES without writing to disk -- is
-FACTORABLE, not a stumper: =write_nodecomplete_telescope= (=one_node.rs=)
-already does =unfold_node= -> =nodefs_from_section= -> =node_fs.to_yaml()=
--> path; factoring that into a =Vec<(path, yaml)>= producer (leaving the
-=fs::write= to the caller) gives exactly the bytes git2 blob-building
-needs. Everything else is new but understood: git2 0.18 plumbing
-(blob/treebuilder/commit/reference, no checkout), =repo.state()= /
-=head_detached()= precondition guards (added fresh), a per-connection
-=PendingIncident= (=g_pre=, =g_post=, touched set, base commits), and a
-second "reload recover" request offered/confirmed like the fork flow.
-No git-writing code exists in the server yet, so this is all additive.
+** low-priority collateral scheduler and Git presentation
+- Every graph transition replaces one connection-local queue containing every
+  non-saved open view.  One cancellable worker renders at a time, ordered by
+  most-recent visit; foreground requests preempt it.  Offers are server-owned
+  operations naming graph/presentation generations and a base view revision.
+  The client applies only to a still-clean matching buffer and ACKs that exact
+  offer before Rust advances its forest.
+- Reload presents dirty affected views synchronously as conflicts and queues
+  every clean view. Save updates its authored buffer in the foreground and
+  queues every other view. A second transition discards obsolete remaining
+  work. The code and comments now use 'collateral' only for any non-saved view.
+- A deterministic HEAD/index signature over configured direct '.skg' paths
+  advances a separate presentation generation. Stage/unstage therefore
+  refreshes diff-mode views without pretending the worktree or graph changed.
+- Explicit cyclic-root repair now reruns every clean live Emacs search from its
+  recorded terms and axes after Tantivy commits; modified search buffers remain
+  untouched and receive a warning.
 
-* changes to the plan's envisioned order
-- Within Component 1, the plan's batch "scoped duplicate-ID check" (plan
-  1.4 step 6) is NOT implemented; only the override-invariant batch guard
-  is. Duplicate-IDs remain caught by a full rebuild, not by a scoped
-  reload. Tracked under "imperfect" below.
-- Built in the order Components 1 -> 2 -> 3 (server core, mutex, Emacs)
-  as planned; Component 4 (recovery) is the remaining phase.
+** fatal incident preservation and recovery
+- Fatal reloads capture and final-reread the complete participating '.skg'
+  overlay, including base-only tombstones, unrelated dirty/untracked bytes,
+  malformed and non-UTF-8 contents, all touched possible paths, repository
+  bases/states and ownership. Nested repositories are not traversed.
+- Save and recovery share one graph-to-telescope serializer. While the graph
+  writer still protects the newly selected generation, recovery records become
+  process-owned and an atomic user-only journal is written outside every source
+  repository. Startup reloads unresolved journals; both client handshakes show
+  them persistently.
+- Confirmed Emacs recovery revalidates bytes, chooses one common unused N,
+  constructs P/L/A blobs, trees and commits everywhere before refs, and then
+  publishes the documented sibling topology without checkout or index writes.
+  Existing dirty '.skg' overlays are preserved. Owned non-Git/unborn sources
+  receive a root P and symbolic branch; detached, sequencer and foreign-only
+  repositories are warning-only. Only owned fatal paths are restored from L.
+- Ref publication rolls back only refs created by the failed attempt. The
+  client report names every root/ref/commit/restored path. Explicit dismissal
+  deletes only the private journal after explaining that automatic recovery is
+  thereafter impossible. Neovim shows unresolved recovery prominently but has
+  an explicit unsupported confirmation action rather than recovering silently.
 
-* what's imperfect about what's done
-- Override-invariant rejection is coarse: a violation rejects the WHOLE
-  reload batch (all touched telescopes keep last-good), not just the
-  offending one. Safe, but blunt. (Planned as acceptable.)
-- Scoped duplicate-ID detection on reload is not implemented yet (see
-  above). A reload that introduces a cross-source duplicate ID would be
-  applied; a subsequent full rebuild would catch it.
-- Collateral re-render has no dedicated open-view integration test: the
-  parity tests register no views, so the re-render path early-returns in
-  them. It reuses the heavily-tested save collateral path, but a reload
-  test that registers a view and asserts a streamed CollateralView is
-  still owed.
-- Component 3 (elisp) is byte-compiled but not runtime-verified (no live
-  Emacs/magit/server here). The change-detection scans all =.skg= files
-  on each magit refresh via mtime (cheap); if a large tree lags, upgrade
-  to hashing only mtime-changed files.
+** observation and external batches
+- Nonrecursive file notifications, raw-file saves, Magit refreshes, manual full
+  sweeps and the transient ID-stack TO-RELOAD selector feed one sequence-tagged
+  coalescing map. Digests and absence are compared by the server; metadata is
+  never authoritative.
+- 'pull-all.sh' holds a process-wide token on a persistent control connection.
+  The last matching end or EOF advances a reconciliation generation. The
+  server pushes that generation only to a verified interactive client; Emacs
+  takes its current dirty-buffer census and submits one exact full sweep. A
+  later connection performs the sweep at handshake, so the shell never needs
+  editor-local state.
 
-* choices determining the future
-- Reload's store commit reuses =apply_define_nodes_to_stores= directly
-  (never =update_graph_minus_nodeMerges=). This is the mechanism that
-  keeps reload from writing any =.skg= file. Any future change to the
-  save pipeline must preserve that this function, with write_fs=false,
-  performs no filesystem writes.
-- =reload_touched_telescopes= is async and pub, so tests can =.await= it
-  and the handler =block_on=s it. The recovery work (Component 4) will
-  add a =pending_incident= parameter here and to the dispatch arm.
-- The write mutex is a tokio async mutex acquired under
-  =block_on=-per-connection-thread. If the server ever moves to a shared
-  multithreaded async runtime, revisit that the guard is not held across
-  a point that could deadlock the runtime.
+** replacement-aware extra-ID fallback
+- A legal extra-ID change still uses a complete-corpus fold because it may
+  redirect anchors and relationships outside the touched telescope. If the
+  same incident also contains a malformed telescope, that fatal PID is now
+  supplied exactly from G0 while every readable telescope folds under the
+  tentative resolver. The selected manifest likewise retains G0 for the
+  fatal PID, while a separate exact-byte manifest protects the final stability
+  check. A TypeDB-backed integration test proves that the legal change commits
+  and the malformed telescope remains last-good.
+
+* final verification state
+- Focused reload/recovery tests prove exact snapshot bytes and tombstones,
+  nested-repository exclusion, owned/foreign warning visibility, changed-byte
+  refusal, P/L/A topology, non-Git initialization, preservation of HEAD/index,
+  and fatal-only restoration.
+- All Rust library targets and integration targets compile. The serial Rust
+  library suite passes (200/200), the full TypeDB-backed nextest suite passes
+  (603/603), the Emacs suite passes (331/331), and the complete Neovim suite
+  passes.
+- The repository's polite end-to-end harness passes in full: build, both
+  client suites, nextest, doctests and all 68 live server/client integration
+  runs (Emacs and Neovim). Its Neovim bootstrap now uses the real initialization
+  path, including normalized config paths and server-push handlers, and the
+  collateral integrations wait for the documented background application
+  boundary instead of assuming it precedes the foreground save response.
+- Protocol and glossary documentation now cover request/incident/operation
+  identity, reload and batch endpoints, fatal recovery, manifests, tombstones,
+  generations and the scalar-release boundary.
+
+* known limit left explicit rather than hidden
+- Neovim does not yet originate partial reload or confirm recovery; it displays
+  batch/recovery warnings and never mutates automatically. This is the planned
+  fail-closed interim behavior.
+- If disk changes after a fatal incident, recovery refuses and preserves the
+  original journal and any already-published evidence refs. Its structured
+  failure makes Emacs assign a fresh incident and queue an exact full sweep,
+  which classifies and presents the changed bytes as the successor.

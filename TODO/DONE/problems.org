@@ -1,3 +1,184 @@
+* Problems found reviewing partial reload and Magit (fixed 2026-08-30)
+  Full context and settled decisions are in
+  TODO/partial-reload-and-magit/4_recap.org.  The dependency-ordered
+  implementation plan and newly discovered protocol lacunae are in
+  TODO/partial-reload-and-magit/5_plan.org.
+
+  RESOLVED: Implemented by the complete partial-reload-and-magit execution
+  series. Reload now uses stable writer-locked byte transactions, exact
+  generations, request/incident/operation identities, dirty-view and scalar
+  gates, normalized source selection, complete-view background scheduling,
+  Git-presentation generations, local context repair, durable fatal-incident
+  recovery, tokenized pull batches, and a dirty-aware final-sweep handshake.
+
+  A final execution-time corner was also closed: when a legal extra-ID change
+  shares a batch with a malformed telescope, the complete-corpus fold retains
+  that fatal PID exactly from G0 while folding every readable telescope under
+  the tentative resolver. Thus the legal change can commit without admitting
+  broken bytes into the selected generation.
+** Partial reload reads disk before acquiring the graph writer lock
+   'handle_reload_paths_request' classifies and folds touched telescopes
+   before 'reload_touched_telescopes' acquires the process-global mutex.
+   A concurrent save can therefore write newer disk/store state after the
+   fold but before reload's store update; reload then applies its stale fold
+   to the derived stores.  Hold the lock across fold, validation and apply,
+   or re-fold/revalidate after acquiring it.
+** Partial reload can silently overwrite unsaved Skg view edits
+   Reload registers the ordinary 'collateral-view' replacement handler but
+   does not run the save path's modified-buffer confirmation, stream guard or
+   buffer locking.  If the user edits an affected open view while the reload
+   is in flight, 'skg-replace-buffer-with-new-content' erases those edits and
+   clears the modified flag.  Reload needs the same protection lifecycle as
+   save/rerender before it can update open buffers safely.
+** The Emacs reload snapshot forgets changes before success
+   'skg--reload-scan-changed' installs the current snapshot before the
+   request is acknowledged, and the plain-file save hook records its stamp
+   immediately.  Any transport, validation or store failure consumes the
+   change, so later scans do not retry it.  Track in-flight paths and advance
+   their acknowledged stamps only on a successful terminal response.
+** Overlapping reload/save streams collide in the client handler map
+   Response handlers are keyed only by response type.  A second
+   'reload-paths' request replaces the first one-shot handler and increments
+   the pending count again; reload and save also share 'collateral-view'.
+   Rapid hooks or a simultaneous content-view save can lose handlers and
+   unbalance pending state.  Serialize/coalesce reloads or add request IDs/a
+   response queue, and remove reload's streaming handler at its terminal.
+   Reload also calls 'skg-lp-reset' without consulting
+   'skg--stream-in-progress', so it can discard a partially received message
+   from the stream already in flight.
+** Reload failures are sent under a response type the caller does not handle
+   The server uses generic 'error' for reload parse, invariant and store
+   failures, while 'skg-reload-paths' registers only 'reload-paths' and
+   'collateral-view'.  The failure can become only an unhandled-response log;
+   no retry state or reload-specific warning is maintained.
+** Partial-reload collateral text can bypass main's scalar-release gate
+   Merge '971e17b5' gates ugly-telescope text before direct views, saves and
+   rerenders cross a restricted source-set boundary.  The branch's
+   'rerender_views_after_reload' instead renders, mutates 'ViewsState' and
+   streams 'collateral-view' text without a 'ScalarReleaseDecision' or
+   approved-pid input.  Integrating it unchanged would reopen a scalar leak.
+   Reload must prepare and authorize the whole affected stream before sending
+   text, with a retry which does not reapply an already committed graph
+   mutation.
+** Partial reload's owned/foreign normalization differs from bulk load
+   Main's one-pid reader retains the owned telescope and ignores same-pid
+   non-owned sections before 'Telescope::try_new'.  Bulk load validates every
+   file before that normalization.  A foreign 'X.skg' containing 'pid: Y' is
+   therefore ignored by the one-pid path when owned 'X.skg' exists but
+   rejected by full rebuild.  Make the validation/normalization order agree.
+   The one-pid reader also reduces 'IgnoredForeignPidCollision' to a tracing
+   warning; reload should carry it into its terminal response and keep
+   'telescope-warnings.org' consistent with bulk load.
+** Partial reload omits main's distinct-node ID-claim validation
+   'error_unless_each_id_names_one_node' rejects a primary or extra id claimed
+   by nodes with distinct pids during full initialization/rebuild.  Reload's
+   candidate pass checks only override invariants, so an out-of-band edit can
+   reach store application with such a conflict.  Run the check over the
+   complete candidate graph under the writer lock, after extracting a pure
+   validator from the current fixed-report-writing wrapper.  Same-pid files
+   across sources are one telescope, not this error; main's
+   owned-versus-foreign normalization should happen before folding.
+** Partial reload can fold extra-id anchors differently from full init
+   Full-corpus loading resolves placement anchors through a graph-wide
+   extra-id-to-pid map.  The one-telescope reader used by reload supplies an
+   identity resolver, so an anchor naming a merged-away id from another
+   telescope is treated as dangling and its private run can move.  Partial
+   reload and a subsequent full rebuild can therefore produce different
+   in-memory ordering from the same files.  Main's new checked 'Telescope'
+   still explicitly leaves this one-pid read identity-only.
+** Recovery does not retain the incident-time worktree bytes
+   The planned 'PendingIncident' records graphs, touched telescopes and base
+   commits, but branch 3 reads worktree bytes only after the user confirms.
+   An intervening edit is then archived as if it caused the incident and can
+   be overwritten by restoration.  Snapshot affected bytes at detection and
+   refuse or reconfirm if the live files changed before a recovery write.
+** Planned oops refs have underspecified snapshot and base-commit semantics
+   The plan starts from HEAD and overlays only incident-touched paths, so
+   pre-existing uncommitted '.skg' changes elsewhere are absent from refs
+   named as complete pre-incident/legal/all-change states.  Decide whether
+   refs are complete Skg snapshots or incident-local overlays and name/report
+   them honestly.  The algorithm also assumes a base commit, but 'git init'
+   does not supply one for non-git or unborn repositories; their initial
+   branch, tree and parent semantics must be defined.  Fatal foreign-source
+   files cannot be restored under the no-foreign-writes rule and need an
+   explicit warning-only path.
+** TypeDB failure recovery is unsafe when reload has known-fatal disk files
+   The shared store helper updates the in-Rust graph before TypeDB.  On a
+   TypeDB failure it rebuilds from all disk files, but partial reload may
+   deliberately have left an unloadable telescope on disk.  That rebuild can
+   fail after the graph changed, leaving stores inconsistent.  Reload needs
+   rollback or recovery which excludes/replaces its known-fatal disk state.
+** The new graph writer lock omits other whole-graph writers
+   Save, partial reload and explicit rebuild take the lock, but
+   'strip_body_whitespace_and_refresh_caches' swaps the whole graph without
+   it.  It can interleave with save/reload despite the intended process-global
+   serialization.  Main now buries the live telescope-migration endpoint, so
+   that half of the original finding will be obsolete after integration.
+** Reload collateral selection misses inverse-only view changes
+   It rerenders only views already containing an applied pid.  If A newly
+   subscribes to, overrides, hides or links to B, an open view of B may need
+   to gain A in an inbound collection or update its stats even though it did
+   not previously contain A.  The save path has the same limitation; reload
+   inherits it and leaves such views stale.
+** The agreed stage/unstage diff-mode refresh was not implemented
+   The design says an index-only Magit change should rerender diff-mode views
+   without reloading the graph.  The hook compares only worktree stamps, so
+   pure staging and unstaging do nothing and open diff annotations go stale.
+** Partial reload does not refresh all affected Tantivy context labels
+   Context-origin types are emitted only for Save definitions; Delete emits
+   none, and changed containment or links can change other nodes' root,
+   multi-contained, destination or cycle status.  Search-ranking metadata
+   can therefore remain stale until a full rebuild.  Recompute the affected
+   closure or schedule a full context recomputation for topology changes.
+** Reload scanning disagrees with server source-path semantics
+   'skg-source-paths-from-toml' omits sources whose optional 'name' is absent,
+   although the server defaults the name to the path.  The client also scans
+   source directories recursively while the server loads only direct '.skg'
+   children; server path resolution accepts any descendant and chooses the
+   first matching source from a HashMap.  Unnamed sources can be missed, and
+   nested/overlapping paths can be misattributed.
+** No interactive command selects an arbitrary partial-reload set
+   The server and Lisp have a path-taking API, but the only user command,
+   'skg-reload-changed', chooses paths by scanning.  Add
+   'skg-reload-from-id-stack': only this entry into the ID stack enables the
+   buffer-local Org keyword 'TO-RELOAD', and 'C-c C-c' submits the marked IDs
+   as one incident.  Resolve each ID to its complete cross-source telescope;
+   do not persist the transient marker in the stack's labels.
+** Background presentation frames outlive their originating request
+   A save or reload can return its one terminal response before the planned
+   low-priority collateral queue finishes.  Its later view frames therefore
+   cannot honestly retain that completed request id, but response-type
+   dispatch gives them no independent identity.  Give server-push offers a
+   server-issued operation id and require apply ACKs to name it, while keeping
+   search snapshot exchange inside its still-live search operation.
+** Tantivy idleness does not prove that the requested generation committed
+   The background writer decrements its in-flight count after a failed write
+   and records the failure only in logs.  Reload could therefore acknowledge
+   a path, update a live search or claim all databases succeeded merely because
+   the queue became idle.  Record per-generation pending/committed/failed
+   outcomes, retain immutable reconstruction input and distinguish graph-
+   selected path bytes from client-acknowledged bytes.
+** Fatal-reload recovery evidence can disappear before confirmation
+   The agreed exact byte snapshot still lives only in a connection-owned
+   'PendingIncident'.  Disconnect loses its handle and server restart loses
+   the last-good graph bytes while the broken worktree remains.  Prefer a
+   process-owned incident plus an atomic, user-only recovery journal outside
+   source repositories; this new persistent copy of private filestore bytes
+   needs explicit retention and approval policy.
+** pull-all.sh has no channel on which to hold the reload batch open
+   The script and Emacs are separate processes.  A conceptual begin/end bracket
+   cannot suppress client dispatch across a slow serial pull without a shared
+   control path.  Have the script hold a small server TCP connection whose
+   token opens the bracket; end it in the exit trap and have EOF release it and
+   request the final sweep.
+** A server-triggered sweep has no current dirty-buffer census
+   Moving hashing and the final batch sweep into the server lets it discover
+   work without an interactive request, but the conservative overwrite guard
+   and local modification tokens live in the client.  Specify a server-push
+   handshake which asks the active client to lock and inventory its views,
+   plus reconnect behavior for a graph advanced while Emacs buffers survived
+   offline.  Otherwise closing the shell batch cannot itself guarantee a safe
+   reload.
 * Same-title Skg views overwrote each other and left stale server URIs (fixed 2026-08-24)
    'skg-open-org-buffer-from-text' used 'get-buffer-create' with a name
    derived only from the first headline's title. Opening a distinct

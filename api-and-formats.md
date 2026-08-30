@@ -673,6 +673,10 @@ So far there are these endpoints:
     warning-only.
   - Successful response type `reload-recovery` names each repository, ref,
     commit and restored path. Failure leaves the journal unresolved. An
+    incident-byte mismatch returns terminal status `failed` with
+    `(successor-required true)`; Emacs assigns a fresh incident and requests
+    an exact full sweep while preserving the original journal and any evidence
+    refs already published. An
     explicit permanent dismissal uses the same endpoint with
     `(action . "dismiss") (approved . "true")`; it deletes only the private
     journal and explains that automatic recovery becomes impossible.

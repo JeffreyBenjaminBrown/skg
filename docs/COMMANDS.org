@@ -773,6 +773,48 @@ Closes the TCP connection to the Rust server.
 *** skg-rebuild-dbs
 Rebuilds TypeDB and Tantivy databases,
 using the .skg files on disk.
+*** automatic partial reload
+While connected, Emacs watches only the direct =.skg= children of each
+configured source.  A raw-file save or an external worktree change is queued,
+coalesced with nearby changes and compared with the server's exact accepted
+byte manifest.  Stable valid changes update the graph, TypeDB and Tantivy;
+reload itself never writes a =.skg= file.  =data/bash/pull-all.sh= brackets
+its serial pulls into one incident and requests one final sweep.
+
+If an external change would alter a modified Skg view, Skg leaves that buffer
+untouched, sounds the harsh warning beep and opens =*SKG Disk-Client
+Conflicts*=.  Clean buffers continue updating.  Raw =.skg= saves and Magit
+commands which could change a configured worktree are refused earlier while
+any Skg view is dirty; save the view and retry.
+*** skg-reload-changed
+Requests an exact server-side sweep of every configured source.  This is the
+manual fallback after a missed file notification or an out-of-band tool which
+did not trigger one.  It compares content digests, not mtimes.
+*** skg-reload-from-id-stack
+Opens a transient copy of the ID stack in reload-selection mode.  Use Org's
+ordinary =S-left= or =S-right= TODO cycling to mark each desired node
+=TO-RELOAD=, then =C-c C-c= to submit them as one incident.  Each ID selects
+its complete cross-source telescope.  Acknowledged marks clear; rejected marks
+remain with their reasons.  This transient buffer cannot replace or save the
+ordinary ID stack.
+*** skg-resolve-disk-client-conflict
+From a save-blocked conflicted view, opens an Ediff comparison among its last
+rendered base, the unsaved local text and the incoming disk-derived rendering.
+Reconcile the editable buffer manually.  With a prefix argument, this command
+then submits that text through the normal save path; the conflict marker
+clears only after save succeeds.  Saving without resolving is refused because
+it could silently clobber the external change.
+*** skg-recover-reload-incident
+After a fatal =.skg= parse/read error, explicitly confirms recovery of a
+durably journaled incident.  Skg first verifies that the incident bytes have
+not changed, creates the three reported =oops-N_*= evidence refs without
+moving HEAD or the index, and restores only fatal files in owned sources to
+their last-good bytes.  If disk changed meanwhile, recovery refuses, retains
+the journal and queues a fresh successor incident.
+*** skg-dismiss-reload-recovery-incident
+Permanently deletes one unresolved private recovery journal without changing
+sources or Git.  Use this only when you accept that Skg can no longer perform
+automatic recovery for that incident.
 *** skg-recompute-cyclicroots
 Recomputes the rank-only =CyclicRoot= cache from the complete current
 graph and updates the affected Tantivy documents.  Ordinary saves and
