@@ -578,16 +578,40 @@ So far there are these endpoints:
 ## Reload paths or selected IDs
 
   - Request: `((request . "reload paths") (paths "PATH" ...)
-    (ids "ID" ...) (incident-id . "UUID"))`.  At least one path or ID is
+    (ids "ID" ...) (dirty-view-uris "URI" ...)
+    (allow-ugly-telescopes "PID" ...) (incident-id . "UUID"))`.
+    At least one path or ID is
     required.  An ID may be primary or extra; the server resolves it against
     the selected graph and reloads that primary PID's complete cross-source
     telescope.  Repeated paths, IDs and aliases of one PID are deduplicated.
-  - A successful terminal `reload-paths` response carries `content` plus
-    `requested-id-outcomes`.  Each outcome names the requested ID, resolved
+  - A successful terminal `reload-paths` response carries `content`,
+    `requested-id-outcomes`, `conflicted-views`, `updated-views`,
+    `files-affected`, `rerender-errors`, and `warnings`. Each requested-ID
+    outcome names the requested ID, resolved
     primary PID, every configured section path considered, and status
     `acknowledged` or `rejected` with a reason.  Mixed success terminates as
     `complete-with-rejected-files`; a batch-wide stability, invariant or store
-    failure terminates as `failed`.  Reload never writes a `.skg` file.
+    failure terminates as `failed`. Each view outcome names its URI, changed
+    PIDs and paths. A conflicted view also carries its scalar-authorized
+    incoming rendering, which the client retains for explicit three-way
+    review but never installs automatically. Reload never writes a `.skg`
+    file.
+  - The client locks all views before sending and reports which were dirty.
+    Rust stages the complete affected batch, runs scalar release before and
+    after completion, updates only clean buffers, and leaves a dirty affected
+    view on its previous server forest. A scalar challenge is the terminal
+    `ugly-telescope-confirmation`; its committed store result is retained by
+    incident ID, so an approved retry performs presentation only and does not
+    apply the graph transition twice.
+  - An out-of-band change which intersects a dirty view opens
+    `*SKG Disk-Client Conflicts*`, marks that view save-blocked, and plays the
+    harsh warning sound. `skg-resolve-disk-client-conflict` compares its last
+    rendered base, editable local text, and incoming rendering in Ediff. A
+    prefix invocation explicitly submits the manually reconciled local text
+    through the normal save path; the marker clears only after save success.
+    Raw `.skg` saves and Magit operations capable of writing a configured
+    source's worktree are refused earlier whenever any Skg view is dirty.
+    Read-only and index/ref-only Git operations remain available.
   - `M-x skg-reload-from-id-stack` opens a transient copy of the Emacs ID
     stack.  Org's ordinary S-left/S-right TODO cycling marks `TO-RELOAD`;
     C-c C-c submits the marked IDs.  This mode neither changes the canonical

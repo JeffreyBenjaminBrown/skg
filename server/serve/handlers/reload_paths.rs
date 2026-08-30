@@ -40,6 +40,7 @@ use crate::dbs::tantivy::background_writer::{
 };
 use crate::serve::ViewsState;
 use crate::serve::handlers::reload_batch::reload_batch_active;
+use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix,
@@ -48,21 +49,28 @@ use crate::serve::util::{
   value_from_request_sexp,
 };
 use crate::source_sets::ActiveSourceSet;
-use crate::update_buffer::rerender_views_after_reload;
+use crate::sound::play_harsh_sound_in_background;
+use crate::update_buffer::{
+  ReloadPresentation,
+  ReloadRerenderOutcome,
+  ReloadViewImpact,
+  rerender_views_after_reload,
+};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceCatalog, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::store_state::{PathDigest, SelectedPathManifest};
+use crate::types::views_state::ViewUri;
 use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::Telescope;
 
 use futures::executor::block_on;
-use std::collections::HashSet;
-use std::collections::BTreeSet;
+use std::cell::RefCell;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::net::TcpStream;
@@ -99,18 +107,52 @@ struct CapturedTelescope {
   path_bytes    : Vec<(PathBuf, Option<Vec<u8>>)>,
   selected      : Vec<(PathBuf, PathDigest)>, }
 
+#[derive(Debug)]
 pub struct ReloadStoreOutcome {
   pub message           : String,
   pub applied           : Vec<DefineNode>,
   pub acknowledged_pids : HashSet<ID>,
   pub rejected          : Vec<(ID, String)>, }
 
+#[derive(Clone)]
 struct RequestedIdOutcome {
   requested_id : ID,
   pid          : Option<ID>,
   status       : &'static str,
   reason       : Option<String>,
   paths        : Vec<PathBuf>, }
+
+#[derive(Clone)]
+pub(crate) struct PendingReloadPresentation {
+  applied            : Vec<DefineNode>,
+  message            : String,
+  requested_outcomes : Vec<RequestedIdOutcome>,
+  affected_paths     : Vec<PathBuf>,
+  any_rejected       : bool,
+}
+
+thread_local! {
+  /// Presentation authority is connection-local because each connection
+  /// thread owns one independent `ViewsState`.  Keeping it here avoids
+  /// burdening that public struct (which integration fixtures construct), and
+  /// the thread exit drops every declined or abandoned incident.
+  static PENDING_RELOAD_PRESENTATIONS :
+    RefCell<HashMap<String, PendingReloadPresentation>> =
+      RefCell::new (HashMap::new ());
+}
+
+fn take_pending_reload (incident : &str) -> Option<PendingReloadPresentation> {
+  PENDING_RELOAD_PRESENTATIONS . with (|pending|
+    pending . borrow_mut () . remove (incident))
+}
+
+fn retain_pending_reload (
+  incident : &str,
+  pending  : PendingReloadPresentation,
+) {
+  PENDING_RELOAD_PRESENTATIONS . with (|registry|
+    registry . borrow_mut () . insert (incident . to_string (), pending));
+}
 
 pub fn handle_reload_paths_request (
   stream            : &mut TcpStream,
@@ -125,6 +167,19 @@ pub fn handle_reload_paths_request (
       send_reload_error (stream, &format! (
         "reload paths: failed to parse request: {}", e ));
       return; } };
+  let dirty_uris : HashSet<ViewUri> =
+    match optional_string_list (&parsed, "dirty-view-uris") {
+      Ok (values) => values . into_iter ()
+        . map (ViewUri::from_client_string) . collect (),
+      Err (error) => { send_reload_error (stream, &error); return; }};
+  let incident_id = value_from_request_sexp ("incident-id", request) . ok ();
+  let scalar_approved_pids = approved_pids_from_request (request);
+  if let Some (incident) = incident_id . as_ref () {
+    if let Some (pending) = take_pending_reload (incident) {
+      present_committed_reload (
+        stream, env, views_state, active_source_set,
+        incident, pending, &dirty_uris, &scalar_approved_pids );
+      return; }}
   let path_strings : Vec<String> = match optional_string_list (&parsed, "paths") {
     Ok (values) => values,
     Err (error) => { send_reload_error (stream, &error); return; }};
@@ -188,14 +243,6 @@ pub fn handle_reload_paths_request (
       Err (e)   => {
         send_reload_error (stream, &format! ("Reload failed: {}", e));
         return; } };
-  if ! store_outcome . applied . is_empty () {
-    // Re-stream every open view touched by the reload (diff-mode views
-    // included), then send the summary.
-    let diff_mode : bool = views_state . diff_mode_enabled;
-    if let Err (e) = block_on ( rerender_views_after_reload (
-      stream, &store_outcome . applied, env, diff_mode,
-      views_state, Some (active_source_set) )) {
-        tracing::error! ("reload collateral re-render failed: {}", e); } }
   let requested_outcomes = requested . into_iter () . map (
     |(requested_id, pid)| {
       let paths = pid . as_ref () . map (|pid| possible_paths (
@@ -222,13 +269,69 @@ pub fn handle_reload_paths_request (
   let any_rejected = requested_outcomes . iter ()
     . any (|outcome| outcome . status == "rejected")
     || ! store_outcome . rejected . is_empty ();
+  let mut affected_paths = paths;
+  for outcome in &requested_outcomes {
+    if outcome . pid . is_some () {
+      affected_paths . extend (outcome . paths . iter () . cloned ()); }}
+  affected_paths . sort ();
+  affected_paths . dedup ();
+  let pending = PendingReloadPresentation {
+    applied: store_outcome . applied,
+    message: store_outcome . message,
+    requested_outcomes,
+    affected_paths,
+    any_rejected,
+  };
+  present_committed_reload (
+    stream, env, views_state, active_source_set,
+    incident_id . as_deref () . unwrap_or (""), pending,
+    &dirty_uris, &scalar_approved_pids ); }
+
+fn present_committed_reload (
+  stream               : &mut TcpStream,
+  env                  : &SkgEnv,
+  views_state          : &mut ViewsState,
+  active_source_set    : &ActiveSourceSet,
+  incident_id          : &str,
+  pending              : PendingReloadPresentation,
+  dirty_uris           : &HashSet<ViewUri>,
+  scalar_approved_pids : &HashSet<ID>,
+) {
+  let presentation = if pending . applied . is_empty () {
+    ReloadPresentation {
+      updated: Vec::new (), conflicted: Vec::new (),
+      errors: Vec::new (), warnings: Vec::new (), }
+  } else {
+    let diff_mode = views_state . diff_mode_enabled;
+    match block_on (rerender_views_after_reload (
+      stream, &pending . applied, env, diff_mode, views_state,
+      Some (active_source_set), dirty_uris, scalar_approved_pids )) {
+      Ok (ReloadRerenderOutcome::Presented (presentation)) => presentation,
+      Ok (ReloadRerenderOutcome::Challenge (challenge)) => {
+        if incident_id . is_empty () {
+          send_reload_error (
+            stream,
+            "reload rerender needs authorization but request has no incident-id" );
+        } else {
+          retain_pending_reload (incident_id, pending);
+          send_response_with_length_prefix (stream, &challenge); }
+        return; },
+      Err (error) => {
+        if !incident_id . is_empty () {
+          retain_pending_reload (incident_id, pending); }
+        send_reload_error (stream, &format! (
+          "reload presentation failed after stores committed: {}", error));
+        return; }} };
+  if !presentation . conflicted . is_empty () {
+    play_harsh_sound_in_background (); }
   let payload = format_reload_response (
-    &store_outcome . message, &requested_outcomes);
+    &pending . message, &pending . requested_outcomes,
+    &presentation, &pending . affected_paths, &env . config . sources );
   send_response_with_length_prefix (
     stream,
     &tag_terminal_sexp_response (
       TcpToClient::ReloadPaths,
-      if any_rejected { "complete-with-rejected-files" }
+      if pending . any_rejected { "complete-with-rejected-files" }
       else { "complete" },
       &payload)); }
 
@@ -417,8 +520,11 @@ fn possible_paths (config : &SkgConfig, pid : &ID) -> Vec<PathBuf> {
 }
 
 fn format_reload_response (
-  message   : &str,
-  requested : &[RequestedIdOutcome],
+  message        : &str,
+  requested      : &[RequestedIdOutcome],
+  presentation   : &ReloadPresentation,
+  affected_paths : &[PathBuf],
+  sources        : &SourceCatalog,
 ) -> String {
   let atom = |value : &str| Sexp::Atom (Atom::S (value . into ()));
   let field = |key : &str, value : Sexp| Sexp::List (vec![atom (key), value]);
@@ -432,10 +538,47 @@ fn format_reload_response (
     field ("paths", Sexp::List (outcome . paths . iter ()
       . map (|path| atom (&path . to_string_lossy ())) . collect ())),
   ])) . collect ();
+  let format_impact = |impact : &ReloadViewImpact| {
+    let paths = paths_for_impact (impact, affected_paths, sources);
+    let mut fields = vec![
+      field ("view-uri", atom (&impact . uri . repr_in_client ())),
+      field ("pids", Sexp::List (impact . pids . iter ()
+        . map (|pid| atom (pid . as_str ())) . collect ())),
+      field ("paths", Sexp::List (paths . iter ()
+        . map (|path| atom (&path . to_string_lossy ())) . collect ())),
+    ];
+    if let Some (incoming) = &impact . incoming {
+      fields . push (field ("incoming", atom (incoming))); }
+    Sexp::List (fields) };
   Sexp::List (vec![
     field ("content", atom (message)),
     field ("requested-id-outcomes", Sexp::List (outcomes)),
+    field ("conflicted-views", Sexp::List (
+      presentation . conflicted . iter () . map (format_impact) . collect ())),
+    field ("updated-views", Sexp::List (
+      presentation . updated . iter () . map (format_impact) . collect ())),
+    field ("files-affected", Sexp::List (affected_paths . iter ()
+      . map (|path| atom (&path . to_string_lossy ())) . collect ())),
+    field ("rerender-errors", Sexp::List (presentation . errors . iter ()
+      . map (|error| atom (error)) . collect ())),
+    field ("warnings", Sexp::List (presentation . warnings . iter ()
+      . map (|warning| atom (warning)) . collect ())),
   ]) . to_string ()
+}
+
+fn paths_for_impact (
+  impact         : &ReloadViewImpact,
+  affected_paths : &[PathBuf],
+  sources        : &SourceCatalog,
+) -> Vec<PathBuf> {
+  let pids : HashSet<&ID> = impact . pids . iter () . collect ();
+  let mut paths : Vec<PathBuf> = affected_paths . iter () . filter (|path|
+    sources . source_and_pid_for_direct_path (path)
+      . map (|(_, pid)| pids . contains (&pid)) . unwrap_or (false))
+    . cloned () . collect ();
+  paths . sort ();
+  paths . dedup ();
+  paths
 }
 
 fn summarize_reload (
@@ -643,6 +786,9 @@ mod tests {
 
   #[test]
   fn explicit_id_outcomes_name_pid_paths_and_rejection () {
+    let presentation = ReloadPresentation {
+      updated: Vec::new (), conflicted: Vec::new (),
+      errors: Vec::new (), warnings: Vec::new (), };
     let payload = format_reload_response ("mixed", &[
       RequestedIdOutcome {
         requested_id: ID::from ("alias"),
@@ -653,12 +799,32 @@ mod tests {
         requested_id: ID::from ("missing"), pid: None,
         status: "rejected", reason: Some ("not found" . into ()),
         paths: Vec::new (), },
-    ]);
+    ], &presentation, &[], &sources (&[("public", "/data/public")]));
     assert! (payload . contains ("(requested-id alias)"));
     assert! (payload . contains ("(pid primary)"));
     assert! (payload . contains ("/data/public/primary.skg"));
     assert! (payload . contains ("(status rejected)"));
     assert! (payload . contains ("(reason \"not found\")")); }
+
+  #[test]
+  fn conflict_response_carries_paths_and_authorized_incoming_without_applying () {
+    let catalog = sources (&[("public", "/data/public")]);
+    let presentation = ReloadPresentation {
+      updated: Vec::new (),
+      conflicted: vec![ReloadViewImpact {
+        uri: ViewUri::ContentView ("dirty-uri" . into ()),
+        pids: vec![ID::from ("primary")],
+        incoming: Some ("* incoming" . into ()),
+      }],
+      errors: Vec::new (), warnings: Vec::new (), };
+    let payload = format_reload_response (
+      "done", &[], &presentation,
+      &[PathBuf::from ("/data/public/primary.skg")], &catalog );
+    assert! (payload . contains ("(conflicted-views"));
+    assert! (payload . contains ("(view-uri dirty-uri)"));
+    assert! (payload . contains ("/data/public/primary.skg"));
+    assert! (payload . contains ("(incoming \"* incoming\")"));
+  }
 
   #[test]
   fn manifest_comparison_uses_digest_and_explicit_absence () {

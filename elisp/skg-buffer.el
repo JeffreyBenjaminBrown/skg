@@ -152,6 +152,7 @@ otherwise generate a new UUID."
         (skg-content-view-mode)
         (heralds-minor-mode))
       (setq skg-view-uri uri)
+      (setq-local skg--last-rendered-content org-text)
       (setq skg-contentView-initialRoot-source source)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook

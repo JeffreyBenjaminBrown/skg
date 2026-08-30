@@ -109,6 +109,28 @@ struct RenderedCollateralView {
   viewforest : ViewForest,
 }
 
+#[derive(Clone, Debug)]
+pub struct ReloadViewImpact {
+  pub uri      : ViewUri,
+  pub pids     : Vec<ID>,
+  /// A dirty view's authorized incoming rendering.  The client keeps this
+  /// beside local text for explicit conflict resolution; it never applies it
+  /// automatically.
+  pub incoming : Option<String>,
+}
+
+pub struct ReloadPresentation {
+  pub updated    : Vec<ReloadViewImpact>,
+  pub conflicted : Vec<ReloadViewImpact>,
+  pub errors     : Vec<String>,
+  pub warnings   : Vec<String>,
+}
+
+pub enum ReloadRerenderOutcome {
+  Presented (ReloadPresentation),
+  Challenge (String),
+}
+
 /// PURPOSE:
 /// Updates the rendered views and ViewsState
 /// for each view affected by the save.
@@ -305,13 +327,13 @@ async fn rerender_collateral_view (
     viewforest,
   }) }
 
-/// Re-render every open view containing any reloaded/deleted telescope,
-/// streaming each as a CollateralView. Called after a PARTIAL RELOAD has
-/// already updated the stores. Unlike `update_views_after_save` there is
-/// no "saved" view -- all affected views are collateral -- and no
-/// filesystem write is involved. Diff-mode views that contain a changed
-/// pid re-render too, picking up the fresh HEAD-vs-worktree diff via
-/// `for_save`'s recomputed `source_diffs`.
+/// Prepare and, when authorized, publish each clean affected reload view.
+///
+/// The stores already contain `define_nodes`.  Dirty affected views are
+/// deliberately left on their old server forest and returned as conflicts.
+/// Clean forests pass the scalar-release boundary both before and after
+/// completion.  Until both decisions allow the batch, this function sends no
+/// text and mutates no `ViewsState` entry.
 pub async fn rerender_views_after_reload (
   stream            : &mut std::net::TcpStream,
   define_nodes      : &[DefineNode],
@@ -319,39 +341,96 @@ pub async fn rerender_views_after_reload (
   diff_mode_enabled : bool,
   views_state       : &mut ViewsState,
   active_source_set : Option<&ActiveSourceSet>,
-) -> Result<(), Box<dyn Error>> {
+  dirty_uris        : &HashSet<ViewUri>,
+  scalar_approved_pids : &HashSet<ID>,
+) -> Result<ReloadRerenderOutcome, Box<dyn Error>> {
   let changed_pids : HashSet<ID> =
     define_nodes . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Save ( SaveNode (n)) => Some ( n . pid . clone () ),
       DefineNode::Delete (dn)          => Some ( dn . id . clone () ) } )
     . collect ();
-  let affected_uris : Vec<ViewUri> = {
+  let mut affected_uris : Vec<ViewUri> = {
     let set : HashSet<ViewUri> =
       changed_pids . iter ()
       . flat_map ( |pid|
         views_state . open_views . views_containing (pid) )
       . collect ();
     set . into_iter () . collect () };
-  if affected_uris . is_empty () { return Ok (( )); }
+  affected_uris . sort_by_key (ViewUri::repr_in_client);
+  let impacts : Vec<ReloadViewImpact> = affected_uris . iter () . map (|uri| {
+    let mut pids : Vec<ID> = views_state . open_views . viewuri_to_pids (uri)
+      . into_iter () . filter (|pid| changed_pids . contains (pid)) . collect ();
+    pids . sort_by (|a, b| a . as_str () . cmp (b . as_str ()));
+    ReloadViewImpact { uri: uri . clone (), pids, incoming: None }
+  }) . collect ();
+  let (mut conflicted, clean) : (Vec<ReloadViewImpact>, Vec<ReloadViewImpact>) =
+    impacts . into_iter () . partition (|impact|
+      dirty_uris . contains (&impact . uri));
+  if clean . is_empty () && conflicted . is_empty () {
+    return Ok (ReloadRerenderOutcome::Presented (ReloadPresentation {
+      updated: clean, conflicted, errors: Vec::new (), warnings: Vec::new (),
+    })); }
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::for_save (
       env, diff_mode_enabled, define_nodes, active_source_set );
-  for uri in affected_uris {
-    match rerender_collateral_view ( uri, views_state, &mut context )
-      . await {
-      Ok (rendered) => {
-        views_state . open_views . update_view (
-          &rendered . uri, rendered . viewforest);
-        send_response_with_length_prefix (
-          stream,
-          & tag_sexp_response (
-            TcpToClient::CollateralView,
-            & format_single_view_sexp (
-              &rendered . uri, &rendered . text) )); },
-      Err (e) =>
-        tracing::error! ("reload rerender of a view failed: {}", e), } }
-  Ok (( )) }
+  if let Some (active) = active_source_set {
+    let input_candidates : Vec<ID> = clean . iter () . chain (&conflicted)
+      . flat_map (|impact|
+      views_state . open_views . viewuri_to_view (&impact . uri)
+        . into_iter () . flat_map (active_ids_in_viewforest)) . collect ();
+    let release = decide (
+      "reload-rerender", active, &input_candidates,
+      &context . graph_snap, scalar_approved_pids );
+    if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+      return Ok (ReloadRerenderOutcome::Challenge (
+        challenge_response (&release) . unwrap ())); }}
+
+  let mut rendered_views : Vec<RenderedCollateralView> = Vec::new ();
+  for impact in clean . iter () . chain (&conflicted) {
+    match rerender_collateral_view (
+      impact . uri . clone (), views_state, &mut context ) . await {
+      Ok (rendered) => rendered_views . push (rendered),
+      Err (error) => context . errors . push (error), }}
+
+  if let Some (active) = active_source_set {
+    let output_candidates : Vec<ID> = rendered_views . iter () . flat_map (
+      |rendered| active_ids_in_viewforest (&rendered . viewforest)) . collect ();
+    let release = decide (
+      "reload-rerender", active, &output_candidates,
+      &context . graph_snap, scalar_approved_pids );
+    match release {
+      ScalarReleaseDecision::Challenge { .. } =>
+        return Ok (ReloadRerenderOutcome::Challenge (
+          challenge_response (&release) . unwrap ())),
+      ScalarReleaseDecision::AllowWithWarning { warning } =>
+        context . warnings . push (warning),
+      ScalarReleaseDecision::Allow => {}, }}
+
+  let rendered_uris : HashSet<ViewUri> = rendered_views . iter ()
+    . map (|rendered| rendered . uri . clone ()) . collect ();
+  let incoming_by_uri : HashMap<ViewUri, String> = rendered_views . iter ()
+    . map (|rendered| (rendered . uri . clone (), rendered . text . clone ()))
+    . collect ();
+  for impact in &mut conflicted {
+    impact . incoming = incoming_by_uri . get (&impact . uri) . cloned (); }
+  for rendered in rendered_views {
+    if dirty_uris . contains (&rendered . uri) { continue; }
+    views_state . open_views . update_view (
+      &rendered . uri, rendered . viewforest);
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response (
+        TcpToClient::CollateralView,
+        & format_single_view_sexp (
+          &rendered . uri, &rendered . text) )); }
+  Ok (ReloadRerenderOutcome::Presented (ReloadPresentation {
+    updated: clean . into_iter () . filter (|impact|
+      rendered_uris . contains (&impact . uri)) . collect (),
+    conflicted,
+    errors: context . errors,
+    warnings: context . warnings,
+  })) }
 
 /// Given the saved ViewUri and DefineNodes,
 /// return the URIs of other views whose viewforests

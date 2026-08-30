@@ -8,6 +8,15 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
+(defvar-local skg--last-rendered-content nil
+  "Last server rendering installed in this view.")
+
+(defvar-local skg--disk-client-conflict nil
+  "Structured metadata for an unresolved out-of-band disk conflict.")
+
+(defvar-local skg--disk-conflict-resolution-in-progress nil
+  "Non-nil while an explicitly reconciled conflict is being saved.")
+
 (defun skg--other-unsaved-skg-buffers ()
   "Return the list of skg view buffers OTHER than the current one that
 have unsaved modifications (`buffer-modified-p')."
@@ -57,6 +66,10 @@ nothing. `skg--fork-confirmation-handler' then shows the confirmation
 buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
   (interactive)
+  (when (and skg--disk-client-conflict
+             (not skg--disk-conflict-resolution-in-progress))
+    (user-error
+     "Save blocked by a disk-client conflict; run M-x skg-resolve-disk-client-conflict"))
   (skg--confirm-save-despite-other-unsaved)
   (when (org-before-first-heading-p)
     ;; Rather than complain, save as if point were at the first headline.
@@ -261,7 +274,16 @@ streams; LOG-CATEGORY and HANDLER-NAME label any error."
         (when buf
           (with-current-buffer buf
             (skg--unlock-after-save)
-            (skg-replace-buffer-with-new-content nil content))))
+            (if (buffer-modified-p)
+                (progn
+                  (setq skg--disk-client-conflict
+                        `((reason . "stream arrived after local modification")
+                          (incoming . ,content)))
+                  (ding)
+                  (skg-log 'error log-category
+                           "%s refused to overwrite newly dirty buffer %s"
+                           handler-name (buffer-name)))
+              (skg-replace-buffer-with-new-content nil content)))))
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
 
@@ -646,6 +668,11 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
         (when content-value
           (skg-replace-buffer-with-new-content
            nil content-value save-point-position))
+        (when skg--disk-conflict-resolution-in-progress
+          (setq skg--disk-conflict-resolution-in-progress nil)
+          (when (and content-value
+                     (not (skg--message-list-nonempty-p errors-list)))
+            (setq skg--disk-client-conflict nil)))
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings
@@ -707,6 +734,7 @@ moves point to focused headline, and removes focus marker."
       (skg-fold-marked-headlines)
       (skg-remove-folded-markers))
     (skg--restore-save-point-position save-point-position)
+    (setq skg--last-rendered-content new-content)
     (set-buffer-modified-p
      ;; Clear modified flag and re-register the one-shot hook
      ;; AFTER all buffer modifications are done.

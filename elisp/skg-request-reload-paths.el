@@ -17,6 +17,7 @@
 (require 'skg-config)
 (require 'skg-id-search)
 (require 'skg-request-save) ; for skg--collateral-view-handler
+(require 'skg-worktree-guard)
 (require 'filenotify)
 
 ;;; ---- change observation -------------------------------------------
@@ -99,7 +100,8 @@
              full-sweep)
           (error
            (setq skg--reload-observation-in-flight nil)
-           (skg-log 'error 'reload "observation dispatch failed: %S" err)))))))
+           (skg-log 'error 'reload "observation dispatch failed: %S" err)
+           (skg--schedule-reload-observation 0.5)))))))
 
 (defun skg--finish-reload-observation
     (snapshot full-sweep incident response)
@@ -113,7 +115,7 @@
       ;; connection may bracket a slow serial pull for minutes.
       (setq skg--reload-observation-incident-id incident)
       (skg--schedule-reload-observation 1.0))
-     ((eq status 'failed)
+     ((memq status '(failed needs-authorization))
       ;; Stable invalid bytes do not spin.  A new filesystem event or explicit
       ;; sweep retries them; the retained candidates preserve their incident.
       nil)
@@ -162,36 +164,243 @@
 ;;; ---- the request ---------------------------------------------------
 
 (defun skg-reload-paths
-    (paths &optional ids incident-id terminal-callback full-sweep)
+    (paths &optional ids incident-id terminal-callback full-sweep
+           scalar-approved-pids)
   "Ask the server to reload the telescopes owning PATHS or IDS.
 PATHS are absolute .skg paths.  IDS may contain primary or extra IDs.
 INCIDENT-ID identifies retries of one reconciliation episode.  Invoke
 TERMINAL-CALLBACK with the parsed terminal response, when non-nil."
   (when (or paths ids full-sweep)
+    (when skg--active-request-id
+      (user-error "skg: reload is waiting for the active request to finish"))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
+           (dirty-view-uris
+            (delq nil
+                  (mapcar (lambda (buffer)
+                            (buffer-local-value 'skg-view-uri buffer))
+                          (skg--dirty-view-buffers))))
            (request-sexp
             (concat (prin1-to-string
-                     `((request . "reload paths")
-                       (paths ,@paths)
-                       (ids ,@ids)
-                       (full-sweep . ,(if full-sweep "true" "false"))))
+                     (append
+                      `((request . "reload paths")
+                        (paths ,@paths)
+                        (ids ,@ids)
+                        (dirty-view-uris ,@dirty-view-uris)
+                        (full-sweep . ,(if full-sweep "true" "false")))
+                      (when scalar-approved-pids
+                        `((allow-ugly-telescopes
+                           ,@scalar-approved-pids)))))
                     "\n"))
            (incident-id (or incident-id (skg-fresh-incident-id))))
-      (skg-register-response-handler ; refresh any open touched buffers
-       'collateral-view
-       (lambda (_tcp-proc payload)
-         (skg--collateral-view-handler payload))
-       nil) ; non-one-shot
-      (skg-register-response-handler
-       'reload-paths
-       (lambda (_tcp-proc payload)
-         (let* ((response (read payload))
-                (content (cadr (assoc 'content response))))
-           (when content (message "%s" content))
-           (when terminal-callback
-             (funcall terminal-callback response))))
-       t) ; one-shot
-      (skg-submit-request tcp-proc request-sexp nil incident-id))))
+      (condition-case err
+          (progn
+            (skg--begin-stream "reload")
+            (skg--lock-all-skg-buffers)
+            (skg-register-response-handler ; refresh safe touched buffers
+             'collateral-view
+             (lambda (_tcp-proc payload)
+               (skg--collateral-view-handler payload))
+             nil) ; non-one-shot
+            (skg-register-response-handler
+             'ugly-telescope-confirmation
+             (lambda (_tcp-proc payload)
+               (skg--reload-scalar-confirmation-handler
+                payload paths ids incident-id terminal-callback full-sweep))
+             nil)
+            (skg-register-response-handler
+             'reload-paths
+             (lambda (_tcp-proc payload)
+               (skg--reload-terminal-handler payload terminal-callback))
+             t) ; one-shot
+            (skg-submit-request tcp-proc request-sexp nil incident-id))
+        (error
+         (skg--end-stream)
+         (skg--unlock-all-save-locked)
+         (signal (car err) (cdr err)))))))
+
+(defun skg--reload-scalar-confirmation-handler
+    (payload paths ids incident-id terminal-callback full-sweep)
+  "Handle a text-free reload presentation challenge."
+  (skg--end-stream)
+  (skg--unlock-all-save-locked)
+  (let* ((response (read payload))
+         (pids (mapcar (lambda (pid) (format "%s" pid))
+                       (cadr (assoc 'pids response))))
+         (prompt (or (cadr (assoc 'prompt response))
+                     "Display protected reload text? "))
+         (approved (and (not noninteractive)
+                        (y-or-n-p (concat (format "%s" prompt) " ")))))
+    (if approved
+        ;; The request coordinator finishes the challenged request after this
+        ;; handler returns.  Build the retry on the next event-loop turn so its
+        ;; handlers belong to the new request record, while preserving incident.
+        (run-at-time
+         0 nil
+         (lambda ()
+           (skg-reload-paths
+            paths ids incident-id terminal-callback full-sweep pids)))
+      (when terminal-callback
+        (funcall terminal-callback response)))))
+
+(defun skg--reload-terminal-handler (payload terminal-callback)
+  "Unlock the reload request, show conflicts and pass its terminal result on."
+  (skg--end-stream)
+  (skg--unlock-all-save-locked)
+  (let* ((response (read payload))
+         (content (cadr (assoc 'content response))))
+    (skg--handle-reload-conflicts response)
+    (when content (message "%s" content))
+    (when terminal-callback
+      (funcall terminal-callback response))))
+
+(defun skg--reload-impact-paths (impact)
+  "Return IMPACT's path values as strings."
+  (mapcar (lambda (path) (format "%s" path))
+          (cadr (assoc 'paths impact))))
+
+(defun skg--reload-impact-buffer (impact)
+  "Return the live buffer named by IMPACT, if it remains open."
+  (let ((uri (cadr (assoc 'view-uri impact))))
+    (and uri (skg-find-buffer-by-uri (format "%s" uri)))))
+
+(defun skg--conflict-heading-text (value)
+  "Make VALUE safe as one line of an Org heading."
+  (replace-regexp-in-string "[\n\r]+" " " (format "%s" value)))
+
+(defun skg--insert-reload-impact-section (title impacts &optional introduction)
+  "Insert an Org section TITLE describing IMPACTS, after INTRODUCTION."
+  (insert "** " title "\n")
+  (when introduction (insert introduction "\n"))
+  (if (null impacts)
+      (insert "None.\n")
+    (dolist (impact impacts)
+      (let* ((buffer (skg--reload-impact-buffer impact))
+             (uri (cadr (assoc 'view-uri impact)))
+             (name (if buffer (buffer-name buffer) (format "%s" uri))))
+        (insert "*** " (skg--conflict-heading-text name) "\n"
+                "Affected by these changed nodes:\n")
+        (dolist (path (skg--reload-impact-paths impact))
+          (insert "**** " (skg--conflict-heading-text path) "\n"))))))
+
+(defun skg--reload-conflict-report (conflicted updated files)
+  "Return the persistent Org report for a reload conflict."
+  (with-temp-buffer
+    (insert
+     "* WARNING: Disk-client conflict(s)\n"
+     "Skg detected changes to the .skg filestore made outside of Skg.\n")
+    (skg--insert-reload-impact-section
+     "buffers with unsaved changes that cannot be automatically updated"
+     conflicted
+     "Other dirty Skg buffers, if any, are unaffected and hence omitted here.")
+    (skg--insert-reload-impact-section "buffers that have been updated" updated)
+    (let ((path-buffers (make-hash-table :test #'equal)))
+      (dolist (impact conflicted)
+        (let* ((buffer (skg--reload-impact-buffer impact))
+               (uri (cadr (assoc 'view-uri impact)))
+               (name (if buffer (buffer-name buffer) (format "%s" uri))))
+          (dolist (path (skg--reload-impact-paths impact))
+            (puthash path (cons name (gethash path path-buffers))
+                     path-buffers))))
+      (insert "** changed nodes affecting more than one conflicted buffer\n")
+      (let (shared)
+        (maphash (lambda (path buffers)
+                   (when (> (length (delete-dups buffers)) 1)
+                     (push (cons path (delete-dups buffers)) shared)))
+                 path-buffers)
+        (if (null shared)
+            (insert "None.\n")
+          (dolist (entry (sort shared (lambda (a b) (string< (car a) (car b)))))
+            (insert "*** " (skg--conflict-heading-text (car entry)) "\n")
+            (dolist (name (sort (cdr entry) #'string<))
+              (insert "**** " (skg--conflict-heading-text name) "\n"))))))
+    (insert "** files affected\n")
+    (if files
+        (dolist (path files)
+          (insert "*** " (skg--conflict-heading-text path) "\n"))
+      (insert "None reported.\n"))
+    (insert
+     "** what it means, and what to do about it\n"
+     "Skg applied the disk changes to its graph, databases and the buffers where doing so was safe.  It did not update the conflicted buffers above because they contain unsaved edits.  Saving them normally could clobber the external changes, so ordinary save is blocked.  Resolve each with M-x skg-resolve-disk-client-conflict, reviewing base, local and incoming text.  After one resolution, refresh the incoming side of the others before resolving them.  Skg cannot infer why the out-of-band changes happened or safely choose a merge; review and repair them manually with caution.\n")
+    (buffer-string)))
+
+(defun skg--handle-reload-conflicts (response)
+  "Persist and display the dirty-view conflicts described by RESPONSE."
+  (let* ((conflicted (cadr (assoc 'conflicted-views response)))
+         (updated (cadr (assoc 'updated-views response)))
+         (files (mapcar (lambda (path) (format "%s" path))
+                        (cadr (assoc 'files-affected response))))
+         (incident (cadr (assoc 'incident-id response))))
+    (dolist (impact updated)
+      (when-let ((buffer (skg--reload-impact-buffer impact)))
+        (with-current-buffer buffer
+          (setq skg--disk-client-conflict nil))))
+    (dolist (impact conflicted)
+      (when-let ((buffer (skg--reload-impact-buffer impact)))
+        (with-current-buffer buffer
+          (let ((old skg--disk-client-conflict))
+            (setq skg--disk-client-conflict
+                  `((incident-id . ,(format "%s" incident))
+                    (paths . ,(skg--reload-impact-paths impact))
+                    (pids . ,(mapcar
+                              (lambda (pid) (format "%s" pid))
+                              (cadr (assoc 'pids impact))))
+                    (base . ,(or (alist-get 'base old)
+                                 skg--last-rendered-content
+                                 (buffer-string)))
+                    (incoming . ,(cadr (assoc 'incoming impact)))
+                    (local-token . ,(buffer-chars-modified-tick))))))))
+    (when conflicted
+      (skg-big-nonfatal-message
+       "*SKG Disk-Client Conflicts*"
+       "WARNING: Disk-client conflicts require manual resolution"
+       (skg--reload-conflict-report conflicted updated files)))))
+
+(defun skg--conflict-review-buffer (name text)
+  "Create a read-only Org buffer NAME containing TEXT."
+  (let ((buffer (get-buffer-create name)))
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (or text ""))
+        (skg--org-mode-with-options)
+        (set-buffer-modified-p nil)
+        (setq buffer-read-only t)))
+    buffer))
+
+(defun skg-resolve-disk-client-conflict (&optional accept-current-text)
+  "Review this view's disk conflict, or explicitly save a finished merge.
+Without a prefix argument, compare the editable local view with read-only
+incoming and base buffers in Ediff.  Edit the original local view until it is
+correct.  Then invoke this command with a prefix argument to confirm that the
+current text is the intended merge and send it through the normal save
+pipeline.  The conflict marker clears only after that save succeeds."
+  (interactive "P")
+  (unless skg--disk-client-conflict
+    (user-error "This buffer has no unresolved disk-client conflict"))
+  (if accept-current-text
+      (when (yes-or-no-p
+             "Save the current buffer as the manually reconciled result? ")
+        (setq skg--disk-conflict-resolution-in-progress t)
+        (condition-case err
+            (skg-request-save-buffer)
+          (error
+           (setq skg--disk-conflict-resolution-in-progress nil)
+           (signal (car err) (cdr err)))))
+    (let* ((origin (current-buffer))
+           (suffix (buffer-name origin))
+           (incoming (alist-get 'incoming skg--disk-client-conflict))
+           (base (alist-get 'base skg--disk-client-conflict)))
+      (unless incoming
+        (user-error "The incoming rendering was withheld or failed; retry the reload first"))
+      (require 'ediff)
+      (ediff-buffers3
+       origin
+       (skg--conflict-review-buffer
+        (format "*SKG incoming: %s*" suffix) incoming)
+       (skg--conflict-review-buffer
+        (format "*SKG base: %s*" suffix) base))
+      (message
+       "Edit the original local view; when satisfied use C-u M-x skg-resolve-disk-client-conflict"))))
 
 ;;; ---- explicit ID-stack selection ---------------------------------
 

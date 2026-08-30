@@ -5,6 +5,166 @@
 (require 'heralds-minor-mode)
 (require 'skg-reload)
 (require 'skg-request-reload-paths)
+(require 'skg-worktree-guard)
+
+(ert-deftest test-skg-git-worktree-classifier-allows-index-and-ref-operations ()
+  (dolist (args '(("status")
+                  ("diff" "--cached")
+                  ("add" "--" "node.skg")
+                  ("reset" "HEAD" "--" "node.skg")
+                  ("restore" "--staged" "--" "node.skg")
+                  ("rm" "--cached" "--" "node.skg")
+                  ("commit" "-m" "message")))
+    (should (skg--git-command-preserves-worktree-p args))))
+
+(ert-deftest test-skg-git-worktree-classifier-refuses-writers-and-unknowns ()
+  (dolist (args '(("checkout" "other")
+                  ("switch" "other")
+                  ("reset" "--hard" "HEAD")
+                  ("restore" "node.skg")
+                  ("restore" "--staged" "--worktree" "node.skg")
+                  ("rm" "node.skg")
+                  ("apply" "change.patch")
+                  ("stash" "pop")
+                  ("pull")
+                  ("merge" "other")
+                  ("rebase" "main")
+                  ("new-future-command")))
+    (should-not (skg--git-command-preserves-worktree-p args))))
+
+(ert-deftest test-skg-magit-guards-are-installed-at-both-process-seams ()
+  (require 'magit-process)
+  (should (advice-member-p #'skg--guard-magit-call-git 'magit-call-git))
+  (should (advice-member-p #'skg--guard-magit-start-git 'magit-start-git)))
+
+(ert-deftest test-skg-magit-guard-refuses-only-when-a-dirty-view-is-at-risk ()
+  (let ((view (generate-new-buffer "*skg dirty guard test*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer view
+            (setq-local skg-view-uri "dirty-view")
+            (insert "dirty")
+            (set-buffer-modified-p t))
+          (cl-letf (((symbol-function 'skg--magit-repository-contains-source-p)
+                     (lambda () t)))
+            (should-error (skg--guard-magit-git-args '("checkout" "other"))
+                          :type 'user-error)
+            (should-not (skg--guard-magit-git-args '("add" "node.skg"))))
+          (cl-letf (((symbol-function 'skg--magit-repository-contains-source-p)
+                     (lambda () nil)))
+            (should-not (skg--guard-magit-git-args '("checkout" "other")))))
+      (with-current-buffer view (set-buffer-modified-p nil))
+      (kill-buffer view))))
+
+(ert-deftest test-skg-raw-file-guard-names-dirty-views ()
+  (let ((view (generate-new-buffer "*skg dirty raw guard test*")))
+    (unwind-protect
+        (with-current-buffer view
+          (setq-local skg-view-uri "dirty-view")
+          (insert "dirty")
+          (set-buffer-modified-p t)
+          (let ((message (condition-case err
+                             (progn
+                               (skg--refuse-worktree-write-if-views-dirty
+                                "Raw .skg save")
+                               nil)
+                           (user-error (error-message-string err)))))
+            (should (string-match-p "Raw \\.skg save refused" message))
+            (should (string-match-p (regexp-quote (buffer-name view)) message))))
+      (with-current-buffer view (set-buffer-modified-p nil))
+      (kill-buffer view))))
+
+(ert-deftest test-skg-reload-conflict-preserves-local-and-opens-structured-report ()
+  (let ((dirty (generate-new-buffer "*skg dirty conflict test*"))
+        (clean (generate-new-buffer "*skg clean conflict test*"))
+        shown)
+    (unwind-protect
+        (progn
+          (with-current-buffer dirty
+            (setq-local skg-view-uri "dirty-uri")
+            (setq-local skg--last-rendered-content "base text")
+            (insert "local text")
+            (set-buffer-modified-p t))
+          (with-current-buffer clean
+            (setq-local skg-view-uri "clean-uri")
+            (insert "updated text")
+            (set-buffer-modified-p nil))
+          (cl-letf (((symbol-function 'skg-big-nonfatal-message)
+                     (lambda (name message content)
+                       (setq shown (list name message content)))))
+            (skg--handle-reload-conflicts
+             '((incident-id incident-one)
+               (conflicted-views
+                (((view-uri dirty-uri) (pids (node-a))
+                  (paths ("/source/node-a.skg"))
+                  (incoming "incoming text"))))
+               (updated-views
+                (((view-uri clean-uri) (pids (node-a))
+                  (paths ("/source/node-a.skg"))))
+               (files-affected ("/source/node-a.skg")))))
+          (with-current-buffer dirty
+            (should (equal (buffer-string) "local text"))
+            (should (buffer-modified-p))
+            (should (equal (alist-get 'base skg--disk-client-conflict)
+                           "base text"))
+            (should (equal (alist-get 'incoming skg--disk-client-conflict)
+                           "incoming text"))
+            (should-error (skg-request-save-buffer) :type 'user-error))
+          (should (equal (car shown) "*SKG Disk-Client Conflicts*"))
+          (should (string-prefix-p
+                   "* WARNING: Disk-client conflict(s)" (caddr shown)))
+          (should (string-match-p
+                   "^\\*\\* buffers that have been updated$" (caddr shown)))
+          (should-not (string-match-p "^  \\*" (caddr shown))))
+      (dolist (buffer (list dirty clean))
+        (when (buffer-live-p buffer)
+          (with-current-buffer buffer (set-buffer-modified-p nil))
+          (kill-buffer buffer)))))))
+
+(ert-deftest test-skg-streamed-update-never-overwrites-a-newly-dirty-buffer ()
+  (let ((view (generate-new-buffer "*skg late dirty test*")))
+    (unwind-protect
+        (with-current-buffer view
+          (setq-local skg-view-uri "late-dirty-uri")
+          (insert "local survives")
+          (set-buffer-modified-p t)
+          (skg--apply-streamed-view-update
+           "((view-uri late-dirty-uri) (content \"incoming\"))"
+           'reload "test")
+          (should (equal (buffer-string) "local survives"))
+          (should (buffer-modified-p))
+          (should skg--disk-client-conflict))
+      (with-current-buffer view (set-buffer-modified-p nil))
+      (kill-buffer view))))
+
+(ert-deftest test-skg-reload-request-locks-and-reports-dirty-uri ()
+  (let ((view (generate-new-buffer "*skg dirty request test*"))
+        (skg--active-request-id nil)
+        (skg--stream-in-progress nil)
+        submitted)
+    (unwind-protect
+        (progn
+          (with-current-buffer view
+            (setq-local skg-view-uri "dirty-request-uri")
+            (insert "local")
+            (set-buffer-modified-p t))
+          (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+                     (lambda () 'fake-process))
+                    ((symbol-function 'skg-submit-request)
+                     (lambda (_tcp request &optional _content incident)
+                       (setq submitted (list (read request) incident)))))
+            (skg-reload-paths '("/source/node.skg") nil "same-incident"))
+          (should (equal (cadr submitted) "same-incident"))
+          (should (equal
+                   (cadr (assoc 'dirty-view-uris (car submitted)))
+                   "dirty-request-uri"))
+          (with-current-buffer view
+            (should skg--save-lock-overlay)))
+      (skg--end-stream)
+      (skg--unlock-all-save-locked)
+      (setq skg--request-draft nil)
+      (with-current-buffer view (set-buffer-modified-p nil))
+      (kill-buffer view))))
 
 (ert-deftest test-skg-reload-preserves-herald-rules-on-load-error ()
   "A load error mid-reload must NOT strip the herald rule table.

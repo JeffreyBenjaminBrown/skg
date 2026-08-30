@@ -11,6 +11,7 @@
 (require 'skg-keymaps-and-aliases)
 (require 'skg-id-search)
 (require 'skg-request-reload-paths)
+(require 'skg-worktree-guard)
 
 ;;;###autoload
 (define-minor-mode skg-file-minor-mode
@@ -21,7 +22,10 @@ server to reload the file (its stores mirror the worktree)."
   :lighter " skg"
   :keymap skg-file-minor-mode-map
   (if skg-file-minor-mode
-      (add-hook 'after-save-hook #'skg--reload-after-skg-save nil t)
+      (progn
+        (add-hook 'before-save-hook #'skg--guard-raw-skg-save nil t)
+        (add-hook 'after-save-hook #'skg--reload-after-skg-save nil t))
+    (remove-hook 'before-save-hook #'skg--guard-raw-skg-save t)
     (remove-hook 'after-save-hook #'skg--reload-after-skg-save t)))
 
 (defun skg-file-minor-mode--maybe-enable ()

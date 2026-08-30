@@ -151,6 +151,37 @@ what's imperfect about what's done; choices determining the future.
 - Validation: =bash -n= is clean, all 186 serial Rust library tests and
   321 Emacs tests pass, and the complete Neovim suite passes.
 
+** dirty-view safety and scalar-gated reload presentation (in progress)
+- Added a conservative client worktree gate. A raw direct-source =.skg= save
+  or a Magit command which may write a repository containing a configured
+  source is refused while any Skg view is dirty, naming every such view.
+  Read-only and proven index/ref-only commands (including stage, unstage and
+  commit) remain available; unknown Git commands fail closed. Both central
+  synchronous and asynchronous Magit process seams are advised.
+- Reload now locks views before dispatch and reports the exact dirty URI
+  snapshot. Rust partitions dirty affected views before publication, stages
+  all incoming renderings in memory, and applies main's scalar-release
+  decision before and after completion. No view registry mutation or textual
+  frame precedes authorization.
+- A scalar challenge retains the already-committed store transition under
+  its incident in connection-thread state. An approved new request with the
+  same incident performs prepare/gate/present only, avoiding a second graph
+  mutation. The client keeps the same incident across that prompt.
+- Clean affected views update normally. Dirty affected views retain both
+  their local text and old server forest; the authorized incoming rendering
+  is returned as conflict data, never automatically installed. The client
+  stores last-rendered base/local/incoming state, blocks ordinary save, opens
+  the agreed =*SKG Disk-Client Conflicts*= Org report and offers a three-way
+  Ediff review. A prefix invocation of the resolution command submits the
+  user's reconciled text normally and clears the marker only on save success.
+- Factored sound playback out of =main.rs=. A committed disk/client conflict
+  plays =/home/sound/beep-harsh.wav= once; server readiness alone retains the
+  glorious sound. Missing audio is nonfatal.
+- A final client-side race defense refuses any streamed view update which
+  nevertheless reaches a newly modified buffer. Focused validation: 187
+  serial Rust library tests, 329 Emacs tests, the complete Neovim suite, and
+  compilation of every Rust integration-test target pass.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

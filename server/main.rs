@@ -20,6 +20,7 @@ use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::serve::serve;
+use skg::sound::play_ready_sound_in_background;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 
@@ -29,7 +30,6 @@ use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_subscriber::layer::SubscriberExt;
@@ -232,29 +232,6 @@ fn busysignal_accept_loop (
               BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
       Err (e) => {
         tracing::warn! ("Busysignal accept error: {}", e); } } } }
-
-fn play_ready_sound_in_background (
-) {
-  const READY_SOUND : &str =
-    "/home/sound/beep-glorious.wav";
-  if ! Path::new (READY_SOUND) . exists () {
-    tracing::debug! (
-      sound = READY_SOUND,
-      "Ready sound not found; skipping playback" );
-    return; }
-  std::thread::spawn ( || {
-    let result : Result<std::process::ExitStatus, std::io::Error> =
-      Command::new ("pw-play")
-      . arg (READY_SOUND)
-      . stdin (Stdio::null ())
-      . stdout (Stdio::null ())
-      . stderr (Stdio::null ())
-      . status ();
-    if let Err (e) = result {
-      tracing::debug! (
-        error = %e,
-        "Ready sound playback failed" ); } } );
-}
 
 /// Installed BEFORE initialize_dbs,
 /// so that a kill during init still cleans up the database.

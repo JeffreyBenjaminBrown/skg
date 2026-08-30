@@ -32,5 +32,6 @@
 (require 'skg-view-org-ancestry)
 (require 'skg-readable-ids)
 (require 'skg-request-reload-paths)
+(require 'skg-worktree-guard)
 (require 'skg-file-minor-mode)
 (require 'skg-git-add)
