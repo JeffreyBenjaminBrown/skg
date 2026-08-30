@@ -167,9 +167,9 @@ fn cross_source_move_yields_no_membership_change () {
 }
 
 #[test]
-fn edge_level_gates_deleted_stage_signs () {
+fn edge_source_gates_deleted_stage_signs () {
   // del-r's file was Deleted; its before_node's override of N was
-  // recorded at the PRIVATE level (a PrivaciedMember whose level
+  // recorded in the PRIVATE source (a MemberAtSource whose source
   // differs from del-r's own -- public -- home). A public-only
   // active set must not see the resulting phantom sign; ungated
   // (None) still does.
@@ -179,7 +179,7 @@ fn edge_level_gates_deleted_stage_signs () {
   before . title = "del-r" . to_string ();
   before . source = src ("public");
   before . overrides_view_of = MSV::Specified ( vec! [
-    PrivaciedMember::at ( src ("private"), owner . clone () ) ] );
+    MemberAtSource::at_source ( src ("private"), owner . clone () ) ] );
   let mut sd : SourceDiff = empty_source_diff ();
   sd . unstaged . insert (
     PathBuf::from ("del-r.skg"),
@@ -194,7 +194,7 @@ fn edge_level_gates_deleted_stage_signs () {
       &owner, NodeRelation::OverridesViewOf, &diffs,
       Some (&public_only) );
   assert! ( gated . is_empty (),
-    "a Deleted-stage sign recorded at an inactive level must not \
+    "a Deleted-stage sign recorded at an inactive source must not \
      surface: {:?}", gated );
   let ungated : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_col (

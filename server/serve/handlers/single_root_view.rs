@@ -4,6 +4,11 @@ use crate::serve::ViewsState;
 use crate::to_org::render::content_view::multi_root_view_via_env;
 use crate::to_org::render::override_menu::override_menu_view;
 use crate::serve::protocol::TcpToClient;
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision,
+  approved_pids_from_request,
+  challenge_response,
+  decide as decide_scalar_release};
 use crate::serve::util::{
   view_uri_from_request,
   value_from_request_sexp,
@@ -133,7 +138,9 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
           return; }
-      let response_sexp : String =
+      let approved_ugly_pids =
+        approved_pids_from_request (request);
+      let response : String =
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
@@ -147,26 +154,41 @@ pub fn handle_single_root_view_request (
                            env, &pid,
                            Some (active_source_set) ) . await }
             { Ok ( Some ((menu_content, menu_pids, menu_forest)) ) => {
+                let release = decide_scalar_release (
+                  "override-menu",
+                  active_source_set,
+                  &menu_pids,
+                  &env . in_rust_graph_snapshot (),
+                  &approved_ugly_pids );
+                if matches! (
+                  release, ScalarReleaseDecision::Challenge { .. } ) {
+                  return challenge_response (&release) . unwrap (); }
                 views_state . open_views . register_view (
                   menu_uri . clone (),
                   menu_forest,
                   &menu_pids );
-                let warnings : Vec<String> =
-                  take_pending_audit_warning ()
-                    . map ( |w| vec! [w] )
-                    . unwrap_or_default ();
-                return format_override_menu_response_sexp (
-                  &menu_content,
-                  &menu_uri,
-                  "The requested node is overridden. Choose a destination.",
-                  &warnings ); },
+                let mut warnings : Vec<String> = Vec::new ();
+                if let ScalarReleaseDecision::AllowWithWarning {
+                  warning,
+                } = release {
+                  warnings . push (warning); }
+                warnings . extend (take_pending_audit_warning ());
+                return tag_sexp_response (
+                  TcpToClient::ContentView,
+                  & format_override_menu_response_sexp (
+                    &menu_content,
+                    &menu_uri,
+                    "The requested node is overridden. Choose a destination.",
+                    &warnings ) ); },
               Ok (None) => {}, // not overridden (visibly): render normally
               Err (e) => {
-                return format_buffer_response_sexp (
-                  &String::new (),
-                  &[ format! (
-                      "Error generating override menu: {}", e ) ],
-                  &[] ); }}
+                return tag_sexp_response (
+                  TcpToClient::ContentView,
+                  & format_buffer_response_sexp (
+                    &String::new (),
+                    &[ format! (
+                        "Error generating override menu: {}", e ) ],
+                    &[] ) ); }}
             let mut render_warnings : Vec<String> = Vec::new ();
             match multi_root_view_via_env (
               env,
@@ -175,6 +197,15 @@ pub fn handle_single_root_view_request (
               Some (active_source_set),
               &mut render_warnings ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {
+                let release = decide_scalar_release (
+                  "single-root-view",
+                  active_source_set,
+                  &pids,
+                  &env . in_rust_graph_snapshot (),
+                  &approved_ugly_pids );
+                if matches! (
+                  release, ScalarReleaseDecision::Challenge { .. } ) {
+                  return challenge_response (&release) . unwrap (); }
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view (
                     view_uri . clone (),
@@ -183,13 +214,19 @@ pub fn handle_single_root_view_request (
                 let warnings : Vec<String> =
                   { let mut warnings : Vec<String> =
                       render_warnings;
+                    if let ScalarReleaseDecision::AllowWithWarning {
+                      warning,
+                    } = release {
+                      warnings . push (warning); }
                     warnings . extend (
                       take_pending_audit_warning () );
                     warnings };
-                format_buffer_response_sexp (
-                  & buffer_content,
-                  &[],
-                  & warnings ) },
+                tag_sexp_response (
+                  TcpToClient::ContentView,
+                  & format_buffer_response_sexp (
+                    & buffer_content,
+                    &[],
+                    & warnings ) ) },
               Err (e) => { // If we fail to generate the view, ship the generation error (and any pending audit warning) in the errors vec, with empty content so the client skips opening a main buffer.
                 let mut errors : Vec<String> = Vec::new ();
                 let mut warnings : Vec<String> = Vec::new ();
@@ -197,14 +234,14 @@ pub fn handle_single_root_view_request (
                 { warnings . push (w); }
                 errors . push ( format! (
                   "Error generating document: {}", e ));
-                format_buffer_response_sexp (
-                  & String::new (),
-                  & errors,
-                  & warnings ) }} } ) };
+                tag_sexp_response (
+                  TcpToClient::ContentView,
+                  & format_buffer_response_sexp (
+                    & String::new (),
+                    & errors,
+                    & warnings ) ) }} } ) };
       send_response_with_length_prefix (
-        stream,
-        & tag_sexp_response (
-          TcpToClient::ContentView, &response_sexp )); },
+        stream, &response ); },
     Err (err) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);

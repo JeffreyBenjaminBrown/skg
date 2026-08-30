@@ -101,7 +101,9 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             handle_git_diff_toggle_and_rerender (
-              &mut server, &env, views_state, active ); } ); } );
+              &mut server,
+              "((request . \"git diff mode toggle\"))",
+              &env, views_state, active ); } ); } );
         drop (server);
         let mut reader : BufReader<TcpStream> =
           BufReader::new (client);
@@ -195,7 +197,8 @@ async fn switch_refusals_take_the_unwinding_shape (
           terms          : "untouched by a refusal" . to_string (),
           search_results : vec![],
           ancestry_by_id : HashMap::new (),
-          graphnodestats : AllGraphNodeStats::empty (), })));
+          graphnodestats : AllGraphNodeStats::empty (),
+          include_ugly_telescopes : true, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
       { // Switching to a restricted set while diff mode is on is
@@ -293,7 +296,9 @@ async fn refusal_first_messages_parse_and_read_as_documented (
       std::thread::scope ( |scope| {
         scope . spawn ( || {
           handle_git_diff_toggle_and_rerender (
-            &mut server, &env, &mut views_state, &restricted ); } ); } );
+            &mut server,
+            "((request . \"git diff mode toggle\"))",
+            &env, &mut views_state, &restricted ); } ); } );
       drop (server);
       let mut reader : BufReader<TcpStream> =
         BufReader::new (client);

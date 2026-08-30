@@ -6,10 +6,10 @@ use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
-use skg::test_utils::set_source_retagging_levels;
+use skg::test_utils::set_source_retagging_member_sources;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -47,7 +47,7 @@ fn test_load_from_single_source() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
-  set_source_retagging_levels ( &mut node, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -93,21 +93,23 @@ fn test_load_from_multiple_sources() {
   let mut node1 : NodeComplete = empty_node_complete();
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
-  set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
-  set_source_retagging_levels ( &mut node2, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node2, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
-  // Create nodes in shared source
-  let mut node3 : NodeComplete = empty_node_complete();
-  node3 . pid = ID::new ("shared1");
-  node3 . title = "Shared Node 1" . to_string();
-  set_source_retagging_levels ( &mut node3, &SourceName::from ("shared") );
-  write_nodecomplete_to_source(&node3, &config) . unwrap();
+  // Create a node in the shared source. Written RAW: 'shared' is
+  // foreign, and the node writer is the SAVE path, which refuses a
+  // foreign home rather than drop the title silently. Planting a
+  // foreign fixture is a filesystem act, not a save.
+  fs::write (
+    config . sources . get (&SourceName::from ("shared"))
+      . unwrap () . path . join ("shared1.skg"),
+    "pid: shared1\ntitle: Shared Node 1\n" ) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -129,7 +131,7 @@ fn test_load_from_multiple_sources() {
 }
 
 #[test]
-fn test_duplicate_id_detection_across_sources() {
+fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
   // Create two source directories
@@ -163,7 +165,7 @@ fn test_duplicate_id_detection_across_sources() {
   // this dummy config: "main" precedes "shared"). The stray second
   // title is a fold warning, not an error. The section files are
   // written RAW: a whole-node write would (correctly) sweep the
-  // pid's sections at other levels, so two sequential
+  // pid's sections at other sources, so two sequential
   // write_nodecomplete_to_source calls cannot build a telescope.
   fs::write (
     config . sources . get (&SourceName::from ("main"))
@@ -181,7 +183,7 @@ fn test_duplicate_id_detection_across_sources() {
   assert_eq!( nodes[0] . title, "Node in Main",
     "the home (most public titled section) wins the title" );
   assert_eq!( nodes[0] . source, SourceName::from ("main") );
-  check_for_duplicate_ids_across_sources (
+  error_unless_each_id_names_one_node (
     &nodes, &config . data_root)
     . expect ("a telescope is not an id conflict");
 
@@ -191,25 +193,26 @@ fn test_duplicate_id_detection_across_sources() {
     node_a . pid = ID::new ("pid-a");
     node_a . title = "A" . to_string();
     node_a . extra_ids = vec! [ ID::new ("contested") ];
-    set_source_retagging_levels ( &mut node_a, &SourceName::from ("main") );
+    set_source_retagging_member_sources ( &mut node_a, &SourceName::from ("main") );
     let mut node_b : NodeComplete = empty_node_complete();
     node_b . pid = ID::new ("pid-b");
     node_b . title = "B" . to_string();
     node_b . extra_ids = vec! [ ID::new ("contested") ];
-    set_source_retagging_levels ( &mut node_b, &SourceName::from ("shared") );
+    set_source_retagging_member_sources ( &mut node_b, &SourceName::from ("shared") );
     let result : IoResult<()> =
-      check_for_duplicate_ids_across_sources (
+      error_unless_each_id_names_one_node (
         & [ node_a, node_b ], &config . data_root);
     assert!(result . is_err(), "Should fail: two pids claim one id");
     let err : IoError = result . unwrap_err();
     assert_eq!(err . kind(), IoErrorKind::InvalidData);
     let err_msg = err . to_string();
-    assert!(err_msg . contains ("Duplicate ID"), "Error should mention duplicate ID");
+    assert!(err_msg . contains ("claimed by more than one node"),
+            "Error should say what the violation is: {}", err_msg);
     assert!(err_msg . contains ("contested"), "Error should include the ID"); }
 }
 
 #[test]
-fn test_node_with_multiple_ids_duplicate_detection() {
+fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   let temp_dir : TempDir = tempdir() . unwrap();
 
   // Create two source directories
@@ -242,21 +245,20 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   node1 . pid = ID::new ("id1");
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
-  set_source_retagging_levels ( &mut node1, &SourceName::from ("main") );
+  set_source_retagging_member_sources ( &mut node1, &SourceName::from ("main") );
   write_nodecomplete_to_source(&node1, &config) . unwrap();
 
-  // Create node in shared that has one overlapping ID
-  let mut node2 : NodeComplete = empty_node_complete();
-  node2 . pid = ID::new ("id2");
-  node2 . extra_ids = vec![ID::new ("id3")];
-  node2 . title = "Another Node" . to_string();
-  set_source_retagging_levels ( &mut node2, &SourceName::from ("shared") );
-  write_nodecomplete_to_source(&node2, &config) . unwrap();
+  // Create node in shared that has one overlapping ID. Written RAW:
+  // 'shared' is foreign, and the node writer refuses a foreign home.
+  fs::write (
+    config . sources . get (&SourceName::from ("shared"))
+      . unwrap () . path . join ("id2.skg"),
+    "pid: id2\ntitle: Another Node\nextra_ids:\n- id3\n" ) . unwrap();
 
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) . unwrap();
   let result : IoResult<()> =
-    check_for_duplicate_ids_across_sources (
+    error_unless_each_id_names_one_node (
       &nodes, &config . data_root);
   assert!(result . is_err(), "Should fail due to overlapping ID");
 
@@ -324,13 +326,13 @@ fn test_source_field_set_correctly() {
   let mut node_a : NodeComplete = empty_node_complete();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
-  set_source_retagging_levels ( &mut node_a, &SourceName::from ("source_a") );
+  set_source_retagging_member_sources ( &mut node_a, &SourceName::from ("source_a") );
   write_nodecomplete_to_source(&node_a, &config) . unwrap();
 
   let mut node_b : NodeComplete = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
-  set_source_retagging_levels ( &mut node_b, &SourceName::from ("source_b") );
+  set_source_retagging_member_sources ( &mut node_b, &SourceName::from ("source_b") );
   write_nodecomplete_to_source(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
@@ -354,7 +356,7 @@ fn test_source_field_set_correctly() {
 }
 
 #[test]
-fn test_many_duplicate_ids_creates_org_file() {
+fn test_many_id_conflicts_create_org_file() {
   // Test that >10 duplicates triggers org file creation
   let temp_dir : TempDir = tempdir() . unwrap();
 
@@ -398,33 +400,35 @@ fn test_many_duplicate_ids_creates_org_file() {
     node_b . extra_ids = vec![ID::new (&id)];
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
-    set_source_retagging_levels ( &mut node_a, &SourceName::from ("source_a") );
-    set_source_retagging_levels ( &mut node_b, &SourceName::from ("source_b") );
+    set_source_retagging_member_sources ( &mut node_a, &SourceName::from ("source_a") );
+    set_source_retagging_member_sources ( &mut node_b, &SourceName::from ("source_b") );
     nodes . push (node_a);
     nodes . push (node_b); }
 
   let result : IoResult<()> =
-    check_for_duplicate_ids_across_sources (
+    error_unless_each_id_names_one_node (
       &nodes, &config . data_root);
-  assert!(result . is_err(), "Should fail due to duplicate IDs");
+  assert!(result . is_err(), "Should fail: 15 ids claimed by two nodes each");
 
   let err : IoError = result . unwrap_err();
   assert_eq!(err . kind(), IoErrorKind::InvalidData);
   let err_msg = err . to_string();
-  assert!(err_msg . contains ("15") || err_msg . contains ("duplicate"),
-          "Error should mention duplicates: {}", err_msg);
+  assert!(err_msg . contains ("15")
+          && err_msg . contains ("claimed by more than one node"),
+          "Error should count the conflicts and name them: {}", err_msg);
 
   // Check that org file was created in the test's tempdir.
   let org_file_path : PathBuf =
-    temp_dir . path () . join ("initialization-error_duplicate-ids.org");
+    temp_dir . path () . join (
+      "initialization-error_ids-claimed-by-two-nodes.org");
   assert!(org_file_path . exists(),
-          "Org file should be created for >10 duplicates");
+          "Org file should be created for >10 conflicts");
 
   // Generate expected content programmatically
   let mut expected : String = String::new();
-  expected . push_str ("#+title: Duplicate IDs Across Sources\n");
+  expected . push_str ("#+title: IDs claimed by more than one node\n");
   expected . push_str ("#+date: <generated at initialization>\n\n");
-  expected . push_str ("Found 15 duplicate IDs across sources.\n\n");
+  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
 
   // IDs are sorted alphabetically (lexicographic), not numerically
   // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...
@@ -433,9 +437,10 @@ fn test_many_duplicate_ids_creates_org_file() {
   ids . sort();
 
   for id in ids {
+    let n : &str = id . rsplit ('_') . next () . unwrap ();
     expected . push_str(&format!("* {}\n", id));
-    expected . push_str ("** source_a\n");
-    expected . push_str ("** source_b\n");
+    expected . push_str(&format!("** pid_a_{} (source_a)\n", n));
+    expected . push_str(&format!("** pid_b_{} (source_b)\n", n));
   }
 
   // Read and verify full org file content
@@ -473,7 +478,7 @@ fn test_unreadable_files_creates_org_file() {
   let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
-  set_source_retagging_levels ( &mut node, &SourceName::from ("source_good") );
+  set_source_retagging_member_sources ( &mut node, &SourceName::from ("source_good") );
   write_nodecomplete_to_source(&node, &write_config) . unwrap();
 
   // Create config with both sources for reading (including the bad one)
@@ -538,4 +543,138 @@ fn test_unreadable_files_creates_org_file() {
           "Error should mention file/directory not found");
 
   // No explicit cleanup: temp_dir's Drop handles it.
+}
+
+/// The malformed scalar and foreign-home shapes
+/// 'write_nodecomplete_telescope' refuses. Neither
+/// arises from a skg save (every recording source is clamped to at least the
+/// owner's home); both arrive from hand-edited files or a pull.
+/// Writing either would publish the node's text or lose it.
+#[test]
+fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
+  let temp_dir : TempDir = tempdir() . unwrap();
+  let public_path  : PathBuf = temp_dir . path() . join ("public");
+  let foreign_path : PathBuf = temp_dir . path() . join ("foreign");
+  fs::create_dir_all (&public_path)  . unwrap();
+  fs::create_dir_all (&foreign_path) . unwrap();
+  let config : SkgConfig = {
+    let mut sources : HashMap<SourceName, SkgfileSource> =
+      HashMap::new();
+    for (name, path, owned) in
+      [ ("public",  public_path  . clone(), true  ),
+        ("foreign", foreign_path . clone(), false ) ] {
+      sources . insert ( SourceName::from (name), SkgfileSource {
+        name         : SourceName::from (name),
+        abbreviation : None,
+        path,
+        user_owns_it : owned, } ); }
+    let mut config : SkgConfig =
+      test_config (sources, temp_dir . path () . to_path_buf ());
+    config . source_order = // most public first
+      vec! [ SourceName::from ("foreign"),
+             SourceName::from ("public") ];
+    config };
+  { // FOREIGN HOME: refused, rather than silently dropping the title.
+    let mut node : NodeComplete = empty_node_complete();
+    node . pid   = ID::new ("F");
+    node . title = "foreign-homed" . to_string();
+    set_source_retagging_member_sources (
+      &mut node, &SourceName::from ("foreign") );
+    let err : IoError =
+      write_nodecomplete_to_source (&node, &config)
+      . expect_err ("a foreign home is not writable");
+    assert!( err . to_string() . contains ("do not own"),
+             "the refusal says why: {}", err ); }
+  { // TITLE HOIST: the home exists and is titleless, so the text
+    // lives more privately and this write would publish it.
+    fs::write ( public_path . join ("H.skg"),
+                "pid: H\ncontains:\n- C\n" ) . unwrap();
+    let mut node : NodeComplete = empty_node_complete();
+    node . pid   = ID::new ("H");
+    node . title = "private text" . to_string();
+    set_source_retagging_member_sources (
+      &mut node, &SourceName::from ("public") );
+    let err : IoError =
+      write_nodecomplete_to_source (&node, &config)
+      . expect_err ("hoisting a title into a titleless home is refused");
+    assert!( err . to_string() . contains ("would publish it"),
+             "the refusal says why: {}", err );
+    assert_eq!( fs::read_to_string (
+                  public_path . join ("H.skg") ) . unwrap(),
+                "pid: H\ncontains:\n- C\n",
+                "and nothing was written" ); }
+  { // The ordinary shape still writes: an owned, titled home.
+    let mut node : NodeComplete = empty_node_complete();
+    node . pid   = ID::new ("N");
+    node . title = "ordinary" . to_string();
+    set_source_retagging_member_sources (
+      &mut node, &SourceName::from ("public") );
+    write_nodecomplete_to_source (&node, &config)
+      . expect ("an owned titled home writes"); }
+}
+
+#[test]
+fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
+  use skg::dbs::filesystem::multiple_nodes::write_all_nodes_to_fs;
+  let temp_dir : TempDir = tempdir() . unwrap();
+  let public_path  : PathBuf = temp_dir . path() . join ("public");
+  let private_path : PathBuf = temp_dir . path() . join ("private");
+  let foreign_path : PathBuf = temp_dir . path() . join ("foreign");
+  for path in [&public_path, &private_path, &foreign_path] {
+    fs::create_dir_all (path) . unwrap (); }
+  let config : SkgConfig = {
+    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new ();
+    for (name, path, owned) in [
+      ("public",  public_path  . clone (), true),
+      ("private", private_path . clone (), true),
+      ("foreign", foreign_path . clone (), false),
+    ] {
+      sources . insert ( SourceName::from (name), SkgfileSource {
+        name         : SourceName::from (name),
+        abbreviation : None,
+        path,
+        user_owns_it : owned,
+      } ); }
+    let mut config : SkgConfig =
+      test_config (sources, temp_dir . path () . to_path_buf ());
+    config . source_order = ["public", "private", "foreign"]
+      . into_iter () . map (SourceName::from) . collect ();
+    config };
+
+  fs::write (
+    public_path . join ("B.skg"),
+    "title: visible title\npid: B\n" ) . unwrap ();
+  fs::write (
+    private_path . join ("B.skg"),
+    "pid: B\nbody: hidden body\n" ) . unwrap ();
+  let mut body_hoist : NodeComplete = empty_node_complete ();
+  body_hoist . pid = ID::new ("B");
+  body_hoist . title = "visible title" . to_string ();
+  body_hoist . body = Some ("hidden body" . to_string ());
+  set_source_retagging_member_sources (
+    &mut body_hoist, &SourceName::from ("public") );
+  let err : IoError = write_nodecomplete_to_source (&body_hoist, &config)
+    . expect_err ("a body below home requires interactive Hoist approval");
+  assert! (err . to_string () . contains ("would publish it"));
+  assert_eq! (
+    fs::read_to_string (private_path . join ("B.skg")) . unwrap (),
+    "pid: B\nbody: hidden body\n" );
+
+  let mut valid : NodeComplete = empty_node_complete ();
+  valid . pid = ID::new ("V");
+  valid . title = "valid" . to_string ();
+  set_source_retagging_member_sources (
+    &mut valid, &SourceName::from ("public") );
+  let mut invalid : NodeComplete = empty_node_complete ();
+  invalid . pid = ID::new ("X");
+  invalid . title = "invalid" . to_string ();
+  set_source_retagging_member_sources (
+    &mut invalid, &SourceName::from ("public") );
+  invalid . contains . push (
+    skg::types::misc::MemberAtSource::at_source (
+      SourceName::from ("foreign"), ID::new ("child") ));
+  write_all_nodes_to_fs (vec! [valid, invalid], config)
+    . expect_err ("a later foreign output rejects the entire batch");
+  assert! (! public_path . join ("V.skg") . exists (),
+           "the valid earlier node was not written before batch failure");
 }

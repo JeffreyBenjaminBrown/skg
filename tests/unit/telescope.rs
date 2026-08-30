@@ -1,62 +1,88 @@
 //! Property suite for the telescope fold/unfold pair. The
 //! load-bearing laws (5_plan.org, section-format-and-fold):
-//! - fold(unfold(x)) == x for every leveled list ("round-trip");
+//! - fold(unfold(x)) == x for every list of members at sources ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application
 //!   (unfold output is canonical);
-//! - every member's level survives both directions;
+//! - every member's source survives both directions;
 //! - dangling/duplicate-anchor junk folds totally and
 //!   deterministically;
-//! - the silent-leak guard: no member ever changes level.
+//! - the silent-leak guard: no member ever changes source.
 
-use super::fold::{FoldedNode, fold_sections};
+use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices};
 use super::unfold::{UnfoldInput, unfold_node};
-use crate::types::misc::{ID, PrivaciedMember, SourceName};
+use crate::types::misc::{
+  ID, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
+};
 
 use proptest::prelude::*;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// The test privacy order: S0 most public .. S3 most private.
-fn level_universe () -> Vec<SourceName> {
+fn source_universe () -> Vec<SourceName> {
   (0..4) . map ( |i| SourceName ( format! ("S{}", i) ))
     . collect () }
 
-fn position_of (
-  level : &SourceName,
-) -> Option<usize> {
-  level_universe () . iter () . position ( |l| l == level ) }
+fn telescope_config () -> SkgConfig {
+  let sources : HashMap<SourceName, SkgfileSource> =
+    source_universe () . into_iter ()
+    . map ( |source| (
+      source . clone (),
+      SkgfileSource {
+        name         : source . clone (),
+        abbreviation : None,
+        path         : PathBuf::from (format! ("owned/{}", source)),
+        user_owns_it : true,
+      } ))
+    . collect ();
+  let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
+  config . source_order = source_universe ();
+  config }
+
+fn unfold_sections (
+  input : &UnfoldInput,
+) -> Vec<(SourceName, SectionSlices)> {
+  unfold_node (input, &telescope_config ()) . unwrap ()
+    . into_sections () . into_iter ()
+    . map ( |(source, node_fs)|
+      (source, node_fs . into_section_slices ()) )
+    . collect () }
 
 fn identity_resolve (
   id : &ID,
 ) -> ID {
   id . clone () }
 
-/// An arbitrary leveled list with UNIQUE members: up to N members,
-/// each at a random level of the universe. Uniqueness matters
+/// An arbitrary list of members at sources with UNIQUE members: up to N
+/// members, each at a random source in the universe. Uniqueness matters
 /// because the fold dedups (with warnings), which round-trip inputs
 /// must not trigger.
-fn arb_leveled_list (
+fn arb_members_at_sources (
   max_len : usize,
-) -> impl Strategy<Value = Vec<PrivaciedMember<ID>>> {
+) -> impl Strategy<Value = Vec<MemberAtSource<ID>>> {
   proptest::collection::vec ( 0usize..4, 0..max_len )
-    . prop_map ( |levels| {
-      let universe : Vec<SourceName> = level_universe ();
-      levels . into_iter () . enumerate ()
-        . map ( |(i, l)| PrivaciedMember::at (
+    . prop_map ( |sources| {
+      let universe : Vec<SourceName> = source_universe ();
+      sources . into_iter () . enumerate ()
+        . map ( |(i, l)| MemberAtSource::at_source (
           universe [l] . clone (),
           ID ( format! ("id{}", i) )))
         . collect () } ) }
 
-/// Wrap ordered leveled lists (and nothing else) into an
+/// Wrap ordered lists of members at sources (and nothing else) into an
 /// UnfoldInput-shaped FoldedNode for the round-trip tests.
 fn folded_from_lists (
   home     : &SourceName,
-  contains : Vec<PrivaciedMember<ID>>,
-  subs     : Vec<PrivaciedMember<ID>>,
-  hides    : Vec<PrivaciedMember<ID>>,
+  contains : Vec<MemberAtSource<ID>>,
+  subs     : Vec<MemberAtSource<ID>>,
+  hides    : Vec<MemberAtSource<ID>>,
 ) -> FoldedNode {
   FoldedNode {
     title                        : Some ("t" . to_string ()),
+    title_source                 : Some (home . clone ()),
     body                         : None,
+    body_source                  : None,
     home                         : Some ( home . clone () ),
     aliases                      : None,
     contains,
@@ -72,8 +98,11 @@ fn unfold_then_fold (
   let home : SourceName =
     folded . home . clone () . expect ("home set");
   let sections : Vec<(SourceName, SectionSlices)> =
-    unfold_node (
+    unfold_sections (
       & UnfoldInput {
+        pid      : &ID::new ("p"),
+        extra_ids : &[],
+        misc      : &[],
         title    : folded . title . as_deref (),
         body     : folded . body . as_deref (),
         home     : &home,
@@ -87,8 +116,7 @@ fn unfold_then_fold (
           . unwrap_or (&[]),
         overrides_view_of :
           folded . overrides_view_of . as_deref ()
-          . unwrap_or (&[]), },
-      &position_of );
+          . unwrap_or (&[]), } );
   fold_sections ( &sections, &identity_resolve ) }
 
 proptest! {
@@ -96,20 +124,20 @@ proptest! {
 
   #[test]
   fn round_trip_ordered_and_unordered (
-    contains in arb_leveled_list (12),
-    subs_raw in arb_leveled_list (6),
-    hides_raw in arb_leveled_list (6),
+    contains in arb_members_at_sources (12),
+    subs_raw in arb_members_at_sources (6),
+    hides_raw in arb_members_at_sources (6),
   ) {
     // distinct id spaces so the three lists cannot collide
-    let subs : Vec<PrivaciedMember<ID>> =
+    let subs : Vec<MemberAtSource<ID>> =
       subs_raw . into_iter ()
-      . map ( |m| PrivaciedMember::at (
-        m . level, ID ( format! ("s-{}", m . member . 0 ))))
+      . map ( |m| MemberAtSource::at_source (
+        m . source, ID ( format! ("s-{}", m . member . 0 ))))
       . collect ();
-    let hides : Vec<PrivaciedMember<ID>> =
+    let hides : Vec<MemberAtSource<ID>> =
       hides_raw . into_iter ()
-      . map ( |m| PrivaciedMember::at (
-        m . level, ID ( format! ("h-{}", m . member . 0 ))))
+      . map ( |m| MemberAtSource::at_source (
+        m . source, ID ( format! ("h-{}", m . member . 0 ))))
       . collect ();
     let home : SourceName = SourceName::from ("S0");
     let folded : FoldedNode =
@@ -121,13 +149,13 @@ proptest! {
     prop_assert_eq! ( &refolded . subscribes_to,
                       &folded . subscribes_to );
     { // Unordered relations have no order to preserve: sections
-      // cannot express cross-level interleavings without anchors,
+      // cannot express cross-source interleavings without anchors,
       // which unordered relations deliberately lack, so the fold's
-      // output order is CANONICAL (level-major). The law is
-      // set-equality with levels intact.
-      let sort = |v : Option<&Vec<PrivaciedMember<ID>>>|
-      -> Vec<PrivaciedMember<ID>> {
-        let mut v : Vec<PrivaciedMember<ID>> =
+      // output order is CANONICAL (source-major). The law is
+      // set-equality with sources intact.
+      let sort = |v : Option<&Vec<MemberAtSource<ID>>>|
+      -> Vec<MemberAtSource<ID>> {
+        let mut v : Vec<MemberAtSource<ID>> =
           v . cloned () . unwrap_or_default ();
         v . sort_by ( |a, b| a . member . cmp ( &b . member ));
         v };
@@ -142,7 +170,7 @@ proptest! {
 
   #[test]
   fn unfold_is_canonical (
-    contains in arb_leveled_list (12),
+    contains in arb_members_at_sources (12),
   ) {
     // unfold . fold . unfold == unfold  (sections are a normal form)
     let home : SourceName = SourceName::from ("S0");
@@ -150,43 +178,43 @@ proptest! {
       &home, contains, Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
     let sections_once : Vec<(SourceName, SectionSlices)> =
-      unfold_node (
+      unfold_sections (
         & UnfoldInput {
+          pid : &ID::new ("p"), extra_ids : &[], misc : &[],
           title : folded . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &folded . contains,
           subscribes_to : &[],
           hides_from_its_subscriptions : &[],
-          overrides_view_of : &[], },
-        &position_of );
+          overrides_view_of : &[], } );
     let sections_twice : Vec<(SourceName, SectionSlices)> =
-      unfold_node (
+      unfold_sections (
         & UnfoldInput {
+          pid : &ID::new ("p"), extra_ids : &[], misc : &[],
           title : refolded . title . as_deref (),
           body : None, home : &home,
           aliases : &[], contains : &refolded . contains,
           subscribes_to : &[],
           hides_from_its_subscriptions : &[],
-          overrides_view_of : &[], },
-        &position_of );
+          overrides_view_of : &[], } );
     prop_assert_eq! (sections_once, sections_twice);
   }
 
   #[test]
-  fn no_member_ever_changes_level ( // the silent-leak guard
-    contains in arb_leveled_list (12),
+  fn no_member_ever_changes_source ( // the silent-leak guard
+    contains in arb_members_at_sources (12),
   ) {
     let home : SourceName = SourceName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
       &home, contains . clone (), Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
     for m in &contains {
-      let found : Option<&PrivaciedMember<ID>> =
+      let found : Option<&MemberAtSource<ID>> =
         refolded . contains . iter ()
         . find ( |n| n . member == m . member );
       prop_assert_eq! (
-        found . map ( |n| &n . level ), Some ( &m . level ),
-        "member {:?} changed level", m . member );
+        found . map ( |n| &n . source ), Some ( &m . source ),
+        "member {:?} changed source", m . member );
     }
   }
 }
@@ -307,4 +335,144 @@ fn anchors_resolve_through_the_resolver ( // extra-id safety
     . collect ();
   assert_eq! ( got, vec! ["a", "y"] );
   assert! ( warnings . is_empty (), "{:?}", warnings );
+}
+
+#[test]
+fn the_home_is_the_most_public_section_titled_or_not (
+) { // Jeff's rule: a node's text always lives in its most public
+    // section. So the home is the most public SECTION, not the most
+    // public section bearing a title; a titleless one above the
+    // title is a violation to report, not a shape to search past.
+  let titleless_public : (SourceName, SectionSlices) =
+    ( SourceName::from ("public"),
+      SectionSlices { contains : Some ( vec! [
+        ListItem::Member ( ID::new ("C") ) ] ),
+        .. SectionSlices::default () } );
+  let titled_private : (SourceName, SectionSlices) =
+    ( SourceName::from ("private"),
+      SectionSlices { title : Some ( "N" . to_string () ),
+                      body  : Some ( "secret" . to_string () ),
+                      .. SectionSlices::default () } );
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
+    fold_sections (
+      & [ titleless_public, titled_private ],
+      & identity_resolve );
+  assert_eq! ( folded . home,
+               Some ( SourceName::from ("public") ),
+               "the home is the most public section" );
+  assert_eq! ( folded . title, Some ( "N" . to_string () ),
+               "the title still folds in, from wherever it sits" );
+  assert! ( warnings . contains ( & FoldWarning::TitleBelowHome {
+              home     : SourceName::from ("public"),
+              title_at : SourceName::from ("private"), } ),
+            "the shape is reported: {:?}", warnings );
+}
+
+#[test]
+fn a_titled_most_public_section_raises_no_title_warning (
+) {
+  let titled_public : (SourceName, SectionSlices) =
+    ( SourceName::from ("public"),
+      SectionSlices { title : Some ( "N" . to_string () ),
+                      .. SectionSlices::default () } );
+  let titleless_private : (SourceName, SectionSlices) =
+    ( SourceName::from ("private"),
+      SectionSlices { contains : Some ( vec! [
+        ListItem::Member ( ID::new ("C") ) ] ),
+        .. SectionSlices::default () } );
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
+    fold_sections (
+      & [ titled_public, titleless_private ],
+      & identity_resolve );
+  assert_eq! ( folded . home,
+               Some ( SourceName::from ("public") ) );
+  assert! ( ! warnings . iter () . any ( |w| matches! (
+              w, FoldWarning::TitleBelowHome { .. }
+                 | FoldWarning::NonHomeTitle { .. }
+                 | FoldWarning::MissingTitle )),
+            "the ordinary telescope shape warns about nothing: {:?}",
+            warnings );
+}
+
+fn scalar_node (
+  sections : Vec<(SourceName, SectionSlices)>,
+) -> (crate::types::nodes::complete::NodeComplete, Vec<FoldWarning>) {
+  let (folded, warnings) = fold_sections (&sections, &identity_resolve);
+  let node = nodecomplete_from_fold (
+    ID::new ("scalar-node"), Vec::new (), Vec::new (), folded )
+    .expect ("test cases carry a title");
+  (node, warnings) }
+
+#[test]
+fn title_and_body_select_independently_and_mark_ugliness (
+) {
+  let public = SourceName::from ("public");
+  let private = SourceName::from ("private");
+
+  let (clean, _) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        title : Some ("home title" . to_string ()),
+        body  : Some ("home body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (clean . title, "home title");
+  assert_eq! (clean . body . as_deref (), Some ("home body"));
+  assert! (!clean . ugly_telescope);
+
+  let (lower_title, warnings) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        body : Some ("home body" . to_string ()),
+        .. SectionSlices::default () } ),
+    ( private . clone (), SectionSlices {
+        title : Some ("lower title" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (lower_title . title, "lower title");
+  assert_eq! (lower_title . body . as_deref (), Some ("home body"));
+  assert! (lower_title . ugly_telescope);
+  assert! (warnings . iter () . any ( |warning| matches! (
+    warning, FoldWarning::TitleBelowHome { title_at, .. }
+      if title_at == &private )));
+
+  let (lower_body, warnings) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        title : Some ("home title" . to_string ()),
+        .. SectionSlices::default () } ),
+    ( private . clone (), SectionSlices {
+        body : Some ("lower body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (lower_body . title, "home title");
+  assert_eq! (lower_body . body . as_deref (), Some ("lower body"));
+  assert! (lower_body . ugly_telescope);
+  assert! (warnings . iter () . any ( |warning| matches! (
+    warning, FoldWarning::BodyBelowHome { body_at, .. }
+      if body_at == &private )));
+
+  let (both_lower, _) = scalar_node (vec! [
+    ( public, SectionSlices::default () ),
+    ( private, SectionSlices {
+        title : Some ("lower title" . to_string ()),
+        body  : Some ("lower body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert_eq! (both_lower . title, "lower title");
+  assert_eq! (both_lower . body . as_deref (), Some ("lower body"));
+  assert! (both_lower . ugly_telescope);
+}
+
+#[test]
+fn later_scalars_report_the_source_that_actually_won (
+) {
+  let public = SourceName::from ("public");
+  let private = SourceName::from ("private");
+  let (_node, warnings) = scalar_node (vec! [
+    ( public . clone (), SectionSlices {
+        title : Some ("winner" . to_string ()),
+        body  : Some ("winner body" . to_string ()),
+        .. SectionSlices::default () } ),
+    ( private . clone (), SectionSlices {
+        title : Some ("later" . to_string ()),
+        body  : Some ("later body" . to_string ()),
+        .. SectionSlices::default () } ) ]);
+  assert! (warnings . contains (&FoldWarning::NonHomeTitle {
+    source : private . clone (), selected_at : public . clone () }));
+  assert! (warnings . contains (&FoldWarning::NonHomeBody {
+    source : private, selected_at : public }));
 }

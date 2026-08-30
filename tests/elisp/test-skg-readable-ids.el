@@ -203,3 +203,25 @@ clears the cache and asks again."
      (should (= 0 (test-skg-readable-ids--after-string-count)))
      (skg-readable-ids-refresh)
      (should (= 2 (length sent))))))
+
+(ert-deftest test-skg-readable-ids-privacy-challenge-retries-exact-pids ()
+  "A title challenge releases no title and an approval retry names its PIDs."
+  (test-skg-readable-ids--with-clean-state
+   (with-temp-buffer
+     (insert test-skg-readable-ids--id-c)
+     (skg-readable-ids--annotate-buffer)
+     (should (= 1 (length sent)))
+     (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) t)))
+       (skg-lp--dispatch-by-type
+        nil
+        (format
+         "((response-type ugly-telescope-confirmation) \
+           (operation titles-by-ids) (pids (%S)) \
+           (prompt \"Include lower text?\"))"
+         test-skg-readable-ids--id-c)))
+     (should (= 2 (length sent)))
+     (let ((retry (car sent)))
+       (should (string-match-p "allow-ugly-telescopes" retry))
+       (should (string-match-p test-skg-readable-ids--id-c retry)))
+     (should-not (gethash test-skg-readable-ids--id-c
+                          skg-readable-ids--title-cache)))))

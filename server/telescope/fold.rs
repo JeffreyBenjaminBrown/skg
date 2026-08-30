@@ -1,9 +1,9 @@
-//! The FOLD: sections (per-level slices, most public first) -> the
-//! node's effective leveled lists. Total and deterministic: junk
+//! The FOLD: sections (per-source slices, most public first) -> the
+//! node's effective lists of members at sources. Total and deterministic: junk
 //! degrades to 'FoldWarning's, never errors (see types.rs).
 //!
-//! Semantics, per ordered relation: the fold THROUGH level k is
-//! exactly what a level-k viewer sees. The most public section
+//! Semantics, per ordered relation: the fold THROUGH source k is
+//! exactly what a source-k viewer sees. The most public section
 //! mentioning the relation contributes the base list; each more
 //! private section's prepend lands at the front, and each of its
 //! runs lands immediately after its anchor -- an anchor being any
@@ -14,35 +14,80 @@
 //! prepend if it is first (Jeff's fallback, 4_discussion.org).
 //!
 //! Unordered relations (hides, overrides) and aliases: union in
-//! level order; a member repeated across levels keeps its most
+//! source order; a member repeated across sources keeps its most
 //! public occurrence, with a warning.
 
-use crate::telescope::types::{FoldWarning, ListItem, SectionSlices};
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
+use std::io;
 
-/// The fold of one node's sections, as effective leveled lists plus
+/// The fold of one node's sections, as effective lists of members at sources plus
 /// scalars. Field names mirror 'NodeComplete'.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
   pub title                        : Option<String>,
+  pub title_source                 : Option<SourceName>,
   pub body                         : Option<String>,
+  pub body_source                  : Option<SourceName>,
   pub home                         : Option<SourceName>,
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
   // NodeComplete's.
-  pub aliases                      : Option<Vec<PrivaciedMember<String>>>,
-  pub contains                     : Vec<PrivaciedMember<ID>>,
-  pub subscribes_to                : Option<Vec<PrivaciedMember<ID>>>,
-  pub hides_from_its_subscriptions : Option<Vec<PrivaciedMember<ID>>>,
-  pub overrides_view_of            : Option<Vec<PrivaciedMember<ID>>>,
+  pub aliases                      : Option<Vec<MemberAtSource<String>>>,
+  pub contains                     : Vec<MemberAtSource<ID>>,
+  pub subscribes_to                : Option<Vec<MemberAtSource<ID>>>,
+  pub hides_from_its_subscriptions : Option<Vec<MemberAtSource<ID>>>,
+  pub overrides_view_of            : Option<Vec<MemberAtSource<ID>>>,
 }
 
-/// The fold as a NodeComplete. None iff the telescope has no home
-/// (no section carried a title) -- the caller decides whether that
-/// is a hard load error (it is, at init) or a warning.
+/// THE fold entry point: one telescope on disk -> the effective
+/// node, plus whatever the fold complained about. 'resolve' maps
+/// extra ids to pids for anchor resolution and must be built from
+/// the whole corpus, not just this telescope (else a nodeMerge can
+/// dangle an anchor).
+///
+/// Errors only when no section anywhere carries a title. A title
+/// present but BELOW the home folds fine, carrying a
+/// 'TitleBelowHome' warning.
+pub fn fold_telescope_collecting_warnings (
+  telescope : Telescope,
+  resolve   : &dyn Fn (&ID) -> ID,
+) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
+  let pid       : ID                = telescope . pid () . clone ();
+  let extra_ids : Vec<ID>           = telescope . extra_ids ();
+  let misc      : Vec<FileProperty> = telescope . misc ();
+  let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
+    fold_sections ( & telescope . into_slices (), resolve );
+  let node : NodeComplete = nodecomplete_from_fold (
+    pid . clone (), extra_ids, misc, folded )
+    . ok_or_else ( || io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! ("Telescope '{}' has no title in any section.",
+               pid ))) ?;
+  Ok (( node, warnings )) }
+
+/// 'fold_telescope_collecting_warnings', with the warnings logged
+/// rather than returned -- for callers with no way to report them.
+pub fn fold_telescope (
+  telescope : Telescope,
+  resolve   : &dyn Fn (&ID) -> ID,
+) -> io::Result<NodeComplete> {
+  let pid : ID = telescope . pid () . clone ();
+  let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+    fold_telescope_collecting_warnings ( telescope, resolve ) ?;
+  for w in &warnings {
+    tracing::warn! ( pid = %pid, warning = %w,
+                     "telescope fold warning" ); }
+  Ok (node) }
+
+/// The fold as a NodeComplete. None iff the telescope has no
+/// sections at all, or no section carried a title anywhere -- the
+/// caller decides whether that is a hard load error (it is, at
+/// init) or a warning. A title present but BELOW the home is not
+/// such a case: it folds, carrying a 'TitleBelowHome' warning.
 pub fn nodecomplete_from_fold (
   pid       : ID,
   extra_ids : Vec<ID>,
@@ -50,13 +95,19 @@ pub fn nodecomplete_from_fold (
   folded    : FoldedNode,
 ) -> Option<NodeComplete> {
   let home : SourceName = folded . home ?;
-  let msv = |o : Option<Vec<PrivaciedMember<ID>>>|
-  -> MSV<PrivaciedMember<ID>> {
+  let ugly_telescope : bool =
+    folded . title_source . as_ref () != Some (&home)
+    || folded . body_source . as_ref ()
+       .map ( |source| source != &home )
+       .unwrap_or (false);
+  let msv = |o : Option<Vec<MemberAtSource<ID>>>|
+  -> MSV<MemberAtSource<ID>> {
     match o {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), }};
   Some ( NodeComplete {
     title                        : folded . title ?,
+    ugly_telescope,
     aliases                      : match folded . aliases {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), },
@@ -81,27 +132,40 @@ pub fn fold_sections (
 ) -> (FoldedNode, Vec<FoldWarning>) {
   let mut warnings : Vec<FoldWarning> = Vec::new ();
   let mut folded : FoldedNode = FoldedNode::default ();
-  { // scalars: the home is the most public section bearing a title.
-    for (level, s) in sections {
-      match (&folded . title, &s . title) {
-        (None, Some (t)) => {
-          folded . title = Some ( t . clone () );
-          folded . home  = Some ( level . clone () );
-          if let Some (b) = &s . body {
-            folded . body = Some ( b . clone () ); }}
-        (Some (_), Some (_)) => {
-          warnings . push ( FoldWarning::NonHomeTitle {
-            level : level . clone () } );
-          if s . body . is_some ()
-          && folded . body . is_none () {
-            // A stray body rides its stray title's warning.
+  { // Scalars select independently: the first title and first body
+    // in privacy order win. The home remains the first section,
+    // whether or not it carries either scalar.
+    folded . home = sections . first ()
+      . map ( |(source, _)| source . clone () );
+    for (source, section) in sections {
+      if let Some (title) = &section . title {
+        match &folded . title_source {
+          None => {
+            folded . title = Some (title . clone ());
+            folded . title_source = Some (source . clone ());
+            if folded . home . as_ref () != Some (source) {
+              warnings . push ( FoldWarning::TitleBelowHome {
+                home : folded . home . clone ()
+                  . expect ("a section establishes the home"),
+                title_at : source . clone (), } ); }}
+          Some (selected_at) =>
+            warnings . push ( FoldWarning::NonHomeTitle {
+              source      : source . clone (),
+              selected_at : selected_at . clone (), } ), }}
+      if let Some (body) = &section . body {
+        match &folded . body_source {
+          None => {
+            folded . body = Some (body . clone ());
+            folded . body_source = Some (source . clone ());
+            if folded . home . as_ref () != Some (source) {
+              warnings . push ( FoldWarning::BodyBelowHome {
+                home : folded . home . clone ()
+                  . expect ("a section establishes the home"),
+                body_at : source . clone (), } ); }}
+          Some (selected_at) =>
             warnings . push ( FoldWarning::NonHomeBody {
-              level : level . clone () } ); }}
-        _ => {
-          if s . body . is_some () && folded . title . is_none () {
-            // body in a titleless section, before any home was seen
-            warnings . push ( FoldWarning::NonHomeBody {
-              level : level . clone () } ); }} }}
+              source      : source . clone (),
+              selected_at : selected_at . clone (), } ), }} }
     if folded . title . is_none () {
       warnings . push ( FoldWarning::MissingTitle ); }}
   folded . contains = fold_ordered (
@@ -134,13 +198,13 @@ pub fn fold_sections (
       // but members are strings, deduped verbatim.
       let mut seen : std::collections::HashSet<String> =
         std::collections::HashSet::new ();
-      let mut out : Vec<PrivaciedMember<String>> = Vec::new ();
-      for (level, s) in sections {
+      let mut out : Vec<MemberAtSource<String>> = Vec::new ();
+      for (source, s) in sections {
         if let Some (aliases) = &s . aliases {
           for a in aliases {
             if seen . insert ( a . clone () ) {
-              out . push ( PrivaciedMember::at (
-                level . clone (), a . clone () )); }
+              out . push ( MemberAtSource::at_source (
+                source . clone (), a . clone () )); }
             else {
               // No per-alias id to report; reuse DuplicateMember with
               // a synthetic ID carrying the alias text.
@@ -156,10 +220,10 @@ fn fold_ordered (
   slice_of : impl Fn (&SectionSlices) -> Option<&[ListItem]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
-) -> Vec<PrivaciedMember<ID>> {
-  let mut effective : Vec<PrivaciedMember<ID>> = Vec::new ();
+) -> Vec<MemberAtSource<ID>> {
+  let mut effective : Vec<MemberAtSource<ID>> = Vec::new ();
   let mut any_section_yet : bool = false;
-  for (level, s) in sections {
+  for (source, s) in sections {
     let Some (items) = slice_of (s) else { continue; };
     let is_base : bool = ! any_section_yet;
     any_section_yet = true;
@@ -214,41 +278,41 @@ fn fold_ordered (
         warnings . push ( FoldWarning::DuplicateMember {
           member : id . clone () } );
         false }};
-    let mut next : Vec<PrivaciedMember<ID>> =
+    let mut next : Vec<MemberAtSource<ID>> =
       Vec::with_capacity ( effective . len ()
                            + prepend . len () );
     for id in prepend {
       if keep (&id, warnings) {
-        next . push ( PrivaciedMember::at (
-          level . clone (), id )); }}
+        next . push ( MemberAtSource::at_source (
+          source . clone (), id )); }}
     for m in effective {
       let key : ID = resolve ( &m . member );
       next . push (m);
       if let Some (queue) = queues . remove (&key) {
         for id in queue {
           if keep (&id, warnings) {
-            next . push ( PrivaciedMember::at (
-              level . clone (), id )); }} }}
+            next . push ( MemberAtSource::at_source (
+              source . clone (), id )); }} }}
     effective = next; }
   effective }
 
-/// One unordered relation's fold: union in level order, most public
+/// One unordered relation's fold: union in source order, most public
 /// occurrence winning.
 fn fold_unordered (
   sections : &[(SourceName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ID]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
-) -> Vec<PrivaciedMember<ID>> {
+) -> Vec<MemberAtSource<ID>> {
   let mut seen : std::collections::HashSet<ID> =
     std::collections::HashSet::new ();
-  let mut out : Vec<PrivaciedMember<ID>> = Vec::new ();
-  for (level, s) in sections {
+  let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
+  for (source, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
     for id in members {
       if seen . insert ( resolve (id) ) {
-        out . push ( PrivaciedMember::at (
-          level . clone (), id . clone () ));
+        out . push ( MemberAtSource::at_source (
+          source . clone (), id . clone () ));
       } else {
         warnings . push ( FoldWarning::DuplicateMember {
           member : id . clone () } ); }}}

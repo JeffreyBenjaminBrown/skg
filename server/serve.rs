@@ -17,15 +17,18 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_n
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
-use crate::serve::handlers::edge_level_info::handle_edge_level_info_request;
+use crate::serve::handlers::edge_source_info::handle_edge_source_info_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
-use crate::serve::handlers::migrate_to_telescopes::handle_migrate_to_telescopes_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::reload_paths::handle_reload_paths_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision,
+  decide as decide_scalar_release,
+  exclude_ugly_nodes_from_viewforest};
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
@@ -192,7 +195,8 @@ fn handle_emacs (
               &mut stream, &request_header,
               &env . tantivy_index, &env . config,
               views_state . diff_mode_enabled,
-              &active_source_set ),
+              &active_source_set,
+              &env . in_rust_graph_snapshot () ),
           Ok (RequestType::DiffAnalysis) =>
             handle_diff_analysis_request_with_source_set (
               &mut stream, &request_header, &env . config,
@@ -200,8 +204,8 @@ fn handle_emacs (
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (
               &mut stream, &env . config ),
-          Ok (RequestType::EdgeLevelInfo) =>
-            handle_edge_level_info_request (
+          Ok (RequestType::EdgeSourceInfo) =>
+            handle_edge_source_info_request (
               &mut stream, &request_header, &env ),
           Ok (RequestType::ListSourceSets)
           | Ok (RequestType::ActiveSourceSet)
@@ -219,6 +223,7 @@ fn handle_emacs (
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_toggle_and_rerender (
               &mut stream,
+              &request_header,
               &env,
               &mut views_state,
               &active_source_set ),
@@ -230,18 +235,13 @@ fn handle_emacs (
             handle_rebuild_dbs_request ( &mut stream,
                                          &mut env,
                                          &mut views_state ),
-          Ok (RequestType::MigrateToTelescopes) =>
-            handle_migrate_to_telescopes_request (
-              &mut stream,
-              &mut env,
-              &mut views_state,
-              &active_source_set ),
           Ok (RequestType::StripBodyWhitespace) =>
             handle_strip_body_whitespace_request ( &mut stream,
                                                    &mut env ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
               &mut stream,
+              &request_header,
               &env,
               &mut views_state,
               &active_source_set ),
@@ -361,11 +361,39 @@ fn handle_snapshot_response (
   apply_source_set_to_viewforest (
     &mut viewforest,
     active_source_set );
+  if ! payload . include_ugly_telescopes {
+    exclude_ugly_nodes_from_viewforest (
+      &mut viewforest, &env . in_rust_graph_snapshot () ); }
+  let rendered_pids : Vec<_> =
+    viewforest . root () . descendants ()
+    . filter_map ( |node| match &node . value () . kind {
+      crate::types::viewnode::ViewNodeKind::Vognode (
+        crate::types::viewnode::Vognode::Active (active_node)) =>
+          Some (active_node . id . clone ()),
+      _ => None, } )
+    . collect ();
+  let approved : std::collections::HashSet<_> =
+    if payload . include_ugly_telescopes {
+      rendered_pids . iter () . cloned () . collect ()
+    } else { std::collections::HashSet::new () };
+  let release = decide_scalar_release (
+    "search-enrichment", active_source_set, &rendered_pids,
+    &env . in_rust_graph_snapshot (), &approved );
+  if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+    // Preflight and the load-bearing payload should make this unreachable.
+    // Fail closed rather than serialize if a future change violates either.
+    tracing::error! (
+      "search enrichment reached the release boundary without approval" );
+    return; }
+  let release_warnings : Vec<String> = match release {
+    ScalarReleaseDecision::AllowWithWarning { warning } => vec! [warning],
+    _ => Vec::new (), };
   let enriched : String =
     viewforest_to_string ( &viewforest, &env . config )
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
-    mk_search_enrichment_sexp ( &terms, &enriched );
+    mk_search_enrichment_sexp (
+      &terms, &enriched, &release_warnings );
   { let uri : ViewUri = // update ViewsState with enriched viewforest
       ViewUri::SearchView ( terms . clone () );
     views_state . open_views . update_view ( &uri, viewforest ); }

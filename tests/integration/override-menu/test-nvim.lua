@@ -50,7 +50,7 @@ local raw_content = T.buffer_text(raw_buf)
 -- The raw view may legitimately show R in an overriderCol; that is
 -- fine either way (no assertion), mirroring the elisp test's
 -- permissive check.
-T.check(raw_content:find('the overridden node', 1, true),
+T.check(raw_content:find('cooking', 1, true),
         "raw view lacks Z's title")
 print('bypass opened the raw node Z')
 

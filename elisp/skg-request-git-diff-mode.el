@@ -6,7 +6,7 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-state) ; for skg--git-diff-mode-enabled
 
-(defun skg-view-diff-mode ()
+(defun skg-view-diff-mode (&optional approved-pids)
   "Toggle git diff mode on the server and rerender all views.
 When enabled, subsequent content views and saves show
 what changed between HEAD and the worktree.
@@ -46,11 +46,17 @@ rerender-done."
            (message "%s" (or content "toggled")))))
      t)
     (skg--register-rerender-stream-handlers)
+    (skg--register-rerender-ugly-confirmation
+     (lambda (pids) (skg-view-diff-mode pids))
+     'git-diff-mode)
     (skg-lp-reset)
     (process-send-string
      tcp-proc
      (concat (prin1-to-string
-              '((request . "git diff mode toggle")))
+              (append
+               '((request . "git diff mode toggle"))
+               (when approved-pids
+                 `((allow-ugly-telescopes ,@approved-pids)))))
              "\n"))))
 
 (provide 'skg-request-git-diff-mode)

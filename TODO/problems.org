@@ -277,12 +277,6 @@
    disproportionate, and it is precisely when you can least afford to
    lose the tool (you cannot inspect or delete the offending node
    through the UI, because the UI will not start).
-** The unreadable-files report is not deleted after a successful boot
-   data/initialization-error_unreadable-skg-files.org survives from the
-   failed run into the healthy one, so a stale "Found 1 unreadable
-   file(s)" sits in the data root claiming a problem that no longer
-   exists. Suggested fix: remove it at the top of a successful init
-   (same for telescope-warnings.org when the warning count is 0).
 ** start-servers.sh's pkill patterns match nothing
    The process is '/bin/cargo-watch watch -w server/ -x run --bin skg
    -- data/skgconfig.toml' (cargo dispatches 'cargo watch' to the
@@ -684,6 +678,11 @@
 
    These did not block connection verification, but they are important
    enough that the client should probably surface them after init.
+   NOTE (2026-07-28): the duplicate-id example above predates the
+   privacy telescope. One id in two sources is now the normal shape of
+   any node with a privatized edge, not a defect. The entry's point --
+   init warning files are easy to miss -- still stands; only the
+   illustration is stale. See [[../dup-ids-maybe-bad.org]].
 ** Replacing data/skgconfig.toml can leave server and client on different ports
    Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
    but the already-running server process was still listening on 1730.
@@ -1342,3 +1341,10 @@
   into phase 2. The merge's one CODE/TEST semantic conflict --
   override_search_ancestry.rs asserting =(birthHerald)= / "aO" -- WAS
   reconciled to the semantic form as part of the merge.
+* override_menu::all_tests expects Oa heralds that rendering omits (2026-08-24)
+  Found during final verification of an unrelated Emacs navigation fix.
+  Both the full =cargo nextest run= and an isolated rerun fail at
+  =tests/override_menu.rs:126=: the override-menu tree has the correct Z,
+  F, F2, and R shape and semantic override facts, but the rendered
+  overriders lack the expected =Oa= herald marker.  No Rust production
+  code changed in the navigation fix.

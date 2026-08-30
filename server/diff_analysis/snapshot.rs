@@ -1,5 +1,9 @@
 use crate::dbs::filesystem::multiple_nodes::{
-  fold_one_telescope, read_skg_sections_from_folder};
+  read_skg_sections_from_folder};
+use crate::telescope::fold::fold_telescope;
+use crate::telescope::types::{
+  Telescope, retain_owned_sections_when_pid_collides,
+};
 use crate::diff_analysis::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
 use crate::git_ops::misc::path_relative_to_repo;
@@ -141,7 +145,7 @@ fn read_graph_snapshot (
               "Reading worktree source '{}': {}", source_name, e )), }) ?;
     sections . append (&mut source_sections); }
   profile_step ("snapshot_from_sections", || {
-    snapshot_from_sections (sections) })
+    snapshot_from_sections (config, sections) })
 }
 
 fn read_graph_snapshot_maybe_cached (
@@ -354,7 +358,7 @@ fn overlay_changed_after_snapshot (
           record_section_claims (
             &mut after . id_claims, node_fs, source_name ); }
         Some ( fold_telescope_tolerating_homelessness (
-          pid, sections, &resolve ) ? ) };
+          config, pid, sections, &resolve ) ? ) };
     affected_pids . extend (
       affected_pids_for_changed_node (
         before_node, after_node . as_ref () ));
@@ -389,6 +393,13 @@ fn read_telescope_sections_at_endpoint (
       read_section_at_endpoint (
         kind, &repo, &source_name, &rel_path ) ? {
       sections . push (( source_name, node_fs )); }}
+  let (sections, collision) =
+    retain_owned_sections_when_pid_collides (sections, config);
+  if let Some (collision) = collision {
+    tracing::warn! (
+      pid = %pid,
+      ignored_sources = ?collision . ignored_sources,
+      "diff snapshot ignored non-owned files colliding with an owned telescope" ); }
   Ok (sections)
 }
 
@@ -557,21 +568,36 @@ fn profile_log (
     duration . subsec_millis ()); }
 
 /// Group sections by pid (sections must arrive in privacy order),
-/// fold each telescope, and record every section's id claims.
+/// normalize owned/non-owned pid collisions, fold each telescope,
+/// and record the retained sections' id claims.
 fn snapshot_from_sections (
+  config   : &SkgConfig,
   sections : Vec<(SourceName, NodeFS)>,
 ) -> Result<GraphSnapshot, String> {
   let mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>> =
     HashMap::new ();
-  let mut id_claims
-    : HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>> =
-    HashMap::new ();
   for (source_name, node_fs) in sections {
-    record_section_claims (
-      &mut id_claims, &node_fs, &source_name );
     sections_by_pid . entry (node_fs . pid . clone ())
       . or_insert_with (Vec::new)
       . push (( source_name, node_fs )); }
+  for (pid, telescope_sections) in &mut sections_by_pid {
+    let sections : Vec<(SourceName, NodeFS)> =
+      std::mem::take (telescope_sections);
+    let (retained, collision) =
+      retain_owned_sections_when_pid_collides (sections, config);
+    *telescope_sections = retained;
+    if let Some (collision) = collision {
+      tracing::warn! (
+        pid = %pid,
+        ignored_sources = ?collision . ignored_sources,
+        "diff snapshot ignored non-owned files colliding with an owned telescope" ); }}
+  let mut id_claims
+    : HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>> =
+    HashMap::new ();
+  for sections in sections_by_pid . values () {
+    for (source_name, node_fs) in sections {
+      record_section_claims (
+        &mut id_claims, node_fs, source_name ); }}
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {
@@ -587,7 +613,7 @@ fn snapshot_from_sections (
   for (pid, telescope_sections) in sections_by_pid {
     let node : NodeComplete =
       fold_telescope_tolerating_homelessness (
-        &pid, telescope_sections, &resolve ) ?;
+        config, &pid, telescope_sections, &resolve ) ?;
     by_pid . insert (pid, node); }
   Ok ( GraphSnapshot { nodes: by_pid, id_claims } )
 }
@@ -599,14 +625,18 @@ fn snapshot_from_sections (
 /// a placeholder title on the most public section, so the report
 /// can still describe the telescope.
 fn fold_telescope_tolerating_homelessness (
+  config   : &SkgConfig,
   pid      : &ID,
   sections : Vec<(SourceName, NodeFS)>,
   resolve  : &dyn Fn (&ID) -> ID,
 ) -> Result<NodeComplete, String> {
   let retry : Vec<(SourceName, NodeFS)> =
     sections . clone ();
-  match fold_one_telescope (pid, sections, resolve) {
-    Ok (node) => Ok (node),
+  let telescope : Telescope =
+    Telescope::try_new ( pid . clone (), sections, config )
+    . map_err ( |e| e . to_string () ) ?;
+  match fold_telescope ( telescope, resolve )
+  { Ok (node) => Ok (node),
     Err (_) => {
       let mut retry : Vec<(SourceName, NodeFS)> = retry;
       match retry . first_mut () {
@@ -615,7 +645,10 @@ fn fold_telescope_tolerating_homelessness (
             Some ("(no titled section)" . to_string ()),
         None => return Err ( format! (
           "Telescope '{}' has no sections to fold.", pid )), }
-      fold_one_telescope (pid, retry, resolve)
+      let retry_telescope : Telescope =
+        Telescope::try_new ( pid . clone (), retry, config )
+        . map_err ( |e| e . to_string () ) ?;
+      fold_telescope ( retry_telescope, resolve )
         . map_err ( |e| e . to_string () ) }}
 }
 

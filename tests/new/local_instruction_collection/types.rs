@@ -39,7 +39,7 @@ fn exclusive_slot_rules () {
     NodeIntent_Local::SetContains (vec![(ID::from ("c"), None)]) ) . unwrap();
   acc . instructionMerge_intent (
     ID::from ("a"),
-    NodeIntent_Local::SetAliases (vec!["x" . to_string()]) ) . unwrap();
+    NodeIntent_Local::SetAliases (vec![("x" . to_string(), None)]) ) . unwrap();
   acc . instructionMerge_intent (
     ID::from ("a"),
     NodeIntent_Local::NodeMerge { acquiree : ID::from ("b") } ) . unwrap();

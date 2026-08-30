@@ -13,7 +13,7 @@
 //! 'source'), then serialize the 'NodeFS'. This way the type
 //! system enforces that 'source' never appears in YAML.
 
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
@@ -27,21 +27,25 @@ pub enum FileProperty {
 pub struct NodeComplete {
   // There is a 1-to-1 correspondence between NodeCompletes and privacy TELESCOPES (families of same-pid .skg files, one section per source; see docs/telescopes.md). Reading FOLDS the sections into a NodeComplete; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. NodeComplete is the format used to initialize the TypeDB and Tantivy databases (via narrowing conversions to NodeTypedb / NodeTantivy at their boundaries).
   // Tantivy receives some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges leveled at it -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges sourced there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
 
   pub title: String,
-  pub aliases: MSV<PrivaciedMember<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the privacy level of the telescope section that records it.
+  /// True when the selected title or body came from below the home.
+  /// Precise scalar sources remain a fold/save-time fact; runtime
+  /// release decisions intentionally use this coarse flag.
+  pub ugly_telescope: bool,
+  pub aliases: MSV<MemberAtSource<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the source of the telescope section that records it.
   pub source: SourceName, // source name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   // Each relationship member carries the privacy LEVEL of the edge
-  // (see 'PrivaciedMember'). List order is fold order.
-  pub contains                     : Vec<PrivaciedMember<ID>>, // See schema.tql.
-  pub subscribes_to                : MSV<PrivaciedMember<ID>>, // See schema.tql.
-  pub hides_from_its_subscriptions : MSV<PrivaciedMember<ID>>, // See schema.tql.
-  pub overrides_view_of            : MSV<PrivaciedMember<ID>>, // See schema.tql.
+  // (see 'MemberAtSource'). List order is fold order.
+  pub contains                     : Vec<MemberAtSource<ID>>, // See schema.tql.
+  pub subscribes_to                : MSV<MemberAtSource<ID>>, // See schema.tql.
+  pub hides_from_its_subscriptions : MSV<MemberAtSource<ID>>, // See schema.tql.
+  pub overrides_view_of            : MSV<MemberAtSource<ID>>, // See schema.tql.
 
   pub misc: Vec<FileProperty>,
 }
@@ -80,6 +84,7 @@ pub fn normalize_body (
 pub fn empty_node_complete () -> NodeComplete {
   NodeComplete {
     title                        : String::new (),
+    ugly_telescope               : false,
     aliases                      : MSV::Unspecified,
     source                       : SourceName::from ("main"),
     pid                          : ID::new (""),

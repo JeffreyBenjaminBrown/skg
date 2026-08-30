@@ -1,7 +1,8 @@
-use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
+use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, ColRelation};
 use crate::types::viewnode::{QualCol, Qual};
 use crate::types::tree::viewnode_nodecomplete::{
@@ -53,9 +54,13 @@ pub async fn build_and_integrate_aliases (
   { // If it already has an AliasCol child,
     // then reconcile_alias_col_children (in update_buffer) already handled it.
     return Ok (( )); }
-  let aliases : Vec < String > =
-    fetch_aliases_from_file (
-      config, driver, node_id_val ) . await;
+  let node : Option<NodeComplete> =
+    optnodecomplete_from_id (config, driver, &node_id_val) . await ?;
+  let home : Option<SourceName> =
+    node . as_ref () . map ( |node| node . source . clone () );
+  let aliases : Vec<MemberAtSource<String>> = node
+    . map ( |node| node . aliases . or_default () . to_vec () )
+    . unwrap_or_default ();
   let aliascol_id : ego_tree::NodeId =
     insert_scaffold_as_child ( tree, node_id,
       ViewNodeKind::QualCol (QualCol::Alias), true ) ?;
@@ -63,7 +68,11 @@ pub async fn build_and_integrate_aliases (
     insert_scaffold_as_child (
       tree, aliascol_id,
       ViewNodeKind::Qual (
-        Qual::Alias { text: alias . clone (),
+        Qual::Alias { text: alias . member . clone (),
+                      rel_source: home . as_ref ()
+                        .and_then ( |home|
+                          if &alias . source == home { None }
+                          else { Some (alias . source . clone ()) } ),
                       membership: MembershipAxes::default () } ),
       false ) ?; }
   Ok (( )) }

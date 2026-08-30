@@ -19,8 +19,10 @@ local M = {}
 ---@param node_id string
 ---@param view_uri string
 ---@param bypass_override boolean|nil
+---@param approved_pids string[]|nil
 ---@return string
-function M.request_string (node_id, view_uri, bypass_override)
+function M.request_string (node_id, view_uri, bypass_override,
+                           approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
     sexpr.pair(sexpr.symbol('id'), node_id),
@@ -28,6 +30,11 @@ function M.request_string (node_id, view_uri, bypass_override)
   if bypass_override then
     table.insert(request,
       sexpr.pair(sexpr.symbol('override-choice'), 'bypass')) end
+  if approved_pids and #approved_pids > 0 then
+    local approval = { sexpr.symbol('allow-ugly-telescopes') }
+    for _, pid in ipairs(approved_pids) do
+      table.insert(approval, pid) end
+    table.insert(request, approval) end
   return sexpr.to_string(request) .. '\n'
 end
 
@@ -38,15 +45,36 @@ end
 ---@param node_id string
 ---@param bypass_override boolean|nil
 function M.request_single_root_content_view_from_id (node_id,
-                                                     bypass_override)
-  local view_uri = buffer.generate_uuid()
+                                                     bypass_override,
+                                                     approved_pids,
+                                                     existing_view_uri)
+  local view_uri = existing_view_uri or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
+      state.response_handler_map['ugly-telescope-confirmation'] = nil
       M.handle_content_view(payload_text, response, view_uri)
     end, true)
+  -- Alternative to content-view. It is non-one-shot so the pending
+  -- response count represents only the one terminal reply.
+  state.register_response_handler('ugly-telescope-confirmation',
+    function (_payload_text, response)
+      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      if state.response_handler_map['content-view'] then
+        state.response_handler_map['content-view'] = nil
+        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+      end
+      local prompt = payload.field_text(response, 'prompt') or
+        'This view includes text selected below a node home source. Include it?'
+      local pids =
+        payload.string_list(payload.field(response, 'pids'))
+      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
+        M.request_single_root_content_view_from_id(
+          node_id, bypass_override, pids, view_uri) end
+    end, false)
   state.lp_reset()
   client.send_string(
-    M.request_string(node_id, view_uri, bypass_override))
+    M.request_string(
+      node_id, view_uri, bypass_override, approved_pids))
 end
 
 ---Handle a content-view response: either a (switch-to-view URI)

@@ -3,11 +3,11 @@ use crate::context::{
   content_maps_from_nodes,
   had_id_set_from_nodes,
   link_dests_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::telescope::invariants::{report_telescope_violations, validate_all_telescopes};
+use crate::telescope::invariants::{TelescopeViolation, report_all_telescope_violations};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   override_invariants::error_unless_override_invariants_hold,
@@ -16,7 +16,7 @@ use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
-use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
 
 use futures::executor::block_on;
@@ -61,22 +61,21 @@ pub fn rebuild_dbs_in_place (
       load_config (&config_path)
       . map_err ( |e| format! (
         "Reloading config from {}: {}", config_path, e) ) ?;
-    let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&fresh_config)
+    let (nodes, load_violations)
+      : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+      read_all_skg_files_from_sources_collecting_violations (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-    check_for_duplicate_ids_across_sources (
+    error_unless_each_id_names_one_node (
       &nodes, &fresh_config . data_root)
-      . map_err ( |e| format! ("Duplicate ID check failed: {}", e) ) ?;
+      . map_err ( |e| format! ("Id-conflict check failed: {}", e) ) ?;
     let fresh_graph : InRustGraph =
       InRustGraph::from_nodecompletes (&nodes);
     error_unless_override_invariants_hold (
         &fresh_config, &fresh_graph )
       . map_err ( |e| format! (
         "Override invariant validation failed: {}", e) ) ?;
-    { let violations =
-        validate_all_telescopes (&fresh_config, &fresh_graph);
-      let _ = report_telescope_violations (
-        &violations, &fresh_config . data_root ); }
+    report_all_telescope_violations (
+      &fresh_config, &fresh_graph, load_violations );
     block_on ( wipe_then_init_typedb_db (
       &fresh_config, &env . driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;

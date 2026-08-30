@@ -1,7 +1,8 @@
 ;;; Integration test for the override-choice menu fetch path.
 ;;; Visiting overridden Z yields the menu buffer (registered under
 ;;; the server-assigned "override-menu:Z" URI, showing the overrider
-;;; R); visiting Z with override-choice bypass yields the raw node.
+;;; R).  Z and R deliberately share the title "cooking", come from
+;;; different sources, and subscribe to each other.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -13,56 +14,69 @@
   (kill-emacs 1))
 
 (defun integration-test-override-menu ()
-  "Visit overridden Z twice: menu, then bypass."
+  "Keep same-title menu and overrider views distinct, then revisit Z."
   (message "Starting override-menu integration test...")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-  (progn ;; Visiting overridden Z yields the menu.
+  (let (menu-buf cheese-buf reopened-menu)
     (skg-request-single-root-content-view-from-id "Z")
-    (let ((menu-buf (skg-test-wait-for
-                     (lambda ()
-                       (skg-find-buffer-by-uri "override-menu:Z"))
-                     10)))
-      (unless menu-buf
-        (test-fail "no buffer with the override-menu:Z URI appeared"))
-      (with-current-buffer menu-buf
-        (let ((content (buffer-substring-no-properties
-                        (point-min) (point-max))))
-          (unless (string-match-p (regexp-quote "(id Z)") content)
-            (test-fail "menu lacks the requested root Z:\n%s" content))
-          (unless (string-match-p (regexp-quote "(id R)") content)
-            (test-fail "menu lacks the overrider R:\n%s" content))
-          (message "✓ menu buffer shows Z with overrider R")))))
-  (progn ;; Bypass opens the raw node, as its own buffer.
-    (skg-request-single-root-content-view-from-id "Z" nil t)
-    (let ((raw-buf (skg-test-wait-for
-                    (lambda ()
-                      (seq-find
-                       (lambda (buf)
-                         (with-current-buffer buf
-                           (and (boundp 'skg-view-uri)
-                                skg-view-uri
-                                (not (string-prefix-p
-                                      "override-menu:" skg-view-uri))
-                                (string-match-p
-                                 (regexp-quote "(id Z)")
-                                 (buffer-substring-no-properties
-                                  (point-min) (point-max))))))
-                       (buffer-list)))
-                    10)))
-      (unless raw-buf
-        (test-fail "bypass did not open a raw view of Z"))
-      (with-current-buffer raw-buf
-        (let ((content (buffer-substring-no-properties
-                        (point-min) (point-max))))
-          (when (string-match-p (regexp-quote "overriderCol") content)
-            ;; fine -- the raw view may show R in the overriderCol
-            nil)
-          (unless (string-match-p "the overridden node" content)
-            (test-fail "raw view lacks Z's title:\n%s" content))
-          (message "✓ bypass opened the raw node Z")))))
+    (setq menu-buf
+          (skg-test-wait-for
+           (lambda () (skg-find-buffer-by-uri "override-menu:Z")) 10))
+    (unless menu-buf
+      (test-fail "no buffer with the override-menu:Z URI appeared"))
+    (with-current-buffer menu-buf
+      (let ((content (buffer-substring-no-properties
+                      (point-min) (point-max))))
+        (unless (and (string-match-p (regexp-quote "(id Z)") content)
+                     (string-match-p (regexp-quote "(id R)") content))
+          (test-fail "menu lacks Z or its overrider R:\n%s" content))))
+
+    ;; Opening same-titled R must not overwrite Z's menu.
+    (skg-request-single-root-content-view-from-id "R")
+    (setq cheese-buf
+          (skg-test-wait-for
+           (lambda ()
+             (seq-find
+              (lambda (buf)
+                (with-current-buffer buf
+                  (and (boundp 'skg-view-uri) skg-view-uri
+                       (equal skg-contentView-initialRoot-source
+                              "Cheese"))))
+              (buffer-list)))
+           10))
+    (unless cheese-buf
+      (test-fail "same-titled Cheese view did not open"))
+    (unless (equal (buffer-name menu-buf) "*cooking* <public>")
+      (test-fail "unexpected public buffer name: %s" (buffer-name menu-buf)))
+    (unless (equal (buffer-name cheese-buf) "*cooking* <Cheese>")
+      (test-fail "unexpected Cheese buffer name: %s" (buffer-name cheese-buf)))
+    (unless (equal (buffer-local-value 'skg-view-uri menu-buf)
+                   "override-menu:Z")
+      (test-fail "opening R changed Z's menu URI"))
+
+    ;; A repeat visit receives switch-to-view and must display the old menu.
+    (skg-request-single-root-content-view-from-id "Z")
+    (unless (skg-test-wait-for
+             (lambda ()
+               (eq (window-buffer (selected-window)) menu-buf))
+             10)
+      (test-fail "revisiting Z did not display its existing menu buffer"))
+    (message "✓ same-title views remained distinct and Z was revisited")
+
+    ;; Killing both views must close both server registrations.
+    (kill-buffer menu-buf)
+    (kill-buffer cheese-buf)
+    (skg-request-single-root-content-view-from-id "Z")
+    (setq reopened-menu
+          (skg-test-wait-for
+           (lambda () (skg-find-buffer-by-uri "override-menu:Z")) 10))
+    (unless (and reopened-menu (not (eq reopened-menu menu-buf)))
+      (test-fail "Z's menu did not reopen after both views were closed"))
+    (kill-buffer reopened-menu)
+    (message "✓ close-view lifecycle allowed the menu to reopen"))
   (message "PASS: Integration test successful!")
   (kill-emacs 0))
 

@@ -4,7 +4,7 @@ use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
 use skg::source_sets::ActiveSourceSet;
-use skg::types::misc::{ID, MSV, PrivaciedMember, SkgConfig, SourceName, SourceSetName, TantivyIndex, privacied_msv};
+use skg::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, SourceSetName, TantivyIndex, members_at_source_msv};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
@@ -40,7 +40,7 @@ fn test_text_search_org_format (
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
-        privacied_msv ( & node1 . source, MSV::Specified ( vec! [
+        members_at_source_msv ( & node1 . source, MSV::Specified ( vec! [
           "bear cheese" . to_string (),
           "the cheese" . to_string ()
         ] ) );
@@ -312,7 +312,8 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       // factor is computed from how many regexes match the doc's
       // title. Behaviour should be analogous to the literal case.
       let regex_opts : SearchOptions = SearchOptions {
-        regex: true, body: false, operators: false };
+        regex: true, body: false, operators: false,
+        exclude_ugly_telescope : false };
       let ( best_matches_re, searcher_re ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &regex_opts ) ?;
@@ -363,7 +364,7 @@ fn private_alias_documents_are_filtered_before_grouping (
       node . pid = ID::new ("id_leveled");
       node . title = "public title" . to_string ();
       node . aliases = MSV::Specified ( vec! [
-        PrivaciedMember::at (
+        MemberAtSource::at_source (
           SourceName::from ("private"),
           "secret zanzibar" . to_string () ) ] );
       let nodes : Vec<NodeComplete> = vec! [ node ];

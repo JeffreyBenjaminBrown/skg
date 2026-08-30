@@ -1,0 +1,207 @@
+#+title: Progress on 7_plan.org
+
+  The plan is implemented and its completion gate is green. The branch now
+  treats privacy telescopes as checked values on both sides of the fold,
+  prevents ugly scalar text from crossing a restricted release boundary,
+  offers an explicit save-time Hoist, and applies one owned-source rule to
+  new relationships and aliases. The two warnings in Jeff's live data were
+  repaired through the normal UI and a rebuild left no telescope-warning
+  report.
+
+* What landed
+
+** Checked telescope boundaries and disk selection
+
+   Commit '5bc332d3' made load-side 'Telescope' construction checked and
+   private, added the corresponding private save-side
+   'UnfoldedTelescope', and routed bulk load, one-pid reads, snapshots,
+   export, and home lookup through the same owned-versus-foreign
+   normalization. If owned and foreign sections claim one pid, Skg reports
+   the collision, retains the owned telescope, and makes the foreign
+   claimant semantically unreachable without modifying its files.
+
+   Commit '0e218ad0' made unfolding produce a checked output batch and made
+   the writer prepare and validate every path, serialization, ownership
+   decision, and deletion before the first filesystem mutation. It cannot
+   write a foreign non-home section after partially writing earlier levels.
+
+** Independent scalar folding and release control
+
+   Commit '41e82de8' folds title and body independently, records their
+   source levels, and persists the resulting coarse 'ugly_telescope' bit in
+   'NodeComplete', 'NodeRust', and 'NodeTantivy'. Tantivy stores and indexes
+   the bit so restricted search can exclude ugly documents before matching.
+
+   Four commits put one release policy in front of all textual outputs:
+
+   - '3778bdd5': direct content views;
+   - '22f15396': search and title lookup;
+   - '13668a62': rerender, source-set switch, diff analysis, and export;
+   - '6a9b4116': saved and collateral rerenders.
+
+   Under source-set 'all', text is returned with a warning. Under a
+   restricted source-set, affected pids are challenged before any text or
+   match is returned; a retry approves only the reported pids. Restricted
+   search is deliberately different: its prequery choice is include or
+   exclude, because identifying matching pids before authorization would
+   itself disclose the result. Noninteractive export fails closed unless
+   '--include-ugly-telescopes' is explicit.
+
+** Save-time Hoist
+
+   Commit 'f5703196' added the batched 'telescope-hoist-confirmation'
+   protocol and matching Emacs and Neovim flows. The initial save explains
+   which pids have title or body below home and returns without changing
+   disk. An approved-pid retry rereads disk, reruns every ordinary
+   validation, moves only title/body to home, preserves lower-level lists,
+   writes the preflighted batch, and verifies that the resulting telescope
+   is clean. Hoist authorization precedes fork authorization when both are
+   needed.
+
+** Source behavior and vocabulary
+
+   Commit '24cf2890' centralized the default in
+   'SkgConfig::relationship_default_source': a new writable outbound
+   relationship from an owned node to a foreign node belongs to the
+   owner's home unless the user explicitly chooses a more-private owned
+   source. Save resolution, metadata, and the advisory source-info request
+   now use that same rule. Alias 'relSource' is carried in metadata and
+   round-trips; its current/default value is derived locally because an
+   alias is not a graph edge and the edge-source endpoint needs two node
+   ids.
+
+   Commit '4660c433' completed the live 'level' to 'source' vocabulary
+   change without a compatibility alias. Commit '7c5ea626' strengthened
+   the deterministic-home regression test by rebuilding randomized source
+   maps repeatedly.
+
+** Documentation and ledgers
+
+   Commit '4c0c8243' reconciled the API, telescope, glossary, Emacs, and
+   Neovim documentation and appended the August disk-reader and
+   scalar-response audit to '4_audit-list.org'. This included the minor
+   terminology note Jeff left in the plan: the existing
+   'skg-set-relationship-source' name is broader in practice when it acts
+   on an alias.
+
+   Commit '80e13e5c' moved the three recap findings to
+   'TODO/DONE/problems.org' after their fixes passed. Commit 'f66ea352'
+   likewise closed the pre-existing override-menu finding once its
+   semantic-wire decision and test were settled.
+
+* Architectural outcome and implementation-time judgments
+
+  No product choice in '7_plan.org' had to be reopened. The architecture
+  proposed in its final section survived implementation. These local
+  judgments are worth retaining:
+
+  - 'Telescope' and 'UnfoldedTelescope' have different checked constructors
+    and private fields. A trusted ordered disk input and a proposed disk
+    output have different invariants; sharing one superficially general
+    type would weaken both boundaries.
+  - Owned-pid precedence is normalization of raw sections, not a filter on
+    an already folded node. That keeps discarded foreign ids, aliases, and
+    edges out of every graph and index, including snapshots and fallbacks.
+  - Relationship defaults belong in 'SkgConfig', not separately in save
+    resolution and the UI advice handler. The centralized method is now
+    the rule for 'contains', 'subscribes_to', and 'overrides_view_of'.
+  - A save may commit graph data successfully and then encounter an ugly
+    collateral view under a restricted source-set. The scalar gate is
+    therefore after the successful save but before registering or sending
+    that view's text; it withholds presentation, not the already-authorized
+    graph mutation.
+  - Restricted search never uses a pid allowlist for its first decision.
+    It asks only include versus exclude before matching. Direct views,
+    rerenders, titles, export, and Hoist use exact approved-pid lists.
+  - The two hidden-from-subscriptions fixtures had encoded an owned source
+    as more public than their foreign source. The old writer silently put
+    inferred hides in foreign output; the checked writer correctly refused
+    it. Commit '7915a2b1' reordered those fixture source maps so the public
+    foreign data precedes the private owned overlay and the tests exercise
+    their intended hide behavior.
+  - The subscribee golden view still expected a source annotation for an
+    owned-owner default. Commit '94ba687b' re-blessed it to the new single
+    rule. This changed an expectation, not the architecture.
+
+* Verification
+
+** Completion runs
+
+   Fresh runs on 2026-08-28:
+
+   - 'cargo nextest run': 561 passed, 0 failed, 0 skipped;
+   - 'bash/emacs-tests.sh': 303 passed, 0 unexpected;
+   - 'bash/nvim-tests.sh': 293 passed across 23 files;
+   - 'bash/integration-tests.sh': 34 passed, 0 failed. It was rerun after
+     refreshing the generated manifests and left them unchanged;
+   - 'git diff --check main...HEAD': clean.
+
+   The suites ran one after another. The integration wrapper itself used
+   its documented maximum of two integration cases at once, each with its
+   own database and config.
+
+   Focused Rust tests covered telescope construction and folding,
+   owned/foreign selection, fold/unfold and filesystem round-trips, writer
+   preflight and refusal, save leveling and Hoist, source sets, Tantivy,
+   search, title lookup, export, diff analysis, and raw protocol behavior.
+   Focused Emacs relationship-source tests passed 32/32; the corresponding
+   Neovim confirmation and metadata tests also passed.
+
+** Pre-existing test and fixture corrections
+
+   The full run found three expectations unrelated to the new policy:
+
+   - 'aa19e2db' replaces the stale server-rendered "Oa" assertion in
+     'override_menu::all_tests' with the semantic wire fact the server has
+     emitted since July. Herald presentation belongs to the clients.
+   - '94ba687b' updates the subscribee view described above.
+   - '58881271' records 33 generated integration 'DEPENDENCIES.toml'
+     fixtures in the inline-table format introduced on 'main' in July.
+     Before this commit, merely starting those fixture servers dirtied the
+     worktree. A second complete integration run was byte-stable.
+
+   One plain parallel 'cargo test' invocation exposed process-global graph
+   state shared by a unit-test module. The same tests passed serially and
+   under Nextest's isolation, and the exact completion command above is
+   green. This is a test-harness concurrency limitation, not a failure of
+   the telescope work.
+
+** Service and tool preconditions
+
+   The completion environment had exactly one TypeDB CE 3.12.0 server
+   listening on port 1729 and one live Skg server using
+   'data/skgconfig.toml' on port 1732. Tantivy was rebuilt after adding the
+   'ugly_telescope' field. Tool versions were:
+
+   - rustc 1.95.0 (2026-04-14);
+   - cargo-nextest 0.9.137;
+   - GNU Emacs 30.2;
+   - Neovim 0.12.3.
+
+* Live-data repair
+
+  The two warnings named in the plan were repaired through the running Skg
+  client/server rather than by hand-editing YAML:
+
+  - pid '6652685e-472e-4c07-a456-fbc3432b1dbf': its 'contains' relationship
+    moved from 'personal-proc' to a new telescope section in
+    'personal-most', using 'skg-set-relationship-source' and save;
+  - pid '33d5cd4e-8a0c-48f0-85c2-467db86e1862': the duplicate public alias
+    was removed.
+
+  'skg-rebuild-dbs' then succeeded and 'data/telescope-warnings.org' is
+  absent, which is the clean-report behavior. These source directories are
+  nested data repositories. No data commit, staging operation, or other git
+  operation was performed on Jeff's behalf. Their working trees retain the
+  repairs, regenerated dependency manifests, and unrelated user data.
+
+* Worktree handoff
+
+  This progress file is the final branch change. Jeff's modified
+  '7_plan.org' remains intentionally unstaged, as do the unrelated
+  untracked paths visible in the outer worktree. Nothing in the nested data
+  repositories was staged or committed.
+
+  The implementation is ready for review or merge. Moving this directory
+  under 'TODO/DONE/' remains a human bookkeeping choice rather than part of
+  the implementation plan.

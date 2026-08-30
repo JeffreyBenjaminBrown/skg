@@ -11,8 +11,9 @@
 /// EXACTLY one source (titled in that source's git HEAD, absent or
 /// titleless in its worktree) and appeared in EXACTLY one other
 /// (titled in the worktree, absent or titleless in HEAD). Titleless
-/// section creations and deletions are re-levelings of individual
-/// relationships, not moves, and stage as ordinary edits.
+/// section creations and deletions move individual relationships
+/// between recording sources; they are not node moves, and stage as
+/// ordinary edits.
 ///
 /// A move is AUTO-STAGED only when it is a pure delete/create pair:
 /// the old source's file is gone from its worktree and the new

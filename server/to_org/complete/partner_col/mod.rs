@@ -4,7 +4,7 @@ pub mod inverse_scan;
 pub mod kind;
 
 use crate::source_sets::ActiveSourceSet;
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::dbs::typedb::search::hidden_in_subscribee_content::{
@@ -159,7 +159,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       |id : &ID| snapshot_global ()
                  . and_then ( |g| g . pid_and_source (id)
                                   . map ( |(_pid, src)| src ))
-                 . or_else ( || source_from_disk (id, config) ));
+                 . or_else ( || home_from_disk (id, config) ));
   if subscribee_ids . is_empty () {
     // Skip because it would be empty -- unless, in diff mode, the
     // HEAD side of the membership is non-empty: a col emptied since
@@ -176,11 +176,11 @@ pub async fn maybe_add_subscribeeCol_branch (
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
-    // edge-level-GATED from the in-Rust graph when the global
+    // edge-source-GATED from the in-Rust graph when the global
     // handle is present (production always; render-and-gating,
-    // 5_plan.org): hides and memberships recorded above the active
+    // 5_plan.org): hides and memberships recorded outside the active
     // prefix must not shape this derived col. TypeDB fallback is
-    // ungated (it stores no levels; harness-only).
+    // ungated (it stores no recording sources; harness-only).
     let r_hides : HashSet < ID > =
       match snapshot_global () {
         Some (snap) =>
@@ -349,7 +349,7 @@ pub async fn maybe_add_one_partnerCol (
       active_source_set,
       |id : &ID| graph . pid_and_source (id)
                  . map ( |(_pid, src)| src )
-                 . or_else ( || source_from_disk (id, config) ));
+                 . or_else ( || home_from_disk (id, config) ));
   if member_ids . is_empty () {
     // It would be empty, so don't draw it -- unless, in diff mode,
     // the HEAD side of the membership is non-empty: a col emptied
@@ -408,10 +408,10 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = match snapshot_global () {
-      // Edge-level-GATED when the global handle is present
+      // Edge-source-GATED when the global handle is present
       // (production always; render-and-gating, 5_plan.org): hides
-      // and memberships above the active prefix must not shape
-      // this derived col. TypeDB fallback is ungated (no levels;
+      // and memberships outside the active prefix must not shape
+      // this derived col. TypeDB fallback is ungated (no recording sources;
       // harness-only).
       Some (snap) => {
         let subscriber_hides : HashSet<ID> =
@@ -446,7 +446,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
              snapshot_global ()
                . and_then ( |g| g . pid_and_source (pid)
                                 . map ( |(_p, src)| src ))
-               . or_else ( || source_from_disk (pid, config) )
+               . or_else ( || home_from_disk (pid, config) )
                . unwrap_or_else ( SourceName::not_found ) };
            let subscribee_source : SourceName =
              source_of (&subscribee_pid);

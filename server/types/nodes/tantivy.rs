@@ -4,7 +4,7 @@
 //! Includes 'misc' because 'Had_ID_Before_Import' feeds the
 //! context-ranking score multiplier (see [[../../../server/context.rs][context.rs]]).
 
-use crate::types::misc::{ID, MSV, PrivaciedMember, SourceName};
+use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -13,23 +13,25 @@ pub struct NodeTantivy {
   pub source  : SourceName, // the home; each alias doc instead
                             // carries ITS OWN level (see 'aliases')
   pub title   : String,
+  pub ugly_telescope : bool,
   // Aliases keep their PRIVACY LEVELS: each alias document's
-  // source field is the alias's level, not the node's home, so a
+  // source field is the alias's recording source, not the node's home, so a
   // restricted search cannot match a private alias of a public
   // node (dbs-and-search, 5_plan.org).
-  pub aliases : MSV<PrivaciedMember<String>>,
+  pub aliases : MSV<MemberAtSource<String>>,
   pub body    : Option<String>,
   pub misc    : Vec<FileProperty>,
 }
 
 impl From<&NodeComplete> for NodeTantivy {
-  /// Keep title, aliases (leveled), body, misc (Tantivy indexes
+  /// Keep title, aliases (with recording sources), body, misc (Tantivy indexes
   /// these). Drop relations.
   fn from (c: &NodeComplete) -> Self {
     NodeTantivy {
       pid     : c . pid . clone (),
       source  : c . source . clone (),
       title   : c . title . clone (),
+      ugly_telescope : c . ugly_telescope,
       aliases : c . aliases . clone (),
       body    : c . body . clone (),
       misc    : c . misc . clone (),

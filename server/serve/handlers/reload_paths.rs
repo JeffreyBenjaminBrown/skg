@@ -150,7 +150,7 @@ pub async fn reload_touched_telescopes (
   match apply_define_nodes_to_stores (
     defs, &[], config,
     &env . tantivy_index, &env . driver, &env . in_rust_graph,
-    false /* write_fs */ ) . await {
+    false /* write_fs */, &HashSet::new () ) . await {
     Ok (Some (new_index)) => { env . tantivy_index = new_index; }
     Ok (None) => {}
     Err (e) => return Err ( format! (

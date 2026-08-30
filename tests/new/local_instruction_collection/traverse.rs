@@ -63,7 +63,7 @@ fn ordinary_definitive_emissions () {
                         Some ("Root body" . to_string()) )) );
     assert_eq!( root . contains, Some (vec![(ID::from ("child"), None)]) );
     assert_eq!( root . aliases,
-                Some (vec!["nickname" . to_string()]) );
+                Some (vec![("nickname" . to_string(), None)]) );
     assert_eq!( root . subscribes_to, Some (vec![(ID::from ("s"), None)]) );
     assert_eq!( root . overrides, Some (vec![(ID::from ("o"), None)]) );
     assert!( ! root . delete ); }
@@ -298,7 +298,8 @@ fn duplicate_defining_col_members_dedup_preserving_order () {
       "} );
   let owner : &IntentsForOneId = entry (&collected, "owner");
   assert_eq!( owner . aliases,
-              Some (vec!["echo" . to_string(), "other" . to_string()]) );
+              Some (vec![("echo" . to_string(), None),
+                          ("other" . to_string(), None)]) );
   assert_eq!( owner . subscribes_to,
               Some (vec![(ID::from ("s1"), None), (ID::from ("s2"), None)]) );
   assert_eq!( owner . overrides,

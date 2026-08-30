@@ -132,7 +132,8 @@ the full id. POSITIONS is a list of (start end id-string) triples."
                        (propertize "…"
                                    'face 'skg-magit-title-face)))))))
 
-(defun skg-readable-ids--request-titles (ids generation buf)
+(defun skg-readable-ids--request-titles (ids generation buf
+                                             &optional approved-pids)
   "Send a titles-by-ids request for IDS.
 GENERATION and BUF are captured for the response handler."
   (condition-case err
@@ -140,14 +141,14 @@ GENERATION and BUF are captured for the response handler."
         (skg-readable-ids--ensure-title-response-handler)
         (skg-lp-reset)
         (let* ((tcp-proc (skg-tcp-connect-to-rust))
-               (id-list
-                (mapconcat
-                 (lambda (id) (format "%S" id))
-                 ids " "))
                (request-sexp
                 (concat
-                 (format "((request . \"titles by ids\") (ids %s))"
-                         id-list)
+                 (prin1-to-string
+                  (append
+                   `((request . "titles by ids")
+                     (ids ,@ids))
+                   (when approved-pids
+                     `((allow-ugly-telescopes ,@approved-pids)))))
                  "\n")))
           (setq skg-readable-ids--pending-title-requests
                 (append skg-readable-ids--pending-title-requests
@@ -165,7 +166,27 @@ GENERATION and BUF are captured for the response handler."
    'titles-by-ids
    (lambda (_tcp-proc payload)
      (skg-readable-ids--handle-next-response payload))
+   nil)
+  (skg-register-response-handler
+   'ugly-telescope-confirmation
+   (lambda (_tcp-proc payload)
+     (skg-readable-ids--handle-title-confirmation payload))
    nil))
+
+(defun skg-readable-ids--handle-title-confirmation (payload)
+  "Prompt for a challenged title lookup and retry its FIFO entry on approval."
+  (let ((entry (pop skg-readable-ids--pending-title-requests)))
+    (if (not entry)
+        (message "skg-readable-ids: privacy challenge without pending request")
+      (setq skg-lp--pending-count
+            (max 0 (1- skg-lp--pending-count)))
+      (let* ((response (read payload))
+             (prompt (format "%s" (cadr (assoc 'prompt response))))
+             (pids (mapcar (lambda (pid) (format "%s" pid))
+                           (cadr (assoc 'pids response)))))
+        (when (y-or-n-p (concat prompt " "))
+          (skg-readable-ids--request-titles
+           (nth 2 entry) (nth 0 entry) (nth 1 entry) pids))))))
 
 (defun skg-readable-ids--handle-next-response (payload)
   "Handle PAYLOAD for the oldest pending titles-by-ids request."
@@ -190,7 +211,10 @@ re-requested. GENERATION is checked against the buffer's current
 generation before annotating, to drop stale responses. BUF is the
 magit buffer to annotate."
   (let* ((response (read payload))
-         (content  (cadr (assoc 'content response))))
+         (content  (cadr (assoc 'content response)))
+         (warnings (cadr (assoc 'warnings response))))
+    (dolist (warning warnings)
+      (display-warning 'skg (format "%s" warning) :warning))
     (dolist (pair content)
       (when (consp pair)
         (puthash (format "%s" (car pair))

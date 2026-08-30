@@ -14,7 +14,7 @@
 //! subcommand both call it.
 
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, PrivaciedMember};
+use crate::types::misc::{ID, MemberAtSource};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
@@ -184,6 +184,40 @@ pub fn export_to_org (
         "could not write {} (root {}): {}", rel, root . root_pid, e )), }}
   report . files_written . sort ();
   Ok (report) }
+
+/// PIDs whose scalar data can affect an export: every rendered event and
+/// every marker whose title/body can determine whether a root exists and
+/// where its file is written. This performs discovery only; it writes no
+/// files and is therefore safe to use at the release preflight.
+pub fn export_candidate_pids (
+  active : &ActiveSourceSet,
+  nodes  : &[NodeComplete],
+) -> Vec<ID> {
+  let by_pid : HashMap<ID, &NodeComplete> =
+    nodes . iter ()
+    . map ( |node| (node . pid . clone (), node) )
+    . collect ();
+  let alias_to_pid : HashMap<ID, ID> = {
+    let mut aliases : HashMap<ID, ID> = HashMap::new ();
+    for node in nodes {
+      for extra in &node . extra_ids {
+        aliases . insert (extra . clone (), node . pid . clone ()); }}
+    aliases };
+  let mut ignored_warnings : Vec<String> = Vec::new ();
+  let (roots_by_pid, marker_pids) = discover_roots (
+    nodes, &alias_to_pid, active, &mut ignored_warnings );
+  let mut candidates : HashSet<ID> = marker_pids . clone ();
+  for root in roots_by_pid . values () {
+    candidates . extend (
+      collect_events (
+        &root . root_pid, &by_pid, &alias_to_pid,
+        &roots_by_pid, &marker_pids, active )
+      . into_iter ()
+      . map ( |event| event . pid ) ); }
+  let mut candidates : Vec<ID> = candidates . into_iter () . collect ();
+  candidates . sort ();
+  candidates
+}
 
 fn write_export_file (
   path    : &Path,
@@ -377,7 +411,7 @@ fn collect_events (
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
       if ! edge_active (member, active) { continue; } // the EDGE's
-        // level is inactive: the visible fold omits it, even when
+        // source is inactive: the visible fold omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
@@ -593,13 +627,13 @@ fn node_active (
   active . is_all () || active . contains_source (&node . source) }
 
 /// Whether an EDGE is visible under the active set: its recorded
-/// privacy level must be active. (The visible fold = active
+/// recording source must be active. (The visible fold = active
 /// sections' lists only.)
 fn edge_active (
-  member : &PrivaciedMember<ID>,
+  member : &MemberAtSource<ID>,
   active : &ActiveSourceSet,
 ) -> bool {
-  active . is_all () || active . contains_source (&member . level) }
+  active . is_all () || active . contains_source (&member . source) }
 
 fn anchor_text (
   node : &NodeComplete,

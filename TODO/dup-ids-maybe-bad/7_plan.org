@@ -1,0 +1,947 @@
+#+title: Plan for finishing dup-ids-maybe-bad
+#+date: <2026-08-28 Fri>
+* introduction
+  The original plan, [[./3_plan.org]], is complete. This plan covers the
+  work discovered during the review and settled in [[./6_recap.org]]. It
+  supersedes that recap's short "Suggested way to resume" list; it does
+  not reopen the decisions recorded there.
+
+  The work below is intentionally ordered. Each implementation heading is
+  meant to land as its own coherent commit, including its focused tests
+  and directly affected documentation. If two adjacent headings turn out
+  to require an inseparable change to the same boundary, combine them and
+  record why in a new progress document rather than manufacturing an
+  intermediate state that cannot compile or is unsafe.
+
+* Outcome
+
+  When this plan is done:
+
+  - A privacy telescope is structurally checked before it can be folded.
+    Its home is unambiguously its first, most-public retained section.
+  - If a pid exists in both owned and non-owned sources, Skg keeps the
+    owned telescope, ignores every non-owned same-pid section, and reports
+    the ignored pid and source names at load. The ignored data remains on
+    disk but is absent from Skg's graph, indexes, diffs, exports, and disk
+    fallback lookups.
+  - The title and body are folded independently. A node is marked
+    'ugly_telescope' when either selected scalar came from below home.
+    The exact source of each scalar is needed while folding and while
+    preparing a save, but is not retained in the live databases.
+  - Ugly data still loads into the in-Rust graph, TypeDB, and Tantivy.
+    With source-set 'all', Skg warns and releases the text without asking.
+    With any restricted source-set, no title or body from an ugly
+    telescope crosses the server boundary without explicit approval for
+    that request.
+  - Restricted text search decides whether ugly documents are eligible
+    BEFORE matching. A declined or absent opt-in cannot reveal that a
+    private title/body matched the query.
+  - Saving an all-owned ugly telescope offers Abort or Hoist. Hoist means
+    an explicit, warned publication of the selected title and body into
+    home, followed by removal of lower owned scalar copies while retaining
+    relationships and aliases in those sections. No ordinary save,
+    background cleanup, or batch command hoists silently.
+  - The filesystem writer proves that every proposed output section is
+    configured and owned before its first write. It never writes or
+    deletes a foreign source.
+  - A new relationship from an owned node to a foreign node defaults to
+    the owned node's home. An explicit 'relSource' may make it more private
+    only by choosing a configured, owned source at or below that home.
+  - Aliases round-trip 'relSource' metadata and use the same explicit,
+    sticky, then default source resolution as other members at sources.
+  - The code says 'MemberAtSource { source, member }', 'edge source', and
+    'list of members at sources'. The old live 'level' vocabulary is gone;
+    literal names of historical work items remain historical.
+  - Unfolding returns a checked telescope-shaped value rather than a bare
+    vector, so both directions have named boundaries and the round-trip
+    law can be stated on those boundaries.
+
+* Settled policy, made precise
+
+** Home and ugly scalars
+
+   Home remains definitionally the most-public retained section, whether
+   or not that section has text. In well-formed data, both title and body
+   are in home.
+
+   Folding selects the most-public title and the most-public body
+   independently. A present scalar is below home if its selected source is
+   not home. Either condition makes the node ugly. In particular, all of
+   these load:
+
+   - title below home, body beside it;
+   - title at home, body below home;
+   - body at home, title below home;
+   - title and body in different non-home sections.
+
+   Later duplicate titles or bodies remain warnings; they do not replace
+   the selected, more-public value. No title anywhere remains the existing
+   hard error and is outside this plan.
+
+** Coarse runtime state
+
+   Persist only 'ugly_telescope: bool' in the loaded snapshot. Do not keep
+   'title_at' or 'body_at' in TypeDB, the in-Rust graph, or the view model.
+   This deliberately overprotects: every restricted source-set challenges
+   for an ugly node even if that set happens to include the actual lower
+   scalar source.
+
+   Reread the checked telescope when a save needs precise scalar sources.
+   Do not reread files on ordinary view, title, or search requests: the
+   authorization decision must describe the same loaded snapshot whose
+   text is about to be returned.
+
+** Release decisions
+
+   Give the server one shared scalar-release decision with these results:
+
+   - normal telescope: allow;
+   - ugly telescope under 'all': allow and attach a warning;
+   - ugly telescope under a restricted set and named in this request's
+     explicit approval: allow and attach a warning;
+   - ugly telescope under a restricted set without that approval: return
+     a typed confirmation response containing pid(s) and explanation, but
+     no title, body, alias, search match, or rendered buffer text.
+
+   Approval is per request. Do not cache it in 'ViewsState', in Emacs, or
+   in Neovim: a rebuild, pull, save, or source-set change can replace the
+   loaded snapshot. A batch request challenges once for its complete set
+   of ugly pids and retries with an explicit allowlist.
+
+   The warning should use Jeff's language, corrected and shortened for a
+   batch when necessary:
+
+   #+begin_example
+   The text of node <ID> is defined in a .skg file more private than
+   its home. This is ugly data: Skg cannot create it through an
+   ordinary save, but it can display it. Render the node nonetheless?
+   #+end_example
+
+** Search is authorized before matching
+
+   Search cannot first match and then name the ugly result in a challenge;
+   even the fact of a match is a leak. Under a restricted set, the initial
+   request therefore performs only an ugliness preflight if the request
+   lacks an explicit choice. It does not parse or execute the user's query.
+   The client then retries with one of:
+
+   - exclude ugly telescopes; Tantivy adds a MUST-NOT ugly clause before
+     executing the query;
+   - include ugly telescopes; Tantivy may match them and the response warns.
+
+   If the loaded index contains no ugly telescope, the server can execute
+   immediately without bothering the user. Under 'all', it includes ugly
+   documents automatically and warns if one appears in the returned view.
+   Search enrichment inherits the initial request's decision and snapshot;
+   it must not create a second, less-protected path.
+
+** Owned pid wins over foreign same-pid data
+
+   For one pid's configured sections:
+
+   - If at least one section is owned, retain all owned sections and ignore
+     all non-owned sections.
+   - If no section is owned, retain the non-owned telescope normally; it is
+     a foreign node, not a collision with the user's data.
+
+   Initialization reports each affected pid and its ignored source names,
+   with one summary explaining that Skg chose the user's data and left the
+   other files untouched. This replaces 'ForeignOverlay'; there is no
+   overlay after selection.
+
+   Selection happens before collecting extra IDs, choosing a home,
+   folding, validating, or building any database. The same rule applies to
+   bulk load, one-pid disk fallback, git snapshot folding, export, and
+   'home_from_disk'. Otherwise an ignored foreign section could reappear
+   through a secondary path and violate "thereafter unreachable within
+   Skg".
+
+** Save-time hoist
+
+   A save rereads every touched pid before any graph, database, or
+   filesystem mutation. If the current selected telescope is ugly, the
+   first attempt returns a typed save confirmation. Its choices are:
+
+   - Abort. Make no changes and explain that manual repair means moving the
+     selected title/body to home and removing their lower copies, without
+     disturbing the lower sections' lists.
+   - Hoist. Explicitly approve publication of both selected scalars at
+     home for the listed pids.
+
+   On the approved retry, repeat the disk read and every preflight. Never
+   trust the first attempt's result after the user has had time to answer.
+   A concurrent disk change may alter the candidate set and produce a new
+   challenge.
+
+   The foreign-pid selection rule makes an owned telescope's retained
+   sections all owned. The general writer ownership preflight nevertheless
+   remains mandatory; it defends hand-authored 'relSource', configuration
+   changes, new callers, and future members at sources.
+
+* Implementation order
+
+** Make load-side 'Telescope' construction checked
+
+   Strengthen [[../../server/telescope/types.rs]] before adding more policy
+   to the abstraction.
+
+   - Make 'pid' and 'sections' private. Expose 'pid()', 'home()',
+     'sections()' as an immutable slice where needed, and a crate-private
+     consuming operation for the fold. Do not expose mutable access.
+   - Add 'Telescope::try_new(pid, sections, config)' with a typed error.
+     Accept only a nonempty sequence whose embedded 'NodeFS.pid' values
+     all equal 'pid', whose sources are configured and unique, and whose
+     order is strictly most-public to most-private.
+   - Build the source-position map once and scan once. Do not repeatedly
+     clone and linearly scan 'ordered_sources' for every section.
+   - Make the one-pid reader return 'Option<Telescope>' internally. Translate
+     'None' to the existing NotFound error at its public boundary; an empty
+     'Telescope' should become unrepresentable.
+   - Route all current struct-literal sites through the constructor: bulk
+     load, the one-pid reader, normal diff snapshot folding, and the
+     titleless diff-snapshot retry. Thread 'SkgConfig' to the diff helpers
+     instead of constructing an unchecked value after config is gone.
+   - Keep content anomalies out of this constructor. 'TitleBelowHome',
+     dangling anchors, and duplicate members are fold/report concerns, not
+     structural ordering errors.
+
+   Tests in the same commit:
+
+   - accept a valid one- and multi-section telescope;
+   - reject empty, reversed, duplicate-source, unknown-source, and
+     mixed-pid inputs;
+   - preserve the public NotFound behavior for a missing pid;
+   - run the existing diff snapshot and telescope fold tests.
+
+** Select owned telescopes before folding
+
+   Put the collision rule in one filesystem/telescope helper, not in each
+   caller's loop.
+
+   - Given ordered raw sections plus 'SkgConfig', return retained sections
+     and, when applicable, an 'IgnoredForeignPidCollision' warning carrying
+     every ignored source.
+   - Run this before building the cross-corpus extra-id resolver. Extra IDs
+     and relationships in ignored files must not enter any map transiently.
+   - Replace 'ForeignOverlay' and its repair message with the new warning.
+     Aggregate the report by pid and say explicitly that the non-owned
+     files were ignored and not modified.
+   - Use the helper in bulk load and every checked one-pid/diff telescope
+     builder. Adjust 'home_from_disk' to prefer the first owned existing
+     section whenever any owned section exists; only if none exists may it
+     return the first foreign section.
+   - Audit the disk readers named in [[./4_audit-list.org]] again. In
+     particular, export and diff analysis must consume retained telescopes,
+     not regroup raw files independently.
+   - Leave the ignored files on disk. No cleanup, quarantine move, or git
+     operation is implied.
+
+   Required tests:
+
+   - foreign-more-public plus owned-more-private chooses the owned home;
+   - owned-more-public plus foreign-more-private ignores the foreign data;
+   - several owned sections remain one valid telescope while every foreign
+     colliding section is dropped;
+   - a wholly foreign telescope still loads normally;
+   - ignored titles, bodies, aliases, extra IDs, and relationships cannot
+     be resolved, searched, rendered, diffed, or exported;
+   - the report lists the pid and all ignored sources deterministically;
+   - one-pid fallback and 'home_from_disk' agree with bulk initialization.
+
+** Adopt the final source vocabulary
+
+   Make the broad mechanical rename before new behavior multiplies the old
+   names.
+
+   - 'PrivaciedMember<T> { level, member }'
+     becomes 'MemberAtSource<T> { source, member }'. Rename its constructor
+     and helpers so they read in that vocabulary; do not leave legacy type
+     aliases.
+   - Rename variables and live functions that mean the recording source,
+     including 'edge_level' to 'edge_source', 'ExplicitLevels' to
+     'ExplicitSources', and the 'edge level info' request/response/file/test
+     family to 'edge source info'. The wire strings change too; this is a
+     repo-only protocol with no compatibility aliases.
+   - In comments, tests, API documentation, and the glossary, use "list of
+     members at sources" for the collection and "member at source" for one
+     item. Reserve "privacy order" for ordering the sources.
+   - Rename privacy-sensitive locals such as 'level' when they carry a
+     'SourceName'. Do not rename unrelated tree depth, headline level, log
+     level, or mathematical level variables.
+   - Preserve literal 'leveled-lists' labels where they name a historical
+     work item or commit under 'TODO/DONE'. A parenthetical can give the
+     current term without rewriting history.
+
+   Use the occurrence list in [[./6_recap.org]] as the initial checklist,
+   then finish with repository-wide searches for 'PrivaciedMember',
+   'edge_level', 'edge level', and variants of 'leveled list'. Compile and
+   run the source/fold/edge-source tests before proceeding.
+
+** Give unfolding a checked result type
+
+   This is deliberately a separate commit from the load-side 'Telescope'
+   change.
+
+   - Introduce 'UnfoldedTelescope' with private pid, home, and ordered
+     '(SourceName, NodeFS)' sections. Its input must include the pid, extra
+     IDs, and misc properties that the writer currently adds after unfold,
+     so the result is a complete disk telescope rather than slices awaiting
+     assembly. Construction requires 'SkgConfig' and rejects an empty
+     result, unknown or duplicate sources, a first section other than home,
+     an embedded pid mismatch, and any order inversion.
+   - Change 'unfold_node' to return 'Result<UnfoldedTelescope, ...>'. It must
+     no longer sort unconfigured junk after every configured source; an
+     unconfigured member source is an error at the boundary.
+   - Give the filesystem writer read-only/consuming accessors rather than a
+     public vector. Adapt the org-roam importer and tests through that same
+     boundary.
+   - Keep ownership OUT of the type invariant. A structurally valid
+     unfolded telescope can still name a configured foreign source; the
+     writer's next preflight is what makes a value writable by this user.
+   - State and test the round-trip law using the named boundaries:
+     unfolding a valid effective node and folding the resulting telescope
+     recovers the same title, body, lists of members at sources, pid, extra
+     IDs, and misc properties, aside from explicitly irrelevant
+     serialization distinctions.
+
+   Expand [[../../tests/unit/telescope.rs]] with reversed/duplicate/unknown
+   source rejection and the existing randomized list properties. Keep the
+   no-cosmetic-rewrite fixtures byte-stable.
+
+** Preflight the complete filesystem write
+
+   Make [[../../server/dbs/filesystem/one_node.rs]] uphold its foreign-write
+   promise independently of every caller.
+
+   - Unfold first, then prepare every output path and serialized 'NodeFS'
+     plus every proposed deletion. Do not perform filesystem mutation while
+     discovering this set.
+   - Before the first write, validate that home and every output section
+     name a configured source owned by the user. Return one error naming all
+     offending sources and the pid. The deletion set must remain owned by
+     construction.
+   - Only after validation and serialization succeed may the writer compare
+     bytes, write changed files, and delete emptied owned sections.
+   - Retain the foreign-home refusal as an early, clearer diagnostic, but do
+     not rely on it for safety.
+   - Add a final assertion at the write loop's boundary so a later caller
+     cannot bypass the preflight by refactoring the preparation code.
+
+   The core regression has an owned home and a member at a foreign non-home
+   source. The call must fail before changing any existing section or
+   creating any new file. Also test multiple proposed outputs, with the
+   foreign one last, to prove the check is genuinely before all writes.
+
+** Default new owned-to-foreign relationships to the owner
+
+   Update the source resolution used by both save validation and the
+   'edge source info' advisory endpoint.
+
+   - For a new edge between two owned nodes, keep the existing default: the
+     more-private endpoint home.
+   - For a new edge whose owner is owned and member is foreign, default to
+     the owner's home, regardless of the foreign node's position in the
+     privacy order.
+   - An explicit 'relSource' for that edge may choose any configured,
+     owned source at least as private as the owner's home. It may not name a
+     foreign source. State plainly in the docs that the owner-home default
+     exposes the foreign node's ID and the relationship to readers of that
+     owned source; that is the chosen sharing rule.
+   - Existing edges remain sticky when their retained source is valid and
+     owned. A source that became foreign through a config change fails the
+     final writer preflight rather than being moved silently.
+   - Apply the rule uniformly to 'contains', 'subscribes_to', and
+     'overrides_view_of'. Hides and inferred textlinks keep their existing
+     derivation rules.
+
+   Tests should cover both privacy-order positions for the foreign member,
+   every writable relation, a more-private explicit owned choice, an
+   explicit foreign refusal, and agreement between the advisory endpoint
+   and the save result.
+
+** Make alias 'relSource' load-bearing
+
+   Aliases are also members at sources. Give them the same explicit/sticky/
+   default path without pretending their text is a node ID.
+
+   - Extend 'Qual::Alias' with 'rel_source: Option<SourceName>'. Render it as
+     the same '(viewStats (relSource NAME))' metadata shape used on node
+     headlines, and teach metadata parsing to attach the parsed value to an
+     alias rather than discarding it.
+   - Collect aliases as '(text, Option<SourceName>)' in
+     'NodeSaveIntent'. Add the explicit values to 'ExplicitSources' keyed by
+     alias text before lowering to 'MemberAtSource<String>'.
+   - Resolve an alias source in order: explicit request; existing source for
+     the same alias text; owner home. Validate that an explicit source is
+     configured and not more public than the owner home. The writer's
+     all-output check remains the ownership backstop.
+   - Render 'relSource' when an alias is away from its default, just as an
+     edge does. Suppress it at the default after a successful save.
+   - Extend 'skg-set-relationship-source' at an alias headline. The alias
+     path can derive its default from the owning node's home and its current
+     value from alias metadata, so it need not lie to the edge-source
+     endpoint with a fake member ID. Update the command's prose to say that
+     it edits a relationship or alias member source. The recursive command
+     remains relationship-only.
+   - Add equivalent parsing/rendering support in any Neovim metadata
+     manipulation that can preserve or edit the atom. A client that cannot
+     offer a gesture must at least round-trip the load-bearing metadata.
+
+   Tests belong at every boundary: Org render/parse round-trip, alias-col
+   extraction, explicit beats sticky, no override preserves sticky, new
+   alias defaults home, explicit more-private move, more-public refusal,
+   foreign-source refusal, Emacs gesture, and a full save/reload round trip.
+
+** Fold title and body independently and carry ugliness
+
+   Refactor the scalar part of [[../../server/telescope/fold.rs]] without
+   changing list folding.
+
+   - Use a small fold-local 'ScalarAtSource<T>' or equivalent for the
+     selected title and body. Pick the first present value of each
+     independently.
+   - Set 'ugly_telescope' if either selected source differs from home.
+     Preserve precise sources only long enough to produce warnings and the
+     boolean.
+   - Keep 'TitleBelowHome' and add a corresponding 'BodyBelowHome'. Rewrite
+     the later-title/body warnings so they say whether a more-public scalar
+     won; do not claim "home's won" when the selected scalar was itself
+     below home.
+   - Add 'ugly_telescope' to 'NodeComplete', 'NodeRust', and 'NodeTantivy'.
+     New/buffer-authored nodes default false. 'NodeTypedb' deliberately
+     omits the flag while receiving the same folded title, body, and graph
+     data as today.
+   - Add an indexed and stored Tantivy field on every title and alias
+     document. Preserve it through background updates, context-origin
+     rewrites, saves, and index rebuilds. A successful normal save or hoist
+     reindexes the node as false.
+   - Make diff snapshot nodes carry the classifier too, including the
+     titleless placeholder retry. The placeholder must not erase a body-
+     below-home fact.
+
+   Test all four title/body placements listed under "Home and ugly
+   scalars", plus normal home text, duplicate later scalars, no title, and
+   Tantivy save/rebuild preservation. Add a public-source-set regression
+   that proves the flag is true before adding the release gate; do not add
+   a temporary code path that releases the text.
+
+** Put the scalar-release gate in front of every textual response
+
+   Introduce one policy module used by handlers before serialization. The
+   module takes the active source-set, candidate pids, the loaded ugliness
+   lookup, and the request's approval; it returns allow, allow-with-warning,
+   or challenge. Callers should not construct their own wording or decide
+   that one endpoint is harmless.
+
+   Add a tagged 'ugly-telescope-confirmation' response. It carries the
+   operation, pid list when known, and explanatory prompt, but no data text.
+   Retried direct/batch requests carry an 'allow-ugly-telescopes' pid list.
+   Search uses an explicit include/exclude choice because its matching pids
+   must not be learned before authorization. No legacy untagged fallback.
+
+   Audit and gate these surfaces:
+
+   - single-root views, override menus, definitive expansion, and direct
+     one-pid disk fallbacks;
+   - ordinary rerender, source-set-switch rerender, diff-mode rerender,
+     saved-view rerender, and collateral view updates;
+   - 'titles by ids', including Tantivy, added-node, deleted-node, and disk
+     fallbacks used for readable IDs;
+   - initial text-search results and background search enrichment;
+   - diff analysis and any stage/diff report that contains titles, bodies,
+     aliases, or text diffs;
+   - server and command-line Org export;
+   - any remaining request found by tracing every use of 'title', 'body',
+     'NodeComplete', 'NodeRust', and stored Tantivy text to a
+     'TcpToClient' response or output file.
+
+   Pure path, source-set, source-list, connection, and relationship-source
+   responses contain no scalar text and need no gate. Record this negative
+   audit in the implementation progress document so a later reviewer can
+   see why each request type was included or excluded.
+
+   Client behavior:
+
+   - Emacs and Neovim display one prompt per challenged request, then retry
+     the original request with the approval. Decline leaves the current
+     buffer and open-view registry unchanged.
+   - Under 'all', and after a restricted approval, warnings go through the
+     clients' normal warning presentation. Do not hide the warning inside
+     server logs.
+   - Source-set changes and rerender streams must challenge before locking,
+     mutating open-view state, or streaming the first view. If a client has
+     preemptively locked, send the existing balanced empty-unwind sequence
+     on decline.
+   - A challenged single-root request must not register an open view until
+     the approved retry succeeds.
+
+   Search implementation:
+
+   - Add the Tantivy ugliness filter to the query itself, not to the returned
+     'TopDocs'. Filtering afterward both leaks match existence internally to
+     later ranking code and can let excluded hits consume the result limit.
+   - Store the include/exclude decision in 'SearchEnrichmentPayload' so the
+     snapshot/enrichment exchange cannot broaden it.
+   - When excluded, aliases of an ugly node are excluded too even if an
+     alias itself sits at home; the chosen policy is telescope-coarse.
+
+   Noninteractive behavior:
+
+   - A restricted CLI export fails closed unless given an explicit
+     '--include-ugly-telescopes' option. 'all' exports and warns.
+   - Library/batch callers without a confirmation channel return a typed
+     error naming the operation and pid(s); they never assume yes.
+
+   The privacy tests must assert ABSENCE, not only the response type. Seed a
+   unique secret in each title/body and prove it is absent from the raw
+   response, error, warning, search result IDs, enrichment, exported files,
+   and view registry until approved. Then prove 'all' and an approved
+   restricted retry return the text with a warning.
+
+** Offer a preflighted hoist on save
+
+   Build this on the checked telescope, complete writer preflight, and
+   release protocol rather than weakening the current refusal in place.
+
+   - Before graph/database/filesystem mutation, derive the save's touched
+     pids and reread each selected telescope from disk. Select title and body
+     independently with the same helper as load; do not infer ugliness from
+     "home has no title" alone.
+   - If any is ugly and lacks this retry's explicit approval, return one
+     typed 'telescope-hoist-confirmation' containing every pid and home.
+     Nothing is committed. The response explains that Hoist publishes the
+     lower text at home and Abort requires manual '.skg' repair.
+   - The approved retry carries the exact approved pids. Reread and
+     reclassify; newly ugly or changed candidates challenge again.
+   - Run the normal buffer validation, foreign-node validation,
+     member-at-source validation, full unfolded-output ownership check,
+     and serialization preflight before the first write. Confirmation is
+     permission for publication, not permission to bypass another rule.
+   - Write the selected title and selected body into home. Rewriting the
+     lower owned sections removes their scalar keys but preserves their
+     aliases, relationships, anchors, extra section data, and byte-stable
+     representations wherever unchanged.
+   - Reread the result and require 'ugly_telescope == false' before updating
+     the in-Rust graph and derived databases. If verification fails, report
+     the failure loudly; do not mark the in-memory node clean.
+   - Keep ordinary noninteractive writers fail-closed. In particular,
+     'strip body whitespace', imports, node merge, and maintenance binaries
+     must not acquire an implicit Hoist answer merely because they call the
+     common writer.
+
+   If a save also needs fork confirmation, request Hoist approval first,
+   then run the existing fork-candidate check on the approved retry. Each
+   terminal confirmation balances 'save-lock' exactly as
+   'fork-confirmation' does today, and neither attempt writes. Do not combine
+   the two decisions into one ambiguous yes/no prompt.
+
+   Required save tests:
+
+   - Abort leaves every file byte-for-byte unchanged;
+   - title-only, body-only, and both-scalar hoists become clean;
+   - title and body from different lower sources both land at home;
+   - lower relationships and aliases survive;
+   - several ugly pids produce one batch confirmation;
+   - a disk change between attempts triggers a fresh decision;
+   - a separate invalid/foreign output prevents every write despite Hoist
+     approval;
+   - graph, TypeDB, Tantivy, search, and rerender see the clean result only
+     after verified success;
+   - Hoist followed by a second save needs no confirmation and makes no
+     cosmetic rewrites.
+
+** Strengthen the deterministic-home test
+
+   Repair the test whose twenty calls reuse one 'HashMap'. Rebuild the
+   config/map for every iteration so each map gets a fresh randomized hash
+   seed, then assert 'home_from_disk' always returns the same most-public
+   RETAINED source. Include an owned/foreign collision case so the new
+   selection policy, not raw iteration order, determines the answer.
+
+   This can be a small independent commit; do not bury it in the scalar
+   gate or hoist changes.
+
+** Repair the two real-data warnings
+
+   These are data changes, not fixtures and not an excuse to weaken a
+   warning.
+
+   - In
+     'data/owned/public/33d5cd4e-8a0c-48f0-85c2-467db86e1862.skg',
+     remove one duplicate "shows-because (relationship)" alias, preserving
+     the original ordering of all other aliases.
+   - For node '6652685e-472e-4c07-a456-fbc3432b1dbf', move its 'contains'
+     membership of 'f0a77ca4-2371-423b-af9c-c07d2cfae4f2' from 'pers-p' to
+     at least 'pers-m'. Prefer the normal source-setting gesture and save so
+     the server validates the edit; inspect the resulting source-repository
+     diff before accepting it.
+   - Reinitialize and confirm that neither warning remains. If the generated
+     'telescope-warnings.org' disappears because the report is clean, that
+     is the intended stale-report behavior.
+
+   The source folders may be separate git repositories. Edit only the two
+   named nodes and do not perform git operations on Jeff's behalf.
+
+** Reconcile docs, reports, and problem tracking
+
+   Documentation changes that are load-bearing for an earlier commit
+   should land with that commit. At the end, make one consistency pass:
+
+   - [[../../docs/telescopes.md]], [[../../glossary.md]],
+     [[../../api-and-formats.md]], [[../../docs/COMMANDS.org]], and comments
+     in [[../../schema.tql]] must agree that home is the most-public retained
+     section and title/body at home is an invariant.
+   - Document the owned-pid collision rule, ugly-data warning/confirmation,
+     search opt-in, Hoist consequences, owned-to-foreign relationship
+     default, alias 'relSource', and the final source vocabulary.
+   - Describe every new/renamed wire request and response exactly, including
+     length prefixing, retry fields, terminal save ordering, and
+     noninteractive behavior. Remove the old 'edge level info' protocol;
+     do not document an alias the code does not accept.
+   - Update warning text and fixtures to use the commands and names that
+     actually exist after the rename.
+   - Append the new disk-selection and response-boundary audit results to
+     [[./4_audit-list.org]] or link a focused audit from it. Do not rewrite
+     the July conclusions as if they had covered work discovered in August.
+   - Leave [[./6_recap.org]] as the discussion record. Add only a short link
+     to this plan if navigation needs it; do not mechanically rewrite Jeff
+     and Codex's historical dialogue.
+   - After the fixes and their tests pass, move the three recap findings
+     (read-time scalar release, foreign non-home write, and unchecked
+     'Telescope') from [[../problems.org]] to
+     [[../DONE/problems.org]] under that file's normal protocol.
+
+* Verification while implementing
+
+  Follow [[../../coding-advice/development-process.md]]: run focused tests
+  after each change, and the entire suite before calling the branch ready.
+  Rust/TypeDB, Emacs, and integration runs are serialized because their
+  test databases and services collide.
+
+  The focused ladder should grow with the implementation rather than wait
+  for the end:
+
+  - telescope constructor, fold/unfold property, multi-source load, and
+    diff-snapshot tests after boundary changes;
+  - save-leveling, writer refusal/atomic-preflight, edge-source info, alias
+    extraction, and filesystem round-trip tests after save changes;
+  - source-set, Tantivy, search, titles-by-ids, export, diff analysis, and
+    raw-protocol tests after the scalar gate;
+  - Emacs and Neovim response/gesture tests for confirmations and alias
+    metadata;
+  - integration tests for restricted direct view, search exclusion and
+    opt-in, 'all' warnings, source-set-switch rerender, Abort, and Hoist.
+
+  Before the final run:
+
+  - Start exactly one TypeDB server and one Skg server as required by
+    [[../../tests/USAGE.md]].
+  - Rebuild Tantivy rather than reusing a schema created before the
+    'ugly_telescope' field.
+  - Resolve or explicitly re-bless the pre-existing
+    'override_menu::all_tests' expectation in a separate, clearly unrelated
+    commit. Do not call the Rust suite green while it is still red.
+
+  Final commands, using the repository's documented wrappers where they
+  exist:
+
+  #+begin_src sh
+  cargo nextest run
+  bash/emacs-tests.sh
+  bash/integration-tests.sh
+  git diff --check main...HEAD
+  #+end_src
+
+  Record counts, service versions/preconditions, the data-warning result,
+  and any deviation from this plan in '8_progress.org'. A historical July
+  run is useful evidence but is not the completion gate for this work.
+
+* Explicitly outside this plan
+
+  - The incremental initialization path still checks ID conflicts after
+    applying its deltas. It is marked "DEAD ?" and the recap records the
+    exposure. This plan does not silently claim to fix it; revive or remove
+    that path in a separate task if it is still used.
+  - A telescope with no title in any section remains a hard load error. The
+    existing problem about quarantining/synthesizing such a node has a
+    different product decision.
+  - Ignored foreign same-pid files are not deleted, renamed, moved, or
+    edited. "Unreachable within Skg" describes semantic ingestion and
+    output, not ownership of the raw repository.
+  - The coarse boolean does not remember which source supplied title or
+    body. More selective prompting would be a different policy and data
+    model.
+  - This plan does not make a multi-file save transactionally crash-proof.
+    It requires complete validation before mutation and verification after
+    Hoist, but a process or machine failure between filesystem writes is the
+    existing durability problem, not one to smuggle into this branch.
+
+* Completion checklist
+
+  The branch is ready for merge only when all of the following are true:
+
+  - every retained telescope and every unfolded output crosses a checked,
+    private-field boundary;
+  - foreign same-pid sections are reported and absent from every semantic
+    read path;
+  - the writer's no-foreign-write rule is proven before all writes;
+  - title/body independence and 'ugly_telescope' survive load, save, index,
+    and diff paths;
+  - every scalar-output request is audited, with restricted leakage tests;
+  - search excludes before matching unless explicitly included;
+  - Abort is byte-stable and Hoist is explicit, complete, and verified;
+  - alias 'relSource' and the owned-to-foreign default round-trip;
+  - the final vocabulary is consistent in live code and docs;
+  - the two real-data warnings are repaired;
+  - the three findings in 'TODO/problems.org' are closed only after their
+    fixes pass;
+  - focused tests, Rust, Emacs, integration, and 'git diff --check' all have
+    fresh recorded results, with the override-menu test no longer an
+    unexplained red exception.
+
+* Architectural choices Codex supplied while writing this plan
+
+  Yes: the recap settled the PRODUCT behavior more completely than it
+  settled the architecture. I supplied the choices below in order to make
+  the plan executable rather than leave several headings saying "design
+  this later".
+
+  This section qualifies the introduction's statement that the plan "does
+  not reopen the decisions". I did not reopen Jeff's product decisions,
+  but the following designs are recommendations from Codex, not agreements
+  already reached in [[./6_recap.org]]. They should be reviewed before
+  implementation. Changing one of them should amend this plan; it need not
+  restart the earlier product discussion unless it changes observable
+  behavior.
+
+** what they do not change
+
+   None of the choices above changes these settled product rules:
+
+   - home is the most-public retained section;
+   - title and body are judged independently;
+   - the runtime policy is deliberately coarse;
+   - 'all' warns without asking, while a restricted set asks;
+   - search authorization precedes matching;
+   - owned data wins a same-pid collision with foreign data;
+   - Hoist is explicit and Abort is non-mutating;
+   - foreign sources are never written.
+
+   Those are Jeff's decisions. The preceding subsections describe the
+   architecture I chose to realize them, and are the places to challenge
+   before implementation begins.
+** a list of them
+*** Where the ugly boolean lives
+
+   Settled beforehand: retain a coarse 'ugly telescope' boolean in the
+   loaded snapshot, use the same snapshot for release decisions, and put
+   enough information in Tantivy to exclude ugly documents before search.
+
+   Supplied here: put 'ugly_telescope' directly on 'NodeComplete',
+   'NodeRust', and 'NodeTantivy'; add one indexed and stored field to every
+   Tantivy title/alias document; omit it from 'NodeTypedb'. That makes the
+   classifier travel with the existing projections instead of creating a
+   separate pid-to-ugliness registry or a TypeDB attribute.
+
+   This is substantive because it changes the Tantivy schema and makes
+   ugliness part of equality/conversion for three core Rust node types. A
+   separate immutable registry would be a plausible alternative, but every
+   save/rebuild and request would then have to keep that registry coherent
+   with the graph and index.
+
+*** One centralized scalar-release boundary
+
+   Settled beforehand: challenge before releasing ugly text under a
+   restricted set, batch affected pids, fail closed for callers that cannot
+   ask, and do not reveal a search match before authorization.
+
+   Supplied here: one server policy module returns 'allow',
+   'allow-with-warning', or 'challenge' for all textual handlers; a common
+   'ugly-telescope-confirmation' response carries no scalar data; approved
+   retries carry a pid allowlist. I also chose REQUEST-SCOPED approval with
+   no cache in 'ViewsState' or either client.
+
+   The recap mentioned a source-set-and-fingerprint cache as a possible
+   limit on remembered approval but never chose caching versus no caching.
+   I chose no cache because it needs no telescope fingerprint, cannot
+   survive a pull or rebuild by mistake, and already fits the retry pattern
+   used by fork confirmation. A connection-scoped cache would be less
+   repetitive but would require a precise invalidation design.
+
+*** The restricted-search handshake
+
+   Settled beforehand: an ugly document must be excluded before matching
+   unless the user opts in before the query runs.
+
+   Supplied here: when a restricted search request has no explicit choice
+   and the loaded index contains any ugly document, the server performs an
+   ugliness preflight but does not execute the text query. The client then
+   retries with either include or exclude; exclude adds a Tantivy MUST-NOT
+   clause to the query itself. If the index has no ugly documents, the
+   server proceeds without prompting.
+
+   Other viable designs were to make restricted search always exclude ugly
+   documents, to add a connection-wide setting, or to have the client ask
+   before every restricted search without consulting the server. The plan's
+   handshake avoids needless prompts when the corpus is clean and avoids a
+   persistent authorization state, at the price of an extra round trip
+   while ugly data exists.
+
+*** Foreign-pid handling as input normalization
+
+   Settled beforehand: when the user's files and non-owned files share a
+   pid, explain the collision, choose the user's data, leave the foreign
+   files untouched, and make their data unreachable within Skg.
+
+   Supplied here: treat that as a normalization step on raw ordered
+   sections BEFORE extra-ID collection, home selection, folding, or any
+   database write. Apply the same helper to bulk load, one-pid fallback,
+   git snapshots, export, and 'home_from_disk'. If no owned section exists,
+   retain the wholly foreign telescope normally.
+
+   The early placement is important architecture, not just an audit detail:
+   dropping the foreign node after fold could still let its extra IDs or
+   aliases enter resolution/search transiently. Extending the rule to diff
+   and fallback paths is how this plan interprets "thereafter unreachable";
+   limiting it to initialization would leave alternate semantic readers.
+
+*** The exact save-side telescope type
+
+   Settled beforehand: add a typed save-side boundary, and make it a
+   separate commit from strengthening load-side 'Telescope'.
+
+   Supplied here: 'UnfoldedTelescope' contains private pid, home, and fully
+   assembled ordered '(SourceName, NodeFS)' sections, including the extra
+   IDs and misc properties that the writer currently adds afterward. Its
+   structural constructor knows the config but deliberately does not know
+   ownership.
+
+   A smaller type containing only '(SourceName, SectionSlices)' would also
+   satisfy "not a bare vector", but it would leave part of telescope
+   assembly outside the boundary and make the stated round-trip law omit
+   pid, extra IDs, and misc. Reusing load-side 'Telescope' directly was
+   another possibility; I chose a distinct type because a checked disk
+   input and a proposed disk output have different trust and ownership
+   questions.
+
+*** Preparing the whole write before mutating the filesystem
+
+   Settled beforehand: validate every proposed output source before the
+   first write, and never write or delete a foreign source.
+
+   Supplied here: prepare paths, serialized 'NodeFS' bytes, and deletions
+   for the complete telescope before mutation, then run ownership and
+   serialization validation over that prepared set. This is stronger than
+   merely scanning the source names returned by 'unfold_node'.
+
+   The stronger boundary prevents a later path/serialization failure from
+   occurring only after an earlier section was written. It still does not
+   make the multi-file update crash-transactional, which the plan leaves
+   explicitly out of scope.
+
+*** Generalizing the owned-to-foreign default
+
+   Settled beforehand through Jeff's example: a new relationship owned by
+   an owned node and pointing to a foreign node defaults to the owner's
+   home, unless explicitly made more private.
+
+   Supplied here: apply that rule to all three writable outbound relations
+   ('contains', 'subscribes_to', and 'overrides_view_of'); define "more
+   private" as any configured OWNED source at or below the owner's home;
+   reject an explicit foreign source; retain an existing source only while
+   it remains configured and owned. Make the advisory 'edge source info'
+   endpoint compute the identical rule.
+
+   The recap's example named 'contains' and did not explicitly settle those
+   generalizations. I chose uniformity because all three relations share
+   the same 'relSource' and save-resolution machinery. A relation-specific
+   exception would need a product reason that has not appeared.
+
+*** Alias 'relSource' representation and gesture
+
+   Settled beforehand: make 'relSource' metadata work on aliases too.
+
+   Supplied here:
+
+   - add 'rel_source: Option<SourceName>' to 'Qual::Alias';
+   - use the existing '(viewStats (relSource NAME))' wire shape;
+   - carry explicit alias sources through 'NodeSaveIntent' and
+     'ExplicitSources', keyed by alias text;
+   - resolve explicit, else sticky-by-text, else owner home;
+   - validate the owner home as the privacy floor;
+   - extend the single-item 'skg-set-relationship-source' gesture to alias
+     headlines while leaving its recursive form relationship-only;
+   - derive alias default/current information locally instead of inventing
+     a fake edge or broadening the edge-source endpoint.
+
+   None of that representation or UI was settled in the recap. Alternatives
+   include a new alias-specific command, a newly generalized "member source
+   info" endpoint, or renaming the existing gesture to cover both kinds.
+   I chose the smallest protocol extension that round-trips the already
+   chosen 'relSource' atom, though the command's relationship-specific name
+   is admittedly less elegant once it also handles aliases.
+
+**** DONE document the terminology abuse in COMMANDS.org
+Here's a verbatim passage to append there once the feature lands:
+
+"Note that the name 'skg-set-relationship-source' is somewhat misleading.
+Normally, by 'relationship' we mean
+'a relationship between two nodes in the graph'.
+But for this command we need to broaden the definition to
+'a relationship from what this viewnode represents
+(which might be an alias) to what its parent represents (a node in the graph)'."
+
+*** Protocol renames and client parity
+
+   Settled beforehand: rename 'edge level' to 'edge source' everywhere and
+   use no legacy support for the repo-only rename.
+
+   Supplied here: include the request string, response tag, handler/file
+   names, and tests in that break; require both Emacs and Neovim to handle
+   new ugliness confirmations; and make noninteractive restricted export
+   require an explicit '--include-ugly-telescopes' option.
+
+   The wire rename follows the project's no-legacy rule, but the scope of
+   client parity and the exact CLI opt-in were not individually discussed.
+   I chose them because a server-side privacy rule is not complete if one
+   supported client cannot answer safely or a batch caller silently assumes
+   approval.
+
+*** Which textual outputs cross the release boundary
+
+   Settled beforehand: direct views, title lookup, search, rerendering,
+   export, and any API returning node text need the same decision.
+
+   Supplied here: explicitly include diff analysis and git-snapshot title/
+   body fallbacks, source-set-switch streams, saved/collateral rerenders,
+   readable-ID title responses, and maintenance/batch paths that can emit or
+   rewrite scalar text. Challenge before registering a view or beginning a
+   rerender stream; leave path/source/connection/relationship-source
+   responses outside because they contain no scalar.
+
+   Much of this follows necessarily from the privacy invariant, but the
+   placement at the final server serialization boundary is architectural.
+   An alternative would be to make every intermediate view-node carry a
+   protected-text wrapper; that would be harder to bypass but would spread
+   authorization state through the rendering model.
+
+*** Hoist protocol and ordering
+
+   Settled beforehand: on save, explain the publication, offer Abort or
+   Hoist, reread disk for precise source facts, and preserve lower lists
+   while moving title/body home.
+
+   Supplied here: one batched 'telescope-hoist-confirmation' response;
+   approved pid lists rather than a bare boolean; reread and reclassify on
+   the retry; run every other validation despite approval; verify the
+   rewritten telescope is clean before marking the graph/index clean; and,
+   when both are needed, request Hoist approval before the existing fork
+   confirmation.
+
+   The ordering with fork confirmation and the post-write verification were
+   not discussed. I put Hoist first because it authorizes publication of
+   existing disk text and should be settled before the save considers
+   cloning foreign nodes. I required verification because updating the live
+   snapshot to 'ugly_telescope = false' merely on the strength of intended
+   output would recreate a disk/snapshot disagreement if the rewrite did
+   not actually produce a clean telescope.

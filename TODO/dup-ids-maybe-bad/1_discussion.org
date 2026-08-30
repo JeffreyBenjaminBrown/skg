@@ -1,0 +1,709 @@
+#+title: "Duplicate IDs across sources": a name that now means the opposite of what it says
+
+* NOTE ON MARKERS:
+TODO / ONGOING / DONE here track the state of the
+DISCUSSION, not of the implementation. A plan item marked DONE is
+one we have stopped arguing about; none of them are coded yet.
+
+* DONE The short answer
+
+  The runtime is right. The vocabulary is wrong. But the wrong
+  vocabulary is not cosmetic: it has already misled at least two
+  readers on record, and it concealed one real nondeterminism bug
+  whose blast radius includes the privacy level at which edges get
+  written.
+
+  So: no data is being corrupted today, no legitimate telescope is
+  rejected today, and nothing here is an emergency. But I would not
+  file it as "just a rename" either. There are four live defects
+  behind the misleading name, and one root cause that the privacy
+  telescope plan explicitly predicted and asked to be prevented.
+
+  Since the first draft, two things changed. Your rule -- the text
+  always lives in the most public section -- turns out to be an
+  invariant the save path ALREADY enforces but never names, and
+  adopting it makes the 'source_from_disk' fix simpler, not harder
+  ([[*ONGOING 4. Fix 'source_from_disk', and pin the home to the most public section][item 4]]). And the TypeDB experiment came back split: one
+  flavor of a real id conflict dies inside TypeDB before the readable
+  report can run, the other passes TypeDB silently ([[*DONE Open question, now settled: does TypeDB reject a conflict first?][the experiment]]).
+
+* DONE What I verified: the check itself is correct
+
+  'check_for_duplicate_ids_across_sources'
+  (server/dbs/filesystem/multiple_nodes.rs:144) does NOT flag
+  telescopes. It groups every claimant of every id and reports only
+  ids whose claimants have MORE THAN ONE DISTINCT PID:
+
+  #+begin_src rust
+    let distinct_pids : HashSet<&ID> =
+      owners . iter() . map ( |(pid, _)| pid ) . collect();
+    distinct_pids . len() > 1
+  #+end_src
+
+  Sections of one telescope share a pid, so they can never trip it.
+  Its own doc comment (line 136) says so in as many words.
+
+  I checked every call site. All nine pass POST-FOLD nodes -- one
+  NodeComplete per telescope, never one per file:
+
+  - server/main.rs:140 (from 'initialize_dbs')
+  - server/save.rs:132 (TypeDB-rebuild fallback)
+  - server/nodeMerge.rs:87 and :116 (rebuild fallbacks)
+  - server/serve/handlers/rebuild_dbs.rs:63
+  - tools/bench-audit.rs, tools/probe-audit.rs,
+    tools/top-contents.rs, tools/bench-context-inmemory.rs,
+    tools/top-contentward-descendants.rs
+
+  And the tests pin the telescope case as LEGAL, explicitly:
+  tests/multi_source_loading.rs:178-186 writes the same pid into two
+  sources, asserts they fold into one node, and asserts the check
+  passes ("a telescope is not an id conflict").
+
+  The surrounding subsystems are already telescope-aware too:
+  diff analysis reports only the two-pid violation
+  (server/diff_analysis/diff.rs:116-118), api-and-formats.md:170-176
+  spells out the distinction, and stage-moves was redefined around
+  title presence rather than file presence.
+
+  Conclusion: there is no code path on which a privacy telescope is
+  treated as invalid.
+
+* DONE Where the codebase does contradict itself
+
+** DONE The name is the only part most readers ever see, and it lies
+
+   'check_for_duplicate_ids_across_sources' appears in twelve files.
+   Nothing about the identifier says "two distinct nodes"; the phrase
+   "duplicate ids across sources" is, post-telescope, a precise
+   description of the FEATURE. A reader who greps, or who reads a call
+   site rather than the definition, learns the opposite of the truth.
+
+** DONE Everything user-facing still says "across sources"
+
+   In server/dbs/filesystem/multiple_nodes.rs:
+
+   - the error string: "Duplicate ID(s) found: ..." (line 175)
+   - the log lines: "Found N duplicate ID(s) across sources"
+     (lines 280, 288)
+   - the report filename: 'initialization-error_duplicate-ids.org'
+     (line 255)
+   - the report title: "Duplicate IDs Across Sources" (line 257)
+   - the report body: "Found N duplicate IDs across sources" (line 260)
+
+** DONE The plan asked for exactly this to be fixed, and it was not
+
+   TODO/DONE/privacy-telescope/5_plan.org:195 --
+
+     'check_for_duplicate_ids_across_sources' is subsumed by the shape
+     validator (next item) -- same-ID-different-source stops being an
+     error and starts being the feature.
+
+   TODO/DONE/privacy-telescope/4_discussion.org:754 --
+
+     Group-by-ID currently ends in an error report
+     ('check_for_duplicate_ids_across_sources'); it should end in a
+     VALUE ... Making "several files, one node" a type, not a
+     condition, is what keeps the scattered-assumption sweep from
+     regressing later: new code meets Accordion, not a surprising
+     second file.
+
+   Neither happened. The check was correctly NARROWED but not renamed,
+   and it was not subsumed -- 'server/telescope/invariants.rs' is a
+   separate validator covering different violations
+   ('LeakShapedMember', 'UnconfiguredLevel'). The group-by-ID still
+   ends in an anonymous 'HashMap<ID, Vec<(SourceName, NodeFS)>>'
+   (multiple_nodes.rs:20) and a bare 'Vec<(SourceName, NodeFS)>'
+   passed between functions (multiple_nodes.rs:71, :98; one_node.rs:44,
+   :88). There is no Telescope type.
+
+* DONE Consequences
+
+** DONE Already-realized damage (two instances on record)
+
+*** DONE The other Claude's report
+
+    This is the instance you brought to me. An agent that read the
+    codebase concluded that "duplicate IDs across sources" is an
+    invalid state fatal to the save process. Both halves are wrong:
+    it is the central valid state, and the check is not in the save
+    pipeline at all -- only in save.rs's TypeDB-rebuild FALLBACK,
+    reached after a TypeDB update already failed.
+
+*** DONE TODO/problems.org currently cites a telescope as a problem
+
+    That entry ("Initialization warning files can be easy to miss")
+    reproduces a real report line from 2026-05-06:
+
+      duplicate id 0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d in
+      pers-deprecated and public
+
+    Under the pre-telescope semantics that meant "the same file exists
+    in two sources". That is now the normal shape of any node with a
+    privatized edge. The entry stands in your open-problems file
+    presenting the feature as a defect. (I have since appended a
+    dated note there saying so; the entry's real point -- init warning
+    files are easy to miss -- still stands.)
+
+** DONE Live defect: the report throws away the only actionable data
+
+   'check_for_duplicate_ids_across_sources' collects claimants as
+   '(pid, home)' pairs and then maps the pid away before reporting:
+
+   #+begin_src rust
+     . map ( |(id, owners)|
+             (id, owners . into_iter()
+                  . map ( |(_, src)| src ) . collect()) )
+   #+end_src
+
+   'report_duplicate_ids' therefore receives 'ID -> Vec<SourceName>'.
+   Post-telescope the sources are the USELESS half. The violation is
+   "two nodes claim this id"; the two pids are what you need to open
+   and repair. Worse, both claimants can live in ONE source (nothing
+   about the violation is cross-source any more), in which case the
+   report prints that source twice:
+
+     - ID 'contested' in sources: public, public
+
+   That is the entire diagnostic the user gets. The experiment below
+   sharpens this: for one flavor of conflict TypeDB's own error is
+   what you actually see, and it names the contested VALUE but neither
+   claimant -- so the pids are missing from both diagnostics.
+
+** DONE Live defect: the report file is never deleted
+
+   'report_duplicate_ids' is only reached when the set is non-empty
+   (line 166 returns early otherwise), so nothing ever removes
+   'initialization-error_duplicate-ids.org' after a clean boot.
+
+   Contrast 'report_telescope_violations'
+   (server/telescope/invariants.rs:132-142), which explicitly removes
+   its stale report "so the file's presence is meaningful". This is
+   the same defect problems.org already files against
+   'initialization-error_unreadable-skg-files.org' -- but the
+   duplicate-ids file is the dangerous one, because a stale copy
+   written by a pre-telescope binary names id/source pairs that are
+   now perfectly healthy. Someone acting on it would "repair" a valid
+   telescope by deleting a section.
+
+** DONE Live defect: at init the check runs after the databases are built
+
+   server/main.rs:130-144 calls 'initialize_dbs' first and checks
+   afterward. 'full_init' (server/dbs/init.rs:280-324) populates
+   TypeDB (line 309) and Tantivy (line 318), each with its own
+   'std::process::exit (1)' on failure.
+
+   I have now confirmed by experiment what this costs; see
+   [[*DONE Open question, now settled: does TypeDB reject a conflict first?][the experiment]]. Short version: for an extra_id/extra_id
+   conflict TypeDB errors first and the readable report never runs;
+   for a pid/extra_id conflict TypeDB accepts silently and the Rust
+   check is the only thing that catches it -- after both databases
+   have already been filled with the ambiguous data.
+
+   Note the internal contrast: 'rebuild_dbs_in_place'
+   (server/serve/handlers/rebuild_dbs.rs:58-76) gets the order right --
+   read files, check ids, THEN wipe and repopulate. Init does not.
+
+** DONE Live defect, and the weighty one: 'source_from_disk'
+
+   server/types/phantom.rs:106-116:
+
+   #+begin_src rust
+     pub fn source_from_disk (
+       id     : &ID,
+       config : &SkgConfig,
+     ) -> Option<SourceName> {
+       let filename : String = format!( "{}.skg", id . 0 );
+       for (source_name, source_config) in &config . sources {
+         let path : PathBuf =
+           PathBuf::from( &source_config . path ) . join (&filename);
+         if path . exists() {
+           return Some( source_name . clone() ); }}
+       None }
+   #+end_src
+
+   It iterates 'config.sources', which is a 'HashMap', and returns the
+   FIRST directory holding a file with that name.
+
+   Pre-telescope there was at most one such directory, so iteration
+   order was irrelevant. Post-telescope, any node with a privatized
+   edge has two or more section files -- this is the normal shape, not
+   an edge case -- and this function returns an ARBITRARY one, chosen
+   by 'HashMap' iteration order, which Rust randomizes per process.
+
+   It also breaks the rule stated at server/types/misc.rs:191-201,
+   where 'source_order' is marked LOAD-BEARING and the comment ends
+   "No other code may compare source positions." This code compares
+   source positions by declining to.
+
+   Every consumer reads the returned SourceName as the node's HOME:
+
+   - server/from_text/supplement_from_disk.rs:275 -- 'home_of' feeds
+     'default_floor_for', which computes the sticky-else-default LEVEL
+     of a relationship edge. A wrong home means a wrong default
+     privacy floor for a new edge, and once written the level is
+     sticky.
+   - server/from_text/weave.rs:42 -- 'member_is_visible' decides
+     whether a disk member counts as visible during a save. Wrong in
+     one direction, a member the user deleted is retained; wrong in
+     the other, a member they never saw is dropped.
+   - server/to_org/complete/partner_col/mod.rs:162, :352, :449,
+     server/update_buffer/reconcile/content.rs:249,
+     server/update_buffer/reconcile/partner_col.rs:62,
+     server/to_org/complete/partner_col/goal_list.rs:358 -- rendering,
+     where a wrong home means a wrong source herald.
+   - server/types/env.rs:60, :97 -- the last rung of 'find_source'.
+
+   *How exposed is it today.* It is the LAST fallback. The in-Rust
+   graph answers first and knows every node loaded at init, so in a
+   healthy running server this fires only for ids the global snapshot
+   does not know. In harnesses where 'snapshot_global ()' returns None
+   it fires always -- but the one fixture set with genuine
+   multi-section telescopes on disk (tests/leak_battery/fixtures, N.skg
+   and S.skg in two sources) installs the global handle, so no test
+   is flaking on this now.
+
+   So: latent, not currently firing. But it is nondeterministic by
+   construction and it sits on the path that decides how public a
+   relationship gets written. That is the one place in this codebase
+   where "arbitrary" is least acceptable.
+
+** DONE Loose end: a promise no validator keeps
+
+   server/dbs/filesystem/one_node.rs:139-141 says a foreign same-pid
+   file is "the forbidden-overlay shape, left for the validators to
+   report". No validator reports it: 'TelescopeViolation'
+   (server/telescope/invariants.rs:26-49) has exactly two variants,
+   'LeakShapedMember' and 'UnconfiguredLevel'. Either the variant is
+   missing or the comment is.
+
+   Your most-public-section rule gives this loose end teeth; see the
+   [[*TODO A foreign section can make your rule unsatisfiable][first open question]].
+
+** DONE Root cause: the type the plan asked for was never built
+
+   'source_from_disk' is precisely the regression that
+   4_discussion.org:754-761 predicted and proposed to prevent by
+   making "several files, one node" a TYPE rather than a condition.
+   Because grouping stayed an anonymous HashMap, nothing forced
+   'source_from_disk' to answer the question "which of this node's
+   several sections do you mean?" -- so it silently kept answering the
+   pre-telescope question.
+
+   This is why I would not treat the rename as the fix. The rename
+   stops the bleeding; the type is what stops the next one.
+
+* DONE Plan
+
+  Ordered by (value / risk), cheapest first. Items 1-5 are
+  independent; item 6 is the large one and can wait.
+
+** DONE 1. Rename the check and its whole vocabulary
+
+   Rename 'check_for_duplicate_ids_across_sources'. The name should
+   say what the violation IS, not where it was historically found.
+   Candidates, in my order of preference:
+
+   - 'error_unless_each_id_names_one_node'
+   - 'check_for_ids_claimed_by_two_nodes'
+
+   The first matches the 'error_unless_*' precedent already in the
+   codebase ('error_unless_override_invariants_hold',
+   'error_unless_source_exists').
+
+   Sites: server/dbs/filesystem/multiple_nodes.rs (definition),
+   server/main.rs, server/save.rs, server/nodeMerge.rs (x2),
+   server/serve/handlers/rebuild_dbs.rs, five files under tools/,
+   tests/multi_source_loading.rs. Per coding-advice/for-ai.md, no
+   legacy alias.
+
+   Also rename the surrounding strings:
+
+   - report file -> 'initialization-error_ids-claimed-by-two-nodes.org'
+   - report title -> "IDs claimed by more than one node"
+     (matches the wording api-and-formats.md:172 already uses for the
+     diff-analysis bucket, so the two reports agree)
+   - error and log strings -> "N id(s) claimed by more than one node"
+
+   And add one sentence to the doc comment saying, in the negative,
+   that same-id files across sources are the telescope and are fine.
+   The comment at line 136 already says this; it should survive the
+   rename and move to the top of the block, where a reader hits it
+   before the code.
+
+   Rename 'test_duplicate_id_detection_across_sources'
+   (tests/multi_source_loading.rs:132) and
+   'test_node_with_multiple_ids_duplicate_detection' (line 291) to
+   match, and update the expected report text in the >10 case
+   (lines 424-430).
+
+** DONE 2. Report the pids, not the sources
+
+   Change 'report_duplicate_ids' to take
+   'HashMap<ID, Vec<(ID, SourceName)>>' -- stop dropping the pid at
+   multiple_nodes.rs:162-164. Render each claimant as
+   "pid (home)". This is what makes the report usable at all now that
+   a violation need not be cross-source.
+
+   The experiment raised the stakes here. TypeDB's own error for the
+   extra_id/extra_id flavor reads:
+
+     [CNT9] Constraint '@unique' has been violated: there is a
+     conflict for value '"contested"'.
+
+   It names the contested value and neither claimant. So today, for
+   that flavor, NOTHING tells you which two nodes to open. Fixing
+   this item plus item 5 is what closes that gap.
+
+   While there: the DANGER comment at line 253 (two tests sharing a
+   data_root clobber each other's report) applies unchanged and should
+   stay.
+
+** DONE 3. Delete the report on a clean run
+
+   Move the empty-set early return (line 166) to AFTER a call that
+   removes a stale report, mirroring
+   'report_telescope_violations' (invariants.rs:135-145). Then the
+   file's presence means something. Consider doing the same for
+   'initialization-error_unreadable-skg-files.org' at the same time --
+   TODO/problems.org already asks for it and it is the same three
+   lines.
+
+** DONE 4. Fix 'source_from_disk', and pin the home to the most public section
+
+   Your rule is folded in here. The item got SIMPLER, not harder:
+   under the rule, the cheap answer is the right answer, so the
+   read-every-section complication I proposed last round is gone.
+
+   Two shapes the rule does not settle on its own are the two TODOs
+   in [[*ONGOING Open questions for you][Open questions for you]], at the end of this file. Neither
+   changes the code changes listed below; they decide what happens at
+   the edges.
+
+*** DONE The rule, and what I found checking it
+
+    THE RULE (yours): a node's text always lives in its most public
+    section. So the home is THE MOST PUBLIC SECTION, full stop --
+    not, as today, "the most public section bearing a title". A
+    titleless section above the title is then a violation to report,
+    not a shape to search past.
+
+    What I verified: the save path ALREADY enforces this for owned
+    data, without naming it. 'apply_sticky_levels'
+    (server/from_text/supplement_from_disk.rs) clamps every level to
+    at least the owner's home --
+
+    #+begin_src rust
+      config . more_private_of (unclamped, owner_home . clone ())
+    #+end_src
+
+    -- for ordered relations (line 302), for hides (line 376), and
+    for aliases (line 391). Its own comment there calls a
+    more-public section "the 'extends on the other side' junk
+    shape". So no owned section written by the current save path can
+    be more public than the home.
+
+    Your rule is therefore not a new constraint. It is an existing
+    one that was never named, never validated on read, and never
+    relied on. That is exactly the pattern this whole document is
+    about, so I think naming it is worth more than the code change.
+
+*** DONE What changes
+
+    - 'source_from_disk' becomes cheap AND correct: walk
+      'config . ordered_sources ()' -- never '&config . sources' --
+      and return the first source whose '<pid>.skg' exists. No file
+      reads, no title check. Deterministic, most-public-first, and
+      it stops violating the "no other code may compare source
+      positions" rule at server/types/misc.rs:191-201.
+
+    - Rename it. It answers "the home", so 'home_from_disk' stops
+      the next reader assuming it answers "the source of the file I
+      am thinking of". Prior art: 'nodecomplete_from_pid_and_source'
+      already documents its 'source' parameter as "the caller's
+      BELIEF about the home".
+
+    - 'fold_sections' (server/telescope/fold.rs:84-105) currently
+      SEARCHES for the most public titled section. It should take
+      the most public section as home and warn when that section
+      carries no title. That needs a new 'FoldWarning' variant --
+      'TitleBelowHome { home, title_at }' -- distinct from the
+      existing 'MissingTitle' (no section has one) and
+      'NonHomeTitle' (a stray extra title further down). The fold
+      already treats this shape as anomalous for BODY: line 100-104
+      warns 'NonHomeBody' for "body in a titleless section, before
+      any home was seen". This just makes title and body agree.
+
+    - A matching 'TelescopeViolation' variant, so init and rebuild
+      surface it in telescope-warnings.org alongside the leak shapes.
+
+    - Docs. Three places define home by the title search and should
+      instead define it as the most public section, with the title
+      rule stated as the invariant: glossary.md ("privacy telescope,
+      telescope section, home"), docs/telescopes.md ("What lives
+      where"), api-and-formats.md:737-740.
+
+    - Test: a fixture with a titleless public section and a titled
+      private one. Assert 'home_from_disk' returns the PUBLIC source
+      (the violation is reported, not silently routed around), and
+      that the fold emits 'TitleBelowHome'.
+
+*** DONE jbb : That home might not be the most-public source seems like a defect.
+    It would be silly for someone to share a node
+    without sharing the text of it.
+    So let's make that impossible -- the text should always
+    be in the most-public skg file | section.
+
+**** DONE folded into "The rule, and what I found checking it" and "What changes", above.
+     Two shapes it does not settle on its own are in the open
+     questions at the end of this file.
+
+** DONE 5. Move the init check before the databases are built
+
+   In server/main.rs, the check runs on nodes 'initialize_dbs' has
+   already handed to TypeDB and Tantivy. Push it inside 'full_init'
+   and the incremental path in server/dbs/init.rs, immediately after
+   'read_all_skg_files_from_sources' and before
+   'wipe_then_init_typedb_db' -- which is exactly the order
+   'rebuild_dbs_in_place' already uses. Then delete the call and the
+   'drop (nodes)' dance at main.rs:140-146.
+
+   The experiment settles whether this is worth doing: yes, and for
+   both flavors, for different reasons.
+
+   - extra_id/extra_id: TypeDB rejects it, so today the readable
+     report never runs and you get a raw '[CNT9]' driver error that
+     names the value but neither claimant. Moving the check makes the
+     readable report the thing you actually see.
+   - pid/extra_id: TypeDB accepts it silently, so the Rust check is
+     the ONLY thing that catches it -- but only after TypeDB and
+     Tantivy have both been filled with ambiguous data. Moving the
+     check means the databases are never built from data we already
+     know is broken.
+
+** DONE 6. Give the telescope a type
+
+   The largest item, and the one the plan actually asked for. Replace
+   the anonymous 'HashMap<ID, Vec<(SourceName, NodeFS)>>' and the bare
+   'Vec<(SourceName, NodeFS)>' with a named value -- 'Telescope', to
+   match the vocabulary that won ('accordion' is retired) -- carrying
+   its pid and its sections in privacy order.
+
+   Sites: server/dbs/filesystem/multiple_nodes.rs:20, :36-38, :71,
+   :86-90, :98-123; server/dbs/filesystem/one_node.rs:44-71, :85-99.
+
+   The value of this is not local tidiness. It is that the next
+   'source_from_disk' -- the next function that quietly answers a
+   one-file question about a many-file node -- meets a 'Telescope' and
+   has to say which section it means.
+
+   With your rule adopted, the type gets a natural invariant to
+   carry: a 'Telescope' knows its home is its first section, and can
+   assert it. That is a better place for the rule than a validator,
+   because it is checked wherever a Telescope is built.
+
+   I would do 1-5 first and let this stand as its own work item; it
+   touches the load path, which is the one place a mistake is
+   expensive.
+
+** DONE 7. Bookkeeping
+
+   - TODO/problems.org, "Initialization warning files can be easy to
+     miss": the example now describes a healthy telescope as a
+     problem. I appended a dated note there rather than rewriting
+     your observation; if you would rather the example were replaced
+     outright, say so.
+   - server/dbs/filesystem/one_node.rs:139-141: either add a
+     'ForeignOverlay' variant to 'TelescopeViolation' or delete the
+     claim that validators report it. My preference is the variant --
+     see the first open question, where your rule makes this load
+     bearing rather than tidy.
+   - The audit list 4_discussion.org:554-566 asked for
+     ("a written audit list of these sites, checked off during
+     implementation, is the only protection") was never written down
+     as a checkable artifact. Item 6 is the moment to write it.
+
+* DONE Open question, now settled: does TypeDB reject a conflict first?
+
+  You asked me to find out. I ran it.
+
+** DONE Method
+
+   Started a TypeDB server, created a scratch database, and defined
+   the relevant slice of schema.tql verbatim: 'attribute id',
+   'entity node owns id @key', 'entity extra_id owns id @key',
+   'relation has_extra_id', plus 'source' / 'has_source'. Then issued
+   the same two queries 'create_node' and 'insert_extra_ids'
+   (server/dbs/typedb/nodes.rs:155-205) issue, one node per
+   transaction, committed separately -- mirroring
+   'create_one_node_in_own_tx'.
+
+   Both scratch databases were deleted and the server stopped
+   afterward; TypeDB was not running when I started and is not
+   running now.
+
+** DONE Result A: extra_id vs extra_id -- TypeDB REJECTS
+
+   Two nodes with distinct pids ('pid-a', 'pid-b') each claiming
+   extra_id 'contested'. The SECOND node's insert fails -- at query
+   execution, not even at commit:
+
+     [CNT9] Constraint '@unique' has been violated: there is a
+     conflict for value '"contested"'.
+     Caused: [DVL9] Instance ... of type 'extra_id' has a key
+     constraint violation for attribute ownership of 'id', since it
+     is not the unique owner of attribute '"contested"'.
+
+   So 'tx.query(...)' returns Err, 'create_one_node_in_own_tx'
+   propagates, 'create_all_nodes' returns Err, and 'full_init'
+   dies at init.rs:309-313 with "Failed to populate TypeDB: ..."
+   and 'exit (1)'. 'check_for_duplicate_ids_across_sources' never
+   runs. Confirmed as hypothesized.
+
+   Two aggravations I had not anticipated. The error names the
+   contested VALUE but neither claimant, so it is strictly less
+   useful than the report it preempts -- and 'create_all_nodes' uses
+   'buffer_unordered', so WHICH of the two nodes fails is itself
+   nondeterministic.
+
+** DONE Result B: pid vs extra_id -- TypeDB ACCEPTS, silently
+
+   Node 'pid-c' with extra_id 'pid-d', then a separate node whose
+   pid IS 'pid-d'. Both commit cleanly. '@key' uniqueness is per
+   owner type, and 'node' and 'extra_id' are different types, so
+   nothing stops one id from being a node's key and another node's
+   extra id at once. Confirmed as hypothesized.
+
+   The consequence is worse than "the check catches it late". While
+   that state exists, id resolution is genuinely ambiguous and the
+   layers disagree: 'pid_and_source_from_id'
+   (server/dbs/typedb/search.rs:209-221) matches on an 'or' over
+   "node has id X" and "extra_id has id X", so it returns TWO rows;
+   the in-Rust graph's 'pid_of' (in_rust_graph.rs:144-149) checks
+   'nodes . contains_key' FIRST and returns one. Production never
+   runs in that state today only because init exits afterward -- but
+   it builds both databases from it first.
+
+*** TODO This must change.
+Good finding.
+
+** DONE Bearing on item 5
+
+   Folded into [[*DONE 5. Move the init check before the databases are built][item 5]]: the move is worth doing, for both flavors,
+   for different reasons.
+
+* DONE Pushback on the framing
+
+  The claim you were given was wrong in two ways, not one. Besides
+  calling the feature invalid, it called the state "fatal to the save
+  process". The check is not in the save pipeline. It appears in
+  server/save.rs only inside the branch taken after a TypeDB update
+  has ALREADY failed, as a guard on the rebuild-from-disk recovery.
+  Even under the pre-telescope semantics, a save would not have hit it.
+
+  That matters for how much weight to put on the incident: the report
+  was not a careful reading that the code defeated. It was a
+  name-level reading. Which is the point -- the name is what is
+  wrong -- but it argues for fixing the name and the strings (items
+  1-3, cheap) before anything else, and it argues that item 4 is
+  worth doing on its own merits rather than as part of this story.
+
+* ONGOING Open questions for you
+
+  Both arise from adopting your most-public-section rule. Terms used
+  below: a SECTION is one '.skg' file of a node; the HOME is the
+  section holding title and body; a FOREIGN source is one you do not
+  own (its directory is outside the config's 'owned_folder'), and
+  foreign sections are never written by skg.
+
+** DONE A foreign section can make your rule unsatisfiable
+
+   The shape: a source you do NOT own holds a titleless 'N.skg',
+   while your owned private source holds N's titled section. N's most
+   public section is then foreign and titleless. You cannot hoist a
+   title into it -- foreign sections are never written
+   (server/dbs/filesystem/one_node.rs:139-141) -- so the rule cannot
+   be satisfied by any action of yours.
+
+   This is the "forbidden overlay" shape that one_node.rs already
+   names and that no validator currently reports (item 7). Your rule
+   is what makes reporting it load-bearing rather than tidy: without
+   a report, such a node silently gets a home you cannot write.
+
+   Three ways to define our way out:
+
+   (a) Home is the most public section, foreign included; the shape
+       is reported as a ForeignOverlay violation and left alone. The
+       reader is told plainly: "source X holds a section of N that
+       you cannot write; your title at 'private' will not be visible
+       to anyone reading at X's level." Nothing tries to repair it.
+
+   (b) Home is the most public section YOU OWN, or the most public
+       titled section, whichever is more public. Keeps the rule
+       satisfiable, but reintroduces a title search -- and with it
+       the two-notions-of-home problem that produced
+       'source_from_disk' in the first place.
+
+   (c) Refuse to load a telescope with a foreign titleless section.
+       Contradicts the enforcement-strength doctrine at
+       server/telescope/invariants.rs:7-15 (cross-file violations
+       warn, never refuse, because a pull must never brick a source),
+       so I raise it only to reject it.
+
+   I recommend (a). It keeps one definition of home, keeps
+   'home_from_disk' a single 'exists()' walk, and converts an
+   unrepairable-by-you shape into a report instead of a silently
+   wrong answer.
+
+   One caveat that makes (a) need care: 'write_nodecomplete_telescope'
+   (one_node.rs:169-188) writes every level 'unfold_node' produced
+   with NO ownership check -- only the delete sweep at line 192 checks
+   'user_owns_source'. The "foreign sources are never written"
+   guarantee lives in the callers (from_text/validate.rs,
+   from_text/fork.rs), not in the writer. If home can be foreign, I
+   would want a guard in the writer itself before relying on that.
+   I did not find a reachable path today; I am flagging it because
+   (a) would make one conceivable.
+
+*** DONE agreed
+including adding the guard
+
+** DONE What should skg-migrate-to-telescopes do about title placement?
+
+   'skg-migrate-to-telescopes' today raises every owned edge's
+   privacy to at least its default level and rebuilds the databases
+   (docs/telescopes.md, "What leaks, and what migration fixes"). It
+   says nothing about where titles sit.
+
+   With the rule adopted, migration could also repair title
+   placement, and there are two opposite repairs for the same shape.
+   Given an owned titleless section MORE PUBLIC than the title:
+
+   - HOIST: move the title (and body) up into the more public
+     section. Makes the node's text as public as its most public
+     section already is.
+   - COLLAPSE: fold that section's contents down into the titled one
+     and delete the now-empty file. Keeps the node's text as private
+     as it was.
+
+   These have opposite privacy consequences, and the tool cannot
+   guess which you meant -- HOIST publishes text that was private,
+   which is the one direction a migration should never take
+   unasked. My instinct is that migration should COLLAPSE (it never
+   publicizes anything, matching the rest of the migration's
+   direction of travel) and that HOIST should exist only as a
+   deliberate per-node gesture, if at all. But this is a product
+   call about your data, not a code call, so I am asking rather than
+   assuming.
+
+   A third possibility: migration REPORTS these and repairs
+   nothing, on the grounds that a shape this rare deserves a human
+   look. That is the most conservative option and I would not argue
+   against it.
+
+*** TODO let's bury it
+That migration is complete.
+I am the only user who would ever need it, and I've used it;
+all other users will start Skg with privacy telescopes in place.
+There's already a graveyard somewhere for burying code
+that might imaginably but unlikely need to be unearthed;
+let's add this to that.

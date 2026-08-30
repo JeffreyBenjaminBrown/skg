@@ -10,8 +10,10 @@ use crate::types::misc::TantivyIndex;
 
 use tantivy::Searcher;
 use tantivy::collector::TopDocs;
-use tantivy::query::{BooleanQuery, Occur, Query, QueryParser, RegexQuery};
+use tantivy::query::{
+  BooleanQuery, Occur, Query, QueryParser, RegexQuery, TermQuery};
 use tantivy::schema;
+use tantivy::Term;
 
 /// Options for `search_index`. Defaults: all false — literal search
 /// across titles+aliases only, OR between words, operator chars
@@ -21,6 +23,7 @@ pub struct SearchOptions {
   pub regex     : bool, // Interpret the query as a per-token regex. Bypasses QueryParser and builds RegexQuery directly.
   pub body      : bool, // Also search node bodies (titles always searched).
   pub operators : bool, // Honor AND/OR/NOT/+/- operators between words. In non-regex mode these pass through Tantivy's QueryParser; in regex mode they combine per-piece RegexQueries at the document level.
+  pub exclude_ugly_telescope : bool, // Apply telescope-coarse exclusion in the query, before TopDocs and ranking.
 }
 
 /// Returns ALL matching Tantivy "Documents" (see glossary).
@@ -54,13 +57,20 @@ pub fn search_index (
   tantivy_index . reader . reload () ?;
   let searcher : Searcher =
     tantivy_index . reader . searcher ();
-  let query : Box < dyn Query > =
+  let text_query : Box < dyn Query > =
     if opts . regex {
       build_regex_query (
         tantivy_index, query_text, opts . body, opts . operators ) ?
     } else {
       build_parser_query (
         tantivy_index, query_text, opts . operators, opts . body ) ? };
+  let query : Box<dyn Query> =
+    if opts . exclude_ugly_telescope {
+      Box::new ( BooleanQuery::new ( vec! [
+        (Occur::Must, text_query),
+        (Occur::MustNot, ugly_telescope_query (tantivy_index)),
+      ] ) )
+    } else { text_query };
   Ok (( {
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
@@ -69,6 +79,28 @@ pub fn search_index (
           . order_by_score () )?;
     best_matches },
        searcher )) }
+
+/// Whether the current index contains any telescope-coarse ugly document.
+/// This is used only for search preflight; it returns no matching IDs.
+pub fn has_ugly_telescope (
+  tantivy_index : &TantivyIndex,
+) -> Result<bool, Box<dyn std::error::Error>> {
+  tantivy_index . reader . reload () ?;
+  let searcher : Searcher = tantivy_index . reader . searcher ();
+  let matches = searcher . search (
+    &* ugly_telescope_query (tantivy_index),
+    &TopDocs::with_limit (1) . order_by_score () ) ?;
+  Ok (! matches . is_empty ())
+}
+
+fn ugly_telescope_query (
+  tantivy_index : &TantivyIndex,
+) -> Box<dyn Query> {
+  Box::new ( TermQuery::new (
+    Term::from_field_text (
+      tantivy_index . ugly_telescope_field, "true" ),
+    schema::IndexRecordOption::Basic ) )
+}
 
 fn build_parser_query (
   tantivy_index : &TantivyIndex,

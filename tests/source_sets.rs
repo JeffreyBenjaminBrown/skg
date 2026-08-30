@@ -24,7 +24,7 @@ use skg::source_sets::{
   run_with_source_set_test_db};
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::test_utils::set_source_retagging_levels;
+use skg::test_utils::set_source_retagging_member_sources;
 use skg::test_utils::run_with_shared_test_db;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -35,7 +35,7 @@ use skg::to_org::expand::backpath::{
 use skg::to_org::render::content_view::multi_root_view_with_source_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, privacied_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, members_at_source_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
@@ -346,7 +346,8 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           terms          : "shared ranking term" . to_string (),
           search_results : vec![ID::from ("active-search-hit")],
           ancestry_by_id : HashMap::new (),
-          graphnodestats : AllGraphNodeStats::empty (), })));
+          graphnodestats : AllGraphNodeStats::empty (),
+          include_ugly_telescopes : false, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
       let (mut server_stream, _client_stream) =
@@ -773,21 +774,21 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     skg::types::nodes::complete::empty_node_complete ();
   result_node . pid = ID::from ("active-search-hit");
   result_node . title = "active search hit" . to_string ();
-  set_source_retagging_levels ( &mut result_node, &SourceName::from ("public") );
-  result_node . aliases = privacied_msv (
+  set_source_retagging_member_sources ( &mut result_node, &SourceName::from ("public") );
+  result_node . aliases = members_at_source_msv (
     & result_node . source,
     MSV::Specified (vec!["search term" . to_string ()]) );
   let mut active_container : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   active_container . pid = ID::from ("active-container");
   active_container . title = "active-container" . to_string ();
-  set_source_retagging_levels ( &mut active_container, &SourceName::from ("public") );
+  set_source_retagging_member_sources ( &mut active_container, &SourceName::from ("public") );
   let mut private_container : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   private_container . pid = ID::from ("private-container");
   private_container . title =
     "private container title must not leak" . to_string ();
-  set_source_retagging_levels ( &mut private_container, &SourceName::from ("private") );
+  set_source_retagging_member_sources ( &mut private_container, &SourceName::from ("private") );
   let index_dir : &str =
     "/tmp/tantivy-test-source-sets-search-enrichment-truncation";
   let (tantivy, _count) =

@@ -9,7 +9,7 @@
 // one.
 
 use super::*;
-use crate::types::misc::{SkgfileSource, members_of, privacied_all};
+use crate::types::misc::{SkgfileSource, members_of, members_at_source};
 use crate::types::nodes::complete::empty_node_complete;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol,
@@ -115,7 +115,7 @@ fn fork_clone_hides_children_the_edit_deleted () {
     title    : "N-edited" . to_string (),
     source   : SourceName::from ("foreign"),
     pid      : ID::from ("N"),
-    contains : privacied_all (
+    contains : members_at_source (
       & SourceName::from ("foreign"),
       vec! [ ID::from ("N1") ] ),
     .. empty_node_complete () };

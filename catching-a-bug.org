@@ -1,0 +1,37 @@
+* the buffer before the buggy edit
+  * (skg (node (id 5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800) (source pers-p) (parentIs absent) (rels (contains (out 3))) (viewStats (sourceHerald ⌂:pers-p)))) Priceless Festival
+  ** (skg (node (id 832c45b9-357d-4f30-bb39-d112af144012) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) (more) logistics
+  CC booking@pricelessfestival.org
+  ~/priceless-festival/
+  - my req's
+    - speakers
+    - hard floor
+    - I wear socks
+    - 1 mic
+  - sites they asked for
+    - https://bogota-brown.bandcamp.com/
+    - https://www.facebook.com/mejeff.younotjeff
+    - https://www.instagram.com/jeffreybenjaminbrown/
+  ** (skg (node (id 7d8442ea-b074-413c-9d34-864fae3001dc) (source pers-p) (rels (contains (in 1 (ancestors 1)) (out 8)) (birth contains)))) people from peiceless
+  *** (skg (node (id 2ae80a96-4bf0-44e1-8f41-7f015f2614a4) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) Aaron the astronomer who served as god sometimes
+  *** (skg (node (id e8f7d92f-4b62-4047-b7ca-6020f0b95523) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) David Glasser
+  *** (skg (node (id d2fb58b6-2445-4eca-bf4a-09dbd5e2fcd1) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) Tashi
+  *** (skg (node (id 2918ecc2-2d34-45c5-bce8-ffbd9d98f321) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) Freescha - Nick and Mike
+  *** (skg (node (id a0204ebd-2ad8-47f3-9ed1-93d9a506c850) (source public) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats (sourceHerald ⌂:public)))) JD is Palindrome on SoundCloud
+  *** (skg (node (id e2451093-1a60-41cb-bad2-0c4768aa9bc9) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) Gigi - 617 952 2512
+  *** (skg (node (id ec3ab1cf-8600-4203-aeb1-0961ffae7b42) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) Alice & Dima
+  347 777 1706
+  alicepau7@gmail.com
+  *** (skg (node (id ac602a9a-9963-4bb5-9d38-aea5813e99eb) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) Isaac Pond
+  ** (skg (node (id 2a378fce-9acc-441a-a957-032d22d0698f) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) [[id:eee478af-72f3-4cab-b1ac-788017733f14][pack list for Priceless+ 2006]]
+* the story
+I open node
+  5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800
+and then try to delete (C-c DEL) its last content node, which is
+  2a378fce-9acc-441a-a957-032d22d0698f
+
+The result opens an error buffer with the following content:
+```
+  * errors
+  ** Collateral view bd737455-1177-4dd2-94a8-4ddd44aaf96f: No .skg file for '2a378fce-9acc-441a-a957-032d22d0698f' in any source (caller expected one in 'pers-p')
+```

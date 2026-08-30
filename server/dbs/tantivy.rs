@@ -55,6 +55,8 @@ pub(crate) fn tantivy_index_from_index (
     schema . get_field ("title_or_alias") ?;
   let raw_title_field : schema::Field =
     schema . get_field ("raw_title") ?;
+  let ugly_telescope_field : schema::Field =
+    schema . get_field ("ugly_telescope") ?;
   let source_field : schema::Field =
     schema . get_field ("source") ?;
   let context_origin_type_field : schema::Field =
@@ -71,6 +73,7 @@ pub(crate) fn tantivy_index_from_index (
     id_field,
     title_or_alias_field,
     raw_title_field,
+    ugly_telescope_field,
     source_field,
     context_origin_type_field,
     is_title_field,
@@ -85,6 +88,8 @@ pub(crate) fn tantivy_index_from_index (
 /// - "raw_title":           STRING | STORED — the un-reduced title, stored
 ///                          only on is_title="true" docs. Preserves the
 ///                          textlink syntax that 'title_or_alias' strips.
+/// - "ugly_telescope":      STRING | STORED — "true" when title or body
+///                          was selected below the node's home.
 /// - "source":              STRING | STORED — the source name.
 /// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
 /// - "is_title":            STRING | STORED — "true" for the primary title,
@@ -107,6 +112,8 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "title_or_alias", schema::TEXT | schema::STORED);
   schema_builder . add_text_field(
     "raw_title", schema::STRING | schema::STORED);
+  schema_builder . add_text_field(
+    "ugly_telescope", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "source", schema::STRING | schema::STORED);
   schema_builder . add_text_field(

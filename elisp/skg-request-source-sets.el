@@ -52,13 +52,14 @@
               '((request . "active source set")))
              "\n"))))
 
-(defun skg-set-active-source-set (name)
+(defun skg-set-active-source-set (name &optional approved-pids)
   "Set the active source-set for this TCP connection to NAME.
 Open SKG buffers are kept and re-rendered in place: the server
 replies with the active-source-set confirmation followed by the
 rerender stream (rerender-lock, rerender-view*, rerender-done)."
   (interactive (list (skg--prompt-for-source-set)))
-  (when (yes-or-no-p "Switch source-set and re-render all SKG buffers? ")
+  (when (or approved-pids
+            (yes-or-no-p "Switch source-set and re-render all SKG buffers? "))
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
       (skg-register-response-handler
        'active-source-set
@@ -73,12 +74,18 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
       (skg--begin-stream "rerender")
       (skg--lock-all-skg-buffers)
       (skg--register-rerender-stream-handlers)
+      (skg--register-rerender-ugly-confirmation
+       (lambda (pids) (skg-set-active-source-set name pids))
+       'active-source-set)
       (skg-lp-reset)
       (process-send-string
        tcp-proc
        (concat (prin1-to-string
-                `((request . "set active source set")
-                  (name . ,name)))
+                (append
+                 `((request . "set active source set")
+                   (name . ,name))
+                 (when approved-pids
+                   `((allow-ugly-telescopes ,@approved-pids)))))
                "\n")))))
 
 (provide 'skg-request-source-sets)

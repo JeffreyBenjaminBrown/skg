@@ -122,23 +122,23 @@ fn read_hiddenoutside_context (
   let wt_subscriber_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &subscriber_pid, &subscriber_source ) ?;
-  // Edge-level gating (render-and-gating, 5_plan.org): both are the
+  // Edge-source gating (render-and-gating, 5_plan.org): both are the
   // subscriber's own outbound lists (hides_from_its_subscriptions,
-  // subscribes_to); a membership recorded at an inactive level must
+  // subscribes_to); a membership recorded in an inactive source must
   // not feed this derived col.
-  let level_active = |level : &SourceName| match active_source_set {
+  let source_active = |source : &SourceName| match active_source_set {
     None      => true,
-    Some (a)  => a . is_all () || a . contains_source (level) };
+    Some (a)  => a . is_all () || a . contains_source (source) };
   let wt_subscriber_hides : Vec<ID> =
     wt_subscriber_nodecomplete . hides_from_its_subscriptions
     . or_default () . iter ()
-    . filter ( |m| level_active (& m . level) )
+    . filter ( |m| source_active (& m . source) )
     . map ( |m| m . member . clone () )
     . collect ();
   let wt_subscribees : Vec<ID> =
     wt_subscriber_nodecomplete . subscribes_to
     . or_default () . iter ()
-    . filter ( |m| level_active (& m . level) )
+    . filter ( |m| source_active (& m . source) )
     . map ( |m| m . member . clone () )
     . collect ();
   Ok (HiddenOutsideContext {
@@ -146,4 +146,3 @@ fn read_hiddenoutside_context (
     subscriber_source,
     subscriber_hides : wt_subscriber_hides,
     subscribees      : wt_subscribees }) }
-

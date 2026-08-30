@@ -109,16 +109,22 @@ end
 ---@param ids string[]
 ---@param generation integer
 ---@param buf integer
-function M.request_titles (ids, generation, buf)
+function M.request_titles (ids, generation, buf, approved_pids)
   local ok, err = pcall(function ()
     M.ensure_title_response_handler()
     state.lp_reset()
     local ids_form = { sexpr.symbol('ids') }
     for _, id in ipairs(ids) do table.insert(ids_form, id) end
-    local request = sexpr.to_string({
+    local request_form = {
       sexpr.pair(sexpr.symbol('request'), 'titles by ids'),
-      ids_form }) .. '\n'
-    table.insert(M.pending_title_requests, { generation, buf })
+      ids_form }
+    if approved_pids and #approved_pids > 0 then
+      local approval = { sexpr.symbol('allow-ugly-telescopes') }
+      for _, pid in ipairs(approved_pids) do
+        table.insert(approval, pid) end
+      table.insert(request_form, approval) end
+    local request = sexpr.to_string(request_form) .. '\n'
+    table.insert(M.pending_title_requests, { generation, buf, ids })
     state.lp_pending_count = state.lp_pending_count + 1
     client.send_string(request)
   end)
@@ -141,6 +147,19 @@ function M.ensure_title_response_handler ()
       state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
       M.handle_response(response, entry[1], entry[2])
     end, false)
+  state.register_response_handler('ugly-telescope-confirmation',
+    function (_payload_text, response)
+      local entry = table.remove(M.pending_title_requests, 1)
+      if not entry then
+        vim.notify('skg readable ids: privacy challenge without pending request')
+        return end
+      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+      local prompt = payload.field_text(response, 'prompt') or
+        'This title lookup includes text selected below home. Include it?'
+      local pids = payload.string_list(payload.field(response, 'pids'))
+      if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
+        M.request_titles(entry[3], entry[1], entry[2], pids) end
+    end, false)
 end
 
 ---Annotate BUF from RESPONSE, unless GENERATION is stale.
@@ -151,6 +170,9 @@ function M.handle_response (response, generation, buf)
   if not vim.api.nvim_buf_is_valid(buf) then return end
   if generation ~= vim.b[buf].skg_readable_ids_generation then return end
   local title_map = {}
+  for _, warning in ipairs(
+      payload.string_list(payload.field(response, 'warnings'))) do
+    vim.notify(warning, vim.log.levels.WARN) end
   local content = payload.field(response, 'content')
   if content ~= nil and sexpr.is_list(content) then
     for _, pair in ipairs(content) do

@@ -315,7 +315,18 @@ pub async fn pid_and_source_from_id (
         skgid );
       query } ) . await ?;
     answer } {
-      if let Some (doc_result) = stream . next () . await {
+      // Both disjuncts can match at once when one id is a node's
+      // PID and another node's EXTRA_ID -- a state the id-conflict
+      // check refuses at init, but which TypeDB itself accepts
+      // ('@key' uniqueness is per owner type, so a 'node' and an
+      // 'extra_id' may both own one id; verified by experiment, see
+      // TODO/dup-ids-maybe-bad/1_discussion.org). Taking whichever
+      // row arrived first would then answer differently from the
+      // in-Rust graph's 'pid_of', which tries 'nodes' before
+      // 'extra_id_to_pid'. Prefer the row whose primary id IS the
+      // queried id: that is the node branch, hence the same answer.
+      let mut first : Option<(ID, SourceName)> = None;
+      while let Some (doc_result) = stream . next () . await {
         let doc : ConceptDocument = doc_result ?;
         if let Some ( Node::Map ( ref map ) ) = doc . root {
           let primary_id_opt : Option < ID > =
@@ -332,5 +343,9 @@ pub async fn pid_and_source_from_id (
               None } );
           if let ( Some (pid), Some (source) )
             = ( primary_id_opt, source_opt )
-          { return Ok ( Some ( ( pid, source ) ) ); }} }}
+          { if &pid == skgid {
+              return Ok ( Some ( ( pid, source ) ) ); }
+            if first . is_none () {
+              first = Some ( ( pid, source ) ); }} }}
+      return Ok (first); }
   Ok (None) }

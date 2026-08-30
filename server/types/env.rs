@@ -10,7 +10,7 @@
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, snapshot_global};
 use crate::dbs::tantivy::title_and_source_by_id;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::phantom::source_from_disk;
+use crate::types::phantom::home_from_disk;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -57,7 +57,7 @@ impl SkgEnv {
     if let Some ((_title, src)) =
       title_and_source_by_id (&self . tantivy_index, id)
     { return Some (src); }
-    source_from_disk (id, &self . config) }
+    home_from_disk (id, &self . config) }
 }
 
 /// Free-function variant of 'SkgEnv::find_source' for callers that
@@ -94,4 +94,4 @@ pub fn find_source_with_optional_tantivy (
   if let Some (idx) = tantivy_index {
     if let Some ((_title, src)) = title_and_source_by_id (idx, id)
     { return Some (src); } }
-  source_from_disk (id, config) }
+  home_from_disk (id, config) }
