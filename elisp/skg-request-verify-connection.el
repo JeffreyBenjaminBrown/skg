@@ -69,6 +69,8 @@ calls `(skg-tcp-connect-to-rust)`
                     (fboundp 'skg-start-reload-observation))
            (skg-start-reload-observation))
          (skg--show-handshake-telescope-warnings response)
+         (when (fboundp 'skg-install-pending-recovery-incidents)
+           (skg-install-pending-recovery-incidents response))
          (message "%s" (or (and content (format "%s" content))
                            "connected"))))
      t)

@@ -13,6 +13,7 @@
 ;;;   - M-x skg-reload-changed: reload changed files on demand.
 ;;;   - M-x skg-reload-from-id-stack: mark arbitrary IDs TO-RELOAD.
 
+(require 'cl-lib)
 (require 'skg-length-prefix)
 (require 'skg-config)
 (require 'skg-id-search)
@@ -26,6 +27,9 @@
   "Candidate paths mapped to their newest client observation sequence.")
 (defvar skg--reload-observation-sequence 0)
 (defvar skg--reload-observation-incident-id nil)
+
+(defvar skg--pending-recovery-incidents nil
+  "Fatal reload incidents whose durable recovery journals remain unresolved.")
 (defvar skg--reload-observation-timer nil)
 (defvar skg--reload-observation-in-flight nil)
 (defvar skg--reload-observation-full-sweep nil)
@@ -247,11 +251,128 @@ TERMINAL-CALLBACK with the parsed terminal response, when non-nil."
   (skg--end-stream)
   (skg--unlock-all-save-locked)
   (let* ((response (read payload))
-         (content (cadr (assoc 'content response))))
+         (content (cadr (assoc 'content response)))
+         (incident (cadr (assoc 'incident-id response)))
+         (recovery-available
+          (equal (format "%s" (cadr (assoc 'recovery-available response)))
+                 "true")))
     (skg--handle-reload-conflicts response)
     (when content (message "%s" content))
     (when terminal-callback
-      (funcall terminal-callback response))))
+      (funcall terminal-callback response))
+    (when (and recovery-available incident)
+      (setq skg--pending-recovery-incidents
+            (cons `((incident-id . ,(format "%s" incident))
+                    (fatal . ,(cadr (assoc 'requested-id-outcomes response))))
+                  (cl-remove-if
+                   (lambda (entry)
+                     (equal (format "%s" (cadr (assoc 'incident-id entry)))
+                            (format "%s" incident)))
+                   skg--pending-recovery-incidents)))
+      (unless noninteractive
+        (run-at-time 0 nil #'skg-recover-reload-incident
+                     (format "%s" incident))))))
+
+(defun skg--recovery-report (response)
+  "Render a successful reload recovery RESPONSE as an Org report."
+  (concat
+   "* Fatal reload recovery complete\n"
+   (format "%s\n" (or (cadr (assoc 'content response)) "Recovered."))
+   "** repositories and refs\n"
+   (if-let ((repositories (cadr (assoc 'repositories response))))
+       (mapconcat
+        (lambda (repository)
+          (format
+           "*** %s\n**** pre-incident: %s (%s)\n**** legal: %s (%s)\n**** complete incident: %s (%s)"
+           (cadr (assoc 'root repository))
+           (cadr (assoc 'pre-ref repository))
+           (cadr (assoc 'pre-commit repository))
+           (cadr (assoc 'legal-ref repository))
+           (cadr (assoc 'legal-commit repository))
+           (cadr (assoc 'incident-ref repository))
+           (cadr (assoc 'incident-commit repository))))
+        repositories "\n")
+     "None.\n")
+   "\n** restored owned paths\n"
+   (mapconcat (lambda (path) (format "*** %s" path))
+              (cadr (assoc 'restored-paths response)) "\n")
+   "\n** warnings\n"
+   (mapconcat (lambda (warning) (format "*** %s" warning))
+              (cadr (assoc 'warnings response)) "\n")
+   "\n"))
+
+(defun skg-recover-reload-incident (&optional incident-id)
+  "After explicit confirmation, recover fatal reload INCIDENT-ID.
+Recovery creates the three documented Git refs without checkout or staging,
+then restores only owned fatal telescope paths to Skg's last-good bytes."
+  (interactive)
+  (let* ((ids (mapcar (lambda (entry)
+                        (format "%s" (cadr (assoc 'incident-id entry))))
+                      skg--pending-recovery-incidents))
+         (incident-id
+          (or incident-id
+              (and ids (completing-read "Fatal reload incident: " ids nil t))
+              (user-error "Skg knows of no unresolved recovery incident"))))
+    (when (yes-or-no-p
+           (format "Create recovery refs and restore fatal files for %s? "
+                   incident-id))
+      (let ((tcp-proc (skg-tcp-connect-to-rust)))
+        (skg-register-response-handler
+         'reload-recovery
+         (lambda (_tcp-proc payload)
+           (let* ((response (read payload))
+                  (status (format "%s"
+                                  (cadr (assoc 'terminal-status response))))
+                  (content (cadr (assoc 'content response))))
+             (if (equal status "complete")
+                 (progn
+                   (setq skg--pending-recovery-incidents
+                         (cl-remove-if
+                          (lambda (entry)
+                            (equal
+                             (format "%s"
+                                     (cadr (assoc 'incident-id entry)))
+                             incident-id))
+                          skg--pending-recovery-incidents))
+                   (skg-big-nonfatal-message
+                    "*SKG Reload Recovery*"
+                    (or (and content (format "%s" content))
+                        "Fatal reload recovery complete")
+                    (skg--recovery-report response)))
+               (skg-big-nonfatal-message
+                "*SKG Reload Recovery Failed*"
+                "WARNING: Fatal reload recovery did not complete"
+                (format "* Recovery stopped\n%s\n\nThe incident journal remains available."
+                        (or content "Unknown recovery error"))))))
+         t)
+        (skg-submit-request
+         tcp-proc
+         "((request . \"reload recover\") (approved . \"true\"))\n"
+         nil incident-id)))))
+
+(defun skg-install-pending-recovery-incidents (response)
+  "Install and visibly report unresolved incidents from handshake RESPONSE."
+  (setq skg--pending-recovery-incidents
+        (cadr (assoc 'pending-recovery-incidents response)))
+  (when skg--pending-recovery-incidents
+    (skg-big-nonfatal-message
+     "*SKG Pending Reload Recovery*"
+     (format "WARNING: %d fatal reload recovery incident(s) remain unresolved"
+             (length skg--pending-recovery-incidents))
+     (concat
+      "* Unresolved fatal reload incidents\n"
+      (mapconcat
+       (lambda (incident)
+         (concat
+          (format "** %s\n" (cadr (assoc 'incident-id incident)))
+          (mapconcat
+           (lambda (fatal)
+             (format "*** %s\n%s"
+                     (cadr (assoc 'pid fatal))
+                     (cadr (assoc 'reason fatal))))
+           (cadr (assoc 'fatal incident)) "\n")))
+       skg--pending-recovery-incidents "\n")
+      "\n** what to do\nRun M-x skg-recover-reload-incident to inspect and explicitly confirm recovery. Skg will not recover automatically.\n"))))
 
 (defun skg--reload-impact-paths (impact)
   "Return IMPACT's path values as strings."

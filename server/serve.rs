@@ -30,6 +30,11 @@ use crate::serve::handlers::reload_batch::{
   release_connection_reload_batches,
 };
 use crate::serve::handlers::reload_paths::handle_reload_paths_request;
+use crate::serve::handlers::reload_recovery::{
+  handle_reload_recovery_request,
+  load_recovery_journals,
+  pending_incidents_for_config,
+};
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::scalar_release::{
@@ -91,6 +96,14 @@ pub fn serve (
   env            : SkgEnv,
   emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
+
+  match load_recovery_journals (&env . config) {
+    Ok (count) if count > 0 => tracing::warn! (
+      count, "loaded unresolved fatal-reload recovery journals"),
+    Ok (_) => {}
+    Err (error) => tracing::error! (
+      %error, "could not completely load fatal-reload recovery journals"),
+  }
 
   for stream_res in emacs_listener . incoming() { // the loop
     match stream_res {
@@ -288,6 +301,9 @@ fn handle_emacs (
               &mut views_state,
               &active_source_set,
               &mut collateral_scheduler ),
+          Ok (RequestType::ReloadRecover) =>
+            handle_reload_recovery_request (
+              &mut stream, &request_header, &env . config),
           Ok (RequestType::BeginReloadBatch) =>
             handle_begin_reload_batch_request (
               &mut stream, &mut owned_reload_batch_tokens),
@@ -580,6 +596,18 @@ fn verify_connection_response (
         field ("ignored-paths", path_list (ignored_paths)),
       ]) })
     . collect ();
+  let recovery_entries : Vec<Sexp> = pending_incidents_for_config (config)
+    . into_iter () . map (|incident| {
+      let fatal = incident . draft . fatal . iter () . map (|(pid, reason)|
+        Sexp::List (vec![
+          field ("pid", atom (pid)),
+          field ("reason", atom (reason)),
+        ])) . collect ();
+      Sexp::List (vec![
+        field ("incident-id", atom (&incident . incident_id)),
+        field ("fatal", Sexp::List (fatal)),
+      ])
+    }) . collect ();
   let path_entries : Vec<Sexp> = selected . path_outcomes . iter ()
     . map ( |(path, outcome)| {
       let (index_state, tantivy_generation) = match outcome . index_state {
@@ -612,6 +640,7 @@ fn verify_connection_response (
       "This is the skg server verifying the connection.")),
     field ("source-inventory", Sexp::List (source_entries)),
     field ("telescope-warnings", Sexp::List (warning_entries)),
+    field ("pending-recovery-incidents", Sexp::List (recovery_entries)),
     field ("graph-generation", Sexp::Atom (Atom::I (
       selected . graph_generation . get () as i64))),
     field ("path-outcomes", Sexp::List (path_entries)),

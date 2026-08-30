@@ -17,7 +17,8 @@ use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
 use std::fs;
 use serde_yaml;
 use typedb_driver::TypeDBDriver;
@@ -158,6 +159,27 @@ pub(crate) struct PreparedTelescopeWrite {
   verify_as_hoist : bool,
 }
 
+/// Serialize the complete graph telescope without writing it. Every
+/// configured section path is explicit: `Some(bytes)` for a section emitted
+/// by unfold, `None` for its tombstone. Recovery uses the same bytes as save
+/// rather than inventing a second graph-to-YAML implementation.
+pub(crate) fn serialize_telescope_manifest (
+  nodecomplete : &NodeComplete,
+  config       : &SkgConfig,
+) -> io::Result<BTreeMap<PathBuf, Option<Vec<u8>>>> {
+  let writes = serialize_telescope_sections (nodecomplete, config)?;
+  let mut manifest : BTreeMap<PathBuf, Option<Vec<u8>>> = config
+    . ordered_sources () . into_iter () . map (|source| {
+      let configured = config . sources . get (&source)
+        . expect ("ordered source exists");
+      (configured . path . join (format! ("{}.skg", nodecomplete . pid)),
+       None)
+    }) . collect ();
+  for (_, path, yaml) in writes {
+    manifest . insert (PathBuf::from (path), Some (yaml . into_bytes ())); }
+  Ok (manifest)
+}
+
 impl PreparedTelescopeWrite {
   pub(crate) fn apply (
     &self,
@@ -227,10 +249,54 @@ pub(crate) fn prepare_nodecomplete_telescope (
   config       : &SkgConfig,
   allow_hoist  : bool,
 ) -> io::Result<PreparedTelescopeWrite> {
-  let pid : &ID = &nodecomplete . pid;
   let verify_as_hoist : bool =
     error_unless_home_is_writable (
       nodecomplete, config, allow_hoist ) ?;
+  let prepared_writes = serialize_telescope_sections (nodecomplete, config)?;
+  let offending_sources : Vec<SourceName> = {
+    let mut sources : Vec<SourceName> = prepared_writes . iter ()
+      . map (|(source, _, _)| source)
+      . filter (|source| !config . user_owns_source (source))
+      . cloned () . collect ();
+    sources . sort ();
+    sources . dedup ();
+    sources
+  };
+  if ! offending_sources . is_empty () {
+    return Err ( io::Error::new (
+      io::ErrorKind::PermissionDenied,
+      format! (
+        "Refusing to write '{}': proposed telescope section(s) belong to non-owned source(s) [{}]. No files were changed.",
+        nodecomplete . pid,
+        offending_sources . iter ()
+          . map ( |source| format! ("'{}'", source) )
+          . collect::<Vec<String>> () . join (", ") ))); }
+  let written_sources : Vec<SourceName> = prepared_writes . iter ()
+    . map ( |(source, _, _)| source . clone () )
+    . collect ();
+  let mut prepared_deletions : Vec<String> = Vec::new ();
+  for source in config . ordered_sources () {
+    if written_sources . contains (&source) { continue; }
+    if ! config . user_owns_source (&source) { continue; }
+    let path : String = path_from_pid_and_source (
+      config, &source, nodecomplete . pid . clone () )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::NotFound, e) ) ?;
+    prepared_deletions . push (path); }
+
+  Ok ( PreparedTelescopeWrite {
+    pid             : nodecomplete . pid . clone (),
+    home            : nodecomplete . source . clone (),
+    writes          : prepared_writes,
+    deletions       : prepared_deletions,
+    verify_as_hoist,
+  } ) }
+
+fn serialize_telescope_sections (
+  nodecomplete : &NodeComplete,
+  config       : &SkgConfig,
+) -> io::Result<Vec<(SourceName, String, String)>> {
+  let pid = &nodecomplete . pid;
   let unfolded : UnfoldedTelescope =
     unfold_node (
       & UnfoldInput {
@@ -252,24 +318,6 @@ pub(crate) fn prepare_nodecomplete_telescope (
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
 
-  let mut offending_sources : Vec<SourceName> = unfolded . sections ()
-    . iter ()
-    .map ( |(source, _)| source )
-    . filter ( |source| ! config . user_owns_source (source) )
-    . cloned ()
-    . collect ();
-  offending_sources . sort ();
-  offending_sources . dedup ();
-  if ! offending_sources . is_empty () {
-    return Err ( io::Error::new (
-      io::ErrorKind::PermissionDenied,
-      format! (
-        "Refusing to write '{}': proposed telescope section(s) belong to non-owned source(s) [{}]. No files were changed.",
-        pid,
-        offending_sources . iter ()
-          . map ( |source| format! ("'{}'", source) )
-          . collect::<Vec<String>> () . join (", ") ))); }
-
   let mut prepared_writes : Vec<(SourceName, String, String)> =
     Vec::new ();
   for (source, node_fs) in unfolded . sections () {
@@ -282,26 +330,8 @@ pub(crate) fn prepare_nodecomplete_telescope (
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e . to_string () )) ?;
     prepared_writes . push (( source . clone (), path, yaml )); }
-  let written_sources : Vec<SourceName> = prepared_writes . iter ()
-    . map ( |(source, _, _)| source . clone () )
-    . collect ();
-  let mut prepared_deletions : Vec<String> = Vec::new ();
-  for source in config . ordered_sources () {
-    if written_sources . contains (&source) { continue; }
-    if ! config . user_owns_source (&source) { continue; }
-    let path : String = path_from_pid_and_source (
-      config, &source, pid . clone () )
-      . map_err ( |e| io::Error::new (
-        io::ErrorKind::NotFound, e) ) ?;
-    prepared_deletions . push (path); }
-
-  Ok ( PreparedTelescopeWrite {
-    pid             : pid . clone (),
-    home            : nodecomplete . source . clone (),
-    writes          : prepared_writes,
-    deletions       : prepared_deletions,
-    verify_as_hoist,
-  } ) }
+  Ok (prepared_writes)
+}
 
 
 /// The two shapes 'write_nodecomplete_telescope' refuses, because

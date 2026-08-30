@@ -9,6 +9,7 @@ pub mod rebuild_dbs;
 pub mod recompute_cyclic_roots;
 pub mod reload_paths;
 pub mod reload_batch;
+pub mod reload_recovery;
 pub mod rerender_all_views;
 pub mod save_buffer;
 pub mod scalar_release;

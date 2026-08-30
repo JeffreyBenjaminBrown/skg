@@ -12,6 +12,7 @@
 
 use crate::dbs::filesystem::one_node::{
   parse_nodefs_bytes,
+  serialize_telescope_manifest,
   validate_pid_matches_filename,
 };
 use crate::dbs::filesystem::multiple_nodes::{
@@ -32,6 +33,7 @@ use crate::dbs::in_rust_graph::{
 use crate::save::{
   StoreUpdateOutcome,
   apply_define_nodes_to_stores,
+  nodecomplete_from_noderust,
   nodecompletes_from_graph,
 };
 use crate::dbs::tantivy::background_writer::{
@@ -41,6 +43,11 @@ use crate::dbs::tantivy::background_writer::{
 use crate::serve::ViewsState;
 use crate::serve::handlers::reload_batch::reload_batch_active;
 use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
+use crate::serve::handlers::reload_recovery::{
+  IncidentDiskSnapshot,
+  RecoveryDraft,
+  register_incident,
+};
 use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -71,7 +78,7 @@ use crate::telescope::types::Telescope;
 
 use futures::executor::block_on;
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::net::TcpStream;
@@ -113,7 +120,8 @@ pub struct ReloadStoreOutcome {
   pub message           : String,
   pub applied           : Vec<DefineNode>,
   pub acknowledged_pids : HashSet<ID>,
-  pub rejected          : Vec<(ID, String)>, }
+  pub rejected          : Vec<(ID, String)>,
+  pub recovery          : Option<RecoveryDraft>, }
 
 #[derive(Clone)]
 struct RequestedIdOutcome {
@@ -130,6 +138,7 @@ pub(crate) struct PendingReloadPresentation {
   requested_outcomes : Vec<RequestedIdOutcome>,
   affected_paths     : Vec<PathBuf>,
   any_rejected       : bool,
+  recovery_available : bool,
 }
 
 thread_local! {
@@ -240,12 +249,26 @@ pub fn handle_reload_paths_request (
         touched . push (TouchedTelescope {
           pid: pid . clone (), source, path }); }}
     requested . push ((requested_id, pid)); }
-  let store_outcome : ReloadStoreOutcome =
+  let mut store_outcome : ReloadStoreOutcome =
     match block_on ( reload_touched_telescopes (env, touched) ) {
       Ok (outcome) => outcome,
       Err (e)   => {
         send_reload_error (stream, &format! ("Reload failed: {}", e));
         return; } };
+  let recovery_available = match store_outcome . recovery . take () {
+    None => false,
+    Some (draft) => {
+      let Some (incident) = incident_id . as_deref () else {
+        send_reload_error (stream,
+          "reload produced a recoverable fatal incident without an incident-id");
+        return; };
+      if let Err (error) = register_incident (&env . config, incident, draft) {
+        send_reload_error (stream, &format! (
+          "reload committed its legal changes but could not persist its recovery journal: {}",
+          error));
+        return; }
+      true
+    }};
   let requested_outcomes = requested . into_iter () . map (
     |(requested_id, pid)| {
       let paths = pid . as_ref () . map (|pid| possible_paths (
@@ -284,6 +307,7 @@ pub fn handle_reload_paths_request (
     requested_outcomes,
     affected_paths,
     any_rejected,
+    recovery_available,
   };
   present_committed_reload (
     stream, env, views_state, active_source_set,
@@ -331,7 +355,8 @@ fn present_committed_reload (
     play_harsh_sound_in_background (); }
   let payload = format_reload_response (
     &pending . message, &pending . requested_outcomes,
-    &presentation, &pending . affected_paths, &env . config . sources );
+    &presentation, &pending . affected_paths, &env . config . sources,
+    pending . recovery_available );
   send_response_with_length_prefix (
     stream,
     &tag_terminal_sexp_response (
@@ -348,6 +373,8 @@ pub async fn reload_touched_telescopes (
   env     : &mut SkgEnv,
   touched : Vec<TouchedTelescope>,
 ) -> Result<ReloadStoreOutcome, String> {
+  let touched_pids : Vec<ID> = touched . iter ()
+    . map (|telescope| telescope . pid . clone ()) . collect ();
   let mut defs : Vec<DefineNode> = Vec::new ();
   let mut fatals : Vec<(ID, String)> = Vec::new ();
   let (mut saves, mut deletes) : (usize, usize) = (0, 0);
@@ -422,30 +449,39 @@ pub async fn reload_touched_telescopes (
         "full-corpus reload would violate override invariants ({}); \
          stores unchanged", error)); }}
 
-  if defs . is_empty () {
-    return Ok (ReloadStoreOutcome {
-      message: summarize_reload (0, 0, &fatals),
-      applied: Vec::new (),
-      acknowledged_pids: HashSet::new (),
-      rejected: fatals, }); }
-
   // Batch guard: applying these to a clone of the live graph must not
   // break override invariants. If it would, reject the whole batch and
   // keep last-good (coarse attribution; see progress.org).
-  { let mut candidate : InRustGraph =
-      (* env . in_rust_graph . load_full () . graph) . clone ();
-    apply_definenodes_to_inRustGraph (&mut candidate, &defs);
+  let mut legal_graph : InRustGraph = (*graph_before) . clone ();
+  { apply_definenodes_to_inRustGraph (&mut legal_graph, &defs);
     let conflicts = distinct_id_claim_conflicts (
-      &nodecompletes_from_graph (&candidate));
+      &nodecompletes_from_graph (&legal_graph));
     if !conflicts . is_empty () {
       return Err (format! (
         "reloading would make IDs name multiple nodes: {:?}; \
          stores unchanged", conflicts)); }
     if let Err (e) =
-      error_unless_override_invariants_hold (&env . config, &candidate) {
-        return Err ( format! (
-          "reloading would violate override invariants ({}); \
+      error_unless_override_invariants_hold (&env . config, &legal_graph) {
+      return Err ( format! (
+        "reloading would violate override invariants ({}); \
           kept last-good state, stores unchanged", e )); } }
+
+  // A fatal telescope keeps its G0 graph state while unrelated legal
+  // definitions form G1. Capture the complete incident-time `.skg` overlay
+  // before releasing the writer lock; P/L manifests use the same serializer
+  // as an ordinary save.
+  let recovery = if fatals . is_empty () { None } else {
+    Some (RecoveryDraft {
+      fatal: fatals . clone (),
+      touched_pids: touched_pids . clone (),
+      pre_manifest: graph_telescope_manifest (
+        &graph_before, &touched_pids, &env . config) ?,
+      legal_manifest: graph_telescope_manifest (
+        &legal_graph, &touched_pids, &env . config) ?,
+      disk_snapshot: IncidentDiskSnapshot::capture (
+        &env . config, &touched_pids) ?,
+    })
+  };
 
   for snapshot in &captured_for_revalidation {
     revalidate_path_bytes (snapshot) . map_err ( |error| format! (
@@ -458,6 +494,18 @@ pub async fn reload_touched_telescopes (
     if &actual != expected {
       return Err (
         "full-corpus bytes changed during reload; stores unchanged" . into ()); }}
+  if let Some (recovery) = &recovery {
+    recovery . disk_snapshot . revalidate (&env . config, &touched_pids)
+      . map_err (|error| format! (
+        "incident bytes changed during reload ({}); stores unchanged", error)) ?; }
+
+  if defs . is_empty () {
+    return Ok (ReloadStoreOutcome {
+      message: summarize_reload (0, 0, &fatals),
+      applied: Vec::new (),
+      acknowledged_pids: HashSet::new (),
+      rejected: fatals,
+      recovery, }); }
 
   // Commit to the three stores, filesystem untouched. Keep a copy of the
   // instructions so the caller can re-render the views they touched.
@@ -495,7 +543,8 @@ pub async fn reload_touched_telescopes (
     message,
     applied,
     acknowledged_pids,
-    rejected: fatals, }) }
+    rejected: fatals,
+    recovery, }) }
 
 fn optional_string_list (sexp : &Sexp, key : &str) -> Result<Vec<String>, String> {
   let present = match sexp {
@@ -531,12 +580,42 @@ fn possible_paths (config : &SkgConfig, pid : &ID) -> Vec<PathBuf> {
       . path . join (format! ("{}.skg", pid)) }) . collect ()
 }
 
+fn graph_telescope_manifest (
+  graph  : &InRustGraph,
+  pids   : &[ID],
+  config : &SkgConfig,
+) -> Result<BTreeMap<PathBuf, Option<Vec<u8>>>, String> {
+  let owned_paths : HashSet<PathBuf> = config . sources . values ()
+    . filter (|source| source . user_owns_it)
+    . map (|source| source . path . clone ()) . collect ();
+  let mut manifest = BTreeMap::new ();
+  for pid in pids {
+    if let Some (node) = graph . nodes . get (pid) {
+      let complete = nodecomplete_from_noderust (node);
+      let serialized = serialize_telescope_manifest (&complete, config)
+        . map_err (|error| format! (
+          "could not serialize recovery state for {}: {}", pid, error)) ?;
+      manifest . extend (serialized . into_iter () . filter (|(path, _)|
+        path . parent () . map (|parent| owned_paths . contains (parent))
+          . unwrap_or (false)));
+    } else {
+      for source in config . sources . values ()
+        . filter (|source| source . user_owns_it)
+      {
+        manifest . insert (
+          source . path . join (format! ("{}.skg", pid)), None); }
+    }
+  }
+  Ok (manifest)
+}
+
 fn format_reload_response (
   message        : &str,
   requested      : &[RequestedIdOutcome],
   presentation   : &ReloadPresentation,
   affected_paths : &[PathBuf],
   sources        : &SourceCatalog,
+  recovery_available : bool,
 ) -> String {
   let atom = |value : &str| Sexp::Atom (Atom::S (value . into ()));
   let field = |key : &str, value : Sexp| Sexp::List (vec![atom (key), value]);
@@ -575,6 +654,8 @@ fn format_reload_response (
       . map (|error| atom (error)) . collect ())),
     field ("warnings", Sexp::List (presentation . warnings . iter ()
       . map (|warning| atom (warning)) . collect ())),
+    field ("recovery-available", atom (
+      if recovery_available { "true" } else { "false" })),
   ]) . to_string ()
 }
 
@@ -811,7 +892,7 @@ mod tests {
         requested_id: ID::from ("missing"), pid: None,
         status: "rejected", reason: Some ("not found" . into ()),
         paths: Vec::new (), },
-    ], &presentation, &[], &sources (&[("public", "/data/public")]));
+    ], &presentation, &[], &sources (&[("public", "/data/public")]), false);
     assert! (payload . contains ("(requested-id alias)"));
     assert! (payload . contains ("(pid primary)"));
     assert! (payload . contains ("/data/public/primary.skg"));
@@ -831,11 +912,12 @@ mod tests {
       errors: Vec::new (), warnings: Vec::new (), };
     let payload = format_reload_response (
       "done", &[], &presentation,
-      &[PathBuf::from ("/data/public/primary.skg")], &catalog );
+      &[PathBuf::from ("/data/public/primary.skg")], &catalog, true );
     assert! (payload . contains ("(conflicted-views"));
     assert! (payload . contains ("(view-uri dirty-uri)"));
     assert! (payload . contains ("/data/public/primary.skg"));
     assert! (payload . contains ("(incoming \"* incoming\")"));
+    assert! (payload . contains ("(recovery-available true)"));
   }
 
   #[test]
