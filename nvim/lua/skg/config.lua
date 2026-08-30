@@ -7,12 +7,47 @@
 -- uses, not a general TOML parser.
 
 local M = {}
+local payload = require('skg.payload')
+local sexpr = require('skg.sexpr.parse')
 
 ---The absolute path of the active skgconfig.toml, set by
 ---require('skg').init. (The analog of 'skg-config-dir', which lived
 ---in skg-state; here the config module owns it.)
 ---@type string|nil
 M.config_file_path = nil
+
+---Normalized source entries supplied by the connected server. Nil before
+---connection, when the TOML readers below remain the startup fallback.
+---@type table[]|nil
+M.source_inventory = nil
+
+local function optional_atom_text (value)
+  if value == nil or sexpr.is_nil(value) then return nil end
+  return sexpr.atom_text(value)
+end
+
+---Install the source-inventory value from a verification response.
+---@param wire_entries any
+function M.install_source_inventory (wire_entries)
+  if wire_entries == nil or not sexpr.is_list(wire_entries) then return end
+  local inventory = {}
+  for _, entry in ipairs(wire_entries) do
+    local owned = payload.field(entry, 'owned')
+    table.insert(inventory, {
+      name = optional_atom_text(payload.field(entry, 'name')),
+      abbreviation = optional_atom_text(
+        payload.field(entry, 'abbreviation')),
+      owned = owned ~= nil and not sexpr.is_nil(owned),
+      position = payload.field(entry, 'position'),
+      configured_path = optional_atom_text(
+        payload.field(entry, 'configured-path')),
+      path = optional_atom_text(payload.field(entry, 'directory')),
+      directory_identity = optional_atom_text(
+        payload.field(entry, 'directory-identity')),
+    })
+  end
+  M.source_inventory = inventory
+end
 
 ---@return string|nil the active config path, if it exists on disk
 function M.config_file ()
@@ -127,7 +162,10 @@ end
 ---@param file string
 ---@return string[] configured source names
 function M.source_names_from_toml (file)
-  return M.table_names_from_toml(file, 'sources')
+  local names = {}
+  for _, source in ipairs(M.source_paths_from_toml(file)) do
+    table.insert(names, source.name) end
+  return names
 end
 
 ---Pairs of {name, absolute dir} for each [[sources]] entry in FILE.
@@ -143,11 +181,11 @@ function M.source_paths_from_toml (file)
   local current_name = nil
   local current_path = nil
   local function flush ()
-    if current_name and current_path then
+    if current_path then
       local absolute = current_path
       if not absolute:match('^/') then
         absolute = config_dir .. '/' .. absolute end
-      table.insert(result, { name = current_name,
+      table.insert(result, { name = current_name or current_path,
                              path = vim.fn.fnamemodify(absolute, ':p')
                                     :gsub('/$', '') })
       current_name = nil
@@ -176,12 +214,22 @@ end
 
 ---@return table[]|nil (name, absolute-path) pairs, or nil without config
 function M.source_paths ()
+  if M.source_inventory then
+    local result = {}
+    for _, source in ipairs(M.source_inventory) do
+      table.insert(result, { name = source.name, path = source.path }) end
+    return result end
   local file = M.config_file()
   return file and M.source_paths_from_toml(file) or nil
 end
 
 ---@return string[]|nil
 function M.source_names ()
+  if M.source_inventory then
+    local result = {}
+    for _, source in ipairs(M.source_inventory) do
+      table.insert(result, source.name) end
+    return result end
   local file = M.config_file()
   return file and M.source_names_from_toml(file) or nil
 end
@@ -201,6 +249,11 @@ end
 
 ---@return string[]|nil owned source names, or nil without config
 function M.owned_sources ()
+  if M.source_inventory then
+    local result = {}
+    for _, source in ipairs(M.source_inventory) do
+      if source.owned then table.insert(result, source.name) end end
+    return result end
   local file = M.config_file()
   return file and M.owned_sources_from_toml(file) or nil
 end

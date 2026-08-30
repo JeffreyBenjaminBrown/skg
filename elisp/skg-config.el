@@ -13,6 +13,37 @@
  ;; It is set once, by `skg-client-init'.
  'skg-state)
 
+(defvar skg--server-source-inventory nil
+  "Normalized source entries received from the connected server.
+Nil before connection; local TOML readers are the startup fallback.")
+
+(defun skg--atom-string (value)
+  "Normalize a wire atom VALUE to a string, preserving nil."
+  (when value (format "%s" value)))
+
+(defun skg-install-source-inventory (response)
+  "Install the normalized source inventory carried by RESPONSE."
+  (let ((wire-entries (cadr (assoc 'source-inventory response))))
+    (when wire-entries
+      (setq skg--server-source-inventory
+            (mapcar
+             (lambda (entry)
+               (list :name (skg--atom-string
+                            (cadr (assoc 'name entry)))
+                     :abbreviation (skg--atom-string
+                                    (cadr (assoc 'abbreviation entry)))
+                     :owned (not (null (cadr (assoc 'owned entry))))
+                     :position (cadr (assoc 'position entry))
+                     :configured-path
+                     (skg--atom-string
+                      (cadr (assoc 'configured-path entry)))
+                     :directory
+                     (skg--atom-string (cadr (assoc 'directory entry)))
+                     :directory-identity
+                     (skg--atom-string
+                      (cadr (assoc 'directory-identity entry)))))
+             wire-entries)))))
+
 (defun skg-config-file ()
   "Return the skgconfig.toml path for `skg-config-dir', or nil."
   (when skg-config-dir
@@ -92,26 +123,32 @@ everything available."
      source-sets nil t nil nil "all" nil source-sets)))
 
 (defun skg--source-paths ()
-  "Return an alist of (source-name . absolute-path) from skgconfig.toml."
-  (let ((config-file (skg-config-file)))
-    (when config-file
-      (skg-source-paths-from-toml config-file))))
+  "Return (source-name . absolute-path) entries for this server."
+  (if skg--server-source-inventory
+      (mapcar (lambda (entry)
+                (cons (plist-get entry :name)
+                      (plist-get entry :directory)))
+              skg--server-source-inventory)
+    (let ((config-file (skg-config-file)))
+      (when config-file
+        (skg-source-paths-from-toml config-file)))))
 
 (defun skg--source-names ()
-  "Return the configured source names from skgconfig.toml."
-  (let ((config-file (skg-config-file)))
-    (when config-file
-      (skg-source-names-from-toml config-file))))
+  "Return configured source names in privacy order."
+  (if skg--server-source-inventory
+      (mapcar (lambda (entry) (plist-get entry :name))
+              skg--server-source-inventory)
+    (let ((config-file (skg-config-file)))
+      (when config-file
+        (skg-source-names-from-toml config-file)))))
 
 (defun skg--source-set-names ()
   "Return the source-set choices, in privacy order, ending with \"all\".
 The choices are the configured source names (each meaning that
 source and everything more public -- a prefix of the config's
 privacy order) plus the reserved \"all\"."
-  (let ((config-file (skg-config-file)))
-    (when config-file
-      (append (skg-source-names-from-toml config-file)
-              (list "all")))))
+  (let ((names (skg--source-names)))
+    (when names (append names (list "all")))))
 
 (defun skg-view-source-list ()
   "Display an org buffer listing configured sources and their paths."
@@ -132,10 +169,16 @@ privacy order) plus the reserved \"all\"."
       (display-buffer buffer))))
 
 (defun skg--owned-sources ()
-  "Return the list of owned source names from skgconfig.toml, or nil."
-  (let ((config-file (skg-config-file)))
-    (when config-file
-      (skg-owned-sources-from-toml config-file))))
+  "Return owned source names in privacy order, or nil."
+  (if skg--server-source-inventory
+      (delq nil
+            (mapcar (lambda (entry)
+                      (when (plist-get entry :owned)
+                        (plist-get entry :name)))
+                    skg--server-source-inventory))
+    (let ((config-file (skg-config-file)))
+      (when config-file
+        (skg-owned-sources-from-toml config-file)))))
 
 (defun skg-port-from-toml (file)
   "Return the integer value of `port = ...` from FILE (a TOML config)."
@@ -241,8 +284,9 @@ its name to its path, also mirroring the server."
       (nreverse names))))
 
 (defun skg-source-names-from-toml (file)
-  "Return configured source names from FILE."
-  (skg-table-names-from-toml file "sources"))
+  "Return effective configured source names from FILE.
+An unnamed source's name is its path string, matching the server."
+  (mapcar #'car (skg-source-paths-from-toml file)))
 
 (defun skg-source-paths-from-toml (file)
   "Return an alist of (name . absolute-dir) for each [[sources]] entry
@@ -258,8 +302,8 @@ config-load time."
            (cur-name      nil)
            (cur-path      nil)
            (flush (lambda ()
-                    (when (and cur-name cur-path)
-                      (push (cons cur-name
+                    (when cur-path
+                      (push (cons (or cur-name cur-path)
                                   (expand-file-name cur-path dir))
                             result)
                       (setq cur-name nil cur-path nil)))))

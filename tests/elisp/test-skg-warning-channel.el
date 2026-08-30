@@ -5,6 +5,23 @@
 (require 'ert)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-rerender-all-views)
+(require 'skg-request-verify-connection)
+
+(ert-deftest test-connection-warning-opens-persistent-telescope-buffer ()
+  (let (shown)
+    (cl-letf (((symbol-function 'skg-big-nonfatal-message)
+               (lambda (name message-text content)
+                 (setq shown (list name message-text content)))))
+      (skg--show-handshake-telescope-warnings
+       '((telescope-warnings
+          (((pid X) (kind ignored-foreign-pid-collision)
+            (message "owned telescope won")
+            (winning-paths (/data/owned/X.skg))
+            (ignored-paths (/data/foreign/X.skg)))))))
+      (should (equal (car shown) "*SKG Telescope Warnings*"))
+      (should (string-match-p "^WARNING:" (cadr shown)))
+      (should (string-match-p "retained owned files" (nth 2 shown)))
+      (should (string-match-p "/data/foreign/X.skg" (nth 2 shown))))))
 
 (ert-deftest test-content-view-success-with-warnings-opens-content-and-shows-warning ()
   (let ((opened nil)

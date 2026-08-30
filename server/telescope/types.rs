@@ -422,7 +422,7 @@ mod telescope_construction_tests {
       . collect ();
     let mut config : SkgConfig =
       SkgConfig::dummyFromSources (sources);
-    config . source_order = ordered;
+    config . sources . set_order (ordered);
     config }
 
   #[test]

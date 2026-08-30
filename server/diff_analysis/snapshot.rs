@@ -1,5 +1,8 @@
-use crate::dbs::filesystem::multiple_nodes::{
-  read_skg_sections_from_folder};
+use crate::dbs::filesystem::source_files::{
+  IgnoredForeignPathCollision, SelectedSourceFiles, SourceFile,
+  selected_direct_source_files, selected_direct_source_files_for_pid,
+  select_source_file_candidates, select_source_file_candidates_for_pid,
+};
 use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::{
   Telescope, retain_owned_sections_when_pid_collides,
@@ -105,7 +108,7 @@ fn validate_sources_for_selection (
   let needs_head : bool =
     before_kind == SnapshotKind::Head ||
     after_kind  == SnapshotKind::Head;
-  for (source_name, source) in &config . sources {
+  for (source_name, source) in config . sources . iter () {
     let source_path : &Path =
       Path::new ( &source . path );
     let repo : Repository =
@@ -127,25 +130,74 @@ fn read_graph_snapshot (
   config : &SkgConfig,
   kind   : SnapshotKind,
 ) -> Result<GraphSnapshot, String> {
-  // Sections arrive in privacy order (ordered_sources) so each
-  // telescope folds with its most public section first.
+  let selected : SelectedSourceFiles =
+    selected_source_files_at_endpoint (config, kind) ?;
+  for collision in &selected . collisions {
+    tracing::warn! (
+      pid = %collision . pid,
+      winners = ?collision . winners,
+      losers = ?collision . losers,
+      "diff snapshot ignored non-owned files colliding with an owned telescope" ); }
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
-  for source_name in config . ordered_sources () {
-    let label : String =
-      format! ("read source '{}' from {:?}", source_name, kind);
-    let mut source_sections : Vec<(SourceName, NodeFS)> =
-      profile_step_result (&label, || match kind {
-        SnapshotKind::Head =>
-          read_source_from_head (config, &source_name),
-        SnapshotKind::Index =>
-          read_source_from_index (config, &source_name),
-        SnapshotKind::Worktree =>
-          read_skg_sections_from_folder (&source_name, config)
-            . map_err ( |e| format! (
-              "Reading worktree source '{}': {}", source_name, e )), }) ?;
-    sections . append (&mut source_sections); }
+  for pid in &selected . pid_order {
+    for file in selected . by_pid . get (pid)
+      . into_iter () . flatten () {
+      sections . push ((
+        file . source . clone (),
+        read_selected_section_at_endpoint (config, kind, file) ? )); }}
   profile_step ("snapshot_from_sections", || {
     snapshot_from_sections (config, sections) })
+}
+
+fn selected_source_files_at_endpoint (
+  config : &SkgConfig,
+  kind   : SnapshotKind,
+) -> Result<SelectedSourceFiles, String> {
+  if kind == SnapshotKind::Worktree {
+    return selected_direct_source_files (config)
+      . map_err ( |e| format! ("Reading worktree source inventory: {}", e) ); }
+  let mut candidates : Vec<(ID, SourceFile)> = Vec::new ();
+  for source_name in config . ordered_sources () {
+    let paths : Vec<PathBuf> = match kind {
+      SnapshotKind::Head  =>
+        list_source_paths_from_head (config, &source_name) ?,
+      SnapshotKind::Index =>
+        list_source_paths_from_index (config, &source_name) ?,
+      SnapshotKind::Worktree => unreachable! (), };
+    for path in paths {
+      let pid : ID = pid_from_endpoint_path (&path) ?;
+      candidates . push ((pid, SourceFile {
+        source: source_name . clone (), path })); }
+  }
+  Ok (select_source_file_candidates (config, candidates))
+}
+
+fn read_selected_section_at_endpoint (
+  config : &SkgConfig,
+  kind   : SnapshotKind,
+  file   : &SourceFile,
+) -> Result<NodeFS, String> {
+  if kind == SnapshotKind::Worktree {
+    let bytes : Vec<u8> = fs::read (&file . path) . map_err ( |e| format! (
+      "Reading worktree path {:?} for source '{}': {}",
+      file . path, file . source, e )) ?;
+    return parse_blob_section (&bytes, &file . path); }
+  let source : &SkgfileSource = config . sources . get (&file . source)
+    . expect ("selected source is configured");
+  let repo : Repository = open_repo (&source . path) . ok_or_else ( || format! (
+    "Could not open git repo for source '{}'", file . source )) ?;
+  read_section_at_endpoint (kind, &repo, &file . source, &file . path) ?
+    . ok_or_else ( || format! (
+      "Selected {:?} path {:?} for source '{}' disappeared",
+      kind, file . path, file . source ) )
+}
+
+fn pid_from_endpoint_path (path : &Path) -> Result<ID, String> {
+  let stem : &str = path . file_stem () . and_then ( |s| s . to_str () )
+    . ok_or_else ( || format! ("Path {:?} has no UTF-8 file stem", path) ) ?;
+  if stem . is_empty () {
+    return Err (format! ("Path {:?} has an empty file stem", path)); }
+  Ok (ID::from (stem))
 }
 
 fn read_graph_snapshot_maybe_cached (
@@ -251,7 +303,7 @@ fn changed_paths_by_source (
 ) -> Result<HashMap<SourceName, BTreeSet<PathBuf>>, String> {
   let mut result : HashMap<SourceName, BTreeSet<PathBuf>> =
     HashMap::new ();
-  for (source_name, source) in &config . sources {
+  for (source_name, source) in config . sources . iter () {
     let source_path : &Path =
       Path::new (&source . path);
     let repo : Repository =
@@ -375,32 +427,56 @@ fn read_telescope_sections_at_endpoint (
   kind   : SnapshotKind,
   pid    : &ID,
 ) -> Result<Vec<(SourceName, NodeFS)>, String> {
+  let (selected, collision)
+    : (Vec<SourceFile>, Option<IgnoredForeignPathCollision>) =
+    selected_source_files_for_pid_at_endpoint (config, kind, pid) ?;
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
-  for source_name in config . ordered_sources () {
-    let source : &SkgfileSource =
-      config . sources . get (&source_name) . ok_or_else ( || format! (
-        "Source '{}' not found in config", source_name )) ?;
-    let source_path : &Path =
-      Path::new (&source . path);
-    let repo : Repository =
-      open_repo (source_path) . ok_or_else ( || format! (
-        "Could not open git repo for source '{}'", source_name )) ?;
-    let prefix : PathBuf =
-      source_prefix_in_repo (&repo, source_path) ?;
-    let rel_path : PathBuf =
-      prefix . join ( format! ("{}.skg", pid) );
-    if let Some (node_fs) =
-      read_section_at_endpoint (
-        kind, &repo, &source_name, &rel_path ) ? {
-      sections . push (( source_name, node_fs )); }}
-  let (sections, collision) =
-    retain_owned_sections_when_pid_collides (sections, config);
+  for file in selected {
+    sections . push ((
+      file . source . clone (),
+      read_selected_section_at_endpoint (config, kind, &file) ? )); }
   if let Some (collision) = collision {
     tracing::warn! (
       pid = %pid,
-      ignored_sources = ?collision . ignored_sources,
+      winners = ?collision . winners,
+      losers = ?collision . losers,
       "diff snapshot ignored non-owned files colliding with an owned telescope" ); }
   Ok (sections)
+}
+
+fn selected_source_files_for_pid_at_endpoint (
+  config : &SkgConfig,
+  kind   : SnapshotKind,
+  pid    : &ID,
+) -> Result<(Vec<SourceFile>, Option<IgnoredForeignPathCollision>), String> {
+  if kind == SnapshotKind::Worktree {
+    return selected_direct_source_files_for_pid (config, pid)
+      . map_err ( |e| format! (
+        "Reading worktree paths for telescope '{}': {}", pid, e )); }
+  let mut candidates : Vec<SourceFile> = Vec::new ();
+  for source_name in config . ordered_sources () {
+    let source : &SkgfileSource = config . sources . get (&source_name)
+      . expect ("ordered source exists");
+    let repo : Repository = open_repo (&source . path) . ok_or_else ( || format! (
+      "Could not open git repo for source '{}'", source_name )) ?;
+    let prefix : PathBuf = source_prefix_in_repo (&repo, &source . path) ?;
+    let rel_path : PathBuf = prefix . join (format! ("{}.skg", pid));
+    let exists : bool = match kind {
+      SnapshotKind::Head => repo . head ()
+        . and_then ( |head| head . peel_to_tree () )
+        . ok ()
+        .and_then ( |tree| tree . get_path (&rel_path) . ok () )
+        .map ( |entry| entry . kind () == Some (ObjectType::Blob) )
+        .unwrap_or (false),
+      SnapshotKind::Index => repo . index ()
+        .ok ()
+        .and_then ( |index| index . get_path (&rel_path, 0) )
+        .is_some (),
+      SnapshotKind::Worktree => unreachable! (), };
+    if exists {
+      candidates . push (SourceFile { source: source_name, path: rel_path }); }
+  }
+  Ok (select_source_file_candidates_for_pid (config, pid, candidates))
 }
 
 /// Drop the claims a pid's sections contributed at the before
@@ -667,10 +743,10 @@ fn record_section_claims (
       . or_insert_with (BTreeSet::new)
       . insert (source . clone ()); }}
 
-fn read_source_from_head (
+fn list_source_paths_from_head (
   config      : &SkgConfig,
   source_name : &SourceName,
-) -> Result<Vec<(SourceName, NodeFS)>, String> {
+) -> Result<Vec<PathBuf>, String> {
   let source : &SkgfileSource =
     config . sources . get (source_name) . ok_or_else ( || format! (
       "Source '{}' not found in config", source_name )) ?;
@@ -686,41 +762,28 @@ fn read_source_from_head (
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
         "Reading HEAD tree for source '{}': {}", source_name, e )) ?;
-  let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
-  let mut parse_error : Option<String> = None;
+  let mut paths : Vec<PathBuf> = Vec::new ();
   let walk_result : Result<(), git2::Error> =
     tree . walk (TreeWalkMode::PreOrder, |root, entry| {
-    if parse_error . is_some () {
-      return TreeWalkResult::Abort; }
     if entry . kind () != Some (ObjectType::Blob) {
       return TreeWalkResult::Ok; }
     let rel_path : PathBuf =
       PathBuf::from (root) . join (entry . name () . unwrap_or (""));
     if ! path_is_source_skg (&rel_path, &prefix) {
       return TreeWalkResult::Ok; }
-    let oid : git2::Oid = entry . id ();
-    match repo . find_blob (oid)
-      . map_err ( |e| e . to_string () )
-      . and_then ( |blob| parse_blob_section (
-        blob . content (), &rel_path ) ) {
-      Ok (node_fs) =>
-        sections . push (( source_name . clone (), node_fs )),
-      Err (e) => {
-        parse_error = Some (e);
-        return TreeWalkResult::Abort; } }
+    paths . push (rel_path);
     TreeWalkResult::Ok
   });
-  if let Some (error) = parse_error {
-    return Err (error); }
   walk_result . map_err ( |e| format! (
     "Walking HEAD tree for source '{}': {}", source_name, e )) ?;
-  Ok (sections)
+  paths . sort ();
+  Ok (paths)
 }
 
-fn read_source_from_index (
+fn list_source_paths_from_index (
   config      : &SkgConfig,
   source_name : &SourceName,
-) -> Result<Vec<(SourceName, NodeFS)>, String> {
+) -> Result<Vec<PathBuf>, String> {
   let source : &SkgfileSource =
     config . sources . get (source_name) . ok_or_else ( || format! (
       "Source '{}' not found in config", source_name )) ?;
@@ -734,21 +797,15 @@ fn read_source_from_index (
   let index : git2::Index =
     repo . index () . map_err ( |e| format! (
       "Reading index for source '{}': {}", source_name, e )) ?;
-  let mut sections : Vec<(SourceName, NodeFS)> =
-    Vec::new ();
+  let mut paths : Vec<PathBuf> = Vec::new ();
   for entry in index . iter () {
     let rel_path : PathBuf =
       PathBuf::from (String::from_utf8_lossy (&entry . path) . to_string ());
     if ! path_is_source_skg (&rel_path, &prefix) {
       continue; }
-    let blob : git2::Blob =
-      repo . find_blob (entry . id) . map_err ( |e| format! (
-        "Reading index blob {:?} for source '{}': {}",
-        rel_path, source_name, e )) ?;
-    let node_fs : NodeFS =
-      parse_blob_section (blob . content (), &rel_path) ?;
-    sections . push (( source_name . clone (), node_fs )); }
-  Ok (sections)
+    paths . push (rel_path); }
+  paths . sort ();
+  Ok (paths)
 }
 
 pub(super) fn source_prefix_in_repo (
@@ -767,7 +824,7 @@ pub(super) fn path_is_source_skg (
   rel_path : &Path,
   prefix   : &Path,
 ) -> bool {
-  rel_path . starts_with (prefix) &&
+  rel_path . parent () == Some (prefix) &&
     rel_path . extension () . map_or (
       false, |ext| ext == "skg" )
 }

@@ -45,6 +45,8 @@ use crate::source_sets::ActiveSourceSet;
 use crate::source_sets::apply_source_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SourceSetName;
+use crate::types::misc::SkgConfig;
+use crate::telescope::invariants::TelescopeViolation;
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -59,6 +61,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
+use sexp::{Atom, Sexp};
 
 /// Per-connection state for the Emacs client. The in-Rust graph
 /// handle is in 'SkgEnv', which is also per-connection (cloned at
@@ -181,7 +184,7 @@ fn handle_emacs (
               &active_source_set ); }
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
-              &mut stream ),
+              &mut stream, &env ),
           Ok (RequestType::Shutdown) =>
             // Never returns - exits process
             handle_shutdown_request ( &mut stream, &env ),
@@ -403,12 +406,72 @@ fn handle_snapshot_response (
     stream, &enriched_sexp ); }
 
 fn handle_verify_connection_request (
-  stream: &mut std::net::TcpStream) {
+  stream : &mut std::net::TcpStream,
+  env    : &SkgEnv,
+) {
   send_response_with_length_prefix (
     stream,
-    & tag_text_response (
-      TcpToClient::VerifyConnection,
-      "This is the skg server verifying the connection." )); }
+    & verify_connection_response (
+      &env . config, &env . startup_warnings)); }
+
+fn verify_connection_response (
+  config   : &SkgConfig,
+  warnings : &[(crate::types::misc::ID, TelescopeViolation)],
+) -> String {
+  let atom = |value : &str| -> Sexp {
+    Sexp::Atom (Atom::S (value . to_string ())) };
+  let field = |key : &str, value : Sexp| -> Sexp {
+    Sexp::List (vec! [atom (key), value]) };
+  let source_entries : Vec<Sexp> = config . ordered_sources ()
+    . into_iter ()
+    . enumerate ()
+    . map ( |(position, name)| {
+      let source = config . sources . get (&name)
+        . expect ("ordered source exists");
+      Sexp::List (vec! [
+        field ("name", atom (&name)),
+        field ("abbreviation", source . abbreviation . as_deref ()
+          . map (&atom) . unwrap_or_else ( || atom ("nil") )),
+        field ("owned", atom (
+          if source . user_owns_it { "true" } else { "nil" })),
+        field ("position", Sexp::Atom (Atom::I (position as i64))),
+        field ("configured-path", atom (
+          &config . sources . configured_path (&name)
+            . unwrap_or (&source . path) . to_string_lossy ())),
+        field ("directory", atom (&source . path . to_string_lossy ())),
+        field ("directory-identity", atom (
+          &config . sources . directory_identity (&name)
+            . unwrap_or (&source . path) . to_string_lossy ())),
+      ]) })
+    . collect ();
+  let warning_entries : Vec<Sexp> = warnings . iter ()
+    . map ( |(pid, warning)| {
+      let (kind, winning_paths, ignored_paths) = match warning {
+        TelescopeViolation::IgnoredForeignPidCollision {
+          winning_paths, ignored_paths, .. } =>
+          ("ignored-foreign-pid-collision",
+           winning_paths . as_slice (), ignored_paths . as_slice ()),
+        _ => ("telescope-warning", &[][..], &[][..]), };
+      let path_list = |paths : &[std::path::PathBuf]| -> Sexp {
+        Sexp::List (paths . iter () . map ( |path|
+          atom (&path . to_string_lossy ()) ) . collect ()) };
+      Sexp::List (vec! [
+        field ("pid", atom (pid)),
+        field ("kind", atom (kind)),
+        field ("message", atom (&warning . to_string ())),
+        field ("winning-paths", path_list (winning_paths)),
+        field ("ignored-paths", path_list (ignored_paths)),
+      ]) })
+    . collect ();
+  Sexp::List (vec! [
+    field ("response-type", atom (
+      TcpToClient::VerifyConnection . repr_in_client ())),
+    field ("content", atom (
+      "This is the skg server verifying the connection.")),
+    field ("source-inventory", Sexp::List (source_entries)),
+    field ("telescope-warnings", Sexp::List (warning_entries)),
+  ]) . to_string ()
+}
 
 fn handle_shutdown_request (
   stream : &mut std::net::TcpStream,
@@ -443,3 +506,44 @@ fn cleanup_and_shutdown (env : &SkgEnv) {
         }} ); }
   tracing::info! ("Shutdown complete.");
   std::process::exit (0); }
+
+#[cfg(test)]
+mod connection_tests {
+  use super::*;
+  use crate::types::misc::{SkgfileSource, SourceName};
+  use std::collections::HashMap;
+  use std::path::PathBuf;
+
+  #[test]
+  fn verification_carries_the_ordered_normalized_source_inventory () {
+    let mut sources = HashMap::new ();
+    for (name, path, owned) in [
+      ("second", "/tmp/second", false),
+      ("first", "/tmp/first", true),
+    ] {
+      sources . insert (SourceName::from (name), SkgfileSource {
+        name: SourceName::from (name), abbreviation: None,
+        path: PathBuf::from (path), user_owns_it: owned,
+      }); }
+    let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
+    config . sources . set_order (vec! [
+      SourceName::from ("first"), SourceName::from ("second") ]);
+    let warnings = vec! [(crate::types::misc::ID::from ("X"),
+      TelescopeViolation::IgnoredForeignPidCollision {
+        winning_sources: vec![SourceName::from ("first")],
+        winning_paths: vec![PathBuf::from ("/tmp/first/X.skg")],
+        ignored_sources: vec![SourceName::from ("second")],
+        ignored_paths: vec![PathBuf::from ("/tmp/second/X.skg")],
+      })];
+    let response : String = verify_connection_response (&config, &warnings);
+    let first : usize = response . find ("(name first)") . unwrap ();
+    let second : usize = response . find ("(name second)") . unwrap ();
+    assert! (first < second, "{}", response);
+    assert! (response . contains ("(position 0)"), "{}", response);
+    assert! (response . contains ("(owned true)"), "{}", response);
+    assert! (response . contains ("(directory /tmp/first)"), "{}", response);
+    assert! (response . contains (
+      "(kind ignored-foreign-pid-collision)"), "{}", response);
+    assert! (response . contains ("/tmp/second/X.skg"), "{}", response);
+  }
+}

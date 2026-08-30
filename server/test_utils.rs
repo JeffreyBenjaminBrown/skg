@@ -514,7 +514,8 @@ pub fn skg_env_from_parts (
     config        : config . clone (),
     in_rust_graph : graph . clone (),
     tantivy_index : tantivy_index . clone (),
-    driver, } }
+    driver,
+    startup_warnings : Arc::new (Vec::new ()), } }
 
 /// Test shim around 'update_from_and_rerender_buffer' that accepts
 /// the four DB handles separately, builds a 'SkgEnv', and calls the

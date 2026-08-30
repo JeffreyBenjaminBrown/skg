@@ -75,7 +75,7 @@ pub fn rebuild_dbs_in_place (
       . map_err ( |e| format! (
         "Override invariant validation failed: {}", e) ) ?;
     report_all_telescope_violations (
-      &fresh_config, &fresh_graph, load_violations );
+      &fresh_config, &fresh_graph, load_violations . clone () );
     block_on ( wipe_then_init_typedb_db (
       &fresh_config, &env . driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
@@ -85,6 +85,7 @@ pub fn rebuild_dbs_in_place (
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
     env . config = fresh_config;
     env . tantivy_index = new_tantivy;
+    env . startup_warnings = Arc::new (load_violations);
     tracing::info!("Tantivy rebuilt.");
     let had_id_set = had_id_set_from_nodes (&nodes);
     let all_node_ids = nodes . iter ()

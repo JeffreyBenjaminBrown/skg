@@ -1,7 +1,10 @@
+(load-file (expand-file-name "../../elisp/skg-test-utils.el"
+                             (file-name-directory load-file-name)))
 (require 'ert)
 (require 'cl-lib)
 (require 'heralds-minor-mode)
 (require 'skg-reload)
+(require 'skg-request-reload-paths)
 
 (ert-deftest test-skg-reload-preserves-herald-rules-on-load-error ()
   "A load error mid-reload must NOT strip the herald rule table.
@@ -28,5 +31,26 @@ error AND leave the captured table installed."
                  (error "simulated load error during reload"))))
       (should-error (skg-reload))
       (should (equal heralds--transform-rules '(skg test-sentinel))))))
+
+(ert-deftest test-skg-reload-path-scan-uses-only-direct-regular-files ()
+  "Nested .skg files and .skg-named directories are outside a source."
+  (let* ((root (make-temp-file "skg-reload-paths" t))
+         (source (expand-file-name "owned/source" root))
+         (nested (expand-file-name "nested" source))
+         (config (expand-file-name "skgconfig.toml" root))
+         (skg-config-dir (file-name-as-directory root)))
+    (unwind-protect
+        (progn
+          (make-directory nested t)
+          (make-directory (expand-file-name "directory.skg" source))
+          (with-temp-file config
+            (insert "[[sources]]\npath = \"owned/source\"\n"))
+          (with-temp-file (expand-file-name "direct.skg" source)
+            (insert "pid: direct\n"))
+          (with-temp-file (expand-file-name "nested.skg" nested)
+            (insert "pid: nested\n"))
+          (should (equal (skg--reload-all-skg-files)
+                         (list (expand-file-name "direct.skg" source)))))
+      (delete-directory root t))))
 
 (provide 'test-skg-reload)

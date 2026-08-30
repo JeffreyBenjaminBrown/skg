@@ -12,9 +12,7 @@ use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// public < private, per source_order (dummy configs otherwise fall
-/// back to ALPHABETICAL order, where "private" < "public" would
-/// invert the ladder).
+/// public < private, per the source catalog's declaration order.
 fn two_source_config () -> SkgConfig {
   let mut sources : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();
@@ -28,9 +26,9 @@ fn two_source_config () -> SkgConfig {
         user_owns_it : true, } ); }
   let mut config : SkgConfig =
     SkgConfig::dummyFromSources (sources);
-  config . source_order = vec! [
+  config . sources . set_order (vec! [
     SourceName::from ("public"),
-    SourceName::from ("private") ];
+    SourceName::from ("private") ]);
   config }
 
 fn node_at (

@@ -1,4 +1,4 @@
-use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
+use crate::types::misc::{SkgConfig, SourceCatalog, SourceName};
 
 use std::collections::HashMap;
 use std::fs;
@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 /// - If it is marked owned (in the config), create it.
 /// - If it is foreign, fail.
 pub fn validate_source_paths_creating_owned_ones_if_needed (
-  sources: &HashMap<SourceName, SkgfileSource>
+  sources: &SourceCatalog,
 ) -> io::Result<()> {
   for (source_name, source) in sources . iter() {
     if !source . path . exists() { // If it doesn't exist
@@ -21,28 +21,13 @@ pub fn validate_source_paths_creating_owned_ones_if_needed (
         return Err(io::Error::new(
           io::ErrorKind::NotFound,
           format!("Foreign source '{}' path does not exist: {:?}",
-                  source_name, source . path )) ); }} }
+                  source_name, source . path )) ); }
+    } else if ! source . path . is_dir () {
+      return Err (io::Error::new (
+        io::ErrorKind::InvalidInput,
+        format! ("Source '{}' path is not a directory: {:?}",
+                 source_name, source . path) )); }}
   Ok(( )) }
-
-/// The source names in TOML declaration order, read from the raw
-/// '[[sources]]' array. The parsed 'SkgConfig.sources' is a HashMap and
-/// loses order, so the loaders re-extract it here to fill
-/// 'SkgConfig.source_order'. LOAD-BEARING: declaration order is the
-/// privacy order, most public first (see the chokepoint methods on
-/// 'SkgConfig'). Empty when the TOML has no parseable sources array.
-fn source_order_from_toml (
-  contents : &str,
-) -> Vec<SourceName> {
-  toml::from_str::<toml::Value> (contents) . ok ()
-    . as_ref ()
-    . and_then ( |v| v . get ("sources") )
-    . and_then ( |s| s . as_array () )
-    . map ( |arr| arr . iter ()
-            . filter_map ( |t| t . get ("name")
-                           . and_then ( |n| n . as_str () )
-                           . map (SourceName::from) )
-            . collect () )
-    . unwrap_or_default () }
 
 /// Named source-sets are retired: source-sets are now the prefixes of
 /// the config's privacy order (see TODO/user-owned_autofork_chain/
@@ -95,7 +80,7 @@ fn reject_retired_config_keys (
 
 /// Fills the DERIVED parts of each source. Must run AFTER
 /// 'make_paths_absolute' (so 'data_root' and absolute paths exist),
-/// with 'raw_paths' captured from the sources BEFORE it:
+/// using the raw configured paths retained by 'SourceCatalog':
 /// - 'user_owns_it': true iff the source's absolute path sits under
 ///   DATA_ROOT/OWNED_FOLDER (the author-folder layout: the user's
 ///   own author folder holds exactly the owned sources).
@@ -106,16 +91,19 @@ fn reject_retired_config_keys (
 ///   "notes"); a foreign source keeps the full "author/repo" form,
 ///   mirroring the folder layout.
 fn derive_ownership_and_labels (
-  config    : &mut SkgConfig,
-  raw_paths : &HashMap<SourceName, PathBuf>,
+  config : &mut SkgConfig,
 ) {
   let owned_root : PathBuf =
     config . data_root . join ( &config . owned_folder );
-  for source in config . sources . values_mut () {
+  for source_name in config . sources . ordered_names () {
+    let configured_path : Option<PathBuf> = config . sources
+      . configured_path (&source_name) . map (Path::to_path_buf);
+    let source = config . sources . get_mut (&source_name)
+      . expect ("ordered source exists");
     source . user_owns_it =
       source . path . starts_with (&owned_root);
     let raw_path_string : Option<String> =
-      raw_paths . get ( &source . name )
+      configured_path . as_ref ()
       . map ( |p| p . to_string_lossy () . into_owned () );
     let name_was_defaulted : bool =
       Some ( source . name . 0 . as_str () )
@@ -130,6 +118,37 @@ fn derive_ownership_and_labels (
       if ! trimmed . is_empty () { // path == owned folder: keep full
         source . abbreviation = Some (trimmed); }}}}
 
+/// Resolve each validated directory to its physical identity, reject aliases,
+/// and make the canonical absolute path the one used for filesystem access.
+/// The catalog retains the exact configured path separately.
+fn resolve_source_directory_identities (
+  config : &mut SkgConfig,
+) -> io::Result<()> {
+  let mut first_source_by_identity : HashMap<PathBuf, SourceName> =
+    HashMap::new ();
+  for source_name in config . sources . ordered_names () {
+    let path : PathBuf = config . sources . get (&source_name)
+      . expect ("ordered source exists") . path . clone ();
+    let identity : PathBuf = fs::canonicalize (&path) ?;
+    if let Some (first) = first_source_by_identity . get (&identity) {
+      return Err (io::Error::new (
+        io::ErrorKind::InvalidInput,
+        format! (
+          "Configured sources '{}' ({}) and '{}' ({}) name the same physical directory: {}",
+          first,
+          config . sources . configured_path (first)
+            . unwrap_or (Path::new ("")) . display (),
+          source_name,
+          config . sources . configured_path (&source_name)
+            . unwrap_or (Path::new ("")) . display (),
+          identity . display () ))); }
+    first_source_by_identity . insert (
+      identity . clone (), source_name . clone ());
+    config . sources . set_resolved_directory (&source_name, identity);
+  }
+  Ok (( ))
+}
+
 pub fn load_config (
   path: &str )
   -> Result <SkgConfig,
@@ -143,11 +162,6 @@ pub fn load_config (
   
   let mut config: SkgConfig =
     toml::from_str (&contents) ?;
-  config . source_order = source_order_from_toml (&contents);
-  let raw_paths : HashMap<SourceName, PathBuf> =
-    config . sources . iter ()
-    . map ( |(name, s)| (name . clone (), s . path . clone ()) )
-    . collect ();
   config . config_path =
     fs::canonicalize (path)
     . unwrap_or_else ( |_| PathBuf::from (path) );
@@ -165,10 +179,11 @@ pub fn load_config (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
-  derive_ownership_and_labels (&mut config, &raw_paths);
+  derive_ownership_and_labels (&mut config);
   validate_source_sets (&config)?;
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
+  resolve_source_directory_identities (&mut config)?;
   Ok (config) }
 
 /// Load config from TOML file with optional overrides for testing.
@@ -210,11 +225,6 @@ pub fn load_config_with_overrides (
   reject_retired_config_keys (&contents)?;
   let mut config: SkgConfig =
     toml::from_str (&contents)?;
-  config . source_order = source_order_from_toml (&contents);
-  let raw_paths : HashMap<SourceName, PathBuf> =
-    config . sources . iter ()
-    . map ( |(name, s)| (name . clone (), s . path . clone ()) )
-    . collect ();
   config . config_path =
     fs::canonicalize (path)
     . unwrap_or_else ( |_| PathBuf::from (path) );
@@ -226,7 +236,7 @@ pub fn load_config_with_overrides (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
-  derive_ownership_and_labels (&mut config, &raw_paths);
+  derive_ownership_and_labels (&mut config);
   validate_source_sets (&config)?;
   if let Some (name) = db_name {
     config . db_name = name . to_string();
@@ -234,13 +244,12 @@ pub fn load_config_with_overrides (
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
   for (source_name, new_path) in source_overrides {
     let key : SourceName = SourceName::from (*source_name);
-    if let Some (source) = config . sources . get_mut (&key) {
-      source . path = new_path . clone();
-    } else {
+    if ! config . sources . set_path_override (&key, new_path . clone ()) {
       return Err(format!(
         "Source '{}' not found in config", source_name) . into()); }}
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
+  resolve_source_directory_identities (&mut config)?;
   Ok (config) }
 
 fn validate_source_sets (
@@ -270,3 +279,94 @@ fn make_paths_absolute (
     if source . path . is_relative () {
       source . path = root . join (
         &source . path ); } } }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::misc::ID;
+  use tempfile::tempdir;
+
+  fn write_config (
+    root    : &Path,
+    sources : &str,
+  ) -> PathBuf {
+    let path : PathBuf = root . join ("skgconfig.toml");
+    fs::write (
+      &path,
+      format! (
+        "db_name = \"test\"\ntantivy_folder = \"tantivy\"\n{}",
+        sources )) . unwrap ();
+    path
+  }
+
+  #[test]
+  fn mixed_named_and_unnamed_sources_keep_declaration_order () {
+    let temp = tempdir () . unwrap ();
+    let path : PathBuf = write_config (
+      temp . path (),
+      concat! (
+        "\n[[sources]]\npath = \"owned/first\"\n",
+        "\n[[sources]]\nname = \"middle\"\npath = \"owned/second\"\n",
+        "\n[[sources]]\npath = \"owned/third\"\n" ));
+    let config : SkgConfig = load_config (path . to_str () . unwrap ())
+      . unwrap ();
+    assert_eq! (
+      config . ordered_sources (),
+      ["owned/first", "middle", "owned/third"]
+        . into_iter () . map (SourceName::from) . collect::<Vec<_>> () );
+    assert_eq! (
+      config . sources . configured_path (
+        &SourceName::from ("owned/first")),
+      Some (Path::new ("owned/first")) );
+    for source in config . sources . values () {
+      assert! (source . path . is_absolute ());
+      assert_eq! (
+        config . sources . directory_identity (&source . name),
+        Some (source . path . as_path ()) ); }
+  }
+
+  #[test]
+  fn two_sources_may_not_alias_one_physical_directory () {
+    let temp = tempdir () . unwrap ();
+    fs::create_dir_all (temp . path () . join ("owned/shared"))
+      . unwrap ();
+    let path : PathBuf = write_config (
+      temp . path (),
+      concat! (
+        "\n[[sources]]\nname = \"first\"\npath = \"owned/shared\"\n",
+        "\n[[sources]]\nname = \"alias\"\npath = \"owned/shared/.\"\n" ));
+    let error : String = match load_config (path . to_str () . unwrap ()) {
+      Ok (_)  => panic! ("duplicate physical source directory was accepted"),
+      Err (e) => e . to_string (), };
+    assert! (error . contains ("first"), "{}", error);
+    assert! (error . contains ("alias"), "{}", error);
+    assert! (error . contains ("same physical directory"), "{}", error);
+  }
+
+  #[cfg(unix)]
+  #[test]
+  fn symlinked_source_keeps_configured_path_but_uses_physical_identity () {
+    use std::os::unix::fs::symlink;
+    let temp = tempdir () . unwrap ();
+    let real : PathBuf = temp . path () . join ("owned/real");
+    let alias : PathBuf = temp . path () . join ("owned/alias");
+    fs::create_dir_all (&real) . unwrap ();
+    symlink (&real, &alias) . unwrap ();
+    let path : PathBuf = write_config (
+      temp . path (),
+      "\n[[sources]]\nname = \"linked\"\npath = \"owned/alias\"\n" );
+    let config : SkgConfig = load_config (path . to_str () . unwrap ())
+      . unwrap ();
+    let name : SourceName = SourceName::from ("linked");
+    assert_eq! (
+      config . sources . configured_path (&name),
+      Some (Path::new ("owned/alias")) );
+    assert_eq! (
+      config . sources . directory_identity (&name),
+      Some (fs::canonicalize (&real) . unwrap () . as_path ()) );
+    assert_eq! (
+      config . sources . source_and_pid_for_direct_path (
+        &alias . join ("X.skg")),
+      Some ((name, ID::from ("X"))) );
+  }
+}

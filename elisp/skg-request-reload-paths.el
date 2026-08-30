@@ -26,15 +26,16 @@
 first magit refresh does not treat every file as new.")
 
 (defun skg--reload-all-skg-files ()
-  "List absolute paths of every .skg file under the configured sources."
+  "List regular direct .skg children of the configured sources."
   (let ((files '()))
     (dolist (src (skg--source-paths))
       (let ((dir (cdr src)))
         (when (and dir (file-directory-p dir))
-          (setq files
-                (nconc files
-                       (directory-files-recursively dir "\\.skg\\'"))))))
-    files))
+          (dolist (path (directory-files dir t "\\.skg\\'" t))
+            (when (and (file-regular-p path)
+                       (not (file-symlink-p path)))
+              (push path files))))))
+    (nreverse files)))
 
 (defun skg--reload-file-stamp (path)
   "Return (MTIME . SIZE) for PATH, or nil if it cannot be stat'd."

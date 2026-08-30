@@ -31,8 +31,8 @@ fn config_with_order (
         user_owns_it : true, } ); }
   let mut config : SkgConfig =
     SkgConfig::dummyFromSources (sources);
-  config . source_order =
-    names . iter () . map ( |n| SourceName::from (*n) ) . collect ();
+  config . sources . set_order (
+    names . iter () . map ( |n| SourceName::from (*n) ) . collect ());
   config }
 
 fn node_at (

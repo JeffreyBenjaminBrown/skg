@@ -1,13 +1,17 @@
 use crate::telescope::fold::fold_telescope_collecting_warnings;
 use crate::telescope::types::{
-  FoldWarning, Telescope, retain_owned_sections_when_pid_collides,
+  FoldWarning, Telescope,
 };
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
   read_nodecomplete, validate_pid_matches_filename,
 };
-use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
+use crate::dbs::filesystem::source_files::{
+  IgnoredForeignPathCollision, SelectedSourceFiles,
+  selected_direct_source_files,
+};
+use crate::types::misc::{SkgConfig, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 
@@ -50,38 +54,53 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
     : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
-  let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
   let mut load_errors: Vec<(String, // source name
-                            String, // filename
+                            String, // filename or source directory
                             String)> // error message
     = Vec::new();
+  // Preserve the aggregate load report for an unreadable source directory.
+  // The selector itself returns `io::Error`; here we still have the source
+  // identity needed to make that error actionable.
   for source_name in config . ordered_sources () {
-    let Some (source) : Option<&SkgfileSource> =
-      config . sources . get (&source_name) else { continue; };
-    match read_skg_sections_from_folder (&source_name, config) {
-      Ok (sections) => {
-        for (source, node_fs) in sections {
-          let pid : ID = node_fs . pid . clone ();
-          if ! sections_by_pid . contains_key (&pid) {
-            pid_order . push ( pid . clone () ); }
-          sections_by_pid . entry (pid)
-            . or_insert_with (Vec::new)
-            . push ((source, node_fs)); }}
-      Err (e) => {
-        load_errors . push ((
-          source_name . to_string(),
-          source . path . display() . to_string(),
-          e . to_string()
-        )); }} }
+    let source = config . sources . get (&source_name)
+      . expect ("ordered source exists");
+    if let Err (e) = fs::read_dir (&source . path) {
+      load_errors . push ((
+        source_name . to_string (),
+        source . path . display () . to_string (),
+        e . to_string () )); }}
+  if ! load_errors . is_empty () {
+    report_load_errors (&load_errors, &config . data_root) ?;
+    return Err (io::Error::new (
+      io::ErrorKind::InvalidData,
+      format! ("{} unreadable file(s)", load_errors . len ()) )); }
+  let selected : SelectedSourceFiles =
+    selected_direct_source_files (config) ?;
+  let pid_order : Vec<ID> = selected . pid_order;
+  let collision_violations : Vec<(ID, TelescopeViolation)> =
+    selected . collisions . into_iter ()
+    . map (collision_violation)
+    . collect ();
+  for pid in &pid_order {
+    for candidate in selected . by_pid . get (pid)
+      . into_iter () . flatten () {
+      match read_nodecomplete (&candidate . path)
+        . and_then ( |node_fs| {
+          validate_pid_matches_filename (&node_fs, &candidate . path) ?;
+          Ok (node_fs) }) {
+        Ok (node_fs) => sections_by_pid . entry (pid . clone ())
+          . or_default ()
+          . push ((candidate . source . clone (), node_fs)),
+        Err (e) => load_errors . push ((
+          candidate . source . to_string (),
+          candidate . path . display () . to_string (),
+          e . to_string () )), }}}
   report_load_errors (&load_errors, &config . data_root) ?;
   if ! load_errors . is_empty() {
     return Err (io::Error::new (
       io::ErrorKind::InvalidData,
       format! ("{} unreadable file(s)",
                load_errors . len() ))); }
-  let collision_violations : Vec<(ID, TelescopeViolation)> =
-    retain_owned_telescopes (
-      &mut sections_by_pid, &pid_order, config );
   let (nodes, fold_violations)
     : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
     fold_grouped_sections (sections_by_pid, pid_order, config) ?;
@@ -92,28 +111,25 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
           all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
           all } )) }
 
-/// When owned and non-owned files use one pid, retain only the
-/// owned files before folding or building the extra-id map. A pid
-/// represented entirely by non-owned files remains readable.
-fn retain_owned_telescopes (
-  sections_by_pid : &mut HashMap<ID, Vec<(SourceName, NodeFS)>>,
-  pid_order       : &[ID],
-  config          : &SkgConfig,
-) -> Vec<(ID, TelescopeViolation)> {
-  let mut violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
-  for pid in pid_order {
-    let Some (sections) = sections_by_pid . remove (pid)
-      else { continue; };
-    let (retained, collision) =
-      retain_owned_sections_when_pid_collides (sections, config);
-    sections_by_pid . insert (pid . clone (), retained);
-    if let Some (collision) = collision {
-      violations . push ((
-        pid . clone (),
-        TelescopeViolation::IgnoredForeignPidCollision {
-          ignored_sources : collision . ignored_sources,
-        } )); }}
-  violations }
+fn collision_violation (
+  collision : IgnoredForeignPathCollision,
+) -> (ID, TelescopeViolation) {
+  let pid : ID = collision . pid;
+  let winning_sources : Vec<SourceName> = collision . winners . iter ()
+    . map ( |file| file . source . clone () ) . collect ();
+  let winning_paths : Vec<PathBuf> = collision . winners . into_iter ()
+    . map ( |file| file . path ) . collect ();
+  let ignored_sources : Vec<SourceName> = collision . losers . iter ()
+    . map ( |file| file . source . clone () ) . collect ();
+  let ignored_paths : Vec<PathBuf> = collision . losers . into_iter ()
+    . map ( |file| file . path ) . collect ();
+  (pid, TelescopeViolation::IgnoredForeignPidCollision {
+    winning_sources,
+    winning_paths,
+    ignored_sources,
+    ignored_paths,
+  })
+}
 
 /// One telescope, read fresh from disk by pid (all its sections,
 /// folded). Errors if no section exists or no section has a title.
@@ -218,25 +234,19 @@ pub fn read_skg_sections_from_folder (
   source_name : &SourceName,
   config      : &SkgConfig,
 ) -> io::Result < Vec<(SourceName, NodeFS)> > {
-  let source : &SkgfileSource =
-    config . sources . get (source_name)
-    . ok_or_else(|| io::Error::new(
+  if ! config . sources . contains_key (source_name) {
+    return Err (io::Error::new (
       io::ErrorKind::NotFound,
-      format!("Source '{}' not found in config", source_name)))?;
+      format! ("Source '{}' not found in config", source_name))); }
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
-  let entries : ReadDir = // an iterator
-    fs::read_dir (&source . path) ?;
-  for entry in entries {
-    let entry : DirEntry = entry ?;
-    let path : PathBuf = entry . path () ;
-    if ( path . is_file () &&
-         path . extension () . map_or (
-           false,                  // None => no extension found
-           |ext| ext == "skg") ) { // Some
-      let node_fs : NodeFS =
-        read_nodecomplete (&path) ?;
-      validate_pid_matches_filename (&node_fs, &path) ?;
-      sections . push (( source_name . clone (), node_fs )); }}
+  let selected : SelectedSourceFiles = selected_direct_source_files (config) ?;
+  for pid in &selected . pid_order {
+    for file in selected . by_pid . get (pid)
+      . into_iter () . flatten ()
+      .filter ( |file| &file . source == source_name ) {
+      let node_fs : NodeFS = read_nodecomplete (&file . path) ?;
+      validate_pid_matches_filename (&node_fs, &file . path) ?;
+      sections . push ((source_name . clone (), node_fs)); }}
   Ok (sections) }
 
 /// Like `read_all_skg_files_from_sources` but only for telescopes
@@ -262,11 +272,9 @@ pub fn read_recently_modified_skgfiles_from_sources (
       let mtime : std::time::SystemTime =
         fs::metadata (&path) ? . modified() ?;
       if mtime <= since { continue; }
-      let node_fs : NodeFS =
-        read_nodecomplete (&path) ?;
-      validate_pid_matches_filename (&node_fs, &path) ?;
-      let pid : ID =
-        node_fs . pid . clone();
+      let Some ((_source, pid)) =
+        config . sources . source_and_pid_for_direct_path (&path)
+      else { continue; };
       if seen_ids . insert (pid . clone()) {
         modified_pids . push (pid); }} }
   let mut all_nodes : Vec<NodeComplete> = Vec::new();

@@ -299,6 +299,38 @@ the sources in privacy order, then \"all\"."
      (should (equal (mapcar #'car (skg--source-paths))
                     '("public" "private"))))))
 
+(ert-deftest test-config-readers-default-unnamed-source-to-its-path ()
+  "Every source reader uses the server's optional-name rule."
+  (test--with-skg-content-view
+   "* (skg (node (id x) (source owned/unnamed))) x\n"
+   (concat "[[sources]]\n"
+           "path = \"owned/unnamed\"\n\n"
+           "[[sources]]\n"
+           "name = \"named\"\n"
+           "path = \"owned/named\"\n")
+   (lambda ()
+     (should (equal (skg--source-names) '("owned/unnamed" "named")))
+     (should (equal (skg--owned-sources) '("owned/unnamed" "named")))
+     (should (equal (mapcar #'car (skg--source-paths))
+                    '("owned/unnamed" "named"))))))
+
+(ert-deftest test-connected-source-inventory-supersedes-local-toml ()
+  "After verification, source consumers use the server's normalized facts."
+  (let ((skg--server-source-inventory nil))
+    (skg-install-source-inventory
+     '((source-inventory
+        (((name public) (abbreviation pub) (owned true) (position 0)
+          (configured-path owned/public) (directory /real/public)
+          (directory-identity /real/public))
+         ((name foreign) (abbreviation nil) (owned nil) (position 1)
+          (configured-path ../foreign) (directory /real/foreign)
+          (directory-identity /real/foreign))))))
+    (should (equal (skg--source-names) '("public" "foreign")))
+    (should (equal (skg--owned-sources) '("public")))
+    (should (equal (skg--source-paths)
+                   '(("public" . "/real/public")
+                     ("foreign" . "/real/foreign"))))))
+
 ;; --- Empty-node metadata view (C-c v m on a metadata-less headline) ---
 
 (defvar test--config-one-source

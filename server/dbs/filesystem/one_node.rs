@@ -1,6 +1,10 @@
 use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::{
-  Telescope, retain_owned_sections_when_pid_collides,
+  Telescope,
+};
+use crate::dbs::filesystem::source_files::{
+  IgnoredForeignPathCollision, SourceFile,
+  selected_direct_source_files_for_pid,
 };
 use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
@@ -62,24 +66,21 @@ pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Option<Telescope>> {
+  let (selected, collision)
+    : (Vec<SourceFile>, Option<IgnoredForeignPathCollision>) =
+    selected_direct_source_files_for_pid (config, pid) ?;
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
-  for source_name in config . ordered_sources () {
-    let path : String =
-      match path_from_pid_and_source (
-        config, &source_name, pid . clone () ) {
-        Ok (p) => p,
-        Err (_) => continue, };
-    if ! Path::new (&path) . is_file () { continue; }
-    let node_fs : NodeFS = read_nodecomplete (&path) ?;
-    sections . push (( source_name, node_fs )); }
+  for file in selected {
+    let node_fs : NodeFS = read_nodecomplete (&file . path) ?;
+    validate_pid_matches_filename (&node_fs, &file . path) ?;
+    sections . push (( file . source, node_fs )); }
   if sections . is_empty () {
     return Ok (None); }
-  let (sections, collision) =
-    retain_owned_sections_when_pid_collides (sections, config);
   if let Some (collision) = collision {
     tracing::warn! (
       pid = %pid,
-      ignored_sources = ?collision . ignored_sources,
+      winners = ?collision . winners,
+      losers = ?collision . losers,
       "owned telescope won a collision with non-owned files" ); }
   Telescope::try_new ( pid . clone (), sections, config )
     . map (Some)

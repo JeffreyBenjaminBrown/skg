@@ -89,7 +89,8 @@ async fn multi_root_view_inner (
     config        : config . clone (),
     in_rust_graph : new_handle ( InRustGraph::from_nodecompletes (&nodes) ),
     tantivy_index : tantivy_owned,
-    driver        : Arc::clone (driver), };
+    driver        : Arc::clone (driver),
+    startup_warnings : Arc::new (Vec::new ()), };
   multi_root_view_via_env (
     &env, root_ids, diff_mode_enabled, active_source_set,
     // The test shims discard render warnings; the production
@@ -150,4 +151,3 @@ pub async fn multi_root_view_with_source_set (
   multi_root_view_inner (
     driver, config, tantivy_index, root_ids,
     diff_mode_enabled, Some (active_source_set) ) . await }
-

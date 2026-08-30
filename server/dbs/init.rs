@@ -106,10 +106,11 @@ pub fn initialize_dbs (
                 "Override invariant validation failed: {}", e);
               std::process::exit (1); }
           report_all_telescope_violations (
-            config, &graph, load_violations );
+            config, &graph, load_violations . clone () );
           let (env, handoff) : (SkgEnv, InitContextHandoff) =
             env_and_handoff_from_nodes (
-              config, &nodes, Arc::new (driver), tantivy_index );
+              config, &nodes, Arc::new (driver), tantivy_index,
+              load_violations );
           (env, handoff, nodes) }
         Err (e) => {
           tracing::warn! ("Incremental init failed ({}), \
@@ -250,6 +251,7 @@ fn env_and_handoff_from_nodes (
   nodes         : &[NodeComplete],
   driver        : Arc<TypeDBDriver>,
   tantivy_index : TantivyIndex,
+  startup_warnings : Vec<(ID, TelescopeViolation)>,
 ) -> (SkgEnv, InitContextHandoff) {
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
@@ -268,7 +270,8 @@ fn env_and_handoff_from_nodes (
       config : config . clone (),
       in_rust_graph,
       tantivy_index,
-      driver, },
+      driver,
+      startup_warnings : Arc::new (startup_warnings), },
     InitContextHandoff {
       had_id_set,
       all_node_ids,
@@ -313,7 +316,8 @@ fn full_init (
     = error_unless_override_invariants_hold (config, &graph)
     { tracing::error! ("Override invariant validation failed: {}", e);
       std::process::exit (1); }
-  report_all_telescope_violations (config, &graph, load_violations);
+  report_all_telescope_violations (
+    config, &graph, load_violations . clone ());
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");
@@ -334,7 +338,8 @@ fn full_init (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "extract_context_data_from_nodes" ). entered();
       env_and_handoff_from_nodes (
-        config, &nodes, Arc::new (driver), tantivy_index ) };
+        config, &nodes, Arc::new (driver), tantivy_index,
+        load_violations ) };
   (env, handoff, nodes) }
 
 fn touch_init_marker (

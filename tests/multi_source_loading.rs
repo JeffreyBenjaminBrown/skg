@@ -8,7 +8,12 @@ use tempfile::{tempdir, TempDir};
 
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::{
+  nodecomplete_from_telescope_on_disk,
+  read_all_skg_files_from_sources_collecting_violations,
+};
 use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
+use skg::telescope::invariants::TelescopeViolation;
 use skg::test_utils::set_source_retagging_member_sources;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -128,6 +133,63 @@ fn test_load_from_multiple_sources() {
 
   assert_eq!(main_nodes . len(), 2, "Should have 2 nodes from main");
   assert_eq!(shared_nodes . len(), 1, "Should have 1 node from shared");
+}
+
+#[test]
+fn malformed_foreign_collision_is_opaque_before_every_worktree_parse () {
+  let temp_dir : TempDir = tempdir () . unwrap ();
+  let owned_path : PathBuf = temp_dir . path () . join ("owned");
+  let foreign_path : PathBuf = temp_dir . path () . join ("foreign");
+  fs::create_dir_all (&owned_path) . unwrap ();
+  fs::create_dir_all (&foreign_path) . unwrap ();
+  let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new ();
+  for (name, path, user_owns_it) in [
+    ("owned", owned_path . clone (), true),
+    ("foreign", foreign_path . clone (), false),
+  ] {
+    sources . insert (SourceName::from (name), SkgfileSource {
+      name: SourceName::from (name), abbreviation: None, path, user_owns_it,
+    }); }
+  let mut config : SkgConfig =
+    test_config (sources, temp_dir . path () . to_path_buf ());
+  config . sources . set_order (vec! [
+    SourceName::from ("foreign"), SourceName::from ("owned") ]);
+  fs::write (
+    owned_path . join ("X.skg"),
+    "pid: X\ntitle: owned wins\n" ) . unwrap ();
+  fs::write (
+    foreign_path . join ("X.skg"),
+    "this: [is not valid YAML" ) . unwrap ();
+
+  let (nodes, violations) =
+    read_all_skg_files_from_sources_collecting_violations (&config)
+      . expect ("the ignored foreign bytes must never be parsed");
+  assert_eq! (nodes . len (), 1);
+  assert_eq! (nodes[0] . title, "owned wins");
+  assert! (matches! (
+    &violations[0].1,
+    TelescopeViolation::IgnoredForeignPidCollision {
+      ignored_sources, .. }
+      if ignored_sources == &vec![SourceName::from ("foreign")]
+  ));
+  assert_eq! (
+    nodecomplete_from_telescope_on_disk (&config, &ID::from ("X"))
+      . expect ("one-pid loading must make the same pre-parse choice")
+      . title,
+    "owned wins" );
+
+  fs::write (
+    owned_path . join ("X.skg"),
+    "this: [owned winner is malformed" ) . unwrap ();
+  assert! (read_all_skg_files_from_sources (&config) . is_err ());
+  assert! (nodecomplete_from_telescope_on_disk (&config, &ID::from ("X"))
+    . is_err ());
+
+  fs::remove_file (owned_path . join ("X.skg")) . unwrap ();
+  assert! (read_all_skg_files_from_sources (&config) . is_err (),
+           "once the owned winner is deleted, the foreign bytes are active");
+  assert! (nodecomplete_from_telescope_on_disk (&config, &ID::from ("X"))
+    . is_err ());
 }
 
 #[test]
@@ -570,9 +632,9 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
         user_owns_it : owned, } ); }
     let mut config : SkgConfig =
       test_config (sources, temp_dir . path () . to_path_buf ());
-    config . source_order = // most public first
+    config . sources . set_order ( // most public first
       vec! [ SourceName::from ("foreign"),
-             SourceName::from ("public") ];
+             SourceName::from ("public") ]);
     config };
   { // FOREIGN HOME: refused, rather than silently dropping the title.
     let mut node : NodeComplete = empty_node_complete();
@@ -637,8 +699,9 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
       } ); }
     let mut config : SkgConfig =
       test_config (sources, temp_dir . path () . to_path_buf ());
-    config . source_order = ["public", "private", "foreign"]
-      . into_iter () . map (SourceName::from) . collect ();
+    config . sources . set_order (
+      ["public", "private", "foreign"]
+      . into_iter () . map (SourceName::from) . collect ());
     config };
 
   fs::write (

@@ -189,10 +189,10 @@ fn home_from_disk_is_the_most_public_section () {
         user_owns_it, } ); }
     let mut config : SkgConfig =
       SkgConfig::dummyFromSources (sources);
-    config . source_order = // most public first
+    config . sources . set_order ( // most public first
       vec! [ source_name ("foreign"),
              source_name ("zed"),
-             source_name ("alpha") ];
+             source_name ("alpha") ]);
     config };
   { // The foreign collision is ignored; most-public retained wins.
     std::fs::write ( foreign_path . join ("N.skg"),

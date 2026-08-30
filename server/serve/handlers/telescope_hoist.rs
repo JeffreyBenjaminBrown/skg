@@ -183,8 +183,9 @@ mod tests {
       } ); }
     let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
     config . data_root = temp . path () . to_path_buf ();
-    config . source_order = ["public", "middle", "private", "foreign"]
-      . into_iter () . map (SourceName::from) . collect ();
+    config . sources . set_order (
+      ["public", "middle", "private", "foreign"]
+      . into_iter () . map (SourceName::from) . collect ());
     (temp, config, paths)
   }
 

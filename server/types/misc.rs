@@ -1,8 +1,8 @@
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tantivy::Index;
 use tantivy::schema::Field;
@@ -56,7 +56,7 @@ pub enum MSV<T> {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ID ( pub String );
 
-#[derive(Serialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SkgfileSource {
   pub name         : SourceName,
   pub abbreviation : Option<String>,
@@ -68,6 +68,200 @@ pub struct SkgfileSource {
   // in server/dbs/filesystem/not_nodes.rs. Rust constructors (tests)
   // may still set it directly.
   pub user_owns_it : bool,
+}
+
+/// The configured sources, in declaration/privacy order.
+///
+/// This is the authoritative source inventory.  It deliberately owns both
+/// the ordered entries and the path facts derived while loading the config;
+/// keeping a `HashMap` plus a separately filled order vector allowed those
+/// two interpretations to disagree (most visibly for unnamed sources).
+/// Lookup remains map-like because source sets are small and nearly every
+/// caller cares more about the one shared order than constant-time lookup.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SourceCatalog {
+  entries              : Vec<SkgfileSource>,
+  configured_paths     : HashMap<SourceName, PathBuf>,
+  directory_identities : HashMap<SourceName, PathBuf>,
+}
+
+impl SourceCatalog {
+  pub fn insert (
+    &mut self,
+    name   : SourceName,
+    source : SkgfileSource,
+  ) -> Option<SkgfileSource> {
+    assert_eq! (name, source . name, "source key must equal source name");
+    self . configured_paths
+      . insert (name . clone (), source . path . clone ());
+    self . directory_identities . remove (&name);
+    if let Some (position) = self . entries . iter ()
+      . position ( |old| old . name == name ) {
+      Some (std::mem::replace (
+        &mut self . entries[position], source ))
+    } else {
+      self . entries . push (source);
+      None
+    }
+  }
+
+  pub fn get (&self, name : &SourceName) -> Option<&SkgfileSource> {
+    self . entries . iter () . find ( |s| &s . name == name ) }
+
+  pub fn get_mut (
+    &mut self,
+    name : &SourceName,
+  ) -> Option<&mut SkgfileSource> {
+    self . entries . iter_mut () . find ( |s| &s . name == name ) }
+
+  pub fn contains_key (&self, name : &SourceName) -> bool {
+    self . get (name) . is_some () }
+
+  pub fn len (&self) -> usize {
+    self . entries . len () }
+
+  pub fn is_empty (&self) -> bool {
+    self . entries . is_empty () }
+
+  pub fn iter (
+    &self,
+  ) -> impl Iterator<Item = (&SourceName, &SkgfileSource)> {
+    self . entries . iter () . map ( |s| (&s . name, s) ) }
+
+  pub fn values (
+    &self,
+  ) -> impl Iterator<Item = &SkgfileSource> {
+    self . entries . iter () }
+
+  pub fn values_mut (
+    &mut self,
+  ) -> impl Iterator<Item = &mut SkgfileSource> {
+    self . entries . iter_mut () }
+
+  pub fn keys (&self) -> impl Iterator<Item = &SourceName> {
+    self . entries . iter () . map ( |s| &s . name ) }
+
+  pub fn ordered_names (&self) -> Vec<SourceName> {
+    self . keys () . cloned () . collect () }
+
+  pub fn position (&self, name : &SourceName) -> Option<usize> {
+    self . entries . iter () . position ( |s| &s . name == name ) }
+
+  /// The path exactly as configured, before resolution against DATA_ROOT.
+  pub fn configured_path (&self, name : &SourceName) -> Option<&Path> {
+    self . configured_paths . get (name) . map (PathBuf::as_path) }
+
+  /// The canonical identity of the existing source directory.
+  pub fn directory_identity (&self, name : &SourceName) -> Option<&Path> {
+    self . directory_identities . get (name) . map (PathBuf::as_path) }
+
+  /// Resolve a candidate direct `SOURCE/PID.skg` path.  Directory ancestry
+  /// is deliberately irrelevant: a nested `.skg` file belongs only when its
+  /// immediate physical parent is itself a configured source.
+  ///
+  /// The file need not currently exist, because deletion observations need
+  /// the same classification.  Corpus enumeration separately requires a
+  /// regular file.
+  pub fn source_and_pid_for_direct_path (
+    &self,
+    path : &Path,
+  ) -> Option<(SourceName, ID)> {
+    if path . extension () . and_then ( |e| e . to_str () )
+       != Some ("skg") {
+      return None; }
+    let stem : &str =
+      path . file_stem () . and_then ( |s| s . to_str () ) ?;
+    if stem . is_empty () { return None; }
+    let parent : &Path = path . parent () ?;
+    let parent_identity : PathBuf =
+      std::fs::canonicalize (parent)
+      . unwrap_or_else ( |_| parent . to_path_buf () );
+    for source in &self . entries {
+      let source_directory : &Path = self . directory_identity (&source . name)
+        . unwrap_or (source . path . as_path ());
+      if parent_identity == source_directory {
+        return Some (( source . name . clone (), ID::from (stem) )); }
+    }
+    None
+  }
+
+  pub fn set_directory_identity (
+    &mut self,
+    name     : SourceName,
+    identity : PathBuf,
+  ) {
+    self . directory_identities . insert (name, identity); }
+
+  /// Replace a configured path in a test override while keeping the catalog's
+  /// raw-path fact and resolved identity coherent.
+  pub fn set_path_override (
+    &mut self,
+    name : &SourceName,
+    path : PathBuf,
+  ) -> bool {
+    let Some (source) = self . get_mut (name) else { return false; };
+    source . path = path . clone ();
+    self . configured_paths . insert (name . clone (), path);
+    self . directory_identities . remove (name);
+    true
+  }
+
+  /// Record the canonical directory used for membership comparisons and
+  /// filesystem access.  The as-configured path remains available through
+  /// `configured_path`.
+  pub fn set_resolved_directory (
+    &mut self,
+    name      : &SourceName,
+    directory : PathBuf,
+  ) {
+    self . get_mut (name)
+      . unwrap_or_else ( || panic! ("unknown source '{}'", name) )
+      . path = directory . clone ();
+    self . set_directory_identity (name . clone (), directory);
+  }
+
+  /// Test/import helper for sources not parsed from TOML.  Production config
+  /// order comes only from deserialization.
+  pub fn set_order (
+    &mut self,
+    order : Vec<SourceName>,
+  ) {
+    let unique : HashSet<&SourceName> = order . iter () . collect ();
+    assert_eq! (
+      unique . len (), order . len (),
+      "source order may not repeat a source" );
+    let mut reordered : Vec<SkgfileSource> = Vec::new ();
+    for name in &order {
+      let source : SkgfileSource = self . get (name)
+        . unwrap_or_else ( || panic! (
+          "source order names unconfigured source '{}'", name ))
+        . clone ();
+      reordered . push (source); }
+    assert_eq! (
+      reordered . len (), self . entries . len (),
+      "source order must name every configured source exactly once" );
+    self . entries = reordered;
+  }
+}
+
+impl From<HashMap<SourceName, SkgfileSource>> for SourceCatalog {
+  fn from (sources : HashMap<SourceName, SkgfileSource>) -> Self {
+    let mut entries : Vec<(SourceName, SkgfileSource)> =
+      sources . into_iter () . collect ();
+    entries . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
+    let mut catalog : SourceCatalog = SourceCatalog::default ();
+    for (name, source) in entries {
+      catalog . insert (name, source); }
+    catalog
+  }
+}
+
+impl Serialize for SourceCatalog {
+  fn serialize<S : Serializer> (
+    &self,
+    serializer : S,
+  ) -> Result<S::Ok, S::Error> {
+    self . entries . serialize (serializer) }
 }
 
 /// The TOML shape of a '[[sources]]' entry: 'name' is optional,
@@ -180,19 +374,7 @@ pub struct SkgConfig {
   pub data_root      : PathBuf, // Directory containing skgconfig.toml. Other relative paths (tantivy_folder, source paths) are resolved against this at load time.
 
   #[serde ( deserialize_with = "deserialize_sources" )]
-  pub sources        : HashMap<SourceName, SkgfileSource>,
-
-  // The source names in TOML declaration order ('sources' is a HashMap,
-  // which loses it). Filled at parse time by the config loaders; empty
-  // for dummy/test configs, where the config-order helpers fall back to
-  // alphabetical. LOAD-BEARING: declaration order is the privacy order
-  // (most public first); the fold, the edge-source defaults, the
-  // validators, and prefix source-sets all read it, through the
-  // comparison chokepoint methods below ('ordered_sources',
-  // 'source_position', 'is_strictly_more_public', 'more_private_of',
-  // 'prefix_through'). No other code may compare source positions.
-  #[serde (skip)]
-  pub source_order   : Vec<SourceName>,
+  pub sources        : SourceCatalog,
 
   #[serde(default = "default_source_set_name")]
   pub default_source_set : SourceSetName,
@@ -279,23 +461,22 @@ pub struct TantivyIndex {
 
 fn deserialize_sources<'de, D> (
   deserializer : D
-) -> Result <HashMap<SourceName, SkgfileSource>, D::Error>
+) -> Result <SourceCatalog, D::Error>
 where
   D : Deserializer<'de>
 {
   let sources_vec : Vec<SkgfileSourceToml> =
     Vec::deserialize (deserializer) ?;
-  let mut map : HashMap<SourceName, SkgfileSource> =
-    HashMap::new ();
+  let mut catalog : SourceCatalog = SourceCatalog::default ();
   for raw in sources_vec {
     let source : SkgfileSource =
       SkgfileSource::from (raw);
-    if map . insert (
+    if catalog . insert (
          source . name . clone (),
          source . clone () ) . is_some () {
       return Err (serde::de::Error::custom (
         format! ("Duplicate source name '{}'", source . name))); }}
-  Ok (map)
+  Ok (catalog)
 }
 
 fn default_source_set_name () -> SourceSetName {
@@ -453,8 +634,7 @@ impl SkgConfig {
     SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
-      sources,
-      source_order       : Vec::new (),
+      sources            : sources . into (),
       default_source_set : SourceSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
       db_name            : "unused" . to_string(),
@@ -477,8 +657,7 @@ impl SkgConfig {
     SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
-      sources,
-      source_order       : Vec::new (),
+      sources            : sources . into (),
       default_source_set : SourceSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
       db_name            : db_name . to_string(),
@@ -532,20 +711,12 @@ impl SkgConfig {
 
   /// THE COMPARISON CHOKEPOINT, with the methods below it. Every
   /// source name, in privacy order: most public first, most private
-  /// last (TOML declaration order). Falls back to alphabetical when
-  /// declaration order is unavailable (a dummy/test config, whose
-  /// 'source_order' is empty), so the result is always deterministic.
+  /// last (TOML declaration order).
   /// No code outside these methods may compare source positions.
   pub fn ordered_sources (
     &self,
   ) -> Vec<SourceName> {
-    if self . source_order . is_empty () {
-      // No declaration order recorded: alphabetical, for determinism.
-      let mut names : Vec<SourceName> =
-        self . sources . keys () . cloned () . collect ();
-      names . sort ();
-      names
-    } else { self . source_order . clone () }}
+    self . sources . ordered_names () }
 
   /// Position in the privacy order: 0 = most public.
   /// None for a source absent from the config.
@@ -553,8 +724,7 @@ impl SkgConfig {
     &self,
     source : &SourceName,
   ) -> Option<usize> {
-    self . ordered_sources () . iter ()
-      . position ( |s| s == source ) }
+    self . sources . position (source) }
 
   /// True iff 'a' is STRICTLY more public than 'b' (earlier in the
   /// privacy order). A source absent from the config counts as

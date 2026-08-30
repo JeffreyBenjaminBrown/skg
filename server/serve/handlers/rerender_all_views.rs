@@ -280,7 +280,7 @@ fn sources_not_tracked_in_git (
   config : &SkgConfig,
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();
-  for (source_name, source_config) in &config . sources {
+  for (source_name, source_config) in config . sources . iter () {
     let source_path : &std::path::Path =
       std::path::Path::new ( &source_config . path );
     match open_repo (source_path) {

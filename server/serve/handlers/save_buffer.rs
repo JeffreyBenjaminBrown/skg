@@ -614,7 +614,7 @@ pub fn compute_diff_for_every_source (
 ) -> HashMap<SourceName, SourceDiff> {
   let mut source_diffs : HashMap<SourceName, SourceDiff> =
     HashMap::new();
-  for (source_name, source_config) in &config . sources {
+  for (source_name, source_config) in config . sources . iter () {
     let source_path : &Path =
       Path::new ( &source_config . path );
     match compute_diff_for_source (source_path) {

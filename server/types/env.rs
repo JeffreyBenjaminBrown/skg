@@ -11,6 +11,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, snapshot_global}
 use crate::dbs::tantivy::title_and_source_by_id;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
+use crate::telescope::invariants::TelescopeViolation;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -22,6 +23,9 @@ pub struct SkgEnv {
   pub in_rust_graph : InRustGraphHandle,
   pub tantivy_index : TantivyIndex,
   pub driver        : Arc<TypeDBDriver>,
+  /// Load-time telescope warnings waiting to be presented during the
+  /// connection handshake. Kept as structured data, not only a log/report.
+  pub startup_warnings : Arc<Vec<(ID, TelescopeViolation)>>,
 }
 
 impl SkgEnv {

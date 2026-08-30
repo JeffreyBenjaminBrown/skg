@@ -50,7 +50,10 @@ pub enum TelescopeViolation {
   /// section. The owned telescope won and these sources were
   /// ignored before folding or id-claim collection.
   IgnoredForeignPidCollision {
+    winning_sources : Vec<SourceName>,
+    winning_paths   : Vec<std::path::PathBuf>,
     ignored_sources : Vec<SourceName>,
+    ignored_paths   : Vec<std::path::PathBuf>,
   },
   /// Anything the FOLD noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
@@ -76,7 +79,7 @@ impl fmt::Display for TelescopeViolation {
           "{} member '{}' carries source '{}', which is not configured",
           relation, member, source ),
       TelescopeViolation::IgnoredForeignPidCollision {
-        ignored_sources } =>
+        ignored_sources, .. } =>
         write! ( f,
           "non-owned source(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
           ignored_sources . iter ()

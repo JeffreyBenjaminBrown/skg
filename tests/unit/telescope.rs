@@ -37,7 +37,7 @@ fn telescope_config () -> SkgConfig {
       } ))
     . collect ();
   let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
-  config . source_order = source_universe ();
+  config . sources . set_order (source_universe ());
   config }
 
 fn unfold_sections (

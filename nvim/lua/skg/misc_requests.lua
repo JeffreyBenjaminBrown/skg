@@ -5,9 +5,11 @@
 -- elisp/skg-request-strip-body-whitespace.el.
 
 local client = require('skg.client')
+local config = require('skg.config')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
+local messages = require('skg.messages')
 
 local M = {}
 
@@ -16,6 +18,9 @@ local M = {}
 function M.connection_verify ()
   state.register_response_handler('verify-connection',
     function (_payload, response)
+      config.install_source_inventory(
+        payload.field(response, 'source-inventory'))
+      M.show_handshake_telescope_warnings(response)
       local content = payload.field(response, 'content')
       local message = 'connected'
       if content ~= nil and not sexpr.is_nil(content) then
@@ -25,6 +30,38 @@ function M.connection_verify ()
     end, true)
   state.lp_reset()
   client.send_string('((request . "verify connection"))\n')
+end
+
+---Show structured initialization/reconnect warnings persistently.
+---@param response any
+function M.show_handshake_telescope_warnings (response)
+  local warnings = payload.field(response, 'telescope-warnings')
+  if warnings == nil or not sexpr.is_list(warnings) or #warnings == 0 then
+    return end
+  local lines = { '* WARNING: Telescope load warnings' }
+  for _, warning in ipairs(warnings) do
+    table.insert(lines, '** ' ..
+      (payload.field_text(warning, 'pid') or '[unknown pid]'))
+    table.insert(lines,
+      payload.field_text(warning, 'message') or 'Unspecified warning')
+    local winners = payload.string_list(
+      payload.field(warning, 'winning-paths'))
+    if #winners > 0 then
+      table.insert(lines, '*** retained owned files')
+      for _, path in ipairs(winners) do
+        table.insert(lines, '**** ' .. path) end end
+    local losers = payload.string_list(
+      payload.field(warning, 'ignored-paths'))
+    if #losers > 0 then
+      table.insert(lines, '*** ignored foreign files')
+      for _, path in ipairs(losers) do
+        table.insert(lines, '**** ' .. path) end end
+  end
+  messages.big_nonfatal_message(
+    'skg://messages/telescope-warnings',
+    string.format('WARNING: Skg loaded with %d telescope warning(s).',
+                  #warnings),
+    table.concat(lines, '\n'))
 end
 
 ---Wipe and rebuild TypeDB and Tantivy from the .skg files on disk.

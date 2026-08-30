@@ -80,7 +80,7 @@ fn detect_moves (
 ) -> Result<Vec<NodeMove>, String> {
   let mut sights : BTreeMap<ID, HashMap<SourceName, SourceSight>> =
     BTreeMap::new (); // BTreeMap: deterministic output order.
-  for (source_name, source) in &config . sources {
+  for (source_name, source) in config . sources . iter () {
     for (id, sight) in
       sights_in_source (source)
       . map_err ( |e| format! (

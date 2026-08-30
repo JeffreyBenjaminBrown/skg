@@ -28,10 +28,10 @@ fn config_at (
   let mut config : SkgConfig =
     SkgConfig::dummyFromSources (sources);
   config . data_root = data_root . to_path_buf ();
-  config . source_order =
+  config . sources . set_order (
     entries . iter ()
     . map ( |(name, _, _)| SourceName::from (*name) )
-    . collect ();
+    . collect ());
   config }
 
 #[test]

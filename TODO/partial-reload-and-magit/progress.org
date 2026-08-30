@@ -5,6 +5,49 @@ as-is; deviations in *how* goals are met are recorded here. Categories:
 what's done and went well; changes to the plan's envisioned order;
 what's imperfect about what's done; choices determining the future.
 
+* execution of '5_plan.org'
+** integration and baseline
+- Rewrote '5_plan.org' as a unitary declaration and committed it as
+  'd78cfdf1'.
+- Merged main through '971e17b5' as '311a5c36'.  The only textual conflict,
+  in 'server/save.rs', was resolved by retaining both the reload no-write
+  seam and main's hoist-approval boundary.
+- Focused Rust reload/scalar/telescope suites, all 308 Emacs tests and the
+  Neovim suite passed after the merge.  The two TypeDB-backed reload parity
+  tests passed once the standard development servers were running.
+
+** authoritative source inventory and pre-parse selection (in progress)
+- Replaced the independently mutable source 'HashMap' and 'source_order'
+  with 'SourceCatalog': one ordered lookup catalog which retains each raw
+  configured path and resolved physical-directory identity.  Mixed named
+  and unnamed sources now retain declaration/privacy order.
+- Config load now creates owned directories, validates foreign directories,
+  canonicalizes source identity and rejects two entries which alias the same
+  physical directory, naming both entries in the error.
+- Added one exact direct-child classifier.  Reload no longer treats an
+  arbitrary descendant or a path-prefix sibling as a source file.
+- Added the shared path-selection boundary in 'source_files.rs'.  Bulk load
+  and one-pid load now choose owned same-filename candidates before reading
+  YAML, so a malformed ignored foreign collision is opaque.  The warning
+  carries winner and loser paths internally, while the existing aggregate
+  telescope report still receives its source-level form.
+- Diff snapshot enumeration now ignores nested '.skg' files and applies the
+  same path selection before parsing full HEAD, index and worktree snapshots.
+  Focused source, reload-path, malformed-collision and 28 diff-analysis tests
+  pass.
+- The connection handshake now carries the server's ordered, normalized source
+  inventory.  Emacs and Neovim cache that inventory and use it in preference to
+  reparsing TOML; their TOML fallback also handles unnamed sources correctly.
+- Ignored owned/foreign collisions survive initialization and rebuild as
+  structured telescope warnings.  The handshake makes them prominent and
+  persistent in a dedicated Emacs or Neovim warning buffer, including the
+  winning and ignored paths.
+- Validation after this slice: all 176 Rust library tests under nextest, all
+  312 Emacs tests, and the complete Neovim suite pass; 'git diff --check' is
+  clean.  (The four source/privacy tests which race through shared global graph
+  state when run in one process pass under the repository's required nextest
+  process isolation.)
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

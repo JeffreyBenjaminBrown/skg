@@ -75,7 +75,8 @@
            (process-live-p skg-rust-tcp-proc ))
     (setq skg--git-diff-mode-enabled
           ;; The server starts each connection with diff mode off.
-          nil)
+          nil
+          skg--server-source-inventory nil)
     (condition-case err
         (setq skg-rust-tcp-proc
               (make-network-process

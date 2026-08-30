@@ -23,7 +23,7 @@ pub async fn create_all_sources (
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Write ) . await ?;
-  for (source_name, source) in &config . sources {
+  for (source_name, source) in config . sources . iter () {
     tx . query ( format! (
       r#"insert $src isa source,
                     has source_name "{}",

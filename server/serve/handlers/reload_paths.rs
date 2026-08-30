@@ -32,7 +32,7 @@ use futures::executor::block_on;
 use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// What a single touched telescope resolves to when re-read from disk.
 pub enum TelescopeReloadOutcome {
@@ -180,14 +180,10 @@ pub fn classify_touched_telescopes (
   config : &SkgConfig,
   paths  : &[PathBuf],
 ) -> Vec<TouchedTelescope> {
-  let sources : Vec<(SourceName, PathBuf)> =
-    config . sources . iter ()
-    . map ( |(name, src)| ( name . clone (), src . path . clone () ) )
-    . collect ();
   let mut seen : HashSet<ID> = HashSet::new ();
   let mut unique : Vec<(ID, SourceName, PathBuf)> = Vec::new ();
   for path in paths {
-    match resolve_path_to_source_pid (&sources, path) {
+    match config . sources . source_and_pid_for_direct_path (path) {
       Some ((source, pid)) => {
         if seen . insert ( pid . clone () ) {
           unique . push (( pid, source, path . clone () )); } }
@@ -207,25 +203,6 @@ pub fn classify_touched_telescopes (
     TouchedTelescope { pid, source, path, outcome } } )
     . collect () }
 
-/// Which configured source contains `path`, and the telescope pid (=
-/// file stem) of the `.skg` file there. `None` if `path` is not a
-/// `.skg` file inside any source. Split from the config so it can be
-/// unit-tested without building an `SkgConfig`.
-fn resolve_path_to_source_pid (
-  sources : &[(SourceName, PathBuf)],
-  path    : &Path,
-) -> Option<(SourceName, ID)> {
-  if path . extension () . and_then ( |e| e . to_str () )
-     != Some ("skg") {
-    return None; }
-  let stem : &str =
-    path . file_stem () . and_then ( |s| s . to_str () ) ?;
-  for (name, dir) in sources {
-    if path . starts_with (dir) {
-      return Some (( name . clone (),
-                     ID ( stem . to_string () ) )); } }
-  None }
-
 fn send_reload_error (
   stream : &mut TcpStream,
   msg    : &str,
@@ -238,34 +215,58 @@ fn send_reload_error (
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::types::misc::{SkgfileSource, SourceCatalog};
+  use std::path::Path;
 
-  fn src (name : &str, dir : &str) -> (SourceName, PathBuf) {
-    ( SourceName::from (name), PathBuf::from (dir) ) }
+  fn sources (entries : &[(&str, &str)]) -> SourceCatalog {
+    let mut catalog : SourceCatalog = SourceCatalog::default ();
+    for (name, dir) in entries {
+      catalog . insert (
+        SourceName::from (*name),
+        SkgfileSource {
+          name         : SourceName::from (*name),
+          abbreviation : None,
+          path         : PathBuf::from (dir),
+          user_owns_it : true, }); }
+    catalog
+  }
 
   #[test]
   fn resolves_path_in_a_source_to_its_stem_and_source () {
-    let sources = vec! [
-      src ("public", "/data/public"),
-      src ("private", "/data/private"), ];
+    let sources = sources (&[
+      ("public", "/data/public"),
+      ("private", "/data/private"), ]);
     assert_eq! (
-      resolve_path_to_source_pid (
-        &sources, Path::new ("/data/private/abc123.skg") ),
+      sources . source_and_pid_for_direct_path (
+        Path::new ("/data/private/abc123.skg") ),
       Some (( SourceName::from ("private"),
               ID ("abc123" . to_string ()) )) ); }
 
   #[test]
   fn non_skg_files_do_not_resolve () {
-    let sources = vec! [ src ("public", "/data/public") ];
+    let sources = sources (&[("public", "/data/public")]);
     assert_eq! (
-      resolve_path_to_source_pid (
-        &sources, Path::new ("/data/public/notes.org") ),
+      sources . source_and_pid_for_direct_path (
+        Path::new ("/data/public/notes.org") ),
       None ); }
 
   #[test]
   fn paths_outside_every_source_do_not_resolve () {
-    let sources = vec! [ src ("public", "/data/public") ];
+    let sources = sources (&[("public", "/data/public")]);
     assert_eq! (
-      resolve_path_to_source_pid (
-        &sources, Path::new ("/elsewhere/abc.skg") ),
+      sources . source_and_pid_for_direct_path (
+        Path::new ("/elsewhere/abc.skg") ),
+      None ); }
+
+  #[test]
+  fn nested_files_and_prefix_siblings_do_not_resolve () {
+    let sources = sources (&[("public", "/data/public")]);
+    assert_eq! (
+      sources . source_and_pid_for_direct_path (
+        Path::new ("/data/public/nested/abc.skg") ),
+      None );
+    assert_eq! (
+      sources . source_and_pid_for_direct_path (
+        Path::new ("/data/publicity/abc.skg") ),
       None ); }
 }

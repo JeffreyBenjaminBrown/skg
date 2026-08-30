@@ -1,13 +1,12 @@
 // cargo nextest run --test grouped_unit -E 'test(source_path_validation::)'
 
-use std::collections::HashMap;
 use std::fs;
 use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
 use skg::dbs::filesystem::not_nodes::validate_source_paths_creating_owned_ones_if_needed;
-use skg::types::misc::{SkgfileSource, SourceName};
+use skg::types::misc::{SkgfileSource, SourceCatalog, SourceName};
 
 #[test]
 fn test_validate_existing_owned_source() {
@@ -15,8 +14,7 @@ fn test_validate_existing_owned_source() {
   let dir : TempDir = tempdir() . unwrap();
   let source_path : PathBuf = dir . path() . to_path_buf();
 
-  let mut sources : HashMap<SourceName, SkgfileSource> =
-    HashMap::new();
+  let mut sources : SourceCatalog = SourceCatalog::default ();
   sources . insert(
     SourceName::from ("main"),
     SkgfileSource {
@@ -41,8 +39,7 @@ fn test_validate_nonexistent_owned_source() {
   let source_path : PathBuf =
     temp_dir . path() . join ("nonexistent_source");
 
-  let mut sources : HashMap<SourceName, SkgfileSource> =
-    HashMap::new();
+  let mut sources : SourceCatalog = SourceCatalog::default ();
   sources . insert(
     SourceName::from ("main"),
     SkgfileSource {
@@ -66,8 +63,7 @@ fn test_validate_existing_foreign_source() {
   let dir : TempDir = tempdir() . unwrap();
   let source_path : PathBuf = dir . path() . to_path_buf();
 
-  let mut sources : HashMap<SourceName, SkgfileSource> =
-    HashMap::new();
+  let mut sources : SourceCatalog = SourceCatalog::default ();
   sources . insert(
     SourceName::from ("foreign"),
     SkgfileSource {
@@ -91,8 +87,7 @@ fn test_validate_nonexistent_foreign_source() {
   let source_path : PathBuf =
     temp_dir . path() . join ("nonexistent_foreign");
 
-  let mut sources : HashMap<SourceName, SkgfileSource> =
-    HashMap::new();
+  let mut sources : SourceCatalog = SourceCatalog::default ();
   sources . insert(
     SourceName::from ("foreign"),
     SkgfileSource {
@@ -125,8 +120,7 @@ fn test_validate_multiple_sources() {
   // Path that doesn't exist yet (will be created)
   let new_owned_path : PathBuf = temp_dir . path() . join ("new_owned");
 
-  let mut sources : HashMap<SourceName, SkgfileSource> =
-    HashMap::new();
+  let mut sources : SourceCatalog = SourceCatalog::default ();
   sources . insert(
     SourceName::from ("existing"),
     SkgfileSource {
@@ -166,8 +160,7 @@ fn test_validate_multiple_sources_with_foreign_failure() {
   let nonexistent_foreign : PathBuf =
     temp_dir . path() . join ("nonexistent_foreign");
 
-  let mut sources : HashMap<SourceName, SkgfileSource> =
-    HashMap::new();
+  let mut sources : SourceCatalog = SourceCatalog::default ();
   sources . insert(
     SourceName::from ("existing"),
     SkgfileSource {

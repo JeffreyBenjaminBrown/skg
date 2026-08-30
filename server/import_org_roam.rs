@@ -164,14 +164,13 @@ fn write_nodecomplete_to_dir (
     // section. A one-source config lets the importer use the same
     // checked boundary as the ordinary filesystem writer.
     let source_name : SourceName = node . source . clone ();
-    let mut config : SkgConfig = SkgConfig::dummyFromSources (
+    let config : SkgConfig = SkgConfig::dummyFromSources (
       [ ( source_name . clone (), SkgfileSource {
             name         : source_name . clone (),
             abbreviation : None,
             path         : output_dir . to_path_buf (),
             user_owns_it : true, } ) ]
       . into_iter () . collect () );
-    config . source_order = vec! [source_name];
     let unfolded : UnfoldedTelescope =
       unfold_node (
         & UnfoldInput {

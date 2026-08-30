@@ -409,8 +409,9 @@ mod relationship_default_tests {
             path         : PathBuf::from (name),
             user_owns_it : owned, } ); }
       SkgConfig::dummyFromSources (sources) };
-    config . source_order = ["public", "foreign", "private"]
-      . into_iter () . map (SourceName::from) . collect ();
+    config . sources . set_order (
+      ["public", "foreign", "private"]
+      . into_iter () . map (SourceName::from) . collect ());
 
     let mut owner : NodeComplete = empty_node_complete ();
     owner . pid = ID::new ("owner");
