@@ -39,11 +39,13 @@ use crate::dbs::tantivy::background_writer::{
   wait_for_tantivy_generation,
 };
 use crate::serve::ViewsState;
+use crate::serve::handlers::reload_batch::reload_batch_active;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix,
   tag_terminal_sexp_response,
   tag_terminal_text_response,
+  value_from_request_sexp,
 };
 use crate::source_sets::ActiveSourceSet;
 use crate::update_buffer::rerender_views_after_reload;
@@ -60,6 +62,7 @@ use crate::telescope::types::Telescope;
 
 use futures::executor::block_on;
 use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::net::TcpStream;
@@ -128,11 +131,38 @@ pub fn handle_reload_paths_request (
   let requested_ids : Vec<ID> = match optional_string_list (&parsed, "ids") {
     Ok (values) => values . into_iter () . map (ID::from) . collect (),
     Err (error) => { send_reload_error (stream, &error); return; }};
-  if path_strings . is_empty () && requested_ids . is_empty () {
+  let full_sweep = value_from_request_sexp ("full-sweep", request)
+    . map (|value| value == "true") . unwrap_or (false);
+  if path_strings . is_empty () && requested_ids . is_empty () && !full_sweep {
     send_reload_error (stream, "reload paths: no paths or IDs were supplied");
     return; }
-  let paths : Vec<PathBuf> =
+  if reload_batch_active () {
+    let payload = Sexp::List (vec![
+      Sexp::List (vec![
+        Sexp::Atom (Atom::S ("content" . into ())),
+        Sexp::Atom (Atom::S (
+          "Reload deferred while an external reload batch is active" . into ())),
+      ]),
+      Sexp::List (vec![
+        Sexp::Atom (Atom::S ("deferred" . into ())),
+        Sexp::Atom (Atom::S ("true" . into ())),
+      ]),
+    ]) . to_string ();
+    send_response_with_length_prefix (
+      stream, &tag_terminal_sexp_response (
+        TcpToClient::ReloadPaths, "complete", &payload));
+    return; }
+  let mut paths : Vec<PathBuf> =
     path_strings . into_iter () . map (PathBuf::from) . collect ();
+  if full_sweep {
+    match changed_paths_since_selected (env) {
+      Ok (changed) => paths . extend (changed),
+      Err (error) => {
+        send_reload_error (stream, &format! (
+          "reload full sweep failed: {}", error));
+        return; }} }
+  paths . sort ();
+  paths . dedup ();
   let mut touched : Vec<TouchedTelescope> =
     classify_touched_telescopes (&env . config, &paths);
   let mut seen : HashSet<ID> = touched . iter ()
@@ -361,6 +391,22 @@ fn optional_string_list (sexp : &Sexp, key : &str) -> Result<Vec<String>, String
     _ => false, };
   if present { extract_string_list_from_sexp (sexp, key) }
   else { Ok (Vec::new ()) }
+}
+
+fn changed_paths_since_selected (env : &SkgEnv) -> io::Result<Vec<PathBuf>> {
+  let selected = env . in_rust_graph . load_full ();
+  let actual = selected_path_digest_manifest (&env . config)?;
+  Ok (changed_manifest_paths (&selected . manifest, &actual))
+}
+
+fn changed_manifest_paths (
+  selected : &SelectedPathManifest,
+  actual   : &SelectedPathManifest,
+) -> Vec<PathBuf> {
+  let paths : BTreeSet<PathBuf> = selected . keys () . cloned ()
+    . chain (actual . keys () . cloned ()) . collect ();
+  paths . into_iter () . filter (|path|
+    selected . get (path) != actual . get (path)) . collect ()
 }
 
 fn possible_paths (config : &SkgConfig, pid : &ID) -> Vec<PathBuf> {
@@ -613,4 +659,24 @@ mod tests {
     assert! (payload . contains ("/data/public/primary.skg"));
     assert! (payload . contains ("(status rejected)"));
     assert! (payload . contains ("(reason \"not found\")")); }
+
+  #[test]
+  fn manifest_comparison_uses_digest_and_explicit_absence () {
+    let unchanged = PathBuf::from ("/s/unchanged.skg");
+    let rewritten = PathBuf::from ("/s/rewritten.skg");
+    let deleted = PathBuf::from ("/s/deleted.skg");
+    let added = PathBuf::from ("/s/added.skg");
+    let old = SelectedPathManifest::from ([
+      (unchanged . clone (), PathDigest::of_bytes (b"same")),
+      (rewritten . clone (), PathDigest::of_bytes (b"aaaa")),
+      (deleted . clone (), PathDigest::of_bytes (b"gone")),
+    ]);
+    let new = SelectedPathManifest::from ([
+      (unchanged, PathDigest::of_bytes (b"same")),
+      // Same byte length, different digest: stamp-only scanning misses this.
+      (rewritten . clone (), PathDigest::of_bytes (b"bbbb")),
+      (added . clone (), PathDigest::of_bytes (b"new")),
+    ]);
+    assert_eq! (changed_manifest_paths (&old, &new),
+                vec![added, deleted, rewritten]); }
 }

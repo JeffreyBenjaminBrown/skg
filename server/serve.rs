@@ -22,6 +22,11 @@ use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
+use crate::serve::handlers::reload_batch::{
+  handle_begin_reload_batch_request,
+  handle_end_reload_batch_request,
+  release_connection_reload_batches,
+};
 use crate::serve::handlers::reload_paths::handle_reload_paths_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
@@ -60,6 +65,7 @@ use crate::update_buffer::set_viewnodestats_in_viewforest;
 
 use ego_tree::{NodeId, Tree};
 use std::io::{BufRead, BufReader};
+use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::net::TcpStream; // handles two-way communication
@@ -125,6 +131,7 @@ fn handle_emacs (
   let search_cancelled : Arc<AtomicBool> =
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
+  let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -268,6 +275,13 @@ fn handle_emacs (
               &mut env,
               &mut views_state,
               &active_source_set ),
+          Ok (RequestType::BeginReloadBatch) =>
+            handle_begin_reload_batch_request (
+              &mut stream, &mut owned_reload_batch_tokens),
+          Ok (RequestType::EndReloadBatch) =>
+            handle_end_reload_batch_request (
+              &mut stream, &request_header,
+              &mut owned_reload_batch_tokens),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
@@ -301,6 +315,7 @@ fn handle_emacs (
               snapshot_requested = true; }} }}
       Err (_) => break, // real error
     }}
+  release_connection_reload_batches (&mut owned_reload_batch_tokens);
   tracing::info!(peer = %peer, "Emacs disconnected"); }
 
 /// Handle the snapshot that Emacs sent back.

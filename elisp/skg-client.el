@@ -132,6 +132,8 @@ the request record named by its request-id."
           (message "%s" (cdr (assq 'busy-initializing parsed)))
           (skg--end-stream)
           (skg--unlock-all-save-locked)
+          (when (fboundp 'skg-stop-reload-observation)
+            (skg-stop-reload-observation))
           (skg-clear-request-coordinator)
           (skg-lp-reset))
       (skg-lp-handle-generic-chunk tcp-proc string) )) )
@@ -141,6 +143,8 @@ the request record named by its request-id."
   (when (not (string-prefix-p "open" event))
     (skg--end-stream)
     (skg--unlock-all-save-locked)
+    (when (fboundp 'skg-stop-reload-observation)
+      (skg-stop-reload-observation))
     (skg-clear-request-coordinator)
     (skg-lp-reset)) )
 

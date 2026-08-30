@@ -17,15 +17,18 @@
 (require 'skg-config)
 (require 'skg-id-search)
 (require 'skg-request-save) ; for skg--collateral-view-handler
+(require 'filenotify)
 
-;;; ---- change detection ----------------------------------------------
+;;; ---- change observation -------------------------------------------
 
-(defvar skg--reload-file-snapshot (make-hash-table :test 'equal)
-  "Maps each known .skg worktree path to (MTIME . SIZE) as last seen.")
-
-(defvar skg--reload-initialized nil
-  "Non-nil once the snapshot has been baselined at least once, so the
-first magit refresh does not treat every file as new.")
+(defvar skg--reload-observation-paths (make-hash-table :test 'equal)
+  "Candidate paths mapped to their newest client observation sequence.")
+(defvar skg--reload-observation-sequence 0)
+(defvar skg--reload-observation-incident-id nil)
+(defvar skg--reload-observation-timer nil)
+(defvar skg--reload-observation-in-flight nil)
+(defvar skg--reload-observation-full-sweep nil)
+(defvar skg--reload-watch-descriptors nil)
 
 (defun skg--reload-all-skg-files ()
   "List regular direct .skg children of the configured sources."
@@ -39,56 +42,139 @@ first magit refresh does not treat every file as new.")
               (push path files))))))
     (nreverse files)))
 
-(defun skg--reload-file-stamp (path)
-  "Return (MTIME . SIZE) for PATH, or nil if it cannot be stat'd."
-  (let ((attrs (file-attributes path)))
-    (when attrs
-      (cons (file-attribute-modification-time attrs)
-            (file-attribute-size attrs)))))
+(defun skg--reload-direct-source-path-p (path)
+  "Whether PATH names a possible direct .skg source child."
+  (and (stringp path)
+       (string-match-p "\\.skg\\'" path)
+       (cl-some
+        (lambda (source)
+          (equal (file-name-as-directory
+                  (expand-file-name (file-name-directory path)))
+                 (file-name-as-directory (expand-file-name (cdr source)))))
+        (skg--source-paths))))
 
-(defun skg--reload-refresh-snapshot ()
-  "Reset the snapshot to the current on-disk state (a fresh baseline)."
-  (clrhash skg--reload-file-snapshot)
-  (dolist (path (skg--reload-all-skg-files))
-    (let ((stamp (skg--reload-file-stamp path)))
-      (when stamp
-        (puthash path stamp skg--reload-file-snapshot))))
-  (setq skg--reload-initialized t))
+(defun skg--enqueue-reload-candidate (path)
+  "Retain PATH as a candidate; do not stat, read or hash it here."
+  (when (skg--reload-direct-source-path-p path)
+    (puthash (expand-file-name path)
+             (cl-incf skg--reload-observation-sequence)
+             skg--reload-observation-paths)
+    (unless skg--reload-observation-incident-id
+      (setq skg--reload-observation-incident-id
+            (skg-fresh-incident-id)))
+    (skg--schedule-reload-observation 0.35)))
 
-(defun skg--reload-scan-changed ()
-  "Return the .skg paths that changed since the last scan (new,
-modified, or deleted), and update the snapshot to the current state."
-  (let ((current (make-hash-table :test 'equal))
-        (changed '()))
-    (dolist (path (skg--reload-all-skg-files)) ; new or modified
-      (let ((stamp (skg--reload-file-stamp path)))
-        (when stamp
-          (puthash path stamp current)
-          (unless (equal (gethash path skg--reload-file-snapshot) stamp)
-            (push path changed)))))
-    (maphash ; vanished: in the snapshot, gone now
-     (lambda (path _stamp)
-       (unless (gethash path current)
-         (push path changed)))
-     skg--reload-file-snapshot)
-    (setq skg--reload-file-snapshot current)
-    (setq skg--reload-initialized t)
-    (nreverse changed)))
+(defun skg--request-reload-full-sweep ()
+  "Ask the next observation request to compare the complete manifest."
+  (setq skg--reload-observation-full-sweep t)
+  (unless skg--reload-observation-incident-id
+    (setq skg--reload-observation-incident-id
+          (skg-fresh-incident-id)))
+  (skg--schedule-reload-observation 0))
+
+(defun skg--schedule-reload-observation (delay)
+  (when (timerp skg--reload-observation-timer)
+    (cancel-timer skg--reload-observation-timer))
+  (setq skg--reload-observation-timer
+        (run-at-time delay nil #'skg--dispatch-reload-observation)))
+
+(defun skg--dispatch-reload-observation ()
+  "Dispatch the newest coalesced candidates when no predecessor is active."
+  (setq skg--reload-observation-timer nil)
+  (unless skg--reload-observation-in-flight
+    (let ((snapshot nil)
+          (full-sweep skg--reload-observation-full-sweep)
+          (incident skg--reload-observation-incident-id))
+      (maphash (lambda (path sequence)
+                 (push (cons path sequence) snapshot))
+               skg--reload-observation-paths)
+      (when (or snapshot full-sweep)
+        (setq skg--reload-observation-in-flight t)
+        (condition-case err
+            (skg-reload-paths
+             (mapcar #'car snapshot) nil incident
+             (lambda (response)
+               (skg--finish-reload-observation
+                snapshot full-sweep incident response))
+             full-sweep)
+          (error
+           (setq skg--reload-observation-in-flight nil)
+           (skg-log 'error 'reload "observation dispatch failed: %S" err)))))))
+
+(defun skg--finish-reload-observation
+    (snapshot full-sweep incident response)
+  "Retire exactly SNAPSHOT after RESPONSE, or retain it when deferred."
+  (setq skg--reload-observation-in-flight nil)
+  (let ((deferred (cadr (assoc 'deferred response)))
+        (status (cadr (assoc 'terminal-status response))))
+    (cond
+     (deferred
+      ;; Keep the same incident and newest per-path observations.  A control
+      ;; connection may bracket a slow serial pull for minutes.
+      (setq skg--reload-observation-incident-id incident)
+      (skg--schedule-reload-observation 1.0))
+     ((eq status 'failed)
+      ;; Stable invalid bytes do not spin.  A new filesystem event or explicit
+      ;; sweep retries them; the retained candidates preserve their incident.
+      nil)
+     (t
+      (dolist (entry snapshot)
+        (when (equal (gethash (car entry) skg--reload-observation-paths)
+                     (cdr entry))
+          (remhash (car entry) skg--reload-observation-paths)))
+      (when full-sweep (setq skg--reload-observation-full-sweep nil))
+      (if (and (= (hash-table-count skg--reload-observation-paths) 0)
+               (not skg--reload-observation-full-sweep))
+          (setq skg--reload-observation-incident-id nil)
+        (setq skg--reload-observation-incident-id
+              (skg-fresh-incident-id))
+        (skg--schedule-reload-observation 0))))))
+
+(defun skg--reload-file-notify-callback (event)
+  "Turn one file-notify EVENT into path candidates only."
+  (condition-case err
+      (pcase (cadr event)
+        ((or 'created 'changed 'attribute-changed 'deleted)
+         (skg--enqueue-reload-candidate (caddr event)))
+        ('renamed
+         (skg--enqueue-reload-candidate (caddr event))
+         (skg--enqueue-reload-candidate (cadddr event)))
+        ((or 'stopped 'watcher-stopped)
+         (skg--request-reload-full-sweep)))
+    (error (skg-log 'error 'reload "file notification failed: %S" err))))
+
+(defun skg-stop-reload-observation ()
+  (dolist (descriptor skg--reload-watch-descriptors)
+    (ignore-errors (file-notify-rm-watch descriptor)))
+  (setq skg--reload-watch-descriptors nil))
+
+(defun skg-start-reload-observation ()
+  "Install one nonrecursive watch per authoritative source directory."
+  (skg-stop-reload-observation)
+  (dolist (source (skg--source-paths))
+    (when (file-directory-p (cdr source))
+      (push (file-notify-add-watch
+             (cdr source) '(change attribute-change)
+             #'skg--reload-file-notify-callback)
+            skg--reload-watch-descriptors)))
+  (skg--request-reload-full-sweep))
 
 ;;; ---- the request ---------------------------------------------------
 
-(defun skg-reload-paths (paths &optional ids incident-id terminal-callback)
+(defun skg-reload-paths
+    (paths &optional ids incident-id terminal-callback full-sweep)
   "Ask the server to reload the telescopes owning PATHS or IDS.
 PATHS are absolute .skg paths.  IDS may contain primary or extra IDs.
 INCIDENT-ID identifies retries of one reconciliation episode.  Invoke
 TERMINAL-CALLBACK with the parsed terminal response, when non-nil."
-  (when (or paths ids)
+  (when (or paths ids full-sweep)
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (request-sexp
             (concat (prin1-to-string
                      `((request . "reload paths")
                        (paths ,@paths)
-                       (ids ,@ids)))
+                       (ids ,@ids)
+                       (full-sweep . ,(if full-sweep "true" "false"))))
                     "\n"))
            (incident-id (or incident-id (skg-fresh-incident-id))))
       (skg-register-response-handler ; refresh any open touched buffers
@@ -181,20 +267,28 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
        (equal (org-get-todo-state) "TO-RELOAD")))
    skg--reload-selection-entries))
 
-(defun skg--submit-reload-selection ()
+(defun skg--submit-reload-selection (&optional incident-id)
   "Submit marked IDs in the transient ID-stack selector."
   (interactive)
   (let* ((selection-buffer (current-buffer))
          (marked (skg--marked-reload-selection-entries))
-         (ids (delete-dups (mapcar #'cdr marked))))
+         (ids (delete-dups (mapcar #'cdr marked)))
+         (incident-id (or incident-id (skg-fresh-incident-id))))
     (if (null ids)
         (message "skg: no ID-stack nodes are marked TO-RELOAD")
       (skg-reload-paths
-       nil ids (skg-fresh-incident-id)
+       nil ids incident-id
        (lambda (response)
          (when (buffer-live-p selection-buffer)
            (with-current-buffer selection-buffer
-             (skg--apply-reload-selection-result response))))))))
+             (if (cadr (assoc 'deferred response))
+                 (run-at-time
+                  1.0 nil
+                  (lambda ()
+                    (when (buffer-live-p selection-buffer)
+                      (with-current-buffer selection-buffer
+                        (skg--submit-reload-selection incident-id)))))
+               (skg--apply-reload-selection-result response)))))))))
 
 (defun skg--apply-reload-selection-result (response)
   "Apply RESPONSE's per-ID outcomes to the current selector."
@@ -224,46 +318,28 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
 ;;; ---- triggers ------------------------------------------------------
 
 (defun skg--reload-on-magit-refresh ()
-  "magit-post-refresh-hook: reload whatever .skg worktree files changed.
-The first refresh only baselines the snapshot, so nothing is reloaded
-en masse at startup. Errors are logged, never signalled, so a bug here
-can never break magit's refresh."
+  "Magit hook: request an authoritative full-manifest comparison."
   (condition-case err
-      (if (not skg--reload-initialized)
-          (skg--reload-refresh-snapshot)
-        (let ((changed (skg--reload-scan-changed)))
-          (when changed (skg-reload-paths changed))))
+      (skg--request-reload-full-sweep)
     (error
-     (skg-log (format "skg reload (magit refresh): %s"
-                      (error-message-string err))))))
+     (skg-log 'error 'reload "magit refresh observation: %s"
+              (error-message-string err)))))
 
 (defun skg--reload-after-skg-save ()
-  "after-save-hook for .skg buffers: reload the just-saved file and keep
-its snapshot entry current so the magit hook won't re-fire on it."
+  "after-save-hook for raw .skg buffers: enqueue the exact saved path."
   (when (and buffer-file-name
              (string-match-p "\\.skg\\'" buffer-file-name))
     (condition-case err
-        (progn
-          (skg-reload-paths (list buffer-file-name))
-          (let ((stamp (skg--reload-file-stamp buffer-file-name)))
-            (when stamp
-              (puthash buffer-file-name stamp
-                       skg--reload-file-snapshot))))
+        (skg--enqueue-reload-candidate buffer-file-name)
       (error
-       (skg-log (format "skg reload (after save): %s"
-                        (error-message-string err)))))))
+       (skg-log 'error 'reload "raw-file save observation: %s"
+                (error-message-string err))))))
 
 (defun skg-reload-changed ()
-  "Scan the .skg source dirs and reload any that changed on disk.
-Covers edits made entirely outside Emacs."
+  "Compare the complete disk manifest and reload exact changed bytes."
   (interactive)
-  (let ((changed (skg--reload-scan-changed)))
-    (if changed
-        (progn
-          (skg-reload-paths changed)
-          (message "skg: reloading %d changed .skg file(s)"
-                   (length changed)))
-      (message "skg: no changed .skg files"))))
+  (skg--request-reload-full-sweep)
+  (message "skg: queued a complete .skg manifest comparison"))
 
 ;; Global hook: fires on every magit refresh regardless of any minor
 ;; mode. Mirrors the top-level find-file-hook registration style.

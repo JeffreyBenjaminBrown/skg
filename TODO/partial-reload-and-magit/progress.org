@@ -130,6 +130,27 @@ what's imperfect about what's done; choices determining the future.
   Validation after this slice: 184/184 serial Rust library tests, all 318
   Emacs tests and the complete Neovim suite pass.
 
+** candidate observation and reload-batch brackets (in progress)
+- Replaced stamp-based discovery with one nonrecursive Emacs file-notify watch
+  per normalized source.  Watch callbacks and raw-file saves enqueue path
+  names only.  A sequence-tagged path map coalesces events, preserves a newer
+  event which lands during an in-flight predecessor and groups the dispatched
+  snapshot under one incident.
+- Connection, watcher-recovery, Magit and manual scans request a server-side
+  full sweep.  It compares exact BLAKE3 selected manifests, including explicit
+  additions and deletions; a test proves a same-size rewrite is detected.
+- Added process-wide, overlapping reload-batch tokens.  A token is owned by
+  the connection which opened it and is released only by its matching end or
+  EOF.  While any token is active, reload returns visible =deferred=true=
+  data and selects no bytes.  Automatic observations retry with the same
+  incident; explicit ID selections retain their marks and retry likewise.
+- =data/bash/pull-all.sh= now keeps a small direct TCP control connection open
+  across its serial pulls and closes the token from its EXIT trap.  Server
+  unavailability remains nonfatal.  A live smoke test opened and closed a
+  token on port 1731 and separately verified the deferred incident response.
+- Validation: =bash -n= is clean, all 186 serial Rust library tests and
+  321 Emacs tests pass, and the complete Neovim suite passes.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

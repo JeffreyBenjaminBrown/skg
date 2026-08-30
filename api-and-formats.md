@@ -593,6 +593,31 @@ So far there are these endpoints:
     C-c C-c submits the marked IDs.  This mode neither changes the canonical
     stack nor permits C-x C-s.  Acknowledged marks clear; rejected marks remain
     with transient reason annotations.
+  - Emacs installs one nonrecursive file-notify watch per normalized source
+    directory.  Watch callbacks and raw-file save hooks enqueue path names
+    only; they never stat, read or hash content.  A short quiet timer submits
+    the newest path observation per path under one incident.  Magit refresh,
+    watcher startup/overflow and `skg-reload-changed` request `full-sweep`,
+    which compares BLAKE3 manifests on the server and therefore detects
+    same-size rewrites even when mtimes are restored.
+  - Requests arriving while a reload-batch bracket is open return
+    `(deferred true)` as data inside a terminal response.  The client retains
+    the candidates and incident ID and retries after the bracket closes;
+    `deferred` never means acknowledged.
+
+## Reload-batch control bracket
+
+  - Begin request: `((request . "begin reload batch") ...)`.
+    Response type `reload-batch` carries an opaque `batch-token` and the
+    process-wide `active-count`.
+  - End request: `((request . "end reload batch")
+    (batch-token . "TOKEN") ...)` on the same connection.  A token belongs to
+    its connection, so overlapping drivers cannot close each other's bracket.
+    EOF releases every token owned by that connection.
+  - `data/bash/pull-all.sh` holds this small control connection around its
+    serial repository loop and sends end from its exit trap.  If Skg is not
+    reachable, pulling still proceeds.  While any token remains active, Skg
+    starts no observed reload.
 
 ## Shutdown server
   - Request: ((request . "shutdown"))

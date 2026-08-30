@@ -65,6 +65,9 @@ calls `(skg-tcp-connect-to-rust)`
                   . ,(cadr (assoc 'typedb-health response)))
                  (tantivy-health
                   . ,(cadr (assoc 'tantivy-health response)))))
+         (when (and (not noninteractive)
+                    (fboundp 'skg-start-reload-observation))
+           (skg-start-reload-observation))
          (skg--show-handshake-telescope-warnings response)
          (message "%s" (or (and content (format "%s" content))
                            "connected"))))

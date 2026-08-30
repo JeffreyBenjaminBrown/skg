@@ -130,4 +130,64 @@ error AND leave the captured table installed."
 (ert-deftest test-skg-reload-selection-refuses-ordinary-save ()
   (should-error (skg--reload-selection-refuse-save) :type 'user-error))
 
+(ert-deftest test-skg-reload-observation-callback-only-enqueues-candidates ()
+  "The notification callback does no content read, stat or hash."
+  (let ((skg--server-source-inventory
+         '((:name "s" :directory "/data/source")))
+        (skg--reload-observation-paths (make-hash-table :test 'equal))
+        (skg--reload-observation-sequence 0)
+        skg--reload-observation-incident-id
+        scheduled)
+    (cl-letf (((symbol-function 'skg--schedule-reload-observation)
+               (lambda (delay) (setq scheduled delay)))
+              ((symbol-function 'file-attributes)
+               (lambda (&rest _) (ert-fail "callback statted a file")))
+              ((symbol-function 'insert-file-contents)
+               (lambda (&rest _) (ert-fail "callback read a file"))))
+      (skg--reload-file-notify-callback
+       '(watch changed "/data/source/node.skg"))
+      (should (= (hash-table-count skg--reload-observation-paths) 1))
+      (should (= scheduled 0.35))
+      (should (string-prefix-p
+               "incident-" skg--reload-observation-incident-id))
+      (skg--reload-file-notify-callback
+       '(watch changed "/data/source/nested/node.skg"))
+      (should (= (hash-table-count skg--reload-observation-paths) 1)))))
+
+(ert-deftest test-skg-reload-observation-deferred-retains_same_incident ()
+  (let ((skg--reload-observation-paths (make-hash-table :test 'equal))
+        (skg--reload-observation-in-flight t)
+        skg--reload-observation-timer
+        skg--reload-observation-incident-id
+        scheduled)
+    (puthash "/s/a.skg" 7 skg--reload-observation-paths)
+    (cl-letf (((symbol-function 'skg--schedule-reload-observation)
+               (lambda (delay) (setq scheduled delay))))
+      (skg--finish-reload-observation
+       '(("/s/a.skg" . 7)) nil "incident-original"
+       '((deferred true) (terminal-status complete)))
+      (should (equal (gethash "/s/a.skg" skg--reload-observation-paths) 7))
+      (should (equal skg--reload-observation-incident-id
+                     "incident-original"))
+      (should (= scheduled 1.0)))))
+
+(ert-deftest test-skg-reload-observation-does-not-erase_a_newer_event ()
+  (let ((skg--reload-observation-paths (make-hash-table :test 'equal))
+        (skg--reload-observation-in-flight t)
+        (skg--reload-observation-full-sweep nil)
+        skg--reload-observation-timer
+        skg--reload-observation-incident-id
+        scheduled)
+    ;; Sequence 7 was sent; sequence 8 arrived while it was in flight.
+    (puthash "/s/a.skg" 8 skg--reload-observation-paths)
+    (cl-letf (((symbol-function 'skg--schedule-reload-observation)
+               (lambda (delay) (setq scheduled delay))))
+      (skg--finish-reload-observation
+       '(("/s/a.skg" . 7)) nil "incident-old"
+       '((terminal-status complete)))
+      (should (equal (gethash "/s/a.skg" skg--reload-observation-paths) 8))
+      (should (string-prefix-p
+               "incident-" skg--reload-observation-incident-id))
+      (should (= scheduled 0)))))
+
 (provide 'test-skg-reload)

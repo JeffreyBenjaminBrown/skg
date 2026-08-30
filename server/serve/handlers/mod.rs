@@ -6,6 +6,7 @@ pub mod get_file_path;
 pub mod herald_rules;
 pub mod rebuild_dbs;
 pub mod reload_paths;
+pub mod reload_batch;
 pub mod rerender_all_views;
 pub mod save_buffer;
 pub mod scalar_release;
