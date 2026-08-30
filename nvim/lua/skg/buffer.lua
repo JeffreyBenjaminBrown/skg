@@ -249,7 +249,7 @@ function M.send_close_view (buf)
     local request = sexpr.to_string({
       sexpr.pair(sexpr.symbol('request'), 'close view'),
       sexpr.pair(sexpr.symbol('view-uri'), uri) }) .. '\n'
-    pcall(function () state.tcp:write(request) end)
+    pcall(function () require('skg.client').submit_request(request) end)
   end
 end
 

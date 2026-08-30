@@ -34,8 +34,7 @@ function M.connection_verify ()
                   or sexpr.atom_text(content) end
       vim.notify(message)
     end, true)
-  state.lp_reset()
-  client.send_string('((request . "verify connection"))\n')
+  client.submit_request('((request . "verify connection"))\n')
 end
 
 ---Show structured initialization/reconnect warnings persistently.
@@ -81,8 +80,7 @@ function M.rebuild_dbs ()
                  .. '\nExisting skg views are now invalid.'
                  .. ' Run :SkgCloseAllSkgBuffers to close them.')
     end, true)
-  state.lp_reset()
-  client.send_string('((request . "rebuild dbs"))\n')
+  client.submit_request('((request . "rebuild dbs"))\n')
 end
 
 ---Strip trailing whitespace from every line of every body, in every
@@ -99,8 +97,7 @@ function M.strip_body_whitespace ()
                  .. " review with 'git diff --ignore-all-space'"
                  .. ' (it should show nothing).')
     end, true)
-  state.lp_reset()
-  client.send_string('((request . "strip body whitespace"))\n')
+  client.submit_request('((request . "strip body whitespace"))\n')
 end
 
 return M

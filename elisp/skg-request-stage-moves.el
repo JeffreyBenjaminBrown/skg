@@ -18,8 +18,7 @@ then run it from the skg data root."
      'stage-moves
      #'skg--stage-moves-handler
      t)
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      "((request . \"stage moves\"))\n")))
 

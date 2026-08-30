@@ -23,7 +23,6 @@ the derived caches are refreshed to match."
                           " review with 'git diff --ignore-all-space'"
                           " (it should show nothing)."))))
      t)
-    (skg-lp-reset)
-    (process-send-string tcp-proc request-sexp)))
+    (skg-submit-request tcp-proc request-sexp)))
 
 (provide 'skg-request-strip-body-whitespace)

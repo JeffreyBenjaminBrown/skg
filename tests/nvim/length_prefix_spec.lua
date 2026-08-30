@@ -7,13 +7,26 @@ local state = require('skg.state')
 
 local function reset_state ()
   state.lp_reset()
-  state.response_handler_map = {}
-  state.lp_pending_count = 0
+  state.clear_request_coordinator()
 end
 
 local function framed (payload)
   return string.format('Content-Length: %d\r\n\r\n%s',
                        #payload, payload)
+end
+
+local function activate_request ()
+  local record = state.take_request_record()
+  state.active_request_id = record.id
+  return record
+end
+
+local function response (record, frame_kind, fields, terminal_status)
+  return string.format(
+    '((response-type %s)%s (request-id %q) (frame-kind %s)%s)',
+    frame_kind, fields or '', record.id, frame_kind,
+    terminal_status
+      and string.format(' (terminal-status %s)', terminal_status) or '')
 end
 
 describe('skg.length_prefix dispatch', function ()
@@ -22,26 +35,29 @@ describe('skg.length_prefix dispatch', function ()
   it('reassembles a split chunk with non-ASCII payload', function ()
     -- The elisp test's exact payload: multibyte content must survive
     -- an arbitrary split point.
-    local payload =
-      '((response-type titles-by-ids)'
-      .. ' (content ((id . "Montoya ñó"))))'
-    local message = framed(payload)
     local seen = nil
     state.register_response_handler('titles-by-ids',
       function (payload_text) seen = payload_text end, false)
+    local record = activate_request()
+    local payload = response(
+      record, 'titles-by-ids', ' (content ((id . "Montoya ñó")))',
+      'complete')
+    local message = framed(payload)
     length_prefix.handle_generic_chunk(message:sub(1, 20))
     length_prefix.handle_generic_chunk(message:sub(21))
     assert.are.equal(payload, seen)
   end)
 
   it('dispatches two messages arriving in one chunk', function ()
-    local first = '((response-type save-lock) (lock-views ()))'
-    local second = '((response-type save-result) (content "x"))'
     local calls = {}
     state.register_response_handler('save-lock',
       function () table.insert(calls, 'lock') end, true)
     state.register_response_handler('save-result',
       function () table.insert(calls, 'result') end, true)
+    local record = activate_request()
+    local first = response(record, 'save-lock', ' (lock-views ())')
+    local second = response(
+      record, 'save-result', ' (content "x")', 'complete')
     length_prefix.handle_generic_chunk(framed(first) .. framed(second))
     assert.are.same({ 'lock', 'result' }, calls)
   end)
@@ -50,10 +66,12 @@ describe('skg.length_prefix dispatch', function ()
      function ()
     state.register_response_handler('verify-connection',
       function () end, true)
+    local record = activate_request()
     assert.are.equal(1, state.lp_pending_count)
     length_prefix.handle_generic_chunk(
-      framed('((response-type verify-connection) (content "ok"))'))
-    assert.is_nil(state.response_handler_map['verify-connection'])
+      framed(response(record, 'verify-connection',
+                      ' (content "ok")', 'complete')))
+    assert.is_nil(state.request_records[record.id])
     assert.are.equal(0, state.lp_pending_count)
   end)
 
@@ -61,21 +79,22 @@ describe('skg.length_prefix dispatch', function ()
     local count = 0
     state.register_response_handler('collateral-view',
       function () count = count + 1 end, false)
-    local message =
-      framed('((response-type collateral-view) (view-uri "u"))')
+    local record = activate_request()
+    local message = framed(
+      response(record, 'collateral-view', ' (view-uri "u")'))
     length_prefix.handle_generic_chunk(message .. message)
     assert.are.equal(2, count)
-    assert.is_not_nil(state.response_handler_map['collateral-view'])
+    assert.is_not_nil(record.handlers['collateral-view'])
   end)
 
-  it('keeps a one-shot handler that errored, and logs', function ()
-    -- Mirrors the elisp comment: if the handler signals, the removal
-    -- does not fire, so the handler is not removed.
+  it('cleans a terminal request even when its handler errors', function ()
     state.register_response_handler('save-result',
       function () error('handler boom') end, true)
+    local record = activate_request()
     length_prefix.handle_generic_chunk(
-      framed('((response-type save-result))'))
-    assert.is_not_nil(state.response_handler_map['save-result'])
+      framed(response(record, 'save-result', '', 'complete')))
+    assert.is_nil(state.request_records[record.id])
+    assert.are.equal(0, state.lp_pending_count)
   end)
 
   it('tolerates a response with no response-type', function ()
@@ -87,9 +106,35 @@ describe('skg.length_prefix dispatch', function ()
     local seen = false
     state.register_response_handler('git-diff-mode',
       function () seen = true end, true)
+    local record = activate_request()
     length_prefix.handle_generic_chunk(
-      framed('(("response-type" "git-diff-mode") ("content" "on"))'))
+      framed(string.format(
+        '(("response-type" "git-diff-mode") ("content" "on")'
+        .. ' ("request-id" %q) ("frame-kind" "git-diff-mode")'
+        .. ' ("terminal-status" "complete"))', record.id)))
     assert.is_true(seen)
+  end)
+
+  it('keeps like-typed queued requests separate by request ID', function ()
+    local sent = {}
+    local calls = {}
+    local send = function (wire) table.insert(sent, wire) end
+    state.register_response_handler('verify-connection',
+      function () table.insert(calls, 'first') end, true)
+    local first = state.take_request_record()
+    state.enqueue_request(first, 'first-wire', send)
+    state.register_response_handler('verify-connection',
+      function () table.insert(calls, 'second') end, true)
+    local second = state.take_request_record()
+    state.enqueue_request(second, 'second-wire', send)
+    assert.are.same({ 'first-wire' }, sent)
+    length_prefix.dispatch_frame(
+      response(first, 'verify-connection', '', 'complete'))
+    assert.are.same({ 'first-wire', 'second-wire' }, sent)
+    length_prefix.dispatch_frame(
+      response(second, 'verify-connection', '', 'complete'))
+    assert.are.same({ 'first', 'second' }, calls)
+    assert.is_nil(state.active_request_id)
   end)
 
   it('errors on a malformed header and resets', function ()

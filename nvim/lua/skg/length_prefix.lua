@@ -1,5 +1,4 @@
--- PURPOSE: Read length-prefixed messages from the server and dispatch
--- by response-type via the handler map in skg.state.
+-- PURPOSE: Read length-prefixed frames and dispatch by request identity.
 -- The Lua port of elisp/skg-length-prefix.el. (Like the elisp, this
 -- file does not ADD length prefixes to outgoing messages; that is
 -- easier and done inline where messages are sent.)
@@ -19,7 +18,7 @@ local M = {}
 
 ---Consume the message stream in chunks: accumulate CHUNK's bytes,
 ---then step the LP machine until it must wait or finishes a message;
----each completed message dispatches by response-type. Continues while
+---each completed message dispatches by request-id. Continues while
 ---buffered data remains.
 ---@param chunk string
 function M.handle_generic_chunk (chunk)
@@ -34,7 +33,7 @@ function M.handle_generic_chunk (chunk)
     elseif step.kind == 'done' then
       state.lp_buffer = step.remainder
       state.lp_bytes_left = nil
-      M.dispatch_by_type(step.payload)
+      M.dispatch_frame(step.payload)
       if #state.lp_buffer == 0 then return end
     elseif step.kind == 'error' then
       state.lp_buffer = ''
@@ -44,49 +43,67 @@ function M.handle_generic_chunk (chunk)
   end
 end
 
----Parse PAYLOAD as a sexp, extract its response-type, and dispatch
----via the handler map. A one-shot handler is removed after a
----SUCCESSFUL call (an error leaves it registered, mirroring elisp,
----where the removal is skipped when the handler signals).
+---Parse PAYLOAD, dispatch it to its request record, and clean up once.
 ---@param payload string
-function M.dispatch_by_type (payload)
-  local ok, err = pcall(function ()
-    local response = sexpr.read(payload)
-    local response_type = M.response_type_of(response)
-    if not response_type then
-      log.log('warn', 'dispatch', 'response missing response-type: %s',
-              payload:sub(1, 80))
-      return end
-    local entry = state.response_handler_map[response_type]
-    if not entry then
-      log.log('warn', 'dispatch', 'no handler for response type: %s',
-              response_type)
-      return end
-    entry.handler(payload, response)
-    if entry.one_shot then
-      state.response_handler_map[response_type] = nil
-      state.lp_pending_count =
-        math.max(0, state.lp_pending_count - 1) end
+function M.dispatch_frame (payload)
+  local parsed_ok, response = pcall(sexpr.read, payload)
+  if not parsed_ok then
+    log.log('error', 'dispatch', 'could not parse frame: %s',
+            tostring(response))
+    return end
+  local request_id = M.field_atom(response, 'request-id')
+  local frame_kind = M.field_atom(response, 'frame-kind')
+    or M.field_atom(response, 'response-type')
+  local terminal_status = M.field_atom(response, 'terminal-status')
+  if not request_id then
+    log.log('warn', 'dispatch', 'response missing request-id: %s',
+            payload:sub(1, 80))
+    return end
+  local record = state.request_records[request_id]
+  if not record then
+    log.log('warn', 'dispatch', 'unknown/stale request-id: %s', request_id)
+    return end
+  local entry = record.handlers[frame_kind]
+  state.dispatching_request_id = request_id
+  local handler_ok, handler_error = pcall(function ()
+    if entry then
+      entry.handler(payload, response)
+    elseif frame_kind == 'error' then
+      vim.notify('SKG request failed: '
+        .. (M.field_atom(response, 'content') or payload),
+        vim.log.levels.ERROR)
+    else
+      log.log('warn', 'dispatch',
+              'no handler for frame %s on request %s',
+              tostring(frame_kind), request_id) end
   end)
-  if not ok then
+  state.dispatching_request_id = nil
+  if entry and entry.one_shot then
+    record.handlers[frame_kind] = nil
+    state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
+  if terminal_status then state.finish_request(request_id) end
+  if not handler_ok then
     log.log('error', 'dispatch', 'dispatch error: %s for payload: %s',
-            tostring(err), payload:sub(1, 80))
+            tostring(handler_error), payload:sub(1, 80)) end
+end
+
+function M.field_atom (response, field_name)
+  if not sexpr.is_list(response) then return nil end
+  for _, element in ipairs(response) do
+    if sexpr.is_list(element) and #element >= 2
+       and not sexpr.is_list(element[1])
+       and sexpr.atom_text(element[1]) == field_name
+       and not sexpr.is_list(element[2]) then
+      return sexpr.atom_text(element[2]) end
   end
+  return nil
 end
 
 ---The response-type name of parsed RESPONSE, or nil.
 ---@param response any
 ---@return string|nil
 function M.response_type_of (response)
-  if not sexpr.is_list(response) then return nil end
-  for _, element in ipairs(response) do
-    if sexpr.is_list(element) and #element >= 2
-       and not sexpr.is_list(element[1])
-       and sexpr.atom_text(element[1]) == 'response-type'
-       and not sexpr.is_list(element[2]) then
-      return sexpr.atom_text(element[2]) end
-  end
-  return nil
+  return M.field_atom(response, 'response-type')
 end
 
 ---One pure step of the LP machine over BUF with BYTES_LEFT (nil =

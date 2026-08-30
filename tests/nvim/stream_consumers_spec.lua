@@ -138,9 +138,10 @@ describe('skg stream consumers', function ()
     source_sets.set_active_source_set('public')
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil and seen ~= nil end, 10)
-    assert.are.equal(
-      '((request . "set active source set") (name . "public"))',
-      seen)
+    assert.is_truthy(seen:find(
+      '(request . "set active source set")', 1, true))
+    assert.is_truthy(seen:find('(name . "public")', 1, true))
+    assert.is_truthy(seen:find('(request-id . "nvim-', 1, true))
   end)
 
   it('shows the diff-analysis report with the navigation keymap',

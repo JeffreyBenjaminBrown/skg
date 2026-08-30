@@ -22,10 +22,8 @@
                ((symbol-function 'skg-register-response-handler)
                 (lambda (response-type _handler _one-shot)
                   (setq registered-type response-type)))
-               ((symbol-function 'skg-lp-reset)
-                (lambda () nil))
-               ((symbol-function 'process-send-string)
-                (lambda (_proc string)
+               ((symbol-function 'skg-submit-request)
+                (lambda (_proc string &optional _content)
                   (setq sent-request string))))
        ,@body
        (list sent-request registered-type answers-list))))

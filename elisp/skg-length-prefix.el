@@ -1,7 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Read length-prefixed messages from the server
-;;; and dispatch by response-type via skg-response-handler-map.
+;;; PURPOSE: Read length-prefixed frames and dispatch by request identity.
 ;;; (This file does not handle adding length prefixes to outgoing
 ;;; messages. That's easier, and done inline where messages are sent,
 ;;; e.g., in skg-request-save.el.)
@@ -13,7 +12,7 @@
   "Consumes the message stream in chunks. When a message is completed, dispatches it and continues for the remaining chunks. In more detail:
 .
 Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.
-After :done, dispatches by response-type via `skg-response-handler-map'.
+After :done, dispatches to the request record named by request-id.
 If there is buffered data and a handler matched, continues the loop."
   ;; Append bytes
   (setq skg-lp--buf (skg-lp-append-chunk skg-lp--buf chunk))
@@ -37,7 +36,7 @@ If there is buffered data and a handler matched, continues the loop."
         (`(:done ,payload ,remainder)
          (setq skg-lp--buf        remainder
                skg-lp--bytes-left nil)
-         (skg-lp--dispatch-by-type tcp-proc payload)
+         (skg-lp--dispatch-frame tcp-proc payload)
          (if (> (length skg-lp--buf) 0)
              nil ; continue loop -- more data may contain another LP message
            (cl-return nil)))
@@ -48,34 +47,52 @@ If there is buffered data and a handler matched, continues the loop."
                skg-lp--bytes-left         nil)
          (error "%s" msg)))))
 
-(defun skg-lp--dispatch-by-type (tcp-proc payload)
-  "Parse PAYLOAD as s-exp, extract response-type, and dispatch
-via `skg-response-handler-map'.
-Keys in the map and response-type values are symbols
-because the sexp crate emits simple strings unquoted."
+(defun skg-lp--dispatch-frame (tcp-proc payload)
+  "Dispatch PAYLOAD to its request record and clean up once on terminal."
   (condition-case err
       (let* ((response (read payload))
-             (type-entry (assoc 'response-type response))
-             (response-type (cadr type-entry)))
-        (if (not response-type)
-            (skg-log 'warn 'dispatch "response missing response-type: %s"
-                     (substring payload 0 (min 80 (length payload))))
-          (let ((handler-entry (assoc response-type skg-response-handler-map)))
-            (if (not handler-entry)
-                (skg-log 'warn 'dispatch "no handler for response type: %s" response-type)
-              (let ((handler  (cadr handler-entry))
-                    (one-shot (cddr handler-entry)))
-                (funcall handler tcp-proc payload)
-                (when one-shot ;; It shot, so remove it. If instead the funcall errors, this 'when' statement will not fire, so the (stale? recoverable?) handler will not have been removed.
-                  (setq skg-response-handler-map
-                        (assoc-delete-all response-type
-                                         skg-response-handler-map))
-                  (setq skg-lp--pending-count
-                        (max 0 (1- skg-lp--pending-count))))
-                ) ))))
+             (request-id (cadr (assoc 'request-id response)))
+             (frame-kind (or (cadr (assoc 'frame-kind response))
+                             (cadr (assoc 'response-type response))))
+             (terminal-status (cadr (assoc 'terminal-status response)))
+             (record (and request-id
+                          (gethash (format "%s" request-id)
+                                   skg--request-records))))
+        (cond
+         ((not request-id)
+          (skg-log 'warn 'dispatch "response missing request-id: %s"
+                   (substring payload 0 (min 80 (length payload)))))
+         ((not record)
+          (skg-log 'warn 'dispatch "unknown/stale request-id: %s" request-id))
+         (t
+          (setq request-id (format "%s" request-id))
+          (let ((handler-entry
+                 (assoc frame-kind
+                        (skg--request-record-handlers record)))
+                (skg--dispatching-request-id request-id))
+            (unwind-protect
+                (cond
+                 (handler-entry
+                  (funcall (cadr handler-entry) tcp-proc payload))
+                 ((eq frame-kind 'error)
+                  (ding)
+                  (message "SKG request failed: %s"
+                           (or (cadr (assoc 'content response)) payload)))
+                 (t
+                  (skg-log 'warn 'dispatch
+                           "no handler for frame %s on request %s"
+                           frame-kind request-id)))
+              (when (and handler-entry (cddr handler-entry))
+                (setf (skg--request-record-handlers record)
+                      (assoc-delete-all
+                       frame-kind (skg--request-record-handlers record)))
+                (setq skg-lp--pending-count
+                      (max 0 (1- skg-lp--pending-count))))
+              (when terminal-status
+                (skg--finish-request request-id)))))))
     (error
      (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
-              err (substring payload 0 (min 80 (length payload)))) )))
+              err (substring payload 0 (min 80 (length payload)))))))
 
 (defun skg-lp-step (buf bytes-left)
   "One pure(ish) step of the LP machine.

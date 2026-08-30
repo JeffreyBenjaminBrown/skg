@@ -49,8 +49,7 @@ rerender-done."
     (skg--register-rerender-ugly-confirmation
      (lambda (pids) (skg-view-diff-mode pids))
      'git-diff-mode)
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      (concat (prin1-to-string
               (append

@@ -21,7 +21,6 @@ Useful after importing new data or if the databases are stale."
          (ding) ;; Audible signal: rebuilds take long enough to walk away from.
          (message "%s" full-msg)))
      t)
-    (skg-lp-reset)
-    (process-send-string tcp-proc request-sexp)))
+    (skg-submit-request tcp-proc request-sexp)))
 
 (provide 'skg-request-rebuild-dbs)

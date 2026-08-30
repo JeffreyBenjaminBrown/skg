@@ -35,7 +35,7 @@ pub fn handle_source_set_request (
     Ok (RequestType::ListSourceSets) =>
       send_source_sets_response (stream, &env . config, active_source_set),
     Ok (RequestType::ActiveSourceSet) =>
-      send_active_source_set_response (stream, active_source_set),
+      send_active_source_set_response (stream, active_source_set, true),
     Ok (RequestType::SetActiveSourceSet) =>
       set_active_source_set (
         stream, request, env, views_state,
@@ -111,7 +111,7 @@ fn set_active_source_set (
   if let Ok (mut slot) = enrichment_slot . lock () {
     *slot = None; }
   *active_source_set = active;
-  send_active_source_set_response (stream, active_source_set);
+  send_active_source_set_response (stream, active_source_set, false);
   stream_prepared_rerenders (stream, views_state, prepared); }
 
 fn send_source_sets_response (
@@ -144,15 +144,17 @@ fn send_source_sets_response (
 fn send_active_source_set_response (
   stream : &mut TcpStream,
   active : &ActiveSourceSet,
+  terminal : bool,
 ) {
   let name : &str =
     &active . name . 0;
   let response : String =
     format! (
-      "((response-type {}) (active \"{}\") (content \"Active source-set: {}\"))",
+      "((response-type {}) (active \"{}\") (content \"Active source-set: {}\"){})",
       TcpToClient::ActiveSourceSet . repr_in_client (),
       escape_string (name),
-      escape_string (name));
+      escape_string (name),
+      if terminal { " (terminal-status complete)" } else { "" });
   send_response_with_length_prefix (stream, &response); }
 
 /// The unwinding refusal shape (the quiet shape): the endpoint's

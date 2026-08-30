@@ -105,7 +105,6 @@ or nil (with a user message) if no valid parent metadata is found."
   "Send a get-file-path request for ID and SOURCE, using HANDLER for the response."
   (skg-register-response-handler
    'get-file-path handler t)
-  (skg-lp-reset)
   (let* (( tcp-proc (skg-tcp-connect-to-rust) )
          ( request-sexp
            (concat (prin1-to-string
@@ -113,7 +112,7 @@ or nil (with a user message) if no valid parent metadata is found."
                       (id . ,id)
                       (source . ,source)))
                    "\n") ))
-    (process-send-string tcp-proc request-sexp)))
+    (skg-submit-request tcp-proc request-sexp)))
 
 (defun skg--magit-setup-from-response (payload)
   "Parse PAYLOAD, open magit-status on the response's file directory,

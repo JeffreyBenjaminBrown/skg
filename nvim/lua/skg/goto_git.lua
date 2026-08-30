@@ -83,8 +83,7 @@ function M.request_file_path (id, source, handler)
         resolved = config_dir .. '/' .. path end
       handler(resolved)
     end, true)
-  state.lp_reset()
-  client.send_string(sexpr.to_string({
+  client.submit_request(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'get file path'),
     sexpr.pair(sexpr.symbol('id'), id),
     sexpr.pair(sexpr.symbol('source'), source) }) .. '\n')

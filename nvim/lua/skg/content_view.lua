@@ -51,18 +51,15 @@ function M.request_single_root_content_view_from_id (node_id,
   local view_uri = existing_view_uri or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.remove_response_handler('ugly-telescope-confirmation')
       M.handle_content_view(payload_text, response, view_uri)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
   state.register_response_handler('ugly-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
-      if state.response_handler_map['content-view'] then
-        state.response_handler_map['content-view'] = nil
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      end
+      state.remove_response_handler('ugly-telescope-confirmation')
+      state.remove_response_handler('content-view')
       local prompt = payload.field_text(response, 'prompt') or
         'This view includes text selected below a node home source. Include it?'
       local pids =
@@ -71,8 +68,7 @@ function M.request_single_root_content_view_from_id (node_id,
         M.request_single_root_content_view_from_id(
           node_id, bypass_override, pids, view_uri) end
     end, false)
-  state.lp_reset()
-  client.send_string(
+  client.submit_request(
     M.request_string(
       node_id, view_uri, bypass_override, approved_pids))
 end

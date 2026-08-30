@@ -16,12 +16,64 @@ function M.install_fixture_herald_rules ()
     require('skg.sexpr.parse').read(text))
 end
 
----An LP-framed message around PAYLOAD.
+local nonterminal_frame_kinds = {
+  ['save-lock'] = true,
+  ['save-relax-lock'] = true,
+  ['collateral-view'] = true,
+  ['search-results'] = true,
+  ['request-snapshot'] = true,
+  ['rerender-lock'] = true,
+  ['rerender-view'] = true,
+  ['git-diff-mode'] = true,
+  ['active-source-set'] = true,
+}
+
+local authorization_frame_kinds = {
+  ['fork-confirmation'] = true,
+  ['telescope-hoist-confirmation'] = true,
+  ['ugly-telescope-confirmation'] = true,
+}
+
+---An LP-framed server message. Inside a fake-server callback it adds
+---the request envelope belonging to the line which triggered the callback.
 ---@param payload string
 ---@return string
 function M.framed (payload)
+  if M.current_request_id
+     and not payload:find('(request-id ', 1, true) then
+    local frame_kind = payload:match(
+      '%(%s*"?response%-type"?%s+"?([^"%s%)]+)"?%)') or 'unknown'
+    local terminal_status = nil
+    if authorization_frame_kinds[frame_kind] then
+      terminal_status = 'needs-authorization'
+    elseif frame_kind == 'error' then
+      terminal_status = 'failed'
+    elseif not nonterminal_frame_kinds[frame_kind] then
+      terminal_status = 'complete' end
+    local envelope = string.format(
+      ' (request-id %q) (frame-kind %s)',
+      M.current_request_id, frame_kind)
+    if terminal_status then
+      envelope = envelope
+        .. string.format(' (terminal-status %s)', terminal_status) end
+    payload = payload:sub(1, -2) .. envelope .. ')'
+  end
   return string.format('Content-Length: %d\r\n\r\n%s',
                        #payload, payload)
+end
+
+local function envelope_framed_for_request (message, request_id)
+  if not request_id or not message:find('^Content%-Length:') then
+    return message end
+  local boundary = message:find('\r\n\r\n', 1, true)
+  if not boundary then return message end
+  local payload = message:sub(boundary + 4)
+  if payload:find('(request-id ', 1, true) then return message end
+  local previous = M.current_request_id
+  M.current_request_id = request_id
+  local result = M.framed(payload)
+  M.current_request_id = previous
+  return result
 end
 
 ---A minimal TCP server on 127.0.0.1. ON_REQUEST(line, respond) runs
@@ -45,7 +97,13 @@ function M.fake_server (on_request)
         local line, rest = pending:match('^([^\n]*)\n(.*)$')
         if not line then break end
         pending = rest
-        on_request(line, function (text) connection:write(text) end)
+        local request_id = line:match(
+          '%(%s*request%-id%s+%.%s+"([^"]+)"%)')
+        M.current_request_id = request_id
+        on_request(line, function (text)
+          connection:write(envelope_framed_for_request(text, request_id))
+        end)
+        M.current_request_id = nil
       end
     end)
   end)
@@ -75,8 +133,7 @@ end
 function M.reset_client_state ()
   local state = require('skg.state')
   state.close_connection()
-  state.response_handler_map = {}
-  state.lp_pending_count = 0
+  state.clear_request_coordinator()
   state.lp_reset()
   state.connection_reset_hooks = {}
   require('skg.client').port = nil

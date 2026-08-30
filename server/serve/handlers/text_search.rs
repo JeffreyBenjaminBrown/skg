@@ -31,7 +31,11 @@ use crate::serve::handlers::scalar_release::{
   search_challenge_response,
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
+use crate::serve::util::{
+  send_response_with_length_prefix,
+  tag_terminal_text_response,
+  tag_text_response,
+};
 use crate::types::git::MembershipAxes;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
@@ -143,7 +147,7 @@ pub fn handle_text_search_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          TcpToClient::SearchResults, &err ));
+          TcpToClient::Error, &err ));
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
@@ -153,7 +157,7 @@ pub fn handle_text_search_request (
       Err (error) => {
         send_response_with_length_prefix (
           stream,
-          & tag_text_response (TcpToClient::SearchResults, &error) );
+          & tag_text_response (TcpToClient::Error, &error) );
         return; }};
   match search_terms {
     Ok (search_terms) => {
@@ -167,7 +171,7 @@ pub fn handle_text_search_request (
             send_response_with_length_prefix (
               stream,
               & tag_text_response (
-                TcpToClient::SearchResults,
+                TcpToClient::Error,
                 &format! ("Error checking search privacy: {}", error) ) );
             return; }};
       if ! active . is_all ()
@@ -193,8 +197,9 @@ pub fn handle_text_search_request (
           if best_matches . is_empty () {
             send_response_with_length_prefix (
               stream,
-              & tag_text_response (
+              & tag_terminal_text_response (
                 TcpToClient::SearchResults,
+                "complete",
                 "No matches found." ));
             return; }
           let matches_by_id : MatchGroups =
@@ -210,8 +215,9 @@ pub fn handle_text_search_request (
           if matches_by_id . is_empty () {
             send_response_with_length_prefix (
               stream,
-              & tag_text_response (
+              & tag_terminal_text_response (
                 TcpToClient::SearchResults,
+                "complete",
                 "No matches found." ));
             return; }
           let suppressed : HashSet<ID> =
@@ -266,7 +272,7 @@ pub fn handle_text_search_request (
           send_response_with_length_prefix (
             stream,
             & tag_text_response (
-              TcpToClient::SearchResults,
+              TcpToClient::Error,
               & format! ("Error searching index: {}", e) )); }} },
     Err (err) => {
       let error_msg : String =
@@ -276,7 +282,7 @@ pub fn handle_text_search_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          TcpToClient::SearchResults, &error_msg )); }} }
+          TcpToClient::Error, &error_msg )); }} }
 
 /// Read a boolean axis flag from the request sexp. Absent, empty, or
 /// any non-"true" string is treated as false.

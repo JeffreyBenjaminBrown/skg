@@ -7,6 +7,39 @@ After initialization, every server response is length-prefixed as
 UTF-8 bytes in `PAYLOAD`. The exceptional busy-initializing signal is
 described below.
 
+Every client operation carries a fresh connection-local request ID:
+`((request . "ENDPOINT") ... (request-id . "ID"))`. Endpoint request
+examples below elide only this required final field. The clients serialize
+foreground operations on each connection. Search's `snapshot response` is
+the one continuation: it repeats the still-active search request ID instead
+of allocating a new operation. An authorization retry is a new request and
+therefore receives a new ID.
+
+Every ordinary response payload carries:
+
+```text
+(request-id "ID")
+(frame-kind KIND)
+```
+
+`response-type` remains as payload metadata, but clients dispatch by the
+request ID and then by `frame-kind`; a stale or unknown ID is never routed by
+response type. The final frame also carries exactly one of:
+
+```text
+(terminal-status complete)
+(terminal-status complete-with-rejected-files)
+(terminal-status failed)
+(terminal-status needs-authorization)
+```
+
+Streaming frames such as `save-lock`, `collateral-view`, `rerender-lock`,
+`rerender-view`, `search-results`, and `request-snapshot` have no terminal
+status. Their operation remains active until its terminal frame. Handler
+cleanup is request-local and runs once even when a handler fails. The
+length-prefix parser is connection-local and is reset only when the
+connection opens or is abandoned.
+
 The shared ugly-telescope release warning is
 `OPERATION includes title or body text selected below its node's home
 source for PID P.` (or `PIDs P1, P2, ...`). A restricted request that
@@ -60,7 +93,7 @@ So far there are these endpoints:
 
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
-    2. Emacs replies with `((request . "snapshot response") (terms . "TERMS"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
+    2. Emacs replies with `((request . "snapshot response") (terms . "TERMS") (request-id . "SAME_ID"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
     3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG") ("warnings" (...)))`. Emacs replaces the buffer and exits readonly.
     - Enrichment uses the same active source-set as the original
       search. Containerward ancestry truncates before inactive
@@ -198,7 +231,7 @@ So far there are these endpoints:
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Text search" above)
-  - Request: First `((request . "snapshot response") (terms . "TERMS"))\n`, then `Content-Length: N\r\n\r\n<buffer text>`.
+  - Request: First `((request . "snapshot response") (terms . "TERMS") (request-id . "SAME_ID"))\n`, then `Content-Length: N\r\n\r\n<buffer text>`.
   - Initiated by the client in response to a "request-snapshot" message from the server.
   - Response: LP response-type "search-enrichment" with enriched buffer content and an explicit `warnings` list.
 

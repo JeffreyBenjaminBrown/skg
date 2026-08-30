@@ -1,9 +1,39 @@
 use super::{
+  begin_request_context,
+  clear_request_context,
+  envelope_response,
   format_buffer_response_sexp,
   format_errors_warnings_sexp,
   tag_sexp_response,
   TcpToClient,
 };
+
+#[test]
+fn response_envelope_carries_request_frame_and_terminal_status () {
+  clear_request_context ();
+  begin_request_context (
+    "((request . \"verify connection\") (request-id . \"req-7\"))")
+    . unwrap ();
+  let response = envelope_response (
+    "((response-type verify-connection) (content \"ok\"))");
+  assert! (response . contains ("(request-id req-7)"));
+  assert! (response . contains ("(frame-kind verify-connection)"));
+  assert! (response . contains ("(terminal-status complete)"));
+  clear_request_context ();
+}
+
+#[test]
+fn response_envelope_leaves_stream_frames_nonterminal () {
+  clear_request_context ();
+  begin_request_context (
+    "((request . \"save buffer\") (request-id . \"req-save\"))")
+    . unwrap ();
+  let response = envelope_response (
+    "((response-type collateral-view) (content \"view\"))");
+  assert! (response . contains ("(request-id req-save)"));
+  assert! (! response . contains ("terminal-status"));
+  clear_request_context ();
+}
 
 #[test]
 fn format_buffer_response_includes_empty_errors_and_warnings () {

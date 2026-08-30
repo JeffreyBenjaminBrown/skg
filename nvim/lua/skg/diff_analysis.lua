@@ -39,8 +39,7 @@ function M.diff_report (include_staged, include_unstaged)
     function (_payload_text, response)
       M.diff_analysis_handler(response)
     end, true)
-  state.lp_reset()
-  client.send_string(sexpr.to_string({
+  client.submit_request(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'diff analysis'),
     sexpr.pair(sexpr.symbol('include-staged'),
                include_staged and 'true' or 'false'),

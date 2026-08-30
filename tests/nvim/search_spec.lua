@@ -34,10 +34,12 @@ describe('skg.search', function ()
     end)
     search.request_text_search('dog cat', true, false, true)
     vim.wait(2000, function () return seen ~= nil end, 10)
-    assert.are.equal(
-      '((request . "text search") (terms . "dog cat")'
-      .. ' (regex . "true") (body . "false")'
-      .. ' (operators . "true"))', seen)
+    assert.is_truthy(seen:find('(request . "text search")', 1, true))
+    assert.is_truthy(seen:find('(terms . "dog cat")', 1, true))
+    assert.is_truthy(seen:find('(regex . "true")', 1, true))
+    assert.is_truthy(seen:find('(body . "false")', 1, true))
+    assert.is_truthy(seen:find('(operators . "true")', 1, true))
+    assert.is_truthy(seen:find('(request-id . "nvim-', 1, true))
   end)
 
   it('serializes the explicit ugly telescope search choice', function ()

@@ -63,7 +63,7 @@ function M.request_herald_rules ()
   -- request is sent immediately after connection_verify during init;
   -- resetting the LP machine could drop a partially received
   -- verify-connection response.
-  client.send_string('((request . "herald rules"))\n')
+  client.submit_request('((request . "herald rules"))\n')
 end
 
 ---Return the herald rule table, fetching it from the server if

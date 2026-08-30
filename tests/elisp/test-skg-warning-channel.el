@@ -118,7 +118,7 @@
   (let ((shown nil)
         (ended nil)
         (unlocked nil)
-        (skg-response-handler-map '((rerender-view . ignore))))
+        (skg--request-draft nil))
     (cl-letf (((symbol-function 'skg--end-stream)
                (lambda () (setq ended t)))
               ((symbol-function 'skg--unlock-all-save-locked)
@@ -127,7 +127,10 @@
                (lambda (buffer-name message-text content)
                  (setq shown (list buffer-name message-text content)))))
       (skg--register-rerender-stream-handlers)
-      (let ((handler (cadr (assoc 'rerender-done skg-response-handler-map))))
+      (let ((handler
+             (cadr (assoc
+                    'rerender-done
+                    (skg--request-record-handlers skg--request-draft)))))
         (funcall handler
                  nil
                  (prin1-to-string
@@ -135,7 +138,9 @@
                     (warnings ("audit warning"))))))
       (should ended)
       (should unlocked)
-      (should-not (assoc 'rerender-view skg-response-handler-map))
+      (should-not
+       (assoc 'rerender-view
+              (skg--request-record-handlers skg--request-draft)))
       (should (equal (car shown) "*skg rerender messages*"))
       (should (string-match-p "^\\* errors\n\\*\\* view failed"
                               (nth 2 shown)))

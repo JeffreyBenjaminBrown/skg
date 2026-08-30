@@ -14,8 +14,7 @@ function M.stage_moves ()
     function (_payload_text, response)
       M.stage_moves_handler(response)
     end, true)
-  state.lp_reset()
-  client.send_string('((request . "stage moves"))\n')
+  client.submit_request('((request . "stage moves"))\n')
 end
 
 ---@param response any

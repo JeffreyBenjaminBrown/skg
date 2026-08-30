@@ -69,7 +69,6 @@ calls `(skg-tcp-connect-to-rust)`
          (message "%s" (or (and content (format "%s" content))
                            "connected"))))
      t)
-    (skg-lp-reset)
-    (process-send-string tcp-proc request-sexp)))
+    (skg-submit-request tcp-proc request-sexp)))
 
 (provide 'skg-request-verify-connection)

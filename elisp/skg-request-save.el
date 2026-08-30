@@ -82,10 +82,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     fork-sources
                                     hoist-approved-pids
                                     scalar-approved-pids))
-                                  "\n"))
-           (content-bytes (encode-coding-string buffer-contents 'utf-8))
-           (content-length (length content-bytes))
-           (header (format "Content-Length: %d\r\n\r\n" content-length)))
+                                  "\n")))
       (progn ;; Rust needs these markers, but the user doesn't.
         (skg-remove-focused-marker)
         (skg-remove-folded-markers))
@@ -108,7 +105,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       ;; server's early response.
       (skg--lock-all-skg-buffers)
 
-      ;; Register handlers in the dispatch map
+      ;; Register handlers in this request's dispatch record.
       (skg-register-response-handler
        'save-lock
        (lambda (_tcp-proc payload)
@@ -166,14 +163,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
           hoist-approved-pids))
        nil)
 
-      (skg-lp-reset)
-
-      ;; Send the request line first
-      (process-send-string tcp-proc request-s-exp)
-
-      ;; Send the length-prefixed buffer contents
-      (process-send-string tcp-proc header)
-      (process-send-string tcp-proc buffer-contents))))
+      (skg-submit-request tcp-proc request-s-exp buffer-contents))))
 
 (defun skg--save-request-sexp (view-uri save-point-position
                                         &optional fork-approved fork-sources
@@ -287,20 +277,10 @@ then processes the save response.
 Unlock must happen BEFORE `skg-handle-save-sexp' because
 `skg-replace-buffer-with-new-content' calls erase-buffer + insert,
 which would trigger overlay modification-hooks if still present."
-  (setq skg-response-handler-map
-        (assoc-delete-all 'collateral-view skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
-  ;; The fork-confirmation alternative did not fire; drop it. It is
-  ;; non-one-shot, so no pending-count adjustment is needed.
-  (setq skg-response-handler-map
-        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'telescope-hoist-confirmation
-                          skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'ugly-telescope-confirmation
-                          skg-response-handler-map))
+  (dolist (frame-kind
+           '(collateral-view save-relax-lock fork-confirmation
+             telescope-hoist-confirmation ugly-telescope-confirmation))
+    (skg-remove-response-handler frame-kind))
   (skg--end-stream)
   (unwind-protect
       (progn
@@ -350,24 +330,11 @@ whether to approve.
 Terminal, like `skg--save-result-handler': remove the streaming handlers
 AND the unfired save-result one-shot (decrementing the pending count for
 it), end the stream, and unlock."
-  (setq skg-response-handler-map
-        (assoc-delete-all 'collateral-view skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'telescope-hoist-confirmation
-                          skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'ugly-telescope-confirmation
-                          skg-response-handler-map))
-  (when (assoc 'save-result skg-response-handler-map)
-    ;; save-result was registered one-shot but will never fire; remove it
-    ;; and decrement the pending count it bumped, or the next save hangs.
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
+  (dolist (frame-kind
+           '(collateral-view save-relax-lock fork-confirmation
+             telescope-hoist-confirmation ugly-telescope-confirmation
+             save-result))
+    (skg-remove-response-handler frame-kind))
   (skg--end-stream)
   (skg--unlock-all-save-locked)
   (let ((confirm-buf
@@ -407,22 +374,11 @@ The server has committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
 untouched.  FORK-APPROVED and FORK-SOURCES survive if this challenge arose
 on a retry that had already received fork authority."
-  (setq skg-response-handler-map
-        (assoc-delete-all 'collateral-view skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'fork-confirmation skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'telescope-hoist-confirmation
-                          skg-response-handler-map))
-  (setq skg-response-handler-map
-        (assoc-delete-all 'ugly-telescope-confirmation
-                          skg-response-handler-map))
-  (when (assoc 'save-result skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
+  (dolist (frame-kind
+           '(collateral-view save-relax-lock fork-confirmation
+             telescope-hoist-confirmation ugly-telescope-confirmation
+             save-result))
+    (skg-remove-response-handler frame-kind))
   (skg--end-stream)
   (skg--unlock-all-save-locked)
   (condition-case err
@@ -457,13 +413,9 @@ reissues the save with the exact PIDs; declining leaves the current buffers
 unchanged."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
-             telescope-hoist-confirmation ugly-telescope-confirmation))
-    (setq skg-response-handler-map
-          (assoc-delete-all response-type skg-response-handler-map)))
-  (when (assoc 'save-result skg-response-handler-map)
-    (setq skg-response-handler-map
-          (assoc-delete-all 'save-result skg-response-handler-map))
-    (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
+             telescope-hoist-confirmation ugly-telescope-confirmation
+             save-result))
+    (skg-remove-response-handler response-type))
   (skg--end-stream)
   (skg--unlock-all-save-locked)
   (condition-case err

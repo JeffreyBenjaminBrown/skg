@@ -112,7 +112,6 @@ end
 function M.request_titles (ids, generation, buf, approved_pids)
   local ok, err = pcall(function ()
     M.ensure_title_response_handler()
-    state.lp_reset()
     local ids_form = { sexpr.symbol('ids') }
     for _, id in ipairs(ids) do table.insert(ids_form, id) end
     local request_form = {
@@ -125,8 +124,7 @@ function M.request_titles (ids, generation, buf, approved_pids)
       table.insert(request_form, approval) end
     local request = sexpr.to_string(request_form) .. '\n'
     table.insert(M.pending_title_requests, { generation, buf, ids })
-    state.lp_pending_count = state.lp_pending_count + 1
-    client.send_string(request)
+    client.submit_request(request)
   end)
   if not ok then
     vim.notify('skg readable ids: server not connected: '
@@ -134,8 +132,7 @@ function M.request_titles (ids, generation, buf, approved_pids)
   end
 end
 
----Install the shared titles-by-ids response handler (non-one-shot;
----the FIFO does the per-request accounting).
+---Install this request's alternative terminal handlers.
 function M.ensure_title_response_handler ()
   state.register_response_handler('titles-by-ids',
     function (_payload_text, response)
@@ -144,22 +141,20 @@ function M.ensure_title_response_handler ()
         vim.notify('skg readable ids: titles-by-ids response without'
                    .. ' pending request')
         return end
-      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
       M.handle_response(response, entry[1], entry[2])
-    end, false)
+    end, true)
   state.register_response_handler('ugly-telescope-confirmation',
     function (_payload_text, response)
       local entry = table.remove(M.pending_title_requests, 1)
       if not entry then
         vim.notify('skg readable ids: privacy challenge without pending request')
         return end
-      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
       local prompt = payload.field_text(response, 'prompt') or
         'This title lookup includes text selected below home. Include it?'
       local pids = payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
         M.request_titles(entry[3], entry[1], entry[2], pids) end
-    end, false)
+    end, true)
 end
 
 ---Annotate BUF from RESPONSE, unless GENERATION is stale.

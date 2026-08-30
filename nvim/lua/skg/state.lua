@@ -9,28 +9,99 @@ local M = {}
 ---handle, or nil when disconnected.
 M.tcp = nil
 
----Map from response-type names (strings) to handler entries
----{ handler = fn(payload_text, parsed_response), one_shot = boolean }.
----
----PITFALL (inherited from the Emacs client): keyed by response-type,
----not by request instance. If the user fires two requests of the same
----type in rapid succession, the second registration replaces the
----first's handler. In practice this hasn't been a problem because
----responses are fast. If it ever matters, the fix is a per-request
----token or a queue.
-M.response_handler_map = {}
+---Sent request records, keyed by connection-local request ID.
+M.request_records = {}
+M.request_draft = nil
+M.request_queue = {}
+M.active_request_id = nil
+M.dispatching_request_id = nil
+M.next_request_number = 0
 
----Register HANDLER for RESPONSE_TYPE (a string). If ONE_SHOT, the
----handler is removed after first use and the pending count is
----incremented. Replaces any existing handler for the same type.
----@param response_type string
+local function fresh_request_id ()
+  M.next_request_number = M.next_request_number + 1
+  return string.format('nvim-%d-%d', vim.fn.getpid(), M.next_request_number)
+end
+
+function M.ensure_request_draft ()
+  if not M.request_draft then
+    M.request_draft = { id = fresh_request_id(), handlers = {} } end
+  return M.request_draft
+end
+
+---Register HANDLER for FRAME_KIND on the request being constructed.
+---@param frame_kind string
 ---@param handler fun(payload_text: string, parsed_response: any)
 ---@param one_shot boolean|nil
-function M.register_response_handler (response_type, handler, one_shot)
-  M.response_handler_map[response_type] =
+function M.register_response_handler (frame_kind, handler, one_shot)
+  local record = M.ensure_request_draft()
+  record.handlers[frame_kind] =
     { handler = handler, one_shot = one_shot or false }
   if one_shot then
     M.lp_pending_count = M.lp_pending_count + 1 end
+end
+
+function M.request_record_for_edit ()
+  if M.dispatching_request_id then
+    return M.request_records[M.dispatching_request_id] end
+  return M.request_draft
+end
+
+function M.remove_response_handler (frame_kind)
+  local record = M.request_record_for_edit()
+  if not record then return end
+  local entry = record.handlers[frame_kind]
+  if entry and entry.one_shot then
+    M.lp_pending_count = math.max(0, M.lp_pending_count - 1) end
+  record.handlers[frame_kind] = nil
+end
+
+function M.response_handler_registered (frame_kind)
+  local record = M.request_record_for_edit()
+  return record and record.handlers[frame_kind] or nil
+end
+
+function M.take_request_record ()
+  local record = M.request_draft
+    or { id = fresh_request_id(), handlers = {} }
+  M.request_draft = nil
+  M.request_records[record.id] = record
+  return record
+end
+
+function M.dispatch_next_request ()
+  if M.active_request_id or #M.request_queue == 0 then return end
+  local queued = table.remove(M.request_queue, 1)
+  M.active_request_id = queued.id
+  queued.send(queued.wire)
+end
+
+function M.enqueue_request (record, wire, send)
+  table.insert(M.request_queue,
+               { id = record.id, wire = wire, send = send })
+  M.dispatch_next_request()
+end
+
+function M.finish_request (request_id)
+  local record = M.request_records[request_id]
+  if record then
+    for _, entry in pairs(record.handlers) do
+      if entry.one_shot then
+        M.lp_pending_count = math.max(0, M.lp_pending_count - 1) end
+    end
+    M.request_records[request_id] = nil
+  end
+  if M.active_request_id == request_id then
+    M.active_request_id = nil
+    M.dispatch_next_request() end
+end
+
+function M.clear_request_coordinator ()
+  M.request_records = {}
+  M.request_draft = nil
+  M.request_queue = {}
+  M.active_request_id = nil
+  M.dispatching_request_id = nil
+  M.lp_pending_count = 0
 end
 
 -- Length-prefixed (Content-Length) receiver state. Lua strings are

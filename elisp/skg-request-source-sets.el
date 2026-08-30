@@ -24,8 +24,7 @@
          (error
           (message "skg-list-source-sets: %S" err))))
      t)
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      (concat (prin1-to-string
               '((request . "list source sets")))
@@ -45,8 +44,7 @@
          (error
           (message "skg-active-source-set: %S" err))))
      t)
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      (concat (prin1-to-string
               '((request . "active source set")))
@@ -77,8 +75,7 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
       (skg--register-rerender-ugly-confirmation
        (lambda (pids) (skg-set-active-source-set name pids))
        'active-source-set)
-      (skg-lp-reset)
-      (process-send-string
+      (skg-submit-request
        tcp-proc
        (concat (prin1-to-string
                 (append

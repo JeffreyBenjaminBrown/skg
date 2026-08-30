@@ -23,8 +23,7 @@ function M.list_source_sets ()
         'Active source-set: %s; available: %s',
         active or '?', table.concat(sets, ', ')))
     end, true)
-  state.lp_reset()
-  client.send_string('((request . "list source sets"))\n')
+  client.submit_request('((request . "list source sets"))\n')
 end
 
 ---Ask the server for the active source-set.
@@ -33,8 +32,7 @@ function M.active_source_set ()
     function (_payload_text, response)
       vim.notify(payload.field_text(response, 'content') or '?')
     end, true)
-  state.lp_reset()
-  client.send_string('((request . "active source set"))\n')
+  client.submit_request('((request . "active source set"))\n')
 end
 
 ---Set the active source-set for this connection to NAME (prompted
@@ -59,7 +57,6 @@ function M.set_active_source_set (name, approved_pids)
   rerender.register_ugly_confirmation(function (pids)
     M.set_active_source_set(name, pids)
   end, 'active-source-set')
-  state.lp_reset()
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'set active source set'),
     sexpr.pair(sexpr.symbol('name'), name) }
@@ -67,7 +64,7 @@ function M.set_active_source_set (name, approved_pids)
     local approval = { sexpr.symbol('allow-ugly-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+  client.submit_request(sexpr.to_string(request) .. '\n')
 end
 
 return M

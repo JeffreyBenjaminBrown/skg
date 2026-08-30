@@ -99,8 +99,7 @@ touches, then a final reload-paths summary."
                 (content (cadr (assoc 'content response))))
            (when content (message "%s" content))))
        t) ; one-shot
-      (skg-lp-reset)
-      (process-send-string tcp-proc request-sexp))))
+      (skg-submit-request tcp-proc request-sexp))))
 
 ;;; ---- triggers ------------------------------------------------------
 

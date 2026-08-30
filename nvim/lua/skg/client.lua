@@ -51,6 +51,7 @@ function M.connect ()
     error(M.server_unavailable_message(
       connect_result or 'connection timed out')) end
   state.tcp = tcp
+  state.lp_reset()
   tcp:read_start(function (err, chunk)
     -- The uv read callback: forward data (or closure) to the main
     -- loop. A nil chunk without error means EOF; both tear down like
@@ -100,8 +101,7 @@ function M.handle_rust_response (chunk)
       message = tostring(parsed[1].cdr) end
     vim.notify(message)
     state.run_connection_reset_hooks()
-    state.response_handler_map = {}
-    state.lp_pending_count = 0
+    state.clear_request_coordinator()
     state.lp_reset()
   else
     length_prefix.handle_generic_chunk(chunk) end
@@ -116,8 +116,8 @@ function M.sentinel (event)
   log.log('info', 'tcp', 'connection closed: %s', event)
   state.close_connection()
   state.run_connection_reset_hooks()
-  state.response_handler_map = {}
-  state.lp_pending_count = 0
+  state.clear_request_coordinator()
+  state.lp_reset()
 end
 
 ---Send TEXT on the persistent connection, connecting first if needed.
@@ -127,9 +127,46 @@ function M.send_string (text)
   tcp:write(text)
 end
 
+local function request_with_id (request_text, request_id)
+  local request = request_text:match('^(.-)%s*$')
+  if request:sub(-1) ~= ')' then
+    error('skg: malformed outgoing request s-expression') end
+  return request:sub(1, -2)
+    .. string.format(' (request-id . %q))\n', request_id)
+end
+
+local function request_wire (request_text, request_id, content)
+  local wire = request_with_id(request_text, request_id)
+  if content ~= nil then
+    wire = wire .. string.format('Content-Length: %d\r\n\r\n%s',
+                                #content, content) end
+  return wire
+end
+
+---Submit one complete foreground operation through the serial coordinator.
+function M.submit_request (request_text, content)
+  local tcp = M.connect()
+  local record = state.take_request_record()
+  local wire = request_wire(request_text, record.id, content)
+  state.enqueue_request(record, wire, function (text) tcp:write(text) end)
+  return record.id
+end
+
+---Send a search snapshot continuation under the active request ID.
+function M.submit_request_continuation (request_text, content)
+  local request_id = state.dispatching_request_id
+  if not request_id or request_id ~= state.active_request_id then
+    error('skg: no active request is being dispatched') end
+  local tcp = M.connect()
+  tcp:write(request_wire(request_text, request_id, content))
+end
+
 ---Manually close the connection to the Rust server.
 function M.connection_end ()
   state.close_connection()
+  state.run_connection_reset_hooks()
+  state.clear_request_coordinator()
+  state.lp_reset()
 end
 
 return M

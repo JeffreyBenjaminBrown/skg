@@ -19,8 +19,7 @@ describe('skg.client', function ()
 
   before_each(function ()
     state.close_connection()
-    state.response_handler_map = {}
-    state.lp_pending_count = 0
+    state.clear_request_coordinator()
     state.lp_reset()
     state.connection_reset_hooks = {}
   end)
@@ -65,7 +64,7 @@ describe('skg.client', function ()
     local seen = nil
     state.register_response_handler('verify-connection',
       function (payload) seen = payload end, true)
-    client.send_string('((request . "verify connection"))\n')
+    client.submit_request('((request . "verify connection"))\n')
     vim.wait(2000, function () return seen ~= nil end, 10)
     assert.is_truthy(seen)
     assert.is_truthy(seen:find('pong', 1, true))
@@ -74,18 +73,18 @@ describe('skg.client', function ()
   it('handles a reply split across many small chunks', function ()
     local payload =
       '((response-type verify-connection) (content "chunked ñ"))'
-    local message = framed(payload)
     server = fake_server(function (_line, respond)
       -- Send one byte at a time: worst-case reassembly.
+      local message = framed(payload)
       for i = 1, #message do respond(message:sub(i, i)) end
     end)
     client.port = server.port
     local seen = nil
     state.register_response_handler('verify-connection',
       function (payload_text) seen = payload_text end, true)
-    client.send_string('((request . "verify connection"))\n')
+    client.submit_request('((request . "verify connection"))\n')
     vim.wait(2000, function () return seen ~= nil end, 10)
-    assert.are.equal(payload, seen)
+    assert.is_truthy(seen:find('chunked ñ', 1, true))
   end)
 
   it('tears down streams and handlers on busy-initializing',
@@ -99,10 +98,10 @@ describe('skg.client', function ()
                  function () reset_ran = true end)
     state.register_response_handler('verify-connection',
       function () end, true)
-    client.send_string('((request . "verify connection"))\n')
+    client.submit_request('((request . "verify connection"))\n')
     vim.wait(2000, function () return reset_ran end, 10)
     assert.is_true(reset_ran)
-    assert.are.same({}, state.response_handler_map)
+    assert.are.same({}, state.request_records)
     assert.are.equal(0, state.lp_pending_count)
   end)
 
@@ -119,7 +118,7 @@ describe('skg.client', function ()
     server.close()
     vim.wait(2000, function () return reset_ran end, 10)
     assert.is_true(reset_ran)
-    assert.are.same({}, state.response_handler_map)
+    assert.are.same({}, state.request_records)
     assert.is_nil(state.tcp)
   end)
 

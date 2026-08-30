@@ -45,23 +45,14 @@ untouched."
     (skg-register-response-handler
      'export-to-org
      (lambda (tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map))
+       (skg-remove-response-handler 'ugly-telescope-confirmation)
        (skg--export-to-org-handler tcp-proc payload))
      t)
     (skg-register-response-handler
      'ugly-telescope-confirmation
      (lambda (_tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map))
-       (when (assoc 'export-to-org skg-response-handler-map)
-         (setq skg-response-handler-map
-               (assoc-delete-all 'export-to-org
-                                 skg-response-handler-map))
-         (setq skg-lp--pending-count
-               (max 0 (1- skg-lp--pending-count))))
+       (skg-remove-response-handler 'ugly-telescope-confirmation)
+       (skg-remove-response-handler 'export-to-org)
        (let* ((response (read payload))
               (prompt (format "%s" (cadr (assoc 'prompt response))))
               (pids (mapcar (lambda (pid) (format "%s" pid))
@@ -69,8 +60,7 @@ untouched."
          (when (y-or-n-p (concat prompt " "))
            (skg-export-some-to-org source-set output-dir pids))))
      nil)
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      (concat
       (prin1-to-string

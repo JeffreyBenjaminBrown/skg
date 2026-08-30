@@ -139,7 +139,6 @@ GENERATION and BUF are captured for the response handler."
   (condition-case err
       (let ((entry (list generation buf ids)))
         (skg-readable-ids--ensure-title-response-handler)
-        (skg-lp-reset)
         (let* ((tcp-proc (skg-tcp-connect-to-rust))
                (request-sexp
                 (concat
@@ -153,9 +152,7 @@ GENERATION and BUF are captured for the response handler."
           (setq skg-readable-ids--pending-title-requests
                 (append skg-readable-ids--pending-title-requests
                         (list entry)))
-          (setq skg-lp--pending-count
-                (1+ skg-lp--pending-count))
-          (process-send-string tcp-proc request-sexp)))
+          (skg-submit-request tcp-proc request-sexp)))
     (error
      (message "skg-readable-ids: server not connected: %s"
               (error-message-string err)))))
@@ -166,7 +163,7 @@ GENERATION and BUF are captured for the response handler."
    'titles-by-ids
    (lambda (_tcp-proc payload)
      (skg-readable-ids--handle-next-response payload))
-   nil)
+   t)
   (skg-register-response-handler
    'ugly-telescope-confirmation
    (lambda (_tcp-proc payload)
@@ -178,8 +175,6 @@ GENERATION and BUF are captured for the response handler."
   (let ((entry (pop skg-readable-ids--pending-title-requests)))
     (if (not entry)
         (message "skg-readable-ids: privacy challenge without pending request")
-      (setq skg-lp--pending-count
-            (max 0 (1- skg-lp--pending-count)))
       (let* ((response (read payload))
              (prompt (format "%s" (cadr (assoc 'prompt response))))
              (pids (mapcar (lambda (pid) (format "%s" pid))
@@ -193,8 +188,6 @@ GENERATION and BUF are captured for the response handler."
   (let ((entry (pop skg-readable-ids--pending-title-requests)))
     (if (not entry)
         (message "skg-readable-ids: titles-by-ids response without pending request")
-      (setq skg-lp--pending-count
-            (max 0 (1- skg-lp--pending-count)))
       (skg-readable-ids--handle-response
        payload
        (nth 0 entry)

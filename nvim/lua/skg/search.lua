@@ -95,7 +95,7 @@ function M.request_text_search (search_terms, regex, body, operators,
   local request = sexpr.to_string(request_form) .. '\n'
   state.register_response_handler('search-results',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.remove_response_handler('ugly-telescope-confirmation')
       M.display_search_phase1(response, search_terms)
     end, true)
   state.register_response_handler('search-enrichment',
@@ -110,15 +110,12 @@ function M.request_text_search (search_terms, regex, body, operators,
     end, false) -- persistent, not one-shot
   state.register_response_handler('ugly-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.remove_response_handler('ugly-telescope-confirmation')
       for _, response_type in ipairs(
           { 'search-results', 'search-enrichment' }) do
-        if state.response_handler_map[response_type] then
-          state.response_handler_map[response_type] = nil
-          state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-        end
+        state.remove_response_handler(response_type)
       end
-      state.response_handler_map['request-snapshot'] = nil
+      state.remove_response_handler('request-snapshot')
       local prompt = payload.field_text(response, 'prompt') or
         'Include ugly telescopes in this search?'
       local choice = vim.fn.confirm(
@@ -126,8 +123,7 @@ function M.request_text_search (search_terms, regex, body, operators,
       M.request_text_search(
         search_terms, regex, body, operators, choice)
     end, false)
-  state.lp_reset()
-  client.send_string(request)
+  client.submit_request(request)
 end
 
 ---Display the immediate results: a search view buffer registered
@@ -201,12 +197,9 @@ function M.handle_snapshot_request (response)
   vim.notify('Enriching search results...')
   local contents = table.concat(
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
-  client.send_string(sexpr.to_string({
+  client.submit_request_continuation(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'snapshot response'),
-    sexpr.pair(sexpr.symbol('terms'), terms) }) .. '\n')
-  client.send_string(string.format('Content-Length: %d\r\n\r\n',
-                                   #contents))
-  client.send_string(contents)
+    sexpr.pair(sexpr.symbol('terms'), terms) }) .. '\n', contents)
 end
 
 return M

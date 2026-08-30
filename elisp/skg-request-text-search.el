@@ -88,9 +88,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      ;; Register phase 1 handler (one-shot)
      'search-results
      (lambda (_tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map))
+       (skg-remove-response-handler 'ugly-telescope-confirmation)
        (skg--display-search-phase1 payload clean-terms))
      t)
     (skg-register-response-handler
@@ -109,19 +107,10 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
     (skg-register-response-handler
      'ugly-telescope-confirmation
      (lambda (_tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map))
+       (skg-remove-response-handler 'ugly-telescope-confirmation)
        (dolist (response-type '(search-results search-enrichment))
-         (when (assoc response-type skg-response-handler-map)
-           (setq skg-response-handler-map
-                 (assoc-delete-all response-type
-                                   skg-response-handler-map))
-           (setq skg-lp--pending-count
-                 (max 0 (1- skg-lp--pending-count)))))
-       (setq skg-response-handler-map
-             (assoc-delete-all 'request-snapshot
-                               skg-response-handler-map))
+         (skg-remove-response-handler response-type))
+       (skg-remove-response-handler 'request-snapshot)
        (let* ((response (read payload))
               (prompt (format "%s" (cadr (assoc 'prompt response))))
               (choice (if (y-or-n-p
@@ -131,8 +120,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
          (skg--request-text-search
           clean-terms regex body operators choice)))
      nil)
-    (skg-lp-reset)
-    (process-send-string tcp-proc request-s-exp)))
+    (skg-submit-request tcp-proc request-s-exp)))
 
 (defvar skg--search-buffer-setup-hook nil
   "Hook run inside a freshly populated search buffer.
@@ -216,15 +204,9 @@ Exits readonly after replacing content."
                 (concat (prin1-to-string
                          `((request . "snapshot response")
                            (terms . ,terms)))
-                        "\n"))
-               (content-bytes
-                (encode-coding-string buffer-contents 'utf-8))
-               (content-length (length content-bytes))
-               (header (format "Content-Length: %d\r\n\r\n"
-                               content-length)))
-          (process-send-string tcp-proc request-s-exp)
-          (process-send-string tcp-proc header)
-          (process-send-string tcp-proc buffer-contents))))))
+                        "\n")))
+          (skg-submit-request-continuation
+           tcp-proc request-s-exp buffer-contents))))))
 
 (defun skg--replace-search-content (content)
   "Replace current buffer text with CONTENT, trimmed, with trailing newline.

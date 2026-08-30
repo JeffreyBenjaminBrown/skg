@@ -38,7 +38,8 @@ send_shutdown_command() {
                   :host "127.0.0.1"
                   :service port
                   :family 'ipv4)))
-  (process-send-string tcp-proc "((request . \"shutdown\"))\n")
+  (process-send-string tcp-proc
+                       "((request . \"shutdown\") (request-id . \"integration-shutdown\"))\n")
   (sleep-for 0.083)
   (delete-process tcp-proc))
 EOF

@@ -38,7 +38,6 @@ function M.toggle (approved_pids)
   rerender.register_ugly_confirmation(function (pids)
     M.toggle(pids)
   end, 'git-diff-mode')
-  state.lp_reset()
   local sexpr = require('skg.sexpr.parse')
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'git diff mode toggle') }
@@ -46,7 +45,7 @@ function M.toggle (approved_pids)
     local approval = { sexpr.symbol('allow-ugly-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+  client.submit_request(sexpr.to_string(request) .. '\n')
 end
 
 return M

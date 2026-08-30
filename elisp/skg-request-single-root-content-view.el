@@ -48,9 +48,7 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
     (skg-register-response-handler
      'content-view
      (lambda (tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map))
+       (skg-remove-response-handler 'ugly-telescope-confirmation)
        (skg-handle-content-view-sexp
         tcp-proc payload view-uri clean-id bypass-override approved-pids
         stale-uri-retry-p))
@@ -60,15 +58,8 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
     (skg-register-response-handler
      'ugly-telescope-confirmation
      (lambda (tcp-proc payload)
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map))
-       (when (assoc 'content-view skg-response-handler-map)
-         (setq skg-response-handler-map
-               (assoc-delete-all 'content-view
-                                 skg-response-handler-map))
-         (setq skg-lp--pending-count
-               (max 0 (1- skg-lp--pending-count))))
+       (skg-remove-response-handler 'ugly-telescope-confirmation)
+       (skg-remove-response-handler 'content-view)
        (let* ((response (read payload))
               (prompt (format "%s" (cadr (assoc 'prompt response))))
               (pids (mapcar (lambda (pid) (format "%s" pid))
@@ -78,8 +69,7 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
             clean-id tcp-proc bypass-override pids view-uri
             stale-uri-retry-p))))
      nil)
-    (skg-lp-reset)
-    (process-send-string tcp-proc request-s-exp)) )
+    (skg-submit-request tcp-proc request-s-exp)) )
 
 (defun skg--finish-switchToContentView
     (tcp-proc switch-uri node-id bypass-override approved-pids

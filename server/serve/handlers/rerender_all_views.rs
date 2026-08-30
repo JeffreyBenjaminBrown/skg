@@ -151,7 +151,6 @@ pub(crate) fn authorize_prepared_rerenders (
     ScalarReleaseDecision::Challenge { .. } => {
       send_response_with_length_prefix (
         stream, &challenge_response (&release) . unwrap () );
-      stream_empty_rerender (stream);
       false },
     ScalarReleaseDecision::AllowWithWarning { warning } => {
       prepared . warnings . push (warning);

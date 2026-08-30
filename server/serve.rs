@@ -37,7 +37,7 @@ use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
-use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
+use crate::serve::util::{ begin_request_context, read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
@@ -142,6 +142,13 @@ fn handle_emacs (
       Ok (0) => break, // emacs disconnected
       Ok (_n) => {
         tracing::info! ( request = request_header . trim_end (), "Received request" );
+        if let Err (error) = begin_request_context (&request_header) {
+          tracing::error! ("{}", error);
+          send_response_with_length_prefix (
+            &mut stream,
+            &tag_text_response (TcpToClient::Error, &error));
+          request_header . clear ();
+          continue; }
         match request_type_from_request (&request_header) {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
           Ok (RequestType::SingleRootContentView) =>
@@ -315,11 +322,19 @@ fn handle_snapshot_response (
     = match value_from_request_sexp ("terms", request)
     { Ok (t) => t,
       Err (e) => { tracing::error! ( "snapshot response: bad terms: {}", e);
+                   send_response_with_length_prefix (
+                     stream, &tag_text_response (
+                       TcpToClient::Error,
+                       &format! ("Snapshot response has bad terms: {}", e)));
                    return; }};
   let buffer_text : String
     = match read_length_prefixed_content (reader)
     { Ok (text) => text,
       Err (e) => { tracing::error! ( "snapshot response: failed to read content: {}", e);
+                   send_response_with_length_prefix (
+                     stream, &tag_text_response (
+                       TcpToClient::Error,
+                       &format! ("Snapshot response content failed: {}", e)));
                    return; }};
   let payload : SearchEnrichmentPayload = {
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
@@ -328,10 +343,19 @@ fn handle_snapshot_response (
       Some (p) => p,
       None => { tracing::warn! (
                   "snapshot response: no enrichment payload");
+                send_response_with_length_prefix (
+                  stream, &tag_text_response (
+                    TcpToClient::Error,
+                    "Snapshot response has no pending enrichment"));
                 return; }} };
   if payload . terms != terms {
     tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
                     payload . terms, terms);
+    send_response_with_length_prefix (
+      stream, &tag_text_response (
+        TcpToClient::Error,
+        &format! ("Snapshot terms mismatch: '{}' vs '{}'",
+                  payload . terms, terms)));
     return; }
   let parse_result : Result<(Tree<MpViewnode>,
                              Vec<BufferValidationError>), String>
@@ -342,9 +366,17 @@ fn handle_snapshot_response (
         Ok (f) => f,
         Err (e) => {
           tracing::error! ("snapshot response: check failed: {}", e);
+          send_response_with_length_prefix (
+            stream, &tag_text_response (
+              TcpToClient::Error,
+              &format! ("Snapshot structure check failed: {}", e)));
           return; }},
     Err (e) => {
       tracing::error! ("snapshot response: parse failed: {}", e);
+      send_response_with_length_prefix (
+        stream, &tag_text_response (
+          TcpToClient::Error,
+          &format! ("Snapshot parse failed: {}", e)));
       return; }};
   insert_containerward_ancestries_into_search_view (
     &mut viewforest, &payload . search_results,
@@ -393,6 +425,10 @@ fn handle_snapshot_response (
     // Fail closed rather than serialize if a future change violates either.
     tracing::error! (
       "search enrichment reached the release boundary without approval" );
+    send_response_with_length_prefix (
+      stream, &tag_text_response (
+        TcpToClient::Error,
+        "Search enrichment failed its scalar-release check"));
     return; }
   let release_warnings : Vec<String> = match release {
     ScalarReleaseDecision::AllowWithWarning { warning } => vec! [warning],

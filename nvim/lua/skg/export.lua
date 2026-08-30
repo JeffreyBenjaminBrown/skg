@@ -34,23 +34,19 @@ function M.export_some_to_org (source_set, output_dir, approved_pids)
   end
   state.register_response_handler('export-to-org',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.remove_response_handler('ugly-telescope-confirmation')
       M.export_to_org_handler(response)
     end, true)
   state.register_response_handler('ugly-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
-      if state.response_handler_map['export-to-org'] then
-        state.response_handler_map['export-to-org'] = nil
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      end
+      state.remove_response_handler('ugly-telescope-confirmation')
+      state.remove_response_handler('export-to-org')
       local prompt = payload.field_text(response, 'prompt') or
         'This export includes text selected below home. Include it?'
       local pids = payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
         M.export_some_to_org(source_set, output_dir, pids) end
     end, false)
-  state.lp_reset()
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'export to org'),
     sexpr.pair(sexpr.symbol('source-set'), source_set),
@@ -59,7 +55,7 @@ function M.export_some_to_org (source_set, output_dir, approved_pids)
     local approval = { sexpr.symbol('allow-ugly-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+  client.submit_request(sexpr.to_string(request) .. '\n')
 end
 
 ---@param response any

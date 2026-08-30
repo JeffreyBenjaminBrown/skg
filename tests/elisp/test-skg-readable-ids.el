@@ -24,6 +24,14 @@
   (format "((response-type titles-by-ids) (content ((%S . %S))))"
           id title))
 
+(defun test-skg-readable-ids--dispatch-draft (frame-kind payload)
+  "Call FRAME-KIND's handler in the request under construction."
+  (let ((entry
+         (assoc frame-kind
+                (skg--request-record-handlers skg--request-draft))))
+    (should entry)
+    (funcall (cadr entry) nil payload)))
+
 (defun test-skg-readable-ids--after-string-count ()
   (let ((count 0))
     (dolist (ov (overlays-in (point-min) (point-max)))
@@ -52,7 +60,8 @@
       count)))
 
 (ert-deftest test-skg-readable-ids-later-response-survives-earlier-response ()
-  (let ((skg-response-handler-map nil)
+  (let ((skg--request-draft nil)
+        (skg--request-records (make-hash-table :test #'equal))
         (skg-lp--pending-count 0)
         (skg-lp--buf (unibyte-string))
         (skg-lp--bytes-left nil)
@@ -60,8 +69,8 @@
     (with-temp-buffer
       (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
                  (lambda () 'fake-proc))
-                ((symbol-function 'process-send-string)
-                 (lambda (_proc _string) nil)))
+                ((symbol-function 'skg-submit-request)
+                 (lambda (&rest _) nil)))
         (insert test-skg-readable-ids--id-a)
         (setq skg-readable-ids--positions
               (skg-readable-ids--collect-ids))
@@ -79,20 +88,21 @@
          (list test-skg-readable-ids--id-b)
          skg-readable-ids--generation
          (current-buffer))
-        (skg-lp--dispatch-by-type
-         nil
+        (test-skg-readable-ids--dispatch-draft
+         'titles-by-ids
          (test-skg-readable-ids--titles-payload
           test-skg-readable-ids--id-a
           "Title A"))
-        (skg-lp--dispatch-by-type
-         nil
+        (test-skg-readable-ids--dispatch-draft
+         'titles-by-ids
          (test-skg-readable-ids--titles-payload
           test-skg-readable-ids--id-b
           "Title B"))
 	        (should (= 1 (test-skg-readable-ids--after-string-count)))) )))
 
 (ert-deftest test-skg-readable-ids-shortens-inactive-ids-without-title-overlay ()
-  (let ((skg-response-handler-map nil)
+  (let ((skg--request-draft nil)
+        (skg--request-records (make-hash-table :test #'equal))
         (skg-lp--pending-count 0)
         (skg-lp--buf (unibyte-string))
         (skg-lp--bytes-left nil)
@@ -100,8 +110,8 @@
     (with-temp-buffer
       (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
                  (lambda () 'fake-proc))
-                ((symbol-function 'process-send-string)
-                 (lambda (_proc _string) nil)))
+                ((symbol-function 'skg-submit-request)
+                 (lambda (&rest _) nil)))
         (insert
          (format
           "* (skg (inactiveNode (id %s) (source private)))\n* (skg (node (id %s) (source public))) active\n"
@@ -110,8 +120,8 @@
         (setq skg-readable-ids--generation 0)
         (skg-readable-ids--annotate-buffer)
         (should (= 2 (test-skg-readable-ids--display-count)))
-        (skg-lp--dispatch-by-type
-         nil
+        (test-skg-readable-ids--dispatch-draft
+         'titles-by-ids
          (test-skg-readable-ids--titles-payload
           test-skg-readable-ids--id-active
           "Active Title"))
@@ -131,7 +141,8 @@
   "Run BODY with the LP machine, pending queue and title cache
 rebound to fresh values, the network stubbed out, and every
 process-send-string recorded into the local variable `sent'."
-  `(let ((skg-response-handler-map nil)
+  `(let ((skg--request-draft nil)
+         (skg--request-records (make-hash-table :test #'equal))
          (skg-lp--pending-count 0)
          (skg-lp--buf (unibyte-string))
          (skg-lp--bytes-left nil)
@@ -142,8 +153,9 @@ process-send-string recorded into the local variable `sent'."
      (ignore sent)
      (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
                 (lambda () 'fake-proc))
-               ((symbol-function 'process-send-string)
-                (lambda (_proc string) (push string sent))))
+               ((symbol-function 'skg-submit-request)
+                (lambda (_proc string &optional _content)
+                  (push string sent))))
        ,@body)))
 
 (ert-deftest test-skg-readable-ids-cached-titles-need-no-request ()
@@ -174,8 +186,8 @@ and the response's titles merge into the cache."
      (should-not (string-match-p test-skg-readable-ids--id-c
                                  (car sent)))
      (should (= 1 (test-skg-readable-ids--after-string-count)))
-     (skg-lp--dispatch-by-type
-      nil
+     (test-skg-readable-ids--dispatch-draft
+      'titles-by-ids
       (test-skg-readable-ids--titles-payload
        test-skg-readable-ids--id-d "Fetched Title"))
      (should (= 2 (test-skg-readable-ids--after-string-count)))
@@ -192,8 +204,8 @@ clears the cache and asks again."
      (insert test-skg-readable-ids--id-c)
      (skg-readable-ids--annotate-buffer)
      (should (= 1 (length sent)))
-     (skg-lp--dispatch-by-type
-      nil
+     (test-skg-readable-ids--dispatch-draft
+      'titles-by-ids
       "((response-type titles-by-ids) (content ()))")
      (should (eq :missing
                  (gethash test-skg-readable-ids--id-c
@@ -212,8 +224,8 @@ clears the cache and asks again."
      (skg-readable-ids--annotate-buffer)
      (should (= 1 (length sent)))
      (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) t)))
-       (skg-lp--dispatch-by-type
-        nil
+       (test-skg-readable-ids--dispatch-draft
+        'ugly-telescope-confirmation
         (format
          "((response-type ugly-telescope-confirmation) \
            (operation titles-by-ids) (pids (%S)) \

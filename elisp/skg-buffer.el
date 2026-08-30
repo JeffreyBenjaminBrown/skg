@@ -167,7 +167,7 @@ otherwise generate a new UUID."
                             `((request . "close view")
                               (view-uri . ,view-uri)))
                            "\n")))
-      (process-send-string tcp-proc request))))
+      (skg-submit-request tcp-proc request))))
 
 (defun skg-send-close-view ()
   "Send a close-view message to the server for this buffer's view URI."

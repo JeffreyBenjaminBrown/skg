@@ -148,11 +148,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
         save_buf, response, fork_approved, fork_sources,
         hoist_approved_pids)
     end, false)
-  state.lp_reset()
-  client.send_string(request_line)
-  client.send_string(string.format('Content-Length: %d\r\n\r\n',
-                                   #buffer_contents))
-  client.send_string(buffer_contents)
+  client.submit_request(request_line, buffer_contents)
 end
 
 ---The save-buffer request line.
@@ -274,11 +270,10 @@ end
 ---@param save_buf integer
 ---@param response any
 function M.save_result_handler (save_buf, response)
-  state.response_handler_map['collateral-view'] = nil
-  state.response_handler_map['save-relax-lock'] = nil
-  state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['ugly-telescope-confirmation'] = nil
+  for _, frame_kind in ipairs({
+      'collateral-view', 'save-relax-lock', 'fork-confirmation',
+      'telescope-hoist-confirmation', 'ugly-telescope-confirmation' }) do
+    state.remove_response_handler(frame_kind) end
   lock.end_stream()
   lock.unlock_all_save_locked()
   local ok, err = pcall(M.handle_save_response, save_buf, response)
@@ -451,15 +446,11 @@ end
 ---@param save_buf integer
 ---@param response any
 function M.fork_confirmation_handler (save_buf, response)
-  state.response_handler_map['collateral-view'] = nil
-  state.response_handler_map['save-relax-lock'] = nil
-  state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['ugly-telescope-confirmation'] = nil
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
+  for _, frame_kind in ipairs({
+      'collateral-view', 'save-relax-lock', 'fork-confirmation',
+      'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
+      'save-result' }) do
+    state.remove_response_handler(frame_kind) end
   lock.end_stream()
   lock.unlock_all_save_locked()
   local confirm_buf = nil
@@ -504,15 +495,11 @@ end
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, fork_approved, fork_sources,
     scalar_approved_pids)
-  state.response_handler_map['collateral-view'] = nil
-  state.response_handler_map['save-relax-lock'] = nil
-  state.response_handler_map['fork-confirmation'] = nil
-  state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['ugly-telescope-confirmation'] = nil
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
+  for _, frame_kind in ipairs({
+      'collateral-view', 'save-relax-lock', 'fork-confirmation',
+      'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
+      'save-result' }) do
+    state.remove_response_handler(frame_kind) end
   lock.end_stream()
   lock.unlock_all_save_locked()
   local ok, err = pcall(function ()
@@ -561,13 +548,9 @@ function M.save_scalar_release_confirmation_handler (
     hoist_approved_pids)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'telescope-hoist-confirmation', 'ugly-telescope-confirmation' }) do
-    state.response_handler_map[response_type] = nil
-  end
-  if state.response_handler_map['save-result'] then
-    state.response_handler_map['save-result'] = nil
-    state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-  end
+      'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
+      'save-result' }) do
+    state.remove_response_handler(response_type) end
   lock.end_stream()
   lock.unlock_all_save_locked()
   local approved_pids =

@@ -32,8 +32,7 @@
      'diff-analysis
      #'skg--diff-analysis-handler
      t)
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      (concat
       (prin1-to-string

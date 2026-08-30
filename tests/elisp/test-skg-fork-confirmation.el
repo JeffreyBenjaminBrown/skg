@@ -65,15 +65,21 @@
 
 (ert-deftest test-hoist-confirmation-balances-save-and-retries-exact-pids ()
   "Approving Hoist terminates the first save and preserves fork authority."
-  (let ((origin (generate-new-buffer "*hoist-origin*"))
-        (skg-response-handler-map
-         '((save-result ignore . t)
-           (collateral-view ignore)
-           (save-relax-lock ignore)
-           (fork-confirmation ignore)
-           (telescope-hoist-confirmation ignore)))
+  (let* ((origin (generate-new-buffer "*hoist-origin*"))
+         (record
+          (make-skg--request-record
+           :id "test-hoist"
+           :handlers
+           '((save-result ignore . t)
+             (collateral-view ignore)
+             (save-relax-lock ignore)
+             (fork-confirmation ignore)
+             (telescope-hoist-confirmation ignore))))
+        (skg--request-records (make-hash-table :test #'equal))
+        (skg--dispatching-request-id "test-hoist")
         (skg-lp--pending-count 1)
         called)
+    (puthash "test-hoist" record skg--request-records)
     (unwind-protect
         (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
                   ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
@@ -89,7 +95,8 @@
     (should (equal called
                    '(t (("N" . "owned")) ("A" "B") nil)))
     (should (= skg-lp--pending-count 0))
-    (should-not (assoc 'save-result skg-response-handler-map))))
+    (should-not
+     (assoc 'save-result (skg--request-record-handlers record)))))
 
 (ert-deftest test-save-request-sexp-carries-scalar-release-pids ()
   "Saved/collateral rerender authority uses the shared release field."
@@ -104,14 +111,20 @@
 
 (ert-deftest test-save-scalar-release-balances-and-retries-exact-pids ()
   "The save is committed, but no staged text is adopted before approval."
-  (let ((origin (generate-new-buffer "*save-release-origin*"))
-        (skg-response-handler-map
-         '((save-result ignore . t)
-           (collateral-view ignore)
-           (save-relax-lock ignore)
-           (ugly-telescope-confirmation ignore)))
+  (let* ((origin (generate-new-buffer "*save-release-origin*"))
+         (record
+          (make-skg--request-record
+           :id "test-release"
+           :handlers
+           '((save-result ignore . t)
+             (collateral-view ignore)
+             (save-relax-lock ignore)
+             (ugly-telescope-confirmation ignore))))
+        (skg--request-records (make-hash-table :test #'equal))
+        (skg--dispatching-request-id "test-release")
         (skg-lp--pending-count 1)
         called)
+    (puthash "test-release" record skg--request-records)
     (unwind-protect
         (cl-letf (((symbol-function 'skg--end-stream) #'ignore)
                   ((symbol-function 'skg--unlock-all-save-locked) #'ignore)
@@ -127,7 +140,8 @@
     (should (equal called
                    '(t (("N" . "owned")) ("H") ("U1" "U2"))))
     (should (= skg-lp--pending-count 0))
-    (should-not (assoc 'save-result skg-response-handler-map))))
+    (should-not
+     (assoc 'save-result (skg--request-record-handlers record)))))
 
 (ert-deftest test-fork-sources-from-confirmation-buffer-walks-two-levels ()
   "skg--fork-sources-from-confirmation-buffer pairs each clone-to-be

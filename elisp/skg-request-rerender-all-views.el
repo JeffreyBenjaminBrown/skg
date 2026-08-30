@@ -12,12 +12,6 @@
 (require 'skg-buffer)       ; for skg-find-buffer-by-uri
 (require 'skg-lock-buffers)
 
-(defvar skg--rerender-ugly-retry nil
-  "Function to run after a challenged rerender's empty unwind completes.")
-
-(defvar skg--rerender-ugly-challenged nil
-  "Non-nil while consuming the empty unwind after a privacy challenge.")
-
 (defun skg-request-rerender-all-views (&optional approved-pids)
   "Ask the server to re-render every open view.
 Locks all skg buffers, then registers handlers for the
@@ -28,8 +22,7 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
     (skg--register-rerender-stream-handlers)
     (skg--register-rerender-ugly-confirmation
      (lambda (pids) (skg-request-rerender-all-views pids)))
-    (skg-lp-reset)
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      (concat (prin1-to-string
               (append
@@ -40,32 +33,23 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
 
 (defun skg--register-rerender-ugly-confirmation
     (retry &optional unfired-response-type)
-  "Retry after the challenge unwind, approving its PIDs.
+  "End a challenged rerender and optionally retry with approved PIDs.
 UNFIRED-RESPONSE-TYPE is the one-shot acknowledgement the challenged
 request replaced; remove it and balance its pending count."
-  (setq skg--rerender-ugly-retry nil
-        skg--rerender-ugly-challenged nil)
   (skg-register-response-handler
    'ugly-telescope-confirmation
    (lambda (_tcp-proc payload)
-     (setq skg-response-handler-map
-           (assoc-delete-all 'ugly-telescope-confirmation
-                             skg-response-handler-map))
-     (when (and unfired-response-type
-                (assoc unfired-response-type skg-response-handler-map))
-       (setq skg-response-handler-map
-             (assoc-delete-all unfired-response-type
-                               skg-response-handler-map))
-       (setq skg-lp--pending-count
-             (max 0 (1- skg-lp--pending-count))))
+     (skg-remove-response-handler 'ugly-telescope-confirmation)
+     (when unfired-response-type
+       (skg-remove-response-handler unfired-response-type))
      (let* ((response (read payload))
             (prompt (format "%s" (cadr (assoc 'prompt response))))
             (pids (mapcar (lambda (pid) (format "%s" pid))
                           (cadr (assoc 'pids response)))))
-       (setq skg--rerender-ugly-challenged t)
+       (skg--end-stream)
+       (skg--unlock-all-save-locked)
        (when (y-or-n-p (concat prompt " "))
-         (setq skg--rerender-ugly-retry
-               (lambda () (funcall retry pids))))))
+         (run-at-time 0 nil (lambda () (funcall retry pids))))))
    nil))
 
 (defun skg--register-rerender-stream-handlers ()
@@ -75,10 +59,7 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
    ;; 1. Lock message: unlock buffers not in the URI list.
    'rerender-lock
    (lambda (_tcp-proc payload)
-     (unless skg--rerender-ugly-challenged
-       (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
-                               skg-response-handler-map)))
+     (skg-remove-response-handler 'ugly-telescope-confirmation)
      (condition-case err
          (let* ((response (read payload))
                 (lock-entry (assoc 'lock-views response)))
@@ -99,8 +80,7 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
    ;; 3. Done message: clean up and show errors/warnings.
    'rerender-done
    (lambda (_tcp-proc payload)
-     (setq skg-response-handler-map
-           (assoc-delete-all 'rerender-view skg-response-handler-map))
+     (skg-remove-response-handler 'rerender-view)
      (skg--end-stream)
      (skg--unlock-all-save-locked) ;; safety net
      (condition-case err
@@ -122,15 +102,7 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
               (skg-errors-and-warnings-to-org-string
                errors-list warnings-list))))
        (error
-        (message "skg: rerender-done handler error: %S" err)))
-     (let ((retry (and skg--rerender-ugly-challenged
-                       skg--rerender-ugly-retry)))
-       (setq skg--rerender-ugly-retry nil
-             skg--rerender-ugly-challenged nil)
-       ;; The dispatcher removes this one-shot handler after return. A
-       ;; zero-delay timer starts the retry after that removal, so the new
-       ;; rerender-done handler is not accidentally deleted with the old one.
-       (when retry (run-at-time 0 nil retry))))
+        (message "skg: rerender-done handler error: %S" err))))
    t))
 
 (provide 'skg-request-rerender-all-views)

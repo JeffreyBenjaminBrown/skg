@@ -74,8 +74,7 @@ and prompt from the reply."
          (lambda (_tcp-proc payload)
            (skg--set-relationship-source-from-info buffer marker payload))
          t)
-        (skg-lp-reset)
-        (process-send-string
+        (skg-submit-request
          (skg-tcp-connect-to-rust)
          (concat
           (prin1-to-string

@@ -47,11 +47,7 @@ callers that need the table should go through `skg-herald-rules-ensure'."
            "Heralds: could not parse the rule table from the server: %S"
            err))))
      t)
-    ;; PITFALL: No `skg-lp-reset' here, unlike most request functions.
-    ;; This request is sent immediately after `skg-connection-verify'
-    ;; during `skg-client-init'; resetting the LP machine could drop a
-    ;; partially received verify-connection response.
-    (process-send-string
+    (skg-submit-request
      tcp-proc
      "((request . \"herald rules\"))\n")))
 

@@ -91,6 +91,25 @@ what's imperfect about what's done; choices determining the future.
   135 save/source integration tests, all 312 Emacs tests and the complete
   Neovim suite pass.
 
+** request-scoped response protocol (in progress)
+- Every foreground operation now receives a fresh connection-local request
+  ID.  The server echoes it on every frame, names the frame kind independently
+  of its payload type, and marks exactly one terminal frame.  Search's snapshot
+  response is the sole same-ID continuation; authorization retries are new
+  requests.
+- Both clients retain handlers in per-request records and serialize complete
+  operations through a FIFO coordinator.  A stale or unknown response cannot
+  reach a newer like-typed handler.  Terminal cleanup advances the queue once,
+  including when the selected handler itself errors; parser state is reset
+  only for a new or abandoned connection.
+- Rerender privacy challenges are terminal rather than beginning a synthetic
+  empty rerender stream.  The client unlocks immediately and schedules any
+  approved retry as a new request.
+- The wire contract and its search continuation are recorded in
+  =api-and-formats.md=.  Validation after this slice: 182/182 Rust library
+  tests in one serial process, all 314 Emacs tests and the complete Neovim
+  suite pass; =git diff --check= is clean.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.
