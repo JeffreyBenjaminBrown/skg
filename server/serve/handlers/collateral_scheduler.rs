@@ -7,6 +7,9 @@
 //! operation against the revision from which it was rendered.
 
 use crate::serve::ViewsState;
+use crate::git_ops::presentation_signature::{
+  PresentationSignature, presentation_signature,
+};
 use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision, decide,
 };
@@ -79,6 +82,8 @@ pub struct CollateralScheduler {
   in_flight      : Option<ViewUri>,
   pending_offer  : Option<(String, PendingOffer)>,
   next_operation : u64,
+  presentation_generation : u64,
+  presentation_signature  : Option<PresentationSignature>,
   sender         : Sender<WorkerResult>,
   receiver       : Receiver<WorkerResult>,
 }
@@ -94,6 +99,8 @@ impl CollateralScheduler {
       in_flight: None,
       pending_offer: None,
       next_operation: 0,
+      presentation_generation: 0,
+      presentation_signature: None,
       sender,
       receiver,
     }
@@ -101,6 +108,20 @@ impl CollateralScheduler {
 
   /// Replace all obsolete work after a successful graph transition.
   pub fn replace_after_transition (
+    &mut self,
+    saved_uri           : Option<&ViewUri>,
+    views_state         : &ViewsState,
+    env                 : &SkgEnv,
+    define_nodes        : &[DefineNode],
+    active_source_set   : &ActiveSourceSet,
+    scalar_approved     : &HashSet<ID>,
+  ) {
+    self . replace_queue (
+      saved_uri, views_state, env, define_nodes, active_source_set,
+      scalar_approved);
+  }
+
+  fn replace_queue (
     &mut self,
     saved_uri           : Option<&ViewUri>,
     views_state         : &ViewsState,
@@ -119,7 +140,7 @@ impl CollateralScheduler {
     self . batch = Some (BatchContext {
       generation: RenderGeneration {
         graph: env . in_rust_graph . load_full () . graph_generation,
-        presentation: 0,
+        presentation: self . presentation_generation,
       },
       epoch,
       env: env . clone (),
@@ -128,6 +149,31 @@ impl CollateralScheduler {
       active_source_set: active_source_set . clone (),
       scalar_approved: scalar_approved . clone (),
     });
+  }
+
+  pub fn seed_presentation (&mut self, env : &SkgEnv) -> Result<(), String> {
+    self . presentation_signature = Some (presentation_signature (&env . config)?);
+    Ok (( ))
+  }
+
+  /// Observe HEAD/index independently of worktree selection. A changed
+  /// signature rerenders every view only while diff mode is enabled.
+  pub fn observe_presentation (
+    &mut self,
+    views_state       : &ViewsState,
+    env               : &SkgEnv,
+    active_source_set : &ActiveSourceSet,
+  ) -> Result<bool, String> {
+    let signature = presentation_signature (&env . config)?;
+    let previous = self . presentation_signature . replace (signature);
+    if previous == Some (signature) { return Ok (false); }
+    if previous . is_none () { return Ok (false); }
+    self . presentation_generation = self . presentation_generation
+      . checked_add (1) . ok_or ("presentation generation exhausted")?;
+    if views_state . diff_mode_enabled {
+      self . replace_queue (
+        None, views_state, env, &[], active_source_set, &HashSet::new ()); }
+    Ok (true)
   }
 
   /// A foreground operation gets first use of TypeDB.  The current worker is

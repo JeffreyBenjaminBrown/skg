@@ -32,6 +32,7 @@ pub enum RequestType {
   RecomputeCyclicRoots,
   ApplyCollateral,
   ViewVisited,
+  ObservePresentation,
 }
 
 impl RequestType {
@@ -66,6 +67,7 @@ impl RequestType {
       "recompute cyclic roots"   => Ok (RequestType::RecomputeCyclicRoots),
       "apply collateral"         => Ok (RequestType::ApplyCollateral),
       "view visited"             => Ok (RequestType::ViewVisited),
+      "observe presentation"     => Ok (RequestType::ObservePresentation),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -110,6 +112,7 @@ pub enum TcpToClient {
   RecomputeCyclicRoots,
   CollateralApplied,
   ViewVisited,
+  PresentationObserved,
   Error,
 }
 
@@ -154,4 +157,5 @@ impl TcpToClient {
       TcpToClient::RecomputeCyclicRoots => "recompute-cyclic-roots",
       TcpToClient::CollateralApplied => "collateral-applied",
       TcpToClient::ViewVisited => "view-visited",
+      TcpToClient::PresentationObserved => "presentation-observed",
       TcpToClient::Error            => "error", }} }

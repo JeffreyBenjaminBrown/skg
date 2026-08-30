@@ -527,9 +527,19 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
 ;;; ---- triggers ------------------------------------------------------
 
 (defun skg--reload-on-magit-refresh ()
-  "Magit hook: request an authoritative full-manifest comparison."
+  "Observe both worktree bytes and HEAD/index presentation after Magit."
   (condition-case err
-      (skg--request-reload-full-sweep)
+      (progn
+        (skg--request-reload-full-sweep)
+        (let ((tcp-proc (skg-tcp-connect-to-rust)))
+          (skg-register-response-handler
+           'presentation-observed
+           (lambda (_tcp-proc payload)
+             (when-let ((content (cadr (assoc 'content (read payload)))))
+               (skg-log 'debug 'reload "%s" content)))
+           t)
+          (skg-submit-request
+           tcp-proc "((request . \"observe presentation\"))\n")))
     (error
      (skg-log 'error 'reload "magit refresh observation: %s"
               (error-message-string err)))))

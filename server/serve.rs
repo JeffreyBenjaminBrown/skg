@@ -135,6 +135,8 @@ fn handle_emacs (
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
   let mut collateral_scheduler = CollateralScheduler::new ();
+  if let Err (error) = collateral_scheduler . seed_presentation (&env) {
+    tracing::warn! (%error, "could not seed Git presentation signature"); }
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -161,7 +163,9 @@ fn handle_emacs (
           continue; }
         let request_type = request_type_from_request (&request_header);
         if ! matches! (request_type,
-          Ok (RequestType::ApplyCollateral | RequestType::ViewVisited))
+          Ok (RequestType::ApplyCollateral
+              | RequestType::ViewVisited
+              | RequestType::ObservePresentation))
         { collateral_scheduler . preempt (); }
         match request_type {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
@@ -314,6 +318,24 @@ fn handle_emacs (
               Err (error) => send_response_with_length_prefix (
                 &mut stream, &tag_text_response (
                   TcpToClient::Error, &error)), } },
+          Ok (RequestType::ObservePresentation) => {
+            match collateral_scheduler . observe_presentation (
+                &views_state, &env, &active_source_set)
+            {
+              Ok (changed) => send_response_with_length_prefix (
+                &mut stream, &tag_text_response (
+                  TcpToClient::PresentationObserved,
+                  if changed {
+                    if views_state . diff_mode_enabled {
+                      "Git presentation changed; diff-mode views queued"
+                    } else {
+                      "Git presentation changed; diff mode is disabled" }
+                  } else { "Git presentation is unchanged" })),
+              Err (error) => send_response_with_length_prefix (
+                &mut stream, &tag_text_response (
+                  TcpToClient::Error, &format! (
+                    "Git presentation observation failed: {}", error))),
+            } },
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
