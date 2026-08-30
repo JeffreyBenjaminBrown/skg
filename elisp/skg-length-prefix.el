@@ -52,6 +52,7 @@ If there is buffered data and a handler matched, continues the loop."
   (condition-case err
       (let* ((response (read payload))
              (request-id (cadr (assoc 'request-id response)))
+             (incident-id (cadr (assoc 'incident-id response)))
              (frame-kind (or (cadr (assoc 'frame-kind response))
                              (cadr (assoc 'response-type response))))
              (terminal-status (cadr (assoc 'terminal-status response)))
@@ -64,6 +65,12 @@ If there is buffered data and a handler matched, continues the loop."
                    (substring payload 0 (min 80 (length payload)))))
          ((not record)
           (skg-log 'warn 'dispatch "unknown/stale request-id: %s" request-id))
+         ((not (equal (and incident-id (format "%s" incident-id))
+                      (skg--request-record-incident-id record)))
+          (ding)
+          (skg-log 'error 'dispatch
+                   "incident-id mismatch on request %s" request-id)
+          (skg--finish-request (format "%s" request-id)))
          (t
           (setq request-id (format "%s" request-id))
           (let ((handler-entry

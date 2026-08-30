@@ -5,12 +5,13 @@
 ;;; TODO: Can these globals be avoided?
 
 (require 'cl-lib)
+(require 'org-id)
 
 (defvar skg-rust-tcp-proc nil
   "Persistent TCP connection to the Rust backend. See
 https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html")
 
-(cl-defstruct skg--request-record id handlers)
+(cl-defstruct skg--request-record id incident-id handlers)
 
 (defvar skg--request-records (make-hash-table :test #'equal)
   "Sent request records keyed by connection-local request ID.")
@@ -30,6 +31,10 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
       (setq skg--request-draft
             (make-skg--request-record
              :id (skg--fresh-request-id) :handlers nil))))
+
+(defun skg-fresh-incident-id ()
+  "Return an opaque ID for one reconciliation episode."
+  (format "incident-%s" (org-id-uuid)))
 
 (defun skg-register-response-handler (frame-kind handler &optional one-shot)
   "Register HANDLER for FRAME-KIND on the request being constructed."
@@ -61,20 +66,26 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
   (when-let ((record (skg--request-record-for-edit)))
     (assoc frame-kind (skg--request-record-handlers record))))
 
-(defun skg--request-with-id (request-text request-id)
+(defun skg--request-with-identity (request-text request-id incident-id)
   (let ((request (car (read-from-string request-text))))
     (concat (prin1-to-string
-             (append request `((request-id . ,request-id))))
+             (append request
+                     `((request-id . ,request-id))
+                     (when incident-id
+                       `((incident-id . ,incident-id)))))
             "\n")))
 
-(defun skg-submit-request (tcp-proc request-text &optional content)
+(defun skg-submit-request (tcp-proc request-text &optional content incident-id)
   "Submit one complete operation, queuing it behind the active request.
-CONTENT, when non-nil, is appended with its Content-Length header."
+CONTENT, when non-nil, is appended with its Content-Length header.
+INCIDENT-ID keeps retries in one longer reconciliation episode."
   (let* ((record (or skg--request-draft
                      (make-skg--request-record
                       :id (skg--fresh-request-id) :handlers nil)))
          (request-id (skg--request-record-id record))
-         (wire (skg--request-wire request-text request-id content)))
+         (_ (setf (skg--request-record-incident-id record) incident-id))
+         (wire (skg--request-wire
+                request-text request-id incident-id content)))
     (puthash request-id record skg--request-records)
     (setq skg--request-draft nil)
     (setq skg--request-queue
@@ -82,9 +93,9 @@ CONTENT, when non-nil, is appended with its Content-Length header."
     (skg--dispatch-next-request)
     request-id))
 
-(defun skg--request-wire (request-text request-id content)
+(defun skg--request-wire (request-text request-id incident-id content)
   (concat
-   (skg--request-with-id request-text request-id)
+   (skg--request-with-identity request-text request-id incident-id)
    (when content
      (format "Content-Length: %d\r\n\r\n%s"
              (string-bytes content) content))))
@@ -98,7 +109,11 @@ CONTENT, when non-nil, is appended with its Content-Length header."
     (error "No active request is being dispatched"))
   (process-send-string
    tcp-proc
-   (skg--request-wire request-text skg--dispatching-request-id content)))
+   (let ((record (gethash skg--dispatching-request-id
+                          skg--request-records)))
+     (skg--request-wire
+      request-text skg--dispatching-request-id
+      (and record (skg--request-record-incident-id record)) content))))
 
 (defun skg--dispatch-next-request ()
   (when (and (null skg--active-request-id) skg--request-queue)

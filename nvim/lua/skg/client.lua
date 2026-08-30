@@ -127,16 +127,19 @@ function M.send_string (text)
   tcp:write(text)
 end
 
-local function request_with_id (request_text, request_id)
+local function request_with_identity (request_text, request_id, incident_id)
   local request = request_text:match('^(.-)%s*$')
   if request:sub(-1) ~= ')' then
     error('skg: malformed outgoing request s-expression') end
-  return request:sub(1, -2)
-    .. string.format(' (request-id . %q))\n', request_id)
+  local identity = string.format(' (request-id . %q)', request_id)
+  if incident_id then
+    identity = identity
+      .. string.format(' (incident-id . %q)', incident_id) end
+  return request:sub(1, -2) .. identity .. ')\n'
 end
 
-local function request_wire (request_text, request_id, content)
-  local wire = request_with_id(request_text, request_id)
+local function request_wire (request_text, request_id, incident_id, content)
+  local wire = request_with_identity(request_text, request_id, incident_id)
   if content ~= nil then
     wire = wire .. string.format('Content-Length: %d\r\n\r\n%s',
                                 #content, content) end
@@ -144,10 +147,12 @@ local function request_wire (request_text, request_id, content)
 end
 
 ---Submit one complete foreground operation through the serial coordinator.
-function M.submit_request (request_text, content)
+function M.submit_request (request_text, content, incident_id)
   local tcp = M.connect()
   local record = state.take_request_record()
-  local wire = request_wire(request_text, record.id, content)
+  record.incident_id = incident_id
+  local wire = request_wire(
+    request_text, record.id, record.incident_id, content)
   state.enqueue_request(record, wire, function (text) tcp:write(text) end)
   return record.id
 end
@@ -158,7 +163,9 @@ function M.submit_request_continuation (request_text, content)
   if not request_id or request_id ~= state.active_request_id then
     error('skg: no active request is being dispatched') end
   local tcp = M.connect()
-  tcp:write(request_wire(request_text, request_id, content))
+  local record = state.request_records[request_id]
+  tcp:write(request_wire(
+    request_text, request_id, record and record.incident_id, content))
 end
 
 ---Manually close the connection to the Rust server.

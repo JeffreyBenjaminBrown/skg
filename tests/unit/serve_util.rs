@@ -23,6 +23,20 @@ fn response_envelope_carries_request_frame_and_terminal_status () {
 }
 
 #[test]
+fn response_envelope_carries_incident_identity_across_a_continuation () {
+  clear_request_context ();
+  let request = "((request . \"text search\") (request-id . \"req-8\") \
+                 (incident-id . \"incident-a\"))";
+  begin_request_context (request) . unwrap ();
+  begin_request_context (request) . unwrap ();
+  let response = envelope_response (
+    "((response-type search-enrichment) (content \"ok\"))");
+  assert! (response . contains ("(request-id req-8)"));
+  assert! (response . contains ("(incident-id incident-a)"));
+  clear_request_context ();
+}
+
+#[test]
 fn response_envelope_leaves_stream_frames_nonterminal () {
   clear_request_context ();
   begin_request_context (

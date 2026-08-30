@@ -53,4 +53,81 @@ error AND leave the captured table installed."
                          (list (expand-file-name "direct.skg" source)))))
       (delete-directory root t))))
 
+(ert-deftest test-skg-reload-selection-is-a-distinct-id-stack-entry-path ()
+  "Only the explicit reload command installs TO-RELOAD selection state."
+  (let ((skg-id-stack '(("id-a" "Alpha") ("id-b" "Beta"))))
+    (unwind-protect
+        (save-window-excursion
+          (skg-view-id-stack)
+          (should-not skg-reload-selection-mode)
+          (should-not (member "TO-RELOAD" org-todo-keywords-1))
+          (skg-reload-from-id-stack)
+          (should skg-reload-selection-mode)
+          (should (member "TO-RELOAD" org-todo-keywords-1))
+          (should (equal (mapcar #'cdr skg--reload-selection-entries)
+                         '("id-a" "id-b")))
+          (goto-char (point-min))
+          (org-shiftright)
+          (should (equal (org-get-todo-state) "TO-RELOAD"))
+          (org-shiftleft)
+          (should-not (org-get-todo-state)))
+      (dolist (name '("*skg-id-stack*" "*skg-reload-from-id-stack*"))
+        (when-let ((buffer (get-buffer name)))
+          (with-current-buffer buffer (set-buffer-modified-p nil))
+          (kill-buffer buffer))))))
+
+(ert-deftest test-skg-reload-selection-submits-deduplicated-marked-ids ()
+  (let ((skg-id-stack '(("same" "First") ("same" "Second")
+                        ("other" "Other")))
+        submitted)
+    (unwind-protect
+        (save-window-excursion
+          (skg-reload-from-id-stack)
+          (dolist (entry (butlast skg--reload-selection-entries))
+            (goto-char (marker-position (car entry)))
+            (org-todo "TO-RELOAD"))
+          (cl-letf (((symbol-function 'skg-reload-paths)
+                     (lambda (paths ids incident callback)
+                       (setq submitted (list paths ids incident callback)))))
+            (skg--submit-reload-selection))
+          (should-not (car submitted))
+          (should (equal (cadr submitted) '("same")))
+          (should (string-prefix-p "incident-" (caddr submitted)))
+          (should (functionp (cadddr submitted))))
+      (when-let ((buffer (get-buffer "*skg-reload-from-id-stack*")))
+        (with-current-buffer buffer (set-buffer-modified-p nil))
+        (kill-buffer buffer)))))
+
+(ert-deftest test-skg-reload-selection-clears-only-acknowledged-marks ()
+  (let ((skg-id-stack '(("good" "Good") ("bad" "Bad"))))
+    (unwind-protect
+        (save-window-excursion
+          (skg-reload-from-id-stack)
+          (dolist (entry skg--reload-selection-entries)
+            (goto-char (marker-position (car entry)))
+            (org-todo "TO-RELOAD"))
+          (skg--apply-reload-selection-result
+           '((requested-id-outcomes
+              (((requested-id good) (pid good) (status acknowledged)
+                (reason nil) (paths ("/a/good.skg")))
+               ((requested-id bad) (pid nil) (status rejected)
+                (reason "not found") (paths ()))))))
+          (goto-char (marker-position
+                      (car (car skg--reload-selection-entries))))
+          (should-not (org-get-todo-state))
+          (goto-char (marker-position
+                      (car (cadr skg--reload-selection-entries))))
+          (should (equal (org-get-todo-state) "TO-RELOAD"))
+          (should (= (length skg--reload-selection-reason-overlays) 1))
+          (should (string-match-p
+                   "not found"
+                   (overlay-get (car skg--reload-selection-reason-overlays)
+                                'after-string))))
+      (when-let ((buffer (get-buffer "*skg-reload-from-id-stack*")))
+        (with-current-buffer buffer (set-buffer-modified-p nil))
+        (kill-buffer buffer)))))
+
+(ert-deftest test-skg-reload-selection-refuses-ordinary-save ()
+  (should-error (skg--reload-selection-refuse-save) :type 'user-error))
+
 (provide 'test-skg-reload)

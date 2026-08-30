@@ -11,28 +11,39 @@ use std::net::TcpStream;
 thread_local! {
   /// The one foreground operation owned by this serial connection thread.
   /// Search keeps it across idle-loop snapshot/enrichment continuations.
-  static CURRENT_REQUEST_ID : RefCell<Option<String>> =
+  static CURRENT_REQUEST_CONTEXT : RefCell<Option<RequestContext>> =
     const { RefCell::new (None) };
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RequestContext {
+  request_id  : String,
+  incident_id : Option<String>, }
 
 pub fn begin_request_context (request : &str) -> Result<String, String> {
   let sexp = sexp::parse (request)
     . map_err ( |error| format! ("Malformed request envelope: {}", error)) ?;
   let request_id = extract_v_from_kv_pair_in_sexp (&sexp, "request-id")
     .map_err ( |_| "Request envelope has no request-id" . to_string ())?;
-  CURRENT_REQUEST_ID . with ( |slot| {
+  let incident_id = extract_v_from_kv_pair_in_sexp (&sexp, "incident-id")
+    . ok ();
+  CURRENT_REQUEST_CONTEXT . with ( |slot| {
     let mut current = slot . borrow_mut ();
     match current . as_ref () {
-      Some (active) if active != &request_id => Err (format! (
+      Some (active) if active . request_id != request_id => Err (format! (
         "Request {} arrived while request {} is still active",
-        request_id, active)),
+        request_id, active . request_id)),
+      Some (active) if active . incident_id != incident_id => Err (format! (
+        "Continuation {} changed incident identity", request_id)),
       _ => {
-        *current = Some (request_id . clone ());
+        *current = Some (RequestContext {
+          request_id: request_id . clone (), incident_id });
         Ok (request_id) }}})
 }
 
 fn clear_request_context () {
-  CURRENT_REQUEST_ID . with ( |slot| *slot . borrow_mut () = None); }
+  CURRENT_REQUEST_CONTEXT . with (
+    |slot| *slot . borrow_mut () = None); }
 
 /// Prepend a (response-type "TYPE") entry to an existing s-exp string.
 /// Input:  "((content "...") (errors (...)) (warnings (...)))"
@@ -96,7 +107,7 @@ pub fn send_response_with_length_prefix (
 }
 
 fn envelope_response (response : &str) -> String {
-  let Some (request_id) = CURRENT_REQUEST_ID . with (
+  let Some (context) = CURRENT_REQUEST_CONTEXT . with (
     |slot| slot . borrow () . clone ())
   else { return response . to_string (); };
   let Ok (Sexp::List (mut fields)) = sexp::parse (response)
@@ -104,7 +115,10 @@ fn envelope_response (response : &str) -> String {
   let response_type = field_atom (&fields, "response-type")
     . unwrap_or_else ( || "unknown" . into ());
   if field_atom (&fields, "request-id") . is_none () {
-    fields . push (sexp_field ("request-id", &request_id)); }
+    fields . push (sexp_field ("request-id", &context . request_id)); }
+  if field_atom (&fields, "incident-id") . is_none () {
+    if let Some (incident_id) = &context . incident_id {
+      fields . push (sexp_field ("incident-id", incident_id)); }}
   if field_atom (&fields, "frame-kind") . is_none () {
     fields . push (sexp_field ("frame-kind", &response_type)); }
   if field_atom (&fields, "terminal-status") . is_none () {
@@ -152,6 +166,18 @@ pub fn tag_terminal_text_response (
 ) -> String {
   let Ok (Sexp::List (mut fields)) = sexp::parse (
     &tag_text_response (response_type, text))
+  else { unreachable! () };
+  fields . push (sexp_field ("terminal-status", status));
+  Sexp::List (fields) . to_string ()
+}
+
+pub fn tag_terminal_sexp_response (
+  response_type : TcpToClient,
+  status        : &str,
+  sexp_payload  : &str,
+) -> String {
+  let Ok (Sexp::List (mut fields)) = sexp::parse (
+    &tag_sexp_response (response_type, sexp_payload))
   else { unreachable! () };
   fields . push (sexp_field ("terminal-status", status));
   Sexp::List (fields) . to_string ()

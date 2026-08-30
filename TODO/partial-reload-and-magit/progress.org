@@ -110,6 +110,26 @@ what's imperfect about what's done; choices determining the future.
   tests in one serial process, all 314 Emacs tests and the complete Neovim
   suite pass; =git diff --check= is clean.
 
+** durable incident identity and explicit ID selection (in progress)
+- Request records can now carry a durable incident UUID.  Both clients copy
+  it into the request, the server echoes it on every frame and clients reject
+  a frame whose incident identity differs.  Search continuations retain it;
+  retries may use a new request ID without losing the episode identity.
+- =skg-reload-from-id-stack= opens a transient copy of the canonical stack
+  with a buffer-local, single-keyword Org TODO sequence.  Standard S-left and
+  S-right mark =TO-RELOAD=; C-c C-c submits deduplicated IDs, while C-x C-s
+  explains that this buffer cannot save or alter the real stack.
+- Reload requests now accept paths and primary or extra IDs together.  IDs
+  resolve against the selected graph before the writer transaction and name
+  their complete possible cross-source telescope.  The terminal response
+  reports each requested ID, primary PID, considered paths and acknowledged
+  or rejected status.  The selector clears only acknowledged marks and keeps
+  rejected marks with transient reason overlays.
+- Expected reload failures now terminate as a failed =reload-paths= result
+  rather than bypassing the request's handler through the generic error type.
+  Validation after this slice: 184/184 serial Rust library tests, all 318
+  Emacs tests and the complete Neovim suite pass.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

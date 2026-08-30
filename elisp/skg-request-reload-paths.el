@@ -11,9 +11,11 @@
 ;;;     files changed since the last scan.
 ;;;   - after-save-hook in skg-file-minor-mode: reload the saved file.
 ;;;   - M-x skg-reload-changed: reload changed files on demand.
+;;;   - M-x skg-reload-from-id-stack: mark arbitrary IDs TO-RELOAD.
 
 (require 'skg-length-prefix)
 (require 'skg-config)
+(require 'skg-id-search)
 (require 'skg-request-save) ; for skg--collateral-view-handler
 
 ;;; ---- change detection ----------------------------------------------
@@ -75,18 +77,20 @@ modified, or deleted), and update the snapshot to the current state."
 
 ;;; ---- the request ---------------------------------------------------
 
-(defun skg-reload-paths (paths)
-  "Ask the server to reload the telescopes owning PATHS (absolute .skg
-paths). The server streams collateral-view updates for any open view it
-touches, then a final reload-paths summary."
-  (when paths
+(defun skg-reload-paths (paths &optional ids incident-id terminal-callback)
+  "Ask the server to reload the telescopes owning PATHS or IDS.
+PATHS are absolute .skg paths.  IDS may contain primary or extra IDs.
+INCIDENT-ID identifies retries of one reconciliation episode.  Invoke
+TERMINAL-CALLBACK with the parsed terminal response, when non-nil."
+  (when (or paths ids)
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
-           (paths-str
-            (mapconcat (lambda (p) (format "%S" p)) paths " "))
            (request-sexp
-            (concat (format "((request . \"reload paths\") (paths %s))"
-                            paths-str)
-                    "\n")))
+            (concat (prin1-to-string
+                     `((request . "reload paths")
+                       (paths ,@paths)
+                       (ids ,@ids)))
+                    "\n"))
+           (incident-id (or incident-id (skg-fresh-incident-id))))
       (skg-register-response-handler ; refresh any open touched buffers
        'collateral-view
        (lambda (_tcp-proc payload)
@@ -97,9 +101,125 @@ touches, then a final reload-paths summary."
        (lambda (_tcp-proc payload)
          (let* ((response (read payload))
                 (content (cadr (assoc 'content response))))
-           (when content (message "%s" content))))
+           (when content (message "%s" content))
+           (when terminal-callback
+             (funcall terminal-callback response))))
        t) ; one-shot
-      (skg-submit-request tcp-proc request-sexp))))
+      (skg-submit-request tcp-proc request-sexp nil incident-id))))
+
+;;; ---- explicit ID-stack selection ---------------------------------
+
+(defconst skg--reload-selection-buffer-name
+  "*skg-reload-from-id-stack*")
+
+(defvar-local skg--reload-selection-entries nil
+  "Pairs of headline markers and canonical ID-stack IDs in this selector.")
+
+(defvar-local skg--reload-selection-reason-overlays nil)
+
+(defvar skg-reload-selection-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") #'skg--submit-reload-selection)
+    (define-key map (kbd "C-x C-s") #'skg--reload-selection-refuse-save)
+    map)
+  "Keymap used only by `skg-reload-selection-mode'.")
+
+(define-minor-mode skg-reload-selection-mode
+  "Transient ID-stack selection for an explicit partial reload."
+  :lighter " Reload-Select"
+  :keymap skg-reload-selection-mode-map)
+
+(put 'skg-reload-selection-mode 'completion-predicate #'ignore)
+
+(defun skg--reload-selection-todo-sequence (_sequence)
+  "Replace Org's ordinary TODO sequence inside a reload selector."
+  '(sequence "TO-RELOAD" "|"))
+
+(defun skg-reload-from-id-stack ()
+  "Open a transient ID-stack copy whose marked nodes will be reloaded.
+Use Org's standard S-left/S-right TODO cycling to mark `TO-RELOAD',
+then C-c C-c to submit.  This never edits `skg-id-stack'."
+  (interactive)
+  (let ((buffer (get-buffer-create skg--reload-selection-buffer-name)))
+    (switch-to-buffer buffer)
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert (skg--format-id-stack-as-org))
+      (goto-char (point-min))
+      (skg--org-mode-with-options)
+      (setq-local org-todo-keywords '((sequence "TO-RELOAD" "|")))
+      (add-hook 'org-todo-setup-filter-hook
+                #'skg--reload-selection-todo-sequence nil t)
+      (org-set-regexps-and-options)
+      (setq-local skg--reload-selection-entries nil)
+      (let ((entries skg-id-stack))
+        (org-map-entries
+         (lambda ()
+           (when entries
+             (push (cons (copy-marker (line-beginning-position))
+                         (caar entries))
+                   skg--reload-selection-entries)
+             (setq entries (cdr entries))))
+         nil nil))
+      (setq skg--reload-selection-entries
+            (nreverse skg--reload-selection-entries))
+      (setq-local skg--reload-selection-reason-overlays nil)
+      (skg-reload-selection-mode 1)
+      (set-buffer-modified-p nil))
+    (message "Mark nodes TO-RELOAD with S-left/S-right; C-c C-c submits.")))
+
+(defun skg--reload-selection-refuse-save ()
+  (interactive)
+  (user-error "This is a transient selector; use C-c C-c to reload marked nodes"))
+
+(defun skg--marked-reload-selection-entries ()
+  "Return marked (MARKER . ID) entries from the current selector."
+  (cl-remove-if-not
+   (lambda (entry)
+     (save-excursion
+       (goto-char (marker-position (car entry)))
+       (equal (org-get-todo-state) "TO-RELOAD")))
+   skg--reload-selection-entries))
+
+(defun skg--submit-reload-selection ()
+  "Submit marked IDs in the transient ID-stack selector."
+  (interactive)
+  (let* ((selection-buffer (current-buffer))
+         (marked (skg--marked-reload-selection-entries))
+         (ids (delete-dups (mapcar #'cdr marked))))
+    (if (null ids)
+        (message "skg: no ID-stack nodes are marked TO-RELOAD")
+      (skg-reload-paths
+       nil ids (skg-fresh-incident-id)
+       (lambda (response)
+         (when (buffer-live-p selection-buffer)
+           (with-current-buffer selection-buffer
+             (skg--apply-reload-selection-result response))))))))
+
+(defun skg--apply-reload-selection-result (response)
+  "Apply RESPONSE's per-ID outcomes to the current selector."
+  (mapc #'delete-overlay skg--reload-selection-reason-overlays)
+  (setq skg--reload-selection-reason-overlays nil)
+  (let ((outcomes (cadr (assoc 'requested-id-outcomes response))))
+    (dolist (outcome outcomes)
+      (let ((id (format "%s" (cadr (assoc 'requested-id outcome))))
+            (status (cadr (assoc 'status outcome)))
+            (reason (cadr (assoc 'reason outcome))))
+        (dolist (entry skg--reload-selection-entries)
+          (when (equal id (cdr entry))
+            (save-excursion
+              (goto-char (marker-position (car entry)))
+              (if (eq status 'acknowledged)
+                  (when (org-get-todo-state)
+                    (let ((inhibit-message t)) (org-todo 'none)))
+                (let ((overlay (make-overlay
+                                (line-end-position) (line-end-position))))
+                  (overlay-put overlay 'after-string
+                               (propertize
+                                (format "  [%s]" (or reason "rejected"))
+                                'face 'error))
+                  (push overlay skg--reload-selection-reason-overlays))))))))
+  (set-buffer-modified-p nil)))
 
 ;;; ---- triggers ------------------------------------------------------
 

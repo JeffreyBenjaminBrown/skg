@@ -15,6 +15,12 @@ the one continuation: it repeats the still-active search request ID instead
 of allocating a new operation. An authorization retry is a new request and
 therefore receives a new ID.
 
+Reconciliation work may additionally carry `(incident-id . "UUID")`.
+The server echoes it on every frame.  A request ID owns one wire exchange;
+an incident ID owns the longer disk/store/presentation episode and is reused
+by retries.  A client rejects a response whose incident identity does not
+match its request record.
+
 Every ordinary response payload carries:
 
 ```text
@@ -270,7 +276,7 @@ So far there are these endpoints:
     that would rerender an ugly telescope instead receives LP
     `ugly-telescope-confirmation` with
     `(operation diff-mode-rerender)` and
-    the exact PIDs, followed by the same EMPTY rerender stream. A retry
+    the exact PIDs as its terminal frame. A retry
     adds `(allow-ugly-telescopes "PID" ...)`; declining leaves the mode
     and open-view registry unchanged.
 
@@ -495,8 +501,7 @@ So far there are these endpoints:
     Under a restricted set, ugly content without exact approval returns
     LP `ugly-telescope-confirmation` with
     `(operation rerender-all-views)` and
-    the exact PIDs, followed by an EMPTY rerender stream
-    (`rerender-lock` with no URIs, then clean `rerender-done`). No view
+    the exact PIDs as its terminal frame. No view
     text is sent and no open-view registry entry changes. A retry adds
     `allow-ugly-telescopes`; `all` instead adds the shared warning to
     `rerender-done`.
@@ -546,8 +551,8 @@ So far there are these endpoints:
   - Rerender authorization precedes both the set change and release of
     view text. If the proposed set would render an ugly telescope, the
     first reply is LP `ugly-telescope-confirmation` with
-    `(operation source-set-switch-rerender)` and exact PIDs, followed by an EMPTY
-    rerender stream. A retry adds `allow-ugly-telescopes`; declining
+    `(operation source-set-switch-rerender)` and exact PIDs as its terminal
+    frame. A retry adds `allow-ugly-telescopes`; declining
     leaves the active set and open-view registry unchanged.
 
 ## Titles by ids
@@ -569,6 +574,25 @@ So far there are these endpoints:
     `(operation titles-by-ids)` and the exact PIDs. An approved retry
     carries those PIDs in `allow-ugly-telescopes`; `all` returns the
     ordinary map with the shared warning.
+
+## Reload paths or selected IDs
+
+  - Request: `((request . "reload paths") (paths "PATH" ...)
+    (ids "ID" ...) (incident-id . "UUID"))`.  At least one path or ID is
+    required.  An ID may be primary or extra; the server resolves it against
+    the selected graph and reloads that primary PID's complete cross-source
+    telescope.  Repeated paths, IDs and aliases of one PID are deduplicated.
+  - A successful terminal `reload-paths` response carries `content` plus
+    `requested-id-outcomes`.  Each outcome names the requested ID, resolved
+    primary PID, every configured section path considered, and status
+    `acknowledged` or `rejected` with a reason.  Mixed success terminates as
+    `complete-with-rejected-files`; a batch-wide stability, invariant or store
+    failure terminates as `failed`.  Reload never writes a `.skg` file.
+  - `M-x skg-reload-from-id-stack` opens a transient copy of the Emacs ID
+    stack.  Org's ordinary S-left/S-right TODO cycling marks `TO-RELOAD`;
+    C-c C-c submits the marked IDs.  This mode neither changes the canonical
+    stack nor permits C-x C-s.  Acknowledged marks clear; rejected marks remain
+    with transient reason annotations.
 
 ## Shutdown server
   - Request: ((request . "shutdown"))

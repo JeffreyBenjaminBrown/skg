@@ -40,7 +40,11 @@ use crate::dbs::tantivy::background_writer::{
 };
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
+use crate::serve::util::{
+  send_response_with_length_prefix,
+  tag_terminal_sexp_response,
+  tag_terminal_text_response,
+};
 use crate::source_sets::ActiveSourceSet;
 use crate::update_buffer::rerender_views_after_reload;
 use crate::types::env::SkgEnv;
@@ -60,6 +64,7 @@ use std::fs;
 use std::io;
 use std::net::TcpStream;
 use std::path::PathBuf;
+use sexp::{Atom, Sexp};
 
 /// What a single touched telescope resolves to when re-read from disk.
 pub enum TelescopeReloadOutcome {
@@ -91,6 +96,19 @@ struct CapturedTelescope {
   path_bytes    : Vec<(PathBuf, Option<Vec<u8>>)>,
   selected      : Vec<(PathBuf, PathDigest)>, }
 
+pub struct ReloadStoreOutcome {
+  pub message           : String,
+  pub applied           : Vec<DefineNode>,
+  pub acknowledged_pids : HashSet<ID>,
+  pub rejected          : Vec<(ID, String)>, }
+
+struct RequestedIdOutcome {
+  requested_id : ID,
+  pid          : Option<ID>,
+  status       : &'static str,
+  reason       : Option<String>,
+  paths        : Vec<PathBuf>, }
+
 pub fn handle_reload_paths_request (
   stream            : &mut TcpStream,
   request           : &str,
@@ -104,34 +122,85 @@ pub fn handle_reload_paths_request (
       send_reload_error (stream, &format! (
         "reload paths: failed to parse request: {}", e ));
       return; } };
-  let path_strings : Vec<String> =
-    match extract_string_list_from_sexp (&parsed, "paths") {
-      Ok (v) => v,
-      Err (e) => {
-        send_reload_error (stream, &format! (
-          "reload paths: failed to extract paths: {}", e ));
-        return; } };
+  let path_strings : Vec<String> = match optional_string_list (&parsed, "paths") {
+    Ok (values) => values,
+    Err (error) => { send_reload_error (stream, &error); return; }};
+  let requested_ids : Vec<ID> = match optional_string_list (&parsed, "ids") {
+    Ok (values) => values . into_iter () . map (ID::from) . collect (),
+    Err (error) => { send_reload_error (stream, &error); return; }};
+  if path_strings . is_empty () && requested_ids . is_empty () {
+    send_reload_error (stream, "reload paths: no paths or IDs were supplied");
+    return; }
   let paths : Vec<PathBuf> =
     path_strings . into_iter () . map (PathBuf::from) . collect ();
-  let touched : Vec<TouchedTelescope> =
+  let mut touched : Vec<TouchedTelescope> =
     classify_touched_telescopes (&env . config, &paths);
-  let (msg, applied) : (String, Vec<DefineNode>) =
+  let mut seen : HashSet<ID> = touched . iter ()
+    . map (|item| item . pid . clone ()) . collect ();
+  let graph = env . in_rust_graph_snapshot ();
+  let mut requested : Vec<(ID, Option<ID>)> = Vec::new ();
+  for requested_id in requested_ids {
+    let pid = graph . pid_of (&requested_id);
+    if let Some (pid) = &pid {
+      if seen . insert (pid . clone ()) {
+        let node = graph . nodes . get (pid)
+          . expect ("resolved primary pid exists");
+        let source = node . source . clone ();
+        let path = env . config . sources . get (&source)
+          . expect ("graph source remains configured")
+          . path . join (format! ("{}.skg", pid));
+        touched . push (TouchedTelescope {
+          pid: pid . clone (), source, path }); }}
+    requested . push ((requested_id, pid)); }
+  let store_outcome : ReloadStoreOutcome =
     match block_on ( reload_touched_telescopes (env, touched) ) {
-      Ok (pair) => pair,
+      Ok (outcome) => outcome,
       Err (e)   => {
         send_reload_error (stream, &format! ("Reload failed: {}", e));
         return; } };
-  if ! applied . is_empty () {
+  if ! store_outcome . applied . is_empty () {
     // Re-stream every open view touched by the reload (diff-mode views
     // included), then send the summary.
     let diff_mode : bool = views_state . diff_mode_enabled;
     if let Err (e) = block_on ( rerender_views_after_reload (
-      stream, &applied, env, diff_mode,
+      stream, &store_outcome . applied, env, diff_mode,
       views_state, Some (active_source_set) )) {
         tracing::error! ("reload collateral re-render failed: {}", e); } }
+  let requested_outcomes = requested . into_iter () . map (
+    |(requested_id, pid)| {
+      let paths = pid . as_ref () . map (|pid| possible_paths (
+        &env . config, pid)) . unwrap_or_default ();
+      match pid {
+        None => RequestedIdOutcome {
+          requested_id, pid: None, status: "rejected",
+          reason: Some ("ID is not present in the selected graph" . into ()),
+          paths, },
+        Some (pid) => match store_outcome . rejected . iter ()
+            . find (|(rejected, _)| rejected == &pid) {
+          Some ((_, reason)) => RequestedIdOutcome {
+            requested_id, pid: Some (pid), status: "rejected",
+            reason: Some (reason . clone ()), paths, },
+          None if store_outcome . acknowledged_pids . contains (&pid) =>
+            RequestedIdOutcome {
+            requested_id, pid: Some (pid), status: "acknowledged",
+            reason: None, paths, },
+          None => RequestedIdOutcome {
+            requested_id, pid: Some (pid), status: "rejected",
+            reason: Some ("telescope was not acknowledged" . into ()),
+            paths, }, }}})
+    . collect::<Vec<_>> ();
+  let any_rejected = requested_outcomes . iter ()
+    . any (|outcome| outcome . status == "rejected")
+    || ! store_outcome . rejected . is_empty ();
+  let payload = format_reload_response (
+    &store_outcome . message, &requested_outcomes);
   send_response_with_length_prefix (
     stream,
-    & tag_text_response ( TcpToClient::ReloadPaths, &msg )); }
+    &tag_terminal_sexp_response (
+      TcpToClient::ReloadPaths,
+      if any_rejected { "complete-with-rejected-files" }
+      else { "complete" },
+      &payload)); }
 
 /// Apply the survivors of a classification to the three derived stores
 /// WITHOUT writing the filesystem. Fatal telescopes keep their last-good
@@ -140,7 +209,7 @@ pub fn handle_reload_paths_request (
 pub async fn reload_touched_telescopes (
   env     : &mut SkgEnv,
   touched : Vec<TouchedTelescope>,
-) -> Result<(String, Vec<DefineNode>), String> {
+) -> Result<ReloadStoreOutcome, String> {
   let mut defs : Vec<DefineNode> = Vec::new ();
   let mut fatals : Vec<(ID, String)> = Vec::new ();
   let (mut saves, mut deletes) : (usize, usize) = (0, 0);
@@ -216,7 +285,11 @@ pub async fn reload_touched_telescopes (
          stores unchanged", error)); }}
 
   if defs . is_empty () {
-    return Ok (( summarize_reload (0, 0, &fatals), Vec::new () )); }
+    return Ok (ReloadStoreOutcome {
+      message: summarize_reload (0, 0, &fatals),
+      applied: Vec::new (),
+      acknowledged_pids: HashSet::new (),
+      rejected: fatals, }); }
 
   // Batch guard: applying these to a clone of the live graph must not
   // break override invariants. If it would, reject the whole batch and
@@ -251,6 +324,11 @@ pub async fn reload_touched_telescopes (
   // Commit to the three stores, filesystem untouched. Keep a copy of the
   // instructions so the caller can re-render the views they touched.
   let applied : Vec<DefineNode> = defs . clone ();
+  let acknowledged_pids : HashSet<ID> = defs . iter ()
+    . map (|definition| match definition {
+      DefineNode::Save (SaveNode (node)) => node . pid . clone (),
+      DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), })
+    . collect ();
   let config = env . config . clone ();
   let store_outcome : StoreUpdateOutcome = match apply_define_nodes_to_stores (
     defs, &[], config,
@@ -268,7 +346,51 @@ pub async fn reload_touched_telescopes (
       store_outcome . graph_generation . get (),
       store_outcome . tantivy_generation . get (), reason)),
     TantivyGenerationStatus::Pending => unreachable! (), }
-  Ok (( summarize_reload (saves, deletes, &fatals), applied )) }
+  Ok (ReloadStoreOutcome {
+    message: summarize_reload (saves, deletes, &fatals),
+    applied,
+    acknowledged_pids,
+    rejected: fatals, }) }
+
+fn optional_string_list (sexp : &Sexp, key : &str) -> Result<Vec<String>, String> {
+  let present = match sexp {
+    Sexp::List (items) => items . iter () . any (|item| match item {
+      Sexp::List (parts) => matches! (parts . first (),
+        Some (Sexp::Atom (Atom::S (candidate))) if candidate == key),
+      _ => false, }),
+    _ => false, };
+  if present { extract_string_list_from_sexp (sexp, key) }
+  else { Ok (Vec::new ()) }
+}
+
+fn possible_paths (config : &SkgConfig, pid : &ID) -> Vec<PathBuf> {
+  config . ordered_sources () . into_iter () . map (|source| {
+    config . sources . get (&source)
+      . expect ("ordered source exists")
+      . path . join (format! ("{}.skg", pid)) }) . collect ()
+}
+
+fn format_reload_response (
+  message   : &str,
+  requested : &[RequestedIdOutcome],
+) -> String {
+  let atom = |value : &str| Sexp::Atom (Atom::S (value . into ()));
+  let field = |key : &str, value : Sexp| Sexp::List (vec![atom (key), value]);
+  let outcomes = requested . iter () . map (|outcome| Sexp::List (vec![
+    field ("requested-id", atom (&outcome . requested_id)),
+    field ("pid", outcome . pid . as_ref ()
+      . map (|pid| atom (pid)) . unwrap_or_else (|| atom ("nil"))),
+    field ("status", atom (outcome . status)),
+    field ("reason", outcome . reason . as_ref ()
+      . map (|reason| atom (reason)) . unwrap_or_else (|| atom ("nil"))),
+    field ("paths", Sexp::List (outcome . paths . iter ()
+      . map (|path| atom (&path . to_string_lossy ())) . collect ())),
+  ])) . collect ();
+  Sexp::List (vec![
+    field ("content", atom (message)),
+    field ("requested-id-outcomes", Sexp::List (outcomes)),
+  ]) . to_string ()
+}
 
 fn summarize_reload (
   saves   : usize,
@@ -413,7 +535,7 @@ fn send_reload_error (
   tracing::error! ("{}", msg);
   send_response_with_length_prefix (
     stream,
-    & tag_text_response ( TcpToClient::Error, msg )); }
+    &tag_terminal_text_response (TcpToClient::ReloadPaths, "failed", msg)); }
 
 #[cfg(test)]
 mod tests {
@@ -472,4 +594,23 @@ mod tests {
       sources . source_and_pid_for_direct_path (
         Path::new ("/data/publicity/abc.skg") ),
       None ); }
+
+  #[test]
+  fn explicit_id_outcomes_name_pid_paths_and_rejection () {
+    let payload = format_reload_response ("mixed", &[
+      RequestedIdOutcome {
+        requested_id: ID::from ("alias"),
+        pid: Some (ID::from ("primary")),
+        status: "acknowledged", reason: None,
+        paths: vec![PathBuf::from ("/data/public/primary.skg")], },
+      RequestedIdOutcome {
+        requested_id: ID::from ("missing"), pid: None,
+        status: "rejected", reason: Some ("not found" . into ()),
+        paths: Vec::new (), },
+    ]);
+    assert! (payload . contains ("(requested-id alias)"));
+    assert! (payload . contains ("(pid primary)"));
+    assert! (payload . contains ("/data/public/primary.skg"));
+    assert! (payload . contains ("(status rejected)"));
+    assert! (payload . contains ("(reason \"not found\")")); }
 }

@@ -52,6 +52,7 @@ function M.dispatch_frame (payload)
             tostring(response))
     return end
   local request_id = M.field_atom(response, 'request-id')
+  local incident_id = M.field_atom(response, 'incident-id')
   local frame_kind = M.field_atom(response, 'frame-kind')
     or M.field_atom(response, 'response-type')
   local terminal_status = M.field_atom(response, 'terminal-status')
@@ -62,6 +63,11 @@ function M.dispatch_frame (payload)
   local record = state.request_records[request_id]
   if not record then
     log.log('warn', 'dispatch', 'unknown/stale request-id: %s', request_id)
+    return end
+  if incident_id ~= record.incident_id then
+    vim.notify('SKG protocol failure: incident identity changed',
+               vim.log.levels.ERROR)
+    state.finish_request(request_id)
     return end
   local entry = record.handlers[frame_kind]
   state.dispatching_request_id = request_id
