@@ -182,6 +182,32 @@ what's imperfect about what's done; choices determining the future.
   serial Rust library tests, 329 Emacs tests, the complete Neovim suite, and
   compilation of every Rust integration-test target pass.
 
+** local context repair and cyclic-root terminology (in progress)
+- Renamed the search-rank type and stored index label from =CycleMember= to
+  =CyclicRoot=, including its multiplier, both clients, command references,
+  fixtures and glossary.  Full startup/rebuild passes now write an explicit
+  empty label for ordinary nodes, so the old spelling is cleared rather than
+  accepted as a permanent parser alias.
+- The selected graph state now carries the last authoritative cyclic-root
+  set.  Startup and rebuild replace it after the full context pass; ordinary
+  writes preserve it.  Local writes compare the closed one-hop contains and
+  text-link neighborhood in the old and new graphs, including inverse and
+  canonical extra-ID edges, and put changed context-only documents in the
+  same Tantivy generation as the graph write.
+- Added =skg-recompute-cyclicroots= and =:SkgRecomputeCyclicRoots=.  The
+  server computes against an immutable graph generation without its writer
+  lock, retries if that generation advances, waits through prior Tantivy
+  work, rewrites only labels which differ and publishes the new cache only
+  after a successful commit.  Failures keep the prior cache and give the
+  client a rebuild instruction.
+- The code comment at the algorithm records the precise meaning of cyclic
+  root, the two rejected automatic approaches and their measured costs, and
+  the limited rank/top-N consequence of deliberate staleness.
+- Validation: 16 focused context tests pass; all 329 Emacs tests and the
+  complete Neovim suite pass; the Rust library compiles.  Still owed in the
+  later presentation scheduler: rerun live search views after an explicit
+  repair commits, without clobbering edited search buffers.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

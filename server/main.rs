@@ -14,7 +14,10 @@ use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
-use skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic;
+use skg::dbs::in_rust_graph::{
+  InRustGraphHandle,
+  init_global_handle_for_first_time_or_panic,
+};
 use skg::dbs::in_rust_graph::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::types::env::SkgEnv;
@@ -153,7 +156,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     &config, Arc::clone (&env . driver), env . in_rust_graph . clone () );
 
   compute_context_rankings (
-    &env . tantivy_index, had_id_set, all_node_ids,
+    &env . tantivy_index, &env . in_rust_graph,
+    had_id_set, all_node_ids,
     link_dests, map_to_content, map_to_containers );
 
   init_done . store (true, Ordering::Release);
@@ -286,6 +290,7 @@ fn install_shutdown_signal_handler (
 /// Consumes (and frees) the large lookup maps after use.
 fn compute_context_rankings (
   tantivy_index     : &TantivyIndex,
+  graph             : &InRustGraphHandle,
   had_id_set        : HashSet<ID>,
   all_node_ids      : HashSet<ID>,
   link_dests      : HashSet<ID>,
@@ -301,7 +306,10 @@ fn compute_context_rankings (
     &link_dests,
     &map_to_content,
     &map_to_containers )
-  { Ok (_) => {}
+  { Ok (computation) => {
+      let old = graph . load_full ();
+      graph . store (Arc::new (
+        old . with_cyclic_roots (computation . cyclic_roots))); }
     Err (e) => { tracing::warn! (
       error = %e,
       "context computation failed, \

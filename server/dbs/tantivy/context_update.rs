@@ -25,10 +25,13 @@ pub fn update_context_origin_types (
   tantivy_index       : &TantivyIndex,
   context_types_by_id : &HashMap<ID, String>,
 ) -> Result<usize, Box<dyn Error>> {
-  let searcher : Searcher =
-    tantivy_index . reader . searcher ();
   let _wlock = // serialize with the background save-index worker & other writers
     lock_tantivy_writes ();
+  // Take the searcher only after the writer lock.  It supplies every stored
+  // field which we re-add, so a searcher captured before a concurrent commit
+  // could otherwise resurrect that commit's older document bytes.
+  let searcher : Searcher =
+    tantivy_index . reader . searcher ();
   let mut writer : IndexWriter =
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES) ?;

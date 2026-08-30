@@ -377,6 +377,16 @@ Headline is a term from org-mode. It refers to a line that begins with some aste
 
 # Terms specific to Tantivy
 
+## context origin and cyclic root
+
+A **context origin** is a node whose Tantivy document receives a search-rank
+multiplier: `Root`, `CyclicRoot`, `Dest`, `HadID`, or `MultiContained`.
+A **cyclic root** is specifically a member of an uncovered containment cycle
+which the whole-graph context algorithm must use as a root after growing from
+all obvious origins. A node can participate in a containment cycle without
+being a `CyclicRoot` when content growth from an outside origin already
+reaches it. The older label `CycleMember` was therefore misleading.
+
 ## Document
 
 A Tantivy association. In my case, from a title or alias to an ID.

@@ -91,7 +91,7 @@ pub(crate) fn tantivy_index_from_index (
 /// - "ugly_telescope":      STRING | STORED — "true" when title or body
 ///                          was selected below the node's home.
 /// - "source":              STRING | STORED — the source name.
-/// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
+/// - "context_origin_type": STRING | STORED — Root/CyclicRoot/Dest/…
 /// - "is_title":            STRING | STORED — "true" for the primary title,
 ///                          "false" for alias docs.
 /// - "had_id":              STRING | STORED — "true" if the node had an

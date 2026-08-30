@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use skg::context::{
@@ -6,7 +6,9 @@ use skg::context::{
   MapToContent,
   MapToContainers,
   content_maps_from_nodes,
-  context_origin_types_for_saved_from_in_rust_graph,
+  compute_context_types,
+  context_origin_types_for_graph,
+  context_origin_types_for_transition,
   had_id_set_from_nodes,
   link_dests_from_nodes,
   find_roots_and_multiply_contained,
@@ -22,13 +24,15 @@ use skg::types::save::{DefineNode, SaveNode};
 #[test]
 fn test_from_label_unknown () {
   assert! (ContextOriginType::from_label ("") . is_none());
+  assert! (ContextOriginType::from_label ("CycleMember") . is_none (),
+           "the retired label must be cleared rather than silently retained");
   assert! (ContextOriginType::from_label ("Bogus") . is_none()); }
 
 #[test]
 fn test_label_roundtrip () {
   let types : Vec<ContextOriginType> = vec![
     ContextOriginType::Root,
-    ContextOriginType::CycleMember,
+    ContextOriginType::CyclicRoot,
     ContextOriginType::Dest,
     ContextOriginType::HadID,
     ContextOriginType::MultiContained ];
@@ -122,8 +126,9 @@ fn in_rust_context_types_for_saved_nodes () {
   let defs : Vec<DefineNode> =
     nodes . iter () . cloned ()
     . map ( |n| DefineNode::Save ( SaveNode (n) )) . collect ();
-  let types : HashMap<ID, String> =
-    context_origin_types_for_saved_from_in_rust_graph (&graph, &defs);
+  let cyclic_roots = BTreeSet::from ([ID::new ("cyc1"), ID::new ("cyc2")]);
+  let types : HashMap<ID, String> = context_origin_types_for_transition (
+    &graph, &graph, &defs, &cyclic_roots);
   let got = |id : &str| types . get (&ID::new (id)) . map ( |s| s . as_str () );
   assert_eq! (got ("root"),   Some ("Root"));
   assert_eq! (got ("other"),  Some ("Root"));
@@ -131,10 +136,119 @@ fn in_rust_context_types_for_saved_nodes () {
   assert_eq! (got ("multi"),  Some ("MultiContained"));
   assert_eq! (got ("hadid"),  Some ("HadID"));
   assert_eq! (got ("tgt"),    Some ("Dest"));
-  assert_eq! (got ("ord"),    None,
+  assert_eq! (got ("ord"),    Some (""),
     "a singly-contained ordinary node is not an origin");
-  assert_eq! (got ("cyc1"),   Some ("CycleMember"));
-  assert_eq! (got ("cyc2"),   Some ("CycleMember")); }
+  assert_eq! (got ("cyc1"),   Some ("CyclicRoot"));
+  assert_eq! (got ("cyc2"),   Some ("CyclicRoot")); }
+
+fn context_test_node (
+  pid      : &str,
+  contains : &[&str],
+  body     : Option<&str>,
+) -> NodeComplete {
+  let mut node = empty_node_complete ();
+  node . pid = ID::new (pid);
+  node . title = pid . to_string ();
+  node . source = SourceName::from ("main");
+  node . contains = members_at_source (
+    &node . source,
+    contains . iter () . map (|id| ID::new (*id)) . collect ());
+  node . body = body . map (str::to_string);
+  node
+}
+
+#[test]
+fn transition_repairs_the_old_and_new_closed_contains_neighborhood_only () {
+  let x = context_test_node ("x", &[], None);
+  let unrelated = context_test_node ("unrelated", &[], None);
+  let old_container = context_test_node ("container", &["x"], None);
+  let new_container = context_test_node ("container", &[], None);
+  let old = InRustGraph::from_nodecompletes (&[
+    old_container, x . clone (), unrelated . clone ()]);
+  let new = InRustGraph::from_nodecompletes (&[
+    new_container . clone (), x, unrelated]);
+  let labels = context_origin_types_for_transition (
+    &old, &new,
+    &[DefineNode::Save (SaveNode (new_container))],
+    &BTreeSet::new ());
+  assert_eq! (labels . get (&ID::new ("container")), Some (&"Root" . into ()));
+  assert_eq! (labels . get (&ID::new ("x")), Some (&"Root" . into ()),
+              "removed containment makes the old neighbor a root");
+  assert! (!labels . contains_key (&ID::new ("unrelated")),
+           "an unchanged node outside the closed neighborhood is not visited");
+}
+
+#[test]
+fn transition_repairs_added_container_and_removed_textlink_labels () {
+  let x = context_test_node ("x", &[], None);
+  let stable_container = context_test_node ("stable", &["x"], None);
+  let old_added_container = context_test_node ("added", &[], None);
+  let new_added_container = context_test_node ("added", &["x"], None);
+  let new_linker = context_test_node ("linker", &[], None);
+  let old = InRustGraph::from_nodecompletes (&[
+    x . clone (), stable_container . clone (), old_added_container]);
+  let new_with_second_container = InRustGraph::from_nodecompletes (&[
+    x . clone (), stable_container . clone (), new_added_container . clone ()]);
+  let labels = context_origin_types_for_transition (
+    &old, &new_with_second_container,
+    &[DefineNode::Save (SaveNode (new_added_container))],
+    &BTreeSet::new ());
+  assert_eq! (labels . get (&ID::new ("x")),
+              Some (&"MultiContained" . into ()),
+              "adding a second container updates the new neighbor");
+
+  let old_with_link = InRustGraph::from_nodecompletes (&[
+    x . clone (), stable_container . clone (),
+    context_test_node ("linker", &[], Some ("[[id:x][x]]"))]);
+  let new_without_link = InRustGraph::from_nodecompletes (&[
+    x, stable_container, new_linker . clone ()]);
+  let labels = context_origin_types_for_transition (
+    &old_with_link, &new_without_link,
+    &[DefineNode::Save (SaveNode (new_linker))],
+    &BTreeSet::new ());
+  assert_eq! (labels . get (&ID::new ("x")), Some (&String::new ()),
+              "removing the only text link clears Dest");
+}
+
+#[test]
+fn ordinary_transition_reuses_the_selected_cyclic_root_cache () {
+  let a = context_test_node ("a", &["b"], None);
+  let b = context_test_node ("b", &["a"], None);
+  let graph = InRustGraph::from_nodecompletes (&[a . clone (), b]);
+  let cached = BTreeSet::from ([ID::new ("a")]);
+  let labels = context_origin_types_for_transition (
+    &graph, &graph,
+    &[DefineNode::Save (SaveNode (a))],
+    &cached);
+  assert_eq! (labels . get (&ID::new ("a")), Some (&"CyclicRoot" . into ()));
+  assert! (! labels . contains_key (&ID::new ("b")),
+           "an unchanged neighbor is not rewritten merely because it is cyclic");
+}
+
+#[test]
+fn full_pass_does_not_call_an_externally_reached_cycle_a_cyclic_root () {
+  // root -> a -> b -> a.  The cycle is already covered when the context from
+  // root grows, so the authoritative algorithm has no uncovered cycle roots.
+  let nodes = vec![
+    context_test_node ("root", &["a"], None),
+    context_test_node ("a", &["b"], None),
+    context_test_node ("b", &["a"], None),
+  ];
+  let graph = InRustGraph::from_nodecompletes (&nodes);
+  let all = nodes . iter () . map (|node| node . pid . clone ()) . collect ();
+  let (to_content, to_containers) = content_maps_from_nodes (&nodes);
+  let result = compute_context_types (
+    &HashSet::new (), &all, &HashSet::new (),
+    &to_content, &to_containers);
+  assert! (result . cyclic_roots . is_empty ());
+  let labels = context_origin_types_for_graph (
+    &graph, &result . cyclic_roots);
+  assert_eq! (labels . get (&ID::new ("root")), Some (&"Root" . into ()));
+  assert_eq! (labels . get (&ID::new ("a")),
+              Some (&"MultiContained" . into ()),
+              "the outside edge makes a an ordinary obvious origin");
+  assert_eq! (labels . get (&ID::new ("b")), Some (&String::new ()));
+}
 
 #[test]
 fn test_find_roots_and_multiply_contained () {
@@ -247,16 +361,16 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
     &reverse_map,
     &mut origin_types,
     &mut all_contexts );
-  // All cycle members should now be CycleMember origins.
+  // The uncovered cycle members are the component's CyclicRoot origins.
   assert_eq! (
     origin_types . get (&ID::new ("a")),
-    Some (&ContextOriginType::CycleMember) );
+    Some (&ContextOriginType::CyclicRoot) );
   assert_eq! (
     origin_types . get (&ID::new ("b")),
-    Some (&ContextOriginType::CycleMember) );
+    Some (&ContextOriginType::CyclicRoot) );
   assert_eq! (
     origin_types . get (&ID::new ("c")),
-    Some (&ContextOriginType::CycleMember) );
+    Some (&ContextOriginType::CyclicRoot) );
   // All nodes should be covered.
   let covered : HashSet<ID> =
     all_contexts . iter ()
@@ -388,11 +502,11 @@ fn test_full_context_pipeline () {
     &map_to_containers,
     &mut origin_types,
     &mut all_contexts );
-  // Verify cycle members are now CycleMember origins.
+  // Verify the uncovered cycle members are now CyclicRoot origins.
   assert_eq! (origin_types [&ID::new ("cycle-1")],
-              ContextOriginType::CycleMember);
+              ContextOriginType::CyclicRoot);
   assert_eq! (origin_types [&ID::new ("cycle-2")],
-              ContextOriginType::CycleMember);
+              ContextOriginType::CyclicRoot);
   // Verify the cycle context.
   assert_eq! (ctx_containing ("cycle-1", &all_contexts),
               HashSet::from ([

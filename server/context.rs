@@ -3,11 +3,11 @@
 /// consisting of 'origins' (usually a single rootlike node,
 /// but maybe a cycle) and potentially a lot of other nodes
 /// in the recursive content of the origin(s).
-/// Origins (roots, link dests, multiply-contained nodes, cycle members,
+/// Origins (roots, link dests, multiply-contained nodes, cyclic roots,
 /// nodes with Had_ID_Before_Import) get score multipliers at search time.
 
 use crate::consts::{
-  MULTIPLIER_CYCLE_MEMBER,
+  MULTIPLIER_CYCLIC_ROOT,
   MULTIPLIER_HAD_ID,
   MULTIPLIER_MULTI_CONTAINED,
   MULTIPLIER_ROOT,
@@ -20,7 +20,7 @@ use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::textlinks::textlinks_from_node;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 
 //
@@ -31,7 +31,7 @@ use std::error::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ContextOriginType {
   Root,
-  CycleMember, // A treelike set might have no single root, but rather a rootlike cycle. In that case every member of the cycle should be almost as prominent in search results as a true root. The multipliers reflect that.
+  CyclicRoot, // A treelike set might have no single root, but rather a rootlike cycle. Its uncovered cycle is the component's root; this label does NOT mean every node which happens to participate in any cycle.
   Dest,
   HadID, // If something had an org-roam ID when imported, even if it was not linked to, it was probably considered important enough at some point to be worth linking to.
   MultiContained,
@@ -41,7 +41,7 @@ impl ContextOriginType {
   pub fn label ( &self, ) -> &'static str {
     match self {
       ContextOriginType::Root           => "Root",
-      ContextOriginType::CycleMember    => "CycleMember",
+      ContextOriginType::CyclicRoot     => "CyclicRoot",
       ContextOriginType::Dest         => "Dest",
       ContextOriginType::HadID          => "HadID",
       ContextOriginType::MultiContained => "MultiContained", } }
@@ -49,7 +49,7 @@ impl ContextOriginType {
                       -> Option<ContextOriginType> {
     match label {
       "Root"           => Some (ContextOriginType::Root),
-      "CycleMember"    => Some (ContextOriginType::CycleMember),
+      "CyclicRoot"     => Some (ContextOriginType::CyclicRoot),
       "Dest"         => Some (ContextOriginType::Dest),
       "HadID"          => Some (ContextOriginType::HadID),
       "MultiContained" => Some (ContextOriginType::MultiContained),
@@ -57,7 +57,7 @@ impl ContextOriginType {
   pub fn multiplier ( &self, ) -> f32 {
     match self {
       ContextOriginType::Root           => MULTIPLIER_ROOT,
-      ContextOriginType::CycleMember    => MULTIPLIER_CYCLE_MEMBER,
+      ContextOriginType::CyclicRoot     => MULTIPLIER_CYCLIC_ROOT,
       ContextOriginType::Dest         => MULTIPLIER_DEST,
       ContextOriginType::HadID          => MULTIPLIER_HAD_ID,
       ContextOriginType::MultiContained => MULTIPLIER_MULTI_CONTAINED, }} }
@@ -70,6 +70,11 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 //
 // Top-level: compute all context origin types and store in Tantivy
 //
+
+pub struct ContextComputation {
+  pub labels       : HashMap<ID, String>,
+  pub cyclic_roots : BTreeSet<ID>,
+}
 
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
@@ -84,7 +89,25 @@ pub fn compute_and_store_context_types (
   link_dests  : &HashSet<ID>,
   map_to_content  : &MapToContent,
   map_to_containers   : &MapToContainers,
-) -> Result<HashMap<ID, String>, Box<dyn Error>> {
+) -> Result<ContextComputation, Box<dyn Error>> {
+  let computation = compute_context_types (
+    had_id_set, all_node_ids, link_dests,
+    map_to_content, map_to_containers );
+  let updated : usize = update_context_origin_types (
+    tantivy_index, &computation . labels ) ?;
+  tracing::info! ("  {} Tantivy documents updated with context types.",
+            updated);
+  Ok (computation)
+}
+
+/// The authoritative, pure whole-graph context computation.
+pub fn compute_context_types (
+  had_id_set       : &HashSet<ID>,
+  all_node_ids     : &HashSet<ID>,
+  link_dests       : &HashSet<ID>,
+  map_to_content   : &MapToContent,
+  map_to_containers : &MapToContainers,
+) -> ContextComputation {
   tracing::info! ("Computing context origin types...");
   let edge_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
@@ -106,90 +129,110 @@ pub fn compute_and_store_context_types (
   tracing::info! ("  {} total contexts after cycle detection.",
             all_contexts . len ());
   let context_types_by_id : HashMap<ID, String> =
-    // Converts ContextOriginType too String for Tantivy.
-    origin_types . iter ()
-    . map ( |(id, ct)| (id . clone (),
-                        ct . label () . to_string ()) )
+    // Include the empty label for non-origins.  A full pass is also the index
+    // migration boundary: this explicitly clears obsolete labels such as the
+    // former "CycleMember" spelling instead of retaining a parser alias.
+    all_node_ids . iter ()
+    . map ( |id| (id . clone (),
+      origin_types . get (id)
+        . map (|origin| origin . label () . to_string ())
+        . unwrap_or_default ()))
     . collect ();
-  let updated : usize = // update Tantivy
-    update_context_origin_types (
-      tantivy_index, &context_types_by_id ) ?;
-  tracing::info! ("  {} Tantivy documents updated with context types.",
-            updated);
-  Ok (context_types_by_id) }
+  let cyclic_roots = origin_types . iter ()
+    . filter (|(_, origin)| **origin == ContextOriginType::CyclicRoot)
+    . map (|(id, _)| id . clone ()) . collect ();
+  ContextComputation {
+    labels: context_types_by_id,
+    cyclic_roots,
+  } }
 
-/// Context origin types (used to rank search results) for the nodes a
-/// save touched, read straight from the post-save in-Rust graph — no
-/// TypeDB round-trips. Returns a pid -> origin-type-label map that the
-/// save's single Tantivy index pass writes directly into each document,
-/// so no second writer/commit is needed.
+/// Recompute non-cycle search-rank labels for the closed one-hop
+/// neighborhood of the transition's touched nodes, using edges from both the
+/// old and new graph.  "Closed" means each touched node itself plus every
+/// container/content or text-link neighbor in either direction.  Taking the
+/// union across snapshots covers removed edges and extra-ID redirection.
 ///
-/// Like the previous save-time version this is best-effort for cycles:
-/// it does a containerward walk from each still-untyped saved node
-/// rather than the whole-graph cycle expansion, which stays at
-/// init/rebuild ('compute_and_store_context_types').
-pub fn context_origin_types_for_saved_from_in_rust_graph (
-  graph     : &InRustGraph,
-  node_defs : &[DefineNode],
+/// The result contains every surviving touched node (even if its label is the
+/// empty string) plus each neighbor whose label changed.  The Tantivy task
+/// rewrites those documents in the transition's ordinary generation.
+/// Cyclic-root bits come only from the last authoritative full pass; ordinary
+/// mutations intentionally neither discover nor clear them.
+pub fn context_origin_types_for_transition (
+  old_graph    : &InRustGraph,
+  new_graph    : &InRustGraph,
+  node_defs    : &[DefineNode],
+  cyclic_roots : &BTreeSet<ID>,
 ) -> HashMap<ID, String> {
-  let saved : Vec<&NodeComplete> =
-    node_defs . iter ()
-    . filter_map ( |instr| match instr {
-      DefineNode::Save (SaveNode (node)) => Some (node),
-      DefineNode::Delete (_) => None } )
-    . collect ();
-  if saved . is_empty () { return HashMap::new (); }
-  let saved_ids : HashSet<ID> =
-    saved . iter () . map ( |n| n . pid . clone () ) . collect ();
-  let map_to_containers : MapToContainers = // each saved pid -> its containers
-    saved_ids . iter ()
-    . filter_map ( |id| graph . contained_by . get (id)
-      . map ( |cs| ( id . clone (),
-                     cs . iter () . cloned () . collect () )) )
-    . collect ();
-  let link_dests : HashSet<ID> = // saved nodes that anything links to
-    saved_ids . iter ()
-    . filter ( |id| graph . textlinks_in . get (id)
-               . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
-    . cloned () . collect ();
-  let had_id_set : HashSet<ID> = // from each node's own file properties
-    saved . iter ()
-    . filter ( |n| n . misc . contains (
-        &FileProperty::Had_ID_Before_Import ) )
-    . map ( |n| n . pid . clone () )
-    . collect ();
-  let mut origin_types : HashMap<ID, ContextOriginType> =
-    identify_origins (
-      &saved_ids, &map_to_containers, &link_dests, &had_id_set );
-  for id in &saved_ids {
-    // CycleMember, only for nodes not already a higher-priority origin.
-    if ! origin_types . contains_key (id)
-       && node_is_in_containerward_cycle (graph, id) {
-      origin_types . insert (
-        id . clone (), ContextOriginType::CycleMember ); } }
-  origin_types . iter ()
-    . map ( |(id, ct)| (id . clone (),
-                        ct . label () . to_string ()) )
-    . collect () }
+  let touched : HashSet<ID> = node_defs . iter () . map (|definition| match
+    definition {
+      DefineNode::Save (SaveNode (node)) => node . pid . clone (),
+      DefineNode::Delete (deleted) => deleted . id . clone (),
+    }) . collect ();
+  let mut neighborhood = touched . clone ();
+  for graph in [old_graph, new_graph] {
+    for pid in &touched {
+      add_one_hop_context_neighbors (graph, pid, &mut neighborhood); }}
+  neighborhood . into_iter () . filter_map (|pid| {
+    new_graph . nodes . get (&pid) ?;
+    let old = context_origin_type_for_node (old_graph, &pid, cyclic_roots);
+    let new = context_origin_type_for_node (new_graph, &pid, cyclic_roots);
+    if touched . contains (&pid) || old != new {
+      Some ((pid, new . map (|origin| origin . label () . to_string ())
+                    . unwrap_or_default ()))
+    } else { None }
+  }) . collect ()
+}
 
-/// True when 'start' lies on a containerward cycle: following
-/// 'contained_by' edges from 'start' can return to 'start'. The in-Rust
-/// analogue of the 'cycles' flag from 'containerward_path_stats_bulk'.
-fn node_is_in_containerward_cycle (
-  graph : &InRustGraph,
-  start : &ID,
-) -> bool {
-  let mut stack : Vec<ID> =
-    graph . contained_by . get (start)
-    . map ( |cs| cs . iter () . cloned () . collect () )
-    . unwrap_or_default ();
-  let mut visited : HashSet<ID> = HashSet::new ();
-  while let Some (cur) = stack . pop () {
-    if &cur == start { return true; }
-    if ! visited . insert (cur . clone ()) { continue; }
-    if let Some (containers) = graph . contained_by . get (&cur) {
-      for c in containers { stack . push (c . clone ()); } } }
-  false }
+/// Compute every node's final label against an already selected cyclic-root
+/// cache.  Unlike `compute_context_types`, this does not discover cycles; it
+/// identifies exactly which Tantivy documents change when an explicit
+/// whole-graph cyclic-root repair replaces that cache.
+pub fn context_origin_types_for_graph (
+  graph        : &InRustGraph,
+  cyclic_roots : &BTreeSet<ID>,
+) -> HashMap<ID, String> {
+  graph . nodes . keys ()
+    . map ( |pid| (
+      pid . clone (),
+      context_origin_type_for_node (graph, pid, cyclic_roots)
+        . map (|origin| origin . label () . to_string ())
+        . unwrap_or_default ()))
+    . collect ()
+}
+
+fn add_one_hop_context_neighbors (
+  graph        : &InRustGraph,
+  pid          : &ID,
+  neighborhood : &mut HashSet<ID>,
+) {
+  if let Some (node) = graph . nodes . get (pid) {
+    for target in node . contains . iter () . map (|member| &member . member)
+      . chain (node . textlinks_to . iter ()) {
+      if let Some (canonical) = graph . pid_of (target) {
+        neighborhood . insert (canonical); }} }
+  for inverse in [&graph . contained_by, &graph . textlinks_in] {
+    if let Some (sources) = inverse . get (pid) {
+      neighborhood . extend (sources . iter () . cloned ()); }}
+}
+
+fn context_origin_type_for_node (
+  graph        : &InRustGraph,
+  pid          : &ID,
+  cyclic_roots : &BTreeSet<ID>,
+) -> Option<ContextOriginType> {
+  let node = graph . nodes . get (pid) ?;
+  let container_count = graph . contained_by . get (pid)
+    . map (|containers| containers . len ()) . unwrap_or (0);
+  if container_count == 0 { Some (ContextOriginType::Root) }
+  else if cyclic_roots . contains (pid) { Some (ContextOriginType::CyclicRoot) }
+  else if graph . textlinks_in . get (pid)
+      . map (|sources| !sources . is_empty ()) . unwrap_or (false)
+    { Some (ContextOriginType::Dest) }
+  else if node . misc . contains (&FileProperty::Had_ID_Before_Import)
+    { Some (ContextOriginType::HadID) }
+  else if container_count > 1 { Some (ContextOriginType::MultiContained) }
+  else { None }
+}
 
 //
 // Step 1: identify origins (using the in-Rust graph)
@@ -199,9 +242,9 @@ fn node_is_in_containerward_cycle (
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's a Dest, etc.
 /// Therefore higher-priority origin types are processed later.
-/// CycleMember is assigned later (step 3).
+/// CyclicRoot is assigned later (step 3).
 /// (That's safe because the only higher-priority thing is a Root,
-/// and a Root cannot be a CycleMember.)
+/// and a Root cannot be a CyclicRoot.)
 fn identify_origins (
   all_node_ids : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
@@ -267,11 +310,25 @@ fn grow_all_contexts (
 // Step 3: handle cycles (using the in-Rust graph)
 //
 
-/// The treelike contexts, grown first, might not cover all nodes.
-/// Stragglers are in, or recursively contained in, containment cycles.
-/// For each connected component of uncovered nodes,
-/// this will climb containerward to find a cycle,
-/// mark cycle members as origins, and grow their tails.
+/// Find the cyclic roots which only a whole-graph pass can classify honestly.
+///
+/// The algorithm first grows content contexts from every obvious origin
+/// (root, destination, had-ID and multiply-contained node).  It then takes an
+/// uncovered node, walks containerward until it reaches a cycle, marks that
+/// uncovered cycle as the component's roots and grows contentward from them.
+/// Therefore a node may be part of an ordinary-English containment cycle but
+/// not be a `CyclicRoot`: when content growth from an outside origin already
+/// reached that cycle, none of its members belongs to the uncovered remainder.
+///
+/// We deliberately do not adapt this step to ordinary incremental writes.
+/// Recomputing the whole graph after each write was rejected as disproportionate
+/// for a rank-only fact (about 100 ms on the current corpus, and 200--230 ms on
+/// the former roughly 60,000-node corpus, before Tantivy work).  Maintaining
+/// dynamic connected/context components was similarly heavyweight.  The
+/// selected store instead retains the last full `CyclicRoot` set until startup,
+/// rebuild or `skg-recompute-cyclicroots`.  Staleness can affect score, order
+/// and a top-N cutoff; it never changes which nodes match.  Containment cycles
+/// are discouraged, and this is the explicit cost of making them.
 pub fn extend_contexts_for_cycles (
   all_node_ids      : &HashSet<ID>,
   map_to_content    : &MapToContent,
@@ -293,9 +350,9 @@ pub fn extend_contexts_for_cycles (
     for cm in &cycle_members {
       if origins . get (cm) != Some (&ContextOriginType::Root) {
         // This should never execute: We already handled Roots and MultiContained, so each cycle member should be contained exactly once.
-        // But to be safe, we explicitly avoid clobbering Root with CycleMember. (Recall that in priority, Root > Cycle > others.)
+        // But to be safe, we explicitly avoid clobbering Root with CyclicRoot. (Recall that in priority, Root > Cycle > others.)
         origins . insert ( cm . clone (),
-                           ContextOriginType::CycleMember ); }}
+                           ContextOriginType::CyclicRoot ); }}
     let mut ctx : HashSet<ID> = HashSet::new ();
     for cm in &cycle_members {
       extend_context (

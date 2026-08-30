@@ -1,5 +1,5 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
-use crate::context::context_origin_types_for_saved_from_in_rust_graph;
+use crate::context::context_origin_types_for_transition;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
 };
@@ -164,9 +164,25 @@ pub(crate) async fn apply_define_nodes_to_stores (
   // Tantivy thread) so the read happens before any further mutation.
   let context_types : HashMap<ID, String> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "context_origin_types_for_saved" ). entered();
-      context_origin_types_for_saved_from_in_rust_graph (
-        &new_graph, &node_defs ) };
+      "context_origin_types_for_transition" ). entered();
+      context_origin_types_for_transition (
+        &old_graph_snap, &new_graph, &node_defs,
+        &old_selected . cyclic_roots ) };
+  // Context-only neighbors join the same Tantivy generation as the saved
+  // documents.  They are deliberately NOT TypeDB or filesystem instructions;
+  // rewriting their complete index documents is the simplest atomic way to
+  // change a stored rank label (including clearing it to the empty string).
+  let mut tantivy_instructions = node_defs . clone ();
+  let instructed : HashSet<ID> = node_defs . iter () . map (|definition| match
+    definition {
+      DefineNode::Save (SaveNode (node)) => node . pid . clone (),
+      DefineNode::Delete (deleted) => deleted . id . clone (),
+    }) . collect ();
+  for pid in context_types . keys () {
+    if instructed . contains (pid) { continue; }
+    if let Some (node) = new_graph . nodes . get (pid) {
+      tantivy_instructions . push (DefineNode::Save (SaveNode (
+        nodecomplete_from_noderust (node)))); }}
 
   // TypeDB (foreground): only TypeDB must finish before the save
   // responds, because the response is re-rendered from the in-Rust
@@ -223,7 +239,7 @@ pub(crate) async fn apply_define_nodes_to_stores (
   let store_for_completion = graph . clone ();
   let tantivy_generation = enqueue_tantivy_write_after ( TantivyWriteTask {
     tantivy_index : tantivy_index . clone (),
-    instructions  : node_defs . clone (),
+    instructions  : tantivy_instructions,
     context_types,
     selected_store: Some (store_for_completion), },
     |tantivy_generation| {

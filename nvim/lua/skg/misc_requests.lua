@@ -1,5 +1,6 @@
 -- PURPOSE: The small one-shot request/response commands:
--- verify-connection, rebuild-dbs and strip-body-whitespace. The Lua
+-- verify-connection, rebuild-dbs, cyclic-root repair and
+-- strip-body-whitespace. The Lua
 -- port of elisp/skg-request-verify-connection.el,
 -- elisp/skg-request-rebuild-dbs.el and
 -- elisp/skg-request-strip-body-whitespace.el.
@@ -81,6 +82,20 @@ function M.rebuild_dbs ()
                  .. ' Run :SkgCloseAllSkgBuffers to close them.')
     end, true)
   client.submit_request('((request . "rebuild dbs"))\n')
+end
+
+---Recompute the rank-only cyclic-root cache from the complete current graph.
+function M.recompute_cyclicroots ()
+  vim.notify('Recomputing cyclic-root search ranking ...')
+  state.register_response_handler('recompute-cyclic-roots',
+    function (_payload, response)
+      local content = payload.field_text(response, 'content')
+        or 'Cyclic-root recomputation finished.'
+      local status = payload.field_text(response, 'terminal-status')
+      vim.notify(content,
+        status == 'failed' and vim.log.levels.ERROR or vim.log.levels.INFO)
+    end, true)
+  client.submit_request('((request . "recompute cyclic roots"))\n')
 end
 
 ---Strip trailing whitespace from every line of every body, in every

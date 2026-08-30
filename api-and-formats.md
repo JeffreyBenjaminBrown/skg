@@ -394,6 +394,18 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
+## Recompute cyclic roots
+  - Request: `((request . "recompute cyclic roots"))`.
+  - Response: one terminal LP frame of type `recompute-cyclic-roots` whose
+    content reports the cyclic-root and rewritten-document counts.  Failure
+    is terminal status `failed`, retains the previously selected cache, and
+    recommends `skg-rebuild-dbs` when Tantivy is unhealthy.
+  - Behavior: computes the authoritative whole-graph cyclic-root set from an
+    immutable graph generation without holding the graph-writer lock.  If
+    that generation advances, it discards the result and retries.  It writes
+    only changed context labels and publishes the cache only after Tantivy
+    commits successfully.
+
 ## Edge source info
   - Request: ((request . "edge source info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of

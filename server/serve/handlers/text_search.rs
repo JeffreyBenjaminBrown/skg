@@ -460,7 +460,7 @@ fn mk_search_results_sexp (
 ///   mode, where the user has expressed explicit MUST/MUSTNOT
 ///   semantics that don't translate cleanly to "fraction
 ///   matched".
-/// - Context multiplier (Root, CycleMember, Dest, HadID,
+/// - Context multiplier (Root, CyclicRoot, Dest, HadID,
 ///   MultiContained, or 1.0 for none).
 ///
 /// adjusted_score = bm25_score * coverage * context_multiplier

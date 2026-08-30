@@ -29,6 +29,7 @@ pub enum RequestType {
   ReloadPaths,
   BeginReloadBatch,
   EndReloadBatch,
+  RecomputeCyclicRoots,
 }
 
 impl RequestType {
@@ -60,6 +61,7 @@ impl RequestType {
       "reload paths"             => Ok (RequestType::ReloadPaths),
       "begin reload batch"       => Ok (RequestType::BeginReloadBatch),
       "end reload batch"         => Ok (RequestType::EndReloadBatch),
+      "recompute cyclic roots"   => Ok (RequestType::RecomputeCyclicRoots),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -101,6 +103,7 @@ pub enum TcpToClient {
   ExportToOrg,
   ReloadPaths,
   ReloadBatch,
+  RecomputeCyclicRoots,
   Error,
 }
 
@@ -142,4 +145,5 @@ impl TcpToClient {
       TcpToClient::ExportToOrg      => "export-to-org",
       TcpToClient::ReloadPaths      => "reload-paths",
       TcpToClient::ReloadBatch      => "reload-batch",
+      TcpToClient::RecomputeCyclicRoots => "recompute-cyclic-roots",
       TcpToClient::Error            => "error", }} }

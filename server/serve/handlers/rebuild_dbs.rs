@@ -99,7 +99,7 @@ pub fn rebuild_dbs_in_place (
     let link_dests = link_dests_from_nodes (&nodes);
     let (map_to_content, map_to_containers) =
       content_maps_from_nodes (&nodes);
-    compute_and_store_context_types (
+    let context_computation = compute_and_store_context_types (
       &env . tantivy_index, &had_id_set, &all_node_ids,
       &link_dests, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
@@ -109,7 +109,8 @@ pub fn rebuild_dbs_in_place (
       env . in_rust_graph . store (
         Arc::new (
           old . with_acknowledged_rebuild (
-            fresh_graph, loaded . manifest)) );
+            fresh_graph, loaded . manifest)
+          . with_cyclic_roots (context_computation . cyclic_roots)) );
       tracing::info!("In-Rust graph rebuilt."); }
     Ok (())
   })();

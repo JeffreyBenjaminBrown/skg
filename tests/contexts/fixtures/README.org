@@ -15,16 +15,16 @@ The graph looks like this:
   ** shared ;; MultiContained context origin (already seen)
   ** link-target ;; LinkTarget context origin
   * [[link-target][link-source]] ;; Root context origin
-  * cycle-1 ;; CycleMember context origin
-  ** cycle-2 ;; CycleMember context origin
-  *** cycle-1 ;; CycleMember context origin (already seen)
+  * cycle-1 ;; CyclicRoot context origin
+  ** cycle-2 ;; CyclicRoot context origin
+  *** cycle-1 ;; CyclicRoot context origin (already seen)
   *** from-cycle-2
   ** from-cycle-1
 ```
 
 We should get the following contexts:
 
-[ [ origins : [cycle-1 : CycleMember, cycle-2 : CycleMember],
+[ [ origins : [cycle-1 : CyclicRoot, cycle-2 : CyclicRoot],
     context : [cycle-1, cycle-2, from-cycle-1, from-cycle-2] ],
   [ origins : [ the link : Root ],
     context : [the link] ],

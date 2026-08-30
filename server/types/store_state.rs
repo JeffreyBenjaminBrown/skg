@@ -187,6 +187,15 @@ impl SelectedStoreState {
     let mut next = self . clone ();
     next . tantivy_health = StoreHealth::Poisoned (reason);
     next }
+
+  pub fn with_cyclic_roots (
+    &self,
+    cyclic_roots : BTreeSet<ID>,
+  ) -> Self {
+    let mut next = self . clone ();
+    next . cyclic_roots = cyclic_roots;
+    next
+  }
 }
 
 impl Deref for SelectedStoreState {

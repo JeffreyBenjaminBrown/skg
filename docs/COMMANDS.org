@@ -40,7 +40,7 @@ as skg-delete-recursive.
 The 'f' is for 'find'.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
-matching node. "Rooty" nodes (roots, cycle members, link
+matching node. "Rooty" nodes (roots, cyclic roots, link
 dests, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 
@@ -166,7 +166,7 @@ Examples:
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
 - Results are ranked by BM25 times a context-origin factor
-  (Root 100×, CycleMember ~32×, Dest 10×, HadID 10×,
+  (Root 100×, CyclicRoot ~32×, Dest 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,
   but every match is returned — search is never filtered by
@@ -773,6 +773,12 @@ Closes the TCP connection to the Rust server.
 *** skg-rebuild-dbs
 Rebuilds TypeDB and Tantivy databases,
 using the .skg files on disk.
+*** skg-recompute-cyclicroots
+Recomputes the rank-only =CyclicRoot= cache from the complete current
+graph and updates the affected Tantivy documents.  Ordinary saves and
+partial reloads deliberately leave this cache stale.  Use this command
+after deliberately creating or removing containment cycles when their
+search-result ordering matters.  Matching itself is never stale.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,

@@ -20,7 +20,7 @@ Used to locate docs/COMMANDS.org for `skg-search-interactive' help.")
 (defun skg-search (search-terms)
   "Text search with the conservative defaults: no regex, titles
 only, no Tantivy operator syntax. Searches all nodes; rooty
-ones (roots, cycle members, link targets, hadID) are bumped in
+ones (roots, cyclic roots, link targets, hadID) are bumped in
 the ranking via their context-origin multiplier."
   (interactive "sSearch terms: ")
   (skg--request-text-search search-terms nil nil nil))

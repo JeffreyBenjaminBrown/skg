@@ -114,7 +114,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   let context_time : f64 = t6 . elapsed () . as_secs_f64 ();
   println! ("4. Context computation: {:.3}s", context_time);
   println! ("   {} nodes received context types",
-            context_types . len ());
+            context_types . labels . len ());
 
   // Summary
   let total : f64 = read_time + extract_total

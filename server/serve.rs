@@ -22,6 +22,7 @@ use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
+use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_roots_request;
 use crate::serve::handlers::reload_batch::{
   handle_begin_reload_batch_request,
   handle_end_reload_batch_request,
@@ -282,6 +283,9 @@ fn handle_emacs (
             handle_end_reload_batch_request (
               &mut stream, &request_header,
               &mut owned_reload_batch_tokens),
+          Ok (RequestType::RecomputeCyclicRoots) =>
+            handle_recompute_cyclic_roots_request (
+              &mut stream, &env),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
