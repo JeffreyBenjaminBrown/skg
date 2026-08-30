@@ -113,7 +113,8 @@ struct CapturedTelescope {
   /// ignored foreign losers.  The final comparison detects a writer racing
   /// either selection or parsing.
   path_bytes    : Vec<(PathBuf, Option<Vec<u8>>)>,
-  selected      : Vec<(PathBuf, PathDigest)>, }
+  selected      : Vec<(PathBuf, PathDigest)>,
+  warnings      : Vec<String>, }
 
 #[derive(Debug)]
 pub struct ReloadStoreOutcome {
@@ -121,6 +122,7 @@ pub struct ReloadStoreOutcome {
   pub applied           : Vec<DefineNode>,
   pub acknowledged_pids : HashSet<ID>,
   pub rejected          : Vec<(ID, String)>,
+  pub warnings          : Vec<String>,
   pub recovery          : Option<RecoveryDraft>, }
 
 #[derive(Clone)]
@@ -138,6 +140,7 @@ pub(crate) struct PendingReloadPresentation {
   requested_outcomes : Vec<RequestedIdOutcome>,
   affected_paths     : Vec<PathBuf>,
   any_rejected       : bool,
+  warnings           : Vec<String>,
   recovery_available : bool,
 }
 
@@ -307,6 +310,7 @@ pub fn handle_reload_paths_request (
     requested_outcomes,
     affected_paths,
     any_rejected,
+    warnings: store_outcome . warnings,
     recovery_available,
   };
   present_committed_reload (
@@ -356,7 +360,7 @@ fn present_committed_reload (
   let payload = format_reload_response (
     &pending . message, &pending . requested_outcomes,
     &presentation, &pending . affected_paths, &env . config . sources,
-    pending . recovery_available );
+    &pending . warnings, pending . recovery_available );
   send_response_with_length_prefix (
     stream,
     &tag_terminal_sexp_response (
@@ -377,6 +381,7 @@ pub async fn reload_touched_telescopes (
     . map (|telescope| telescope . pid . clone ()) . collect ();
   let mut defs : Vec<DefineNode> = Vec::new ();
   let mut fatals : Vec<(ID, String)> = Vec::new ();
+  let mut warnings : Vec<String> = Vec::new ();
   let (mut saves, mut deletes) : (usize, usize) = (0, 0);
   // Classification which depends on disk bytes belongs inside the writer
   // transaction.  The pre-lock pass resolves identifiers only.
@@ -398,7 +403,9 @@ pub async fn reload_touched_telescopes (
       Err (error) => CapturedTelescope {
         outcome: TelescopeReloadOutcome::Fatal (error . to_string ()),
         path_bytes: Vec::new (),
-        selected: Vec::new (), }, };
+        selected: Vec::new (),
+        warnings: Vec::new (), }, };
+    warnings . extend (captured . warnings . iter () . cloned ());
     match captured . outcome {
       TelescopeReloadOutcome::Save (nc) => {
         saves += 1;
@@ -505,6 +512,7 @@ pub async fn reload_touched_telescopes (
       applied: Vec::new (),
       acknowledged_pids: HashSet::new (),
       rejected: fatals,
+      warnings,
       recovery, }); }
 
   // Commit to the three stores, filesystem untouched. Keep a copy of the
@@ -544,6 +552,7 @@ pub async fn reload_touched_telescopes (
     applied,
     acknowledged_pids,
     rejected: fatals,
+    warnings,
     recovery, }) }
 
 fn optional_string_list (sexp : &Sexp, key : &str) -> Result<Vec<String>, String> {
@@ -615,6 +624,7 @@ fn format_reload_response (
   presentation   : &ReloadPresentation,
   affected_paths : &[PathBuf],
   sources        : &SourceCatalog,
+  reload_warnings : &[String],
   recovery_available : bool,
 ) -> String {
   let atom = |value : &str| Sexp::Atom (Atom::S (value . into ()));
@@ -653,6 +663,7 @@ fn format_reload_response (
     field ("rerender-errors", Sexp::List (presentation . errors . iter ()
       . map (|error| atom (error)) . collect ())),
     field ("warnings", Sexp::List (presentation . warnings . iter ()
+      . chain (reload_warnings . iter ())
       . map (|warning| atom (warning)) . collect ())),
     field ("recovery-available", atom (
       if recovery_available { "true" } else { "false" })),
@@ -732,13 +743,21 @@ fn capture_telescope (
       Err (error) if error . kind () == io::ErrorKind::NotFound =>
         path_bytes . push ((path, None)),
       Err (error) => return Err (error), }}
-  let (selected_files, _collision) =
+  let (selected_files, collision) =
     select_source_file_candidates_for_pid (config, pid, candidates);
+  let warnings = collision . into_iter () . map (|collision| format! (
+    "WARNING: owned telescope {} was retained; ignored same-ID non-owned file(s): {}",
+    collision . pid,
+    collision . losers . iter ()
+      . map (|file| file . path . display () . to_string ())
+      . collect::<Vec<_>> () . join (", ")))
+    . collect::<Vec<_>> ();
   if selected_files . is_empty () {
     return Ok (CapturedTelescope {
       outcome: TelescopeReloadOutcome::Delete,
       path_bytes,
-      selected: Vec::new (), }); }
+      selected: Vec::new (),
+      warnings, }); }
   let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
   let mut selected : Vec<(PathBuf, PathDigest)> = Vec::new ();
   for file in selected_files {
@@ -756,7 +775,8 @@ fn capture_telescope (
   Ok (CapturedTelescope {
     outcome: TelescopeReloadOutcome::Save (node),
     path_bytes,
-    selected, })
+    selected,
+    warnings, })
 }
 
 fn replace_telescope_manifest (
@@ -824,6 +844,7 @@ mod tests {
   use super::*;
   use crate::types::misc::{SkgfileSource, SourceCatalog};
   use std::path::Path;
+  use tempfile::tempdir;
 
   fn sources (entries : &[(&str, &str)]) -> SourceCatalog {
     let mut catalog : SourceCatalog = SourceCatalog::default ();
@@ -892,7 +913,8 @@ mod tests {
         requested_id: ID::from ("missing"), pid: None,
         status: "rejected", reason: Some ("not found" . into ()),
         paths: Vec::new (), },
-    ], &presentation, &[], &sources (&[("public", "/data/public")]), false);
+    ], &presentation, &[], &sources (&[("public", "/data/public")]),
+       &[], false);
     assert! (payload . contains ("(requested-id alias)"));
     assert! (payload . contains ("(pid primary)"));
     assert! (payload . contains ("/data/public/primary.skg"));
@@ -912,12 +934,14 @@ mod tests {
       errors: Vec::new (), warnings: Vec::new (), };
     let payload = format_reload_response (
       "done", &[], &presentation,
-      &[PathBuf::from ("/data/public/primary.skg")], &catalog, true );
+      &[PathBuf::from ("/data/public/primary.skg")], &catalog,
+      &["owned telescope retained" . into ()], true );
     assert! (payload . contains ("(conflicted-views"));
     assert! (payload . contains ("(view-uri dirty-uri)"));
     assert! (payload . contains ("/data/public/primary.skg"));
     assert! (payload . contains ("(incoming \"* incoming\")"));
     assert! (payload . contains ("(recovery-available true)"));
+    assert! (payload . contains ("owned telescope retained"));
   }
 
   #[test]
@@ -939,4 +963,33 @@ mod tests {
     ]);
     assert_eq! (changed_manifest_paths (&old, &new),
                 vec![added, deleted, rewritten]); }
+
+  #[test]
+  fn reload_reports_ignored_foreign_collision_without_parsing_loser () {
+    let temp = tempdir () . unwrap ();
+    let owned = temp . path () . join ("owned");
+    let foreign = temp . path () . join ("foreign");
+    fs::create_dir_all (&owned) . unwrap ();
+    fs::create_dir_all (&foreign) . unwrap ();
+    fs::write (owned . join ("A.skg"), "pid: A\ntitle: retained\n") . unwrap ();
+    fs::write (foreign . join ("A.skg"), [0xff, 0x00]) . unwrap ();
+    let mut entries = HashMap::new ();
+    for (name, path, user_owns_it) in [
+      ("owned", owned, true), ("foreign", foreign . clone (), false)]
+    {
+      entries . insert (SourceName::from (name), SkgfileSource {
+        name: SourceName::from (name), abbreviation: None,
+        path, user_owns_it,
+      });
+    }
+    let mut config = SkgConfig::dummyFromSources (entries);
+    config . sources . set_order (vec![
+      SourceName::from ("owned"), SourceName::from ("foreign")]);
+    let captured = capture_telescope (
+      &config, &ID::from ("A"), &|id| id . clone ()) . unwrap ();
+    assert! (matches! (captured . outcome, TelescopeReloadOutcome::Save (_)));
+    assert_eq! (captured . warnings . len (), 1);
+    assert! (captured . warnings[0] . contains (
+      &foreign . join ("A.skg") . display () . to_string ()));
+  }
 }

@@ -253,10 +253,17 @@ TERMINAL-CALLBACK with the parsed terminal response, when non-nil."
   (let* ((response (read payload))
          (content (cadr (assoc 'content response)))
          (incident (cadr (assoc 'incident-id response)))
+         (warnings (cadr (assoc 'warnings response)))
          (recovery-available
           (equal (format "%s" (cadr (assoc 'recovery-available response)))
                  "true")))
     (skg--handle-reload-conflicts response)
+    (when warnings
+      (skg-big-nonfatal-message
+       "*SKG Reload Warnings*"
+       (format "WARNING: Reload completed with %d warning(s)"
+               (length warnings))
+       (skg-errors-and-warnings-to-org-string nil warnings)))
     (when content (message "%s" content))
     (when terminal-callback
       (funcall terminal-callback response))
