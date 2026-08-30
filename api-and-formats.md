@@ -598,7 +598,8 @@ So far there are these endpoints:
     telescope.  Repeated paths, IDs and aliases of one PID are deduplicated.
   - A successful terminal `reload-paths` response carries `content`,
     `requested-id-outcomes`, `conflicted-views`, `updated-views`,
-    `files-affected`, `rerender-errors`, and `warnings`. Each requested-ID
+    `files-affected`, `rerender-errors`, `warnings`, and
+    `recovery-available`. Each requested-ID
     outcome names the requested ID, resolved
     primary PID, every configured section path considered, and status
     `acknowledged` or `rejected` with a reason.  Mixed success terminates as
@@ -647,6 +648,35 @@ So far there are these endpoints:
     the candidates and incident ID and retries after the bracket closes;
     `deferred` never means acknowledged.
 
+## Fatal reload recovery
+
+  - A stable reload containing an unloadable telescope commits unrelated
+    legal changes, retains that telescope's last-good store state, and writes
+    an atomic user-only journal outside every source repository before it
+    offers recovery. The journal contains exact incident bytes and absence
+    tombstones, the pre-incident/legal telescope manifests, repository bases
+    and fatal reasons. It survives disconnect and restart and appears as
+    `pending-recovery-incidents` in the verify-connection response.
+  - Recovery request: `((request . "reload recover")
+    (approved . "true") (incident-id . "UUID"))`. The server rejects a
+    request without explicit approval. Emacs supplies the confirmation UI;
+    Neovim currently reports the unresolved incident visibly and does not
+    recover it.
+  - Recovery first revalidates the complete incident-time `.skg` overlay.
+    For every safe owned repository it creates, by Git plumbing only, the
+    common refs `oops-N_1-pre-incident`,
+    `oops-N_2-with-only-legal-changes-from-incident`, and
+    `oops-N_3-with-all-changes-from-incident`. The latter two commits are
+    siblings whose parent is the first. It never checks out or stages. Only
+    after all required refs exist does it restore owned fatal paths to the
+    legal manifest. Detached/sequencer and foreign-only repositories are
+    warning-only.
+  - Successful response type `reload-recovery` names each repository, ref,
+    commit and restored path. Failure leaves the journal unresolved. An
+    explicit permanent dismissal uses the same endpoint with
+    `(action . "dismiss") (approved . "true")`; it deletes only the private
+    journal and explains that automatic recovery becomes impossible.
+
 ## Reload-batch control bracket
 
   - Begin request: `((request . "begin reload batch") ...)`.
@@ -660,6 +690,12 @@ So far there are these endpoints:
     serial repository loop and sends end from its exit trap.  If Skg is not
     reachable, pulling still proceeds.  While any token remains active, Skg
     starts no observed reload.
+  - When the last token ends or its connection is lost, the server sends the
+    verified interactive client a server-owned `reconciliation-ready` frame
+    with a monotonic `sweep-generation`. Emacs then takes its current
+    dirty-buffer census and submits one full manifest sweep. A client which
+    connects later performs the same sweep during handshake, so the shell
+    process never needs access to editor-local buffer state.
 
 ## Shutdown server
   - Request: ((request . "shutdown"))

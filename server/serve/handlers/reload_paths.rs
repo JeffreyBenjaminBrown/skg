@@ -123,6 +123,7 @@ pub struct ReloadStoreOutcome {
   pub acknowledged_pids : HashSet<ID>,
   pub rejected          : Vec<(ID, String)>,
   pub warnings          : Vec<String>,
+  pub recovery_journaled : bool,
   pub recovery          : Option<RecoveryDraft>, }
 
 #[derive(Clone)]
@@ -253,13 +254,14 @@ pub fn handle_reload_paths_request (
           pid: pid . clone (), source, path }); }}
     requested . push ((requested_id, pid)); }
   let mut store_outcome : ReloadStoreOutcome =
-    match block_on ( reload_touched_telescopes (env, touched) ) {
+    match block_on ( reload_touched_telescopes_for_incident (
+      env, touched, incident_id . as_deref ()) ) {
       Ok (outcome) => outcome,
       Err (e)   => {
         send_reload_error (stream, &format! ("Reload failed: {}", e));
         return; } };
   let recovery_available = match store_outcome . recovery . take () {
-    None => false,
+    None => store_outcome . recovery_journaled,
     Some (draft) => {
       let Some (incident) = incident_id . as_deref () else {
         send_reload_error (stream,
@@ -377,6 +379,14 @@ pub async fn reload_touched_telescopes (
   env     : &mut SkgEnv,
   touched : Vec<TouchedTelescope>,
 ) -> Result<ReloadStoreOutcome, String> {
+  reload_touched_telescopes_for_incident (env, touched, None) . await
+}
+
+async fn reload_touched_telescopes_for_incident (
+  env         : &mut SkgEnv,
+  touched     : Vec<TouchedTelescope>,
+  incident_id : Option<&str>,
+) -> Result<ReloadStoreOutcome, String> {
   let touched_pids : Vec<ID> = touched . iter ()
     . map (|telescope| telescope . pid . clone ()) . collect ();
   let mut defs : Vec<DefineNode> = Vec::new ();
@@ -477,7 +487,7 @@ pub async fn reload_touched_telescopes (
   // definitions form G1. Capture the complete incident-time `.skg` overlay
   // before releasing the writer lock; P/L manifests use the same serializer
   // as an ordinary save.
-  let recovery = if fatals . is_empty () { None } else {
+  let mut recovery = if fatals . is_empty () { None } else {
     Some (RecoveryDraft {
       fatal: fatals . clone (),
       touched_pids: touched_pids . clone (),
@@ -507,12 +517,15 @@ pub async fn reload_touched_telescopes (
         "incident bytes changed during reload ({}); stores unchanged", error)) ?; }
 
   if defs . is_empty () {
+    let recovery_journaled = persist_recovery_before_release (
+      &env . config, incident_id, &mut recovery) ?;
     return Ok (ReloadStoreOutcome {
       message: summarize_reload (0, 0, &fatals),
       applied: Vec::new (),
       acknowledged_pids: HashSet::new (),
       rejected: fatals,
       warnings,
+      recovery_journaled,
       recovery, }); }
 
   // Commit to the three stores, filesystem untouched. Keep a copy of the
@@ -531,6 +544,12 @@ pub async fn reload_touched_telescopes (
     Ok (outcome) => outcome,
     Err (e) => return Err ( format! (
       "store update failed: {}", e )), };
+  // The graph/TypeDB generation is now selected and the lock is still held.
+  // Make its recovery evidence durable before either releasing the writer or
+  // telling the client; this closes the crash window between store commit and
+  // journal creation.
+  let recovery_journaled = persist_recovery_before_release (
+    &env . config, incident_id, &mut recovery) ?;
   drop (_write_guard);
   let index_reconstruction = match wait_for_tantivy_generation (
     store_outcome . tantivy_generation) {
@@ -553,7 +572,22 @@ pub async fn reload_touched_telescopes (
     acknowledged_pids,
     rejected: fatals,
     warnings,
+    recovery_journaled,
     recovery, }) }
+
+fn persist_recovery_before_release (
+  config      : &SkgConfig,
+  incident_id : Option<&str>,
+  recovery    : &mut Option<RecoveryDraft>,
+) -> Result<bool, String> {
+  let (Some (incident_id), Some (draft)) = (incident_id, recovery . as_ref ())
+  else { return Ok (false); };
+  register_incident (config, incident_id, draft . clone ())?;
+  // Returning `None` tells the request layer that the process-owned durable
+  // registry, rather than connection-local state, now owns this evidence.
+  *recovery = None;
+  Ok (true)
+}
 
 fn optional_string_list (sexp : &Sexp, key : &str) -> Result<Vec<String>, String> {
   let present = match sexp {

@@ -357,6 +357,44 @@ then restores only owned fatal telescope paths to Skg's last-good bytes."
          "((request . \"reload recover\") (approved . \"true\"))\n"
          nil incident-id)))))
 
+(defun skg-dismiss-reload-recovery-incident (&optional incident-id)
+  "Permanently discard automatic recovery evidence for INCIDENT-ID.
+This does not repair or modify any source file or Git repository."
+  (interactive)
+  (let* ((ids (mapcar (lambda (entry)
+                        (format "%s" (cadr (assoc 'incident-id entry))))
+                      skg--pending-recovery-incidents))
+         (incident-id
+          (or incident-id
+              (and ids (completing-read
+                        "Dismiss fatal reload incident: " ids nil t))
+              (user-error "Skg knows of no unresolved recovery incident"))))
+    (when (yes-or-no-p
+           (format "Delete recovery evidence for %s? Automatic recovery will become impossible. "
+                   incident-id))
+      (let ((tcp-proc (skg-tcp-connect-to-rust)))
+        (skg-register-response-handler
+         'reload-recovery
+         (lambda (_tcp-proc payload)
+           (let* ((response (read payload))
+                  (status (format "%s"
+                                  (cadr (assoc 'terminal-status response))))
+                  (content (cadr (assoc 'content response))))
+             (when (equal status "complete")
+               (setq skg--pending-recovery-incidents
+                     (cl-remove-if
+                      (lambda (entry)
+                        (equal
+                         (format "%s" (cadr (assoc 'incident-id entry)))
+                         incident-id))
+                      skg--pending-recovery-incidents)))
+             (message "%s" (or content "Recovery dismissal failed"))))
+         t)
+        (skg-submit-request
+         tcp-proc
+         "((request . \"reload recover\") (action . \"dismiss\") (approved . \"true\"))\n"
+         nil incident-id)))))
+
 (defun skg-install-pending-recovery-incidents (response)
   "Install and visibly report unresolved incidents from handshake RESPONSE."
   (setq skg--pending-recovery-incidents
@@ -379,7 +417,7 @@ then restores only owned fatal telescope paths to Skg's last-good bytes."
                      (cadr (assoc 'reason fatal))))
            (cadr (assoc 'fatal incident)) "\n")))
        skg--pending-recovery-incidents "\n")
-      "\n** what to do\nRun M-x skg-recover-reload-incident to inspect and explicitly confirm recovery. Skg will not recover automatically.\n"))))
+      "\n** what to do\nRun M-x skg-recover-reload-incident to inspect and explicitly confirm recovery. Skg will not recover automatically. If you accept losing automatic recovery, M-x skg-dismiss-reload-recovery-incident deletes its private journal without changing sources or Git.\n"))))
 
 (defun skg--reload-impact-paths (impact)
   "Return IMPACT's path values as strings."

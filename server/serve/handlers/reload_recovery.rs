@@ -105,6 +105,28 @@ pub fn handle_reload_recovery_request (
       TcpToClient::ReloadRecovery, "failed",
       "Recovery requires explicit client approval"));
     return; }
+  let action = value_from_request_sexp ("action", request)
+    . unwrap_or_else (|_| "recover" . into ());
+  if action == "dismiss" {
+    let result = if pending_incident (&incident_id) . is_some () {
+      retire_incident (&incident_id) . map (|_| format! (
+        "Dismissed fatal reload incident {}. Its automatic recovery journal was deleted; any remaining repair is manual.",
+        incident_id))
+    } else { Err (format! (
+      "No unresolved recovery incident named '{}'", incident_id)) };
+    match result {
+      Ok (message) => send_response_with_length_prefix (
+        stream, &tag_terminal_text_response (
+          TcpToClient::ReloadRecovery, "complete", &message)),
+      Err (error) => send_response_with_length_prefix (
+        stream, &tag_terminal_text_response (
+          TcpToClient::ReloadRecovery, "failed", &error)),
+    }
+    return; }
+  if action != "recover" {
+    send_response_with_length_prefix (stream, &tag_terminal_text_response (
+      TcpToClient::ReloadRecovery, "failed", "Unknown recovery action"));
+    return; }
   let _write_guard = block_on (
     crate::write_lock::acquire_graph_write_lock ());
   match recover_incident (config, &incident_id) {

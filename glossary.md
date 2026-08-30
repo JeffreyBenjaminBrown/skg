@@ -72,6 +72,21 @@ Elsewhere, such as YAML parsing and serialization, **scalar** retains
 its ordinary broader meaning: any single YAML value rather than a
 sequence or mapping.
 
+## manifest, path-digest manifest, and tombstone
+
+A **manifest** is a finite inventory: a map saying which named things belong
+to one snapshot and what is known about each. In partial reload, the
+**path-digest manifest** maps every selected direct `.skg` path to the BLAKE3
+digest of its exact bytes. Comparing manifests finds additions, deletions and
+same-size rewrites without assuming anything about repository layout.
+
+A **tombstone** is an explicit record that a named thing is absent. Recovery
+manifests map a possible telescope-section path to either `Some(bytes)` or an
+absent tombstone (`None`). The tombstone matters because “this file was
+deleted” is incident data, whereas omitting the path could merely mean that
+it was never inspected. Here a tombstone is metadata in a snapshot, not a
+placeholder `.skg` file written to disk.
+
 ## placement, anchor
 
 How a more private section orders its members into a more public
