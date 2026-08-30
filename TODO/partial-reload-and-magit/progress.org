@@ -213,6 +213,14 @@ what's imperfect about what's done; choices determining the future.
   later presentation scheduler: rerun live search views after an explicit
   repair commits, without clobbering edited search buffers.
 
+** low-priority collateral scheduler (in progress)
+- Added immutable render cancellation tickets backed by a monotonic epoch.
+  View completion checks between BFS viewnodes and around its expensive async
+  seams; the finishing pass checks before and after ancestry/graph-stat
+  TypeDB work and before text rendering.  A cancelled job may finish its one
+  already-running query but starts no later expensive stage.  Foreground and
+  de-novo renders carry no ticket and retain their prior behavior.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

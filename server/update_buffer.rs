@@ -43,6 +43,7 @@ use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use typedb_driver::TypeDBDriver;
 
@@ -57,6 +58,31 @@ pub struct RerenderAfterSaveContext<'a> {
   /// Pids deleted by this save; not necessarily a subset of git deletes.
   pub deleted_by_this_save_pids      : HashSet<ID>,
   pub active_source_set              : Option<&'a ActiveSourceSet>,
+  pub cancellation                   : Option<RenderCancellationTicket>,
+}
+
+/// Immutable authority for one background render attempt.  Advancing the
+/// shared epoch makes the attempt obsolete without trying to interrupt a
+/// TypeDB call mid-flight; checkpoints stop it before the next costly stage.
+#[derive(Clone)]
+pub struct RenderCancellationTicket {
+  epoch    : Arc<AtomicU64>,
+  expected : u64,
+}
+
+impl RenderCancellationTicket {
+  pub fn new (epoch : Arc<AtomicU64>, expected : u64) -> Self {
+    Self { epoch, expected } }
+
+  pub fn cancelled (&self) -> bool {
+    self . epoch . load (Ordering::Acquire) != self . expected
+  }
+
+  pub fn checkpoint (&self) -> Result<(), Box<dyn Error>> {
+    if self . cancelled () {
+      Err ("obsolete background render cancelled" . into ())
+    } else { Ok (( )) }
+  }
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -92,6 +118,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
       active_source_set,
+      cancellation: None,
     }}
 
   pub fn without_save (
@@ -527,9 +554,10 @@ pub async fn render_initial_view (
     active_source_set              : active,
     node_budget                    : env . config . initial_node_limit,
     create_partnerCols_for_fresh_nodes : true,
-    diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
+      diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
                          else         { None },
-    warning_sink : Some (&mut sink), };
+      warning_sink : Some (&mut sink),
+      cancellation : None, };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
@@ -546,8 +574,10 @@ pub async fn rerender_view (
   create_partnerCols : bool, // false post-save (cols round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
+  if let Some (ticket) = &context . cancellation { ticket . checkpoint () ?; }
   { tracing::debug!("rerender_view: starting");
     strip_stale_diff_state (viewforest) ?; }
+  if let Some (ticket) = &context . cancellation { ticket . checkpoint () ?; }
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
@@ -573,22 +603,26 @@ pub async fn rerender_view (
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
-      warning_sink, };
+      warning_sink,
+      cancellation : context . cancellation . as_ref (), };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) . await ? }; }
+  if let Some (ticket) = &context . cancellation { ticket . checkpoint () ?; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_activeNode_diff at each Active node's visit, driven by
   // source_diffs = the real diffs).
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();
-      finish_viewforest (
+      finish_viewforest_cancellable (
         viewforest,
         &context . env . config,
         &context . env . driver,
-        context . active_source_set ) . await } ?;
+        context . active_source_set,
+        context . cancellation . as_ref ()) . await } ?;
+  if let Some (ticket) = &context . cancellation { ticket . checkpoint () ?; }
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -618,14 +652,32 @@ pub async fn finish_viewforest (
   driver            : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<String, Box<dyn Error>> {
+  finish_viewforest_cancellable (
+    viewforest, config, driver, active_source_set, None) . await
+}
+
+async fn finish_viewforest_cancellable (
+  viewforest        : &mut ViewForest,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
+  cancellation      : Option<&RenderCancellationTicket>,
+) -> Result<String, Box<dyn Error>> {
+  let checkpoint = || -> Result<(), Box<dyn Error>> {
+    match cancellation {
+      Some (ticket) => ticket . checkpoint (),
+      None => Ok (( )), }};
+  checkpoint () ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "fulfill_root_containerward_requests" ). entered();
     fulfill_root_containerward_requests (
       viewforest, config, driver, active_source_set ) . await ? ; }
+  checkpoint () ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
     attach_containerward_ancestries_to_removedhere_phantoms (
       viewforest, config, driver, active_source_set ) . await ? ; }
+  checkpoint () ?;
   mark_view_roots_parent_absent ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
@@ -645,11 +697,13 @@ pub async fn finish_viewforest (
         set_graphnodestats_in_viewforest (
           viewforest, config, driver ) . await,
     } ?;
+  checkpoint () ?;
   set_viewnodestats_in_viewforest (
     viewforest, &container_to_contents, &content_to_containers, config,
     active_source_set );
   if let Some (active) = active_source_set {
     apply_source_set_to_viewforest ( viewforest, active ); }
+  checkpoint () ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "viewforest_to_string" ). entered();
     viewforest_to_string ( viewforest, config ) } }
@@ -896,3 +950,21 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
     viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }
+
+#[cfg(test)]
+mod cancellation_tests {
+  use super::*;
+
+  #[test]
+  fn advancing_the_epoch_cancels_only_the_old_ticket () {
+    let epoch = Arc::new (AtomicU64::new (4));
+    let old = RenderCancellationTicket::new (epoch . clone (), 4);
+    assert! (!old . cancelled ());
+    epoch . store (5, Ordering::Release);
+    assert! (old . cancelled ());
+    assert! (old . checkpoint () . is_err ());
+    let current = RenderCancellationTicket::new (epoch, 5);
+    assert! (!current . cancelled ());
+    assert! (current . checkpoint () . is_ok ());
+  }
+}

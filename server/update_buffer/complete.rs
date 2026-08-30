@@ -25,6 +25,7 @@ use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_sub
 use super::reconcile::partner_col::reconcile_partnerCol_children;
 use super::reconcile::subscribee_col::reconcile_subscribee_col_children;
 use super::reconcile::content::expand_true_content_at_activeNode;
+use super::RenderCancellationTicket;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -72,6 +73,15 @@ pub(super) struct CompletionContext<'a> {
   /// de-novo renders, collateral rerenders and rerender-all, whose
   /// repairs do not correspond to edits the user just made.
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
+  pub(super) cancellation : Option<&'a RenderCancellationTicket>,
+}
+
+fn cancellation_checkpoint (
+  context : &CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  match context . cancellation {
+    Some (ticket) => ticket . checkpoint (),
+    None => Ok (( )), }
 }
 
 pub(super) async fn complete_viewforest (
@@ -110,7 +120,9 @@ async fn complete_nodes_in_level_order (
   let mut queue : VecDeque<NodeId> = VecDeque::new ();
   queue . push_back (root_treeid);
   while let Some (treeid) = queue . pop_front () {
+    cancellation_checkpoint (context) ?;
     dispatch_node_update (tree, treeid, context) . await ?;
+    cancellation_checkpoint (context) ?;
     // Enqueue the node's *current* children -- including any this visit
     // just created -- so they are completed after every node already in
     // their level. (See 'MANUAL RECURSION' comment at top of file: the
@@ -279,17 +291,20 @@ async fn visit_normal_node (
         &context . env . driver,
         context . active_source_set,
         context . source_diffs ) . await ?; } }
+  cancellation_checkpoint (context) ?;
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
     treeid, tree, &context . env . config, &context . env . driver,
     context . errors, context . active_source_set ) . await ?;
+  cancellation_checkpoint (context) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver,
     context . active_source_set,
     context . source_diffs ) . await ?;
+  cancellation_checkpoint (context) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Active node (content, cols, view requests), so process_activeNode_diff
