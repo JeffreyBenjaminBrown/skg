@@ -17,6 +17,30 @@ local state = require('skg.state')
 
 local M = {}
 
+M.visit_sequence = 0
+M.visit_debounce = 0
+
+function M.report_visit (buf)
+  if not vim.api.nvim_buf_is_valid(buf) then return end
+  local uri = vim.b[buf].skg_view_uri
+  if not uri or vim.b[buf].skg_last_reported_visit == uri then return end
+  vim.b[buf].skg_last_reported_visit = uri
+  M.visit_sequence = M.visit_sequence + 1
+  M.visit_debounce = M.visit_debounce + 1
+  local debounce = M.visit_debounce
+  local sequence = M.visit_sequence
+  vim.defer_fn(function ()
+    if debounce ~= M.visit_debounce
+       or not state.tcp or state.tcp:is_closing() then return end
+    state.register_response_handler('view-visited', function () end, true)
+    require('skg.client').submit_request(sexpr.to_string({
+      sexpr.pair(sexpr.symbol('request'), 'view visited'),
+      sexpr.pair(sexpr.symbol('view-uri'), uri),
+      sexpr.pair(sexpr.symbol('visit-sequence'), tostring(sequence)),
+    }) .. '\n')
+  end, 150)
+end
+
 -- ── naming ─────────────────────────────────────────────────────────
 
 ---Buffer name for a content view of ORG_TEXT; errors if ORG_TEXT has
@@ -181,6 +205,7 @@ function M.configure_view_buffer (buf, uri)
       callback = function ()
         require('skg.folds').set_up_window(
           vim.api.nvim_get_current_win())
+        M.report_visit(buf)
       end })
     vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
       buffer = buf,

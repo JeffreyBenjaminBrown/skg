@@ -18,6 +18,7 @@ use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
+use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision, challenge_response, decide,
 };
@@ -199,6 +200,7 @@ pub async fn update_views_after_save (
   views_state                 : &mut ViewsState,
   active_source_set           : Option<&ActiveSourceSet>,
   scalar_approved_pids        : &HashSet<ID>,
+  mut collateral_scheduler    : Option<&mut CollateralScheduler>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
@@ -217,7 +219,12 @@ pub async fn update_views_after_save (
       &mut saved_view_mut, &context . graph_snap ) ? };
   let collateral_uris : Vec<ViewUri> =
     if let Ok (uri) = viewuri_from_request_result {
-      find_collateral_view_uris (uri, &define_nodes, views_state)
+      if collateral_scheduler . is_some () {
+        views_state . open_views . views . keys ()
+          . filter (|candidate| *candidate != uri)
+          . cloned () . collect ()
+      } else {
+        find_collateral_view_uris (uri, &define_nodes, views_state) }
     } else { Vec::new () };
   // Gate the forests' existing active nodes before rendering, so even a
   // rendering error cannot echo protected scalar text. A second decision
@@ -225,11 +232,12 @@ pub async fn update_views_after_save (
   if let Some (active) = active_source_set {
     let mut input_candidates : Vec<ID> =
       active_ids_in_viewforest (&saved_view_mut);
-    for uri in &collateral_uris {
-      if let Some (viewforest) = views_state . open_views
-          . viewuri_to_view (uri) {
-        input_candidates . extend (
-          active_ids_in_viewforest (viewforest) ); }}
+    if collateral_scheduler . is_none () {
+      for uri in &collateral_uris {
+        if let Some (viewforest) = views_state . open_views
+            . viewuri_to_view (uri) {
+          input_candidates . extend (
+            active_ids_in_viewforest (viewforest) ); }} }
     let release : ScalarReleaseDecision = decide (
       "save-rerender", active, &input_candidates,
       &context . graph_snap, scalar_approved_pids );
@@ -257,11 +265,12 @@ pub async fn update_views_after_save (
     // the saved view, batched per (col, owner).
     render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
-  for curi in &collateral_uris {
-    match rerender_collateral_view (
-      curi . clone (), views_state, &mut context ) . await
-    { Ok (rendered) => collateral_views . push (rendered),
-      Err (e) => context . errors . push (e), }}
+  if collateral_scheduler . is_none () {
+    for curi in &collateral_uris {
+      match rerender_collateral_view (
+        curi . clone (), views_state, &mut context ) . await
+      { Ok (rendered) => collateral_views . push (rendered),
+        Err (e) => context . errors . push (e), }} }
 
   // Everything textual is now staged in memory. Decide before changing the
   // open-view registry, narrowing locks, or streaming the first view.
@@ -297,11 +306,14 @@ pub async fn update_views_after_save (
     // unlocks everything else it locked early, so the user can edit truly-
     // unaffected buffers during the rest of the pipeline. Symmetric with the
     // save-lock message; sent before the collateral-view stream.
+    let still_locked : &[ViewUri] = if collateral_scheduler . is_some () {
+      &[]
+    } else { &collateral_uris };
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
         TcpToClient::SaveRelaxLock,
-        & format_lock_views_sexp ( &collateral_uris )));
+        & format_lock_views_sexp (still_locked)));
     if collateral_uris . is_empty () {
       tracing::debug!("update_views_after_save: no collateral views");
     } else {
@@ -320,6 +332,15 @@ pub async fn update_views_after_save (
           TcpToClient::CollateralView,
           & format_single_view_sexp (
             &rendered . uri, &rendered . text) )); }}
+  if let (Some (scheduler), Ok (saved_uri), Some (active)) = (
+      collateral_scheduler . as_deref_mut (),
+      viewuri_from_request_result,
+      active_source_set)
+  {
+    scheduler . replace_after_transition (
+      Some (saved_uri), views_state, env, &define_nodes, active,
+      scalar_approved_pids);
+  }
   if let Some (w) = take_pending_audit_warning () {
     context . warnings . insert (0, w); }
   Ok ( SaveResponse {
@@ -331,7 +352,7 @@ pub async fn update_views_after_save (
     hoist_confirmation  : None,
     scalar_release_confirmation : None, } ) }
 
-fn active_ids_in_viewforest (
+pub(crate) fn active_ids_in_viewforest (
   viewforest : &ViewForest,
 ) -> Vec<ID> {
   viewforest . nodes ()
@@ -393,6 +414,7 @@ pub async fn rerender_views_after_reload (
   active_source_set : Option<&ActiveSourceSet>,
   dirty_uris        : &HashSet<ViewUri>,
   scalar_approved_pids : &HashSet<ID>,
+  mut collateral_scheduler : Option<&mut CollateralScheduler>,
 ) -> Result<ReloadRerenderOutcome, Box<dyn Error>> {
   let changed_pids : HashSet<ID> =
     define_nodes . iter ()
@@ -400,17 +422,21 @@ pub async fn rerender_views_after_reload (
       DefineNode::Save ( SaveNode (n)) => Some ( n . pid . clone () ),
       DefineNode::Delete (dn)          => Some ( dn . id . clone () ) } )
     . collect ();
-  let mut affected_uris : Vec<ViewUri> = {
-    let set : HashSet<ViewUri> =
-      changed_pids . iter ()
-      . flat_map ( |pid|
-        views_state . open_views . views_containing (pid) )
+  let mut affected_uris : Vec<ViewUri> = if collateral_scheduler . is_some () {
+    views_state . open_views . views . keys () . cloned () . collect ()
+  } else {
+    let set : HashSet<ViewUri> = changed_pids . iter ()
+      . flat_map (|pid| views_state . open_views . views_containing (pid))
       . collect ();
     set . into_iter () . collect () };
   affected_uris . sort_by_key (ViewUri::repr_in_client);
   let impacts : Vec<ReloadViewImpact> = affected_uris . iter () . map (|uri| {
-    let mut pids : Vec<ID> = views_state . open_views . viewuri_to_pids (uri)
-      . into_iter () . filter (|pid| changed_pids . contains (pid)) . collect ();
+    let mut pids : Vec<ID> = if collateral_scheduler . is_some () {
+      changed_pids . iter () . cloned () . collect ()
+    } else {
+      views_state . open_views . viewuri_to_pids (uri)
+        . into_iter () . filter (|pid| changed_pids . contains (pid))
+        . collect () };
     pids . sort_by (|a, b| a . as_str () . cmp (b . as_str ()));
     ReloadViewImpact { uri: uri . clone (), pids, incoming: None }
   }) . collect ();
@@ -425,7 +451,9 @@ pub async fn rerender_views_after_reload (
     RerenderAfterSaveContext::for_save (
       env, diff_mode_enabled, define_nodes, active_source_set );
   if let Some (active) = active_source_set {
-    let input_candidates : Vec<ID> = clean . iter () . chain (&conflicted)
+    let render_clean = collateral_scheduler . is_none ();
+    let input_candidates : Vec<ID> = conflicted . iter ()
+      . chain (if render_clean { clean . iter () } else { [].iter () })
       . flat_map (|impact|
       views_state . open_views . viewuri_to_view (&impact . uri)
         . into_iter () . flat_map (active_ids_in_viewforest)) . collect ();
@@ -437,7 +465,15 @@ pub async fn rerender_views_after_reload (
         challenge_response (&release) . unwrap ())); }}
 
   let mut rendered_views : Vec<RenderedCollateralView> = Vec::new ();
-  for impact in clean . iter () . chain (&conflicted) {
+  let old_text_by_uri : HashMap<ViewUri, String> = conflicted . iter ()
+    . filter_map (|impact| views_state . open_views
+      . viewuri_to_view (&impact . uri)
+      . and_then (|forest| viewforest_to_string (forest, &env . config) . ok ())
+      . map (|text| (impact . uri . clone (), text)))
+    . collect ();
+  let render_clean = collateral_scheduler . is_none ();
+  for impact in conflicted . iter ()
+      . chain (if render_clean { clean . iter () } else { [].iter () }) {
     match rerender_collateral_view (
       impact . uri . clone (), views_state, &mut context ) . await {
       Ok (rendered) => rendered_views . push (rendered),
@@ -464,6 +500,11 @@ pub async fn rerender_views_after_reload (
     . collect ();
   for impact in &mut conflicted {
     impact . incoming = incoming_by_uri . get (&impact . uri) . cloned (); }
+  if collateral_scheduler . is_some () {
+    conflicted . retain (|impact| impact . incoming . as_ref ()
+      . zip (old_text_by_uri . get (&impact . uri))
+      . map (|(incoming, old)| incoming != old)
+      . unwrap_or (true)); }
   for rendered in rendered_views {
     if dirty_uris . contains (&rendered . uri) { continue; }
     views_state . open_views . update_view (
@@ -472,11 +513,19 @@ pub async fn rerender_views_after_reload (
       stream,
       & tag_sexp_response (
         TcpToClient::CollateralView,
-        & format_single_view_sexp (
-          &rendered . uri, &rendered . text) )); }
+          & format_single_view_sexp (
+            &rendered . uri, &rendered . text) )); }
+  if let (Some (scheduler), Some (active)) = (
+      collateral_scheduler . as_deref_mut (), active_source_set)
+  {
+    scheduler . replace_after_transition (
+      None, views_state, env, define_nodes, active,
+      scalar_approved_pids);
+  }
   Ok (ReloadRerenderOutcome::Presented (ReloadPresentation {
-    updated: clean . into_iter () . filter (|impact|
-      rendered_uris . contains (&impact . uri)) . collect (),
+    updated: if collateral_scheduler . is_some () { Vec::new () } else {
+      clean . into_iter () . filter (|impact|
+        rendered_uris . contains (&impact . uri)) . collect () },
     conflicted,
     errors: context . errors,
     warnings: context . warnings,

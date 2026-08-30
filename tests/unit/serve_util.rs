@@ -112,3 +112,17 @@ fn server_push_has_operation_identity_but_no_request_identity () {
   assert! (response . contains ("(frame-kind collateral-view)"));
   assert! (! response . contains ("request-id"));
 }
+
+#[test]
+fn active_request_context_does_not_capture_a_server_push () {
+  clear_request_context ();
+  begin_request_context (
+    "((request . \"text search\") (request-id . \"search-1\"))")
+    . unwrap ();
+  let pushed = tag_server_push_sexp_response (
+    TcpToClient::CollateralView, "background-20",
+    "((view-uri view-a) (content fresh))");
+  let enveloped = envelope_response (&pushed);
+  assert! (! enveloped . contains ("request-id"));
+  clear_request_context ();
+}

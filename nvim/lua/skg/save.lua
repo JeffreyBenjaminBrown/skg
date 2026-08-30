@@ -360,6 +360,9 @@ function M.replace_buffer_with_new_content (buf, new_content,
     vim.api.nvim_buf_call(buf, act_on_markers)
   end
   vim.bo[buf].modified = false
+  vim.b[buf].skg_application_token =
+    (vim.b[buf].skg_application_token or 0) + 1
+  vim.b[buf].skg_background_refresh_stale = nil
   buffer.arm_first_change_warning(buf)
   vim.notify('Buffer updated with processed content from Rust')
 end
@@ -745,6 +748,49 @@ function M.decline_fork ()
   end
   vim.notify('Fork declined; nothing was saved. This buffer is left'
              .. ' open for reference.')
+end
+
+---Apply a revision-checked background offer, then ACK or reject it.
+function M.background_collateral_offer_handler (_payload_text, response)
+  local operation_id = payload.field_text(response, 'operation-id')
+  local uri = payload.field_text(response, 'view-uri')
+  local graph_generation = payload.field_text(response, 'graph-generation')
+  local presentation_generation =
+    payload.field_text(response, 'presentation-generation')
+  local base_revision =
+    payload.field_text(response, 'viewforest-base-revision')
+  local needs_authorization =
+    payload.field_text(response, 'needs-authorization')
+  local content = payload.field(response, 'content')
+  local buf = uri and buffer.find_buffer_by_uri(uri) or nil
+  local applied = false
+  local client_token = 0
+  if needs_authorization == 'true' then
+    vim.notify('SKG background refresh needs authorization: '
+      .. (payload.field_text(response, 'prompt') or 'protected text'),
+      vim.log.levels.WARN)
+  elseif buf and vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified then
+    vim.b[buf].skg_background_refresh_stale = true
+    vim.notify('SKG left modified buffer '
+      .. vim.api.nvim_buf_get_name(buf)
+      .. ' stale; save or refresh it explicitly', vim.log.levels.WARN)
+  elseif buf and content ~= nil and not sexpr.is_list(content) then
+    M.replace_buffer_with_new_content(buf, sexpr.atom_text(content), nil)
+    applied = true
+    client_token = vim.b[buf].skg_application_token or 0
+  end
+  state.register_response_handler('collateral-applied', function () end, true)
+  require('skg.client').submit_request(sexpr.to_string({
+    sexpr.pair(sexpr.symbol('request'), 'apply collateral'),
+    sexpr.pair(sexpr.symbol('operation-id'), operation_id),
+    sexpr.pair(sexpr.symbol('view-uri'), uri),
+    sexpr.pair(sexpr.symbol('applied'), applied and 'true' or 'false'),
+    sexpr.pair(sexpr.symbol('graph-generation'), graph_generation),
+    sexpr.pair(sexpr.symbol('presentation-generation'),
+              presentation_generation),
+    sexpr.pair(sexpr.symbol('viewforest-base-revision'), base_revision),
+    sexpr.pair(sexpr.symbol('client-token'), tostring(client_token)),
+  }) .. '\n')
 end
 
 return M

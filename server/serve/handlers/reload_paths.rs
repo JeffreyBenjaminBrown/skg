@@ -40,6 +40,7 @@ use crate::dbs::tantivy::background_writer::{
 };
 use crate::serve::ViewsState;
 use crate::serve::handlers::reload_batch::reload_batch_active;
+use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -160,6 +161,7 @@ pub fn handle_reload_paths_request (
   env               : &mut SkgEnv,
   views_state       : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
 ) {
   let parsed = match sexp::parse (request) {
     Ok (s) => s,
@@ -178,7 +180,8 @@ pub fn handle_reload_paths_request (
     if let Some (pending) = take_pending_reload (incident) {
       present_committed_reload (
         stream, env, views_state, active_source_set,
-        incident, pending, &dirty_uris, &scalar_approved_pids );
+        incident, pending, &dirty_uris, &scalar_approved_pids,
+        collateral_scheduler );
       return; }}
   let path_strings : Vec<String> = match optional_string_list (&parsed, "paths") {
     Ok (values) => values,
@@ -285,7 +288,7 @@ pub fn handle_reload_paths_request (
   present_committed_reload (
     stream, env, views_state, active_source_set,
     incident_id . as_deref () . unwrap_or (""), pending,
-    &dirty_uris, &scalar_approved_pids ); }
+    &dirty_uris, &scalar_approved_pids, collateral_scheduler ); }
 
 fn present_committed_reload (
   stream               : &mut TcpStream,
@@ -296,6 +299,7 @@ fn present_committed_reload (
   pending              : PendingReloadPresentation,
   dirty_uris           : &HashSet<ViewUri>,
   scalar_approved_pids : &HashSet<ID>,
+  collateral_scheduler : &mut CollateralScheduler,
 ) {
   let presentation = if pending . applied . is_empty () {
     ReloadPresentation {
@@ -305,7 +309,8 @@ fn present_committed_reload (
     let diff_mode = views_state . diff_mode_enabled;
     match block_on (rerender_views_after_reload (
       stream, &pending . applied, env, diff_mode, views_state,
-      Some (active_source_set), dirty_uris, scalar_approved_pids )) {
+      Some (active_source_set), dirty_uris, scalar_approved_pids,
+      Some (collateral_scheduler) )) {
       Ok (ReloadRerenderOutcome::Presented (presentation)) => presentation,
       Ok (ReloadRerenderOutcome::Challenge (challenge)) => {
         if incident_id . is_empty () {

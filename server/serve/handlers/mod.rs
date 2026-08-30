@@ -1,4 +1,5 @@
 pub mod close_view;
+pub mod collateral_scheduler;
 pub mod diff_analysis;
 pub mod edge_source_info;
 pub mod export_to_org;

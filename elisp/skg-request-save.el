@@ -17,6 +17,12 @@
 (defvar-local skg--disk-conflict-resolution-in-progress nil
   "Non-nil while an explicitly reconciled conflict is being saved.")
 
+(defvar-local skg--application-token 0
+  "Monotonic identity of the server text most recently applied here.")
+
+(defvar-local skg--background-refresh-stale nil
+  "Non-nil when a background refresh could not safely be applied.")
+
 (defun skg--other-unsaved-skg-buffers ()
   "Return the list of skg view buffers OTHER than the current one that
 have unsaved modifications (`buffer-modified-p')."
@@ -735,6 +741,8 @@ moves point to focused headline, and removes focus marker."
       (skg-remove-folded-markers))
     (skg--restore-save-point-position save-point-position)
     (setq skg--last-rendered-content new-content)
+    (setq skg--application-token (1+ skg--application-token)
+          skg--background-refresh-stale nil)
     (set-buffer-modified-p
      ;; Clear modified flag and re-register the one-shot hook
      ;; AFTER all buffer modifications are done.
@@ -833,5 +841,57 @@ COLUMN is a character offset from the line's start; nil means column 0."
           (skg-errors-and-warnings-to-org-string errors warnings)))
     (skg-big-nonfatal-message
      buffer-name message-text content)))
+
+(defun skg--background-collateral-offer-handler (tcp-proc payload)
+  "Apply a revision-checked background view offer, then ACK or reject it."
+  (let* ((response (read payload))
+         (operation-id (cadr (assoc 'operation-id response)))
+         (uri (cadr (assoc 'view-uri response)))
+         (graph-generation (cadr (assoc 'graph-generation response)))
+         (presentation-generation
+          (cadr (assoc 'presentation-generation response)))
+         (base-revision
+          (cadr (assoc 'viewforest-base-revision response)))
+         (content (cadr (assoc 'content response)))
+         (needs-authorization
+          (cadr (assoc 'needs-authorization response)))
+         (buf (and uri (skg-find-buffer-by-uri uri)))
+         (applied nil)
+         (client-token 0))
+    (cond
+     (needs-authorization
+      (ding)
+      (message "SKG background refresh needs authorization: %s"
+               (or (cadr (assoc 'prompt response)) "protected text")))
+     ((not (buffer-live-p buf)) nil)
+     ((buffer-modified-p buf)
+      (with-current-buffer buf
+        (setq skg--background-refresh-stale
+              `((operation-id . ,operation-id)
+                (graph-generation . ,graph-generation))))
+      (message "SKG left modified buffer %s stale; save or refresh it explicitly"
+               (buffer-name buf)))
+     ((stringp content)
+      (with-current-buffer buf
+        (skg-replace-buffer-with-new-content nil content)
+        (setq applied t
+              client-token skg--application-token))))
+    (skg-register-response-handler 'collateral-applied #'ignore t)
+    (skg-submit-request
+     tcp-proc
+     (concat
+      (prin1-to-string
+       `((request . "apply collateral")
+         (operation-id . ,operation-id)
+         (view-uri . ,uri)
+         (applied . ,(if applied "true" "false"))
+         (graph-generation . ,graph-generation)
+         (presentation-generation . ,presentation-generation)
+         (viewforest-base-revision . ,base-revision)
+         (client-token . ,client-token)))
+      "\n"))))
+
+(skg-register-server-push-handler
+ 'collateral-view #'skg--background-collateral-offer-handler)
 
 (provide 'skg-request-save)

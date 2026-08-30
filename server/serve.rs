@@ -16,6 +16,7 @@ use crate::dbs::typedb::util::delete_database;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
+use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
 use crate::serve::handlers::edge_source_info::handle_edge_source_info_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
@@ -43,7 +44,7 @@ use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
-use crate::serve::util::{ begin_request_context, read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
+use crate::serve::util::{ begin_request_context, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
@@ -133,6 +134,7 @@ fn handle_emacs (
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
+  let mut collateral_scheduler = CollateralScheduler::new ();
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -157,7 +159,11 @@ fn handle_emacs (
             &tag_text_response (TcpToClient::Error, &error));
           request_header . clear ();
           continue; }
-        match request_type_from_request (&request_header) {
+        let request_type = request_type_from_request (&request_header);
+        if ! matches! (request_type,
+          Ok (RequestType::ApplyCollateral | RequestType::ViewVisited))
+        { collateral_scheduler . preempt (); }
+        match request_type {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
           Ok (RequestType::SingleRootContentView) =>
             handle_single_root_view_request (
@@ -175,7 +181,8 @@ fn handle_emacs (
               &request_header,
               &mut env,
               &mut views_state,
-              &active_source_set ),
+              &active_source_set,
+              &mut collateral_scheduler ),
           Ok (RequestType::CloseView) =>
             handle_close_view_request (
               &mut stream,
@@ -275,7 +282,8 @@ fn handle_emacs (
               &request_header,
               &mut env,
               &mut views_state,
-              &active_source_set ),
+              &active_source_set,
+              &mut collateral_scheduler ),
           Ok (RequestType::BeginReloadBatch) =>
             handle_begin_reload_batch_request (
               &mut stream, &mut owned_reload_batch_tokens),
@@ -286,6 +294,26 @@ fn handle_emacs (
           Ok (RequestType::RecomputeCyclicRoots) =>
             handle_recompute_cyclic_roots_request (
               &mut stream, &env),
+          Ok (RequestType::ApplyCollateral) =>
+            collateral_scheduler . handle_apply_ack (
+              &mut stream, &request_header, &mut views_state),
+          Ok (RequestType::ViewVisited) => {
+            let result = value_from_request_sexp ("view-uri", &request_header)
+              . and_then (|uri| value_from_request_sexp (
+                  "visit-sequence", &request_header)
+                . and_then (|sequence| sequence . parse::<u64> ()
+                  . map_err (|_| "Invalid visit-sequence" . to_string ())
+                  . map (|sequence| (uri, sequence))));
+            match result {
+              Ok ((uri, sequence)) => {
+                collateral_scheduler . note_visit (
+                  ViewUri::from_client_string (uri), sequence);
+                send_response_with_length_prefix (
+                  &mut stream, &tag_text_response (
+                    TcpToClient::ViewVisited, "visit recorded")); }
+              Err (error) => send_response_with_length_prefix (
+                &mut stream, &tag_text_response (
+                  TcpToClient::Error, &error)), } },
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
@@ -316,7 +344,10 @@ fn handle_emacs (
                 & tag_text_response (
                   TcpToClient::RequestSnapshot,
                   &terms ));
-              snapshot_requested = true; }} }}
+              snapshot_requested = true; }}}
+        if ! request_context_active () {
+          collateral_scheduler . pump (&mut stream, &views_state); }
+      }
       Err (_) => break, // real error
     }}
   release_connection_reload_batches (&mut owned_reload_batch_tokens);

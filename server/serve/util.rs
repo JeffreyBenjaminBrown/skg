@@ -45,6 +45,10 @@ fn clear_request_context () {
   CURRENT_REQUEST_CONTEXT . with (
     |slot| *slot . borrow_mut () = None); }
 
+pub fn request_context_active () -> bool {
+  CURRENT_REQUEST_CONTEXT . with (|slot| slot . borrow () . is_some ())
+}
+
 /// Prepend a (response-type "TYPE") entry to an existing s-exp string.
 /// Input:  "((content "...") (errors (...)) (warnings (...)))"
 /// Output: "(("response-type" "TYPE") (content "...") (errors (...)) (warnings (...)))"
@@ -112,6 +116,8 @@ fn envelope_response (response : &str) -> String {
   else { return response . to_string (); };
   let Ok (Sexp::List (mut fields)) = sexp::parse (response)
   else { return response . to_string (); };
+  if field_atom (&fields, "server-push") . as_deref () == Some ("true") {
+    return response . to_string (); }
   let response_type = field_atom (&fields, "response-type")
     . unwrap_or_else ( || "unknown" . into ());
   if field_atom (&fields, "request-id") . is_none () {

@@ -21,6 +21,7 @@ use crate::serve::handlers::telescope_hoist::{
 use crate::serve::handlers::scalar_release::{
   approved_pids_from_request as scalar_approved_pids_from_request,
 };
+use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp,
@@ -111,6 +112,7 @@ pub fn handle_save_buffer_request (
   env        : &mut SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
@@ -160,7 +162,8 @@ pub fn handle_save_buffer_request (
             fork_approved,
             &fork_sources,
             &hoist_approved_pids,
-            &scalar_approved_pids ))
+            &scalar_approved_pids,
+            Some (collateral_scheduler) ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
@@ -421,7 +424,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
     viewuri_from_request_result, views_state, active_source_set,
     fork_approved, fork_sources, hoist_approved_pids,
-    &HashSet::new () ) . await
+    &HashSet::new (), None ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -436,6 +439,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   fork_sources                 : &HashMap<ID, SourceName>,
   hoist_approved_pids         : &HashSet<ID>,
   scalar_approved_pids        : &HashSet<ID>,
+  mut collateral_scheduler    : Option<&mut CollateralScheduler>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
@@ -578,7 +582,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         viewuri_from_request_result,
         views_state,
         active_source_set,
-        scalar_approved_pids ) . await ?;
+        scalar_approved_pids,
+        collateral_scheduler . as_deref_mut () ) . await ?;
     { // Nonfatal parse warnings (e.g. discarded col headline text)
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
@@ -656,10 +661,9 @@ pub fn deleted_ids_to_source (
               . or_insert_with ( || source_name . clone() ); }} }} }
   result }
 
-/// Every other open view sharing at least one PID with the saved view.
-/// Over-approximates true collateral (which requires parsing the buffer
-/// to know which PIDs actually changed). This is intentional: locking
-/// too many buffers briefly is harmless; missing one could lose edits.
+/// Every other open view. A save can affect inverse/generated context in a
+/// view which shares no currently rendered PID with the saved forest, so PID
+/// overlap is not a safe pre-transition lock boundary.
 fn uris_of_views_to_lock (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &ViewsState,
@@ -667,11 +671,7 @@ fn uris_of_views_to_lock (
   let saved_uri : &ViewUri = match viewuri_from_request_result {
     Ok (uri) => uri,
     Err (_)  => return Vec::new () };
-  let pids : Vec<ID> =
-    views_state . open_views . viewuri_to_pids (saved_uri);
-  let mut collateral_views : HashSet<ViewUri> = HashSet::new ();
-  for pid in &pids {
-    for uri in views_state . open_views . views_containing (pid) {
-      if &uri != saved_uri
-      { collateral_views . insert (uri); } } }
-  collateral_views . into_iter () . collect () }
+  views_state . open_views . views . keys ()
+    . filter (|uri| *uri != saved_uri)
+    . cloned ()
+    . collect () }

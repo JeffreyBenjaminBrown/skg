@@ -221,4 +221,37 @@ via the buffer's `kill-buffer-hook' (which is a no-op after
       (kill-buffer buf))
     (message "Closed %d skg buffer(s)." (length bufs))))
 
+(defvar skg--visit-sequence 0)
+(defvar skg--last-visited-uri nil)
+(defvar skg--visit-report-timer nil)
+
+(defun skg--schedule-current-view-visit-report ()
+  "Debounce a monotonic visit report for MRU background scheduling."
+  (let ((uri (and (boundp 'skg-view-uri) skg-view-uri)))
+    (when (and uri (not (equal uri skg--last-visited-uri)))
+      (setq skg--last-visited-uri uri
+            skg--visit-sequence (1+ skg--visit-sequence))
+      (when (timerp skg--visit-report-timer)
+        (cancel-timer skg--visit-report-timer))
+      (let ((sequence skg--visit-sequence))
+        (setq skg--visit-report-timer
+              (run-with-idle-timer
+               0.15 nil
+               (lambda ()
+                 (when (and skg-rust-tcp-proc
+                            (process-live-p skg-rust-tcp-proc))
+                   (skg-register-response-handler
+                    'view-visited #'ignore t)
+                   (skg-submit-request
+                    skg-rust-tcp-proc
+                    (concat
+                     (prin1-to-string
+                      `((request . "view visited")
+                        (view-uri . ,uri)
+                        (visit-sequence . ,sequence)))
+                     "\n"))))))))))
+
+(add-hook 'buffer-list-update-hook
+          #'skg--schedule-current-view-visit-report)
+
 (provide 'skg-buffer)

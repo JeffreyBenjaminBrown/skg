@@ -30,6 +30,8 @@ pub enum RequestType {
   BeginReloadBatch,
   EndReloadBatch,
   RecomputeCyclicRoots,
+  ApplyCollateral,
+  ViewVisited,
 }
 
 impl RequestType {
@@ -62,6 +64,8 @@ impl RequestType {
       "begin reload batch"       => Ok (RequestType::BeginReloadBatch),
       "end reload batch"         => Ok (RequestType::EndReloadBatch),
       "recompute cyclic roots"   => Ok (RequestType::RecomputeCyclicRoots),
+      "apply collateral"         => Ok (RequestType::ApplyCollateral),
+      "view visited"             => Ok (RequestType::ViewVisited),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -104,6 +108,8 @@ pub enum TcpToClient {
   ReloadPaths,
   ReloadBatch,
   RecomputeCyclicRoots,
+  CollateralApplied,
+  ViewVisited,
   Error,
 }
 
@@ -146,4 +152,6 @@ impl TcpToClient {
       TcpToClient::ReloadPaths      => "reload-paths",
       TcpToClient::ReloadBatch      => "reload-batch",
       TcpToClient::RecomputeCyclicRoots => "recompute-cyclic-roots",
+      TcpToClient::CollateralApplied => "collateral-applied",
+      TcpToClient::ViewVisited => "view-visited",
       TcpToClient::Error            => "error", }} }
