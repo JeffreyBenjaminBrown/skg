@@ -89,7 +89,8 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      'search-results
      (lambda (_tcp-proc payload)
        (skg-remove-response-handler 'ugly-telescope-confirmation)
-       (skg--display-search-phase1 payload clean-terms))
+       (skg--display-search-phase1
+        payload clean-terms regex body operators ugly-choice))
      t)
     (skg-register-response-handler
      ;; Register phase 2 handler for search results 'enriched' with containerward paths and graphnodestats. Persists until fired or replaced.
@@ -128,7 +129,11 @@ Each function is called with no arguments, with the search buffer
 as `current-buffer'. Used by `skg-search-make-link' to upgrade the
 buffer to link-creation mode.")
 
-(defun skg--display-search-phase1 (payload search-terms)
+(defvar-local skg--search-request-spec nil
+  "Arguments which reproduce this live search after rank-only repair.")
+
+(defun skg--display-search-phase1
+    (payload search-terms regex body operators ugly-choice)
   "Display phase 1 search results (without paths).
 Sets skg-view-uri to \"search:TERMS\" and registers a
 kill-buffer-hook to send close-view to the server."
@@ -145,6 +150,8 @@ kill-buffer-hook to send close-view to the server."
           (heralds-minor-mode)
           (goto-char (point-min)))
         (setq skg-view-uri view-uri)
+        (setq skg--search-request-spec
+              (list search-terms regex body operators ugly-choice))
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)
         (switch-to-buffer (current-buffer)) ))
@@ -153,6 +160,27 @@ kill-buffer-hook to send close-view to the server."
        "*SKG Search Warnings*"
        "Search completed with warnings"
        (skg-errors-and-warnings-to-org-string nil warnings)))))
+
+(defun skg-refresh-live-searches-after-rank-repair ()
+  "Rerun every clean live search after authoritative rank repair.
+Modified search buffers are preserved and reported rather than overwritten."
+  (let ((specs nil)
+        (skipped nil))
+    (dolist (buffer (buffer-list))
+      (when (buffer-local-value 'skg--search-request-spec buffer)
+        (if (buffer-modified-p buffer)
+            (push (buffer-name buffer) skipped)
+          (push (buffer-local-value 'skg--search-request-spec buffer)
+                specs))))
+    (dolist (spec (nreverse specs))
+      (apply #'skg--request-text-search spec))
+    (when skipped
+      (display-warning
+       'skg
+       (format "Cyclic-root ranks changed, but modified search buffer(s) were left untouched: %s"
+               (mapconcat #'identity (nreverse skipped) ", "))
+       :warning))
+    (length specs)))
 
 (defun skg--as-string (value)
   "Convert VALUE to a string. Symbols become their name."

@@ -23,7 +23,12 @@ advances, then updates Tantivy and publishes the new cache atomically."
              (progn
                (ding)
                (display-warning 'skg (format "%s" content) :error))
-           (message "%s" content))))
+           (let ((count
+                  (if (fboundp 'skg-refresh-live-searches-after-rank-repair)
+                      (skg-refresh-live-searches-after-rank-repair)
+                    0)))
+             (message "%s Queued %d live search refresh(es)."
+                      content count)))))
      t)
     (skg-submit-request
      tcp-proc "((request . \"recompute cyclic roots\"))\n")))
