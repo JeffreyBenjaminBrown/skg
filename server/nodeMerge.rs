@@ -1,18 +1,25 @@
 pub mod nodeMergeInstructionTriple;
 pub mod validate_nodeMerge;
 
-use crate::dbs::filesystem::multiple_nodes::{
-  error_unless_each_id_names_one_node,
-  read_all_skg_files_from_sources};
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
+use crate::dbs::in_rust_graph::{
+  InRustGraph,
+  InRustGraphHandle,
+  apply_definenodes_to_inRustGraph,
+};
 use crate::nodeMerge::nodeMergeInstructionTriple::neighbor_savenodes_for_nodeMerges;
-use crate::save::{ update_fs_from_saveinstructions_with_hoist_approval, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
+use crate::save::{
+  nodecompletes_from_graph,
+  prepare_fs_update,
+  update_tantivy_from_saveinstructions,
+  update_typedb_from_saveinstructions,
+};
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, NodeMerge, SaveNode};
 use std::error::Error;
 use std::collections::HashSet;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 /// Applies NodeMerges by fanning a single 'Vec<DefineNode>' through the
@@ -42,6 +49,11 @@ pub async fn merge_nodes (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
+  if let Some (through) =
+    crate::dbs::tantivy::background_writer::latest_tantivy_generation ()
+  { let _ = crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_through (
+      through); }
   merge_nodes_with_hoist_approval (
     nodeMerge_instructions, config, tantivy_index, driver, graph,
     &HashSet::new () ) . await
@@ -82,19 +94,24 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
   let neighbor_savenodes : Vec<SaveNode> =
     neighbor_savenodes_for_nodeMerges (
       nodeMerge_instructions, &config, driver ) . await ?;
+  let old_selected = graph . load_full ();
+  let mut candidate_graph : InRustGraph = (*old_selected . graph) . clone ();
+  apply_definenodes_to_inRustGraph (
+    &mut candidate_graph, &primary_definenodes);
+  let candidate_nodes : Vec<NodeComplete> =
+    nodecompletes_from_graph (&candidate_graph);
+  let mut selected_manifest = old_selected . manifest . clone ();
 
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
-    update_fs_from_saveinstructions_with_hoist_approval (
+    let prepared = prepare_fs_update (
       &primary_definenodes,
       &[], // No source-moves during a merge.
-      config . clone (),
+      &config,
       hoist_approved_pids ) ?;
+    prepared . apply (&config) ?;
+    prepared . apply_to_manifest (&mut selected_manifest);
     tracing::info!("   Filesystem merge complete."); }
-
-  { // In-Rust graph.
-    apply_definenodes (graph, &primary_definenodes);
-    tracing::info!("   In-Rust graph merge complete."); }
 
   { // TypeDB: primary + neighbor SaveNodes.
     let typedb_definenodes : Vec<DefineNode> = {
@@ -107,51 +124,47 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
       db_name, driver, &typedb_definenodes, &[],
       None ) . await // bulk recreate: pid migration makes a set-diff subtle
     { tracing::error!(
-        "   TypeDB merge failed: {}. Rebuilding from disk...", e);
-      let nodes : Vec<NodeComplete> =
-        read_all_skg_files_from_sources (&config)
-        . map_err ( |e2| -> Box<dyn Error> { format!(
-           "TypeDB rebuild also failed: {}. Restart the server.", e2)
-           . into () } ) ?;
-      error_unless_each_id_names_one_node (
-        &nodes, &config . data_root)
-        . map_err ( |e2| -> Box<dyn Error> { format!(
-           "TypeDB rebuild also failed: {}. Restart the server.", e2)
-           . into () } ) ?;
-      wipe_then_init_typedb_db (&config, driver, &nodes) . await
-        . map_err ( |e2| -> Box<dyn Error> { format!(
-           "TypeDB rebuild also failed: {}. Restart the server.", e2)
-           . into () } ) ?;
+        "   TypeDB merge failed: {}. Reconstructing candidate graph...", e);
+      if let Err (rebuild_error) = wipe_then_init_typedb_db (
+        &config, driver, &candidate_nodes) . await {
+        let reason = format! (
+          "TypeDB is poisoned after node merge: candidate reconstruction \
+           failed ({})", rebuild_error);
+        graph . store (Arc::new (
+          old_selected . with_typedb_poisoned (reason . clone ())));
+        return Err (reason . into ()); }
       tracing::warn!(
-        "NodeMerge succeeded, but TypeDB had to be rebuilt from disk.");
+        "NodeMerge succeeded, but TypeDB used complete candidate reconstruction.");
     } else {
       tracing::info!("   TypeDB merge complete."); } }
 
-  { // Tantivy.
+  let replacement : Option<TantivyIndex> =
     match update_tantivy_from_saveinstructions (
       &primary_definenodes, tantivy_index,
       &std::collections::HashMap::new () ) // merged nodes index with "" context type; refreshed at next rebuild
     { Ok (_count) => {
         tracing::info!("   Tantivy merge complete.");
-        Ok (None) }
+        None }
       Err (e) => {
         tracing::error!(
-          "Tantivy merge failed: {}. Rebuilding from disk...", e);
-        let nodes : Vec<NodeComplete> =
-          read_all_skg_files_from_sources (&config)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        error_unless_each_id_names_one_node (
-          &nodes, &config . data_root)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        let new_index : TantivyIndex =
-          rebuild_tantivy_from_nodes (&config, &nodes)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
+          "Tantivy merge failed: {}. Rebuilding from candidate graph...", e);
+        let new_index : TantivyIndex = match
+          rebuild_tantivy_from_nodes (&config, &candidate_nodes) {
+          Ok (index) => index,
+          Err (rebuild_error) => {
+            let reason = format! (
+              "Tantivy is poisoned after node merge: candidate reconstruction \
+               failed ({})", rebuild_error);
+            let selected = old_selected . with_acknowledged_rebuild (
+              candidate_graph, selected_manifest);
+            graph . store (Arc::new (
+              selected . with_tantivy_poisoned (reason . clone ())));
+            return Err (reason . into ()); }};
         tracing::warn!(
-          "NodeMerge succeeded, but Tantivy had to be rebuilt from disk.");
-        Ok (Some (new_index)) }}} }
+          "NodeMerge succeeded, but Tantivy used candidate reconstruction.");
+        Some (new_index) }};
+  graph . store (Arc::new (
+    old_selected . with_acknowledged_rebuild (
+      candidate_graph, selected_manifest)));
+  tracing::info!("   In-Rust graph and selected manifest published.");
+  Ok (replacement) }

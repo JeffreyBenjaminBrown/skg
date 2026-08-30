@@ -47,7 +47,7 @@ async fn main () -> Result<(), Box<dyn std::error::Error>> {
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&nodes);
   let handle : InRustGraphHandle = new_handle (graph);
   init_global_handle_for_first_time_or_panic (Arc::clone (&handle));
-  let snap : Arc<InRustGraph> = handle . load_full ();
+  let snap : Arc<InRustGraph> = handle . load_full () . graph . clone ();
   println! ("Loaded graph: {} nodes", snap . nodes . len ());
 
   let driver : TypeDBDriver = TypeDBDriver::new (

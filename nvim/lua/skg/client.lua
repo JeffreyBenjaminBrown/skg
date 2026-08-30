@@ -33,6 +33,7 @@ M.connect_timeout_ms = 3000
 function M.connect ()
   if state.tcp and not state.tcp:is_closing() then return state.tcp end
   config.source_inventory = nil
+  config.store_state = nil
   if not M.port then
     if not config.config_file() then
       error('skg: not initialized; run :SkgInit <skgconfig.toml>') end

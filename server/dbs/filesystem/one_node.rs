@@ -12,6 +12,7 @@ use crate::telescope::unfold::{
 use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::store_state::{PathDigest, SelectedPathManifest};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
@@ -182,6 +183,20 @@ impl PreparedTelescopeWrite {
     Ok (( ))
   }
 
+  /// Apply this already-serialized write set to the manifest which described
+  /// the pre-write graph selection.  Digests come from the exact YAML bytes
+  /// passed to `fs::write`, never from a later restat of the live path.
+  pub(crate) fn apply_to_manifest (
+    &self,
+    manifest : &mut SelectedPathManifest,
+  ) {
+    for (_, path, yaml) in &self . writes {
+      manifest . insert (
+        path . into (), PathDigest::of_bytes (yaml . as_bytes ())); }
+    for path in &self . deletions {
+      manifest . remove (Path::new (path)); }
+  }
+
   /// Hoist is not complete until a fresh disk fold proves that title and
   /// body now select from home. This runs after filesystem writes and before
   /// callers update the in-memory graph or either derived database.
@@ -340,7 +355,7 @@ fn error_unless_home_is_writable (
 /// Checks that a node's primary ID matches the filename stem.
 /// This property is assumed by `path_from_pid_and_source` and
 /// elsewhere but was never validated on read.
-pub(super) fn validate_pid_matches_filename (
+pub(crate) fn validate_pid_matches_filename (
   node : &NodeFS,
   path : &Path,
 ) -> io::Result<()> {
@@ -369,13 +384,33 @@ pub(super) fn read_nodecomplete
   ) -> io::Result <NodeFS> {
 
   let file_path : &Path = file_path . as_ref ();
-  let node_fs   : NodeFS = {
-    let contents : String = fs::read_to_string (file_path)?;
-    serde_yaml::from_str (&contents)
+  let bytes : Vec<u8> = fs::read (file_path) ?;
+  parse_nodefs_bytes (&bytes, file_path)
+}
+
+/// Read and parse once while retaining the exact bytes which selected the
+/// section.  Store transactions hash these bytes; they must never reopen the
+/// path after parsing and call the newer contents "selected".
+pub(super) fn read_nodefs_with_bytes
+  <P : AsRef<Path>>
+  (file_path : P
+  ) -> io::Result<(NodeFS, Vec<u8>)> {
+  let file_path : &Path = file_path . as_ref ();
+  let bytes : Vec<u8> = fs::read (file_path) ?;
+  let node_fs = parse_nodefs_bytes (&bytes, file_path) ?;
+  Ok ((node_fs, bytes))
+}
+
+pub(crate) fn parse_nodefs_bytes (
+  bytes     : &[u8],
+  file_path : &Path,
+) -> io::Result<NodeFS> {
+  let node_fs : NodeFS =
+    serde_yaml::from_slice (bytes)
     . map_err (
       |e| io::Error::new (
         io::ErrorKind::InvalidData,
-        e . to_string () )) ? };
+        e . to_string () )) ?;
   if node_fs . title . as_deref () == Some ("") {
     // Absent title = a non-home section, fine; PRESENT-but-empty is
     // malformed.

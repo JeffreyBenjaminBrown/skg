@@ -56,6 +56,15 @@ calls `(skg-tcp-connect-to-rust)`
        (let* ((response (read payload))
               (content (cadr (assoc 'content response))))
          (skg-install-source-inventory response)
+         (setq skg--server-store-state
+               `((graph-generation
+                  . ,(cadr (assoc 'graph-generation response)))
+                 (path-outcomes
+                  . ,(cadr (assoc 'path-outcomes response)))
+                 (typedb-health
+                  . ,(cadr (assoc 'typedb-health response)))
+                 (tantivy-health
+                  . ,(cadr (assoc 'tantivy-health response)))))
          (skg--show-handshake-telescope-warnings response)
          (message "%s" (or (and content (format "%s" content))
                            "connected"))))

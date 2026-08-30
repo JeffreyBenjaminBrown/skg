@@ -181,7 +181,7 @@ fn initial_store_for_today (
   graph     : &InRustGraphHandle,
   _today    : &str,
 ) -> Vec<AuditRecord> {
-  let snap : Arc<InRustGraph> = graph . load_full ();
+  let snap : Arc<InRustGraph> = graph . load_full () . graph . clone ();
   let corpus : HashSet<ID> =
     snap . nodes . keys () . cloned () . collect ();
   let raw : Vec<AuditRecord> = load (data_root);
@@ -199,7 +199,7 @@ fn build_todo (
   store : &[AuditRecord],
   today : &str,
 ) -> Vec<ID> {
-  let snap : Arc<InRustGraph> = graph . load_full ();
+  let snap : Arc<InRustGraph> = graph . load_full () . graph . clone ();
   let corpus : HashSet<ID> =
     snap . nodes . keys () . cloned () . collect ();
   let mut list : Vec<ID> =
@@ -265,7 +265,7 @@ fn process_batch (
   store     : &mut Vec<AuditRecord>,
 ) {
   let t_batch : std::time::Instant = std::time::Instant::now ();
-  let snap : Arc<InRustGraph> = graph . load_full ();
+  let snap : Arc<InRustGraph> = graph . load_full () . graph . clone ();
   let tx : Transaction = match block_on (
     driver . transaction (db_name, TransactionType::Read) )
   { Ok (t) => t,

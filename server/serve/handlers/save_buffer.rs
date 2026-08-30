@@ -465,7 +465,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
     // this save will actually rewrite, not only what appeared in the buffer.
-    let graph_snap = env . in_rust_graph . load_full ();
+    let graph_snap = env . in_rust_graph . load_full () . graph . clone ();
     apply_delete_propagation_cleanup (
       &mut nonmerge_defineNodes, &graph_snap ); }
   let hoist_candidates : Vec<HoistCandidate> =

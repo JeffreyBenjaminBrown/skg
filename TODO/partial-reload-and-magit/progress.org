@@ -48,6 +48,49 @@ what's imperfect about what's done; choices determining the future.
   state when run in one process pass under the repository's required nextest
   process isolation.)
 
+** selected-store and index generations (in progress)
+- Replaced the graph-only 'ArcSwap' payload with one immutable
+  'SelectedStoreState': graph snapshot, monotonic graph generation, BLAKE3
+  selected-path manifest, per-path index state, cyclic-root slot and derived
+  store health now publish as one value.  Existing graph readers retain a
+  cheap 'Arc<InRustGraph>' from that publication.
+- Initialization and rebuild build the manifest from the exact retained bytes
+  they parsed.  Save and node merge update it from their prepared serialized
+  bytes; ignored foreign files are not falsely called selected.  The
+  connection handshake now exposes graph generation, path outcomes and store
+  health, and both clients cache that authoritative baseline.
+- The Tantivy background writer now assigns monotonic generations and retains
+  'Pending', 'Committed' or 'Failed(reason)' for each.  Exact and captured-
+  through waits are available; enqueue failure and worker panic become failed
+  generations.  A transition publishes its awaiting-index paths before the
+  task can run, and the worker promotes precisely those paths by atomic CAS.
+- Save/reload no longer acknowledges before the exact Tantivy generation.
+  Node merge drains older queued work before its direct write.  Whole-corpus
+  whitespace normalization now takes the graph writer lock before scanning,
+  drains the captured older index generation and publishes graph plus manifest
+  together.
+- TypeDB recovery now reconstructs from the immutable candidate graph rather
+  than rereading possibly bad disk.  Reload additionally attempts restoration
+  of the prior graph projection and marks TypeDB poisoned if neither complete
+  reconstruction succeeds.
+
+** stable reload transaction (in progress)
+- Path parsing before the writer lock resolves identifiers only.  Under the
+  lock, reload captures every possible section path as exact bytes or absence,
+  applies owned/foreign selection, parses/folds, and rereads every captured
+  path before the first store mutation.  A mismatch changes no store.
+- Each legal telescope updates the selected manifest from its captured bytes;
+  fatal telescopes keep both their prior graph node and selected digests.  The
+  final graph undergoes pure distinct-ID-claim and override validation.
+- An extra-ID change invokes the complete normalized-corpus fallback, validates
+  it, rechecks its complete selected manifest, and derives graph definitions by
+  comparing old and new graphs.  A test proves that claiming an untouched
+  node's primary ID rejects the transaction without advancing graph or
+  manifest.
+- Validation after these changes: 180/180 Rust library tests, the combined
+  135 save/source integration tests, all 312 Emacs tests and the complete
+  Neovim suite pass.
+
 * what's done and went well
 - Design settled in =2_discussion.org= (all DONE); =3_plan.org= written.
 - Feature branch =partial-reload-and-magit=; design docs committed.

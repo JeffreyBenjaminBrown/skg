@@ -7,6 +7,7 @@
 //! every parser used by bulk load, one-pid load, reload, diff, or recovery.
 
 use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::store_state::{PathDigest, SelectedPathManifest};
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -58,6 +59,22 @@ pub fn selected_direct_source_files (
         source: source_name . clone (), path })); }
   }
   Ok (select_source_file_candidates (config, candidates))
+}
+
+/// Hash the exact currently selected corpus without parsing YAML.  Used only
+/// as the final byte-stability comparison after a full-corpus transaction.
+pub fn selected_path_digest_manifest (
+  config : &SkgConfig,
+) -> io::Result<SelectedPathManifest> {
+  let selected = selected_direct_source_files (config) ?;
+  let mut manifest = SelectedPathManifest::new ();
+  for pid in selected . pid_order {
+    for file in selected . by_pid . get (&pid)
+      . into_iter () . flatten () {
+      let bytes = fs::read (&file . path) ?;
+      manifest . insert (
+        file . path . clone (), PathDigest::of_bytes (&bytes)); }}
+  Ok (manifest)
 }
 
 /// Select the extant direct source files for one filename PID.  Missing paths

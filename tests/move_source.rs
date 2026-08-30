@@ -113,13 +113,10 @@ async fn test_move_node_to_another_owned_source (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
+    let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
-    if let Some (new_idx) = replacement {
-      *tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file should be gone, new file should exist
@@ -206,13 +203,10 @@ async fn test_move_node_referenced_by_extra_id (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
+    let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
-    if let Some (new_idx) = replacement {
-      *tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
@@ -274,13 +268,10 @@ async fn test_move_multiple_nodes (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
+    let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &_tantivy_index, &driver,
         &graph ) . await?;
-    if let Some (new_idx) = replacement {
-      *_tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS
@@ -460,13 +451,10 @@ async fn test_source_only_change_with_populated_pool (
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
-    let replacement : Option<TantivyIndex> =
-      update_graph_minus_nodeMerges (
+    let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
-    if let Some (new_idx) = replacement {
-      *tantivy_index = new_idx; }
     audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present

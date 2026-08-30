@@ -86,7 +86,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext {
       env,
       source_diffs,
-      graph_snap : env . in_rust_graph . load_full (),
+      graph_snap : env . in_rust_graph . load_full () . graph . clone (),
       errors : Vec::new (),
       warnings : Vec::new (),
       deleted_since_head_pid_src_map,
@@ -421,7 +421,8 @@ pub async fn render_initial_view (
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . insert ( ViewRequest::Path (RelationRole::CONTAINER) ); }} }
-  let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
+  let graph_snap : Arc<InRustGraph> =
+    env . in_rust_graph . load_full () . graph . clone ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly

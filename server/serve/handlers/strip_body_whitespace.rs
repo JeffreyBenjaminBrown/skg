@@ -8,16 +8,24 @@
 //! untouched: it stores no body text, and the textlinks it derives
 //! from bodies cannot be changed by stripping trailing whitespace.
 
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use crate::dbs::filesystem::one_node::write_nodecomplete_to_source;
+use crate::dbs::filesystem::multiple_nodes::{
+  LoadedCorpus,
+  read_all_skg_files_with_manifest,
+};
+use crate::dbs::filesystem::one_node::prepare_nodecomplete_telescope;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::write::update_index_with_nodes;
+use crate::dbs::tantivy::background_writer::{
+  latest_tantivy_generation,
+  wait_for_tantivy_writes_through,
+};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
 use crate::types::misc::{SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::store_state::SelectedPathManifest;
 
 use std::collections::BTreeMap;
 use std::net::TcpStream;
@@ -46,8 +54,14 @@ pub fn handle_strip_body_whitespace_request (
 fn strip_body_whitespace_and_refresh_caches (
   env : &mut SkgEnv,
 ) -> Result<String, String> {
-  let (all_nodes, changed) : (Vec<NodeComplete>, Vec<NodeComplete>) =
-    strip_body_whitespace_on_disk (& env . config) ?;
+  // The source scan decides the replacement graph, so classification belongs
+  // inside the same writer boundary as its disk writes and publication.
+  let _write_guard = futures::executor::block_on (
+    crate::write_lock::acquire_graph_write_lock ());
+  let tantivy_through = latest_tantivy_generation ();
+  let (all_nodes, changed, selected_manifest)
+    : (Vec<NodeComplete>, Vec<NodeComplete>, SelectedPathManifest) =
+    strip_body_whitespace_on_disk_with_manifest (& env . config) ?;
   let owned_checked : usize =
     all_nodes . iter ()
     . filter ( |n| env . config . user_owns_source (& n . source) )
@@ -56,12 +70,19 @@ fn strip_body_whitespace_and_refresh_caches (
     return Ok ( format! (
       "No body has trailing whitespace ({} files checked, in owned sources).",
       owned_checked )); }
-  env . in_rust_graph . store (
-    Arc::new ( InRustGraph::from_nodecompletes (&all_nodes) ));
   { let tantivy_nodes : Vec<NodeTantivy> =
       changed . iter () . map (NodeTantivy::from) . collect ();
+    // No queued write older than this whole-graph normalization may land
+    // afterward and restore stale unstripped text.
+    if let Some (through) = tantivy_through {
+      let _ = wait_for_tantivy_writes_through (through); }
     update_index_with_nodes (&tantivy_nodes, & env . tantivy_index)
       . map_err ( |e| format! ("Tantivy update failed: {}", e) ) ?; }
+  { let old = env . in_rust_graph . load_full ();
+    env . in_rust_graph . store ( Arc::new (
+      old . with_acknowledged_rebuild (
+        InRustGraph::from_nodecompletes (&all_nodes),
+        selected_manifest) )); }
   let breakdown : String = {
     // BTreeMap so the report lists sources in a stable order.
     let mut counts : BTreeMap<SourceName, usize> = BTreeMap::new ();
@@ -90,9 +111,17 @@ fn strip_body_whitespace_and_refresh_caches (
 pub fn strip_body_whitespace_on_disk (
   config : &SkgConfig,
 ) -> Result<(Vec<NodeComplete>, Vec<NodeComplete>), String> {
-  let mut all_nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (config)
+  let (all, changed, _) = strip_body_whitespace_on_disk_with_manifest (config) ?;
+  Ok ((all, changed))
+}
+
+fn strip_body_whitespace_on_disk_with_manifest (
+  config : &SkgConfig,
+) -> Result<(Vec<NodeComplete>, Vec<NodeComplete>, SelectedPathManifest), String> {
+  let loaded : LoadedCorpus = read_all_skg_files_with_manifest (config)
     . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
+  let mut all_nodes : Vec<NodeComplete> = loaded . nodes;
+  let mut manifest : SelectedPathManifest = loaded . manifest;
   let mut changed : Vec<NodeComplete> = Vec::new ();
   for node in all_nodes . iter_mut () {
     if ! config . user_owns_source (& node . source) { continue; }
@@ -103,12 +132,17 @@ pub fn strip_body_whitespace_on_disk (
     node . body =
       if stripped . is_empty () { None }
       else { Some (stripped) };
-    write_nodecomplete_to_source (node, config)
+    let prepared = prepare_nodecomplete_telescope (node, config, false)
+      . map_err ( |e| format! (
+        "Preparing node {} in source {}: {}",
+        node . pid . as_str (), node . source, e) ) ?;
+    prepared . apply (config)
       . map_err ( |e| format! (
         "Writing node {} to source {}: {}",
         node . pid . as_str (), node . source, e) ) ?;
+    prepared . apply_to_manifest (&mut manifest);
     changed . push ( node . clone () ); }
-  Ok (( all_nodes, changed )) }
+  Ok (( all_nodes, changed, manifest )) }
 
 /// Strips trailing whitespace (spaces, tabs, '\r') from each line,
 /// then any trailing newlines from the whole body. Interior empty

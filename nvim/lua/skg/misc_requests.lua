@@ -20,6 +20,12 @@ function M.connection_verify ()
     function (_payload, response)
       config.install_source_inventory(
         payload.field(response, 'source-inventory'))
+      config.store_state = {
+        graph_generation = payload.field(response, 'graph-generation'),
+        path_outcomes = payload.field(response, 'path-outcomes'),
+        typedb_health = payload.field(response, 'typedb-health'),
+        tantivy_health = payload.field(response, 'tantivy-health'),
+      }
       M.show_handshake_telescope_warnings(response)
       local content = payload.field(response, 'content')
       local message = 'connected'

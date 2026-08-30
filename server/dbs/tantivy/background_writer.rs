@@ -8,24 +8,24 @@
 //! the critical path.
 //!
 //! A single worker thread applies the queued updates in FIFO order, so
-//! two rapid saves of the same node can never commit out of order. A
-//! search blocks on 'wait_for_tantivy_writes_idle' until the queue has
-//! drained, so it always sees an index reflecting every save issued so
-//! far (read-your-writes), at the cost of waiting through any in-flight
-//! commit.
+//! two rapid saves of the same node can never commit out of order.  Every
+//! accepted batch has a monotonic generation and a durable terminal status.
+//! A search captures the newest generation and waits through that point, so
+//! later enqueues cannot accidentally lengthen its read-your-writes barrier.
 //!
 //! 'lock_tantivy_writes' serializes EVERY Tantivy writer (this worker,
 //! search-make-link's 'update_index_with_nodes', the init/rebuild
 //! context pass), since backgrounding the worker means it can now run
-//! concurrently with those. On a background-write failure the worker
-//! logs and moves on: the filesystem already holds the truth, so the
-//! index stays recoverable via a 'rebuild dbs'.
+//! concurrently with those.  A background-write or enqueue failure is both
+//! logged and recorded against its generation.  Callers can therefore avoid
+//! acknowledging a graph transition whose exact search-index update failed.
 
 use crate::save::update_tantivy_from_saveinstructions;
+use crate::dbs::in_rust_graph::InRustGraphHandle;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::DefineNode;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 
@@ -45,66 +45,302 @@ pub fn lock_tantivy_writes () -> MutexGuard<'static, ()> {
 pub struct TantivyWriteTask {
   pub tantivy_index : TantivyIndex,
   pub instructions  : Vec<DefineNode>,
-  pub context_types : HashMap<ID, String>, }
+  pub context_types : HashMap<ID, String>,
+  /// Store publication whose selected paths await this task.  Tests and
+  /// index-only callers may omit it.
+  pub selected_store : Option<InRustGraphHandle>, }
 
-/// Shared between the worker thread and the enqueue/wait API: the count
-/// of writes not yet committed, and a condvar signalled when it reaches
-/// zero.
-struct Inflight {
-  count  : Mutex<usize>,
-  idle   : Condvar, }
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TantivyGeneration (u64);
+
+impl TantivyGeneration {
+  pub fn get (self) -> u64 { self . 0 }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TantivyGenerationStatus {
+  Pending,
+  Committed,
+  Failed (String), }
+
+struct GenerationLedger {
+  next_generation : u64,
+  statuses        : BTreeMap<TantivyGeneration, TantivyGenerationStatus>, }
+
+impl GenerationLedger {
+  fn new () -> Self {
+    Self { next_generation: 1, statuses: BTreeMap::new () } }
+
+  fn begin (&mut self) -> TantivyGeneration {
+    let generation = TantivyGeneration (self . next_generation);
+    self . next_generation = self . next_generation
+      . checked_add (1)
+      . expect ("Tantivy generation exhausted u64");
+    assert_eq! (
+      self . statuses . insert (
+        generation, TantivyGenerationStatus::Pending),
+      None,
+      "a Tantivy generation is assigned exactly once" );
+    generation }
+
+  fn latest (&self) -> Option<TantivyGeneration> {
+    self . statuses . last_key_value () . map ( |(g, _)| *g ) }
+
+  fn finish (
+    &mut self,
+    generation : TantivyGeneration,
+    status     : TantivyGenerationStatus,
+  ) {
+    assert! (! matches! (status, TantivyGenerationStatus::Pending));
+    let old = self . statuses . insert (generation, status);
+    assert_eq! (
+      old, Some (TantivyGenerationStatus::Pending),
+      "a known pending Tantivy generation reaches one terminal state" ); }
+}
+
+/// Shared between the worker and enqueue/wait APIs.  Completed entries are
+/// intentionally retained: incidents and reconnecting clients need to ask
+/// about the exact generation which represented their graph transition.
+struct CompletionState {
+  ledger  : Mutex<GenerationLedger>,
+  changed : Condvar, }
+
+struct QueuedTantivyWrite {
+  generation : TantivyGeneration,
+  task       : TantivyWriteTask, }
 
 struct Worker {
-  sender   : Mutex<Sender<TantivyWriteTask>>,
-  inflight : Arc<Inflight>, }
+  sender     : Mutex<Sender<QueuedTantivyWrite>>,
+  completion : Arc<CompletionState>, }
 
 static WORKER : OnceLock<Worker> = OnceLock::new ();
 
 fn worker () -> &'static Worker {
   WORKER . get_or_init ( || {
-    let (sender, receiver) = channel::<TantivyWriteTask> ();
-    let inflight : Arc<Inflight> = Arc::new ( Inflight {
-      count : Mutex::new (0),
-      idle  : Condvar::new (), } );
-    let worker_inflight : Arc<Inflight> = inflight . clone ();
+    let (sender, receiver) = channel::<QueuedTantivyWrite> ();
+    let completion : Arc<CompletionState> = Arc::new ( CompletionState {
+      ledger  : Mutex::new (GenerationLedger::new ()),
+      changed : Condvar::new (), } );
+    let worker_completion : Arc<CompletionState> = completion . clone ();
     std::thread::spawn ( move || {
-      while let Ok (task) = receiver . recv () {
+      while let Ok (queued) = receiver . recv () {
         // update_tantivy_from_saveinstructions takes the write lock itself.
-        if let Err (e) = update_tantivy_from_saveinstructions (
-          &task . instructions, &task . tantivy_index, &task . context_types )
-        { tracing::error! (
-            "Background Tantivy write failed: {}. The filesystem is correct; \
-             run 'rebuild dbs' to resync the search index.", e ); }
-        decrement_and_maybe_notify (&worker_inflight); } });
-    Worker { sender : Mutex::new (sender), inflight } } ) }
+        let terminal = match std::panic::catch_unwind (
+          std::panic::AssertUnwindSafe ( ||
+            update_tantivy_from_saveinstructions (
+              &queued . task . instructions,
+              &queued . task . tantivy_index,
+              &queued . task . context_types ))) {
+          Ok (Ok (_)) => TantivyGenerationStatus::Committed,
+          Ok (Err (e)) => failed_generation_status (
+            queued . generation, e . to_string ()),
+          Err (_) => failed_generation_status (
+            queued . generation,
+            "Tantivy writer panicked while applying the batch" . into ()), };
+        record_store_terminal (
+          &queued . task . selected_store,
+          queued . generation,
+          &terminal);
+        finish_generation (
+          &worker_completion, queued . generation, terminal); } });
+    Worker { sender: Mutex::new (sender), completion } } ) }
 
-fn decrement_and_maybe_notify (inflight : &Inflight) {
-  let mut count : MutexGuard<usize> =
-    inflight . count . lock () . unwrap_or_else ( |p| p . into_inner () );
-  *count = count . saturating_sub (1);
-  if *count == 0 { inflight . idle . notify_all (); } }
+fn lock_ledger (
+  completion : &CompletionState,
+) -> MutexGuard<'_, GenerationLedger> {
+  completion . ledger . lock ()
+    . unwrap_or_else ( |poisoned| poisoned . into_inner () )
+}
+
+fn finish_generation (
+  completion : &CompletionState,
+  generation : TantivyGeneration,
+  status     : TantivyGenerationStatus,
+) {
+  lock_ledger (completion) . finish (generation, status);
+  completion . changed . notify_all (); }
+
+fn failed_generation_status (
+  generation : TantivyGeneration,
+  reason     : String,
+) -> TantivyGenerationStatus {
+  tracing::error! (
+    generation = generation . get (),
+    "Background Tantivy write failed: {}. The filesystem is correct; \
+     run 'rebuild dbs' to resync the search index.",
+    reason );
+  TantivyGenerationStatus::Failed (reason)
+}
+
+fn record_store_terminal (
+  selected_store : &Option<InRustGraphHandle>,
+  generation     : TantivyGeneration,
+  terminal       : &TantivyGenerationStatus,
+) {
+  let Some (selected_store) = selected_store else { return; };
+  let failure = match terminal {
+    TantivyGenerationStatus::Committed => None,
+    TantivyGenerationStatus::Failed (reason) => Some (reason . clone ()),
+    TantivyGenerationStatus::Pending => unreachable! (), };
+  // This is a metadata-only compare-and-swap.  It may race a later graph
+  // publication, so retry from that publication rather than overwriting it.
+  // Graph mutations themselves remain serialized by the writer mutex.
+  loop {
+    let old = selected_store . load_full ();
+    let next = Arc::new (old . with_tantivy_terminal (
+      generation, failure . clone ()));
+    let observed = selected_store . compare_and_swap (&old, next);
+    if Arc::ptr_eq (&observed, &old) { break; }} }
 
 /// Enqueue a Tantivy index update to commit in the background, in FIFO
-/// order. Returns immediately — the save does not wait for the commit.
+/// order.  Returns the generation immediately; callers decide when they
+/// need to wait for or present its terminal result.
 pub fn enqueue_tantivy_write (
   task : TantivyWriteTask,
-) {
-  let worker : &Worker = worker ();
-  { let mut count : MutexGuard<usize> =
-      worker . inflight . count . lock () . unwrap_or_else ( |p| p . into_inner () );
-    *count += 1; }
-  if let Err (e) = worker . sender . lock ()
-    . unwrap_or_else ( |p| p . into_inner () ) . send (task)
-  { // worker thread is gone; undo the count so 'wait_for_idle' can't hang
-    tracing::error! ("Tantivy background worker unavailable: {}", e);
-    decrement_and_maybe_notify (&worker . inflight); } }
+) -> TantivyGeneration {
+  enqueue_tantivy_write_after (task, |_| {})
+}
 
-/// Block until every enqueued Tantivy write has committed, so the
-/// caller (a search) sees an index reflecting all saves issued so far.
-pub fn wait_for_tantivy_writes_idle () {
+/// Reserve the generation, let the graph transaction publish bookkeeping
+/// which names it, and only then make the task visible to the worker.
+pub fn enqueue_tantivy_write_after<F> (
+  task        : TantivyWriteTask,
+  before_send : F,
+) -> TantivyGeneration
+where F : FnOnce (TantivyGeneration)
+{
   let worker : &Worker = worker ();
-  let mut count : MutexGuard<usize> =
-    worker . inflight . count . lock () . unwrap_or_else ( |p| p . into_inner () );
-  while *count > 0 {
-    count = worker . inflight . idle . wait (count)
+  let generation = lock_ledger (&worker . completion) . begin ();
+  before_send (generation);
+  let queued = QueuedTantivyWrite { generation, task };
+  if let Err (e) = worker . sender . lock ()
+    . unwrap_or_else ( |p| p . into_inner () ) . send (queued)
+  {
+    let reason = format! ("Tantivy background worker unavailable: {}", e);
+    tracing::error! (generation = generation . get (), "{}", reason);
+    finish_generation (
+      &worker . completion,
+      generation,
+      TantivyGenerationStatus::Failed (reason)); }
+  generation }
+
+/// The newest generation accepted by the process, if there has been one.
+/// Capture this before a read barrier so later saves cannot extend the wait.
+pub fn latest_tantivy_generation () -> Option<TantivyGeneration> {
+  lock_ledger (&worker () . completion) . latest () }
+
+/// Block until one exact generation commits or fails.
+pub fn wait_for_tantivy_generation (
+  generation : TantivyGeneration,
+) -> TantivyGenerationStatus {
+  wait_for_generation_in (&worker () . completion, generation)
+}
+
+fn wait_for_generation_in (
+  completion : &CompletionState,
+  generation : TantivyGeneration,
+) -> TantivyGenerationStatus {
+  let mut ledger = lock_ledger (completion);
+  loop {
+    match ledger . statuses . get (&generation) {
+      Some (TantivyGenerationStatus::Pending) => {
+        ledger = completion . changed . wait (ledger)
+          . unwrap_or_else ( |p| p . into_inner () ); }
+      Some (terminal) => return terminal . clone (),
+      None => return TantivyGenerationStatus::Failed (format! (
+        "unknown Tantivy generation {}", generation . get ())), } } }
+
+/// Block until every generation at or before the captured bound is terminal.
+/// FIFO execution makes the bound's terminal transition the usual wakeup,
+/// but checking all entries makes the contract explicit and testable.
+pub fn wait_for_tantivy_writes_through (
+  through : TantivyGeneration,
+) -> Vec<(TantivyGeneration, TantivyGenerationStatus)> {
+  wait_for_writes_through_in (&worker () . completion, through)
+}
+
+fn wait_for_writes_through_in (
+  completion : &CompletionState,
+  through    : TantivyGeneration,
+) -> Vec<(TantivyGeneration, TantivyGenerationStatus)> {
+  let mut ledger = lock_ledger (completion);
+  loop {
+    let known_through = ledger . statuses . contains_key (&through);
+    let pending_through = ledger . statuses . range (..=through)
+      . any ( |(_, status)| matches! (
+        status, TantivyGenerationStatus::Pending) );
+    if known_through && ! pending_through {
+      return ledger . statuses . range (..=through)
+        . map ( |(generation, status)| (*generation, status . clone ()) )
+        . collect (); }
+    if ! known_through {
+      return vec! [(through, TantivyGenerationStatus::Failed (format! (
+        "unknown Tantivy generation {}", through . get ())))]; }
+    ledger = completion . changed . wait (ledger)
       . unwrap_or_else ( |p| p . into_inner () ); } }
+
+/// Block through the newest generation visible when called.  Work enqueued
+/// later belongs to a later read barrier and does not prolong this one.
+pub fn wait_for_tantivy_writes_idle () {
+  if let Some (through) = latest_tantivy_generation () {
+    let _ = wait_for_tantivy_writes_through (through); } }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::sync::mpsc;
+
+  #[test]
+  fn ledger_assigns_monotonic_generations_and_one_terminal_each () {
+    let mut ledger = GenerationLedger::new ();
+    let first = ledger . begin ();
+    let second = ledger . begin ();
+    assert_eq! (first . get (), 1);
+    assert_eq! (second . get (), 2);
+    assert_eq! (ledger . latest (), Some (second));
+    ledger . finish (first, TantivyGenerationStatus::Committed);
+    ledger . finish (
+      second, TantivyGenerationStatus::Failed ("broken" . into ())) ;
+    assert_eq! (
+      ledger . statuses . get (&first),
+      Some (&TantivyGenerationStatus::Committed));
+    assert_eq! (
+      ledger . statuses . get (&second),
+      Some (&TantivyGenerationStatus::Failed ("broken" . into ()))); }
+
+  #[test]
+  #[should_panic (expected = "one terminal state")]
+  fn ledger_rejects_a_second_terminal_outcome () {
+    let mut ledger = GenerationLedger::new ();
+    let generation = ledger . begin ();
+    ledger . finish (generation, TantivyGenerationStatus::Committed);
+    ledger . finish (generation, TantivyGenerationStatus::Committed); }
+
+  #[test]
+  fn exact_and_through_waits_wake_on_terminal_status () {
+    let completion = Arc::new (CompletionState {
+      ledger: Mutex::new (GenerationLedger::new ()),
+      changed: Condvar::new (), });
+    let (first, second) = {
+      let mut ledger = lock_ledger (&completion);
+      (ledger . begin (), ledger . begin ()) };
+    let waiter_completion = completion . clone ();
+    let (sent, received) = mpsc::channel ();
+    let waiter = std::thread::spawn (move || {
+      sent . send (wait_for_writes_through_in (
+        &waiter_completion, second)) . unwrap (); });
+    finish_generation (
+      &completion, first, TantivyGenerationStatus::Committed);
+    finish_generation (
+      &completion, second,
+      TantivyGenerationStatus::Failed ("no segment" . into ()));
+    let statuses = received . recv () . unwrap ();
+    waiter . join () . unwrap ();
+    assert_eq! (statuses, vec! [
+      (first, TantivyGenerationStatus::Committed),
+      (second, TantivyGenerationStatus::Failed ("no segment" . into ())),
+    ]);
+    assert_eq! (
+      wait_for_generation_in (&completion, second),
+      TantivyGenerationStatus::Failed ("no segment" . into ())); }
+}

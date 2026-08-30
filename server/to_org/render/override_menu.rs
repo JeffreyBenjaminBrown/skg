@@ -39,7 +39,7 @@ pub async fn override_menu_view (
 ) -> Result < Option<(String, Vec<ID>, Tree<ViewNode>)>,
               Box<dyn Error> > {
   let graph : Arc<InRustGraph> =
-    env . in_rust_graph . load_full ();
+    env . in_rust_graph . load_full () . graph . clone ();
   if visible_overriders (&graph, active, pid) . is_empty () {
     return Ok (None); }
   let Some (root_node) = graph . nodes . get (pid)

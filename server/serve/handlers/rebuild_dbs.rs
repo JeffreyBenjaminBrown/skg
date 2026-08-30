@@ -3,8 +3,11 @@ use crate::context::{
   content_maps_from_nodes,
   had_id_set_from_nodes,
   link_dests_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
+use crate::dbs::filesystem::multiple_nodes::{
+  LoadedCorpus,
+  error_unless_each_id_names_one_node,
+  read_all_skg_files_with_manifest,
+};
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::telescope::invariants::{TelescopeViolation, report_all_telescope_violations};
@@ -61,10 +64,12 @@ pub fn rebuild_dbs_in_place (
       load_config (&config_path)
       . map_err ( |e| format! (
         "Reloading config from {}: {}", config_path, e) ) ?;
-    let (nodes, load_violations)
-      : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-      read_all_skg_files_from_sources_collecting_violations (&fresh_config)
+    let loaded : LoadedCorpus =
+      read_all_skg_files_with_manifest (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
+    let nodes : Vec<NodeComplete> = loaded . nodes;
+    let load_violations : Vec<(ID, TelescopeViolation)> =
+      loaded . violations;
     error_unless_each_id_names_one_node (
       &nodes, &fresh_config . data_root)
       . map_err ( |e| format! ("Id-conflict check failed: {}", e) ) ?;
@@ -100,8 +105,11 @@ pub fn rebuild_dbs_in_place (
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
     { // Rebuild the in-Rust graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
+      let old = env . in_rust_graph . load_full ();
       env . in_rust_graph . store (
-        Arc::new (fresh_graph) );
+        Arc::new (
+          old . with_acknowledged_rebuild (
+            fresh_graph, loaded . manifest)) );
       tracing::info!("In-Rust graph rebuilt."); }
     Ok (())
   })();

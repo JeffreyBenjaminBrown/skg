@@ -4,7 +4,10 @@ use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_dests_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
+use crate::dbs::filesystem::multiple_nodes::{
+  LoadedCorpus,
+  read_all_skg_files_with_manifest,
+};
 use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
 use crate::dbs::tantivy::{mk_tantivy_schema, open_existing_tantivy_index, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
@@ -21,10 +24,11 @@ use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
 use crate::telescope::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
 use crate::telescope::invariants::{TelescopeViolation, report_all_telescope_violations};
+use crate::types::store_state::SelectedPathManifest;
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
-  new_handle,
+  new_handle_with_manifest,
   override_invariants::error_unless_override_invariants_hold,
 };
 
@@ -89,10 +93,16 @@ pub fn initialize_dbs (
       { Ok (( tantivy_index )) => {
           tracing::info! ("Incremental init succeeded.");
           // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-Rust graph (env.in_rust_graph) and the InitContextHandoff (contains maps, had_id_set, link_dests) are rebuilt from scratch on every startup, so they need every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
-          let (nodes, load_violations)
-            : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-            read_all_skg_files_from_sources_collecting_violations (config)
-            . unwrap_or_default ();
+          let loaded : LoadedCorpus =
+            read_all_skg_files_with_manifest (config)
+            . unwrap_or_else ( |error| {
+              tracing::error! (
+                "Failed to read full selected corpus after incremental init: {}",
+                error);
+              std::process::exit (1); });
+          let nodes : Vec<NodeComplete> = loaded . nodes;
+          let load_violations : Vec<(ID, TelescopeViolation)> =
+            loaded . violations;
           error_unless_each_id_names_one_node (
             &nodes, &config . data_root )
             . unwrap_or_else ( |e| {
@@ -110,7 +120,7 @@ pub fn initialize_dbs (
           let (env, handoff) : (SkgEnv, InitContextHandoff) =
             env_and_handoff_from_nodes (
               config, &nodes, Arc::new (driver), tantivy_index,
-              load_violations );
+              load_violations, loaded . manifest );
           (env, handoff, nodes) }
         Err (e) => {
           tracing::warn! ("Incremental init failed ({}), \
@@ -252,6 +262,7 @@ fn env_and_handoff_from_nodes (
   driver        : Arc<TypeDBDriver>,
   tantivy_index : TantivyIndex,
   startup_warnings : Vec<(ID, TelescopeViolation)>,
+  selected_manifest : SelectedPathManifest,
 ) -> (SkgEnv, InitContextHandoff) {
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
@@ -265,7 +276,8 @@ fn env_and_handoff_from_nodes (
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
   let in_rust_graph : InRustGraphHandle =
-    new_handle ( InRustGraph::from_nodecompletes (nodes) );
+    new_handle_with_manifest (
+      InRustGraph::from_nodecompletes (nodes), selected_manifest );
   ( SkgEnv {
       config : config . clone (),
       in_rust_graph,
@@ -290,15 +302,16 @@ fn full_init (
   driver : TypeDBDriver,
 ) -> (SkgEnv, InitContextHandoff, Vec<NodeComplete>) {
   tracing::info! ("Performing full init...");
-  let (nodes, load_violations)
-    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+  let loaded : LoadedCorpus =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "read_all_skg_files" ). entered();
       tracing::info! ("Reading .skg files from all sources...");
-      read_all_skg_files_from_sources_collecting_violations (config)
+      read_all_skg_files_with_manifest (config)
       . unwrap_or_else ( |e| {
         tracing::error! ("Failed to read .skg files: {}", e);
         std::process::exit (1); } ) };
+  let nodes : Vec<NodeComplete> = loaded . nodes;
+  let load_violations : Vec<(ID, TelescopeViolation)> = loaded . violations;
   error_unless_each_id_names_one_node (
     // BEFORE the databases are built, not after: an id claimed by
     // two nodes either dies inside TypeDB with a raw key-violation
@@ -339,7 +352,7 @@ fn full_init (
         "extract_context_data_from_nodes" ). entered();
       env_and_handoff_from_nodes (
         config, &nodes, Arc::new (driver), tantivy_index,
-        load_violations ) };
+        load_violations, loaded . manifest ) };
   (env, handoff, nodes) }
 
 fn touch_init_marker (

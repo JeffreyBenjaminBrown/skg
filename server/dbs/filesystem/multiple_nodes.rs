@@ -5,7 +5,8 @@ use crate::telescope::types::{
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
-  read_nodecomplete, validate_pid_matches_filename,
+  read_nodecomplete, read_nodefs_with_bytes,
+  validate_pid_matches_filename,
 };
 use crate::dbs::filesystem::source_files::{
   IgnoredForeignPathCollision, SelectedSourceFiles,
@@ -14,11 +15,18 @@ use crate::dbs::filesystem::source_files::{
 use crate::types::misc::{SkgConfig, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::store_state::{PathDigest, SelectedPathManifest};
 
 use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
+
+pub struct LoadedCorpus {
+  pub nodes      : Vec<NodeComplete>,
+  pub violations : Vec<(ID, TelescopeViolation)>,
+  pub manifest   : SelectedPathManifest, }
 
 /// Reads all .skg files from all configured sources.
 /// Sets each node's source field to the appropriate source name.
@@ -52,8 +60,19 @@ pub fn read_all_skg_files_from_sources (
 pub fn read_all_skg_files_from_sources_collecting_violations (
   config: &SkgConfig
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+  let loaded = read_all_skg_files_with_manifest (config) ?;
+  Ok ((loaded . nodes, loaded . violations))
+}
+
+/// Full normalized corpus plus the exact retained bytes which produced it.
+/// Ignored foreign collision losers are intentionally absent: their bytes
+/// were not parsed and did not select the graph.
+pub fn read_all_skg_files_with_manifest (
+  config: &SkgConfig
+) -> io::Result<LoadedCorpus> {
   let mut sections_by_pid
     : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
+  let mut manifest : SelectedPathManifest = SelectedPathManifest::new ();
   let mut load_errors: Vec<(String, // source name
                             String, // filename or source directory
                             String)> // error message
@@ -84,13 +103,16 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
   for pid in &pid_order {
     for candidate in selected . by_pid . get (pid)
       . into_iter () . flatten () {
-      match read_nodecomplete (&candidate . path)
-        . and_then ( |node_fs| {
+      match read_nodefs_with_bytes (&candidate . path)
+        . and_then ( |(node_fs, bytes)| {
           validate_pid_matches_filename (&node_fs, &candidate . path) ?;
-          Ok (node_fs) }) {
-        Ok (node_fs) => sections_by_pid . entry (pid . clone ())
-          . or_default ()
-          . push ((candidate . source . clone (), node_fs)),
+          Ok ((node_fs, bytes)) }) {
+        Ok ((node_fs, bytes)) => {
+          manifest . insert (
+            candidate . path . clone (), PathDigest::of_bytes (&bytes));
+          sections_by_pid . entry (pid . clone ())
+            . or_default ()
+            . push ((candidate . source . clone (), node_fs)); },
         Err (e) => load_errors . push ((
           candidate . source . to_string (),
           candidate . path . display () . to_string (),
@@ -104,12 +126,14 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
   let (nodes, fold_violations)
     : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
     fold_grouped_sections (sections_by_pid, pid_order, config) ?;
-  Ok (( nodes,
-        { let mut all : Vec<(ID, TelescopeViolation)> =
-            collision_violations;
-          all . extend (fold_violations);
-          all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
-          all } )) }
+  Ok (LoadedCorpus {
+    nodes,
+    violations: {
+      let mut all : Vec<(ID, TelescopeViolation)> = collision_violations;
+      all . extend (fold_violations);
+      all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
+      all },
+    manifest, }) }
 
 fn collision_violation (
   collision : IgnoredForeignPathCollision,
@@ -229,6 +253,20 @@ pub fn error_unless_each_id_names_one_node (
                contested . len() ) };
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
+
+/// Pure distinct-node claim check for speculative transactions.  Reporting
+/// wrappers may write an Org artifact later; candidate validation must not.
+pub fn distinct_id_claim_conflicts (
+  nodes : &[NodeComplete],
+) -> BTreeMap<ID, BTreeSet<ID>> {
+  let mut claims : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
+  for node in nodes {
+    for id in node . all_ids () {
+      claims . entry (id . clone ()) . or_default ()
+        . insert (node . pid . clone ()); }}
+  claims . retain ( |_, pids| pids . len () > 1);
+  claims
+}
 
 pub fn read_skg_sections_from_folder (
   source_name : &SourceName,

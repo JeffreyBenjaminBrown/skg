@@ -124,7 +124,9 @@ fn test_install_or_swap_global_handle
       let mut node : NodeComplete = nodecomplete_example ();
       node . pid = ID::new ("first-graph-node");
       InRustGraph::from_nodecompletes ( & [node] ) };
-    handle_2 . store ( std::sync::Arc::new (graph_1_again) );
+    let old = handle_2 . load_full ();
+    handle_2 . store ( std::sync::Arc::new (
+      old . with_graph_preserving_disk_selection (graph_1_again)) );
     assert! ( snapshot_global () . unwrap () . nodes
               . contains_key ( &ID::new ("first-graph-node") ));
     assert! ( handle_1 . load_full () . nodes

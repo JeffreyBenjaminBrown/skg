@@ -47,6 +47,12 @@ use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree}
 use crate::types::misc::SourceSetName;
 use crate::types::misc::SkgConfig;
 use crate::telescope::invariants::TelescopeViolation;
+use crate::types::store_state::{
+  PathIndexState,
+  SelectedPathValue,
+  SelectedStoreState,
+  StoreHealth,
+};
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -412,11 +418,14 @@ fn handle_verify_connection_request (
   send_response_with_length_prefix (
     stream,
     & verify_connection_response (
-      &env . config, &env . startup_warnings)); }
+      &env . config,
+      &env . startup_warnings,
+      &env . in_rust_graph . load_full ())); }
 
 fn verify_connection_response (
   config   : &SkgConfig,
   warnings : &[(crate::types::misc::ID, TelescopeViolation)],
+  selected : &SelectedStoreState,
 ) -> String {
   let atom = |value : &str| -> Sexp {
     Sexp::Atom (Atom::S (value . to_string ())) };
@@ -463,6 +472,31 @@ fn verify_connection_response (
         field ("ignored-paths", path_list (ignored_paths)),
       ]) })
     . collect ();
+  let path_entries : Vec<Sexp> = selected . path_outcomes . iter ()
+    . map ( |(path, outcome)| {
+      let (index_state, tantivy_generation) = match outcome . index_state {
+        PathIndexState::Acknowledged { tantivy_generation } =>
+          ("acknowledged", tantivy_generation),
+        PathIndexState::SelectedAwaitingIndex { tantivy_generation } =>
+          ("selected-awaiting-index", Some (tantivy_generation)), };
+      Sexp::List (vec! [
+        field ("path", atom (&path . to_string_lossy ())),
+        field ("value", match outcome . value {
+          SelectedPathValue::Present (digest) => atom (&digest . to_hex ()),
+          SelectedPathValue::Absent => atom ("absent"), }),
+        field ("graph-generation", Sexp::Atom (Atom::I (
+          outcome . graph_generation . get () as i64))),
+        field ("index-state", atom (index_state)),
+        field ("tantivy-generation", tantivy_generation
+          . map ( |generation| Sexp::Atom (Atom::I (
+            generation . get () as i64)))
+          . unwrap_or_else ( || atom ("nil"))),
+      ]) })
+    . collect ();
+  let health = |health : &StoreHealth| -> Sexp { match health {
+    StoreHealth::Healthy => atom ("healthy"),
+    StoreHealth::Poisoned (reason) => Sexp::List (vec! [
+      atom ("poisoned"), atom (reason)]), }};
   Sexp::List (vec! [
     field ("response-type", atom (
       TcpToClient::VerifyConnection . repr_in_client ())),
@@ -470,6 +504,11 @@ fn verify_connection_response (
       "This is the skg server verifying the connection.")),
     field ("source-inventory", Sexp::List (source_entries)),
     field ("telescope-warnings", Sexp::List (warning_entries)),
+    field ("graph-generation", Sexp::Atom (Atom::I (
+      selected . graph_generation . get () as i64))),
+    field ("path-outcomes", Sexp::List (path_entries)),
+    field ("typedb-health", health (&selected . typedb_health)),
+    field ("tantivy-health", health (&selected . tantivy_health)),
   ]) . to_string ()
 }
 
@@ -535,7 +574,14 @@ mod connection_tests {
         ignored_sources: vec![SourceName::from ("second")],
         ignored_paths: vec![PathBuf::from ("/tmp/second/X.skg")],
       })];
-    let response : String = verify_connection_response (&config, &warnings);
+    let selected = SelectedStoreState::initial (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::from ([
+        (PathBuf::from ("/tmp/first/X.skg"),
+         crate::types::store_state::PathDigest::of_bytes (b"pid: X\n")),
+      ]));
+    let response : String = verify_connection_response (
+      &config, &warnings, &selected);
     let first : usize = response . find ("(name first)") . unwrap ();
     let second : usize = response . find ("(name second)") . unwrap ();
     assert! (first < second, "{}", response);
@@ -545,5 +591,8 @@ mod connection_tests {
     assert! (response . contains (
       "(kind ignored-foreign-pid-collision)"), "{}", response);
     assert! (response . contains ("/tmp/second/X.skg"), "{}", response);
+    assert! (response . contains ("(graph-generation 1)"), "{}", response);
+    assert! (response . contains ("(index-state acknowledged)"), "{}", response);
+    assert! (response . contains ("(tantivy-health healthy)"), "{}", response);
   }
 }

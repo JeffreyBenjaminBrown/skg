@@ -1,9 +1,5 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::context::context_origin_types_for_saved_from_in_rust_graph;
-use crate::dbs::filesystem::multiple_nodes::{
-  error_unless_each_id_names_one_node,
-  read_all_skg_files_from_sources,
-};
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
 };
@@ -12,14 +8,19 @@ use crate::telescope::invariants::telescope_violations_of;
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
-  apply_definenodes,
   apply_definenodes_to_inRustGraph,
   override_invariants::{
     format_override_invariant_violations,
     validate_touched_override_invariants,
   },
 };
-use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
+use crate::dbs::tantivy::background_writer::{
+  enqueue_tantivy_write_after,
+  lock_tantivy_writes,
+  wait_for_tantivy_generation,
+  TantivyGenerationStatus,
+  TantivyWriteTask,
+};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
@@ -36,6 +37,11 @@ use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::store_state::{
+  GraphGeneration,
+  SelectedPathManifest,
+};
+use crate::dbs::tantivy::background_writer::TantivyGeneration;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
@@ -48,8 +54,11 @@ use typedb_driver::TypeDBDriver;
 ///   1) Filesystem (source of truth)
 ///   2) TypeDB (with recovery: rebuild from disk on failure)
 ///   3) Tantivy (with recovery: rebuild from disk on failure)
-/// Returns `None` when all three stores updated normally.
-/// Returns `Some(new_index)` when Tantivy had to be rebuilt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StoreUpdateOutcome {
+  pub graph_generation   : GraphGeneration,
+  pub tantivy_generation : TantivyGeneration, }
+
 pub async fn update_graph_minus_nodeMerges (
   node_defs     : Vec<DefineNode>,
   source_moves  : &[SourceMove],
@@ -57,10 +66,26 @@ pub async fn update_graph_minus_nodeMerges (
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
-) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  update_graph_minus_nodeMerges_with_hoist_approval (
+) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
+  let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
+  let outcome = update_graph_minus_nodeMerges_with_hoist_approval (
     node_defs, source_moves, config, tantivy_index, driver, graph,
-    &HashSet::new () ) . await
+    &HashSet::new () ) . await ?;
+  require_tantivy_commit (outcome) ?;
+  Ok (outcome)
+}
+
+fn require_tantivy_commit (
+  outcome : StoreUpdateOutcome,
+) -> Result<(), Box<dyn Error>> {
+  match wait_for_tantivy_generation (outcome . tantivy_generation) {
+    TantivyGenerationStatus::Committed => Ok (()),
+    TantivyGenerationStatus::Failed (reason) => Err (format! (
+      "graph generation {} and TypeDB committed, but Tantivy generation {} \
+       failed: {}",
+      outcome . graph_generation . get (),
+      outcome . tantivy_generation . get (), reason) . into ()),
+    TantivyGenerationStatus::Pending => unreachable! (), }
 }
 
 async fn update_graph_minus_nodeMerges_with_hoist_approval (
@@ -71,11 +96,12 @@ async fn update_graph_minus_nodeMerges_with_hoist_approval (
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
-) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
   tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "apply_delete_propagation_cleanup" ). entered();
-    let graph_snap : Arc<InRustGraph> = graph . load_full ();
+    let graph_snap : Arc<InRustGraph> =
+      graph . load_full () . graph . clone ();
     apply_delete_propagation_cleanup (&mut node_defs,
                                       &graph_snap); }
   apply_define_nodes_to_stores ( node_defs,
@@ -85,6 +111,7 @@ async fn update_graph_minus_nodeMerges_with_hoist_approval (
                                  driver,
                                  graph,
                                  true,
+                                 None,
                                  hoist_approved_pids ). await }
 
 /// Apply prepared `DefineNode`s to the derived stores (in-Rust graph,
@@ -105,42 +132,41 @@ pub(crate) async fn apply_define_nodes_to_stores (
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
   write_fs      : bool,
+  reload_manifest : Option<SelectedPathManifest>,
   hoist_approved_pids : &HashSet<ID>,
-) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
   let db_name : &str = &config . db_name;
-  let old_graph_snap : Arc<InRustGraph> = // pre-apply state, for edge deltas
-    graph . load_full ();
+  let old_selected = graph . load_full ();
+  let old_graph_snap : Arc<InRustGraph> = old_selected . graph . clone ();
+  let mut new_graph : InRustGraph = (*old_graph_snap) . clone ();
+  apply_definenodes_to_inRustGraph (&mut new_graph, &node_defs);
+  let mut selected_manifest : SelectedPathManifest =
+    reload_manifest . unwrap_or_else ( || old_selected . manifest . clone ());
 
   if write_fs { // FS (source of truth)
     // TODO: Print per-source write information
     tracing::info!( "Writing {} instruction(s) to disk ...",
                { let total_input : usize = node_defs . len ();
                  total_input } );
-    let (deleted_count, written_count) : (usize, usize) =
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "update_fs_from_savenode_defs") . entered ();
-        update_fs_from_saveinstructions_with_hoist_approval (
-          &node_defs, source_moves,
-          config . clone (), hoist_approved_pids ) } ?;
+    let prepared = prepare_fs_update (
+      &node_defs, source_moves, &config, hoist_approved_pids) ?;
+    let (deleted_count, written_count) : (usize, usize) = {
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "update_fs_from_savenode_defs") . entered ();
+      prepared . apply (&config) ? };
+    prepared . apply_to_manifest (&mut selected_manifest);
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
-  { // In-Rust graph — atomic snapshot swap so readers see a
-    // view that's consistent with what just landed on disk, and
-    // never a mid-save half-applied state.
-    let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "apply_definenodes_to_inRustGraph") . entered ();
-    apply_definenodes (graph, &node_defs); }
-
-  // Context origin types, read from the post-apply in-Rust graph, so
+  // Context origin types, read from the checked candidate graph, so
   // the Tantivy pass below indexes each saved doc once with its final
   // type — no separate context writer/commit. Computed here (not on the
   // Tantivy thread) so the read happens before any further mutation.
   let context_types : HashMap<ID, String> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "context_origin_types_for_saved" ). entered();
+      "context_origin_types_for_saved" ). entered();
       context_origin_types_for_saved_from_in_rust_graph (
-        & graph . load_full (), &node_defs ) };
+        &new_graph, &node_defs ) };
 
   // TypeDB (foreground): only TypeDB must finish before the save
   // responds, because the response is re-rendered from the in-Rust
@@ -152,22 +178,38 @@ pub(crate) async fn apply_define_nodes_to_stores (
       db_name, driver, &node_defs, source_moves,
       Some ( old_graph_snap . as_ref () )) . await }
     { tracing::error!(
-        "TypeDB update failed: {}. Rebuilding from disk...", e);
-      let nodes : Vec<NodeComplete> =
-        read_all_skg_files_from_sources (&config)
-        . map_err (|e2| -> Box<dyn Error> {
-          format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
-          . into () }) ?;
-      error_unless_each_id_names_one_node (
-        &nodes, &config . data_root)
-        . map_err (|e2| -> Box<dyn Error> {
-          format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
-          . into () }) ?;
-      wipe_then_init_typedb_db (&config, driver, &nodes) . await
-        . map_err (|e2| -> Box<dyn Error> {
-          format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
-          . into () }) ?;
-      tracing::warn!("Save succeeded, but TypeDB had to be rebuilt from disk.");
+        "TypeDB incremental update failed: {}. Reconstructing candidate graph...",
+        e);
+      let candidate_nodes = nodecompletes_from_graph (&new_graph);
+      match wipe_then_init_typedb_db (
+        &config, driver, &candidate_nodes) . await {
+        Ok (()) => tracing::warn! (
+          "TypeDB selected the candidate graph by complete reconstruction."),
+        Err (candidate_error) if !write_fs => {
+          let previous_nodes = nodecompletes_from_graph (&old_graph_snap);
+          match wipe_then_init_typedb_db (
+            &config, driver, &previous_nodes) . await {
+            Ok (()) => return Err (format! (
+              "TypeDB rejected the reload candidate (incremental: {}; \
+               reconstruction: {}) and was restored to graph generation {}; \
+               disk was not changed and no reload mutation was published",
+              e, candidate_error,
+              old_selected . graph_generation . get ()) . into ()),
+            Err (previous_error) => {
+              let reason = format! (
+                "TypeDB is poisoned: candidate reconstruction failed ({}); \
+                 previous-graph reconstruction also failed ({})",
+                candidate_error, previous_error);
+              graph . store (Arc::new (
+                old_selected . with_typedb_poisoned (reason . clone ())));
+              return Err (reason . into ()); }}}
+        Err (candidate_error) => {
+          let reason = format! (
+            "TypeDB is poisoned after filesystem save: candidate graph \
+             reconstruction failed ({})", candidate_error);
+          graph . store (Arc::new (
+            old_selected . with_typedb_poisoned (reason . clone ())));
+          return Err (reason . into ()); }}
     } else {
       tracing::info!("   TypeDB update complete."); }
 
@@ -177,11 +219,21 @@ pub(crate) async fn apply_define_nodes_to_stores (
   // block on 'wait_for_tantivy_writes_idle' until it lands. A
   // background failure is logged, not propagated — the filesystem is
   // the source of truth, so 'rebuild dbs' resyncs the index.
-  enqueue_tantivy_write ( TantivyWriteTask {
+  let mut graph_generation = old_selected . graph_generation;
+  let store_for_completion = graph . clone ();
+  let tantivy_generation = enqueue_tantivy_write_after ( TantivyWriteTask {
     tantivy_index : tantivy_index . clone (),
     instructions  : node_defs . clone (),
-    context_types, } );
-  Ok (None) }
+    context_types,
+    selected_store: Some (store_for_completion), },
+    |tantivy_generation| {
+      let selected = old_selected . with_selected_transition (
+        new_graph, selected_manifest, tantivy_generation);
+      graph_generation = selected . graph_generation;
+      graph . store (Arc::new (selected)); } );
+  Ok (StoreUpdateOutcome {
+    graph_generation,
+    tantivy_generation, }) }
 
 /// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
 /// order, applying any Tantivy rebuild from either step to the
@@ -217,15 +269,14 @@ pub async fn update_graph_including_nodeMerges (
       DefineNode::Delete (_) => None } )
     . collect ();
   let config_for_telescope_gate : SkgConfig = config . clone ();
-  let save_replacement : Option<TantivyIndex> =
+  let save_outcome : StoreUpdateOutcome =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_graph_minus_nodeMerges" ). entered();
       update_graph_minus_nodeMerges_with_hoist_approval (
         save_instructions, source_moves, config . clone(),
         tantivy_index, driver, graph,
         hoist_approved_pids ) . await } ?;
-  if let Some (new_index) = save_replacement {
-    *tantivy_index = new_index; }
+  require_tantivy_commit (save_outcome) ?;
   let nodeMerge_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "merge_nodes" ). entered();
@@ -253,7 +304,7 @@ pub fn validate_override_invariants_after_save (
   graph              : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let graph_snap : Arc<InRustGraph> =
-    graph . load_full ();
+    graph . load_full () . graph . clone ();
   let mut simulated : InRustGraph =
     (*graph_snap) . clone ();
   let mut nonmerge : Vec<DefineNode> =
@@ -483,7 +534,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
 /// Project a NodeRust back into a NodeComplete verbatim. Stripping
 /// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
 /// phase 2, and applies uniformly to all Saves.
-fn nodecomplete_from_noderust (
+pub(crate) fn nodecomplete_from_noderust (
   rust : &NodeRust,
 ) -> NodeComplete {
   NodeComplete {
@@ -500,6 +551,15 @@ fn nodecomplete_from_noderust (
     overrides_view_of            : rust . overrides_view_of . clone (),
     misc                         : rust . misc . clone (),
   }}
+
+pub(crate) fn nodecompletes_from_graph (
+  graph : &InRustGraph,
+) -> Vec<NodeComplete> {
+  let mut nodes : Vec<NodeComplete> = graph . nodes . values ()
+    . map (nodecomplete_from_noderust)
+    . collect ();
+  nodes . sort_by ( |a, b| a . pid . cmp (&b . pid));
+  nodes }
 
 fn remove_from_msv (
   msv : &MSV<MemberAtSource<ID>>,
@@ -552,20 +612,20 @@ pub(crate) fn preflight_fs_from_saveinstructions_with_hoist_approval (
   Ok (( ))
 }
 
-struct PreparedFilesystemUpdate {
+pub(crate) struct PreparedFilesystemUpdate {
   writes       : Vec<PreparedTelescopeWrite>,
   deletions    : Vec<String>,
   deleted_pids : HashSet<ID>,
 }
 
 impl PreparedFilesystemUpdate {
-  fn apply (
-    self,
+  pub(crate) fn apply (
+    &self,
     config : &SkgConfig,
   ) -> io::Result<(usize, usize)> {
     // Mutation starts only after the whole batch has passed ownership and
     // serialization preflight.
-    for path in self . deletions {
+    for path in &self . deletions {
       match std::fs::remove_file (&path) {
         Ok (( ))                                          => {},
         Err (e) if e . kind () == io::ErrorKind::NotFound => {},
@@ -576,9 +636,19 @@ impl PreparedFilesystemUpdate {
       telescope . verify_hoist (config) ?; }
     Ok (( self . deleted_pids . len (), self . writes . len () ))
   }
+
+  pub(crate) fn apply_to_manifest (
+    &self,
+    manifest : &mut SelectedPathManifest,
+  ) {
+    for path in &self . deletions {
+      manifest . remove (std::path::Path::new (path)); }
+    for telescope in &self . writes {
+      telescope . apply_to_manifest (manifest); }
+  }
 }
 
-fn prepare_fs_update (
+pub(crate) fn prepare_fs_update (
   node_defs           : &[DefineNode],
   source_moves        : &[SourceMove],
   config              : &SkgConfig,

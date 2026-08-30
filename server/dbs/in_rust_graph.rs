@@ -21,6 +21,7 @@ use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::store_state::{SelectedPathManifest, SelectedStoreState};
 
 /// Process-global handle to the in-Rust graph.
 ///
@@ -71,7 +72,8 @@ pub fn install_or_swap_global_handle (
 /// is served, so None here indicates a test that bypassed startup
 /// (or code running before startup completes).
 pub fn snapshot_global () -> Option<Arc<InRustGraph>> {
-  GLOBAL_HANDLE . get () . map ( |h| h . load_full () ) }
+  GLOBAL_HANDLE . get () . map ( |h|
+    h . load_full () . graph . clone () ) }
 
 /// The in-Rust-graph projection of the graph.
 ///
@@ -292,11 +294,6 @@ fn remove_from_inverse_map (
     if set . is_empty () { map . remove (key); }
     else                 { map . insert ( key . clone (), set ); } } }
 
-/// Apply a batch of DefineNodes to the shared graph atomically.
-/// Clones the current InRustGraph (cheap due to 'im''s structural
-/// sharing), applies Save/Delete mutations along with their inverse-
-/// index updates, and publishes the new snapshot via ArcSwap.
-///
 /// Per-Save ordering: remove-old-inverse → migrate-inverse-for-new-
 /// extraids → insert-new-node → add-new-inverse. The migration step
 /// is load-bearing for nodeMerges: when an acquirer gains the acquiree's
@@ -323,17 +320,6 @@ fn remove_from_inverse_map (
 /// if a user feature ever needs it, a dedicated migration (symmetric
 /// to the acquire path) would be required.
 ///
-/// Called from the save pipeline after the filesystem write has
-/// succeeded.
-pub fn apply_definenodes (
-  graph     : &InRustGraphHandle,
-  node_defs : &[DefineNode],
-) {
-  let old : Arc<InRustGraph> = graph . load_full ();
-  let mut new_graph : InRustGraph = (*old) . clone ();
-  apply_definenodes_to_inRustGraph (&mut new_graph, node_defs);
-  graph . store ( Arc::new (new_graph) ); }
-
 /// Apply a batch of DefineNodes to an ordinary in-memory graph value.
 ///
 /// This is the shared mutation path for the live graph update and for
@@ -393,12 +379,18 @@ pub fn in_rust_graph_coherent_with_save_instructions (
             id )); }} } }
   Ok (( )) }
 
-/// Server-wide handle to the shared graph. Readers call
-/// '.load_full()' to snap a consistent 'Arc<InRustGraph>'; writers
-/// build a new 'Arc<InRustGraph>' (using 'im''s cheap clone +
-/// structural-sharing mutations) and '.store()' it atomically.
-pub type InRustGraphHandle = Arc<ArcSwap<InRustGraph>>;
+/// Server-wide handle to the selected store publication.  Its graph remains
+/// available through `Deref`, while generation and byte-manifest readers can
+/// retain the same immutable snapshot and cannot observe a torn pairing.
+pub type InRustGraphHandle = Arc<ArcSwap<SelectedStoreState>>;
 
 /// Construct a fresh handle wrapping the given graph.
 pub fn new_handle (graph: InRustGraph) -> InRustGraphHandle {
-  Arc::new ( ArcSwap::from ( Arc::new (graph) )) }
+  new_handle_with_manifest (graph, SelectedPathManifest::new ()) }
+
+pub fn new_handle_with_manifest (
+  graph    : InRustGraph,
+  manifest : SelectedPathManifest,
+) -> InRustGraphHandle {
+  Arc::new ( ArcSwap::from ( Arc::new (
+    SelectedStoreState::initial (graph, manifest)) )) }

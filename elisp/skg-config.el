@@ -17,6 +17,9 @@
   "Normalized source entries received from the connected server.
 Nil before connection; local TOML readers are the startup fallback.")
 
+(defvar skg--server-store-state nil
+  "Authoritative graph generation, path outcomes and store health from server.")
+
 (defun skg--atom-string (value)
   "Normalize a wire atom VALUE to a string, preserving nil."
   (when value (format "%s" value)))

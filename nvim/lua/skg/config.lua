@@ -21,6 +21,11 @@ M.config_file_path = nil
 ---@type table[]|nil
 M.source_inventory = nil
 
+---Authoritative selected path generations and derived-store health from the
+---connection handshake.
+---@type table|nil
+M.store_state = nil
+
 local function optional_atom_text (value)
   if value == nil or sexpr.is_nil(value) then return nil end
   return sexpr.atom_text(value)

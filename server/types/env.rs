@@ -31,7 +31,7 @@ pub struct SkgEnv {
 impl SkgEnv {
   /// Snap the current in-Rust graph.
   pub fn in_rust_graph_snapshot (&self) -> Arc<InRustGraph> {
-    self . in_rust_graph . load_full () }
+    self . in_rust_graph . load_full () . graph . clone () }
 
   /// Resolve an ID to its source by checking, in order:
   ///

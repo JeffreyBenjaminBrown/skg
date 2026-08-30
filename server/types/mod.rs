@@ -12,5 +12,6 @@ pub mod nodes;
 pub mod many_to_many;
 pub mod views_state;
 pub mod save;
+pub mod store_state;
 pub mod tree;
 pub mod maps;
