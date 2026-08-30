@@ -6,7 +6,7 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
@@ -37,6 +37,33 @@ pub fn update_index_with_nodes (
   commit_with_status(
     &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }
+
+/// Replace every document in an existing index from one immutable graph
+/// projection.  This is the background writer's recovery boundary: keeping
+/// the same `TantivyIndex` handle lets live readers survive an incremental
+/// failure, while the single writer queue preserves generation order.
+pub fn reconstruct_index_from_nodes (
+  nodes         : &[NodeComplete],
+  tantivy_index : &TantivyIndex,
+  context_types : &HashMap<ID, String>,
+) -> Result<usize, Box<dyn Error>> {
+  let _wlock = lock_tantivy_writes ();
+  let mut writer = tantivy_index . index . writer (
+    TANTIVY_WRITER_BUFFER_BYTES) ?;
+  writer . delete_all_documents () ?;
+  let tantivy_nodes : Vec<NodeTantivy> =
+    nodes . iter () . map (NodeTantivy::from) . collect ();
+  let processed_count = add_documents_to_tantivy_writer (
+    &tantivy_nodes, &mut writer, tantivy_index, context_types) ?;
+  // Commit even for an empty graph: the delete-all operation is itself the
+  // complete desired index state.
+  writer . commit () ?;
+  tantivy_index . reader . reload () ?;
+  tracing::warn! (
+    processed_count,
+    "Reconstructed the complete Tantivy index after an incremental failure");
+  Ok (processed_count)
+}
 
 pub fn delete_nodes_from_index<'a, I>(
   nodes_iter: I,

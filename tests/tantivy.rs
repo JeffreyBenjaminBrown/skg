@@ -12,7 +12,10 @@ use skg::dbs::tantivy::title_and_source_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{
   SearchOptions, has_ugly_telescope, search_index};
-use skg::dbs::tantivy::write::update_index_with_nodes;
+use skg::dbs::tantivy::write::{
+  reconstruct_index_from_nodes,
+  update_index_with_nodes,
+};
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, members_at_source_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -751,3 +754,37 @@ fn ugly_telescope_flag_survives_index_build_and_update (
     &[NodeTantivy::from (&node)], &tantivy_index )?;
   assert_eq! (stored_flag (&tantivy_index)?, "false");
   Ok (( )) }
+
+#[test]
+fn complete_in_place_reconstruction_replaces_old_documents_and_labels (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let mut old = empty_node_complete ();
+  old . pid = ID::new ("old-reconstruction-node");
+  old . title = "old reconstruction marker" . into ();
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[old], Path::new ("/tmp/tantivy-test-in-place-reconstruction"))?;
+
+  let mut fresh = empty_node_complete ();
+  fresh . pid = ID::new ("fresh-reconstruction-node");
+  fresh . title = "fresh reconstruction marker" . into ();
+  let labels = HashMap::from ([
+    (fresh . pid . clone (), "CyclicRoot" . to_string ())]);
+  reconstruct_index_from_nodes (&[fresh . clone ()], &index, &labels)?;
+
+  assert! (title_and_source_by_id (
+    &index, &ID::new ("old-reconstruction-node")) . is_none (),
+    "reconstruction must remove documents absent from the selected graph");
+  assert_eq! (title_and_source_by_id (&index, &fresh . pid)
+    . map (|(title, _)| title), Some (fresh . title));
+  let searcher = index . reader . searcher ();
+  let query = tantivy::query::TermQuery::new (
+    tantivy::Term::from_field_text (index . id_field,
+      "fresh-reconstruction-node"),
+    schema::IndexRecordOption::Basic);
+  let hits = searcher . search (
+    &query, &tantivy::collector::TopDocs::with_limit (1) . order_by_score ())?;
+  let document : TantivyDocument = searcher . doc (hits[0] . 1)?;
+  assert_eq! (document . get_first (index . context_origin_type_field)
+    . and_then (|value| value . as_str ()), Some ("CyclicRoot"));
+  Ok (( ))
+}

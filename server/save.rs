@@ -79,7 +79,8 @@ fn require_tantivy_commit (
   outcome : StoreUpdateOutcome,
 ) -> Result<(), Box<dyn Error>> {
   match wait_for_tantivy_generation (outcome . tantivy_generation) {
-    TantivyGenerationStatus::Committed => Ok (()),
+    TantivyGenerationStatus::Committed
+    | TantivyGenerationStatus::Reconstructed (_) => Ok (()),
     TantivyGenerationStatus::Failed (reason) => Err (format! (
       "graph generation {} and TypeDB committed, but Tantivy generation {} \
        failed: {}",
@@ -237,10 +238,13 @@ pub(crate) async fn apply_define_nodes_to_stores (
   // the source of truth, so 'rebuild dbs' resyncs the index.
   let mut graph_generation = old_selected . graph_generation;
   let store_for_completion = graph . clone ();
+  let recovery_graph = Arc::new (new_graph . clone ());
   let tantivy_generation = enqueue_tantivy_write_after ( TantivyWriteTask {
     tantivy_index : tantivy_index . clone (),
     instructions  : tantivy_instructions,
     context_types,
+    recovery_graph,
+    cyclic_roots: old_selected . cyclic_roots . clone (),
     selected_store: Some (store_for_completion), },
     |tantivy_generation| {
       let selected = old_selected . with_selected_transition (

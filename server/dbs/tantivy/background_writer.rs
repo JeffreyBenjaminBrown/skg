@@ -20,12 +20,14 @@
 //! logged and recorded against its generation.  Callers can therefore avoid
 //! acknowledging a graph transition whose exact search-index update failed.
 
-use crate::save::update_tantivy_from_saveinstructions;
-use crate::dbs::in_rust_graph::InRustGraphHandle;
+use crate::context::context_origin_types_for_graph;
+use crate::save::{nodecompletes_from_graph, update_tantivy_from_saveinstructions};
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
+use crate::dbs::tantivy::write::reconstruct_index_from_nodes;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::DefineNode;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 
@@ -46,6 +48,10 @@ pub struct TantivyWriteTask {
   pub tantivy_index : TantivyIndex,
   pub instructions  : Vec<DefineNode>,
   pub context_types : HashMap<ID, String>,
+  /// Exact selected graph for complete in-place reconstruction if the
+  /// incremental write fails.  An Arc makes the common path cheap.
+  pub recovery_graph : Arc<InRustGraph>,
+  pub cyclic_roots   : BTreeSet<ID>,
   /// Store publication whose selected paths await this task.  Tests and
   /// index-only callers may omit it.
   pub selected_store : Option<InRustGraphHandle>, }
@@ -61,6 +67,7 @@ impl TantivyGeneration {
 pub enum TantivyGenerationStatus {
   Pending,
   Committed,
+  Reconstructed (String),
   Failed (String), }
 
 struct GenerationLedger {
@@ -125,17 +132,18 @@ fn worker () -> &'static Worker {
     std::thread::spawn ( move || {
       while let Ok (queued) = receiver . recv () {
         // update_tantivy_from_saveinstructions takes the write lock itself.
-        let terminal = match std::panic::catch_unwind (
+        let incremental = std::panic::catch_unwind (
           std::panic::AssertUnwindSafe ( ||
             update_tantivy_from_saveinstructions (
               &queued . task . instructions,
               &queued . task . tantivy_index,
-              &queued . task . context_types ))) {
+              &queued . task . context_types )));
+        let terminal = match incremental {
           Ok (Ok (_)) => TantivyGenerationStatus::Committed,
-          Ok (Err (e)) => failed_generation_status (
-            queued . generation, e . to_string ()),
-          Err (_) => failed_generation_status (
-            queued . generation,
+          Ok (Err (e)) => recover_generation (
+            queued . generation, &queued . task, e . to_string ()),
+          Err (_) => recover_generation (
+            queued . generation, &queued . task,
             "Tantivy writer panicked while applying the batch" . into ()), };
         record_store_terminal (
           &queued . task . selected_store,
@@ -172,6 +180,32 @@ fn failed_generation_status (
   TantivyGenerationStatus::Failed (reason)
 }
 
+fn recover_generation (
+  generation         : TantivyGeneration,
+  task               : &TantivyWriteTask,
+  incremental_reason : String,
+) -> TantivyGenerationStatus {
+  tracing::error! (
+    generation = generation . get (),
+    "Background Tantivy write failed: {}. Reconstructing from the exact selected graph...",
+    incremental_reason);
+  let nodes = nodecompletes_from_graph (&task . recovery_graph);
+  let labels = context_origin_types_for_graph (
+    &task . recovery_graph, &task . cyclic_roots);
+  match std::panic::catch_unwind (std::panic::AssertUnwindSafe (||
+    reconstruct_index_from_nodes (&nodes, &task . tantivy_index, &labels))) {
+    Ok (Ok (_)) => TantivyGenerationStatus::Reconstructed (
+      incremental_reason),
+    Ok (Err (recovery_error)) => failed_generation_status (
+      generation, format! (
+        "incremental update failed ({}); complete reconstruction failed ({})",
+        incremental_reason, recovery_error)),
+    Err (_) => failed_generation_status (
+      generation, format! (
+        "incremental update failed ({}); complete reconstruction panicked",
+        incremental_reason)), }
+}
+
 fn record_store_terminal (
   selected_store : &Option<InRustGraphHandle>,
   generation     : TantivyGeneration,
@@ -179,7 +213,8 @@ fn record_store_terminal (
 ) {
   let Some (selected_store) = selected_store else { return; };
   let failure = match terminal {
-    TantivyGenerationStatus::Committed => None,
+    TantivyGenerationStatus::Committed
+    | TantivyGenerationStatus::Reconstructed (_) => None,
     TantivyGenerationStatus::Failed (reason) => Some (reason . clone ()),
     TantivyGenerationStatus::Pending => unreachable! (), };
   // This is a metadata-only compare-and-swap.  It may race a later graph
@@ -288,6 +323,9 @@ pub fn wait_for_tantivy_writes_idle () {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::dbs::init::empty_in_ram_tantivy_index;
+  use crate::dbs::tantivy::title_and_source_by_id;
+  use crate::types::nodes::complete::empty_node_complete;
   use std::sync::mpsc;
 
   #[test]
@@ -343,4 +381,29 @@ mod tests {
     assert_eq! (
       wait_for_generation_in (&completion, second),
       TantivyGenerationStatus::Failed ("no segment" . into ())); }
+
+  #[test]
+  fn failed_incremental_generation_reconstructs_its_exact_graph () {
+    let index = empty_in_ram_tantivy_index () . unwrap ();
+    let mut node = empty_node_complete ();
+    node . pid = ID::new ("recovered-generation");
+    node . title = "recovered generation title" . into ();
+    let graph = Arc::new (InRustGraph::from_nodecompletes (&[node . clone ()]));
+    let task = TantivyWriteTask {
+      tantivy_index: index . clone (),
+      instructions: Vec::new (),
+      context_types: HashMap::new (),
+      recovery_graph: graph,
+      cyclic_roots: BTreeSet::new (),
+      selected_store: None,
+    };
+    assert_eq! (
+      recover_generation (
+        TantivyGeneration (700), &task, "injected failure" . into ()),
+      TantivyGenerationStatus::Reconstructed ("injected failure" . into ()));
+    assert_eq! (
+      title_and_source_by_id (&index, &node . pid)
+        . map (|(title, _)| title),
+      Some (node . title));
+  }
 }

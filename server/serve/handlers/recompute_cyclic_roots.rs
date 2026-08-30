@@ -75,6 +75,7 @@ pub fn handle_recompute_cyclic_roots_request (
           TantivyGenerationStatus::Failed (reason) => Some (format! (
             "generation {}: {}", generation . get (), reason)),
           TantivyGenerationStatus::Committed => None,
+          TantivyGenerationStatus::Reconstructed (_) => None,
           TantivyGenerationStatus::Pending => unreachable! (), })
         . collect ();
       if ! failed . is_empty () {

@@ -471,16 +471,23 @@ pub async fn reload_touched_telescopes (
     Err (e) => return Err ( format! (
       "store update failed: {}", e )), };
   drop (_write_guard);
-  match wait_for_tantivy_generation (store_outcome . tantivy_generation) {
-    TantivyGenerationStatus::Committed => {},
+  let index_reconstruction = match wait_for_tantivy_generation (
+    store_outcome . tantivy_generation) {
+    TantivyGenerationStatus::Committed => None,
+    TantivyGenerationStatus::Reconstructed (reason) => Some (reason),
     TantivyGenerationStatus::Failed (reason) => return Err (format! (
       "graph generation {} and TypeDB committed, but Tantivy generation {} \
        failed: {}",
       store_outcome . graph_generation . get (),
       store_outcome . tantivy_generation . get (), reason)),
-    TantivyGenerationStatus::Pending => unreachable! (), }
+    TantivyGenerationStatus::Pending => unreachable! (), };
+  let mut message = summarize_reload (saves, deletes, &fatals);
+  if let Some (reason) = index_reconstruction {
+    message . push_str (&format! (
+      " WARNING: Tantivy's incremental update failed ({}); Skg reconstructed the complete search index from the committed graph before acknowledging this reload.",
+      reason)); }
   Ok (ReloadStoreOutcome {
-    message: summarize_reload (saves, deletes, &fatals),
+    message,
     applied,
     acknowledged_pids,
     rejected: fatals, }) }

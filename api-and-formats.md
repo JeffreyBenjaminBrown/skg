@@ -608,6 +608,12 @@ So far there are these endpoints:
     incoming rendering, which the client retains for explicit three-way
     review but never installs automatically. Reload never writes a `.skg`
     file.
+  - The exact queued Tantivy generation must finish before acknowledgement.
+    If its incremental write fails, the same single writer reconstructs the
+    complete index in place from that generation's immutable selected graph,
+    then continues later queued deltas in order.  The response reports this
+    recovery.  If reconstruction also fails, Tantivy is marked poisoned and
+    search refuses with an instruction to run `skg-rebuild-dbs`.
   - The client locks all views before sending and reports which were dirty.
     Rust stages the complete affected batch, runs scalar release before and
     after completion, updates only clean buffers, and leaves a dirty affected

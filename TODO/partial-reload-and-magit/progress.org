@@ -60,7 +60,7 @@ what's imperfect about what's done; choices determining the future.
   connection handshake now exposes graph generation, path outcomes and store
   health, and both clients cache that authoritative baseline.
 - The Tantivy background writer now assigns monotonic generations and retains
-  'Pending', 'Committed' or 'Failed(reason)' for each.  Exact and captured-
+  'Pending', 'Committed', 'Reconstructed(reason)' or 'Failed(reason)' for each.  Exact and captured-
   through waits are available; enqueue failure and worker panic become failed
   generations.  A transition publishes its awaiting-index paths before the
   task can run, and the worker promotes precisely those paths by atomic CAS.
@@ -73,6 +73,11 @@ what's imperfect about what's done; choices determining the future.
   than rereading possibly bad disk.  Reload additionally attempts restoration
   of the prior graph projection and marks TypeDB poisoned if neither complete
   reconstruction succeeds.
+- A failed incremental Tantivy write now reconstructs the existing index in
+  place from the exact immutable graph attached to that queued generation,
+  including its complete cached context labels.  Only a failed reconstruction
+  poisons search; later queued deltas remain FIFO after the repair.  Reload
+  acknowledgement reports that fallback prominently.
 
 ** stable reload transaction (in progress)
 - Path parsing before the writer lock resolves identifiers only.  Under the

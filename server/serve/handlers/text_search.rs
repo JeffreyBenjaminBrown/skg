@@ -38,6 +38,7 @@ use crate::serve::util::{
 };
 use crate::types::git::MembershipAxes;
 use crate::types::views_state::ViewUri;
+use crate::types::store_state::StoreHealth;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -164,6 +165,16 @@ pub fn handle_text_search_request (
       // Wait for any in-flight background save-index writes to commit, so
       // the search reflects every save issued so far (read-your-writes).
       wait_for_tantivy_writes_idle ();
+      if let StoreHealth::Poisoned (reason) =
+          &env . in_rust_graph . load_full () . tantivy_health {
+        send_response_with_length_prefix (
+          stream,
+          &tag_text_response (
+            TcpToClient::Error,
+            &format! (
+              "Search is unavailable because the Tantivy index could not be repaired: {}. Run skg-rebuild-dbs.",
+              reason)));
+        return; }
       let index_has_ugly : bool =
         match has_ugly_telescope (&env . tantivy_index) {
           Ok (has_ugly) => has_ugly,
