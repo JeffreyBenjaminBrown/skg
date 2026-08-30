@@ -19,9 +19,16 @@ end
 M.state = require('skg.state')
 M.client = require('skg.client')
 
-do -- the test server's port
+do -- Initialize exactly as an interactive client when the runner supplies
+   -- the temporary server config. Besides connecting, this installs the
+   -- server-push handlers used by background collateral presentation and
+   -- gives path consumers the real config directory. Unit-like standalone
+   -- uses retain the older port-only fallback.
+  local test_config = os.getenv('SKG_TEST_CONFIG')
   local port = os.getenv('SKG_TEST_PORT')
-  if port then
+  if test_config then
+    require('skg').init(test_config)
+  elseif port then
     M.client.port = tonumber(port)
     print('Using test port: ' .. port)
   end

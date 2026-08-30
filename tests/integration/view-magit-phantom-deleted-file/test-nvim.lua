@@ -125,7 +125,7 @@ if resolved_path then
     debug.getinfo(1, 'S').source:sub(2), ':p')
   local test_dir = vim.fn.fnamemodify(this_file, ':h')
   local expected_path =
-    vim.fn.fnamemodify(test_dir .. '/data/skg-data/b.skg', ':p')
+    vim.fn.fnamemodify(test_dir .. '/data/owned/skg-data/b.skg', ':p')
   local normalized_resolved = vim.fn.fnamemodify(resolved_path, ':p')
   T.check(normalized_resolved == expected_path, string.format(
     "resolved path is skg-data/b.skg, not a double-prefixed or"

@@ -166,6 +166,40 @@
       (with-current-buffer view (set-buffer-modified-p nil))
       (kill-buffer view))))
 
+(ert-deftest test-skg-recovery-disk-race-starts-a-successor-incident ()
+  "Changed recovery bytes stay unresolved and trigger a fresh exact sweep."
+  (let ((skg--pending-recovery-incidents
+         '(((incident-id old-incident))))
+        (skg--reload-observation-incident-id "old-incident")
+        handler
+        submitted-incident
+        (sweeps 0))
+    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t))
+              ((symbol-function 'skg-tcp-connect-to-rust)
+               (lambda () 'fake-process))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (_type callback &optional _terminal)
+                 (setq handler callback)))
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp _request &optional _content incident)
+                 (setq submitted-incident incident)))
+              ((symbol-function 'skg-big-nonfatal-message)
+               (lambda (&rest _)))
+              ((symbol-function 'skg--request-reload-full-sweep)
+               (lambda () (setq sweeps (1+ sweeps)))))
+      (skg-recover-reload-incident "old-incident")
+      (should (equal submitted-incident "old-incident"))
+      (funcall handler nil
+               "((terminal-status failed)\
+                  (content \"disk changed\")\
+                  (successor-required true))")
+      (should (= sweeps 1))
+      (should-not (equal skg--reload-observation-incident-id
+                         "old-incident"))
+      (should (string-prefix-p
+               "incident-" skg--reload-observation-incident-id))
+      (should skg--pending-recovery-incidents))))
+
 (ert-deftest test-skg-reload-preserves-herald-rules-on-load-error ()
   "A load error mid-reload must NOT strip the herald rule table.
 

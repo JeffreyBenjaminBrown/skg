@@ -115,19 +115,20 @@ save.approve_fork()
 
 -- 6. The clone must land in owned2 (rotated), NOT owned (inferred).
 local committed = T.wait_for(function ()
-  return #skg_files_in('data/owned2') == 1
+  return #skg_files_in('data/owned/owned2') == 1
 end, 10)
 T.check(committed, string.format(
   'no clone appeared in owned2; owned2=%s owned=%s',
-  vim.inspect(skg_files_in('data/owned2')),
-  vim.inspect(skg_files_in('data/owned'))))
+  vim.inspect(skg_files_in('data/owned/owned2')),
+  vim.inspect(skg_files_in('data/owned/owned'))))
 
-local owned_files = skg_files_in('data/owned')
+local owned_files = skg_files_in('data/owned/owned')
 T.check(#owned_files == 1 and owned_files[1] == 'P.skg', string.format(
   'owned should still hold only P.skg (the clone went to owned2), got %s',
   vim.inspect(owned_files)))
 
-local clone_full_path = vim.fn.glob('data/owned2/*.skg', false, true)[1]
+local clone_full_path =
+  vim.fn.glob('data/owned/owned2/*.skg', false, true)[1]
 local clone_content = table.concat(vim.fn.readfile(clone_full_path), '\n')
 T.check(clone_content:find('overrides_view_of', 1, true),
         'the clone in owned2 should override N')

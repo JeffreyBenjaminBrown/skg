@@ -22,6 +22,7 @@ use crate::dbs::filesystem::multiple_nodes::{
 };
 use crate::dbs::filesystem::source_files::{
   SourceFile,
+  selected_direct_source_files,
   select_source_file_candidates_for_pid,
   selected_path_digest_manifest,
 };
@@ -446,9 +447,22 @@ async fn reload_touched_telescopes_for_incident (
     // Extra-ID changes can alter anchors and relationship resolution in
     // untouched telescopes.  The correctness fallback folds the complete
     // normalized corpus, then emits only graph differences.
-    let loaded : LoadedCorpus = read_all_skg_files_with_manifest (&env . config)
-      . map_err ( |error| format! (
-        "full-corpus fallback after extra-ID change failed: {}", error)) ?;
+    let fatal_pids : HashSet<ID> = fatals . iter ()
+      . map (|(pid, _)| pid . clone ()) . collect ();
+    let (loaded, revalidation_manifest) : (LoadedCorpus, SelectedPathManifest) =
+      if fatal_pids . is_empty () {
+        let loaded = read_all_skg_files_with_manifest (&env . config)
+          . map_err ( |error| format! (
+            "full-corpus fallback after extra-ID change failed: {}", error)) ?;
+        let revalidation = loaded . manifest . clone ();
+        (loaded, revalidation)
+      } else {
+        read_corpus_substituting_fatals (
+          &env . config, &graph_before, &selected_before . manifest,
+          &fatal_pids) . map_err (|error| format! (
+            "replacement-aware full-corpus fallback after extra-ID change failed: {}",
+            error)) ?
+      };
     let conflicts = distinct_id_claim_conflicts (&loaded . nodes);
     if !conflicts . is_empty () {
       return Err (format! (
@@ -457,7 +471,7 @@ async fn reload_touched_telescopes_for_incident (
     let full_graph = InRustGraph::from_nodecompletes (&loaded . nodes);
     defs = graph_delta (&graph_before, &loaded . nodes);
     manifest = loaded . manifest . clone ();
-    full_manifest_for_revalidation = Some (loaded . manifest);
+    full_manifest_for_revalidation = Some (revalidation_manifest);
     // Validate below against the already-folded complete graph rather than a
     // second partial simulation.
     if let Err (error) =
@@ -841,6 +855,76 @@ fn revalidate_path_bytes (
   Ok (( ))
 }
 
+/// Full-fold all readable selected telescopes while retaining known-fatal
+/// PIDs exactly from G0. This is needed only when an extra-ID change can
+/// redirect anchors or relationship members in untouched telescopes.
+///
+/// The two manifests are intentionally different. `selected_manifest` keeps
+/// G0 digests for substituted fatal PIDs because their broken disk bytes did
+/// not enter G1. `captured_manifest` records those exact broken bytes so the
+/// final stability check still detects any race before commit.
+fn read_corpus_substituting_fatals (
+  config          : &SkgConfig,
+  graph_before    : &InRustGraph,
+  manifest_before : &SelectedPathManifest,
+  fatal_pids      : &HashSet<ID>,
+) -> io::Result<(LoadedCorpus, SelectedPathManifest)> {
+  let selected = selected_direct_source_files (config)?;
+  let mut sections : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new ();
+  let mut selected_manifest = SelectedPathManifest::new ();
+  let mut captured_manifest = SelectedPathManifest::new ();
+  for pid in &selected . pid_order {
+    for file in selected . by_pid . get (pid) . into_iter () . flatten () {
+      let bytes = fs::read (&file . path)?;
+      let digest = PathDigest::of_bytes (&bytes);
+      captured_manifest . insert (file . path . clone (), digest);
+      if fatal_pids . contains (pid) { continue; }
+      let node_fs = parse_nodefs_bytes (&bytes, &file . path)?;
+      validate_pid_matches_filename (&node_fs, &file . path)?;
+      selected_manifest . insert (file . path . clone (), digest);
+      sections . entry (pid . clone ()) . or_default ()
+        . push ((file . source . clone (), node_fs));
+    }
+  }
+  for (path, digest) in manifest_before {
+    if config . sources . source_and_pid_for_direct_path (path)
+      . map (|(_, pid)| fatal_pids . contains (&pid)) . unwrap_or (false)
+    {
+      selected_manifest . insert (path . clone (), *digest); }
+  }
+
+  let mut fallback_nodes : Vec<NodeComplete> = fatal_pids . iter ()
+    . filter_map (|pid| graph_before . nodes . get (pid))
+    . map (nodecomplete_from_noderust) . collect ();
+  let mut extra_to_pid : HashMap<ID, ID> = HashMap::new ();
+  for (pid, telescope_sections) in &sections {
+    for (_, node_fs) in telescope_sections {
+      for extra in &node_fs . extra_ids {
+        extra_to_pid . insert (extra . clone (), pid . clone ()); }
+    }
+  }
+  for node in &fallback_nodes {
+    for extra in &node . extra_ids {
+      extra_to_pid . insert (extra . clone (), node . pid . clone ()); }
+  }
+  let resolve = |id : &ID| extra_to_pid . get (id) . cloned ()
+    . unwrap_or_else (|| id . clone ());
+  let mut nodes = Vec::new ();
+  for pid in selected . pid_order . into_iter ()
+    . filter (|pid| !fatal_pids . contains (pid))
+  {
+    let telescope = Telescope::try_new (
+      pid . clone (), sections . remove (&pid) . unwrap_or_default (), config)
+      . map_err (|error| io::Error::new (io::ErrorKind::InvalidData, error))?;
+    nodes . push (fold_telescope (telescope, &resolve)?);
+  }
+  nodes . append (&mut fallback_nodes);
+  nodes . sort_by (|a, b| a . pid . cmp (&b . pid));
+  Ok ((LoadedCorpus {
+    nodes, violations: Vec::new (), manifest: selected_manifest,
+  }, captured_manifest))
+}
+
 fn graph_delta (
   before : &InRustGraph,
   after  : &[NodeComplete],
@@ -1025,5 +1109,46 @@ mod tests {
     assert_eq! (captured . warnings . len (), 1);
     assert! (captured . warnings[0] . contains (
       &foreign . join ("A.skg") . display () . to_string ()));
+  }
+
+  #[test]
+  fn full_fold_substitutes_known_fatal_node_but_validates_its_live_bytes () {
+    let temp = tempdir () . unwrap ();
+    let source = temp . path () . join ("owned");
+    fs::create_dir_all (&source) . unwrap ();
+    let bad_path = source . join ("bad.skg");
+    let good_path = source . join ("good.skg");
+    fs::write (&bad_path, b"not: [valid") . unwrap ();
+    fs::write (&good_path, b"pid: good\ntitle: good\nextra_ids:\n- alias\n")
+      . unwrap ();
+    let name = SourceName::from ("owned");
+    let mut entries = HashMap::new ();
+    entries . insert (name . clone (), SkgfileSource {
+      name: name . clone (), abbreviation: None,
+      path: source, user_owns_it: true,
+    });
+    let mut config = SkgConfig::dummyFromSources (entries);
+    config . sources . set_order (vec![name . clone ()]);
+    let mut old_bad = crate::types::nodes::complete::empty_node_complete ();
+    old_bad . pid = ID::from ("bad");
+    old_bad . title = "last good" . into ();
+    old_bad . source = name;
+    let graph = InRustGraph::from_nodecompletes (&[old_bad]);
+    let old_digest = PathDigest::of_bytes (b"pid: bad\ntitle: last good\n");
+    let manifest_before = SelectedPathManifest::from ([
+      (bad_path . clone (), old_digest),
+    ]);
+
+    let (loaded, captured) = read_corpus_substituting_fatals (
+      &config, &graph, &manifest_before,
+      &[ID::from ("bad")] . into_iter () . collect ()) . unwrap ();
+    assert_eq! (loaded . nodes . len (), 2);
+    assert_eq! (loaded . nodes . iter () . find (|node| node . pid == ID::from ("bad"))
+      . unwrap () . title, "last good");
+    assert_eq! (loaded . manifest . get (&bad_path), Some (&old_digest));
+    assert_eq! (captured . get (&bad_path),
+                Some (&PathDigest::of_bytes (b"not: [valid")));
+    assert_eq! (loaded . manifest . get (&good_path),
+                captured . get (&good_path));
   }
 }

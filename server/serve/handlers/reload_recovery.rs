@@ -134,6 +134,21 @@ pub fn handle_reload_recovery_request (
       let payload = recovery_report_sexp (&report) . to_string ();
       send_response_with_length_prefix (stream, &tag_terminal_sexp_response (
         TcpToClient::ReloadRecovery, "complete", &payload)); }
+    Err (error) if error . contains (
+        "Recovery stopped because disk changed after the incident") => {
+      let payload = Sexp::List (vec![
+        Sexp::List (vec![
+          Sexp::Atom (Atom::S ("content" . into ())),
+          Sexp::Atom (Atom::S (error)),
+        ]),
+        Sexp::List (vec![
+          Sexp::Atom (Atom::S ("successor-required" . into ())),
+          Sexp::Atom (Atom::S ("true" . into ())),
+        ]),
+      ]) . to_string ();
+      send_response_with_length_prefix (
+        stream, &tag_terminal_sexp_response (
+          TcpToClient::ReloadRecovery, "failed", &payload)); }
     Err (error) => send_response_with_length_prefix (
       stream, &tag_terminal_text_response (
         TcpToClient::ReloadRecovery, "failed", &error)),
@@ -596,7 +611,7 @@ fn recovery_tree (
   for (path, bytes) in overlay {
     match bytes {
       Some (bytes) => {
-        let entry = plain_blob_index_entry (&path);
+        let entry = plain_blob_index_entry (&path) ?;
         index . add_frombuffer (&entry, &bytes)
           . map_err (|error| format! (
             "Could not add {} to recovery tree: {}", path . display (), error))?; }
@@ -609,14 +624,16 @@ fn recovery_tree (
   index . write_tree_to (repo) . map_err (|error| error . to_string ())
 }
 
-fn plain_blob_index_entry (path : &Path) -> IndexEntry {
-  let path = path . to_string_lossy () . replace ('\\', "/") . into_bytes ();
-  IndexEntry {
+fn plain_blob_index_entry (path : &Path) -> Result<IndexEntry, String> {
+  let path = path . to_str () . ok_or_else (|| format! (
+    "Recovery cannot safely represent non-UTF-8 Git path {:?}", path)) ?
+    . replace ('\\', "/") . into_bytes ();
+  Ok (IndexEntry {
     ctime: IndexTime::new (0, 0), mtime: IndexTime::new (0, 0),
     dev: 0, ino: 0, mode: 0o100644, uid: 0, gid: 0,
     file_size: 0, id: Oid::zero (), flags: 0, flags_extended: 0,
     path,
-  }
+  })
 }
 
 fn publish_recovery_refs (plans : &[RecoveryRepositoryPlan]) -> Result<(), String> {

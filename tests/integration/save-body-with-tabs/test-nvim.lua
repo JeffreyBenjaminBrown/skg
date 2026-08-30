@@ -35,7 +35,7 @@ end
 T.check(T.wait_for_response(), 'save response arrived')
 
 print('=== PHASE 3: file contents ===')
-local skg_file = 'data/skg-data/bwt-root.skg'
+local skg_file = 'data/owned/skg-data/bwt-root.skg'
 T.check(vim.fn.filereadable(skg_file) == 1,
         skg_file .. ' exists on disk')
 local disk_contents = table.concat(vim.fn.readfile(skg_file), '\n')

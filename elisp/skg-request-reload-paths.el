@@ -330,7 +330,11 @@ then restores only owned fatal telescope paths to Skg's last-good bytes."
            (let* ((response (read payload))
                   (status (format "%s"
                                   (cadr (assoc 'terminal-status response))))
-                  (content (cadr (assoc 'content response))))
+                  (content (cadr (assoc 'content response)))
+                  (successor-required
+                   (equal (format "%s"
+                                  (cadr (assoc 'successor-required response)))
+                          "true")))
              (if (equal status "complete")
                  (progn
                    (setq skg--pending-recovery-incidents
@@ -349,8 +353,15 @@ then restores only owned fatal telescope paths to Skg's last-good bytes."
                (skg-big-nonfatal-message
                 "*SKG Reload Recovery Failed*"
                 "WARNING: Fatal reload recovery did not complete"
-                (format "* Recovery stopped\n%s\n\nThe incident journal remains available."
-                        (or content "Unknown recovery error"))))))
+                (format "* Recovery stopped\n%s\n\nThe incident journal remains available.%s"
+                        (or content "Unknown recovery error")
+                        (if successor-required
+                            "\nSkg queued a new exact sweep to classify the changed bytes as a successor incident."
+                          "")))
+               (when successor-required
+                 (setq skg--reload-observation-incident-id
+                       (skg-fresh-incident-id))
+                 (skg--request-reload-full-sweep)))))
          t)
         (skg-submit-request
          tcp-proc

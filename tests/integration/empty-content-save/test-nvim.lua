@@ -1,7 +1,8 @@
 -- Integration test for skg empty-content save, nvim client.
 -- The Lua mirror of test-emacs.el in this directory:
 -- open an empty skg buffer, enter '* (skg (node (id 1) (source
--- main))) 1', save, and verify the result lands in data/skg/1.skg.
+-- main))) 1', save, and verify the result lands in
+-- data/owned/skg/1.skg.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(20)
@@ -32,7 +33,7 @@ require('skg.save').request_save_buffer()
 
 -- Wait for the file to be written by the server (mirrors the elisp
 -- test's manual polling loop: 40 attempts * 0.25s = 10s).
-local target_file = 'data/skg/1.skg'
+local target_file = 'data/owned/skg/1.skg'
 local found = T.wait_for(function ()
   return vim.fn.filereadable(target_file) == 1
 end, 10)

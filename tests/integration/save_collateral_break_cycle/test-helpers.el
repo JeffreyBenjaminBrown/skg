@@ -111,7 +111,11 @@ Depth is the number of asterisks. Relation is a symbol (see
 (defun assert-headline-structure (buffer expected phase-label)
   "Assert that BUFFER's headline structure matches EXPECTED.
 EXPECTED is a list of (depth relation id) triples.
-PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
+PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure.
+Polls because collateral presentation deliberately follows the foreground
+save response."
+  (skg-test-wait-for
+   (lambda () (equal (headline-structure buffer) expected)) 15)
   (let ((actual (headline-structure buffer)))
     (if (equal actual expected)
         (message "✓ PASS [%s]: headline-structure is (%s)"
@@ -129,6 +133,8 @@ PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
   "Assert that BUFFER's headline titles match EXPECTED exactly.
 EXPECTED is a list of (depth relation title) triples.
 PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
+  (skg-test-wait-for
+   (lambda () (equal (headline-titles buffer) expected)) 15)
   (let ((actual (headline-titles buffer)))
     (if (equal actual expected)
         (message "✓ PASS [%s]: headline-titles is (%s)"
@@ -186,6 +192,8 @@ deleted; for (skg (deletedScaffold KIND)) it is deletedScaffold; and so on."
   "Assert that BUFFER's (depth type title) triples match EXPECTED.
 EXPECTED is a list of (depth type-symbol title-string) triples.
 PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
+  (skg-test-wait-for
+   (lambda () (equal (headline-types-and-titles buffer) expected)) 15)
   (let ((actual (headline-types-and-titles buffer)))
     (if (equal actual expected)
         (message "✓ PASS [%s]: headline-types-and-titles match"

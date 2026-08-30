@@ -205,7 +205,8 @@ run_nvim_test() {
   echo ""
   echo "Running Neovim integration test..."
   cd "$TEST_DIR"
-  if SKG_TEST_PORT="$AVAILABLE_PORT" nvim --headless -l "$test_file"; then
+  if SKG_TEST_PORT="$AVAILABLE_PORT" SKG_TEST_CONFIG="$TEMP_CONFIG" \
+      nvim --headless -l "$test_file"; then
     echo "✓ Integration test PASSED."
     TEST_RESULT=0
   else

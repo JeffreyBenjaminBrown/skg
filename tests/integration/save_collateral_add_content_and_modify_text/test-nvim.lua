@@ -142,6 +142,9 @@ end
 ---@param expected table[]
 ---@param phase_label string
 local function assert_headline_structure (buf, expected, phase_label)
+  T.wait_for(function ()
+    return vim.deep_equal(headline_structure(buf), expected)
+  end, 15)
   local actual = headline_structure(buf)
   local ok = vim.deep_equal(actual, expected)
   if not ok then
@@ -158,6 +161,9 @@ end
 ---@param expected table[]
 ---@param phase_label string
 local function assert_headline_titles (buf, expected, phase_label)
+  T.wait_for(function ()
+    return vim.deep_equal(headline_titles(buf), expected)
+  end, 15)
   local actual = headline_titles(buf)
   local ok = vim.deep_equal(actual, expected)
   if not ok then

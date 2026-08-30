@@ -219,12 +219,9 @@ pub async fn update_views_after_save (
       &mut saved_view_mut, &context . graph_snap ) ? };
   let collateral_uris : Vec<ViewUri> =
     if let Ok (uri) = viewuri_from_request_result {
-      if collateral_scheduler . is_some () {
-        views_state . open_views . views . keys ()
-          . filter (|candidate| *candidate != uri)
-          . cloned () . collect ()
-      } else {
-        find_collateral_view_uris (uri, &define_nodes, views_state) }
+      views_state . open_views . views . keys ()
+        . filter (|candidate| *candidate != uri)
+        . cloned () . collect ()
     } else { Vec::new () };
   // Gate the forests' existing active nodes before rendering, so even a
   // rendering error cannot echo protected scalar text. A second decision
@@ -422,21 +419,11 @@ pub async fn rerender_views_after_reload (
       DefineNode::Save ( SaveNode (n)) => Some ( n . pid . clone () ),
       DefineNode::Delete (dn)          => Some ( dn . id . clone () ) } )
     . collect ();
-  let mut affected_uris : Vec<ViewUri> = if collateral_scheduler . is_some () {
-    views_state . open_views . views . keys () . cloned () . collect ()
-  } else {
-    let set : HashSet<ViewUri> = changed_pids . iter ()
-      . flat_map (|pid| views_state . open_views . views_containing (pid))
-      . collect ();
-    set . into_iter () . collect () };
+  let mut affected_uris : Vec<ViewUri> =
+    views_state . open_views . views . keys () . cloned () . collect ();
   affected_uris . sort_by_key (ViewUri::repr_in_client);
   let impacts : Vec<ReloadViewImpact> = affected_uris . iter () . map (|uri| {
-    let mut pids : Vec<ID> = if collateral_scheduler . is_some () {
-      changed_pids . iter () . cloned () . collect ()
-    } else {
-      views_state . open_views . viewuri_to_pids (uri)
-        . into_iter () . filter (|pid| changed_pids . contains (pid))
-        . collect () };
+    let mut pids : Vec<ID> = changed_pids . iter () . cloned () . collect ();
     pids . sort_by (|a, b| a . as_str () . cmp (b . as_str ()));
     ReloadViewImpact { uri: uri . clone (), pids, incoming: None }
   }) . collect ();
@@ -500,11 +487,10 @@ pub async fn rerender_views_after_reload (
     . collect ();
   for impact in &mut conflicted {
     impact . incoming = incoming_by_uri . get (&impact . uri) . cloned (); }
-  if collateral_scheduler . is_some () {
-    conflicted . retain (|impact| impact . incoming . as_ref ()
-      . zip (old_text_by_uri . get (&impact . uri))
-      . map (|(incoming, old)| incoming != old)
-      . unwrap_or (true)); }
+  conflicted . retain (|impact| impact . incoming . as_ref ()
+    . zip (old_text_by_uri . get (&impact . uri))
+    . map (|(incoming, old)| incoming != old)
+    . unwrap_or (true));
   for rendered in rendered_views {
     if dirty_uris . contains (&rendered . uri) { continue; }
     views_state . open_views . update_view (
@@ -530,34 +516,6 @@ pub async fn rerender_views_after_reload (
     errors: context . errors,
     warnings: context . warnings,
   })) }
-
-/// Given the saved ViewUri and DefineNodes,
-/// return the URIs of other views whose viewforests
-/// contain any changed PID. Includes search views --
-/// they are just as editable as other kinds.
-pub(crate) fn find_collateral_view_uris (
-  saved_uri    : &ViewUri,
-  define_nodes : &[DefineNode],
-  views_state  : &ViewsState,
-) -> Vec<ViewUri> {
-  let changed_pids : HashSet<ID> =
-    define_nodes . iter ()
-    . filter_map ( |instr| match instr {
-      DefineNode::Save ( SaveNode (n)) =>
-        Some ( n . pid . clone () ),
-      DefineNode::Delete (dn) =>
-        Some ( dn . id . clone () ) } )
-    . collect ();
-  tracing::debug!(
-    "find_collateral_view_uris: {} changed PIDs, {} views in ViewsState",
-    changed_pids . len (),
-    views_state . open_views . views . len ());
-  let uris : HashSet<ViewUri> =
-    changed_pids . iter ()
-    . flat_map ( |pid| views_state . open_views . views_containing (pid) )
-    . filter ( |uri| uri != saved_uri )
-    . collect ();
-  uris . into_iter () . collect () }
 
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the

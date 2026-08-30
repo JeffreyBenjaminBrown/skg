@@ -157,3 +157,43 @@ fn reload_rejects_a_new_extra_id_claimed_by_an_untouched_node (
         selected_before . graph_generation);
       assert_eq! (selected_after . manifest, selected_before . manifest);
       Ok (( )) } )) }
+
+#[test]
+fn extra_id_full_fold_keeps_a_known_fatal_telescope_at_last_good (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-reload-extra-id-with-fatal",
+    "tests/reload/fixtures-title-change",
+    "/tmp/tantivy-test-reload-extra-id-with-fatal",
+    |config, driver, tantivy| Box::pin ( async move {
+      let graph = graph_handle_from_config (config) ?;
+      let mut env = skg_env_from_parts (
+        config, driver . clone (), tantivy, &graph);
+      let source = main_source_dir (config);
+      let n1_path = source . join ("n1.skg");
+      let n2_path = source . join ("n2.skg");
+      let before = env . in_rust_graph . load_full ();
+      let n2_selected_digest = *before . manifest . get (&n2_path)
+        . expect ("n2 starts selected");
+      std::fs::write (
+        &n1_path,
+        "pid: n1\nextra_ids:\n- fresh-alias\ntitle: n1 accepted\n") ?;
+      std::fs::write (&n2_path, "not: [valid") ?;
+      let touched = classify_touched_telescopes (
+        &env . config, &[n1_path . clone (), n2_path . clone ()]);
+
+      let outcome = reload_touched_telescopes (&mut env, touched) . await
+        . map_err (|error| -> Box<dyn Error> { error . into () }) ?;
+      assert_eq! (outcome . rejected . len (), 1);
+      assert_eq! (outcome . rejected[0] . 0, ID::from ("n2"));
+      let after = env . in_rust_graph . load_full ();
+      assert_eq! (title_in (&after, "n1"), Some ("n1 accepted" . into ()),
+                  "the legal extra-ID telescope committed");
+      assert_eq! (after . pid_of (&ID::from ("fresh-alias")),
+                  Some (ID::from ("n1")));
+      assert_eq! (title_in (&after, "n2"), Some ("n2" . into ()),
+                  "the malformed telescope retained G0");
+      assert_eq! (after . manifest . get (&n2_path), Some (&n2_selected_digest),
+                  "broken bytes did not become selected");
+      Ok (( )) } ))
+}
