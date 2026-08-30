@@ -585,30 +585,6 @@
    or changed content). The planned "separate diff pass over Vognode::Normal"
    (TODO/local-view-update) would fix it by visiting every Normal vognode
    regardless of when it became definitive.
-** Collateral graphStats can go stale when only a node's relationships change
-   server/update_buffer.rs / find_collateral_view_uris.
-   Collateral views are selected by the PIDs in the SavePlan's DefineNodes.
-   If saving buffer X changes A.contains to include B (only A is saved),
-   then a different view rooted at B is not rerendered, even though B's
-   container count (graphStats.containRels) changed. B's herald is stale
-   until B's view is next rerendered. Pre-existing and arguably acceptable;
-   fixing it would require selecting collateral by the neighbors of changed
-   nodes, not just the changed nodes.
-** (not a bug, but a simplification) Lock over-approximates the rerender set
-   server/serve/handlers/save_buffer.rs, elisp/skg-request-save.el.
-   The early lock message ('uris_of_views_to_lock') locks every open view
-   sharing any PID with the saved buffer, but only views sharing a
-   *changed* PID receive a 'collateral-view' message
-   ('find_collateral_view_uris'). I checked the client: a buffer that is
-   locked but never rerendered is still unlocked, because
-   'skg--save-result-handler' calls 'skg--unlock-all-save-locked' on
-   save-result (skg-request-save.el:171, and again in its unwind-protect at
-   174). So there is no permanently-locked bug.
-
-   It is therefore only an opportunity to simplify: narrowing the lock to
-   the changed-PID set would make lock and rerender coincide, removing the
-   transient lock on buffers that won't change. See the collateral
-   resolution in TODO/local-view-update/problems.org.
 * Performance: the save-buffer pathway (see profiling-save.org)
   Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
   found four inefficiencies, in impact order. Full evidence, numbers,

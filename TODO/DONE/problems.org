@@ -1,3 +1,16 @@
+* PID-overlap collateral selection and its lock mismatch (fixed 2026-08-30)
+  The old save pipeline selected background views only when they already
+  contained a changed PID. That missed inverse-only effects such as a newly
+  changed container count, and its broad early lock did not match the smaller
+  rerender set.
+
+  RESOLVED: The partial-reload-and-magit completion scheduler removed
+  'find_collateral_view_uris'. After a transition, collateral means every open
+  view except the authored saved view. Work runs one view at a time in the
+  background, MRU-first, and each offer names its base revision; a dirty or
+  advanced client buffer rejects the offer. The early save lock is therefore
+  only a foreground safety guard and is relaxed before background work rather
+  than pretending to predict the eventual rerender set.
 * Problems found reviewing partial reload and Magit (fixed 2026-08-30)
   Full context and settled decisions are in
   TODO/partial-reload-and-magit/4_recap.org.  The dependency-ordered
