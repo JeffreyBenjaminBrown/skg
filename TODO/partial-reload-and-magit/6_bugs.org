@@ -1,0 +1,21 @@
+(Herein I indent by two spaces when quoting.)
+
+After the server is warm, if in the Emacs client I evaluate the reload snippet:
+  (progn (load-file "../elisp/skg-reload.el")
+         (skg-reload)
+         (skg-client-init "../data/skgconfig.toml"))
+in docs/setup.org, I quickly see 'skg: all modules reloaded'
+as before, but then there's a pause (2 seconds?) that's new,
+during which I can't do anything in Emacs,
+after which I see
+  "skg connected on port 1731, but the herald rule table came back EMPTY, so heralds will not render. See /home/rust/skg2/data/logs/server-to-user.log ."
+
+Then there's a *very* long period -- a minute? --
+during which I can still use emacs,
+after which I get a buffer with
+  * WARNING: Telescope load warnings
+  ** 33d5cd4e-8a0c-48f0-85c2-467db86e1862
+  member 'shows-because (relationship)' appeared in two sources; the more public occurrence won
+
+Finally, if I visit that node (C-c g i), I am warned the following:
+  SKG request failed: No visit-sequence field found in S-expression
