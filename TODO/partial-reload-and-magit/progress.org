@@ -413,6 +413,13 @@ what's imperfect about what's done; choices determining the future.
 - While exercising nested evidence paths, found and fixed an umask-dependent
   permission hole: every newly created intermediate evidence directory is now
   mode 0700 from first creation.  The focused maintenance suite passes (24/24).
+- Added the exact, idempotent maintenance-evidence endpoint.  It serves only
+  the active archive owner after coherent store selection, requires the
+  already-journaled server bundle checksum, journals the deterministic transfer
+  manifest and opaque-stream checksums before sending, and emits every safe
+  path/offset/length/SHA-256 in the framed descriptor.  A replacement request
+  can therefore receive the same transfer without repeating selection.  The
+  focused Rust maintenance/protocol suite passes (25/25).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

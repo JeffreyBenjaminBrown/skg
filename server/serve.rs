@@ -36,6 +36,7 @@ use crate::serve::handlers::maintenance_protocol::{
   handle_cancel_maintenance_request,
   handle_maintenance_archive_failed_request,
   handle_maintenance_archive_ready_request,
+  handle_maintenance_evidence_request,
   handle_maintenance_status_request,
 };
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
@@ -658,6 +659,8 @@ fn dispatch_request (
       handle_cancel_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceStatus =>
       handle_maintenance_status_request (stream, runtime),
+    RequestType::MaintenanceEvidence =>
+      handle_maintenance_evidence_request (stream, request, runtime),
   }
 }
 

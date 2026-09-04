@@ -341,6 +341,15 @@ pub struct ServerEvidenceRecord {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ClientEvidenceTransferRecord {
+  pub server_bundle_sha256     : String,
+  pub transfer_manifest_sha256 : String,
+  pub artifact_bytes_sha256    : String,
+  pub artifact_count           : u64,
+  pub artifact_bytes           : u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SelectedStoreRecord {
   pub graph_generation   : GraphGeneration,
   pub manifest_revision  : ManifestRevision,
@@ -400,6 +409,10 @@ pub struct ActiveMaintenance {
   pub undo_waivers      : BTreeMap<String, String>,
   #[serde(default)]
   pub server_evidence   : Option<ServerEvidenceRecord>,
+  #[serde(default)]
+  pub client_evidence_transfer : Option<ClientEvidenceTransferRecord>,
+  #[serde(default)]
+  pub client_evidence_acknowledged : bool,
   #[serde(default)]
   pub selected_store    : Option<SelectedStoreRecord>,
   #[serde(default)]

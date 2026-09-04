@@ -42,6 +42,7 @@ pub enum RequestType {
   ApproveUndoWaiver,
   CancelMaintenance,
   MaintenanceStatus,
+  MaintenanceEvidence,
 }
 
 impl RequestType {
@@ -86,6 +87,7 @@ impl RequestType {
       "approve undo waiver"      => Ok (RequestType::ApproveUndoWaiver),
       "cancel maintenance"       => Ok (RequestType::CancelMaintenance),
       "maintenance status"       => Ok (RequestType::MaintenanceStatus),
+      "maintenance evidence"     => Ok (RequestType::MaintenanceEvidence),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md

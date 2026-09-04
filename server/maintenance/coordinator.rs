@@ -208,6 +208,8 @@ impl MaintenanceCoordinator {
       buffer_census,
       undo_waivers: Default::default (),
       server_evidence: None,
+      client_evidence_transfer: None,
+      client_evidence_acknowledged: false,
       selected_store: None,
       view_settlements: Default::default (),
       blocking_reason: None,
@@ -341,6 +343,36 @@ impl MaintenanceCoordinator {
     active . selected_store = Some (selected);
     active . blocking_reason = None;
     active . phase = MaintenancePhase::Presenting;
+    Ok (( ))
+  }
+
+  pub fn record_client_evidence_transfer (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    transfer    : ClientEvidenceTransferRecord,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if !matches! (active . phase,
+      MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
+    {
+      return Err (format! (
+        "client evidence is invalid during {:?}", active . phase)); }
+    let server_evidence = active . server_evidence . as_ref ()
+      . ok_or_else (|| "client evidence has no durable server bundle"
+        . to_string ())?;
+    if active . selected_store . is_none () {
+      return Err ("client evidence cannot precede store selection" . into ()); }
+    if transfer . server_bundle_sha256 != server_evidence . bundle_sha256 {
+      return Err ("client evidence names another server bundle" . into ()); }
+    if transfer . artifact_count != server_evidence . artifact_count {
+      return Err ("client evidence artifact inventory changed" . into ()); }
+    if let Some (existing) = &active . client_evidence_transfer {
+      if existing != &transfer {
+        return Err ("incident already offered different client evidence"
+          . into ()); }
+    } else {
+      active . client_evidence_transfer = Some (transfer); }
     Ok (( ))
   }
 
@@ -770,6 +802,21 @@ mod tests {
         manifest_revision: ManifestRevision::INITIAL . successor (),
         tantivy_generation: 1, tantivy_outcome: "committed" . into (),
       }) . unwrap ();
+    let transfer = ClientEvidenceTransferRecord {
+      server_bundle_sha256: "hash" . into (),
+      transfer_manifest_sha256: "transfer" . into (),
+      artifact_bytes_sha256: "bytes" . into (),
+      artifact_count: 1,
+      artifact_bytes: 2,
+    };
+    coordinator . record_client_evidence_transfer (
+      &active . incident_id, active . epoch, transfer . clone ()) . unwrap ();
+    coordinator . record_client_evidence_transfer (
+      &active . incident_id, active . epoch, transfer . clone ()) . unwrap ();
+    let mut changed_transfer = transfer;
+    changed_transfer . artifact_bytes_sha256 = "different" . into ();
+    assert! (coordinator . record_client_evidence_transfer (
+      &active . incident_id, active . epoch, changed_transfer) . is_err ());
     assert! (coordinator . record_view_settlements (
       &active . incident_id, active . epoch, vec![settlement ("one")])
       . is_err ());
@@ -791,5 +838,7 @@ mod tests {
     let CoordinatorState::Active (active) = &coordinator . state else {
       panic! ("incident vanished"); };
     assert_eq! (active . phase, MaintenancePhase::FinalizingArchive);
+    assert_eq! (active . client_evidence_transfer . as_ref ()
+      . unwrap () . transfer_manifest_sha256, "transfer");
   }
 }

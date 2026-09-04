@@ -4,19 +4,27 @@ use crate::maintenance::archive::{
   InitialArchiveExpectation,
   verify_initial_archive,
 };
+use crate::maintenance::evidence::{
+  CLIENT_EVIDENCE_FORMAT_VERSION,
+  ClientEvidenceArtifact,
+  ClientEvidenceBundle,
+};
 use crate::maintenance::selection::select_archived_candidate;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
   CandidateId,
+  ClientEvidenceTransferRecord,
   CoordinatorState,
   IncidentId,
   MaintenanceEpoch,
   MaintenanceOrigin,
+  MaintenancePhase,
 };
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
+  send_artifact_bundle_with_length_prefix,
   send_response_with_length_prefix,
   tag_terminal_sexp_response,
   tag_terminal_text_response,
@@ -312,6 +320,113 @@ pub fn handle_maintenance_status_request (
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", Ok (payload));
 }
 
+pub fn handle_maintenance_evidence_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  match maintenance_evidence (request, runtime) {
+    Ok ((descriptor, bytes)) => {
+      let _ = send_artifact_bundle_with_length_prefix (
+        stream, &descriptor, &bytes); }
+    Err (error) => send_result (
+      stream, TcpToClient::MaintenanceEvidence, "failed", Err (error)),
+  }
+}
+
+fn maintenance_evidence (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<(String, Vec<u8>), String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let expected_server_sha = value_from_request_sexp (
+    "server-evidence-sha256", request)?;
+  let active = require_archive_owner (runtime, &incident, epoch)?;
+  if !matches! (active . phase,
+    MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
+  {
+    return Err (format! (
+      "maintenance evidence is unavailable during {:?}", active . phase)); }
+  let server_record = active . server_evidence . as_ref ()
+    . ok_or_else (|| "incident has no durable server evidence" . to_string ())?;
+  if expected_server_sha != server_record . bundle_sha256 {
+    return Err ("maintenance evidence request names another server bundle"
+      . into ()); }
+  let selected = active . selected_store . as_ref ()
+    . ok_or_else (|| "incident has not selected a coherent store generation"
+      . to_string ())?;
+  let bundle = runtime . maintenance_evidence . client_bundle (&incident)?;
+  if bundle . maintenance_epoch != epoch
+  || active . candidate . as_ref () != Some (&bundle . candidate)
+  || bundle . server_bundle_sha256 != server_record . bundle_sha256
+  || bundle . artifacts . len () as u64 != server_record . artifact_count
+  {
+    return Err ("durable client evidence does not match the active incident"
+      . into ()); }
+  let transfer = ClientEvidenceTransferRecord {
+    server_bundle_sha256: bundle . server_bundle_sha256 . clone (),
+    transfer_manifest_sha256: bundle . transfer_manifest_sha256 . clone (),
+    artifact_bytes_sha256: bundle . artifact_bytes_sha256 . clone (),
+    artifact_count: bundle . artifacts . len () as u64,
+    artifact_bytes: bundle . bytes . len () as u64,
+  };
+  runtime . transition_maintenance (|coordinator|
+    coordinator . record_client_evidence_transfer (
+      &incident, epoch, transfer))?;
+  let payload = maintenance_evidence_payload (&active, &bundle, selected);
+  let descriptor = tag_terminal_sexp_response (
+    TcpToClient::MaintenanceEvidence, "complete", &payload);
+  Ok ((descriptor, bundle . bytes))
+}
+
+fn maintenance_evidence_payload (
+  active   : &crate::maintenance::ActiveMaintenance,
+  bundle   : &ClientEvidenceBundle,
+  selected : &crate::maintenance::SelectedStoreRecord,
+) -> String {
+  Sexp::List (vec![
+    integer_field (
+      "artifact-bundle-format-version", CLIENT_EVIDENCE_FORMAT_VERSION as u64),
+    atom_field ("incident-id", active . incident_id . as_str ()),
+    integer_field ("maintenance-epoch", active . epoch . get ()),
+    atom_field ("candidate-id", bundle . candidate . id . as_str ()),
+    integer_field (
+      "g0-graph-generation", active . g0_graph_generation . get ()),
+    integer_field (
+      "g0-manifest-revision", active . g0_manifest_revision . get ()),
+    integer_field (
+      "g1-graph-generation", selected . graph_generation . get ()),
+    integer_field (
+      "g1-manifest-revision", selected . manifest_revision . get ()),
+    integer_field ("tantivy-generation", selected . tantivy_generation),
+    atom_field ("server-evidence-sha256", &bundle . server_bundle_sha256),
+    atom_field (
+      "transfer-manifest-sha256", &bundle . transfer_manifest_sha256),
+    atom_field ("artifact-bytes-sha256", &bundle . artifact_bytes_sha256),
+    integer_field ("artifact-count", bundle . artifacts . len () as u64),
+    integer_field ("artifact-bytes", bundle . bytes . len () as u64),
+    Sexp::List (vec![
+      Sexp::Atom (Atom::S ("artifacts" . into ())),
+      Sexp::List (bundle . artifacts . iter ()
+        . map (client_artifact_sexp) . collect ()),
+    ]),
+  ]) . to_string ()
+}
+
+fn client_artifact_sexp (artifact : &ClientEvidenceArtifact) -> Sexp {
+  Sexp::List (vec![
+    atom_field ("artifact-key", &artifact . key),
+    atom_field ("relative-path", &artifact . relative_path),
+    atom_field ("purpose", &artifact . purpose),
+    integer_field ("byte-offset", artifact . byte_offset),
+    integer_field ("byte-length", artifact . byte_length),
+    atom_field ("sha256", &artifact . sha256),
+  ])
+}
+
 fn matching_active (
   runtime  : &ServerRuntime,
   incident : &IncidentId,
@@ -454,4 +569,63 @@ fn send_result (
       TcpToClient::Error, "failed", &error),
   };
   let _ = send_response_with_length_prefix (stream, &response);
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::maintenance::{
+    CandidateSummary,
+    MaintenanceCoordinator,
+    ObservationSequence,
+    SelectedStoreRecord,
+  };
+  use crate::types::store_state::{GraphGeneration, ManifestRevision};
+
+  #[test]
+  fn evidence_descriptor_names_every_exact_artifact_slice () {
+    let summary = CandidateSummary {
+      id: CandidateId::new (),
+      base_graph_generation: GraphGeneration::INITIAL,
+      base_manifest_revision: ManifestRevision::INITIAL,
+      covered_sequence: ObservationSequence::INITIAL,
+      changed_primary_ids: vec!["A" . into ()],
+    };
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation, Some (summary . clone ()))
+      . unwrap ();
+    let bundle = ClientEvidenceBundle {
+      incident_id: active . incident_id . clone (),
+      maintenance_epoch: active . epoch,
+      candidate: summary,
+      server_bundle_sha256: "a" . repeat (64),
+      transfer_manifest_sha256: "b" . repeat (64),
+      artifact_bytes_sha256: "c" . repeat (64),
+      artifacts: vec![ClientEvidenceArtifact {
+        key: "artifact-00000000" . into (),
+        relative_path: "modified-nodes/node-00000000-deadbeef/semantic.diff"
+          . into (),
+        purpose: "semantic-diff" . into (),
+        byte_offset: 0,
+        byte_length: 11,
+        sha256: "d" . repeat (64),
+      }],
+      bytes: b"abcdefghijk" . to_vec (),
+    };
+    let selected = SelectedStoreRecord {
+      graph_generation: GraphGeneration::INITIAL . successor (),
+      manifest_revision: ManifestRevision::INITIAL . successor (),
+      tantivy_generation: 9,
+      tantivy_outcome: "committed" . into (),
+    };
+    let payload = maintenance_evidence_payload (&active, &bundle, &selected);
+    let parsed = sexp::parse (&payload) . unwrap ();
+    assert! (matches! (parsed, Sexp::List (_)));
+    assert! (payload . contains ("(artifact-bundle-format-version 1)"));
+    assert! (payload . contains ("(byte-offset 0)"));
+    assert! (payload . contains ("(byte-length 11)"));
+    assert! (payload . contains (
+      "modified-nodes/node-00000000-deadbeef/semantic.diff"));
+  }
 }
