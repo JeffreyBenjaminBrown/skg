@@ -448,6 +448,14 @@ what's imperfect about what's done; choices determining the future.
   ACK replay succeeds; a changed transfer or final manifest is rejected, and
   terminal completion additionally requires this durable evidence ACK.  The
   focused Rust maintenance suite passes (25/25).
+- Added a durable terminal-delivery handshake instead of dropping a completed
+  incident straight to idle.  Completion now retains the exact incident,
+  epoch, owner, final-manifest checksum, selected store and unlock census until
+  the client acknowledges the terminal instruction; a lost completion reply
+  is exactly replayable, and only the final ACK compacts the active journal.
+  Safe pre-mutation terminals can unlock, while failure after mutation remains
+  locked.  The focused Rust maintenance suite passes (26/26), and
+  =cargo check --tests= passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

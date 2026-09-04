@@ -31,9 +31,11 @@ use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::maintenance_protocol::{
+  handle_acknowledge_terminal_maintenance_request,
   handle_approve_undo_waiver_request,
   handle_begin_maintenance_request,
   handle_cancel_maintenance_request,
+  handle_complete_maintenance_request,
   handle_maintenance_archive_failed_request,
   handle_maintenance_archive_finalized_request,
   handle_maintenance_archive_ready_request,
@@ -667,6 +669,11 @@ fn dispatch_request (
       handle_maintenance_evidence_request (stream, request, runtime),
     RequestType::MaintenanceViewSettled =>
       handle_maintenance_view_settled_request (stream, request, runtime),
+    RequestType::CompleteMaintenance =>
+      handle_complete_maintenance_request (stream, request, runtime),
+    RequestType::AcknowledgeTerminalMaintenance =>
+      handle_acknowledge_terminal_maintenance_request (
+        stream, request, runtime),
   }
 }
 
@@ -708,6 +715,9 @@ fn skg_save_policy_refusal (state : &CoordinatorState) -> Option<String> {
     CoordinatorState::Active (active) => format! (
       "maintenance incident {} is {:?}; Skg saves remain disabled until its terminal disposition",
       active . incident_id, active . phase),
+    CoordinatorState::Terminal (terminal) => format! (
+      "maintenance incident {} is terminal ({}) and awaits client acknowledgement",
+      terminal . incident_id, terminal . disposition . label ()),
     CoordinatorState::BlockedStoreHealth { reason } => format! (
       "Skg saves are disabled because store health is blocked: {}", reason),
     CoordinatorState::Idle | CoordinatorState::Observing =>

@@ -19,6 +19,8 @@ use crate::maintenance::{
   MaintenanceEpoch,
   MaintenanceOrigin,
   MaintenancePhase,
+  TerminalDisposition,
+  TerminalMaintenance,
   ViewSettlementRequirement,
 };
 use crate::runtime::ServerRuntime;
@@ -131,6 +133,138 @@ pub fn handle_maintenance_archive_finalized_request (
 ) {
   let result = archive_finalized (request, runtime);
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+pub fn handle_complete_maintenance_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = complete_maintenance (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn complete_maintenance (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let manifest_sha256 = sha256_request_field (request, "manifest-sha256")?;
+  require_completion_owner (
+    runtime, &incident, epoch, &manifest_sha256)?;
+  let terminal = runtime . transition_maintenance (|coordinator|
+    coordinator . finish (
+      &incident, epoch, TerminalDisposition::Completed))?;
+  Ok (terminal_payload (&terminal))
+}
+
+pub fn handle_acknowledge_terminal_maintenance_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = acknowledge_terminal_maintenance (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn acknowledge_terminal_maintenance (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let attached = attached_client (runtime)?;
+  {
+    let coordinator = runtime . maintenance . lock ()
+      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+    if let CoordinatorState::Terminal (terminal) = &coordinator . state {
+      if terminal . archive_owner_session_id != attached . session_id {
+        return Err (
+          "terminal acknowledgement came from a different client session"
+            . into ()); }
+    }
+  }
+  let newly_acknowledged = runtime . transition_maintenance (|coordinator|
+    coordinator . acknowledge_terminal (&incident, epoch))?;
+  let coordinator = runtime . maintenance . lock ()
+    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+    . clone ();
+  if let Err (error) = runtime . maintenance_journal
+    . remove_completed (&coordinator)
+  {
+    tracing::warn! (%error,
+      "could not compact acknowledged maintenance journal"); }
+  Ok (Sexp::List (vec![
+    atom_field ("status", "idle"),
+    atom_field ("terminal-acknowledged",
+      if newly_acknowledged { "true" } else { "already-idle" }),
+  ]) . to_string ())
+}
+
+fn require_completion_owner (
+  runtime         : &ServerRuntime,
+  incident        : &IncidentId,
+  epoch           : MaintenanceEpoch,
+  manifest_sha256 : &str,
+) -> Result<(), String> {
+  let attached = attached_client (runtime)?;
+  let coordinator = runtime . maintenance . lock ()
+    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+  match &coordinator . state {
+    CoordinatorState::Active (active) => {
+      if &active . incident_id != incident || active . epoch != epoch {
+        return Err ("completion names another active incident" . into ()); }
+      if active . archive_owner_session_id != attached . session_id {
+        return Err ("completion came from a different client session"
+          . into ()); }
+      match &active . archive_status {
+        crate::maintenance::ArchiveStatus::Finalized {
+          manifest_sha256: expected,
+        } if expected == manifest_sha256 => Ok (( )),
+        crate::maintenance::ArchiveStatus::Finalized { .. } =>
+          Err ("completion changed the final manifest checksum" . into ()),
+        _ => Err ("completion precedes final archive acknowledgement"
+          . into ()),
+      }
+    }
+    CoordinatorState::Terminal (terminal) => {
+      if &terminal . incident_id != incident || terminal . epoch != epoch {
+        return Err ("completion names another terminal incident" . into ()); }
+      if terminal . archive_owner_session_id != attached . session_id {
+        return Err ("completion came from a different client session"
+          . into ()); }
+      if terminal . archive_manifest_sha256 . as_deref ()
+         != Some (manifest_sha256)
+      {
+        return Err ("completion changed the final manifest checksum" . into ()); }
+      Ok (( ))
+    }
+    _ => Err ("no finalized maintenance incident can complete" . into ()),
+  }
+}
+
+fn terminal_payload (terminal : &TerminalMaintenance) -> String {
+  let mut fields = vec![
+    atom_field ("status", "terminal"),
+    atom_field ("incident-id", terminal . incident_id . as_str ()),
+    integer_field ("maintenance-epoch", terminal . epoch . get ()),
+    atom_field ("disposition", terminal . disposition . label ()),
+    atom_field ("manifest-sha256", terminal . archive_manifest_sha256
+      . as_deref () . unwrap_or ("none")),
+    list_field ("unlock-buffer-ids", &terminal . registered_buffer_ids),
+  ];
+  if let Some (selected) = &terminal . selected_store {
+    fields . push (integer_field (
+      "selected-graph-generation", selected . graph_generation . get ()));
+    fields . push (integer_field (
+      "selected-manifest-revision", selected . manifest_revision . get ()));
+  }
+  Sexp::List (fields) . to_string ()
 }
 
 fn archive_finalized (
@@ -355,6 +489,9 @@ pub fn handle_maintenance_status_request (
       atom_field ("candidate-id", pending . candidate . as_ref ()
         . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     ]),
+    CoordinatorState::Terminal (terminal) =>
+      sexp::parse (&terminal_payload (&terminal))
+        . expect ("terminal payload is valid"),
     other => Sexp::List (vec![
       atom_field ("status", &format! ("{:?}", other)),
     ]),

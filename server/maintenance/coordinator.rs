@@ -32,6 +32,7 @@ impl MaintenanceCoordinator {
         self . state = CoordinatorState::Observing;
         Ok (( )) }
       CoordinatorState::Pending (_) | CoordinatorState::Active (_)
+      | CoordinatorState::Terminal (_)
       | CoordinatorState::BlockedStoreHealth { .. } =>
         Err ("observation may continue in the background but cannot replace the current coordinator state" . into ()),
     }
@@ -182,6 +183,10 @@ impl MaintenanceCoordinator {
         return Err (format! (
           "maintenance incident {} is already {:?}",
           active . incident_id, active . phase)),
+      CoordinatorState::Terminal (terminal) =>
+        return Err (format! (
+          "maintenance incident {} is terminal and awaits acknowledgement",
+          terminal . incident_id)),
       CoordinatorState::BlockedStoreHealth { reason } =>
         return Err (format! ("stores require repair: {}", reason)),
     }
@@ -563,7 +568,13 @@ impl MaintenanceCoordinator {
     incident_id : &IncidentId,
     epoch       : MaintenanceEpoch,
     disposition : TerminalDisposition,
-  ) -> Result<(), String> {
+  ) -> Result<TerminalMaintenance, String> {
+    if let CoordinatorState::Terminal (terminal) = &self . state {
+      if &terminal . incident_id != incident_id || terminal . epoch != epoch {
+        return Err ("terminal maintenance identity changed" . into ()); }
+      if terminal . disposition != disposition {
+        return Err ("terminal maintenance disposition changed" . into ()); }
+      return Ok (terminal . clone ()); }
     let active = self . matching_active_mut (incident_id, epoch)?;
     if disposition == TerminalDisposition::Completed
     && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
@@ -572,9 +583,41 @@ impl MaintenanceCoordinator {
       return Err (
         "completed maintenance requires an acknowledged finalized archive"
           . into ()); }
-    active . terminal = Some (disposition);
-    self . state = CoordinatorState::Idle;
-    Ok (( ))
+    let manifest_sha256 = match &active . archive_status {
+      ArchiveStatus::Finalized { manifest_sha256 } =>
+        Some (manifest_sha256 . clone ()),
+      _ => None,
+    };
+    let terminal = TerminalMaintenance {
+      incident_id: active . incident_id . clone (),
+      epoch: active . epoch,
+      disposition,
+      archive_owner_session_id: active . archive_owner_session_id . clone (),
+      archive_manifest_sha256: manifest_sha256,
+      registered_buffer_ids: active . registered_buffer_ids . clone (),
+      selected_store: active . selected_store . clone (),
+    };
+    self . state = CoordinatorState::Terminal (terminal . clone ());
+    Ok (terminal)
+  }
+
+  pub fn acknowledge_terminal (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+  ) -> Result<bool, String> {
+    match &self . state {
+      CoordinatorState::Idle => Ok (false),
+      CoordinatorState::Terminal (terminal) => {
+        if &terminal . incident_id != incident_id || terminal . epoch != epoch {
+          return Err ("terminal acknowledgement names another incident"
+            . into ()); }
+        self . state = CoordinatorState::Idle;
+        Ok (true)
+      }
+      _ => Err ("maintenance is not ready for terminal acknowledgement"
+        . into ()),
+    }
   }
 
   fn matching_active_mut (
@@ -735,10 +778,35 @@ mod tests {
     coordinator . archive_finalized (
       &active . incident_id, active . epoch, "final" . into (),
       "transfer" . into (), "bytes" . into ()) . unwrap ();
-    coordinator . finish (
+    let terminal = coordinator . finish (
       &active . incident_id, active . epoch,
       TerminalDisposition::Completed) . unwrap ();
+    assert_eq! (terminal . archive_manifest_sha256,
+      Some ("final" . into ()));
+    assert_eq! (coordinator . finish (
+      &active . incident_id, active . epoch,
+      TerminalDisposition::Completed) . unwrap (), terminal);
+    assert! (matches! (
+      coordinator . state, CoordinatorState::Terminal (_)));
+    assert! (coordinator . state . policy () . skg_saves_allowed);
+    assert! (coordinator . acknowledge_terminal (
+      &active . incident_id, active . epoch) . unwrap ());
     assert_eq! (coordinator . state, CoordinatorState::Idle);
+    assert! (!coordinator . acknowledge_terminal (
+      &active . incident_id, active . epoch) . unwrap ());
+  }
+
+  #[test]
+  fn pre_archive_failure_terminal_claims_no_archive_and_can_unlock () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+    let terminal = coordinator . finish (
+      &active . incident_id, active . epoch,
+      TerminalDisposition::FailedBeforeArchive) . unwrap ();
+    assert_eq! (terminal . archive_manifest_sha256, None);
+    assert! (!coordinator . state . policy () . maintenance_locked);
+    assert! (coordinator . state . policy () . skg_saves_allowed);
   }
 
   #[test]

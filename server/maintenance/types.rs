@@ -139,6 +139,18 @@ pub enum TerminalDisposition {
   Dismissed,
 }
 
+impl TerminalDisposition {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::Completed => "completed",
+      Self::MaintenanceAborted => "maintenance-aborted",
+      Self::FailedBeforeArchive => "failed-before-archive",
+      Self::FailedAfterArchive => "failed-after-archive",
+      Self::Dismissed => "dismissed",
+    }
+  }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BufferKind {
@@ -436,6 +448,20 @@ pub struct ActiveMaintenance {
   pub terminal          : Option<TerminalDisposition>,
 }
 
+/// A fully resolved incident retained until the owning editor confirms that
+/// it received and applied the terminal unlock instruction.  Keeping this in
+/// the durable journal makes a lost terminal response exactly replayable.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TerminalMaintenance {
+  pub incident_id       : IncidentId,
+  pub epoch             : MaintenanceEpoch,
+  pub disposition       : TerminalDisposition,
+  pub archive_owner_session_id : String,
+  pub archive_manifest_sha256 : Option<String>,
+  pub registered_buffer_ids : Vec<String>,
+  pub selected_store    : Option<SelectedStoreRecord>,
+}
+
 fn initial_graph_generation () -> GraphGeneration {
   GraphGeneration::INITIAL
 }
@@ -451,6 +477,7 @@ pub enum CoordinatorState {
   Observing,
   Pending (PendingDiskState),
   Active (ActiveMaintenance),
+  Terminal (TerminalMaintenance),
   BlockedStoreHealth { reason : String },
 }
 
@@ -466,7 +493,14 @@ pub struct StatePolicy {
 impl CoordinatorState {
   pub fn policy (&self) -> StatePolicy {
     match self {
-      Self::Idle | Self::Observing => StatePolicy {
+      Self::Idle | Self::Observing
+      | Self::Terminal (TerminalMaintenance {
+          disposition: TerminalDisposition::Completed
+            | TerminalDisposition::MaintenanceAborted
+            | TerminalDisposition::FailedBeforeArchive
+            | TerminalDisposition::Dismissed,
+          ..
+        }) => StatePolicy {
         edits_allowed: true,
         skg_saves_allowed: true,
         queries_allowed: true,
@@ -505,6 +539,13 @@ impl CoordinatorState {
         },
       },
       Self::BlockedStoreHealth { .. } => StatePolicy {
+        edits_allowed: false,
+        skg_saves_allowed: false,
+        queries_allowed: false,
+        raw_saves_allowed: false,
+        maintenance_locked: true,
+      },
+      Self::Terminal (_) => StatePolicy {
         edits_allowed: false,
         skg_saves_allowed: false,
         queries_allowed: false,

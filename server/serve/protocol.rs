@@ -45,6 +45,8 @@ pub enum RequestType {
   MaintenanceStatus,
   MaintenanceEvidence,
   MaintenanceViewSettled,
+  CompleteMaintenance,
+  AcknowledgeTerminalMaintenance,
 }
 
 impl RequestType {
@@ -93,6 +95,9 @@ impl RequestType {
       "maintenance status"       => Ok (RequestType::MaintenanceStatus),
       "maintenance evidence"     => Ok (RequestType::MaintenanceEvidence),
       "maintenance view settled" => Ok (RequestType::MaintenanceViewSettled),
+      "complete maintenance"     => Ok (RequestType::CompleteMaintenance),
+      "acknowledge terminal maintenance" =>
+        Ok (RequestType::AcknowledgeTerminalMaintenance),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
