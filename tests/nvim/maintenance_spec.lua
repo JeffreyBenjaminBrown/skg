@@ -57,14 +57,20 @@ end
 
 describe('skg Neovim maintenance handshake', function ()
   local original_defer
+  local original_archive_finalize
+  local original_client_submit
 
   before_each(function ()
     reset()
     original_defer = maintenance.defer
+    original_archive_finalize = require('skg.recovery_archive').finalize
+    original_client_submit = require('skg.client').submit_request
   end)
 
   after_each(function ()
     maintenance.defer = original_defer
+    require('skg.recovery_archive').finalize = original_archive_finalize
+    require('skg.client').submit_request = original_client_submit
     reset()
   end)
 
@@ -185,6 +191,65 @@ describe('skg Neovim maintenance handshake', function ()
       state.maintenance_client_incident.phase)
     assert.are.equal('terminal', state.maintenance_state.state)
     assert.are.equal(1, terminal_ack_runs)
+  end)
+
+  it('finishes the exact evidence and terminal acknowledgement chain',
+     function ()
+    local archive_module = require('skg.recovery_archive')
+    local client = require('skg.client')
+    local manifest = string.rep('a', 64)
+    local transfer = string.rep('b', 64)
+    local artifact = string.rep('c', 64)
+    local requests = {}
+    archive_module.finalize = function ()
+      return {
+        manifest_sha256 = manifest,
+        transfer_manifest_sha256 = transfer,
+        artifact_bytes_sha256 = artifact,
+        path = '/archive',
+      }
+    end
+    client.submit_request = function (wire, _content, request_incident_id)
+      table.insert(requests, {
+        wire = wire, incident_id = request_incident_id,
+      })
+    end
+    maintenance.defer = function (callback) callback() end
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9, phase = 'requesting-evidence',
+      registered_buffer_ids = {}, g1_graph_generation = 2,
+      g1_manifest_revision = 6,
+      server_evidence_sha256 = string.rep('d', 64),
+      archive = {}, settlements = {},
+    }
+
+    maintenance.handle_evidence(nil, {
+      f('incident-id', incident_id), f('maintenance-epoch', 9),
+    }, 'opaque evidence')
+    assert.matches('maintenance archive finalized', requests[1].wire,
+      1, true)
+    assert.are.equal(incident_id, requests[1].incident_id)
+
+    maintenance.handle_final_archive_ack(nil, {
+      f('status', 'archive-finalized'), f('manifest-sha256', manifest),
+      f('transfer-manifest-sha256', transfer),
+      f('artifact-bytes-sha256', artifact),
+    })
+    assert.matches('complete maintenance', requests[2].wire, 1, true)
+
+    maintenance.handle_terminal(nil, {
+      f('status', 'terminal'), f('incident-id', incident_id),
+      f('maintenance-epoch', 9), f('disposition', 'completed'),
+      f('manifest-sha256', manifest), f('unlock-buffer-ids', {}),
+      f('selected-graph-generation', 2),
+      f('selected-manifest-revision', 6),
+    })
+    assert.matches('acknowledge terminal maintenance', requests[3].wire,
+      1, true)
+
+    maintenance.handle_terminal_ack(nil, { f('status', 'idle') })
+    assert.is_nil(state.maintenance_client_incident)
+    assert.are.equal('idle', state.maintenance_state.state)
   end)
 
   it('does not detach active settlement debt during reconnect census',
