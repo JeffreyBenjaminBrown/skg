@@ -210,6 +210,18 @@ impl ServerRuntime {
       . observe_paths (paths, reason)
   }
 
+  pub fn schedule_maintenance_target_observation (
+    &self,
+    incident : crate::maintenance::IncidentId,
+    epoch    : crate::maintenance::MaintenanceEpoch,
+  ) -> Result<(), String> {
+    self . observation . lock ()
+      . map_err (|_| "observation service lock poisoned" . to_string ())?
+      . as_ref ()
+      . ok_or_else (|| "observation service is not running" . to_string ())?
+      . observe_maintenance_targets (incident, epoch)
+  }
+
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
     let mut candidates = self . candidates . lock () . unwrap ();
     candidates . clear ();

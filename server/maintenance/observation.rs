@@ -3,15 +3,25 @@
 use crate::maintenance::candidate::{
   DiskObservation,
   observe_complete_disk,
+  observe_targeted_disk,
 };
-use crate::maintenance::{PendingReason, QueuedObservationReason};
+use crate::maintenance::{
+  CoordinatorState,
+  IncidentId,
+  MaintenanceEpoch,
+  MaintenanceOrigin,
+  MaintenancePhase,
+  PendingReason,
+  QueuedObservationReason,
+};
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::QueuedServerEvent;
 use crate::serve::protocol::TcpToClient;
 
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use sexp::{Atom, Sexp};
-use std::path::PathBuf;
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 use std::sync::{Weak, mpsc};
 use std::thread;
 use std::time::Duration;
@@ -20,6 +30,7 @@ use std::time::Duration;
 enum ObservationSignal {
   Paths (Vec<PathBuf>, QueuedObservationReason),
   FullSweep (QueuedObservationReason),
+  MaintenanceTargets (IncidentId, MaintenanceEpoch),
   WatcherFailure (String),
 }
 
@@ -72,6 +83,16 @@ impl ObservationService {
     self . sender . send (ObservationSignal::FullSweep (reason))
       . map_err (|_| "observation worker stopped" . to_string ())
   }
+
+  pub fn observe_maintenance_targets (
+    &self,
+    incident : IncidentId,
+    epoch    : MaintenanceEpoch,
+  ) -> Result<(), String> {
+    self . sender . send (ObservationSignal::MaintenanceTargets (
+      incident, epoch))
+      . map_err (|_| "observation worker stopped" . to_string ())
+  }
 }
 
 fn observation_worker (
@@ -81,13 +102,19 @@ fn observation_worker (
   while let Ok (first) = receiver . recv () {
     let mut paths = Vec::new ();
     let mut reasons = Vec::new ();
-    absorb_signal (first, &mut paths, &mut reasons);
+    let mut maintenance_jobs = Vec::new ();
+    absorb_signal (
+      first, &mut paths, &mut reasons, &mut maintenance_jobs);
     while let Ok (signal) = receiver . recv_timeout (
         Duration::from_millis (175))
     {
-      absorb_signal (signal, &mut paths, &mut reasons); }
+      absorb_signal (
+        signal, &mut paths, &mut reasons, &mut maintenance_jobs); }
     let Some (runtime) = runtime . upgrade () else { return; };
-    run_observation (&runtime, paths, reasons);
+    if !reasons . is_empty () || !paths . is_empty () {
+      run_observation (&runtime, paths, reasons); }
+    for (incident, epoch) in maintenance_jobs {
+      run_target_observation (&runtime, incident, epoch); }
     thread::yield_now ();
   }
 }
@@ -96,6 +123,7 @@ fn absorb_signal (
   signal  : ObservationSignal,
   paths   : &mut Vec<PathBuf>,
   reasons : &mut Vec<String>,
+  maintenance_jobs : &mut Vec<(IncidentId, MaintenanceEpoch)>,
 ) {
   match signal {
     ObservationSignal::Paths (new_paths, reason) => {
@@ -103,9 +131,140 @@ fn absorb_signal (
       reasons . push (reason . label () . into ()); }
     ObservationSignal::FullSweep (reason) =>
       reasons . push (reason . label () . into ()),
+    ObservationSignal::MaintenanceTargets (incident, epoch) =>
+      maintenance_jobs . push ((incident, epoch)),
     ObservationSignal::WatcherFailure (error) => {
       reasons . push (format! ("watcher failure: {}", error)); }
   }
+}
+
+fn run_target_observation (
+  runtime  : &ServerRuntime,
+  incident : IncidentId,
+  epoch    : MaintenanceEpoch,
+) {
+  enum Failure {
+    InvalidDisk (String),
+    Operational (String),
+  }
+  impl From<String> for Failure {
+    fn from (error : String) -> Self { Self::Operational (error) }
+  }
+  impl From<&str> for Failure {
+    fn from (error : &str) -> Self { Self::Operational (error . into ()) }
+  }
+
+  let result = (|| -> Result<String, Failure> {
+    let active = {
+      let coordinator = runtime . maintenance . lock ()
+        . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+      let CoordinatorState::Active (active) = &coordinator . state else {
+        return Err ("target observation lost its active incident" . into ()); };
+      if active . incident_id != incident || active . epoch != epoch
+      || active . origin != MaintenanceOrigin::ExplicitPartialReload
+      || active . phase != MaintenancePhase::FinalObservation
+      {
+        return Err ("target observation authority is stale" . into ()); }
+      active . clone ()
+    };
+    let sequence = runtime . transition_maintenance (|coordinator|
+      Ok (coordinator . next_observation_sequence ()))?;
+    let snapshot = runtime . selected_snapshot ();
+    if snapshot . selected . graph_generation != active . g0_graph_generation
+    || snapshot . selected . manifest_revision != active . g0_manifest_revision
+    {
+      return Err ("target observation G0 was superseded" . into ()); }
+    let targets = resolve_target_pids (
+      &snapshot . env . config, &snapshot . selected . graph,
+      &active . targets . paths, &active . targets . ids)?;
+    let candidate = match observe_targeted_disk (
+      &snapshot . env . config, &snapshot . selected, sequence, &targets)
+    {
+      DiskObservation::Valid (candidate) => candidate,
+      DiskObservation::Invalid { details } => return Err (
+        Failure::InvalidDisk (format! (
+          "targeted disk is invalid: {}", details . join ("; ")))),
+      DiskObservation::Unstable { details } => return Err (
+        Failure::InvalidDisk (format! (
+          "targeted disk was unstable: {}", details . join ("; ")))),
+      DiskObservation::ByteEquivalent
+      | DiskObservation::SemanticallyEqual { .. } => return Err (
+        Failure::Operational (
+          "targeted observation returned a non-candidate result" . into ())),
+    };
+    runtime . retain_candidate (candidate . clone ());
+    runtime . transition_maintenance (|coordinator|
+      coordinator . record_observed_candidate (
+        &incident, epoch, candidate . summary . clone ()))?;
+    let verified = runtime . verified_archive (&incident)
+      . ok_or_else (|| "verified initial archive was not retained"
+        . to_string ())?;
+    crate::serve::handlers::maintenance_protocol::select_and_stage_candidate (
+      runtime, &incident, epoch, &verified) . map_err (Failure::Operational)
+  })();
+
+  let payload = match result {
+    Ok (payload) => payload,
+    Err (failure) => {
+      let error = match failure {
+        Failure::InvalidDisk (error) => {
+          let _ = runtime . transition_maintenance (|coordinator|
+            coordinator . block_invalid_disk (
+              &incident, epoch, error . clone ()));
+          error
+        }
+        Failure::Operational (error) => error,
+      };
+      let phase = match &runtime . maintenance . lock () . unwrap () . state {
+        CoordinatorState::Active (active) => active . phase . label (),
+        state => state . label (),
+      };
+      Sexp::List (vec![
+        field ("status", "origin-operation-failed"),
+        field ("incident-id", incident . as_str ()),
+        field ("maintenance-epoch", &epoch . get () . to_string ()),
+        field ("phase", phase),
+        field ("error", &error),
+      ]) . to_string ()
+    }
+  };
+  runtime . queue_server_event (QueuedServerEvent {
+    frame_kind: TcpToClient::MaintenanceStatus . repr_in_client () . into (),
+    operation_id: format! ("maintenance-origin-{}", incident),
+    payload,
+  });
+}
+
+fn resolve_target_pids (
+  config : &crate::types::misc::SkgConfig,
+  graph  : &crate::dbs::in_rust_graph::InRustGraph,
+  paths  : &[String],
+  ids    : &[String],
+) -> Result<BTreeSet<crate::types::misc::ID>, String> {
+  let mut result = BTreeSet::new ();
+  for id in ids {
+    let id = crate::types::misc::ID::from (id . as_str ());
+    result . insert (graph . pid_of (&id) . unwrap_or (id));
+  }
+  for value in paths {
+    let path = Path::new (value);
+    let absolute = if path . is_absolute () {
+      path . to_path_buf ()
+    } else {
+      config . data_root . join (path)
+    };
+    let Some ((_, pid)) = config . sources
+      . source_and_pid_for_direct_path (&absolute)
+    else {
+      return Err (format! (
+        "partial reload path is not a direct configured .skg file: {}",
+        value));
+    };
+    result . insert (pid);
+  }
+  if result . is_empty () {
+    return Err ("partial reload has no resolved telescope" . into ()); }
+  Ok (result)
 }
 
 fn run_observation (

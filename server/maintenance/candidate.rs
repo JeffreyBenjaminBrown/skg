@@ -246,9 +246,6 @@ fn observe_targeted_disk_inner (
   }
   for (path, bytes) in &captured . selected_bytes {
     manifest . insert (path . clone (), PathDigest::of_bytes (bytes)); }
-  if manifest == selected . manifest {
-    return Ok (DiskObservation::ByteEquivalent); }
-
   let before_nodes = nodes_by_pid (nodecompletes_from_graph (&selected . graph));
   let mut after_nodes = before_nodes . clone ();
   let stale_target_ids : BTreeSet<ID> = targets . iter () . flat_map (|pid|
@@ -717,5 +714,45 @@ mod tests {
     assert! (matches! (candidate . disk_fence, CandidateDiskFence::Complete));
     assert_eq! (candidate . graph . nodes . get (&ID::from ("B"))
       . unwrap () . title, "newly observed B");
+  }
+
+  #[test]
+  fn targeted_semantic_no_op_still_produces_an_explicit_candidate () {
+    let temporary = tempdir () . unwrap ();
+    let source_path = temporary . path () . join ("owned");
+    fs::create_dir (&source_path) . unwrap ();
+    let a_path = source_path . join ("A.skg");
+    fs::write (&a_path, "pid: A\ntitle: unchanged\n") . unwrap ();
+    let source_name = SourceName::from ("owned");
+    let mut entries = HashMap::new ();
+    entries . insert (source_name . clone (), SkgfileSource {
+      name: source_name, abbreviation: None,
+      path: source_path, user_owns_it: true,
+    });
+    let config = SkgConfig::dummyFromSources (entries);
+    let loaded = read_all_skg_files_with_manifest (&config) . unwrap ();
+    let selected = SelectedStoreState::initial (
+      InRustGraph::from_nodecompletes (&loaded . nodes), loaded . manifest);
+
+    // The explicit operation still needs one candidate identity and the
+    // archive/presentation lifecycle even when the selected bytes are exact.
+    let exact = observe_targeted_disk (
+      &config, &selected, ObservationSequence::INITIAL,
+      &BTreeSet::from ([ID::from ("A")]));
+    let DiskObservation::Valid (exact) = exact else {
+      panic! ("byte-identical explicit target did not produce a candidate"); };
+    assert! (exact . definitions . is_empty ());
+    assert! (exact . summary . changed_primary_ids . is_empty ());
+    assert_eq! (exact . manifest, selected . manifest);
+
+    fs::write (&a_path, "pid: A\n\ntitle: unchanged\n") . unwrap ();
+    let reformatted = observe_targeted_disk (
+      &config, &selected, ObservationSequence::INITIAL,
+      &BTreeSet::from ([ID::from ("A")]));
+    let DiskObservation::Valid (reformatted) = reformatted else {
+      panic! ("semantic no-op explicit target did not produce a candidate"); };
+    assert! (reformatted . definitions . is_empty ());
+    assert! (reformatted . summary . changed_primary_ids . is_empty ());
+    assert_ne! (reformatted . manifest, selected . manifest);
   }
 }

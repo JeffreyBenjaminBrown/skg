@@ -284,6 +284,65 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  /// Begin the server-owned observation for an archive-ready explicit reload.
+  /// Replays are harmless; no other origin may borrow this transition.
+  pub fn begin_target_observation (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::ExplicitPartialReload {
+      return Err ("target observation belongs only to an explicit partial reload"
+        . into ()); }
+    if !matches! (active . archive_status, ArchiveStatus::Ready { .. }) {
+      return Err ("target observation requires an acknowledged initial archive"
+        . into ()); }
+    if active . phase == MaintenancePhase::FinalObservation {
+      return Ok (false); }
+    if active . phase != MaintenancePhase::ArchiveReady
+       || active . candidate . is_some ()
+    {
+      return Err (format! (
+        "target observation is invalid during {:?}", active . phase)); }
+    active . phase = MaintenancePhase::FinalObservation;
+    Ok (true)
+  }
+
+  /// Bind one immutable observation to the already-authorized incident.  The
+  /// candidate returns to ArchiveReady so the common evidence/selection path
+  /// can close every precondition before touching a derived store.
+  pub fn record_observed_candidate (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    candidate   : CandidateSummary,
+  ) -> Result<bool, String> {
+    let sequence = self . observation_sequence;
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if candidate . base_graph_generation != active . g0_graph_generation
+    || candidate . base_manifest_revision != active . g0_manifest_revision
+    || candidate . covered_sequence != sequence
+    {
+      return Err (
+        "observed candidate does not share the incident's exact G0/fence"
+          . into ()); }
+    if let Some (existing) = &active . candidate {
+      if existing != &candidate {
+        return Err ("incident already names another observed candidate"
+          . into ()); }
+      if active . phase == MaintenancePhase::ArchiveReady {
+        return Ok (false); }
+    }
+    if active . phase != MaintenancePhase::FinalObservation {
+      return Err (format! (
+        "observed candidate is invalid during {:?}", active . phase)); }
+    active . candidate = Some (candidate);
+    active . blocking_reason = None;
+    active . phase = MaintenancePhase::ArchiveReady;
+    Ok (true)
+  }
+
   pub fn archive_undo_failed (
     &mut self,
     incident_id : &IncidentId,
@@ -605,6 +664,33 @@ impl MaintenanceCoordinator {
     let active = self . matching_active_mut (incident_id, epoch)?;
     active . blocking_reason = Some (reason);
     active . phase = MaintenancePhase::BlockedStoreHealth;
+    Ok (( ))
+  }
+
+  pub fn block_invalid_disk (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    reason      : String,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if reason . is_empty () {
+      return Err ("invalid-disk block requires an exact reason" . into ()); }
+    if active . phase == MaintenancePhase::BlockedInvalidAfterMutation {
+      if active . blocking_reason . as_deref () == Some (&reason) {
+        return Ok (( )); }
+      return Err ("incident already records another invalid-disk reason"
+        . into ());
+    }
+    if !matches! (active . phase,
+      MaintenancePhase::ArchiveReady
+      | MaintenancePhase::RunningExternalMutation
+      | MaintenancePhase::FinalObservation)
+    {
+      return Err (format! (
+        "invalid-disk block is invalid during {:?}", active . phase)); }
+    active . blocking_reason = Some (reason);
+    active . phase = MaintenancePhase::BlockedInvalidAfterMutation;
     Ok (( ))
   }
 
@@ -1062,6 +1148,62 @@ mod tests {
       MaintenanceTargets {
         paths: Vec::new (), ids: vec!["not-a-pull-target" . into ()],
       }) . is_err ());
+  }
+
+  #[test]
+  fn exact_target_observation_attaches_one_candidate_after_archive () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+      }) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    assert! (coordinator . begin_target_observation (
+      &active . incident_id, active . epoch) . unwrap ());
+    assert! (!coordinator . begin_target_observation (
+      &active . incident_id, active . epoch) . unwrap ());
+    let sequence = coordinator . next_observation_sequence ();
+    let observed = CandidateSummary {
+      id: CandidateId::new (),
+      base_graph_generation: GraphGeneration::INITIAL,
+      base_manifest_revision: ManifestRevision::INITIAL,
+      covered_sequence: sequence,
+      changed_primary_ids: vec!["node" . into ()],
+    };
+    assert! (coordinator . record_observed_candidate (
+      &active . incident_id, active . epoch, observed . clone ()) . unwrap ());
+    assert! (!coordinator . record_observed_candidate (
+      &active . incident_id, active . epoch, observed . clone ()) . unwrap ());
+    let CoordinatorState::Active (recorded) = &coordinator . state else {
+      panic! ("incident stopped being active"); };
+    assert_eq! (recorded . phase, MaintenancePhase::ArchiveReady);
+    assert_eq! (recorded . candidate, Some (observed));
+  }
+
+  #[test]
+  fn invalid_disk_cannot_overwrite_a_later_store_health_failure () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+      }) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    coordinator . block_store_health (
+      &active . incident_id, active . epoch, "index failed" . into ())
+      . unwrap ();
+    assert! (coordinator . block_invalid_disk (
+      &active . incident_id, active . epoch, "generic worker error" . into ())
+      . is_err ());
+    let CoordinatorState::Active (recorded) = &coordinator . state else {
+      panic! ("incident stopped being active"); };
+    assert_eq! (recorded . phase, MaintenancePhase::BlockedStoreHealth);
+    assert_eq! (recorded . blocking_reason . as_deref (), Some ("index failed"));
   }
 
   fn settlement (id : &str) -> ViewSettlementRecord {

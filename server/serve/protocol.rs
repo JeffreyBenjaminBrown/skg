@@ -37,6 +37,7 @@ pub enum RequestType {
   ViewVisited,
   ObservePresentation,
   BeginMaintenance,
+  RunMaintenanceOrigin,
   MaintenanceArchiveReady,
   MaintenanceArchiveFinalized,
   MaintenanceArchiveFailed,
@@ -87,6 +88,7 @@ impl RequestType {
       "view visited"             => Ok (RequestType::ViewVisited),
       "observe presentation"     => Ok (RequestType::ObservePresentation),
       "begin maintenance"        => Ok (RequestType::BeginMaintenance),
+      "run maintenance origin"   => Ok (RequestType::RunMaintenanceOrigin),
       "maintenance archive ready" => Ok (RequestType::MaintenanceArchiveReady),
       "maintenance archive finalized" =>
         Ok (RequestType::MaintenanceArchiveFinalized),

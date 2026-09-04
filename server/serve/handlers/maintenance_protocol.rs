@@ -53,6 +53,7 @@ use sha2::{Digest, Sha256};
 use futures::executor::block_on;
 use std::collections::HashSet;
 use std::net::TcpStream;
+use std::path::Path;
 
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -88,6 +89,9 @@ fn begin_maintenance (
     ids: optional_string_list (&parsed, "ids")?,
   };
   let snapshot = runtime . selected_snapshot ();
+  if origin == MaintenanceOrigin::ExplicitPartialReload {
+    validate_partial_reload_paths (&snapshot . env . config, &targets . paths)?;
+  }
   let (client, source_set, census) = {
     let interactive = runtime . interactive . lock ()
       . map_err (|_| "interactive session poisoned" . to_string ())?;
@@ -158,6 +162,47 @@ pub fn handle_maintenance_archive_ready_request (
 ) {
   let result = archive_ready (request, runtime);
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+pub fn handle_run_maintenance_origin_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = run_maintenance_origin (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn run_maintenance_origin (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  require_archive_owner (runtime, &incident, epoch)?;
+  let started = runtime . transition_maintenance (|coordinator|
+    coordinator . begin_target_observation (&incident, epoch))?;
+  if started {
+    if let Err (error) = runtime . schedule_maintenance_target_observation (
+        incident . clone (), epoch)
+    {
+      let _ = runtime . transition_maintenance (|coordinator|
+        coordinator . block_invalid_disk (
+          &incident, epoch, error . clone ()));
+      return Err (format! (
+        "could not schedule maintenance target observation: {}", error));
+    }
+  }
+  Ok (Sexp::List (vec![
+    atom_field ("status", "origin-operation-started"),
+    atom_field ("incident-id", incident . as_str ()),
+    integer_field ("maintenance-epoch", epoch . get ()),
+    atom_field ("phase", "final-observation"),
+    atom_field ("replayed", if started { "nil" } else { "true" }),
+    atom_field ("next-action", "await-maintenance-status"),
+  ]) . to_string ())
 }
 
 pub fn handle_maintenance_archive_finalized_request (
@@ -362,41 +407,53 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
   runtime . transition_maintenance (|coordinator| coordinator . archive_ready (
     &incident, epoch, manifest_sha256 . clone ()))?;
   if active . candidate . is_some () {
-    select_archived_candidate (runtime, &incident, epoch)?;
-    let active = matching_active (runtime, &incident, epoch)?;
-    let candidate_id = active . candidate . as_ref ()
-      . expect ("candidate branch has candidate") . id . clone ();
-    let candidate = runtime . candidate (&candidate_id)
-      . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
-    let settlements = {
-      let interactive = runtime . interactive . lock ()
-        . map_err (|_| "interactive session poisoned" . to_string ())?;
-      plan_incident_view_settlements (
-        &active, &verified, &interactive, &candidate)?
-    };
-    match stage_application_settlements (
-        runtime, &active, settlements, &HashSet::new ())?
-    {
-      ApplicationStaging::Ready (settlements) => {
-        runtime . transition_maintenance (|coordinator|
-          coordinator . record_view_settlements (
-            &incident, epoch, settlements . clone ()))?;
-        return candidate_selected_payload (
-          &active, &verified, &settlements);
-      }
-      ApplicationStaging::Challenge (challenge) => {
-        runtime . transition_maintenance (|coordinator|
-          coordinator . record_scalar_challenge (
-            &incident, epoch, challenge . clone ()))?;
-        return scalar_challenge_payload (&active, &verified, &challenge);
-      }
-    }
+    return select_and_stage_candidate (runtime, &incident, epoch, &verified);
   } else {
     let mut fields = archive_verification_fields (&verified);
     fields . insert (0, atom_field ("status", "archive-ready"));
     fields . push (atom_field (
       "next-action", "origin-specific-operation-required"));
     return Ok (Sexp::List (fields) . to_string ());
+  }
+}
+
+/// Run the common post-archive candidate selection and durable presentation
+/// staging.  Pending reconciliation calls this in its archive-ready request;
+/// background origin workers call the same function after attaching their
+/// exact observation to the incident.
+pub(crate) fn select_and_stage_candidate (
+  runtime  : &ServerRuntime,
+  incident : &IncidentId,
+  epoch    : MaintenanceEpoch,
+  verified : &VerifiedInitialArchive,
+) -> Result<String, String> {
+  select_archived_candidate (runtime, incident, epoch)?;
+  let active = matching_active (runtime, incident, epoch)?;
+  let candidate_id = active . candidate . as_ref ()
+    . expect ("selected incident has candidate") . id . clone ();
+  let candidate = runtime . candidate (&candidate_id)
+    . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
+  let settlements = {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    plan_incident_view_settlements (
+      &active, verified, &interactive, &candidate)?
+  };
+  match stage_application_settlements (
+      runtime, &active, settlements, &HashSet::new ())?
+  {
+    ApplicationStaging::Ready (settlements) => {
+      runtime . transition_maintenance (|coordinator|
+        coordinator . record_view_settlements (
+          incident, epoch, settlements . clone ()))?;
+      candidate_selected_payload (&active, verified, &settlements)
+    }
+    ApplicationStaging::Challenge (challenge) => {
+      runtime . transition_maintenance (|coordinator|
+        coordinator . record_scalar_challenge (
+          incident, epoch, challenge . clone ()))?;
+      scalar_challenge_payload (&active, verified, &challenge)
+    }
   }
 }
 
@@ -1393,6 +1450,26 @@ fn optional_string_list (sexp : &Sexp, key : &str)
   };
   if present { extract_string_list_from_sexp (sexp, key) }
   else { Ok (Vec::new ()) }
+}
+
+fn validate_partial_reload_paths (
+  config : &crate::types::misc::SkgConfig,
+  paths  : &[String],
+) -> Result<(), String> {
+  for value in paths {
+    let path = Path::new (value);
+    let absolute = if path . is_absolute () {
+      path . to_path_buf ()
+    } else {
+      config . data_root . join (path)
+    };
+    if config . sources . source_and_pid_for_direct_path (&absolute) . is_none () {
+      return Err (format! (
+        "partial reload path is not a direct configured .skg file: {}",
+        value));
+    }
+  }
+  Ok (( ))
 }
 
 fn maintenance_offer_payload (

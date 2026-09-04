@@ -16,6 +16,7 @@ use crate::context::context_origin_types_for_graph;
 use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::dbs::tantivy::background_writer::{
   TantivyGenerationStatus,
+  latest_tantivy_generation,
   wait_for_tantivy_generation,
 };
 use crate::dbs::tantivy::write::reconstruct_index_from_nodes;
@@ -121,6 +122,13 @@ async fn select_stores (
   epoch       : MaintenanceEpoch,
   candidate   : Arc<ObservedDiskCandidate>,
 ) -> Result<SelectedStoreRecord, SelectionFailure> {
+  if candidate . definitions . is_empty ()
+     && graph_nodes (&candidate . graph)
+        == graph_nodes (&candidate . base_graph)
+  {
+    return select_manifest_only (
+      runtime, incident_id, epoch, candidate) . await;
+  }
   let expected_generation = candidate . summary . base_graph_generation;
   let selection = runtime . generation_gate . begin_selection (
     expected_generation, false) . map_err (SelectionFailure::Superseded)?;
@@ -235,6 +243,52 @@ async fn select_stores (
     . map_err (|reason| SelectionFailure::Stores {
       reason, queryable_g0: false,
     })?;
+  Ok (record)
+}
+
+/// Select exact byte authority without inventing a graph or Tantivy
+/// generation when the authorized disk observation folds to G0 exactly.
+async fn select_manifest_only (
+  runtime     : &ServerRuntime,
+  incident_id : &IncidentId,
+  epoch       : MaintenanceEpoch,
+  candidate   : Arc<ObservedDiskCandidate>,
+) -> Result<SelectedStoreRecord, SelectionFailure> {
+  let expected_generation = candidate . summary . base_graph_generation;
+  let selection = runtime . generation_gate . begin_selection (
+    expected_generation, false) . map_err (SelectionFailure::Superseded)?;
+  let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
+  let env = runtime . lock_writer_env () . map_err (|reason|
+    SelectionFailure::Stores { reason, queryable_g0: false })?;
+  let old_selected = env . in_rust_graph . load_full ();
+  if let Err (reason) = validate_locked_preselection (
+      runtime, incident_id, epoch, &env . config, &old_selected, &candidate)
+  {
+    drop (env);
+    drop (_write_guard);
+    selection . retain_generation ();
+    return Err (SelectionFailure::Superseded (reason));
+  }
+  let selected = if old_selected . manifest == candidate . manifest {
+    old_selected . clone ()
+  } else {
+    let selected = Arc::new (old_selected . with_semantically_equal_manifest (
+      candidate . manifest . clone ()));
+    env . in_rust_graph . store (selected . clone ());
+    selected
+  };
+  runtime . publish_selected_from_env (&env);
+  let tantivy_generation = latest_tantivy_generation ()
+    . map (|generation| generation . get ()) . unwrap_or (0);
+  let record = SelectedStoreRecord {
+    graph_generation: selected . graph_generation,
+    manifest_revision: selected . manifest_revision,
+    tantivy_generation,
+    tantivy_outcome: "not-required-semantic-no-op" . into (),
+  };
+  drop (env);
+  drop (_write_guard);
+  selection . retain_generation ();
   Ok (record)
 }
 
