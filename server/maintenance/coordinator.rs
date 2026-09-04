@@ -216,6 +216,7 @@ impl MaintenanceCoordinator {
       client_evidence_transfer: None,
       client_evidence_acknowledged: false,
       selected_store: None,
+      scalar_release: None,
       view_settlements: Default::default (),
       blocking_reason: None,
       suspended_phase: None,
@@ -446,6 +447,66 @@ impl MaintenanceCoordinator {
     if active . view_settlements . is_empty () {
       active . phase = MaintenancePhase::FinalizingArchive; }
     Ok (( ))
+  }
+
+  pub fn record_scalar_challenge (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    mut challenge : ScalarReleaseRecord,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::Presenting {
+      return Err (format! (
+        "scalar challenge is invalid during {:?}", active . phase)); }
+    if !active . view_settlements . is_empty () {
+      return Err ("scalar challenge cannot replace planned view settlements"
+        . into ()); }
+    challenge . pids . sort ();
+    challenge . pids . dedup ();
+    if challenge . operation . is_empty ()
+    || challenge . pids . is_empty ()
+    || challenge . prompt . is_empty ()
+    || challenge . approved
+    {
+      return Err ("scalar challenge is incomplete or already approved"
+        . into ()); }
+    if let Some (existing) = &active . scalar_release {
+      if existing != &challenge {
+        return Err ("incident already records a different scalar challenge"
+          . into ()); }
+      active . phase = MaintenancePhase::AwaitingScalarAuthorization;
+      return Ok (false); }
+    active . scalar_release = Some (challenge);
+    active . phase = MaintenancePhase::AwaitingScalarAuthorization;
+    Ok (true)
+  }
+
+  pub fn approve_scalar_release (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    mut pids    : Vec<String>,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    pids . sort ();
+    pids . dedup ();
+    let challenge = active . scalar_release . as_mut ()
+      . ok_or_else (|| "incident has no scalar challenge" . to_string ())?;
+    if challenge . pids != pids {
+      return Err ("scalar approval does not match the exact challenged PIDs"
+        . into ()); }
+    if challenge . approved {
+      if active . phase != MaintenancePhase::Presenting {
+        return Err ("approved scalar challenge has an invalid phase"
+          . into ()); }
+      return Ok (false); }
+    if active . phase != MaintenancePhase::AwaitingScalarAuthorization {
+      return Err (format! (
+        "scalar approval is invalid during {:?}", active . phase)); }
+    challenge . approved = true;
+    active . phase = MaintenancePhase::Presenting;
+    Ok (true)
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -700,6 +761,8 @@ fn allowed_phase_transition (
     | (FinalObservation, SelectingPartial)
     | (SelectingPartial, Presenting)
     | (FullRebuildExclusive, Presenting)
+    | (Presenting, AwaitingScalarAuthorization)
+    | (AwaitingScalarAuthorization, Presenting)
     | (Presenting, FinalizingArchive)
     | (_, BlockedInvalidAfterMutation)
     | (_, BlockedStoreHealth))
@@ -807,6 +870,52 @@ mod tests {
     assert_eq! (terminal . archive_manifest_sha256, None);
     assert! (!coordinator . state . policy () . maintenance_locked);
     assert! (coordinator . state . policy () . skg_saves_allowed);
+  }
+
+  #[test]
+  fn scalar_release_requires_the_exact_durable_challenge () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "server" . into (),
+        artifact_count: 1, total_file_bytes: 2,
+      }) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::SelectingPartial) . unwrap ();
+    coordinator . store_selected (
+      &active . incident_id, active . epoch, SelectedStoreRecord {
+        graph_generation: GraphGeneration::INITIAL . successor (),
+        manifest_revision: ManifestRevision::INITIAL . successor (),
+        tantivy_generation: 1, tantivy_outcome: "committed" . into (),
+      }) . unwrap ();
+    let challenge = ScalarReleaseRecord {
+      operation: "maintenance-presentation" . into (),
+      pids: vec!["b" . into (), "a" . into ()],
+      prompt: "Release protected text?" . into (),
+      approved: false,
+    };
+    assert! (coordinator . record_scalar_challenge (
+      &active . incident_id, active . epoch, challenge . clone ())
+      . unwrap ());
+    let CoordinatorState::Active (retained) = &coordinator . state else {
+      panic! ("challenge discarded incident"); };
+    assert_eq! (retained . phase,
+      MaintenancePhase::AwaitingScalarAuthorization);
+    assert_eq! (retained . scalar_release . as_ref () . unwrap () . pids,
+      vec!["a" . to_string (), "b" . to_string ()]);
+    assert! (coordinator . approve_scalar_release (
+      &active . incident_id, active . epoch, vec!["a" . into ()]) . is_err ());
+    assert! (coordinator . approve_scalar_release (
+      &active . incident_id, active . epoch,
+      vec!["b" . into (), "a" . into ()]) . unwrap ());
+    assert! (!coordinator . approve_scalar_release (
+      &active . incident_id, active . epoch,
+      vec!["a" . into (), "b" . into ()]) . unwrap ());
   }
 
   #[test]

@@ -463,6 +463,13 @@ what's imperfect about what's done; choices determining the future.
   Advanced revision/token/generation authority refuses the ACK, exact replay
   is a no-op, and application ACKs remain blocked until a staged rendering is
   present.  The focused Rust maintenance suite passes (27/27).
+- Added the missing durable scalar-authorization phase for maintenance
+  presentation.  A text-free challenge records the exact operation, sorted
+  protected PIDs and prompt before leaving =presenting=; only an exact PID-set
+  approval returns it there, and approval replay is idempotent.  A different
+  challenge or partial/broadened approval is rejected without releasing text.
+  The focused Rust maintenance suite passes (28/28), and
+  =cargo check --tests= passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

@@ -123,6 +123,7 @@ pub enum MaintenancePhase {
   SelectingPartial,
   FullRebuildExclusive,
   Presenting,
+  AwaitingScalarAuthorization,
   FinalizingArchive,
   BlockedInvalidAfterMutation,
   BlockedStoreHealth,
@@ -380,6 +381,14 @@ pub struct SelectedStoreRecord {
   pub tantivy_outcome    : String,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ScalarReleaseRecord {
+  pub operation : String,
+  pub pids      : Vec<String>,
+  pub prompt    : String,
+  pub approved  : bool,
+}
+
 /// The complete authority-bearing descriptor frozen when an incident begins.
 /// Text remains off the bootstrap wire; its exact checksums bind the later
 /// independently verified archive artifacts to this census.
@@ -438,6 +447,8 @@ pub struct ActiveMaintenance {
   pub client_evidence_acknowledged : bool,
   #[serde(default)]
   pub selected_store    : Option<SelectedStoreRecord>,
+  #[serde(default)]
+  pub scalar_release    : Option<ScalarReleaseRecord>,
   #[serde(default)]
   pub view_settlements  : BTreeMap<String, ViewSettlementRecord>,
   #[serde(default)]
