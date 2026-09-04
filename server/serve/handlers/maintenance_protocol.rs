@@ -24,10 +24,13 @@ use crate::maintenance::{
   TerminalDisposition,
   TerminalMaintenance,
   ScalarReleaseRecord,
+  ViewApplicationAcknowledgement,
   ViewApplicationRecord,
   ViewSettlementRecord,
   ViewSettlementRequirement,
 };
+use crate::from_text::buffer_to_viewnodes::uninterpreted::
+  org_to_uninterpreted_viewforest;
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
 use crate::serve::handlers::scalar_release::{
@@ -51,6 +54,7 @@ use std::collections::HashSet;
 use std::net::TcpStream;
 
 use crate::types::misc::ID;
+use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{
   ViewState,
@@ -939,6 +943,21 @@ fn acknowledge_view_settlement (
     request, "base-server-revision")?;
   let application_token = unsigned_request_field (
     request, "base-application-token")?;
+  let application_ack = if requirement
+       == ViewSettlementRequirement::ApplicationAck
+  {
+    Some (ViewApplicationAcknowledgement {
+      content_sha256: sha256_request_field (request, "content-sha256")?,
+      resulting_graph_generation: unsigned_request_field (
+        request, "resulting-graph-generation")?,
+      resulting_presentation_generation: unsigned_request_field (
+        request, "resulting-presentation-generation")?,
+      resulting_server_revision: unsigned_request_field (
+        request, "resulting-server-revision")?,
+      resulting_application_token: unsigned_request_field (
+        request, "resulting-application-token")?,
+    })
+  } else { None };
   let active = require_archive_owner (runtime, &incident, epoch)?;
   let record = active . view_settlements . get (&buffer_id)
     . ok_or_else (|| format! (
@@ -949,7 +968,8 @@ fn acknowledge_view_settlement (
     let state = record . view_uri . as_ref () . and_then (|uri|
       interactive . views . open_views . views . get (
         &ViewUri::from_client_string (uri . clone ())));
-    prepare_server_settlement_effect (&active, record, state)?
+    prepare_server_settlement_effect (
+      &active, record, state, application_ack . as_ref ())?
   };
   let all_settled = runtime . transition_maintenance (|coordinator|
     coordinator . acknowledge_view_settlement (
@@ -959,7 +979,8 @@ fn acknowledge_view_settlement (
       requirement . clone (),
       view_uri . as_deref (),
       base_revision,
-      application_token))?;
+      application_token,
+      application_ack . as_ref ()))?;
   apply_server_settlement_effect (runtime, effect);
   Ok (Sexp::List (vec![
     atom_field ("status", if all_settled {
@@ -977,7 +998,7 @@ fn acknowledge_view_settlement (
   ]) . to_string ())
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum ServerSettlementEffect {
   None,
   Unregister (ViewUri),
@@ -986,20 +1007,98 @@ enum ServerSettlementEffect {
     graph_generation : u64,
     search_stale     : bool,
   },
+  Apply {
+    uri                     : ViewUri,
+    base_revision           : u64,
+    viewforest              : ViewForest,
+    graph_generation        : u64,
+    presentation_generation : u64,
+    application_token       : u64,
+    search_stale            : bool,
+  },
 }
 
 fn prepare_server_settlement_effect (
-  active : &crate::maintenance::ActiveMaintenance,
-  record : &ViewSettlementRecord,
-  state  : Option<&ViewState>,
+  active          : &crate::maintenance::ActiveMaintenance,
+  record          : &ViewSettlementRecord,
+  state           : Option<&ViewState>,
+  application_ack : Option<&ViewApplicationAcknowledgement>,
 ) -> Result<ServerSettlementEffect, String> {
   if record . acknowledged { return Ok (ServerSettlementEffect::None); }
-  if record . requirement == ViewSettlementRequirement::ApplicationAck {
-    return Err (format! (
-      "buffer '{}' cannot ACK application before its staged rendering",
-      record . buffer_id)); }
   let uri = record . view_uri . as_ref ()
     . map (|uri| ViewUri::from_client_string (uri . clone ()));
+  if record . requirement == ViewSettlementRequirement::ApplicationAck {
+    let uri = uri . ok_or_else (|| format! (
+      "buffer '{}' has an application offer without a view URI",
+      record . buffer_id))?;
+    let state = state . ok_or_else (|| format! (
+      "buffer '{}' closed before application acknowledgement",
+      record . buffer_id))?;
+    validate_application_base (active, record, state)?;
+    let offer = record . application . as_ref () . ok_or_else (|| format! (
+      "buffer '{}' has no staged application offer", record . buffer_id))?;
+    let ack = application_ack . ok_or_else (|| format! (
+      "buffer '{}' application acknowledgement is incomplete",
+      record . buffer_id))?;
+    if offer . content_sha256 != ack . content_sha256
+    || offer . resulting_graph_generation
+         != ack . resulting_graph_generation
+    || offer . resulting_presentation_generation
+         != ack . resulting_presentation_generation
+    || offer . resulting_server_revision
+         != ack . resulting_server_revision
+    || offer . resulting_application_token
+         != ack . resulting_application_token
+    {
+      return Err (format! (
+        "buffer '{}' application acknowledgement changed its offer",
+        record . buffer_id)); }
+    let selected = active . selected_store . as_ref ()
+      . ok_or_else (|| "view application precedes coherent store selection"
+        . to_string ())?;
+    if offer . resulting_graph_generation
+         != selected . graph_generation . get ()
+    || offer . resulting_server_revision
+         != record . base_server_revision . checked_add (1)
+           . ok_or_else (|| "server revision exhausted" . to_string ())?
+    || offer . resulting_application_token
+         != record . base_application_token . checked_add (1)
+           . ok_or_else (|| "application token exhausted" . to_string ())?
+    || format! ("{:x}", Sha256::digest (offer . content . as_bytes ()))
+         != offer . content_sha256
+    {
+      return Err (format! (
+        "buffer '{}' staged application record is internally inconsistent",
+        record . buffer_id)); }
+    let (maybe_placed, parse_errors, _warnings) =
+      org_to_uninterpreted_viewforest (&offer . content)
+      . map_err (|error| format! (
+        "could not reconstruct staged view '{}': {}",
+        record . buffer_id, error))?;
+    if !parse_errors . is_empty () {
+      return Err (format! (
+        "staged view '{}' reparsed with errors: {}",
+        record . buffer_id, parse_errors . iter ()
+          . map (|error| error . to_string ())
+          . collect::<Vec<_>> () . join ("; "))); }
+    let viewforest = maybePlaced_to_placed_viewforest (maybe_placed)
+      . map_err (|error| format! (
+        "could not place staged view '{}': {}",
+        record . buffer_id, error))?;
+    return Ok (ServerSettlementEffect::Apply {
+      uri,
+      base_revision: record . base_server_revision,
+      viewforest,
+      graph_generation: offer . resulting_graph_generation,
+      presentation_generation: offer . resulting_presentation_generation,
+      application_token: offer . resulting_application_token,
+      search_stale: record . kind == BufferKind::SearchView,
+    });
+  }
+  if application_ack . is_some () {
+    return Err (format! (
+      "buffer '{}' supplied application authority for a non-application settlement",
+      record . buffer_id)); }
   if let Some (state) = state {
     let frozen = active . buffer_census . get (&record . buffer_id)
       . ok_or_else (|| "settlement is absent from the frozen census"
@@ -1052,6 +1151,28 @@ fn apply_server_settlement_effect (
         . expect ("validated settlement view disappeared during one request");
       state . graph_generation = graph_generation;
       state . presentation_stale = true;
+      state . search_stale |= search_stale;
+    }
+    ServerSettlementEffect::Apply {
+      uri,
+      base_revision,
+      viewforest,
+      graph_generation,
+      presentation_generation,
+      application_token,
+      search_stale,
+    } => {
+      assert! (interactive . views . open_views . update_view_if_revision (
+        &uri, base_revision, viewforest),
+        "validated maintenance application advanced during one request");
+      interactive . views . open_views . set_client_application_authority (
+        &uri,
+        graph_generation,
+        presentation_generation,
+        application_token)
+        . expect ("validated maintenance application view disappeared");
+      let state = interactive . views . open_views . views . get_mut (&uri)
+        . expect ("applied maintenance view remains registered");
       state . search_stale |= search_stale;
     }
   }
@@ -1410,7 +1531,7 @@ mod tests {
       presentation_stale: false, search_stale: false,
     };
     assert_eq! (prepare_server_settlement_effect (
-      &active, &record, Some (&state)) . unwrap (),
+      &active, &record, Some (&state), None) . unwrap (),
       ServerSettlementEffect::Preserve {
         uri: ViewUri::SearchView ("terms" . into ()),
         graph_generation: 2,
@@ -1423,11 +1544,44 @@ mod tests {
     assert! (validate_application_base (
       &active, &record, &changed) . is_err ());
     assert! (prepare_server_settlement_effect (
-      &active, &record, Some (&changed)) . is_err ());
+      &active, &record, Some (&changed), None) . is_err ());
     let mut application = record . clone ();
     application . requirement = ViewSettlementRequirement::ApplicationAck;
     assert! (prepare_server_settlement_effect (
-      &active, &application, Some (&changed)) . is_err ());
+      &active, &application, Some (&changed), None) . is_err ());
+    changed . revision = 4;
+    application . impacted = true;
+    application . planned_disposition = ViewDisposition::Refreshed;
+    let content_sha256 = format! ("{:x}", Sha256::digest (b""));
+    application . application = Some (ViewApplicationRecord {
+      content: String::new (),
+      content_sha256: content_sha256 . clone (),
+      resulting_graph_generation: 2,
+      resulting_presentation_generation: 9,
+      resulting_server_revision: 5,
+      resulting_application_token: 8,
+      warnings: Vec::new (),
+    });
+    let exact = ViewApplicationAcknowledgement {
+      content_sha256,
+      resulting_graph_generation: 2,
+      resulting_presentation_generation: 9,
+      resulting_server_revision: 5,
+      resulting_application_token: 8,
+    };
+    assert! (matches! (prepare_server_settlement_effect (
+      &active, &application, Some (&changed), Some (&exact)) . unwrap (),
+      ServerSettlementEffect::Apply {
+        graph_generation: 2,
+        presentation_generation: 9,
+        application_token: 8,
+        search_stale: true,
+        ..
+      }));
+    let mut wrong = exact;
+    wrong . content_sha256 = "f" . repeat (64);
+    assert! (prepare_server_settlement_effect (
+      &active, &application, Some (&changed), Some (&wrong)) . is_err ());
   }
 
   #[test]

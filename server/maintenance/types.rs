@@ -282,6 +282,18 @@ pub struct ViewApplicationRecord {
   pub warnings                       : Vec<String>,
 }
 
+/// The client proof that it installed one exact staged application offer.
+/// Content itself is not echoed; its digest binds this acknowledgement to the
+/// journaled bytes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ViewApplicationAcknowledgement {
+  pub content_sha256                     : String,
+  pub resulting_graph_generation         : u64,
+  pub resulting_presentation_generation  : u64,
+  pub resulting_server_revision          : u64,
+  pub resulting_application_token        : u64,
+}
+
 /// One durable promise for one buffer frozen in the maintenance census.
 /// `acknowledged` is false until the editor proves the exact requested action;
 /// an empty render queue is never a substitute for this inventory.

@@ -519,6 +519,7 @@ impl MaintenanceCoordinator {
     view_uri         : Option<&str>,
     base_revision    : u64,
     application_token : u64,
+    application_ack  : Option<&ViewApplicationAcknowledgement>,
   ) -> Result<bool, String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if !matches! (active . phase,
@@ -536,6 +537,23 @@ impl MaintenanceCoordinator {
     {
       return Err (format! (
         "buffer '{}' settlement ACK changed its frozen authority", buffer_id)); }
+    match (&record . application, application_ack) {
+      (Some (offer), Some (ack))
+        if record . requirement == ViewSettlementRequirement::ApplicationAck
+        && offer . content_sha256 == ack . content_sha256
+        && offer . resulting_graph_generation
+             == ack . resulting_graph_generation
+        && offer . resulting_presentation_generation
+             == ack . resulting_presentation_generation
+        && offer . resulting_server_revision
+             == ack . resulting_server_revision
+        && offer . resulting_application_token
+             == ack . resulting_application_token => {}
+      (None, None)
+        if record . requirement != ViewSettlementRequirement::ApplicationAck => {}
+      _ => return Err (format! (
+        "buffer '{}' application ACK changed its staged authority", buffer_id)),
+    }
     if record . acknowledged {
       return Ok (active . view_settlements . values ()
         . all (|record| record . acknowledged)); }
@@ -1064,23 +1082,23 @@ mod tests {
       vec![settlement ("one"), settlement ("two")]) . unwrap ();
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9)
+      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9, None)
       . is_err ());
     assert! (!coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9)
+      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9, None)
       . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "two",
-      ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 4, 9)
+      ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 4, 9, None)
       . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9)
+      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9, None)
       . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9)
+      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9, None)
       . is_err ());
     assert! (coordinator . archive_finalized (
       &active . incident_id, active . epoch, "final" . into (),
@@ -1100,5 +1118,66 @@ mod tests {
     assert! (active . client_evidence_acknowledged);
     assert_eq! (active . client_evidence_transfer . as_ref ()
       . unwrap () . transfer_manifest_sha256, "transfer");
+  }
+
+  #[test]
+  fn application_settlement_acknowledges_only_the_exact_staged_offer () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, vec![FrozenBufferRecord {
+        buffer_id: "view" . into (), kind: BufferKind::ContentView,
+        view_uri: Some ("uri-view" . into ()), graph_generation: 1,
+        presentation_generation: 0, server_revision: 4,
+        application_token: 9, dirty: false, undo_required: false,
+        last_fetched_sha256: "a" . repeat (64),
+        current_sha256: "a" . repeat (64),
+      }]) . unwrap ();
+    let CoordinatorState::Active (state) = &mut coordinator . state else {
+      unreachable! () };
+    state . phase = MaintenancePhase::Presenting;
+    state . selected_store = Some (SelectedStoreRecord {
+      graph_generation: GraphGeneration::INITIAL . successor (),
+      manifest_revision: ManifestRevision::INITIAL . successor (),
+      tantivy_generation: 1,
+      tantivy_outcome: "committed" . into (),
+    });
+    let mut record = settlement ("view");
+    record . dirty = false;
+    record . planned_disposition = ViewDisposition::Refreshed;
+    record . requirement = ViewSettlementRequirement::ApplicationAck;
+    record . application = Some (ViewApplicationRecord {
+      content: "* rendered\n" . into (),
+      content_sha256: "b" . repeat (64),
+      resulting_graph_generation: 2,
+      resulting_presentation_generation: 3,
+      resulting_server_revision: 5,
+      resulting_application_token: 10,
+      warnings: Vec::new (),
+    });
+    coordinator . record_view_settlements (
+      &active . incident_id, active . epoch, vec![record]) . unwrap ();
+    let exact = ViewApplicationAcknowledgement {
+      content_sha256: "b" . repeat (64),
+      resulting_graph_generation: 2,
+      resulting_presentation_generation: 3,
+      resulting_server_revision: 5,
+      resulting_application_token: 10,
+    };
+    let mut changed = exact . clone ();
+    changed . resulting_application_token = 11;
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "view",
+      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 4, 9,
+      Some (&changed)) . is_err ());
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "view",
+      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 4, 9,
+      Some (&exact)) . unwrap ());
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "view",
+      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 4, 9,
+      Some (&exact)) . unwrap ());
   }
 }

@@ -480,6 +480,16 @@ what's imperfect about what's done; choices determining the future.
   same gate, and status/reconnect can replay either the challenge or the exact
   already-recorded offer.  The focused Rust maintenance suite passes (30/30),
   and =cargo check --tests= passes.
+- Completed the server half of exact maintenance application acknowledgement.
+  An application ACK now repeats the offered content checksum and resulting
+  graph/presentation generations, server revision and client token in addition
+  to the frozen base authority.  The coordinator rejects any changed or
+  incomplete tuple, including on replay.  Before journaling the ACK, the server
+  rechecks the offer's own checksum and one-step counters and reconstructs the
+  rendered forest; after the durable transition it installs that forest and
+  authority without rerendering.  Applied searches remain explicitly
+  membership/ranking-stale.  The focused Rust maintenance suite passes (31/31),
+  and =cargo check --tests= passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
