@@ -1006,6 +1006,44 @@ path, manifest checksum, and size report."
     (unless (= seen-files (hash-table-count expected-files))
       (skg-recovery--fail "evidence category %s is incomplete" category))))
 
+(defun skg-recovery--normalize-settlement-application
+    (record required-ack)
+  (let ((present (assoc 'application record)))
+    (cond
+     ((equal required-ack "application-ack")
+      (unless present
+        (skg-recovery--fail
+         "application settlement has no exact rendered identity"))
+      (let ((application (skg-recovery--required-field
+                          record 'application "view settlement")))
+        (skg-recovery--field
+         'application
+         (list
+          (skg-recovery--field
+           'content-sha256
+           (skg-recovery--required-text
+            application 'content-sha256 "view application"))
+          (skg-recovery--field
+           'resulting-graph-generation
+           (skg-recovery--required-nonnegative-integer
+            application 'resulting-graph-generation "view application"))
+          (skg-recovery--field
+           'resulting-presentation-generation
+           (skg-recovery--required-nonnegative-integer
+            application 'resulting-presentation-generation
+            "view application"))
+          (skg-recovery--field
+           'resulting-server-revision
+           (skg-recovery--required-nonnegative-integer
+            application 'resulting-server-revision "view application"))
+          (skg-recovery--field
+           'resulting-application-token
+           (skg-recovery--required-nonnegative-integer
+            application 'resulting-application-token "view application"))))))
+     (present
+      (skg-recovery--fail
+       "non-application settlement unexpectedly carries rendered identity")))))
+
 (defun skg-recovery--normalize-settlements (settlements initial-buffers)
   (unless (proper-list-p settlements)
     (skg-recovery--fail "view settlements are not a proper list"))
@@ -1020,12 +1058,15 @@ path, manifest checksum, and size report."
              (disposition (skg-recovery--required-text
                            record 'planned-disposition context))
              (required-ack (skg-recovery--required-text
-                            record 'required-ack context)))
+                            record 'required-ack context))
+             (application
+              (skg-recovery--normalize-settlement-application
+               record required-ack)))
         (when (gethash buffer-id seen)
           (skg-recovery--fail "duplicate settlement for buffer %s" buffer-id))
         (unless (member disposition
                         '("interrupted" "released-unimpacted"
-                          "refreshed" "retained-clean" "closed"
+                          "refreshed" "retained-clean" "closed-disposable"
                           "detached-derived" "maintenance-aborted" "failed"))
           (skg-recovery--fail "unknown buffer disposition: %s" disposition))
         (unless (member required-ack
@@ -1035,41 +1076,52 @@ path, manifest checksum, and size report."
                               required-ack))
         (puthash buffer-id buffer-key seen)
         (push
-         (list
-          (skg-recovery--field 'buffer-id buffer-id)
-          (skg-recovery--field 'buffer-key buffer-key)
-          (skg-recovery--field
-           'kind (skg-recovery--required-text record 'kind context))
-          (skg-recovery--field
-           'view-uri (skg-recovery--required-text record 'view-uri context))
-          (skg-recovery--field
-           'dirty (skg-recovery--required-text record 'dirty context))
-          (skg-recovery--field
-           'impacted (skg-recovery--required-text record 'impacted context))
-          (skg-recovery--field
-           'parse-uncertain
-           (skg-recovery--required-text record 'parse-uncertain context))
-          (skg-recovery--field
-           'observed-ids
-           (mapcar (lambda (value) (format "%s" value))
-                   (skg-recovery--required-list
-                    record 'observed-ids context)))
-          (skg-recovery--field
-           'resolved-primary-ids
-           (mapcar (lambda (value) (format "%s" value))
-                   (skg-recovery--required-list
-                    record 'resolved-primary-ids context)))
-          (skg-recovery--field
-           'base-server-revision
-           (skg-recovery--required-nonnegative-integer
-            record 'base-server-revision context))
-          (skg-recovery--field
-           'base-application-token
-           (skg-recovery--required-nonnegative-integer
-            record 'base-application-token context))
-          (skg-recovery--field 'disposition disposition)
-          (skg-recovery--field 'required-ack required-ack)
-          (skg-recovery--field 'acknowledged "true"))
+         (delq
+          nil
+          (list
+           (skg-recovery--field 'buffer-id buffer-id)
+           (skg-recovery--field 'buffer-key buffer-key)
+           (skg-recovery--field
+            'kind (skg-recovery--required-text record 'kind context))
+           (skg-recovery--field
+            'view-uri (skg-recovery--required-text record 'view-uri context))
+           (skg-recovery--field
+            'dirty (skg-recovery--required-text record 'dirty context))
+           (skg-recovery--field
+            'impacted (skg-recovery--required-text record 'impacted context))
+           (skg-recovery--field
+            'parse-uncertain
+            (skg-recovery--required-text record 'parse-uncertain context))
+           (skg-recovery--field
+            'observed-ids
+            (mapcar (lambda (value) (format "%s" value))
+                    (skg-recovery--required-list
+                     record 'observed-ids context)))
+           (skg-recovery--field
+            'resolved-primary-ids
+            (mapcar (lambda (value) (format "%s" value))
+                    (skg-recovery--required-list
+                     record 'resolved-primary-ids context)))
+           (skg-recovery--field
+            'base-graph-generation
+            (skg-recovery--required-nonnegative-integer
+             record 'base-graph-generation context))
+           (skg-recovery--field
+            'base-presentation-generation
+            (skg-recovery--required-nonnegative-integer
+             record 'base-presentation-generation context))
+           (skg-recovery--field
+            'base-server-revision
+            (skg-recovery--required-nonnegative-integer
+             record 'base-server-revision context))
+           (skg-recovery--field
+            'base-application-token
+            (skg-recovery--required-nonnegative-integer
+             record 'base-application-token context))
+           (skg-recovery--field 'disposition disposition)
+           (skg-recovery--field 'required-ack required-ack)
+           (skg-recovery--field 'acknowledged "true")
+           application))
          normalized)))
     (dolist (buffer initial-buffers)
       (let ((buffer-id (skg-recovery--required-text

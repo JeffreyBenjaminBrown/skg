@@ -139,6 +139,8 @@
              (parse-uncertain "nil")
              (observed-ids ("root-a"))
              (resolved-primary-ids ("root-a"))
+             (base-graph-generation 7)
+             (base-presentation-generation 3)
              (base-server-revision 11)
              (base-application-token 5)
              (planned-disposition "interrupted")
@@ -155,6 +157,34 @@
        (name "a\n\"b\\c")
        (empty nil)))
     "((archive-format-version 1) (name \"a\\n\\\"b\\\\c\") (empty ()))")))
+
+(ert-deftest test-skg-recovery-final-settlement-binds-application-not-content ()
+  (let* ((settlement
+          `((buffer-id "buffer") (buffer-key "none")
+            (kind "content-view") (view-uri "view") (dirty "nil")
+            (impacted "true") (parse-uncertain "nil")
+            (observed-ids ()) (resolved-primary-ids ())
+            (base-graph-generation 1) (base-presentation-generation 3)
+            (base-server-revision 4) (base-application-token 7)
+            (planned-disposition "refreshed")
+            (required-ack "application-ack")))
+         (application
+          `((content "private rendered text")
+            (content-sha256 ,(make-string 64 ?a))
+            (resulting-graph-generation 2)
+            (resulting-presentation-generation 8)
+            (resulting-server-revision 5)
+            (resulting-application-token 8)))
+         (normalized
+          (car (skg-recovery--normalize-settlements
+                (list (append settlement `((application ,application))))
+                nil)))
+         (identity (cadr (assoc 'application normalized))))
+    (should (equal (cadr (assoc 'content-sha256 identity))
+                   (make-string 64 ?a)))
+    (should-not (assoc 'content identity))
+    (should-error
+     (skg-recovery--normalize-settlements (list settlement) nil))))
 
 (ert-deftest test-skg-recovery-publishes-private-checksummed-incident ()
   (let* ((fixture (skg-test-recovery--fixture))
