@@ -101,6 +101,7 @@ pub fn plan_incident_view_settlements (
       base_application_token: frozen . application_token,
       planned_disposition,
       requirement,
+      application: None,
       acknowledged: false,
     });
   }

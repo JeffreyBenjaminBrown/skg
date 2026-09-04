@@ -41,6 +41,7 @@ pub enum RequestType {
   MaintenanceArchiveFinalized,
   MaintenanceArchiveFailed,
   ApproveUndoWaiver,
+  ApproveMaintenanceScalarRelease,
   CancelMaintenance,
   MaintenanceStatus,
   MaintenanceEvidence,
@@ -91,6 +92,8 @@ impl RequestType {
         Ok (RequestType::MaintenanceArchiveFinalized),
       "maintenance archive failed" => Ok (RequestType::MaintenanceArchiveFailed),
       "approve undo waiver"      => Ok (RequestType::ApproveUndoWaiver),
+      "approve maintenance scalar release" =>
+        Ok (RequestType::ApproveMaintenanceScalarRelease),
       "cancel maintenance"       => Ok (RequestType::CancelMaintenance),
       "maintenance status"       => Ok (RequestType::MaintenanceStatus),
       "maintenance evidence"     => Ok (RequestType::MaintenanceEvidence),

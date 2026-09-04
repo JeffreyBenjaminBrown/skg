@@ -470,6 +470,16 @@ what's imperfect about what's done; choices determining the future.
   challenge or partial/broadened approval is rejected without releasing text.
   The focused Rust maintenance suite passes (28/28), and
   =cargo check --tests= passes.
+- Staged clean impacted maintenance views as durable exact application offers.
+  Rendering now runs from the retained forest under a pinned selected-G1
+  lease, without holding the interactive-session lock or mutating the live
+  forest.  Each offer journals the rendered bytes and SHA-256 together with
+  resulting graph/presentation generations, server revision, application
+  token and warnings.  Restricted-source rendering sends only a durable PID
+  challenge until the exact scalar approval is journaled; retry rechecks the
+  same gate, and status/reconnect can replay either the challenge or the exact
+  already-recorded offer.  The focused Rust maintenance suite passes (30/30),
+  and =cargo check --tests= passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -481,10 +491,10 @@ what's imperfect about what's done; choices determining the future.
   workflows and stale-state detail still need the fuller descriptor schema.
 - Older foreground rerender streams still need to be routed through the same
   exact application/ACK authority used by retained collateral offers.
-- The archive bootstrap is complete, but store selection, final node-evidence
-  transfer, per-view disposition and terminal archive finalization are still
-  in progress; a verified initial archive intentionally leaves its epoch lock
-  installed until those later phases are durable.
+- The server-side archive, selection, evidence, disposition and terminal gates
+  are durable, but the clients do not yet execute the offered view actions and
+  finalization handshake; a verified initial archive therefore intentionally
+  leaves its epoch lock installed until that client work completes.
 - Attached workflow parentage is not present in the current census schema, so
   workflow buffers are classified conservatively (dirty ones are interrupted,
   clean ones close) rather than being settled with their parent.  The durable

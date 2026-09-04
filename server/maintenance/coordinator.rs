@@ -1004,6 +1004,7 @@ mod tests {
       base_application_token: 9,
       planned_disposition: ViewDisposition::Interrupted,
       requirement: ViewSettlementRequirement::RetirementAck,
+      application: None,
       acknowledged: false,
     }
   }

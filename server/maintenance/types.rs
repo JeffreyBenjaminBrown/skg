@@ -268,6 +268,20 @@ impl ViewSettlementRequirement {
   }
 }
 
+/// Server-rendered text held as an uncommitted, replayable application offer.
+/// Every resulting authority field must be echoed by the client before this
+/// content can replace the retained forest.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ViewApplicationRecord {
+  pub content                        : String,
+  pub content_sha256                 : String,
+  pub resulting_graph_generation     : u64,
+  pub resulting_presentation_generation : u64,
+  pub resulting_server_revision      : u64,
+  pub resulting_application_token    : u64,
+  pub warnings                       : Vec<String>,
+}
+
 /// One durable promise for one buffer frozen in the maintenance census.
 /// `acknowledged` is false until the editor proves the exact requested action;
 /// an empty render queue is never a substitute for this inventory.
@@ -287,6 +301,8 @@ pub struct ViewSettlementRecord {
   pub base_application_token : u64,
   pub planned_disposition    : ViewDisposition,
   pub requirement            : ViewSettlementRequirement,
+  #[serde(default)]
+  pub application            : Option<ViewApplicationRecord>,
   pub acknowledged           : bool,
 }
 

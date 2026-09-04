@@ -32,6 +32,7 @@ use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_sou
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::maintenance_protocol::{
   handle_acknowledge_terminal_maintenance_request,
+  handle_approve_maintenance_scalar_release_request,
   handle_approve_undo_waiver_request,
   handle_begin_maintenance_request,
   handle_cancel_maintenance_request,
@@ -661,6 +662,9 @@ fn dispatch_request (
       handle_maintenance_archive_failed_request (stream, request, runtime),
     RequestType::ApproveUndoWaiver =>
       handle_approve_undo_waiver_request (stream, request, runtime),
+    RequestType::ApproveMaintenanceScalarRelease =>
+      handle_approve_maintenance_scalar_release_request (
+        stream, request, runtime),
     RequestType::CancelMaintenance =>
       handle_cancel_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceStatus =>

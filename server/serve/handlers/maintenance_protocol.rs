@@ -2,6 +2,7 @@
 
 use crate::maintenance::archive::{
   InitialArchiveExpectation,
+  VerifiedInitialArchive,
   verify_initial_archive,
 };
 use crate::maintenance::evidence::{
@@ -22,11 +23,18 @@ use crate::maintenance::{
   MaintenancePhase,
   TerminalDisposition,
   TerminalMaintenance,
+  ScalarReleaseRecord,
+  ViewApplicationRecord,
   ViewSettlementRecord,
   ViewSettlementRequirement,
 };
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
+use crate::serve::handlers::scalar_release::{
+  ScalarReleaseDecision,
+  approved_pids_from_request,
+  decide as decide_scalar_release,
+};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_artifact_bundle_with_length_prefix,
@@ -38,9 +46,18 @@ use crate::serve::util::{
 
 use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
+use futures::executor::block_on;
+use std::collections::HashSet;
 use std::net::TcpStream;
 
-use crate::types::views_state::{ViewState, ViewUri};
+use crate::types::misc::ID;
+use crate::types::tree::forest::ViewForest;
+use crate::types::views_state::{
+  ViewState,
+  ViewUri,
+  pids_from_viewforest,
+};
+use crate::update_buffer::render_maintenance_view;
 
 const ARCHIVE_FORMAT_VERSION : u32 = 1;
 
@@ -331,14 +348,9 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
   runtime . retain_verified_archive (incident . clone (), verified . clone ());
   runtime . transition_maintenance (|coordinator| coordinator . archive_ready (
     &incident, epoch, manifest_sha256 . clone ()))?;
-  let mut fields = vec![
-    atom_field ("verified-manifest-sha256", &manifest_sha256),
-    atom_field ("archive-path", &verified . path . to_string_lossy ()),
-    integer_field ("artifact-count", verified . artifact_count as u64),
-    integer_field ("archive-file-bytes", verified . total_file_bytes),
-  ];
   if active . candidate . is_some () {
-    let selected = select_archived_candidate (runtime, &incident, epoch)?;
+    select_archived_candidate (runtime, &incident, epoch)?;
+    let active = matching_active (runtime, &incident, epoch)?;
     let candidate_id = active . candidate . as_ref ()
       . expect ("candidate branch has candidate") . id . clone ();
     let candidate = runtime . candidate (&candidate_id)
@@ -349,39 +361,319 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
       plan_incident_view_settlements (
         &active, &verified, &interactive, &candidate)?
     };
-    runtime . transition_maintenance (|coordinator|
-      coordinator . record_view_settlements (
-        &incident, epoch, settlements . clone ()))?;
-    fields . insert (0, atom_field ("status", "candidate-selected"));
-    fields . push (integer_field (
-      "g1-graph-generation", selected . graph_generation));
-    fields . push (integer_field (
-      "g1-manifest-revision", selected . manifest_revision));
-    fields . push (integer_field (
-      "tantivy-generation", selected . tantivy_generation));
-    fields . push (atom_field (
-      "tantivy-outcome", &selected . tantivy_outcome));
-    fields . push (atom_field (
-      "server-evidence-sha256", &selected . evidence . bundle_sha256));
-    fields . push (integer_field (
-      "server-evidence-artifact-count",
-      selected . evidence . artifact_count as u64));
-    fields . push (integer_field (
-      "server-evidence-bytes", selected . evidence . total_file_bytes));
-    fields . push (Sexp::List (vec![
-      Sexp::Atom (Atom::S ("view-settlements" . into ())),
-      Sexp::List (settlements . iter () . map (settlement_sexp) . collect ()),
-    ]));
+    match stage_application_settlements (
+        runtime, &active, settlements, &HashSet::new ())?
+    {
+      ApplicationStaging::Ready (settlements) => {
+        runtime . transition_maintenance (|coordinator|
+          coordinator . record_view_settlements (
+            &incident, epoch, settlements . clone ()))?;
+        return candidate_selected_payload (
+          &active, &verified, &settlements);
+      }
+      ApplicationStaging::Challenge (challenge) => {
+        runtime . transition_maintenance (|coordinator|
+          coordinator . record_scalar_challenge (
+            &incident, epoch, challenge . clone ()))?;
+        return scalar_challenge_payload (&active, &verified, &challenge);
+      }
+    }
   } else {
+    let mut fields = archive_verification_fields (&verified);
     fields . insert (0, atom_field ("status", "archive-ready"));
     fields . push (atom_field (
       "next-action", "origin-specific-operation-required"));
+    return Ok (Sexp::List (fields) . to_string ());
   }
+}
+
+enum ApplicationStaging {
+  Ready (Vec<ViewSettlementRecord>),
+  Challenge (ScalarReleaseRecord),
+}
+
+struct MaintenanceRenderInput {
+  settlement_index : usize,
+  buffer_id        : String,
+  view_uri         : ViewUri,
+  viewforest       : ViewForest,
+}
+
+struct MaintenanceRenderedView {
+  settlement_index : usize,
+  buffer_id        : String,
+  view_uri         : ViewUri,
+  content          : String,
+  candidate_pids   : Vec<ID>,
+  warnings         : Vec<String>,
+}
+
+fn stage_application_settlements (
+  runtime       : &ServerRuntime,
+  active        : &crate::maintenance::ActiveMaintenance,
+  mut settlements : Vec<ViewSettlementRecord>,
+  approved_pids : &HashSet<ID>,
+) -> Result<ApplicationStaging, String> {
+  if !settlements . iter () . any (|record|
+      record . requirement == ViewSettlementRequirement::ApplicationAck)
+  {
+    return Ok (ApplicationStaging::Ready (settlements)); }
+
+  let selected = active . selected_store . as_ref ()
+    . ok_or_else (|| "view rendering precedes coherent store selection"
+      . to_string ())?;
+  let lease = runtime . query_lease ()?;
+  if lease . snapshot . selected . graph_generation
+       != selected . graph_generation
+  || lease . snapshot . selected . manifest_revision
+       != selected . manifest_revision
+  {
+    return Err (
+      "maintenance view rendering did not acquire the selected G1"
+        . into ()); }
+
+  let (diff_mode_enabled, active_source_set, presentation_generation,
+       render_inputs) = {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    if interactive . active_source_set . name . 0 != active . source_set {
+      return Err (format! (
+        "active source-set changed from '{}' to '{}' during maintenance",
+        active . source_set,
+        interactive . active_source_set . name . 0)); }
+    let mut inputs = Vec::new ();
+    for (settlement_index, record) in settlements . iter () . enumerate () {
+      if record . requirement != ViewSettlementRequirement::ApplicationAck {
+        continue; }
+      let uri_text = record . view_uri . as_ref () . ok_or_else (|| format! (
+        "buffer '{}' has an application settlement without a view URI",
+        record . buffer_id))?;
+      let view_uri = ViewUri::from_client_string (uri_text . clone ());
+      let state = interactive . views . open_views . views . get (&view_uri)
+        . ok_or_else (|| format! (
+          "buffer '{}' lost its retained server forest before rendering",
+          record . buffer_id))?;
+      validate_application_base (active, record, state)?;
+      inputs . push (MaintenanceRenderInput {
+        settlement_index,
+        buffer_id: record . buffer_id . clone (),
+        view_uri,
+        viewforest: state . viewforest . clone (),
+      });
+    }
+    (
+      interactive . views . diff_mode_enabled,
+      interactive . active_source_set . clone (),
+      interactive . collateral_scheduler . presentation_generation (),
+      inputs,
+    )
+  };
+
+  let mut rendered_views = Vec::new ();
+  for input in render_inputs {
+    let (viewforest, content, warnings) = block_on (
+      render_maintenance_view (
+        input . viewforest,
+        &lease . snapshot . env,
+        diff_mode_enabled,
+        Some (&active_source_set)))?;
+    let mut candidate_pids : Vec<ID> =
+      pids_from_viewforest (&viewforest) . into_iter () . collect ();
+    candidate_pids . sort_by (|left, right|
+      left . as_str () . cmp (right . as_str ()));
+    rendered_views . push (MaintenanceRenderedView {
+      settlement_index: input . settlement_index,
+      buffer_id: input . buffer_id,
+      view_uri: input . view_uri,
+      content,
+      candidate_pids,
+      warnings,
+    });
+  }
+
+  {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    if interactive . views . diff_mode_enabled != diff_mode_enabled
+    || interactive . active_source_set != active_source_set
+    || interactive . collateral_scheduler . presentation_generation ()
+         != presentation_generation
+    {
+      return Err (
+        "maintenance presentation inputs advanced while views rendered"
+          . into ()); }
+    for rendered in &rendered_views {
+      let record = &settlements[rendered . settlement_index];
+      let state = interactive . views . open_views . views
+        . get (&rendered . view_uri)
+        . ok_or_else (|| format! (
+          "buffer '{}' closed while its maintenance view rendered",
+          rendered . buffer_id))?;
+      validate_application_base (active, record, state)?;
+    }
+  }
+
+  let mut all_candidate_pids : Vec<ID> = rendered_views . iter ()
+    . flat_map (|rendered| rendered . candidate_pids . iter () . cloned ())
+    . collect ();
+  all_candidate_pids . sort_by (|left, right|
+    left . as_str () . cmp (right . as_str ()));
+  all_candidate_pids . dedup ();
+  match decide_scalar_release (
+      "maintenance-presentation",
+      &active_source_set,
+      &all_candidate_pids,
+      &lease . snapshot . selected . graph,
+      approved_pids)
+  {
+    ScalarReleaseDecision::Challenge { operation, pids, prompt } => {
+      return Ok (ApplicationStaging::Challenge (ScalarReleaseRecord {
+        operation,
+        pids: pids . into_iter () . map (|pid| pid . to_string ()) . collect (),
+        prompt,
+        approved: false,
+      }));
+    }
+    ScalarReleaseDecision::Allow
+    | ScalarReleaseDecision::AllowWithWarning { .. } => {}
+  }
+
+  for rendered in rendered_views {
+    let mut warnings = rendered . warnings;
+    match decide_scalar_release (
+        "maintenance-presentation",
+        &active_source_set,
+        &rendered . candidate_pids,
+        &lease . snapshot . selected . graph,
+        approved_pids)
+    {
+      ScalarReleaseDecision::Allow => {}
+      ScalarReleaseDecision::AllowWithWarning { warning } =>
+        warnings . push (warning),
+      ScalarReleaseDecision::Challenge { .. } => return Err (
+        "an individually rendered view escaped its aggregate scalar gate"
+          . into ()),
+    }
+    let record = &mut settlements[rendered . settlement_index];
+    record . application = Some (ViewApplicationRecord {
+      content_sha256: format! (
+        "{:x}", Sha256::digest (rendered . content . as_bytes ())),
+      content: rendered . content,
+      resulting_graph_generation: selected . graph_generation . get (),
+      resulting_presentation_generation: presentation_generation,
+      resulting_server_revision: record . base_server_revision
+        . checked_add (1)
+        . ok_or_else (|| format! (
+          "buffer '{}' exhausted its server revision",
+          record . buffer_id))?,
+      resulting_application_token: record . base_application_token
+        . checked_add (1)
+        . ok_or_else (|| format! (
+          "buffer '{}' exhausted its application token",
+          record . buffer_id))?,
+      warnings,
+    });
+  }
+  Ok (ApplicationStaging::Ready (settlements))
+}
+
+fn validate_application_base (
+  active : &crate::maintenance::ActiveMaintenance,
+  record : &ViewSettlementRecord,
+  state  : &ViewState,
+) -> Result<(), String> {
+  let frozen = active . buffer_census . get (&record . buffer_id)
+    . ok_or_else (|| format! (
+      "buffer '{}' is absent from the frozen census", record . buffer_id))?;
+  if frozen . dirty
+  || record . dirty
+  || frozen . view_uri != record . view_uri
+  || frozen . kind != record . kind
+  || frozen . server_revision != record . base_server_revision
+  || frozen . application_token != record . base_application_token
+  || state . client_buffer_id . as_deref () != Some (&record . buffer_id)
+  || state . kind != record . kind
+  || state . revision != frozen . server_revision
+  || state . client_application_token != frozen . application_token
+  || state . graph_generation != frozen . graph_generation
+  || state . presentation_generation != frozen . presentation_generation
+  {
+    return Err (format! (
+      "buffer '{}' no longer has its exact clean frozen authority",
+      record . buffer_id)); }
+  Ok (( ))
+}
+
+fn archive_verification_fields (
+  verified : &VerifiedInitialArchive,
+) -> Vec<Sexp> {
+  vec![
+    atom_field ("verified-manifest-sha256", &verified . manifest_sha256),
+    atom_field ("archive-path", &verified . path . to_string_lossy ()),
+    integer_field ("artifact-count", verified . artifact_count as u64),
+    integer_field ("archive-file-bytes", verified . total_file_bytes),
+  ]
+}
+
+fn append_selected_fields (
+  fields : &mut Vec<Sexp>,
+  active : &crate::maintenance::ActiveMaintenance,
+) -> Result<(), String> {
+  let selected = active . selected_store . as_ref ()
+    . ok_or_else (|| "maintenance has no selected G1 record" . to_string ())?;
+  let evidence = active . server_evidence . as_ref ()
+    . ok_or_else (|| "maintenance has no durable server evidence" . to_string ())?;
+  fields . push (integer_field (
+    "g1-graph-generation", selected . graph_generation . get ()));
+  fields . push (integer_field (
+    "g1-manifest-revision", selected . manifest_revision . get ()));
+  fields . push (integer_field (
+    "tantivy-generation", selected . tantivy_generation));
+  fields . push (atom_field (
+    "tantivy-outcome", &selected . tantivy_outcome));
+  fields . push (atom_field (
+    "server-evidence-sha256", &evidence . bundle_sha256));
+  fields . push (integer_field (
+    "server-evidence-artifact-count", evidence . artifact_count));
+  fields . push (integer_field (
+    "server-evidence-bytes", evidence . total_file_bytes));
+  Ok (( ))
+}
+
+fn candidate_selected_payload (
+  active      : &crate::maintenance::ActiveMaintenance,
+  verified    : &VerifiedInitialArchive,
+  settlements : &[ViewSettlementRecord],
+) -> Result<String, String> {
+  let mut fields = archive_verification_fields (verified);
+  fields . insert (0, atom_field ("status", "candidate-selected"));
+  append_selected_fields (&mut fields, active)?;
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("view-settlements" . into ())),
+    Sexp::List (settlements . iter () . map (settlement_sexp) . collect ()),
+  ]));
+  Ok (Sexp::List (fields) . to_string ())
+}
+
+fn scalar_challenge_payload (
+  active    : &crate::maintenance::ActiveMaintenance,
+  verified  : &VerifiedInitialArchive,
+  challenge : &ScalarReleaseRecord,
+) -> Result<String, String> {
+  let mut fields = archive_verification_fields (verified);
+  fields . insert (0, atom_field (
+    "status", "needs-scalar-authorization"));
+  append_selected_fields (&mut fields, active)?;
+  fields . push (atom_field ("operation", &challenge . operation));
+  fields . push (list_field ("pids", &challenge . pids));
+  fields . push (atom_field ("prompt", &challenge . prompt));
+  fields . push (atom_field (
+    "next-action", "approve-maintenance-scalar-release"));
   Ok (Sexp::List (fields) . to_string ())
 }
 
 fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp {
-  Sexp::List (vec![
+  let mut fields = vec![
     atom_field ("buffer-id", &record . buffer_id),
     atom_field ("buffer-key", record . buffer_key . as_deref () . unwrap_or ("none")),
     atom_field ("kind", record . kind . label ()),
@@ -398,7 +690,26 @@ fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp 
     integer_field ("base-application-token", record . base_application_token),
     atom_field ("planned-disposition", record . planned_disposition . label ()),
     atom_field ("required-ack", record . requirement . label ()),
-  ])
+  ];
+  if let Some (application) = &record . application {
+    fields . push (Sexp::List (vec![
+      Sexp::Atom (Atom::S ("application" . into ())),
+      Sexp::List (vec![
+        atom_field ("content", &application . content),
+        atom_field ("content-sha256", &application . content_sha256),
+        integer_field ("resulting-graph-generation",
+          application . resulting_graph_generation),
+        integer_field ("resulting-presentation-generation",
+          application . resulting_presentation_generation),
+        integer_field ("resulting-server-revision",
+          application . resulting_server_revision),
+        integer_field ("resulting-application-token",
+          application . resulting_application_token),
+        list_field ("warnings", &application . warnings),
+      ]),
+    ]));
+  }
+  Sexp::List (fields)
 }
 
 pub fn handle_maintenance_archive_failed_request (
@@ -452,6 +763,65 @@ pub fn handle_approve_undo_waiver_request (
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
+pub fn handle_approve_maintenance_scalar_release_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = approve_maintenance_scalar_release (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn approve_maintenance_scalar_release (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  require_archive_owner (runtime, &incident, epoch)?;
+  let approved_pids = approved_pids_from_request (request);
+  let approved_pid_strings : Vec<String> = approved_pids . iter ()
+    . map (|pid| pid . to_string ()) . collect ();
+  runtime . transition_maintenance (|coordinator|
+    coordinator . approve_scalar_release (
+      &incident, epoch, approved_pid_strings . clone ()))?;
+
+  let active = matching_active (runtime, &incident, epoch)?;
+  let verified = runtime . verified_archive (&incident)
+    . ok_or_else (|| "verified initial archive was not retained"
+      . to_string ())?;
+  if !active . view_settlements . is_empty () {
+    let settlements : Vec<ViewSettlementRecord> = active . view_settlements
+      . values () . cloned () . collect ();
+    return candidate_selected_payload (&active, &verified, &settlements);
+  }
+  let candidate_id = active . candidate . as_ref ()
+    . ok_or_else (|| "scalar authorization incident has no candidate"
+      . to_string ())? . id . clone ();
+  let candidate = runtime . candidate (&candidate_id)
+    . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
+  let settlements = {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    plan_incident_view_settlements (
+      &active, &verified, &interactive, &candidate)?
+  };
+  let ApplicationStaging::Ready (settlements) =
+    stage_application_settlements (
+      runtime, &active, settlements, &approved_pids)?
+  else {
+    return Err (
+      "maintenance scalar challenge changed after exact authorization"
+        . into ());
+  };
+  runtime . transition_maintenance (|coordinator|
+    coordinator . record_view_settlements (
+      &incident, epoch, settlements . clone ()))?;
+  candidate_selected_payload (&active, &verified, &settlements)
+}
+
 pub fn handle_cancel_maintenance_request (
   stream  : &mut TcpStream,
   request : &str,
@@ -479,14 +849,7 @@ pub fn handle_maintenance_status_request (
 ) {
   let coordinator = runtime . maintenance . lock () . unwrap () . clone ();
   let payload = match coordinator . state {
-    CoordinatorState::Active (active) => Sexp::List (vec![
-      atom_field ("status", "active"),
-      atom_field ("active-incident-id", active . incident_id . as_str ()),
-      integer_field ("maintenance-epoch", active . epoch . get ()),
-      atom_field ("phase", &format! ("{:?}", active . phase)),
-      atom_field ("origin", active . origin . label ()),
-      atom_field ("archive-directory-name", &active . archive_directory_name),
-    ]),
+    CoordinatorState::Active (active) => active_status_sexp (&active),
     CoordinatorState::Pending (pending) => Sexp::List (vec![
       atom_field ("status", "pending"),
       atom_field ("pending-reason", &format! ("{:?}", pending . reason)),
@@ -501,6 +864,37 @@ pub fn handle_maintenance_status_request (
     ]),
   } . to_string ();
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", Ok (payload));
+}
+
+fn active_status_sexp (
+  active : &crate::maintenance::ActiveMaintenance,
+) -> Sexp {
+  let mut fields = vec![
+    atom_field ("status", "active"),
+    atom_field ("active-incident-id", active . incident_id . as_str ()),
+    integer_field ("maintenance-epoch", active . epoch . get ()),
+    atom_field ("phase", &format! ("{:?}", active . phase)),
+    atom_field ("origin", active . origin . label ()),
+    atom_field ("archive-directory-name", &active . archive_directory_name),
+  ];
+  if active . selected_store . is_some () {
+    let _ = append_selected_fields (&mut fields, active);
+  }
+  if let Some (scalar) = &active . scalar_release {
+    fields . push (atom_field ("operation", &scalar . operation));
+    fields . push (list_field ("pids", &scalar . pids));
+    fields . push (atom_field ("prompt", &scalar . prompt));
+    fields . push (atom_field (
+      "scalar-approved", if scalar . approved { "true" } else { "nil" }));
+  }
+  if !active . view_settlements . is_empty () {
+    fields . push (Sexp::List (vec![
+      Sexp::Atom (Atom::S ("view-settlements" . into ())),
+      Sexp::List (active . view_settlements . values ()
+        . map (settlement_sexp) . collect ()),
+    ]));
+  }
+  Sexp::List (fields)
 }
 
 pub fn handle_maintenance_evidence_request (
@@ -924,6 +1318,7 @@ mod tests {
     MaintenanceCoordinator,
     ObservationSequence,
     SelectedStoreRecord,
+    ServerEvidenceRecord,
     ViewDisposition,
   };
   use crate::types::tree::forest::ViewForest;
@@ -1004,6 +1399,7 @@ mod tests {
       base_application_token: 7,
       planned_disposition: ViewDisposition::RetainedClean,
       requirement: ViewSettlementRequirement::ReleaseAck,
+      application: None,
       acknowledged: false,
     };
     let state = ViewState {
@@ -1020,13 +1416,94 @@ mod tests {
         graph_generation: 2,
         search_stale: true,
       });
+    assert! (validate_application_base (
+      &active, &record, &state) . is_ok ());
     let mut changed = state;
     changed . revision = 5;
+    assert! (validate_application_base (
+      &active, &record, &changed) . is_err ());
     assert! (prepare_server_settlement_effect (
       &active, &record, Some (&changed)) . is_err ());
     let mut application = record . clone ();
     application . requirement = ViewSettlementRequirement::ApplicationAck;
     assert! (prepare_server_settlement_effect (
       &active, &application, Some (&changed)) . is_err ());
+  }
+
+  #[test]
+  fn staged_application_wire_names_text_and_resulting_authority () {
+    let record = ViewSettlementRecord {
+      buffer_id: "buffer" . into (), buffer_key: None,
+      kind: BufferKind::ContentView, view_uri: Some ("view" . into ()),
+      dirty: false, impacted: true, parse_uncertain: false,
+      uncertainty_reason: None, observed_ids: vec!["node" . into ()],
+      resolved_primary_ids: vec!["node" . into ()],
+      base_server_revision: 4, base_application_token: 7,
+      planned_disposition: ViewDisposition::Refreshed,
+      requirement: ViewSettlementRequirement::ApplicationAck,
+      application: Some (ViewApplicationRecord {
+        content: "* title\nbody \"quoted\"\n" . into (),
+        content_sha256: "a" . repeat (64),
+        resulting_graph_generation: 2,
+        resulting_presentation_generation: 9,
+        resulting_server_revision: 5,
+        resulting_application_token: 8,
+        warnings: vec!["warning" . into ()],
+      }),
+      acknowledged: false,
+    };
+    let payload = settlement_sexp (&record) . to_string ();
+    assert! (sexp::parse (&payload) . is_ok ());
+    assert! (payload . contains ("* title"));
+    assert! (payload . contains ("body"));
+    assert! (payload . contains ("quoted"));
+    assert! (payload . contains ("(content-sha256"));
+    assert! (payload . contains ("(resulting-server-revision 5)"));
+    assert! (payload . contains ("(resulting-application-token 8)"));
+  }
+
+  #[test]
+  fn scalar_challenge_response_contains_no_staged_view_text () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let mut active = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation,
+      Some (CandidateSummary {
+        id: CandidateId::new (),
+        base_graph_generation: GraphGeneration::INITIAL,
+        base_manifest_revision: ManifestRevision::INITIAL,
+        covered_sequence: ObservationSequence::INITIAL,
+        changed_primary_ids: vec!["node" . into ()],
+      })) . unwrap ();
+    active . selected_store = Some (SelectedStoreRecord {
+      graph_generation: GraphGeneration::INITIAL . successor (),
+      manifest_revision: ManifestRevision::INITIAL . successor (),
+      tantivy_generation: 2,
+      tantivy_outcome: "committed" . into (),
+    });
+    active . server_evidence = Some (ServerEvidenceRecord {
+      path: "evidence" . into (),
+      bundle_sha256: "a" . repeat (64),
+      artifact_count: 1,
+      total_file_bytes: 12,
+    });
+    let verified = VerifiedInitialArchive {
+      path: "archive" . into (),
+      manifest_sha256: "b" . repeat (64),
+      artifact_count: 0,
+      total_file_bytes: 1,
+      buffers: Vec::new (),
+    };
+    let challenge = ScalarReleaseRecord {
+      operation: "maintenance-presentation" . into (),
+      pids: vec!["ugly-pid" . into ()],
+      prompt: "Approve the exact PID?" . into (),
+      approved: false,
+    };
+    let payload = scalar_challenge_payload (
+      &active, &verified, &challenge) . unwrap ();
+    assert! (payload . contains ("needs-scalar-authorization"));
+    assert! (payload . contains ("ugly-pid"));
+    assert! (!payload . contains ("view-settlements"));
+    assert! (!payload . contains ("SECRET-STAGED-TEXT"));
   }
 }

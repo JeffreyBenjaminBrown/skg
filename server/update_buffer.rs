@@ -154,6 +154,30 @@ pub(crate) async fn render_background_view (
   Ok ((viewforest, text, context . warnings))
 }
 
+/// Render one maintenance-locked forest without mutating the retained view.
+/// The returned text and forest are a staged offer: neither becomes authority
+/// until the editor acknowledges the exact application token.
+pub(crate) async fn render_maintenance_view (
+  mut viewforest        : ViewForest,
+  env                   : &SkgEnv,
+  diff_mode_enabled     : bool,
+  active_source_set     : Option<&ActiveSourceSet>,
+) -> Result<(ViewForest, String, Vec<String>), String> {
+  let mut context = RerenderAfterSaveContext::without_save (
+    env, diff_mode_enabled, active_source_set);
+  rewriteInPlace_viewnodes_whose_id_is_newly_extra (
+    &mut viewforest, &context . graph_snap)
+    . map_err (|error| error . to_string ())?;
+  let text = rerender_view (
+    &mut viewforest, &mut context, None, false)
+    . await . map_err (|error| error . to_string ())?;
+  if !context . errors . is_empty () {
+    return Err (format! (
+      "maintenance view rendering reported errors: {}",
+      context . errors . join ("; "))); }
+  Ok ((viewforest, text, context . warnings))
+}
+
 struct RenderedCollateralView {
   uri        : ViewUri,
   text       : String,
