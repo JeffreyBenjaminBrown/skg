@@ -1,5 +1,6 @@
+* Jeff found problems.
 (Herein I indent by two spaces when quoting.)
-
+** story
 After the server is warm, if in the Emacs client I evaluate the reload snippet:
   (progn (load-file "../elisp/skg-reload.el")
          (skg-reload)
@@ -17,5 +18,1485 @@ after which I get a buffer with
   ** 33d5cd4e-8a0c-48f0-85c2-467db86e1862
   member 'shows-because (relationship)' appeared in two sources; the more public occurrence won
 
-Finally, if I visit that node (C-c g i), I am warned the following:
+Finally, if I try to visit that node (C-c g i), I am warned the following:
   SKG request failed: No visit-sequence field found in S-expression
+even though the visit succeeds.
+** brief list of problems
+*** pause after reload
+*** (preexisting) : false claim that 'heralds will not render'
+*** long freeze pause ending with telescope warnings
+*** 'SKG request failed: No visit-sequence field found in S-expression'
+* Codex investigated.
+** Result
+There are three branch regressions in this story, with three separate causes.
+I implemented the natural fixes for all three.  The duplicate-telescope
+warning is real data, not a fourth regression.  The old herald-table claim is
+not itself new, as Jeff suspected, although the new oversized handshake made
+that old timeout path fire reliably.
+
+There is one related design choice left open: an actual disconnect still
+requires an exact corpus sweep, and the current implementation runs that
+sweep synchronously on the only foreground request channel.  Hot code reload
+no longer manufactures such a disconnect or sweep, so this does not block the
+reported workflow.  Making a *real* reconnect's sweep preemptible is the
+architectural work described at the end of this report.
+** Evidence from the reported run
+The live server's retained log captured the sequence precisely:
+
+#+begin_example
+00:00:52.485  verify connection       emacs-24047-1
+00:00:55.641  herald rules            emacs-24047-2
+00:00:55.645  herald rules            emacs-24047-3
+00:00:55.646  herald rules            emacs-24047-4
+00:00:56.145  reload paths, full-sweep emacs-24047-7
+00:01:36.636  single root content view emacs-24047-8
+00:01:36.789  view visited             emacs-24047-9
+#+end_example
+
+Most importantly, the final request was logged as:
+
+#+begin_example
+((request . "view visited")
+ (view-uri . "01aa2d8b-257b-4b56-aef4-c2f380c95bbe")
+ (visit-sequence . 2)
+ (request-id . "emacs-24047-9"))
+#+end_example
+
+Thus the error claiming that there was no =visit-sequence= was demonstrably
+wrong; the field was on the wire.
+** Regression 1: the blocking pause and the herald timeout
+*** Cause
+The branch added every selected path outcome to the =verify connection=
+response.  This corpus currently has 29,973 direct =.skg= files.  For every
+one, =verify_connection_response= serialized the pathname, a 64-hex-character
+BLAKE3 digest, graph generation, index state, and Tantivy generation.  That
+made a ping into a multi-megabyte response which Rust had to construct and
+Emacs had to receive, decode, and parse on its UI thread.  In the captured run
+the verification request occupied 3.15 seconds.
+
+Neither client used this data.  Emacs copied =path-outcomes= into
+=skg--server-store-state=, which has no readers.  Neovim copied it into
+=config.store_state=, whose path outcomes likewise have no readers.  The
+server's selected path manifest remains authoritative and is used internally;
+there is no reason to duplicate it over the handshake wire.
+
+The timestamps also explain the misleading herald message.  Client init
+queued verification, then =skg-herald-rules-ensure= made three one-second
+waits.  Because this branch serializes requests, all three herald requests sat
+behind verification and all three waits expired.  They reached Rust together
+immediately after verification completed and succeeded, which is why heralds
+could work despite the message saying their table was empty.
+*** Fix
+I removed =path-outcomes= from the verification response and from both
+clients' unused caches.  The response still carries the small information the
+clients consume: source inventory, telescope warnings, pending recovery
+incidents, graph generation, and store health.
+
+This removes the new cause of the UI pause and keeps the normal handshake well
+inside the existing herald wait.  I did not redesign the preexisting herald
+retry protocol; an independently wedged server could still make its old false
+timeout claim.  That is deliberately outside these branch regressions.
+** Regression 2: hot reload caused a full-corpus sweep and leaked connections
+*** Cause
+Two lifecycle mistakes combined with the branch's new exact sweep:
+
+1. =skg-reload= unloaded =skg-state=.  Unloading made
+   =skg-rust-tcp-proc= void without closing the Emacs process.  The following
+   =skg-client-init= therefore opened a new connection while the server kept
+   the forgotten old one.  The live server had five established Emacs-side
+   connections after repeated reproductions.
+2. The verification handler called =skg-start-reload-observation=, which
+   always removed and recreated even-live file watches and unconditionally
+   scheduled a full sweep.
+
+The full sweep is exact and expensive by design:
+=changed_paths_since_selected= calls =selected_path_digest_manifest=, which
+enumerates and reads all 29,973 files and computes a BLAKE3 digest for each.
+It ran as an ordinary serialized =reload paths= request.  This accounts for
+the roughly 40.5 seconds between the full-sweep request and the next queued
+foreground request in the captured run.  Emacs itself could process unrelated
+input, but no SKG request on that connection could pass the sweep.
+*** Fix
+I made hot reload preserve =skg-state= and re-evaluate it plainly.  This keeps
+the live process, request records, length-prefix state, and monotonic request
+number while refreshing the functions and struct accessors.  Reload now
+refuses to run while a foreground request is active, rather than tearing its
+handlers out mid-flight.  I also plainly re-evaluate the stateful reload and
+worktree-guard modules, so their live watch/advice state survives but edits to
+their functions actually take effect.
+
+=skg-start-reload-observation= is now idempotent when every installed watch is
+valid.  The TCP sentinel still removes all watches on a real disconnect; a
+subsequent real connection therefore installs fresh watches and requests the
+mandatory gap-covering sweep.  A stopped/invalid watcher does the same.  Only
+the no-gap hot-reload case skips it.
+
+Together, these changes make the documented reload snippet reuse its existing
+TCP connection and existing valid watches.  It neither leaks a server
+connection nor launches a full-corpus sweep.
+** The telescope warning is legitimate and is not produced by the sweep
+The warning for =33d5cd4e-8a0c-48f0-85c2-467db86e1862= was already present in
+the server's startup warning set: the member occurs in two sources and the
+more-public section wins.  =skg--show-handshake-telescope-warnings= displays
+that stored warning while handling verification.  The full sweep neither
+creates nor returns it.  Its apparent association with the long wait came
+from the surrounding asynchronous initialization sequence.
+** Regression 3: a numeric visit sequence was mistaken for a missing field
+*** Cause
+Emacs deliberately prints =visit-sequence= as a number.  The Rust S-expression
+parser therefore represents =2= as =Atom::I(2)=.  The general
+=extract_v_from_kv_pair_in_sexp= helper matched only =Atom::S= in the value
+position.  It found the right key and dot but rejected the integer, continued
+to the end, and returned the inaccurate "No visit-sequence field" error.
+
+The content-view request and this idle MRU report are separate serialized
+requests.  That is why visiting the node succeeded first and the harmless MRU
+report error appeared afterward.
+*** Fix
+The key/value extractor now accepts any scalar atom supported by the existing
+=atom_to_string= helper: string, integer, or float.  The visit handler then
+parses that text as =u64= as intended.  Nonintegral and negative values still
+fail validation.
+** Architectural choice left for Jeff
+The plan says full sweeps belong in a low-priority observation worker and that
+foreground save/search preempts them.  The implementation does not yet have
+that worker: a true connection, watcher-gap, explicit-manual, or batch-end
+sweep hashes the corpus synchronously inside
+=handle_reload_paths_request=.  The hot-reload fix removes the accidental
+common trigger, but a genuine reconnect can still occupy SKG for tens of
+seconds on this corpus.
+
+I did not choose an architecture silently.  The credible choices are:
+
+1. Accept the rare real-gap pause for now.  Exact recovery stays simple; the
+   UI should at least report that reconciliation is in progress.
+2. Implement the plan's cooperative low-priority worker.  It must be able to
+   yield/cancel while enumerating and hashing, resume without losing watcher
+   generations, and return to the owning connection for dirty-buffer conflict
+   presentation.  This is the principled fix and my recommendation if real
+   reconnect latency matters.
+
+A metadata-only shortcut is not equivalent: unchanged size/mtime does not
+prove unchanged bytes, so it would weaken the exact-manifest invariant.  A
+second TCP connection is also not a drop-in answer because view state and the
+dirty-buffer conflict workflow are connection-owned.
+** Validation
+Focused regression checks passed:
+
+- Rust: numeric request atoms and the compact verification response, 2/2.
+- Emacs: reload/watcher/lifecycle suites, 25/25.
+
+The repository-wide suite then passed with =bash/all-tests.sh --no-sound=:
+
+- 334/334 Emacs tests;
+- all Neovim unit specifications;
+- 604/604 Rust tests under nextest;
+- all Rust doctests; and
+- 68/68 end-to-end integration tests across the Emacs and Neovim clients.
+
+The run took 206 seconds and needed no retries.  =cargo fmt --check= could not
+be run because this image does not have the =cargo-fmt= component installed;
+=git diff --check= is clean.
+* Jeff asks
+** Yes, let's implement the low-priority worker.
+I'm imagining that if someone asks for a view,
+the worker can bump fix any nodes in that view that it hasn't yet processed
+to the top of its stack,
+to make the view displayable as quickly as possible?
+** Were there other orphaned intentions?
+You say the plan described the low-priority worker, which was never made.
+Are there other things like that?
+* Codex responds
+** Yes: give requested views a fast lane, with one important qualification
+That is the right shape.  I would make the observation work queue
+reprioritizable, and a foreground view request would promote the source paths
+that can affect the requested view ahead of the sweep cursor.  The unit to
+promote should be a normalized =.skg= source path (or telescope), rather than a
+node: one source can define several IDs, and one telescope can contain several
+sources.
+
+For a view we already know, the fast lane can include:
+
+- every source presently selected for an ID in its viewforest;
+- all possible source paths for those primary IDs; and
+- the requested root's possible paths, even if that root is not presently in
+  the graph.
+
+If one of those paths changed, its reload transaction and the view's rerender
+should also jump ahead of ordinary sweep work.  The background scan can then
+resume where it left off.  The worker must yield rather than merely share the
+same FIFO TCP request queue; otherwise it has only moved the existing pause to
+a different function.
+
+The qualification is that scanning the paths in the old view does not prove
+the new view complete.  An as-yet-unscanned file elsewhere can add or remove an
+incoming link, containment edge, subscription/override/hide relationship, or
+an extra ID that changes the requested view.  A requested ID newly introduced
+as an extra ID is especially unknowable from its filename.  Only the completed
+exact sweep can certify that no such source exists.
+
+I therefore recommend this user-visible contract:
+
+1. A view request preempts the scanner and is answered immediately from the
+   selected graph.
+2. Its known source paths enter the observation fast lane, and any resulting
+   view replacement is offered automatically.
+3. Until the exact sweep completes, the client shows a small
+   "reconciliation pending" indication; completion removes it and applies any
+   final collateral replacement.
+
+Waiting for the fast-lane paths before the first display is also possible, but
+it adds latency without buying a correctness guarantee.  Silently presenting
+the answer as fully current would be worse.  Unless Jeff prefers the blocking
+variant, I propose the immediate-display contract above.
+
+The worker itself should own only observation: exact enumeration, byte
+hashing, priority/deduplication, cancellation epochs, and a resumable full-sweep
+cursor.  It should not mutate the graph, own view state, or talk on a client
+connection.  It returns observations to the serialized graph-transition path;
+that path still constructs a stable transaction and lets the owning connection
+handle dirty-buffer conflicts.  I think this division follows the existing
+invariants closely enough to be the natural implementation, but the
+reconciliation UI contract above is an architectural choice, so I am stopping
+for Jeff's response before building it.
+** Yes, there are other orphaned intentions
+I compared the plan's promises with the current coordinator, reconnect,
+collateral-refresh, and Git-presentation code.  The missing observation worker
+is the largest one, but it is not alone.  I found four material clusters, plus
+one old intention that I think should stay abandoned.
+*** Request coordination and disconnect cleanup are incomplete
+The plan gives each request its terminal handler, locks, cleanup guard, and
+incident ownership.  The actual request record contains only an ID, incident
+ID, and response handlers; submission is ordinary FIFO.  There is no priority
+between interactive and observation work and no replacement/coalescing of
+unsent observation requests.
+
+More seriously, the TCP sentinel clears the coordinator without synthesizing
+terminal failures for queued and in-flight requests.  Thus their cleanup
+callbacks do not run.  In particular, a disconnected reload observation can
+leave =skg--reload-observation-in-flight= true indefinitely.  That is a real
+lifecycle bug, not just an unrealized optimization, and it is prerequisite
+work for a worker which must survive preemption and disconnects.
+
+The plan also reserves generic =Error= frames for envelope/connection failure.
+Several expected endpoint failures still use them instead of request-specific
+terminal replies.  Finally, committed-but-unpresented reload incidents are
+thread-local to a connection and are explicitly discarded when its thread
+exits; the planned process-owned incident registry was not built.
+*** Reconnect does not reattach surviving views
+The plan says the next handshake reports each surviving buffer's base graph
+generation, token, and dirty status, so the server can reattach clean and dirty
+stale buffers.  The current verification request carries none of that, and a
+new connection begins with empty =ViewsState=.  Emacs buffers survive a real
+reconnect, but the server has forgotten them.
+
+Relatedly, the planned no-client case---observe and commit safe graph changes,
+then retain presentation debt for the next client---does not exist as such.
+The server retains a reconciliation generation, but not the view/incident
+state needed to discharge all of that debt after reconnect.
+*** The collateral scheduler has its engine but not all of its contract
+The MRU queue, one-at-a-time rendering, cancellation epoch, and
+generation/revision checks exist.  These promised pieces do not:
+
+- A queued buffer is not marked visibly stale.  The stale flag is set only
+  after an offer reaches a buffer that is already modified; edit/save does not
+  reject once and promote the queued refresh as the plan specifies.
+- The server parses the collateral =client-token= but deliberately ignores it,
+  so the exact token check in the design is not enforced.
+- A background scalar challenge is only warned about and rejected by both
+  clients; there is no approval-and-retry path.
+- A search view retains its query, but ordinary collateral repair completes
+  the old result forest rather than rerunning membership and ranking against
+  the corresponding new Tantivy generation.  The special cyclic-root repair
+  reruns searches; general graph changes do not appear to do so.
+
+These are narrower than the missing observer, but the stale-before-edit rule
+and query rerun are correctness/user-data issues rather than polish.
+*** Git presentation observation is not yet durable coordination
+The Magit hook and explicit presentation-observation request exist.  Its
+signature and pending work live in a connection-local scheduler, however, not
+in the planned durable/process-owned observation state.  It consequently lacks
+the same reconnect, failure, priority, and coalescing guarantees.  This should
+probably share the new coordinator rather than grow another special queue.
+*** The client-side acknowledged-manifest cache is an obsolete intention
+The plan says both clients mirror acknowledged path outcomes and pending
+failures.  The old verification reply did transmit the entire path-outcome
+map, but neither client ever read it; that was the large handshake payload I
+removed.  The server is already authoritative, successful reloads wait for the
+exact Tantivy generation, and incident IDs can represent unresolved work.
+
+I do not recommend resurrecting a multi-megabyte client mirror merely to make
+the progress document literally true.  The new observation coordinator should
+keep that state process-side and expose only compact status/incident data.  We
+should update the plan/progress wording when its replacement lands.
+** Scope and proposed order
+I did not find comparable abandoned cores in normalization, telescope source
+selection, stable store transactions, TypeDB/Tantivy recovery, fatal-reference
+handling, extra-ID fallback, or cyclic-root repair.  The orphans cluster at the
+edges: scheduling, request lifetime, reconnect, and presentation.
+
+I propose to implement them in this dependency order:
+
+1. make request termination and disconnect cleanup total;
+2. introduce the process-wide cooperative observation coordinator;
+3. add foreground preemption, view fast lanes, and reconciliation status;
+4. reattach surviving views/incidents across reconnect; and
+5. close the collateral/search/token and Git-presentation gaps.
+
+That is more work than just moving the full sweep onto a thread, but doing only
+the latter would leave precisely the disconnect and ownership holes the plan
+was trying to avoid.  I will split it into independently tested changes and
+keep this document as the decision/work log once Jeff confirms the view-status
+contract.
+* Jeff responds
+** I take it back. Simpler than the fast lane, we could instead
+*** Not permit pull or rebuild while open views are dirty.
+This means moving pull-all.sh from data/bash/ into the skg client.
+It also means that even if we detect out-of-band changes,
+we don't incorporate them until the user's views are clean.
+We should report to the user that such work is pending,
+and once they clean the last view, ask them whether we can proceed.
+If not there should be a manual command
+to rebuild only the part that changed.
+
+I imagine there are corner cases I haven't anticipated.
+Please look for those.
+
+If we do this, can we drop the need for the background worker?
+*** Not let them dirty any view during pull or rebuild.
+They can still query as much as they want.
+** I agree with your suggestions for the holes you found.
+But if my change of tack reduced the number of things you need to do,
+that would be good news.
+* Codex responds again
+** Short answer
+This is a real simplification, and I prefer it to the fast lane.  It lets us
+drop view-prioritized observation and makes a commanded pull's normal path
+conflict-free: begin only when every view is clean, prevent edits, pull,
+reconcile, refresh every surviving view, and only then unlock.
+
+It does not quite let us drop the background observation worker if both of
+these remain requirements:
+
+- missed watcher events are eventually found by an exact sweep; and
+- queries remain usable while that potentially 40-second sweep runs.
+
+Today the sweep is a synchronous request on the one interactive connection,
+so it blocks every query behind it.  We can, however, reduce the worker to a
+much simpler process-owned observer/maintenance job.  It need not promote view
+paths, mediate ordinary edits, or mutate connection-owned view state.  It
+enumerates and hashes paths, retains the pending generations, and hands one
+stable change set back to the serialized transition.  File notifications can
+continue to provide the cheap immediate indication that work is pending.
+
+If it is acceptable for all queries to pause during every exact sweep, then we
+can omit that worker.  That is the actual trade: the editing restriction alone
+does not unblock the TCP request loop.
+** Pull and full rebuild have different query-safety properties
+A pull only changes disk.  Until reconciliation, queries can consistently use
+the old selected graph and indexes.  New query/view buffers must be born
+edit-locked and join the final refresh census, but read-only querying is safe.
+A query which straddles the final graph transition should finish against one
+pinned generation or be retried, never combine graph and TypeDB data from two
+generations.
+
+The current full rebuild is different.  It deletes and recreates the live
+TypeDB database and the live Tantivy directory in place.  Concurrent queries
+can therefore see a missing or half-populated database; putting that function
+on a worker thread does not make it safe.
+
+There are two honest choices:
+
+1. Initially make full rebuild an exclusive maintenance operation: no editing
+   and no queries until it finishes.  Pull plus partial reconciliation still
+   permits queries throughout.  This is my recommendation.
+2. Build TypeDB and Tantivy under shadow generation names and atomically swap
+   the server's store handle after both are ready.  Then queries can remain on
+   the old generation during a rebuild.  That is a useful design, but it is a
+   separate and substantial store-lifecycle project.
+
+Thus I would not promise "query as much as you want during rebuild" in the
+first implementation.  It is safe during pull, observation, and an ordinary
+partial transition; a destructive repair rebuild should visibly enter
+exclusive maintenance.
+** Corner cases the rule needs to cover
+*** A pending disk change can prevent a dirty view from being saved cleanly
+Suppose an external writer changes a telescope while a related view is dirty.
+We correctly postpone incorporating the disk change.  The user then tries to
+clean the view by saving it.  The current save path does not compare every
+would-be-written path with the graph-selected manifest before writing, so it
+can overwrite the external bytes which are still pending.
+
+Every save therefore needs a disk-generation precondition on its complete
+prepared write/delete set.  If those paths still match the selected manifest,
+the save can finish and reduce the dirty census.  If any drifted, ordinary save
+must write nothing and enter an explicit base/local/disk resolution.  There is
+no policy which simultaneously says "never incorporate while any view is
+dirty", "never discard either side", and "ordinary save can always make the
+view clean"; an overlap requires a deliberate conflict-resolution exception
+or requires the user to discard one side.  I recommend retaining the existing
+three-way conflict UI for this exceptional case.
+*** Once pending work is known, letting clean views become dirty defeats convergence
+The cleanest state machine is a draining state:
+
+1. An out-of-band candidate arrives.  Skg reports pending reconciliation.
+2. Views already dirty remain editable so the user can finish them, subject to
+   the disk-generation save check above.
+3. Every currently clean view, every view as it becomes clean, and every newly
+   queried view is edit-locked.  Hence no new dirty view can join the census.
+4. Once the last dirty view is clean and no save/request is still finishing,
+   Skg schedules (rather than nests inside the save handler) one prompt.
+5. Approval starts reconciliation under the same lock.  Successful refresh of
+   all views ends the incident and unlocks them.
+
+This extends Jeff's no-new-edits rule from the pull itself to the short period
+in which already-dirty views drain.  Without it, a different view can become
+dirty just as the last old one becomes clean, and the prompt races forever.
+*** "Not now" needs defined semantics
+If the user declines the prompt and all views become ordinarily editable
+again, the system immediately returns to the save collision and stale-base
+problems above.  The simplest meaning of "not now" is therefore: retain the
+pending incident and leave Skg in read/query-only mode.  A manual
+=skg-reconcile-pending-changes= command later performs a partial reload of the
+retained changed paths (plus an exact fence), refreshes, and unlocks.
+
+If Jeff wants "not now, but let me keep editing", we can support it, but it
+needs the disk-generation save guard and conflict workflow on every intervening
+save.  That is less simple.  Also, the manual operation is a /partial reload/,
+not a database rebuild; naming it that way will keep the destructive repair
+command distinct.
+*** A pull can fail after changing some repositories
+Cancellation, authentication failure, a merge conflict, or failure in a later
+repository does not mean the worktree is unchanged.  The client must close its
+batch bracket in an unwind/finalizer, then reconcile whatever actually changed
+before unlocking.  A failed pull whose disk cannot be legally loaded leaves
+the views locked with an actionable report; it must not unlock merely because
+the Git subprocess exited.
+
+Moving the command into the client means the client owns this lifecycle.  The
+Git processes should still be asynchronous so Emacs/Neovim can answer queries
+and display password/conflict output.  The operation has to preserve the
+current script's partial-success behavior rather than treating the repo loop as
+atomic.
+*** The edit lock must be a state, not a one-time pass over buffers
+The existing save lock covers only buffers which exist when it is installed.
+During a query-enabled pull the user can open new views, so a process-local
+maintenance epoch must cause view constructors to lock those too.  Pure
+navigation, opening views/searches, copying text, and closing views remain
+allowed.  Commands which sound query-like but edit metadata and auto-save
+(such as requesting a collection in the current view) are writes and must be
+refused.
+
+Modified raw buffers visiting configured =.skg= files also belong in the
+preflight.  Git does not know about their unsaved editor contents; a pull can
+replace their on-disk files and a later ordinary file save can silently put the
+old text back.  Such buffers must be clean before a commanded pull and locked
+against saving for its duration.  Counting only =skg-view-uri= buffers misses
+them today.
+*** The end of reconciliation needs a fence, not merely an empty queue
+Watcher delivery can lag.  A file can also change after the full manifest was
+enumerated but before views unlock.  The maintenance epoch therefore needs a
+monotonic observation fence: the final selected manifest must equal an exact
+post-batch observation, and no newer watcher generation may be pending.  A
+writer which never becomes quiescent should leave a visible pending/locked
+state rather than cause a busy retry loop.
+
+Additions, deletions, atomic renames, config/source changes, and Git
+presentation-only changes must all advance the relevant generation.  The last
+one may require only rerendering diff-mode views, but it is still part of the
+"safe to unlock" decision.
+*** Disconnect and multiple-client cases become more important, not less
+The current sentinel unlocks all buffers and forgets request callbacks.  If a
+connection drops during a pull, that behavior would defeat the safety rule at
+exactly the dangerous moment.  The maintenance/pending epoch must be
+process-owned; reconnect verification must rediscover it, reattach surviving
+views, and restore their lock before editing is enabled.  If the editor itself
+dies, the next client must reconcile the possibly changed disk before enabling
+writes.
+
+The design assumes one interactive client, but the server currently accepts
+more than one connection.  A server-issued maintenance lease must either prove
+there is only one verified interactive client or collect/lock all of them.
+Client-only checking in Emacs is not enough when Neovim can also issue rebuild
+and save requests.  Shell/control connections do not count as interactive
+clients, but all state-mutating endpoints should require or respect the
+process-wide epoch.
+*** Failure and authorization are terminal states too
+Invalid YAML, ownership/ID conflicts, telescope scalar-release questions,
+TypeDB failure, and failed Tantivy indexing can prevent reconciliation after
+the disk has changed.  Only a fully acknowledged graph/TypeDB/Tantivy
+generation plus completed view presentation permits unlock.  Otherwise the
+incident remains visible and read/query-only, with explicit repair, recovery,
+or authorization commands.  A full rebuild which fails after deleting the old
+TypeDB is especially unable to return to queryable normal mode.
+** What this removes, and what remains
+This change removes the proposed view fast lane.  It also removes dirty-view
+conflicts from the /commanded pull/rebuild happy path/, and makes
+"stale-before-first-edit" unnecessary for views created during maintenance:
+they are simply locked until refreshed.
+
+It does not remove:
+
+- total request termination and disconnect cleanup;
+- the process-owned pending-incident/maintenance state and reconnect census;
+- a pure observation job, unless we accept blocking queries during exact
+  scans or weaken missed-event recovery;
+- generation-safe search reruns and client-token checks;
+- the collateral scheduler for ordinary saves, which can still affect other
+  open views; or
+- durable/coalesced Git presentation observation.
+
+The observer is nevertheless much smaller than the one I previously
+described: no view-path priority, no edit preemption, and no attempt to make a
+partially scanned graph display-current.  It only discovers exact disk state
+without monopolizing the interactive connection.
+** Revised implementation order
+I propose:
+
+1. make request/disconnect cleanup total and add the process-wide maintenance
+   epoch/lease;
+2. add a complete save write-set versus disk-generation precondition;
+3. implement the client-owned asynchronous pull command and the clean/draining
+   locks, including raw =.skg= buffers and newly opened views;
+4. move exact observation into the simple server-owned job, then apply one
+   fenced partial transition and refresh before unlock;
+5. reattach pending maintenance and views on reconnect; and
+6. finish the independent collateral/search/token and Git-presentation holes.
+
+For the first version I recommend (a) live queries during pull and partial
+reconciliation, (b) exclusive full rebuild, (c) no new edits once pending work
+is known, and (d) "not now" means remain read/query-only until the manual
+partial-reconciliation command runs.  If Jeff agrees with those four precise
+meanings, the architecture is settled enough to implement without silently
+choosing among the corner cases.
+* Jeff considers something hopefully simpler yet.
+If a buffer is dirty, compute the ordinary text diff
+(on the raw buffer text)
+of that buffer against its last received-from-server clean state.
+Make the buffer unsaveable and uneditable,
+except that the uesr can fold/unfold ala org,
+and can undo/redo to see its history.
+
+Make a folder, 'unsaved-work-intterrupted-by-rebuild/',
+and for each offending buffer,
+create a folder named after its original root node,
+with three files:
+last-fetched.org, unsaved-changes.org, and diff.txt.
+
+This way a dirty buffer doesn't even have to interrupt rebuild.
+
+I don't think it makes things more difficult for the user:
+A conflict is going to be a headache one way or the other,
+and extracting changes from a diff is a familiar kind.
+But please push back if you think I'm wrong.
+
+Before walking me through all the decisions that would need to be made
+in order to do this, evaluate the idea for me.
+Would this in fact require less work than the last idea?
+* Codex evaluates the archive idea
+** Verdict: yes, with a qualification
+Yes.  This requires less machinery than the draining design, provided an
+interrupted dirty buffer stops being a live Skg view.  After its evidence is
+durably archived, it should become a read-only recovery artifact which the
+server no longer regards as open.  The user can inspect it and its undo
+history, but cannot save it back through Skg; a newly queried view represents
+the post-rebuild graph.
+
+That boundary is what makes the idea simple.  If the old dirty buffer keeps its
+live =view-uri= and is expected eventually to rejoin the graph, we still need
+base generations, conflict state, reattachment, token checks, and careful
+collateral scheduling, and most of the simplification disappears.
+** What becomes simpler
+We can delete the proposed "wait for all dirty views to drain" protocol and
+its difficult case where a pending disk change prevents the last dirty view
+from saving.  A user-commanded pull or rebuild can instead do this:
+
+1. freeze the set of current views;
+2. durably archive every dirty one's last server text, current raw text, and
+   their ordinary diff;
+3. retire and lock those dirty views, and edit-lock the clean ones;
+4. perform the maintenance operation; and
+5. refresh the clean live views before unlocking them.
+
+No unsaved text is fed into an uncertain merge, and no rebuild has to wait for
+the user.  A crash after step 2 still leaves ordinary files from which to
+recover.  This also sharply reduces the reconnect problem for dirty views:
+their safety no longer depends on reconstructing volatile client/server view
+state.
+
+The archive itself is modest, auditable client work.  An ordinary unified diff
+between =last-fetched.org= and =unsaved-changes.org= is a good choice: it
+records exactly what changed locally without pretending Skg understands the
+user's intent.  Folding is normally overlay/visibility state and is compatible
+with a text lock.  Undo/redo while otherwise read-only needs small custom
+wrappers in both clients, but it is bounded work; the on-disk snapshot remains
+the durable authority even while undo changes what the retired buffer shows.
+** My pushback is about user cost, not technical soundness
+A conflict is not always inevitable.  A dirty view may be wholly unrelated to
+the paths changed by a pull, and the present impact analysis can sometimes
+prove that and preserve the edit session untouched.  The conservative archive
+rule interrupts /every/ dirty view.  It trades a complicated rare conflict
+workflow for a simple but more frequent manual recovery workflow.
+
+The raw diff is familiar, but recovery may still be more awkward than a normal
+source-file merge.  One rendered view can contain edits to several nodes,
+generated collections, repeated appearances, and Skg metadata; its directory
+being named for the original root does not mean all changes belong to that
+root.  After the graph changes, hunks may need to be interpreted and reapplied
+rather than patched mechanically.
+
+I think that trade is reasonable for explicit, comparatively rare maintenance
+commands which the user knowingly starts.  I would push back against silently
+archiving active work whenever any watcher event arrives.  For an unsolicited
+out-of-band change, Skg should report what it detected and ask before it
+interrupts dirty views.  If such interruptions become common, the simpler
+implementation will have made ordinary use materially harder.
+** It does not remove all of the earlier work
+The archive rule removes the draining state, the view fast lane, and most
+dirty-view reattachment/conflict machinery from the maintenance path.  It does
+not remove:
+
+- exact observation and its worker if queries must remain responsive during a
+  long sweep;
+- the current full rebuild's inability to serve safe concurrent queries while
+  it destroys and recreates the live TypeDB/Tantivy stores;
+- process-owned maintenance state, total disconnect cleanup, and a final
+  watcher-generation fence;
+- locking views opened during maintenance and refreshing clean live views;
+- generation-safe search reruns, collateral handling for ordinary saves, and
+  Git-presentation observation; or
+- a save-side disk-generation precondition, because an unseen external write
+  can still race an ordinary save before any maintenance command begins.
+
+It also does not by itself cover a modified raw buffer visiting an actual
+=.skg= file.  Such a buffer has no "last received from server" rendering and
+can overwrite pulled bytes later.  It needs either its own disk-based archive
+variant or a refusal to begin maintenance until it is clean.
+** Overall assessment
+This is a smaller and more failure-tolerant design than my previous proposal.
+Its new persistence and read-only-buffer code is substantially cheaper than
+the draining/conflict/rejoin state machine it replaces.  It does not eliminate
+the observation worker or the independent coordinator holes, but it reduces
+the hardest client-side portion of the project.
+
+I would adopt it if Jeff accepts this precise product trade: starting a
+maintenance operation while views are dirty may convert otherwise unaffected
+unsaved sessions into manual diff-based recovery.  I would make that loss of
+convenience explicit in the confirmation prompt and never archive/retire a
+dirty view merely because a background watcher fired.  Subject to that, I
+think the idea is sound.  I have intentionally stopped at evaluation here,
+rather than expanding the archive naming, lifetime, security, multi-root,
+failure, and cleanup choices Jeff asked to discuss only afterward.
+* Jeff
+** Let's archive the undo history too.
+And create some mechanism for reloading a view with that undo history.
+(That might already exist online, or even as a builtin part of Emacs.)
+** Good point about orthogonal views.
+After rebuild we should check whether each view is in fact impacted,
+releasing those that are not.
+A coarse first cut is to call it orthogonal if none of the viewnode IDs
+in the buffer were involved at all (add, delete, modify) in the pull.
+If the pull would change heralds in the view,
+e.g. because something now has a subscriber,
+that's still sufficiently orthogonal to be safe.
+If an indefinitive node's contents were not drawn,
+and one of those contents changed, that's fine too.
+
+I guess we should divide unsaved-work-intterrupted-by-rebuild/
+into incident subfolders.
+That would have an interrupted-buffers subfolder,
+a new-nodes subfolder, a deleted-nodes subfolder, and amodified-nodes subfolder.
+Those folders for the changes should provide the relevant diff for each node.
+This should make it feasible for the user to see why anything was a problem.
+** agreed to this
+For an unsolicited
+out-of-band change, Skg should report what it detected and ask before it
+interrupts dirty views.
+** re. "locking views opened during maintenance and refreshing clean live views;"
+Why treat views opened during maintenance different from others?
+* Codex enumerates the choices.
+Some children in this tree are by
+the author that did not write their parent.
+** DONE (probably) First: views opened during maintenance are not semantically different
+I feel strongly about this because generation, cleanliness, and view kind are
+the facts relevant to safety; creation time is not.  Giving mid-maintenance
+views a separate lifecycle would add a second protocol for no semantic gain.
+
+Jeff is right.  I singled them out only because a one-time pass over the
+current buffer list would fail to lock them.  The correct rule is uniform:
+every live view carries the graph generation from which it was rendered and
+obeys the current maintenance epoch.
+
+During a pull, a newly requested view may be served from the coherent old
+generation, is born edit-locked, and joins the same impact/refresh decision as
+every older view.  If it was born after the new graph was selected, its
+generation proves that it needs no refresh.  During the present destructive
+full rebuild no query can safely run at all; if we later add shadow stores,
+new views can again use the old generation exactly as they do during a pull.
+
+Thus "views opened during maintenance" needs no special product behavior.
+View construction merely has to consult the epoch, which is an implementation
+invariant easy to overlook.
+** DONE What I take to be settled
+I read Jeff's latest section as settling these points:
+
+- A maintenance operation may begin with dirty views; dirty text does not
+  delay the disk/store operation.
+- Before any dirty work can be lost, Skg writes durable recovery evidence,
+  including undo history.
+- After the candidate graph is known, a dirty view whose displayed node IDs
+  are orthogonal to the semantic node changes remains a live editable view.
+  An impacted dirty view is retired into recovery rather than merged.
+- Derived-only changes such as herald changes do not make a view impacted.
+  Nor does a change to content which an indefinitive viewnode did not draw.
+- One maintenance incident contains buffer evidence plus per-node evidence for
+  additions, deletions, and modifications.
+- Unsolicited out-of-band work asks before it freezes/archives active work.
+
+There are still important meanings to pin down beneath those statements.  I
+give my recommended answer for each below; these are product and correctness
+choices, not yet an implementation plan.
+
+I have now marked the nineteen answers about which I feel strongly as
+=DONE (probably)=.  "Probably" means Jeff can still reopen one, not that its
+invariant is optional.  I deliberately left 6, 7, 11, 12, 14, 17, and 20 open;
+those contain genuine product-preference or scope choices.
+** DONE 1. What operations use this protocol?
+I feel strongly that the safety boundary should be defined by what an
+operation does---selects disk state---not by which command happened to trigger
+it.  Separate protocols inevitably leave a watcher, repair, or config path
+able to bypass archival and locking.
+
+The choices are explicit pull only; pull plus explicit full rebuild; or every
+operation which selects disk state not produced by the current Skg save.
+
+Recommendation: use one maintenance-incident protocol for client-owned pull,
+explicit full rebuild, approved out-of-band reconciliation, watcher-gap/full
+sweep repair, and config/source-set disk replacement.  The observation phase
+can discover there was no semantic change and finish as a no-op.  Ordinary Skg
+saves remain ordinary graph transitions, with their own disk-generation
+precondition.
+** DONE 2. Archive every dirty view up front, or only views later proved impacted?
+The archive must precede the operation which creates the risk.  Otherwise a
+client crash midway through Git can lose the only copy of dirty work before we
+have enough information to classify it.  Extra snapshots are a small price for
+putting the point of no return after durable evidence.
+
+We cannot know pull impact until Git has changed disk and the candidate graph
+has been folded.  We can either keep all dirty work only in volatile editor
+memory until then, or snapshot all dirty views before launching Git and later
+retire only the impacted ones.
+
+Recommendation: durably snapshot every dirty view before the first external
+mutation.  After classification, release orthogonal views unchanged and mark
+their snapshots "released-unimpacted" in the incident.  Keep those snapshots
+rather than deleting them: they are cheap evidence of what the maintenance
+boundary protected, and they close the client-crash window during a long pull.
+Only impacted buffers enter the user-facing interrupted list.
+** DONE 3. What exactly is a changed node?
+Impact is a semantic question.  Using path bytes would both interrupt views
+for harmless rewrites and miss the fact that one telescope/source-selection
+change can alter a different folded node.  G0-versus-G1 node equality is the
+single representation which matches what Skg can later save.
+
+A changed file/telescope is too coarse.  One telescope can contain several
+semantic nodes or source sections, and a byte-only whitespace change need not
+affect a displayed node.
+
+Recommendation: compare the fully folded semantic =NodeComplete= maps of G0
+and candidate G1 by canonical primary ID:
+
+- present only in G1: new;
+- present only in G0: deleted;
+- present in both but semantically unequal: modified; and
+- equal after parsing/folding: unchanged, even if source bytes differ.
+
+Source, scalar text/source provenance, extra IDs, and authored outgoing
+relationships are semantic fields, so changing them modifies the primary
+node.  A primary-ID change is a deletion plus an addition.  Derived inverse
+facts, heralds, ranks, and generated presentation are not themselves node
+modifications.  Invalid disk which cannot produce G1 is not a node diff; it
+belongs in a separate =invalid-paths= incident section.
+** DONE 4. Which IDs count as being "in the buffer"?
+The union and conservative fallback are the narrowest rule I trust not to
+produce false negatives.  Ignoring the dirty text loses newly typed IDs;
+ignoring the clean forest loses IDs the user deleted locally; ignoring
+phantoms misses additions which make an old unknown reference real.
+
+Using the current =ViewState.pids= alone is insufficient.  It includes only
+active normal vognodes.  In particular, it omits an Unknown placeholder whose
+ID might be the very node just added.  It also reflects the last clean server
+forest, not IDs the user added or removed in dirty raw text.
+
+Recommendation: take the union of identifiable viewnode IDs in (a) the last
+server-rendered forest and (b) a conservative parse of the current raw buffer.
+Include active nodes and ID-bearing Unknown, Deleted, and diff phantoms.
+Anonymous inactive placeholders have no ID and cannot participate.  Resolve
+primary and extra IDs through both G0 and G1 before intersecting with the
+changed-primary-ID set.  If dirty text cannot be parsed enough to establish
+this set, call the view impacted.  Uncertainty must create a recoverable false
+positive, never a destructive false negative.
+
+This implements Jeff's intended coarse rule:
+
+  =impacted(view) := displayed_ids(last_clean ∪ dirty_raw) ∩ changed_node_ids ≠ ∅=
+
+A changed node outside that set may alter a herald, an inverse read-only
+collection, search membership, or undrawn content; those presentation effects
+alone are deliberately accepted as orthogonal.
+** DONE 5. Does "orthogonal" mean current, or only safe to keep editing?
+I feel strongly that "safe to retain" and "freshly rendered" must be distinct
+states.  Treating them as the same either lies about stale presentation or
+forces us to overwrite the very unsaved text the orthogonality rule preserved.
+
+An orthogonal view can still have stale heralds or generated presentation, by
+design.  Calling it current would be false, and refreshing it would overwrite
+the unsaved text we just chose to preserve.
+
+Recommendation: release it editable with a visible
+"preserved across maintenance; presentation may be stale" status.  Keep its
+old forest and application token registered against the new graph generation
+as an explicitly preserved base.  Permit it to save; that save is parsed and
+completed against G1 and clears the status after success.  Reopening/explicitly
+refreshing may instead discard its local edits only after the ordinary warning.
+An automatic collateral offer must never overwrite it while dirty.
+
+This distinction is important: orthogonality proves the old edit session is
+safe enough to retain, not that every byte the server would now render is
+identical.
+** DONE 6. Do generated view kinds use the same coarse test
+Search membership/ranking and Git-diff phantoms can change because of nodes
+which did not occur in the old result.  An ID-intersection test therefore
+cannot prove their presentation unchanged.  Override menus and other
+transient/generated views are not authoritative editing surfaces either.
+
+Recommendation: apply the orthogonality rule to ordinary content views.  Clean
+search/menu/generated views are regenerated or closed normally.  If one has
+somehow become user-dirty, archive and retire it conservatively rather than
+calling it orthogonal.  If Jeff intends search results to be first-class
+savable edit sessions, that is a different answer: they need a query-aware
+impact rule and durable query recipe.
+*** DONE yes, search buffers should be treated like normal content buffers
+It's not a big deal that the rankings or even other content may have changed;
+just warn the user.
+**** Codex agrees
+Settled.  Search buffers use the same displayed-ID test and the same dirty
+buffer preservation/retirement rule as content buffers.  Their query result
+set and ordering are allowed to be stale.  We tag that state and warn rather
+than treating query drift as impact or automatically rerunning the query.
+
+For a clean search whose displayed nodes are impacted, Skg may rerender the
+existing result forest so those displayed nodes are current; that is not a
+new search, and it deliberately does not recompute membership or ranking.
+An explicit search is the only operation which does that.
+*** DONE most non-search, non-content-view buffers can be closed, I think
+None of them, I believe, are critical --
+the ID stack, the metadata view, etc.
+But let's do a complete inventory.
+We shouldn't, for instance, close any warning or error buffers.
+What other kinds of buffers might matter?
+**** DONE Codex's inventory and recommendation
+I audited every buffer constructor in the current Emacs and Neovim clients.
+There are four classes.  One correction is important: the metadata editor is
+not merely a generated display.  It can contain an edit which has not yet
+been copied back into its originating view.
+
+***** Server-registered graph views
+
+- Ordinary content views, new-empty content views, and search views are the
+  authoritative edit sessions already covered by the coarse test.
+- Override-choice menus are registered graph views but are intended as
+  navigation menus.  An unmodified one can be closed.  If it has been edited,
+  however, the current clients have allowed real buffer work to accumulate in
+  it; archive and retire it conservatively rather than silently killing it.
+
+****** DONE okay but let's mark what kind it is
+The incident archive should indicate the kind of each buffer somewhere.
+Does each buffer in an incident archive have a readme?
+It probably ought to, even just to record this if nothing else.
+
+***** Unfinished client-side workflows
+
+****** DONE =*skg-metadata-edit*= / =skg://metadata-edit/...=
+  contains an uncommitted
+  metadata edit and a continuation back into a particular source buffer and
+  location.  Treat its originating view as logically dirty while this editor
+  exists.  Archive the editor with that view.  If the origin is orthogonal,
+  release both together after checking the origin token/location; if the
+  origin is retired, leave the editor as detached recovery too.  Never just
+  close it.
+****** DONE =*SKG Fork Confirmation*= / =skg://fork-confirmation=
+  is an unfinished save
+  transaction.  It contains chosen clone sources, refers to its originating
+  view, and its kill hook actively changes that origin by cancelling a fork
+  request.  It must travel with the origin through archive and classification;
+  it must not be killed as cleanup.
+****** DONE =*skg-reload-from-id-stack*= is the control surface for an in-progress or
+  proposed partial reload.  Maintenance operations are serialized, so it
+  remains until its operation reports a terminal result.  A second operation
+  cannot close it out from under the first.
+****** DONE The relationship-kind menu has no user text, but holds a continuation into
+  the originating view.  It should be explicitly cancelled and closed, with
+  a notice, before that origin can be replaced or retired.
+****** DONE Existing disk/client conflict review buffers (the editable origin, its
+  =*SKG incoming: ...*= and =*SKG base: ...*= companions, and the Ediff
+  session) are a recovery workflow, not disposable output.  The new archive
+  design should eventually supersede that workflow.  If one already exists
+  when maintenance starts, archive the whole bundle and then end the Ediff
+  session explicitly; never silently reap its pieces.
+
+***** Client-local state and generated reports
+
+****** DONE The ID-stack buffer is client-local, not graph-authoritative.  A clean one
+  can be closed and recreated from the saved in-memory stack.  A modified one
+  contains unsaved stack edits, so leave it open; it needs neither a graph
+  lock nor a view archive.  After maintenance, warn that IDs in it may now be
+  stale.
+****** DONE Clean derived displays can be closed and regenerated:
+  the source inventory,
+  metadata-free copy, Org-ancestry view, diff analysis, export report,
+  stage-moves script, git-add preview/output, and the Neovim Git-diff buffer.
+  If the user has modified any such buffer, do not close it.  It has no Skg
+  save authority, so leaving it alone is safe; mark graph-derived material as
+  possibly stale where appropriate.
+****** DONE Warning, error, conflict-summary, recovery, pending-recovery,
+  reconciliation, and rerender-message buffers must remain.  Maintenance must
+  neither close them nor erase an older one merely to reuse its conventional
+  name; a new incident should append or use a distinct incident-qualified
+  buffer.  The same preservation rule applies to the main diff/export report
+  when it is the only durable-on-screen account of a failed command.
+
+***** DONE Buffers Skg does not own
+
+Raw visited =.skg= files are choice 20 below.  Magit/Neogit buffers, ordinary
+file buffers, process buffers, and editor/plugin picker buffers are not Skg
+maintenance targets and are never auto-closed.
+
+Thus the mechanical rule should be: auto-close only a buffer explicitly
+tagged by Skg as disposable, with no pending continuation and no modification;
+never infer disposability merely from its name or from the absence of a
+=view-uri=.  I believe that is a complete inventory of the buffers the two
+current clients create.  The remaining product choice here is whether you
+agree that unfinished metadata/fork/conflict workflows receive the stronger
+treatment above.
+** DONE 7. What happens to clean views?
+Recommendation: use the same changed-ID test for efficiency, but there is no
+data-loss issue.  Refresh impacted clean views; unlock orthogonal clean views
+without waiting for their herald-only refresh.  A later low-priority
+presentation refresh may update them because they remain clean.  A clean view
+created during maintenance follows precisely this rule based on its recorded
+generation.
+
+The full-rebuild handler must stop clearing =ViewsState= blindly.  It must
+preserve the registered recipes/forests long enough to make this decision.
+*** DONE yes but warn
+the user that the heralds might be stale,
+both for the current view if that's true,
+and any time they switch to another view with heralds
+**** Codex agrees
+Settled exactly that way.  Every preserved-but-not-rerendered view records
+that its generated presentation may be stale.  At the generation transition,
+warn immediately if the current view has heralds and that flag.  Thereafter,
+every switch into any such herald-bearing view warns again, until a successful
+save, rerender, refresh, or reopen clears the flag.  This is not a one-time
+warning: switching away and back warns again, as requested.  The message
+should name the maintenance incident/generation and say that authored buffer
+text was preserved but the heralds may reflect the old graph.
+** DONE 8. What is the archive root and trust boundary?
+This is private recovery data, not an Skg source or a Git working tree.  Strong
+permissions and structural exclusion from configured sources are
+correctness/privacy requirements, not UI preferences.
+
+The suggested directory can contain private bodies several times over, so it
+must not land inside a configured source, be watched as Skg input, or be
+casually committed to Git.
+
+Recommendation: put a configurable
+=unsaved-work-interrupted-by-rebuild/= beside the config's =logs/= and derived
+database directories, with directories mode 0700 and files mode 0600.  Use the
+correct spelling =interrupted= now, before the path becomes an API; likewise
+=modified-nodes= rather than =amodified-nodes=.  Refuse a configured archive
+root which is at or below any source directory.
+** DONE 9. How are incidents and buffers named?
+Root titles or root IDs alone cannot identify views without collisions.  An
+opaque incident ID, stable view key, and explicit manifest keep filesystem
+naming boring while preserving every human-facing identity separately.
+
+An original root ID alone is not unique: content views can have several roots,
+two views can share a root, a root may be addressed by an extra ID, and search
+views have a query rather than an original root.
+
+Recommendation: name incident directories with UTC timestamp plus UUID, never
+overwrite one, and give each buffer directory a filesystem-safe primary root
+ID plus a short view-identity suffix.  For multi-root/non-content views use a
+neutral =view-N= key.  A machine-readable manifest maps that key to original
+buffer name, view URI, all root IDs, source set, graph generation, client kind
+and version, and final disposition.  A human-readable =incident.org= explains
+the same incident; directory names are identifiers, not the only metadata.
+
+I would slightly generalize Jeff's layout to:
+
+  =INCIDENT/buffer-snapshots/VIEW-KEY/...=
+  =INCIDENT/interrupted-buffers/VIEW-KEY= (a manifest entry or link)
+  =INCIDENT/new-nodes/PID/...=
+  =INCIDENT/deleted-nodes/PID/...=
+  =INCIDENT/modified-nodes/PID/...=
+  =INCIDENT/invalid-paths/...=
+
+This lets us snapshot all dirty buffers before Git while reserving
+"interrupted" for those eventually proved impacted.
+** DONE 10. What exactly is stored for a buffer?
+The two complete texts and their diff are the minimum editor-independent
+recovery proof.  Undo and metadata add convenience and fidelity, but must not
+be the only way to recover the latest local bytes or identify their graph base.
+
+Recommendation: the required buffer record contains:
+
+- =last-fetched.org=: exact raw server text, without display properties;
+- =unsaved-changes.org=: exact raw text at the maintenance boundary;
+- =diff.txt=: UTF-8 unified diff with stable filenames and ordinary line
+  endings;
+- a client-native undo sidecar;
+- metadata/checksums naming the view, G0 generation/application token, roots,
+  source set, point, and fold state; and
+- final disposition: interrupted, released-unimpacted, or maintenance-aborted.
+
+The last-fetched value must be captured on every server application path, not
+reconstructed from the undo list.  The diff and the two complete texts remain
+the universal recovery contract even if a future editor cannot decode the undo
+sidecar.
+** DONE 11. Exact native undo or a portable invented history?
+Neovim already has an exact persistent undo-tree format and explicit
+=:wundo= / =:rundo=.  Emacs exposes =buffer-undo-list=, but its entries may
+contain markers and arbitrary =apply= records; Emacs has no corresponding
+built-in durable write/read command.  Its built-in =buffer-swap-text= preserves
+the undo list when moving text between /live/ buffers, which solves same-session
+retirement but not restart recovery.  Persistent-undo packages exist, but
+would be a new dependency.
+
+The references are:
+
+- [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Undo.html][GNU Emacs Lisp reference: undo-list representation]];
+- [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Swapping-Text.html][GNU Emacs Lisp reference: =buffer-swap-text=]]; and
+- [[https://neovim.io/doc/user/undo.html][Neovim's native =:wundo= / =:rundo= documentation]].
+
+The choices are an editor-native sidecar (faithful, version/client-specific),
+a portable sequence of full texts/patches at each undo boundary (large and
+usually linear rather than a faithful branch tree), or adopting an Emacs
+persistent-undo package.
+
+Recommendation: native, client-specific sidecars, explicitly tagged with
+client and version, with the text/diff triplet as permanent fallback.  Use
+Neovim's native facility.  For Emacs, first test a small isolated serializer
+against the real Skg undo lists and the approach used by a maintained
+persistent-undo package; do not naïvely =prin1= arbitrary marker/apply entries.
+Do not promise that an Emacs archive can load in Neovim or across every future
+major version.
+*** DONE What should I install on my Emacs client on host
+to make this workable? (I'm going with your recommendation.)
+**** Codex recommends =undo-fu-session= 0.8
+Install [[https://elpa.nongnu.org/nongnu/undo-fu-session.html][=undo-fu-session= from stable NonGNU ELPA]].  In Emacs:
+
+  =M-x package-refresh-contents=
+  =M-x package-install RET undo-fu-session RET=
+
+You do not need to install =undo-fu= or =undo-tree=, and you do not need to
+enable =undo-fu-session-global-mode= merely for Skg.  Version 0.8 persists the
+ordinary Emacs undo list, pending undo list, nonlinear branch equivalence,
+markers, and overlays; that is the machinery we need.
+
+There is an implementation qualification, but I do not think it reopens the
+product choice.  The package's public contract is for file-visiting buffers,
+whereas Skg views are non-file buffers.  Skg therefore needs a small adapter
+which directs one save/recover operation to the incident-local sidecar without
+turning on the package's normal global file hooks.  The plan should begin that
+part with a round-trip spike against real Skg histories, including history
+after undo and redo.  The archive still cannot cross the point of no return
+unless that round trip and the permanent text/diff fallback were written
+successfully.
+** DONE 12. Is undo archival mandatory for permission to proceed?
+The text triplet prevents loss of the latest unsaved state even if native undo
+serialization fails, but Jeff has now made history part of the archive
+contract.
+
+Recommendation: a failed undo-sidecar write aborts maintenance by default.
+Offer an explicit second confirmation to proceed with text-and-diff recovery
+only.  Never silently downgrade.  No undo records is a successful empty
+history, not a failure.
+** DONE 13. What does "reload a view with that undo history" mean?
+I feel especially strongly here.  A recovery artifact must not regain live
+save authority merely by being opened; doing so recreates the stale-base
+problem and erases most of the architectural simplification we chose archival
+to obtain.
+
+Reattaching the archive directly as a live Skg view would recreate the stale
+save-authority problem the archive design avoids.
+
+Recommendation: =skg-open-interrupted-view= selects incident and view, visits
+the exact =unsaved-changes.org= text in a detached recovery buffer, restores
+the native undo sidecar when compatible, restores point/folds, and enables a
+special recovery mode.  That mode permits navigation, Org fold/unfold, undo,
+and redo, but refuses Skg save, =write-file=, and automatic refresh.  It carries
+no live =view-uri=.  A separate command opens a fresh live view of the recorded
+root(s) beside it; the user copies or reapplies the desired hunks.
+
+Opening the same archive twice should make independent recovery buffers and
+must not alter the archive.  If native history is incompatible, open the text
+and diff with a clear warning rather than failing recovery altogether.
+** DONE 14. How long are incidents retained?
+Recommendation: never auto-delete them.  Provide list/open/delete commands,
+show total disk usage, and require explicit confirmation to delete an
+incident.  A later optional retention policy can be opt-in.  Node and buffer
+content may be private, so deletion should state that ordinary filesystem
+deletion is not secure erasure.
+*** DONE agreed, just mention to the user how much space the new one and the total take up each time one is written
+**** Codex agrees
+After each incident is atomically published, report both exact and
+human-readable sizes, for example: =Archived incident ...: 19,284,771 bytes
+(18.4 MiB); all retained incidents: 326,841,104 bytes (311.7 MiB).=  Count the
+new incident in the total, and do this for an aborted incident too if we retain
+it as =maintenance-aborted= evidence.
+** DONE 15. What makes archive creation durable enough to cross the point of no return?
+There must be one inspectable boundary between "nothing risky has begun" and
+"recovery is durable."  Staging plus atomic publication gives us that boundary;
+best-effort sequences of ordinary writes do not.
+
+Recommendation: write an incident in a same-filesystem staging directory,
+close and checksum every artifact, write the manifest last, then atomically
+rename it and create a completion marker.  Only after that may Git or a store
+rebuild begin.  Any write, permission, disk-space, diff, or required-undo error
+before the rename aborts with buffers untouched.  On startup, incomplete
+staging directories are reported, never mistaken for complete recovery
+incidents.
+** DONE 16. What is the per-node evidence?
+Neither Git diffs nor canonical nodes alone tell the whole truth.  Semantic
+snapshots explain impact; source paths, digests, and retained bytes explain
+where that semantic change came from.  Keeping both prevents an incident
+report from becoming misleading precisely around telescope folding.
+
+Git diffs alone are not authoritative: sources can be untracked, a pull can
+partly fail, and telescope folding can select among several source sections.
+Conversely, only a canonical whole node can hide which source file supplied a
+field.
+
+Recommendation: for each changed primary PID, store canonical semantic
+=before= and/or =after= node snapshots plus a unified semantic diff, and list
+every contributing source path with before/after digest and outcome.  A new
+node has =after= plus an addition diff; a deletion has =before= plus a deletion
+diff; a modification has both.  Preserve exact touched telescope bytes when
+available, but base impact classification on the semantic node snapshots.
+This makes extra-ID/source-provenance changes explainable without pretending a
+single raw file is the whole node.
+** DONE 17. What happens when the user declines unsolicited maintenance?
+The disk and selected graph then intentionally disagree.  Allowing an
+unconditional save can overwrite the pending disk generation.
+
+The choices are to make all Skg editing read-only until reconciliation, allow
+editing but block every save, or allow only saves whose complete prepared
+write set is proven disjoint from the pending paths/nodes.
+
+Recommendation: continue to allow editing, display a persistent pending badge,
+and allow only server-proven disjoint saves.  A colliding save writes nothing
+and offers "run maintenance (archiving impacted dirty views)" rather than a
+merge.  This is more usable than a global freeze and relies on the save-side
+disk-generation check which is necessary for unseen races anyway.  If Jeff
+wants the absolute smallest first cut, block every save while pending instead.
+*** DONE please describe in more detail, with glossary
+**** Glossary
+***** The /selected generation/, =G0=,
+  is the one coherent graph + TypeDB +
+  Tantivy state which Skg currently answers queries from and permits views to
+  save against.
+***** The /observed candidate/, =Gdisk=,
+  is the coherent graph obtained by reading
+  and folding the changed disk.  It has been validated but has not been made
+  selected.
+***** /Pending disk work/ means that =Gdisk= exists and differs semantically from
+  =G0=, but the user declined the proposed maintenance for now.  Queries still
+  use =G0=; disk already contains the bytes behind =Gdisk=.
+***** A /save proposal/, =S=,
+  is the semantic edit parsed from one live view,
+  before it writes anything.
+***** The save's /prepared write set/
+  is the complete list of files it would
+  create, replace, move, or delete, with their required before-digests and
+  exact proposed after-bytes.  Preparing it has no side effects.
+***** A /colliding save/
+  is one which might overwrite, misinterpret, or invalidate
+  pending disk work.  “The filenames differ” is not enough to prove the
+  absence of a collision: a new extra ID, source selection, relationship, or
+  global uniqueness violation can connect otherwise different files.
+***** A /disjoint save/
+  is a much stronger claim: applying =S= before =Gdisk= and
+  applying it after =Gdisk= have both been validated and produce the same
+  canonical final graph and disk manifest, without overwriting an externally
+  changed byte.  In other words, the two changes commute.
+***** /Reconciliation/
+  is selecting the pending disk work through the maintenance
+  protocol: archive first, build/validate the candidate stores, classify
+  views, and then refresh, preserve, or retire them.
+**** What declining looks like
+Suppose Skg is serving =G0=.  Someone changes node =A= on disk; observation
+constructs =Gdisk= and predicts which dirty views would be retired.  Skg asks,
+and the user chooses “not now.”  Nothing is rolled back on disk.  Instead:
+
+1. =G0= remains the selected query/save base.
+2. A persistent status says that external semantic changes are pending and
+   identifies the candidate/incident.
+3. Existing views remain editable.  New views and searches come from =G0= and
+   carry the same pending/stale notice.
+4. An explicit command can show the changed nodes and can run reconciliation
+   later.
+
+The only dangerous operation in that interval is save: it would write from an
+old graph into a disk that already represents a different graph.
+
+**** The simple save policy
+Allow editing, but reject every Skg save while pending disk work exists.  The
+rejection writes nothing and offers the reconciliation command.  Undo, redo,
+navigation, queries, and more editing continue normally against =G0=.
+
+This is easy to state and test, and it cannot destroy the external bytes.  Its
+cost is that “not now” postpones every save, even a save of an obviously
+unrelated node, until the user accepts reconciliation.
+
+**** What “server-proven disjoint saves” would actually require
+Suppose disk changed =A= and the user edits =B=.  Before allowing the save,
+the server would have to hold both =G0= and =Gdisk= and do all of this without
+writing:
+
+1. prepare =S= from the view and its =G0= base;
+2. verify that none of =S='s files would replace bytes changed in =Gdisk=;
+3. apply and validate =S= speculatively to =Gdisk=, catching global ID,
+   source, override, relationship, and telescope interactions;
+4. also compute =G0 + S= and prove that later adding the pending disk change
+   yields the same canonical graph as =Gdisk + S=; and
+5. at the commit fence, recheck that real disk still has the exact candidate
+   digests, then atomically advance both the selected branch to =G0 + S= and
+   the pending branch to =Gdisk + S=.
+
+If any proof or fence fails, the save writes nothing.  For example, changing
+=A.skg= externally and saving =B.skg= is still colliding if the new =A= claims
+an extra ID which the edited =B= also claims, or if =B='s edit refers to a
+version of =A= which the external change removed.  A pathname intersection
+test would miss both cases.
+
+This dual-generation, commuting-transition machinery is possible, but it is
+substantially more architecture than my earlier short phrase suggested.  The
+existing save-side disk-digest check supplies only the commit fence; it does
+not supply the two speculative graphs or the commutativity proof.
+
+**** Codex's revised recommendation
+For the first implementation, allow editing but block every save while a
+semantic disk candidate is pending.  That is the natural complement of “not
+now”: it postpones incorporation without pretending old-base writes are safe.
+The UI should put “reconcile pending disk changes” directly in the save error,
+so accepting it archives/classifies the current work and then retries no save
+automatically.
+
+We can add proven-disjoint saves later if pending intervals prove frequent
+enough to justify a true dual-generation engine.  I now recommend against
+making that engine part of this plan.  Thus the remaining choice is the
+product tradeoff: block all saves while pending, or pay for that engine now.
+
+***** TODO agreed
+
+** DONE 18. When exactly is the user asked?
+A filesystem event is evidence that inspection is needed, not evidence that
+the selected semantic graph changed.  Interrupting work on raw events would
+turn harmless metadata touches, duplicate notifications, and Skg's own write
+echoes into needless recovery incidents.
+
+Recommendation: a raw watcher event merely queues observation.  Ask only after
+stable hashing/parsing proves a new semantic disk generation, so metadata
+touches and echoes of Skg's own writes do not interrupt the user.  Coalesce all
+changes already pending into one proposed incident and show the dirty buffers
+which the coarse rule predicts will be interrupted.  Explicit pull/rebuild
+asks once up front if any buffer is dirty; its confirmation authorizes archival
+but not silent recovery from later invalid disk.
+*** DONE What does 'proves a new semantic disk generation' mean?
+**** Codex clarifies
+It means more than noticing a changed mtime, and less than committing the
+change to the live stores.
+
+First the observer obtains a stable, exact disk candidate: path names and
+BLAKE3 digests identify the bytes it read, watcher generations fence the scan,
+and any relevant event which arrives during the scan makes it incorporate or
+reread that path before closing the candidate.  It then parses all changed
+sources, applies the normal privacy/source-selection and telescope-folding
+rules, and validates the result as one candidate =NodeComplete= graph.
+
+It compares that candidate graph with selected =G0= by canonical primary ID,
+using choice 3's semantic equality.  There is a “new semantic disk
+generation” only if the candidate has at least one added, deleted, or modified
+semantic node.  For example:
+
+- touching a file, changing whitespace which parses identically, or observing
+  Skg's own already-selected save advances the acknowledged byte manifest but
+  does not create a semantic generation and does not prompt;
+- changing a node's text, source provenance, extra IDs, or authored
+  relationships does create one; and
+- invalid or unfoldable disk proves neither.  It produces an invalid-disk
+  report/pending condition and is never offered as a valid =Gdisk= to select.
+
+“Proves” therefore means “the exact bytes were stably observed, successfully
+folded and validated, and their semantic graph differs from =G0=.”  It does
+not mean the candidate is already authoritative.  Until the user accepts
+maintenance, it remains the pending =Gdisk= defined in choice 17.  A later
+watch event can supersede it and requires the same proof again before the
+prompt is updated.
+*** TODO let's not allow pull when the source set is limited
+** DONE 19. What if Git or rebuilding fails?
+Failure must be classified by whether disk or stores may already have changed,
+not by the subprocess exit code.  Once that possibility exists, optimistic
+unlocking can turn a recoverable failed pull into an unnoticed overwrite.
+
+Recommendation:
+
+- Archive failure: do not start the operation.
+- Cancellation before the first external/store mutation: release all buffers;
+  retain the incident as =maintenance-aborted= evidence.
+- Pull failure after any repo may have changed: observe actual final disk,
+  classify it, and reconcile or report it exactly as a successful pull would.
+- Invalid/unfoldable disk: there is no trustworthy G1 or orthogonality proof,
+  so retain the old stores, conservatively retire the snapshotted dirty views,
+  keep clean views locked, and offer disk repair/recovery.  Do not call the
+  operation reconciled.
+- Store/index failure after selection begins: keep the incident and whichever
+  last-good stores remain; unlock only when one complete graph/TypeDB/Tantivy
+  generation has been re-established.
+
+One alternative in the invalid-disk case is to abort and release the old dirty
+views because the graph did not change.  I do not recommend it after a pull:
+disk has changed and a later save can destroy the evidence.
+** DONE 20. What about modified raw =.skg= file buffers?
+They are not server-rendered views and have no =last-fetched.org= baseline.
+
+Recommendation for the first cut: refuse explicit pull/rebuild while any
+configured raw =.skg= buffer is modified, naming each one.  During maintenance,
+prevent saves from all such buffers and detect if their visited files change
+on disk.  A later feature could archive =last-read-from-disk=, current buffer,
+undo, and diff in the same incident format, but it should not be silently
+conflated with rendered-view recovery.
+*** DONE what is 'maintenance'?
+**** Codex clarifies
+/Maintenance/ is shorthand in this tree for the fenced protocol used by an
+operation which selects disk state not produced by the current Skg save.  It
+is not ordinary software upkeep and it is not every Skg command.
+
+It includes an explicit pull, explicit partial reload, explicit full database
+rebuild, accepted out-of-band reconciliation, watcher-gap/full-sweep repair,
+and a configuration/source-set replacement which selects a different disk
+graph.  It excludes ordinary view/search requests, normal Skg saves, editor
+code hot-reload, and mere Magit/Neogit display refresh.
+
+The /maintenance interval/ begins when the server installs the maintenance
+epoch and clients have applied its archive/lock instructions, before the
+first external mutation or store replacement.  It ends only with a terminal
+outcome: either one coherent generation has been selected and every affected
+buffer has been refreshed, preserved, or retired, or the operation has
+aborted and the protocol has explicitly decided which old state and locks are
+safe to restore.  Observation may happen before that interval in order to
+decide whether unsolicited work is worth asking about.
+
+Thus “prevent raw =.skg= saves during maintenance” means only during that
+bounded epoch, not throughout a long user-declined pending interval.  In the
+pending interval, a raw file's ordinary save instead needs its own exact
+on-disk conflict check; the broader unresolved choice 20 is whether the first
+version should support that or simply refuse to start explicit maintenance
+while such a raw file buffer is modified.
+** DONE 21. Are queries allowed, and is the observer still a worker?
+Given the agreed live-query requirement, this is forced by the current
+one-request-at-a-time connection: a synchronous exact scan monopolizes it.
+The small server-owned job is the least architecture that permits queries
+without weakening exact missed-event recovery.
+
+Recommendation remains: queries use pinned G0 while Git and the exact observer
+run; their result views are born locked and generation-tagged.  Therefore the
+exact scan must be a server-owned job rather than a synchronous handler which
+monopolizes the one request queue.  The job is now simple—no view fast lane or
+edit preemption—and yields one candidate G1/change set.
+
+At the transition boundary, let an in-flight G0 query finish against G0 or
+retry against G1; never render from a mixture.  Search results created from G0
+are rerun after G1's Tantivy generation commits.
+*** DONE
+I think I said this earlier, but rerunning the search isn't needed;
+just tell the user it might be stale.
+They can rerun it themselves easily if needed.
+**** Codex agrees and corrects the recommendation
+Yes; this supersedes the last sentence above.  No maintenance transition
+automatically reruns a search.
+
+An in-flight query may finish against pinned =G0=.  Its buffer is tagged with
+that generation and, after =G1= is selected, handled like any other old-base
+search buffer: the displayed-ID rule governs preservation/retirement, and the
+client warns that query membership and ranking may be stale.  A clean impacted
+search may have its /existing result forest/ rerendered so displayed node
+content is current, but that still does not execute the query again.  Only the
+user's explicit rerun recomputes membership and ordering.
+** DONE 22. Full rebuild: block queries or build shadow stores?
+For the first version I strongly prefer an honest exclusive interval.  The
+existing rebuild deletes the live stores; making that safely queryable requires
+shadow databases and atomic routing, a substantial independent project rather
+than a refinement of this feature.
+
+This choice is unchanged by archival.  The current function destroys the live
+TypeDB and Tantivy stores in place.
+
+Recommendation: make explicit full rebuild exclusive in the first version and
+say so in the prompt.  Pull and partial reconciliation remain queryable.
+Shadow-store rebuild plus atomic handle swap can be designed separately if
+full rebuild becomes common enough to justify it.
+** DONE 23. What survives disconnect and who owns maintenance?
+Only the server can remain authoritative when an initiating editor connection
+vanishes, and only the client can prove its local buffer evidence reached
+disk.  Splitting ownership at that exact boundary is necessary; making either
+side pretend to own the other's state creates an unverifiable crash window.
+
+Recommendation: the server owns the incident ID, maintenance epoch, observed
+generation, and phase; the initiating client owns buffer archive creation and
+reports its durable completion.  A dropped connection cannot cancel an
+already-running Git process safely or make buffers editable.  Reconnect
+verification reports the epoch before enabling writes and reattaches the live
+orthogonal/clean view census.  Archived interrupted buffers need no server
+reattachment because they are detached recovery artifacts.
+
+For the agreed single-interactive-client model, enforce that assumption with a
+server lease rather than merely hoping no second Emacs/Neovim is connected.
+Control connections do not count.  A second interactive client is read/query
+only or is refused while the lease exists; it cannot save/rebuild around the
+epoch.
+** DONE 24. Must Emacs and Neovim have identical recovery artifacts?
+Portable evidence should not depend on the editor which happened to be open,
+but exact undo formats inherently do.  Standardizing everything except that
+opaque sidecar gives cross-client recovery without inventing a worse common
+undo model.
+
+Recommendation: yes for directory layout, manifests, raw texts, diffs, node
+evidence, incident commands, and safety behavior; no for the opaque native undo
+sidecar.  Each client reloads only its own undo format.  This keeps all durable
+evidence cross-readable while using Neovim's strong built-in undo persistence
+and whatever tested Emacs serializer we choose.
+** DONE 25. Which prior holes are part of this design discussion?
+These are preconditions of the promised safety behavior.  Treating them as
+optional follow-ups would let disconnect, stale search, or an unchecked client
+token bypass an otherwise careful archive/maintenance boundary.
+
+Jeff already agreed to repair them.  My recommendation is to regard total
+request termination, reconnect census, client-token validation, generation-safe
+search reruns, ordinary-save collateral safety, and durable Git presentation
+as invariants this feature depends on—not optional extras traded against the
+archive design.  The plan can separate them into milestones later; no further
+product choice is apparent unless implementation uncovers one.
+*** DONE also the search buffers as described above.
+**** Codex agrees
+Yes.  Replace “generation-safe search reruns” in my list with two invariants:
+
+- search buffers participate in the same census, generation tagging,
+  displayed-ID impact classification, archive, reconnect, and stale-view
+  behavior as content buffers; and
+- Skg reports stale search membership/ranking truthfully but never reruns a
+  search automatically.
+
+With that correction, item 25 is settled.
