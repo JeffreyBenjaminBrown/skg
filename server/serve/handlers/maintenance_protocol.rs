@@ -699,6 +699,8 @@ fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp 
     integer_field ("base-application-token", record . base_application_token),
     atom_field ("planned-disposition", record . planned_disposition . label ()),
     atom_field ("required-ack", record . requirement . label ()),
+    atom_field ("acknowledged",
+      if record . acknowledged { "true" } else { "nil" }),
   ];
   if let Some (application) = &record . application {
     fields . push (Sexp::List (vec![
@@ -1598,7 +1600,7 @@ mod tests {
 
   #[test]
   fn staged_application_wire_names_text_and_resulting_authority () {
-    let record = ViewSettlementRecord {
+    let mut record = ViewSettlementRecord {
       buffer_id: "buffer" . into (), buffer_key: None,
       kind: BufferKind::ContentView, view_uri: Some ("view" . into ()),
       dirty: false, impacted: true, parse_uncertain: false,
@@ -1627,6 +1629,10 @@ mod tests {
     assert! (payload . contains ("(content-sha256"));
     assert! (payload . contains ("(resulting-server-revision 5)"));
     assert! (payload . contains ("(resulting-application-token 8)"));
+    assert! (payload . contains ("(acknowledged nil)"));
+    record . acknowledged = true;
+    assert! (settlement_sexp (&record) . to_string () . contains (
+      "(acknowledged true)"));
   }
 
   #[test]

@@ -497,6 +497,12 @@ what's imperfect about what's done; choices determining the future.
   Older journal records deserialize fail-closed with zero generation authority.
   The focused Rust maintenance suite remains 31/31 and
   =cargo check --tests= passes.
+- Tightened the reconnect metadata before teaching clients to resume the
+  settlement handshake.  Maintenance status now marks each exact view action
+  as acknowledged or pending, while the ordinary connection handshake exposes
+  only a concise coordinator-state label instead of Debug-serializing durable
+  incident details (which could include staged clean view text).  Focused wire
+  and handshake tests and =cargo check --tests= pass.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

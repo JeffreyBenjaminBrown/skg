@@ -1022,6 +1022,14 @@ fn verify_connection_response (
     Sexp::Atom (Atom::S (value . to_string ())) };
   let field = |key : &str, value : Sexp| -> Sexp {
     Sexp::List (vec! [atom (key), value]) };
+  let maintenance_state = match &maintenance . state {
+    CoordinatorState::Idle => "idle",
+    CoordinatorState::Observing => "observing",
+    CoordinatorState::Pending (_) => "pending",
+    CoordinatorState::Active (_) => "active",
+    CoordinatorState::Terminal (_) => "terminal",
+    CoordinatorState::BlockedStoreHealth { .. } => "blocked-store-health",
+  };
   let source_entries : Vec<Sexp> = config . ordered_sources ()
     . into_iter ()
     . enumerate ()
@@ -1094,8 +1102,7 @@ fn verify_connection_response (
       selected . manifest_revision . get () as i64))),
     field ("maintenance-epoch", Sexp::Atom (Atom::I (
       maintenance . epoch . get () as i64))),
-    field ("maintenance-state", atom (&format! (
-      "{:?}", maintenance . state))),
+    field ("maintenance-state", atom (maintenance_state)),
     field ("census-required", atom (
       if census_required { "true" } else { "nil" })),
     field ("maintenance-archive-folder", atom (
@@ -1191,5 +1198,23 @@ mod connection_tests {
     assert! (response . contains ("(manifest-revision 1)"), "{}", response);
     assert! (! response . contains ("path-outcomes"), "{}", response);
     assert! (response . contains ("(tantivy-health healthy)"), "{}", response);
+  }
+
+  #[test]
+  fn verification_exposes_only_a_maintenance_state_label () {
+    let config = SkgConfig::dummyFromSources (HashMap::new ());
+    let selected = SelectedStoreState::initial (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::default ());
+    let mut maintenance = crate::maintenance::MaintenanceCoordinator::new ();
+    maintenance . state = CoordinatorState::BlockedStoreHealth {
+      reason: "SECRET-MAINTENANCE-PAYLOAD" . into (),
+    };
+    let response = verify_connection_response (
+      &config, &[], &selected, "all", true, &maintenance);
+    assert! (response . contains (
+      "(maintenance-state blocked-store-health)"), "{}", response);
+    assert! (!response . contains ("SECRET-MAINTENANCE-PAYLOAD"),
+      "{}", response);
   }
 }
