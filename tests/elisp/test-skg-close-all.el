@@ -74,6 +74,19 @@ nor clear their `skg-view-uri'. Before the fix,
     (should (eq skg-rust-tcp-proc 'live-process-sentinel))
     (should (= skg--next-request-number 91))))
 
+(ert-deftest test-skg-reload-preserves-maintenance-retry-state ()
+  "Hot reload must refresh maintenance code without losing its incident."
+  (load-file (expand-file-name
+              "../../elisp/skg-reload.el"
+              test-skg-close-all--this-dir))
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9 :phase evidence-request-pending))
+        (skg--active-request-id nil))
+    (skg-reload)
+    (should (equal skg--maintenance-client-incident
+                   '(:incident-id "incident" :epoch 9
+                     :phase evidence-request-pending)))))
+
 (ert-deftest test-skg-reload-refreshes-keymap-bindings ()
   "Edits to bindings in `skg-keymaps-and-aliases.el' must take
 effect on reload. Before the fix, `defvar MAP (let ((m …)) …)'
