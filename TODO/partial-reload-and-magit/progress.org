@@ -441,6 +441,13 @@ what's imperfect about what's done; choices determining the future.
   last ACK advances to archive finalization; an exact replay there succeeds,
   while any changed authority is still refused.  The focused Rust maintenance
   suite passes (25/25).
+- Added the exact final-archive ACK boundary.  The server now refuses to record
+  finalization until the complete registered-view settlement inventory is
+  acknowledged and the client repeats the journaled transfer-manifest and
+  opaque-stream checksums alongside a valid final-manifest checksum.  Exact
+  ACK replay succeeds; a changed transfer or final manifest is rejected, and
+  terminal completion additionally requires this durable evidence ACK.  The
+  focused Rust maintenance suite passes (25/25).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

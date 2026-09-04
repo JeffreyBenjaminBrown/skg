@@ -35,6 +35,7 @@ use crate::serve::handlers::maintenance_protocol::{
   handle_begin_maintenance_request,
   handle_cancel_maintenance_request,
   handle_maintenance_archive_failed_request,
+  handle_maintenance_archive_finalized_request,
   handle_maintenance_archive_ready_request,
   handle_maintenance_evidence_request,
   handle_maintenance_status_request,
@@ -652,6 +653,8 @@ fn dispatch_request (
       handle_begin_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceArchiveReady =>
       handle_maintenance_archive_ready_request (stream, request, runtime),
+    RequestType::MaintenanceArchiveFinalized =>
+      handle_maintenance_archive_finalized_request (stream, request, runtime),
     RequestType::MaintenanceArchiveFailed =>
       handle_maintenance_archive_failed_request (stream, request, runtime),
     RequestType::ApproveUndoWaiver =>

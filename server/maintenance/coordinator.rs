@@ -301,13 +301,47 @@ impl MaintenanceCoordinator {
     incident_id    : &IncidentId,
     epoch          : MaintenanceEpoch,
     manifest_sha256 : String,
-  ) -> Result<(), String> {
+    transfer_manifest_sha256 : String,
+    artifact_bytes_sha256 : String,
+  ) -> Result<bool, String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if active . phase != MaintenancePhase::FinalizingArchive {
       return Err (format! (
         "archive-finalized is invalid during {:?}", active . phase)); }
+    let settlement_ids : BTreeSet<_> = active . view_settlements
+      . keys () . cloned () . collect ();
+    let registered_ids : BTreeSet<_> = active . registered_buffer_ids
+      . iter () . cloned () . collect ();
+    if settlement_ids != registered_ids
+    || active . view_settlements . values ()
+      . any (|record| !record . acknowledged)
+    {
+      return Err (
+        "archive cannot finalize before every registered view is settled"
+          . into ()); }
+    let transfer = active . client_evidence_transfer . as_ref ()
+      . ok_or_else (||
+        "archive cannot finalize before evidence transfer" . to_string ())?;
+    if transfer . transfer_manifest_sha256 != transfer_manifest_sha256
+    || transfer . artifact_bytes_sha256 != artifact_bytes_sha256
+    {
+      return Err (
+        "archive finalization ACK changed the journaled evidence transfer"
+          . into ()); }
+    if manifest_sha256 . is_empty () {
+      return Err ("archive finalization ACK has no manifest checksum" . into ()); }
+    if let ArchiveStatus::Finalized {
+      manifest_sha256: existing,
+    } = &active . archive_status
+    {
+      if existing != &manifest_sha256 {
+        return Err (
+          "incident already records a different final manifest" . into ()); }
+      active . client_evidence_acknowledged = true;
+      return Ok (false); }
     active . archive_status = ArchiveStatus::Finalized { manifest_sha256 };
-    Ok (( ))
+    active . client_evidence_acknowledged = true;
+    Ok (true)
   }
 
   pub fn record_server_evidence (
@@ -532,9 +566,12 @@ impl MaintenanceCoordinator {
   ) -> Result<(), String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if disposition == TerminalDisposition::Completed
-    && !matches! (active . archive_status, ArchiveStatus::Finalized { .. })
+    && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
+        || !active . client_evidence_acknowledged)
     {
-      return Err ("completed maintenance requires a finalized archive" . into ()); }
+      return Err (
+        "completed maintenance requires an acknowledged finalized archive"
+          . into ()); }
     active . terminal = Some (disposition);
     self . state = CoordinatorState::Idle;
     Ok (( ))
@@ -668,20 +705,36 @@ mod tests {
       MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
     coordinator . archive_ready (
       &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "server" . into (),
+        artifact_count: 1, total_file_bytes: 2,
+      }) . unwrap ();
     coordinator . transition (
       &active . incident_id, active . epoch,
       MaintenancePhase::SelectingPartial) . unwrap ();
-    coordinator . transition (
+    coordinator . store_selected (
       &active . incident_id, active . epoch,
-      MaintenancePhase::Presenting) . unwrap ();
-    coordinator . transition (
-      &active . incident_id, active . epoch,
-      MaintenancePhase::FinalizingArchive) . unwrap ();
+      SelectedStoreRecord {
+        graph_generation: GraphGeneration::INITIAL . successor (),
+        manifest_revision: ManifestRevision::INITIAL . successor (),
+        tantivy_generation: 1, tantivy_outcome: "committed" . into (),
+      }) . unwrap ();
+    coordinator . record_client_evidence_transfer (
+      &active . incident_id, active . epoch, ClientEvidenceTransferRecord {
+        server_bundle_sha256: "server" . into (),
+        transfer_manifest_sha256: "transfer" . into (),
+        artifact_bytes_sha256: "bytes" . into (),
+        artifact_count: 1, artifact_bytes: 2,
+      }) . unwrap ();
+    coordinator . record_view_settlements (
+      &active . incident_id, active . epoch, Vec::new ()) . unwrap ();
     assert! (coordinator . finish (
       &active . incident_id, active . epoch,
       TerminalDisposition::Completed) . is_err ());
     coordinator . archive_finalized (
-      &active . incident_id, active . epoch, "final" . into ()) . unwrap ();
+      &active . incident_id, active . epoch, "final" . into (),
+      "transfer" . into (), "bytes" . into ()) . unwrap ();
     coordinator . finish (
       &active . incident_id, active . epoch,
       TerminalDisposition::Completed) . unwrap ();
@@ -851,9 +904,22 @@ mod tests {
       &active . incident_id, active . epoch, "one",
       ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9)
       . is_err ());
+    assert! (coordinator . archive_finalized (
+      &active . incident_id, active . epoch, "final" . into (),
+      "wrong" . into (), "bytes" . into ()) . is_err ());
+    assert! (coordinator . archive_finalized (
+      &active . incident_id, active . epoch, "final" . into (),
+      "transfer" . into (), "bytes" . into ()) . unwrap ());
+    assert! (!coordinator . archive_finalized (
+      &active . incident_id, active . epoch, "final" . into (),
+      "transfer" . into (), "bytes" . into ()) . unwrap ());
+    assert! (coordinator . archive_finalized (
+      &active . incident_id, active . epoch, "changed-final" . into (),
+      "transfer" . into (), "bytes" . into ()) . is_err ());
     let CoordinatorState::Active (active) = &coordinator . state else {
       panic! ("incident vanished"); };
     assert_eq! (active . phase, MaintenancePhase::FinalizingArchive);
+    assert! (active . client_evidence_acknowledged);
     assert_eq! (active . client_evidence_transfer . as_ref ()
       . unwrap () . transfer_manifest_sha256, "transfer");
   }

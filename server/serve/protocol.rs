@@ -38,6 +38,7 @@ pub enum RequestType {
   ObservePresentation,
   BeginMaintenance,
   MaintenanceArchiveReady,
+  MaintenanceArchiveFinalized,
   MaintenanceArchiveFailed,
   ApproveUndoWaiver,
   CancelMaintenance,
@@ -84,6 +85,8 @@ impl RequestType {
       "observe presentation"     => Ok (RequestType::ObservePresentation),
       "begin maintenance"        => Ok (RequestType::BeginMaintenance),
       "maintenance archive ready" => Ok (RequestType::MaintenanceArchiveReady),
+      "maintenance archive finalized" =>
+        Ok (RequestType::MaintenanceArchiveFinalized),
       "maintenance archive failed" => Ok (RequestType::MaintenanceArchiveFailed),
       "approve undo waiver"      => Ok (RequestType::ApproveUndoWaiver),
       "cancel maintenance"       => Ok (RequestType::CancelMaintenance),

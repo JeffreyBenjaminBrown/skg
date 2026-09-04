@@ -124,6 +124,47 @@ pub fn handle_maintenance_archive_ready_request (
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
+pub fn handle_maintenance_archive_finalized_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = archive_finalized (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn archive_finalized (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let manifest_sha256 = sha256_request_field (
+    request, "manifest-sha256")?;
+  let transfer_manifest_sha256 = sha256_request_field (
+    request, "transfer-manifest-sha256")?;
+  let artifact_bytes_sha256 = sha256_request_field (
+    request, "artifact-bytes-sha256")?;
+  require_archive_owner (runtime, &incident, epoch)?;
+  let newly_recorded = runtime . transition_maintenance (|coordinator|
+    coordinator . archive_finalized (
+      &incident,
+      epoch,
+      manifest_sha256 . clone (),
+      transfer_manifest_sha256 . clone (),
+      artifact_bytes_sha256 . clone ()))?;
+  Ok (Sexp::List (vec![
+    atom_field ("status", "archive-finalized"),
+    atom_field ("manifest-sha256", &manifest_sha256),
+    atom_field ("transfer-manifest-sha256", &transfer_manifest_sha256),
+    atom_field ("artifact-bytes-sha256", &artifact_bytes_sha256),
+    atom_field ("replayed", if newly_recorded { "nil" } else { "true" }),
+    atom_field ("next-action", "complete-maintenance"),
+  ]) . to_string ())
+}
+
 fn archive_ready (request : &str, runtime : &ServerRuntime)
   -> Result<String, String>
 {
@@ -392,6 +433,16 @@ fn acknowledge_view_settlement (
 fn unsigned_request_field (request : &str, key : &str) -> Result<u64, String> {
   value_from_request_sexp (key, request)? . parse::<u64> ()
     . map_err (|_| format! ("{} is not an unsigned integer", key))
+}
+
+fn sha256_request_field (request : &str, key : &str) -> Result<String, String> {
+  let value = value_from_request_sexp (key, request)?;
+  if value . len () != 64
+  || !value . bytes () . all (|byte|
+       byte . is_ascii_digit () || (b'a'..=b'f') . contains (&byte))
+  {
+    return Err (format! ("{} is not a lowercase SHA-256", key)); }
+  Ok (value)
 }
 
 fn maintenance_evidence (
