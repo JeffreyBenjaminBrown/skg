@@ -315,10 +315,25 @@ fn validate_candidate_contract (
     return Err ("candidate evidence configuration identity changed" . into ()); }
   if source_catalog_blake3 (config) != candidate . source_catalog_blake3 {
     return Err ("candidate evidence source catalog changed" . into ()); }
-  let candidate_paths : BTreeSet<&PathBuf> = candidate . manifest . keys () . collect ();
   let byte_paths : BTreeSet<&PathBuf> = candidate . selected_bytes . keys () . collect ();
-  if candidate_paths != byte_paths {
-    return Err ("candidate selected-byte inventory is incomplete" . into ()); }
+  match &candidate . disk_fence {
+    crate::maintenance::candidate::CandidateDiskFence::Complete => {
+      let candidate_paths : BTreeSet<&PathBuf> =
+        candidate . manifest . keys () . collect ();
+      if candidate_paths != byte_paths {
+        return Err (
+          "candidate selected-byte inventory is incomplete" . into ()); }
+    }
+    crate::maintenance::candidate::CandidateDiskFence::Targeted (fence) => {
+      let possible_paths : BTreeSet<&PathBuf> = fence . keys () . collect ();
+      let selected_target_paths : BTreeSet<&PathBuf> = candidate . manifest
+        . keys () . filter (|path| possible_paths . contains (path)) . collect ();
+      if byte_paths != selected_target_paths {
+        return Err (
+          "targeted candidate selected-byte inventory is incomplete"
+            . into ()); }
+    }
+  }
   for (path, bytes) in &candidate . selected_bytes {
     if candidate . manifest . get (path)
        != Some (&crate::types::store_state::PathDigest::of_bytes (bytes))
@@ -767,6 +782,7 @@ mod tests {
       evidence: Default::default (),
       selected_bytes: Default::default (),
       warnings: Vec::new (),
+      disk_fence: crate::maintenance::candidate::CandidateDiskFence::Complete,
     };
     let mut coordinator = MaintenanceCoordinator::new ();
     let active = coordinator . begin (
@@ -831,6 +847,7 @@ mod tests {
       ]),
       selected_bytes: BTreeMap::from ([(path, after_bytes . clone ())]),
       warnings: Vec::new (),
+      disk_fence: crate::maintenance::candidate::CandidateDiskFence::Complete,
     };
     let mut coordinator = MaintenanceCoordinator::new ();
     let active = coordinator . begin (
