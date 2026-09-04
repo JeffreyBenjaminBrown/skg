@@ -1,17 +1,45 @@
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
-* TODO BUG skg-goto should not change both buffers if the window is split
+* ONGOING skg2 : partial rebuild
+for git discard hunk to work
+* TODO BUG cycling TODO | DONE etc. hides text
+e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
+and try toggling that for one of its intermediate children
+* TODO handle the Oa test failure
 * TODO BUG cannot change editRequest from delete to none
 using the in metadata buffer.
 If one does, the resulting metadata is invalid
 (and also the experience of doing it is awkward).
-* ONGOING skg2 : partial rebuild
-for git discard hunk to work
-* TODO the content herald for s subscribee should count unintegated content, not all of it
+* TODO show containment ancestries under removed-here phantoms
+* TODO BUG skg-goto should not change both buffers if the window is split
+* TODO BUG ? Shouldn't skg-rebuild sound the choir when it completes?
+Did my audio app steal it?
+* TODO the content herald for a subscribee should count unintegated content, not all of it
 or both somehow
+* BUG: org import of aliases with quotation marks
+  * AWS AMI ("Amazon Machine Image")
+  **
+  *** AMI (\
+  *** Amazon
+  *** Machine
+  *** Image\")"
+* TODO obsolete elisp macros
+../elisp/skg-state.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [3 times]
+../elisp/skg-length-prefix.el: Warning: ‘if-let’ is an obsolete macro (as of 31.1); use ‘if-let*’ instead.
+../elisp/skg-worktree-guard.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [2 times]
+../elisp/skg-request-reload-paths.el: Warning: ‘if-let’ is an obsolete macro (as of 31.1); use ‘if-let*’ instead.
+../elisp/skg-request-reload-paths.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [3 times]
+* When I make a link into a containment
+worry about links into the old link.
+(There will usually be none.)
+* rename
+** apply_define_nodes_to_stores
+-> apply_defineNodes_to_stores
+** TODO the term 'scalar' is bad; just say 'text'
+* Should I have made Skg reactive?
 * document telescoping privacy's representation in .skg files with an illustration
 * BUG : it reports heralds will not render at startup, and yet they do
-* TODO : if changing a link to a content rel orphans the link node, delete it
+* TODO : if changing a link to a content rel orphans the link node, ask whether to delete it
 * TODO Each save should update the magit map from id to title
 * TODO the warning about two modified buffers
 should not come upon save, but upon modifying the second

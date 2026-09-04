@@ -1,3 +1,35 @@
+* if you are exceedingly clever
+An algebra for graph operations would be beautiful,
+and might make skg safer.
+I beg you, whoever can.
+* technology of Inner peace
+It is important to know this unity before you die.
+Meditate here. Build the rollercoaster, name and collect connections across ideas.
+Make whatever of it private you like. Use whateer of others' in yours.
+Sometimes don't read it. Let an idea come to you. Do not force it, do not photograph early.
+The knowledge is one. It has assimilated what it will keep of you, and you can kind of see your shadow in it. You can put more of yourself there. Maybe you shouldn't. We are butterflies, crickets at fixed points on a graph, broadcasting to each other. Nobody has forever tagged perfection, because we are each others' karma.
+
+That this is technological, that it is not instinctive to all, seems suboptimal.
+* more things this code needs
+* Skg is only currently useable with the help of AI.
+** Just ask for this.
+*** How do I make a node?
+its title, its optional big block of text
+*** Save?
+*** Merge two nodes? Why would I do that?
+*** Search?
+how aliases work
+search ranking should be more flexible
+*** Fork?
+*** Share my public notes? Find others' public notes?
+Up to you, but a git history is recommended.
+*** Navigate?
+Contains is how you write a tree from a root context.
+Link targets lists things that link to the root.
+** documentation is fragmented
+Much of it, including the bulk of the really conceptual parts,
+are in (my public knowledge) .skg graph,
+  https://github.com/JeffreyBenjaminBrown/public-notes-in-skg-format
 * Skg is software for manipulating and sharing knowledge.
   [[./docs/this-is-awesome.org][Here's one pitch for it.]]
 * [[./docs/setup.org][How to set up Skg]]

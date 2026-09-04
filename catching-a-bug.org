@@ -1,3 +1,5 @@
+* TODO (as Jeff) commit all data
+to free Codex to do this
 * the buffer before the buggy edit
   * (skg (node (id 5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800) (source pers-p) (parentIs absent) (rels (contains (out 3))) (viewStats (sourceHerald ⌂:pers-p)))) Priceless Festival
   ** (skg (node (id 832c45b9-357d-4f30-bb39-d112af144012) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) (more) logistics
@@ -26,7 +28,7 @@
   ** (skg (node (id 2a378fce-9acc-441a-a957-032d22d0698f) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) [[id:eee478af-72f3-4cab-b1ac-788017733f14][pack list for Priceless+ 2006]]
 * the story
 I open node
-  5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800
+5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800
 and then try to delete (C-c DEL) its last content node, which is
   2a378fce-9acc-441a-a957-032d22d0698f
 
