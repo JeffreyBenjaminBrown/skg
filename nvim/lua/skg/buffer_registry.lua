@@ -1,5 +1,7 @@
 -- Explicit lifecycle records for every Skg-owned Neovim buffer.
 
+local payload = require('skg.payload')
+
 local M = {}
 
 local function uuid ()
@@ -112,22 +114,182 @@ function M.apply_server_text (buf, text, expected)
   if record.application_token ~= expected.application_token then
     error('Skg application token changed before application') end
   if M.dirty(buf) then error('Skg refuses to replace a dirty buffer') end
-  vim.bo[buf].modifiable = true
-  require('skg.buffer').disarm_first_change_warning(buf)
-  local endofline = text:sub(-1) == '\n'
-  local body = endofline and text:sub(1, -2) or text
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(body, '\n'))
-  vim.bo[buf].endofline = endofline
-  vim.bo[buf].modified = false
-  vim.b[buf].skg_application_token = record.application_token + 1
-  vim.b[buf].skg_last_fetched = text
-  vim.b[buf].skg_last_fetched_sha256 = digest(text)
-  vim.b[buf].skg_graph_generation = expected.graph_generation
-  vim.b[buf].skg_presentation_generation = expected.presentation_generation
-  vim.b[buf].skg_server_revision = expected.server_revision
-  vim.b[buf].skg_presentation_stale = false
-  require('skg.buffer').arm_first_change_warning(buf)
+  local old_modifiable = vim.bo[buf].modifiable
+  local window_views = {}
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == buf then
+      window_views[win] = vim.api.nvim_win_call(win, vim.fn.winsaveview) end
+  end
+  local ok, error_text = xpcall(function ()
+    vim.bo[buf].modifiable = true
+    require('skg.buffer').disarm_first_change_warning(buf)
+    local endofline = text:sub(-1) == '\n'
+    local body = endofline and text:sub(1, -2) or text
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false,
+      vim.split(body, '\n', { plain = true, trimempty = false }))
+    vim.bo[buf].endofline = endofline
+    vim.bo[buf].modified = false
+    vim.b[buf].skg_application_token = record.application_token + 1
+    vim.b[buf].skg_last_fetched = text
+    vim.b[buf].skg_last_fetched_sha256 = digest(text)
+    vim.b[buf].skg_graph_generation = expected.graph_generation
+    vim.b[buf].skg_presentation_generation = expected.presentation_generation
+    vim.b[buf].skg_server_revision = expected.server_revision
+    vim.b[buf].skg_logical_dirty = false
+    vim.b[buf].skg_presentation_stale = false
+    vim.b[buf].skg_herald_bearing = text:find('(heralds', 1, true) ~= nil
+    require('skg.buffer').arm_first_change_warning(buf)
+  end, debug.traceback)
+  if vim.api.nvim_buf_is_valid(buf) then
+    vim.bo[buf].modifiable = old_modifiable end
+  for win, view in pairs(window_views) do
+    if vim.api.nvim_win_is_valid(win)
+       and vim.api.nvim_win_get_buf(win) == buf then
+      pcall(vim.api.nvim_win_call, win, function ()
+        vim.fn.winrestview(view) end)
+    end
+  end
+  if not ok then error(error_text, 0) end
   return vim.b[buf].skg_application_token
+end
+
+local function settlement_text (settlement, key)
+  return payload.field_text(settlement, key)
+end
+
+local function settlement_nat (settlement, key)
+  local value = payload.field(settlement, key)
+  if type(value) == 'number' and value >= 0 and value == math.floor(value) then
+    return value end
+  local text = payload.field_text(settlement, key)
+  if text and text:match('^%d+$') then return tonumber(text) end
+  error('Maintenance settlement has invalid ' .. key)
+end
+
+local function settlement_uri (settlement)
+  local uri = settlement_text(settlement, 'view-uri')
+  if uri == nil or uri == 'nil' or uri == 'none' then return nil end
+  return uri
+end
+
+function M.validate_maintenance_buffer_base (buf, settlement, epoch)
+  local record = M.record(buf)
+  if not record then error('Maintenance buffer is no longer registered') end
+  local dirty = settlement_text(settlement, 'dirty') == 'true'
+  if record.maintenance_epoch ~= epoch
+     or record.id ~= settlement_text(settlement, 'buffer-id')
+     or record.kind ~= settlement_text(settlement, 'kind')
+     or record.view_uri ~= settlement_uri(settlement)
+     or record.graph_generation ~= settlement_nat(
+       settlement, 'base-graph-generation')
+     or record.presentation_generation ~= settlement_nat(
+       settlement, 'base-presentation-generation')
+     or record.server_revision ~= settlement_nat(
+       settlement, 'base-server-revision')
+     or record.application_token ~= settlement_nat(
+       settlement, 'base-application-token')
+     or M.dirty(buf) ~= dirty then
+    error('Maintenance buffer ' .. tostring(record.id)
+      .. ' changed from its frozen authority')
+  end
+  return record
+end
+
+function M.release_across_maintenance (buf, settlement, epoch, graph_generation)
+  local record = M.validate_maintenance_buffer_base(buf, settlement, epoch)
+  vim.b[buf].skg_graph_generation = graph_generation
+  vim.b[buf].skg_presentation_stale = true
+  if record.kind == 'search-view' then vim.b[buf].skg_search_stale = true end
+  return M.record(buf)
+end
+
+local function unique_buffer_name (buf, desired)
+  local candidate, suffix = desired, 2
+  while true do
+    local conflict = false
+    for _, other in ipairs(vim.api.nvim_list_bufs()) do
+      if other ~= buf and vim.api.nvim_buf_is_valid(other)
+         and vim.api.nvim_buf_get_name(other) == candidate then
+        conflict = true
+        break
+      end
+    end
+    if not conflict then return candidate end
+    candidate = desired .. ' #' .. tostring(suffix)
+    suffix = suffix + 1
+  end
+end
+
+function M.retire_for_maintenance (buf, settlement, epoch, incident_id)
+  local record = M.validate_maintenance_buffer_base(buf, settlement, epoch)
+  vim.b[buf].skg_view_uri = nil
+  vim.b[buf].skg_lifecycle = 'detached-recovery'
+  vim.b[buf].skg_presentation_stale = true
+  if record.kind == 'search-view' then vim.b[buf].skg_search_stale = true end
+  local short_incident = incident_id:sub(1, 8)
+  local short_buffer = record.id:sub(1, 8)
+  local desired = string.format('%s [recovery %s/%s]',
+    vim.api.nvim_buf_get_name(buf), short_incident, short_buffer)
+  vim.api.nvim_buf_set_name(buf, unique_buffer_name(buf, desired))
+  return M.record(buf)
+end
+
+function M.close_for_maintenance (buf, settlement, epoch)
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then return end
+  local record = M.validate_maintenance_buffer_base(buf, settlement, epoch)
+  if not record.disposable or M.dirty(buf) then
+    error('Maintenance refuses to close a non-disposable or dirty buffer') end
+  local uri = vim.b[buf].skg_view_uri
+  vim.b[buf].skg_view_uri = nil
+  local ok, error_text = pcall(vim.api.nvim_buf_delete, buf, { force = false })
+  if not ok then
+    if vim.api.nvim_buf_is_valid(buf) then vim.b[buf].skg_view_uri = uri end
+    error('Maintenance close was refused for buffer ' .. record.id
+      .. ': ' .. tostring(error_text), 0)
+  end
+end
+
+function M.apply_maintenance_rendered_view (
+    buf, settlement, application, epoch, graph_generation)
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    error('Maintenance cannot apply text to a missing buffer') end
+  local content = payload.field(application, 'content')
+  local content_sha = settlement_text(application, 'content-sha256')
+  local base_token = settlement_nat(settlement, 'base-application-token')
+  local base_revision = settlement_nat(settlement, 'base-server-revision')
+  local result_token = settlement_nat(
+    application, 'resulting-application-token')
+  local result_revision = settlement_nat(
+    application, 'resulting-server-revision')
+  local result_graph = settlement_nat(
+    application, 'resulting-graph-generation')
+  local result_presentation = settlement_nat(
+    application, 'resulting-presentation-generation')
+  if type(content) ~= 'string' or type(content_sha) ~= 'string'
+     or not content_sha:match('^[0-9a-f]+$') or #content_sha ~= 64
+     or digest(content) ~= content_sha
+     or result_token ~= base_token + 1
+     or result_revision ~= base_revision + 1
+     or result_graph ~= graph_generation then
+    error('Maintenance application offer is internally inconsistent')
+  end
+  local record = M.validate_maintenance_buffer_base(buf, settlement, epoch)
+  local token = M.apply_server_text(buf, content, {
+    view_uri = settlement_uri(settlement),
+    application_token = base_token,
+    graph_generation = result_graph,
+    presentation_generation = result_presentation,
+    server_revision = result_revision,
+  })
+  if record.kind == 'search-view' then vim.b[buf].skg_search_stale = true end
+  local installed = M.record(buf)
+  if token ~= result_token
+     or installed.server_revision ~= result_revision
+     or installed.graph_generation ~= result_graph
+     or installed.presentation_generation ~= result_presentation
+     or installed.last_fetched_sha256 ~= content_sha then
+    error('Maintenance application did not install its exact authority') end
+  return installed
 end
 
 function M.lock_for_maintenance (buf, epoch)
