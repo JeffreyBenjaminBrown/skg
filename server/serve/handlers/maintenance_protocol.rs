@@ -5,6 +5,7 @@ use crate::maintenance::archive::{
   verify_initial_archive,
 };
 use crate::maintenance::selection::select_archived_candidate;
+use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
   CandidateId,
   CoordinatorState,
@@ -87,17 +88,9 @@ fn begin_maintenance (
       return Err (format! ("candidate {} was superseded", candidate . id)); }
   }
 
-  let mut registered : Vec<String> = census . iter ()
-    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
-  let mut dirty : Vec<String> = census . iter ()
-    . filter (|descriptor| descriptor . dirty)
-    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
-  let mut undo_required : Vec<String> = census . iter ()
-    . filter (|descriptor| descriptor . dirty && descriptor . undo_required)
-    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
-  registered . sort ();
-  dirty . sort ();
-  undo_required . sort ();
+  let frozen_census = census . iter ()
+    . map (CensusDescriptor::frozen_record)
+    . collect::<Result<Vec<_>, _>> ()?;
   let active = runtime . transition_maintenance (|coordinator|
     coordinator . begin_with_archive_contract (
       origin,
@@ -107,9 +100,7 @@ fn begin_maintenance (
       source_set,
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision,
-      registered,
-      dirty,
-      undo_required))?;
+      frozen_census))?;
   Ok (maintenance_offer_payload (&active,
     &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
     &snapshot . env . config . maintenance_archive_identity . to_string_lossy ()))
@@ -160,6 +151,19 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
   ];
   if active . candidate . is_some () {
     let selected = select_archived_candidate (runtime, &incident, epoch)?;
+    let candidate_id = active . candidate . as_ref ()
+      . expect ("candidate branch has candidate") . id . clone ();
+    let candidate = runtime . candidate (&candidate_id)
+      . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
+    let settlements = {
+      let interactive = runtime . interactive . lock ()
+        . map_err (|_| "interactive session poisoned" . to_string ())?;
+      plan_incident_view_settlements (
+        &active, &verified, &interactive, &candidate)?
+    };
+    runtime . transition_maintenance (|coordinator|
+      coordinator . record_view_settlements (
+        &incident, epoch, settlements . clone ()))?;
     fields . insert (0, atom_field ("status", "candidate-selected"));
     fields . push (integer_field (
       "g1-graph-generation", selected . graph_generation));
@@ -176,12 +180,37 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
       selected . evidence . artifact_count as u64));
     fields . push (integer_field (
       "server-evidence-bytes", selected . evidence . total_file_bytes));
+    fields . push (Sexp::List (vec![
+      Sexp::Atom (Atom::S ("view-settlements" . into ())),
+      Sexp::List (settlements . iter () . map (settlement_sexp) . collect ()),
+    ]));
   } else {
     fields . insert (0, atom_field ("status", "archive-ready"));
     fields . push (atom_field (
       "next-action", "origin-specific-operation-required"));
   }
   Ok (Sexp::List (fields) . to_string ())
+}
+
+fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp {
+  Sexp::List (vec![
+    atom_field ("buffer-id", &record . buffer_id),
+    atom_field ("buffer-key", record . buffer_key . as_deref () . unwrap_or ("none")),
+    atom_field ("kind", record . kind . label ()),
+    atom_field ("view-uri", record . view_uri . as_deref () . unwrap_or ("none")),
+    atom_field ("dirty", if record . dirty { "true" } else { "nil" }),
+    atom_field ("impacted", if record . impacted { "true" } else { "nil" }),
+    atom_field ("parse-uncertain",
+      if record . parse_uncertain { "true" } else { "nil" }),
+    atom_field ("uncertainty-reason",
+      record . uncertainty_reason . as_deref () . unwrap_or ("none")),
+    list_field ("observed-ids", &record . observed_ids),
+    list_field ("resolved-primary-ids", &record . resolved_primary_ids),
+    integer_field ("base-server-revision", record . base_server_revision),
+    integer_field ("base-application-token", record . base_application_token),
+    atom_field ("planned-disposition", record . planned_disposition . label ()),
+    atom_field ("required-ack", record . requirement . label ()),
+  ])
 }
 
 pub fn handle_maintenance_archive_failed_request (

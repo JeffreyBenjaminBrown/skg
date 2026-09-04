@@ -157,6 +157,45 @@ pub enum BufferKind {
   RawSkgFile,
 }
 
+impl BufferKind {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::ContentView => "content-view",
+      Self::NewEmptyContentView => "new-empty-content-view",
+      Self::SearchView => "search-view",
+      Self::OverrideChoiceMenu => "override-choice-menu",
+      Self::MetadataEditor => "metadata-editor",
+      Self::ForkConfirmation => "fork-confirmation",
+      Self::ReloadSelector => "reload-selector",
+      Self::RelationshipKindMenu => "relationship-kind-menu",
+      Self::DiskConflict => "disk-conflict",
+      Self::IdStack => "id-stack",
+      Self::DerivedReport => "derived-report",
+      Self::DurableReport => "durable-report",
+      Self::RawSkgFile => "raw-skg-file",
+    }
+  }
+
+  pub fn parse (value : &str) -> Result<Self, String> {
+    match value {
+      "content-view" => Ok (Self::ContentView),
+      "new-empty-content-view" => Ok (Self::NewEmptyContentView),
+      "search-view" => Ok (Self::SearchView),
+      "override-choice-menu" => Ok (Self::OverrideChoiceMenu),
+      "metadata-editor" => Ok (Self::MetadataEditor),
+      "fork-confirmation" => Ok (Self::ForkConfirmation),
+      "reload-selector" => Ok (Self::ReloadSelector),
+      "relationship-kind-menu" => Ok (Self::RelationshipKindMenu),
+      "disk-conflict" => Ok (Self::DiskConflict),
+      "id-stack" => Ok (Self::IdStack),
+      "derived-report" => Ok (Self::DerivedReport),
+      "durable-report" => Ok (Self::DurableReport),
+      "raw-skg-file" => Ok (Self::RawSkgFile),
+      other => Err (format! ("unsupported buffer kind '{}'", other)),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ViewDisposition {
@@ -168,6 +207,63 @@ pub enum ViewDisposition {
   DetachedDerived,
   MaintenanceAborted,
   Failed (String),
+}
+
+impl ViewDisposition {
+  pub fn label (&self) -> &str {
+    match self {
+      Self::Interrupted => "interrupted",
+      Self::ReleasedUnimpacted => "released-unimpacted",
+      Self::Refreshed => "refreshed",
+      Self::RetainedClean => "retained-clean",
+      Self::ClosedDisposable => "closed-disposable",
+      Self::DetachedDerived => "detached-derived",
+      Self::MaintenanceAborted => "maintenance-aborted",
+      Self::Failed (_) => "failed",
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ViewSettlementRequirement {
+  RetirementAck,
+  ReleaseAck,
+  ApplicationAck,
+  CloseAck,
+}
+
+impl ViewSettlementRequirement {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::RetirementAck => "retirement-ack",
+      Self::ReleaseAck => "release-ack",
+      Self::ApplicationAck => "application-ack",
+      Self::CloseAck => "close-ack",
+    }
+  }
+}
+
+/// One durable promise for one buffer frozen in the maintenance census.
+/// `acknowledged` is false until the editor proves the exact requested action;
+/// an empty render queue is never a substitute for this inventory.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ViewSettlementRecord {
+  pub buffer_id              : String,
+  pub buffer_key             : Option<String>,
+  pub kind                   : BufferKind,
+  pub view_uri               : Option<String>,
+  pub dirty                  : bool,
+  pub impacted               : bool,
+  pub parse_uncertain        : bool,
+  pub uncertainty_reason     : Option<String>,
+  pub observed_ids           : Vec<String>,
+  pub resolved_primary_ids   : Vec<String>,
+  pub base_server_revision   : u64,
+  pub base_application_token : u64,
+  pub planned_disposition    : ViewDisposition,
+  pub requirement            : ViewSettlementRequirement,
+  pub acknowledged           : bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -252,6 +348,24 @@ pub struct SelectedStoreRecord {
   pub tantivy_outcome    : String,
 }
 
+/// The complete authority-bearing descriptor frozen when an incident begins.
+/// Text remains off the bootstrap wire; its exact checksums bind the later
+/// independently verified archive artifacts to this census.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct FrozenBufferRecord {
+  pub buffer_id               : String,
+  pub kind                    : BufferKind,
+  pub view_uri                : Option<String>,
+  pub graph_generation        : u64,
+  pub presentation_generation : u64,
+  pub server_revision         : u64,
+  pub application_token       : u64,
+  pub dirty                   : bool,
+  pub undo_required           : bool,
+  pub last_fetched_sha256     : String,
+  pub current_sha256          : String,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ActiveMaintenance {
   pub incident_id       : IncidentId,
@@ -281,11 +395,15 @@ pub struct ActiveMaintenance {
   #[serde(default)]
   pub undo_required_buffer_ids : Vec<String>,
   #[serde(default)]
+  pub buffer_census     : BTreeMap<String, FrozenBufferRecord>,
+  #[serde(default)]
   pub undo_waivers      : BTreeMap<String, String>,
   #[serde(default)]
   pub server_evidence   : Option<ServerEvidenceRecord>,
   #[serde(default)]
   pub selected_store    : Option<SelectedStoreRecord>,
+  #[serde(default)]
+  pub view_settlements  : BTreeMap<String, ViewSettlementRecord>,
   #[serde(default)]
   pub blocking_reason   : Option<String>,
   #[serde(default)]

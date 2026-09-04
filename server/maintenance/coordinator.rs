@@ -117,7 +117,7 @@ impl MaintenanceCoordinator {
       . unwrap_or (ManifestRevision::INITIAL);
     self . begin_with_archive_contract (
       origin, candidate, client_session_id, "emacs" . into (), "all" . into (),
-      graph_generation, manifest_revision, Vec::new (), Vec::new (), Vec::new ())
+      graph_generation, manifest_revision, Vec::new ())
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -130,9 +130,7 @@ impl MaintenanceCoordinator {
     source_set   : String,
     g0_graph_generation : GraphGeneration,
     g0_manifest_revision : ManifestRevision,
-    mut registered_buffer_ids : Vec<String>,
-    mut dirty_buffer_ids : Vec<String>,
-    mut undo_required_buffer_ids : Vec<String>,
+    buffer_records : Vec<FrozenBufferRecord>,
   ) -> Result<ActiveMaintenance, String> {
     if client_session_id . is_empty () {
       return Err ("maintenance requires an owning client session" . into ()); }
@@ -140,18 +138,25 @@ impl MaintenanceCoordinator {
       return Err ("maintenance requires a supported archive client" . into ()); }
     if source_set . is_empty () {
       return Err ("maintenance requires an active source-set" . into ()); }
-    let registered_set : BTreeSet<_> = registered_buffer_ids . iter () . collect ();
-    if registered_set . len () != registered_buffer_ids . len () {
-      return Err ("maintenance registered-buffer census contains duplicates" . into ()); }
-    let dirty_set : BTreeSet<_> = dirty_buffer_ids . iter () . collect ();
-    if dirty_set . len () != dirty_buffer_ids . len () {
-      return Err ("maintenance dirty-buffer census contains duplicates" . into ()); }
-    if undo_required_buffer_ids . iter () . any (|id|
-       !dirty_set . contains (id))
-    {
-      return Err ("undo-required buffer is absent from the dirty census" . into ()); }
-    if dirty_buffer_ids . iter () . any (|id| !registered_set . contains (id)) {
-      return Err ("dirty buffer is absent from the registered census" . into ()); }
+    let mut buffer_census = std::collections::BTreeMap::new ();
+    for record in buffer_records {
+      if record . buffer_id . is_empty () {
+        return Err ("maintenance census has an empty buffer ID" . into ()); }
+      if record . undo_required && !record . dirty {
+        return Err ("undo-required buffer is absent from the dirty census" . into ()); }
+      let id = record . buffer_id . clone ();
+      if buffer_census . insert (id . clone (), record) . is_some () {
+        return Err (format! (
+          "maintenance buffer census repeats '{}'", id)); }
+    }
+    let mut registered_buffer_ids : Vec<String> =
+      buffer_census . keys () . cloned () . collect ();
+    let mut dirty_buffer_ids : Vec<String> = buffer_census . values ()
+      . filter (|record| record . dirty)
+      . map (|record| record . buffer_id . clone ()) . collect ();
+    let mut undo_required_buffer_ids : Vec<String> = buffer_census . values ()
+      . filter (|record| record . undo_required)
+      . map (|record| record . buffer_id . clone ()) . collect ();
     registered_buffer_ids . sort ();
     dirty_buffer_ids . sort ();
     undo_required_buffer_ids . sort ();
@@ -200,9 +205,11 @@ impl MaintenanceCoordinator {
       registered_buffer_ids,
       dirty_buffer_ids,
       undo_required_buffer_ids,
+      buffer_census,
       undo_waivers: Default::default (),
       server_evidence: None,
       selected_store: None,
+      view_settlements: Default::default (),
       blocking_reason: None,
       suspended_phase: None,
       client_connected: true,
@@ -335,6 +342,72 @@ impl MaintenanceCoordinator {
     active . blocking_reason = None;
     active . phase = MaintenancePhase::Presenting;
     Ok (( ))
+  }
+
+  pub fn record_view_settlements (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    settlements : Vec<ViewSettlementRecord>,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::Presenting {
+      return Err (format! (
+        "view classification is invalid during {:?}", active . phase)); }
+    let mut records = std::collections::BTreeMap::new ();
+    for record in settlements {
+      if record . buffer_id . is_empty () {
+        return Err ("view settlement has an empty buffer ID" . into ()); }
+      let id = record . buffer_id . clone ();
+      if records . insert (id . clone (), record) . is_some () {
+        return Err (format! ("view settlement repeats buffer '{}'", id)); }
+    }
+    let expected : BTreeSet<_> = active . registered_buffer_ids
+      . iter () . cloned () . collect ();
+    let actual : BTreeSet<_> = records . keys () . cloned () . collect ();
+    if actual != expected {
+      return Err (format! (
+        "view settlement inventory is {:?}, expected {:?}", actual, expected)); }
+    if active . view_settlements . is_empty () {
+      active . view_settlements = records;
+    } else if active . view_settlements != records {
+      return Err ("incident already records different view settlements" . into ()); }
+    if active . view_settlements . is_empty () {
+      active . phase = MaintenancePhase::FinalizingArchive; }
+    Ok (( ))
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn acknowledge_view_settlement (
+    &mut self,
+    incident_id      : &IncidentId,
+    epoch            : MaintenanceEpoch,
+    buffer_id        : &str,
+    requirement      : ViewSettlementRequirement,
+    view_uri         : Option<&str>,
+    base_revision    : u64,
+    application_token : u64,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::Presenting {
+      return Err (format! (
+        "view settlement ACK is invalid during {:?}", active . phase)); }
+    let record = active . view_settlements . get_mut (buffer_id)
+      . ok_or_else (|| format! (
+        "buffer '{}' has no planned settlement", buffer_id))?;
+    if record . requirement != requirement
+    || record . view_uri . as_deref () != view_uri
+    || record . base_server_revision != base_revision
+    || record . base_application_token != application_token
+    {
+      return Err (format! (
+        "buffer '{}' settlement ACK changed its frozen authority", buffer_id)); }
+    if record . acknowledged { return Ok (false); }
+    record . acknowledged = true;
+    let complete = active . view_settlements . values ()
+      . all (|record| record . acknowledged);
+    if complete { active . phase = MaintenancePhase::FinalizingArchive; }
+    Ok (complete)
   }
 
   pub fn block_store_health (
@@ -643,5 +716,80 @@ mod tests {
     assert_eq! (&active . archive_directory_name[8..9], "T");
     assert_eq! (&active . archive_directory_name[15..16], ".");
     assert_eq! (&active . archive_directory_name[22..24], "Z_");
+  }
+
+  fn settlement (id : &str) -> ViewSettlementRecord {
+    ViewSettlementRecord {
+      buffer_id: id . into (),
+      buffer_key: Some (format! ("{}_key", id)),
+      kind: BufferKind::ContentView,
+      view_uri: Some (format! ("uri-{}", id)),
+      dirty: true,
+      impacted: true,
+      parse_uncertain: false,
+      uncertainty_reason: None,
+      observed_ids: vec!["node" . into ()],
+      resolved_primary_ids: vec!["node" . into ()],
+      base_server_revision: 4,
+      base_application_token: 9,
+      planned_disposition: ViewDisposition::Interrupted,
+      requirement: ViewSettlementRequirement::RetirementAck,
+      acknowledged: false,
+    }
+  }
+
+  #[test]
+  fn exact_view_settlement_inventory_and_acks_gate_finalization () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let frozen = |id : &str| FrozenBufferRecord {
+      buffer_id: id . into (), kind: BufferKind::ContentView,
+      view_uri: Some (format! ("uri-{}", id)), graph_generation: 1,
+      presentation_generation: 0, server_revision: 4,
+      application_token: 9, dirty: true, undo_required: false,
+      last_fetched_sha256: "a" . repeat (64),
+      current_sha256: "b" . repeat (64),
+    };
+    let active = coordinator . begin_with_archive_contract (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, vec![frozen ("one"), frozen ("two")])
+      . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "hash" . into (),
+        artifact_count: 1, total_file_bytes: 2,
+      }) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::SelectingPartial) . unwrap ();
+    coordinator . store_selected (
+      &active . incident_id, active . epoch, SelectedStoreRecord {
+        graph_generation: GraphGeneration::INITIAL . successor (),
+        manifest_revision: ManifestRevision::INITIAL . successor (),
+        tantivy_generation: 1, tantivy_outcome: "committed" . into (),
+      }) . unwrap ();
+    assert! (coordinator . record_view_settlements (
+      &active . incident_id, active . epoch, vec![settlement ("one")])
+      . is_err ());
+    coordinator . record_view_settlements (
+      &active . incident_id, active . epoch,
+      vec![settlement ("one"), settlement ("two")]) . unwrap ();
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "one",
+      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9)
+      . is_err ());
+    assert! (!coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "one",
+      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9)
+      . unwrap ());
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "two",
+      ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 4, 9)
+      . unwrap ());
+    let CoordinatorState::Active (active) = &coordinator . state else {
+      panic! ("incident vanished"); };
+    assert_eq! (active . phase, MaintenancePhase::FinalizingArchive);
   }
 }

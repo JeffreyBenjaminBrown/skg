@@ -385,6 +385,18 @@ what's imperfect about what's done; choices determining the future.
   no-follow directory descriptors on Unix, enforces private modes and a closed
   file inventory, hashes every artifact, and checks the client manifest against
   the frozen server contract before durably accepting =ARCHIVE-READY=.
+- Froze the complete typed client buffer census into the durable incident,
+  including presentation generation and exact last-fetched/current hashes, and
+  made server-side archive acceptance bind every archived buffer and byte hash
+  to that census rather than trusting the client manifest in isolation.
+- Added durable per-buffer view-settlement records and conservative incident
+  classification.  The coordinator now refuses an incomplete inventory and
+  cannot enter archive finalization until every registered buffer has supplied
+  the exact retirement, release, application, or close acknowledgement required
+  by its disposition.  Dirty impacted views are always interrupted, never
+  silently refreshed; clean impacted views are assigned exact reapplication.
+- The focused Rust maintenance suite passes (23/23), as does the complete
+  Neovim suite after the census-schema extension.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -400,6 +412,11 @@ what's imperfect about what's done; choices determining the future.
   transfer, per-view disposition and terminal archive finalization are still
   in progress; a verified initial archive intentionally leaves its epoch lock
   installed until those later phases are durable.
+- Attached workflow parentage is not present in the current census schema, so
+  workflow buffers are classified conservatively (dirty ones are interrupted,
+  clean ones close) rather than being settled with their parent.  The durable
+  settlement inventory and ACK gate are in place, but clients do not yet apply
+  or acknowledge these records.
 
 ** choices determining the future
 - None.  The Undo Tree discovery is resolved by the agreed fail-closed active-

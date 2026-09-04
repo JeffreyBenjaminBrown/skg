@@ -49,6 +49,8 @@ pub fn handle_client_census_request (
       match interactive . views . open_views . views . get_mut (&uri) {
         Some (state)
           if state . graph_generation == descriptor . graph_generation
+          && state . presentation_generation
+             == descriptor . presentation_generation
           && state . revision == descriptor . server_revision
           && state . client_application_token == descriptor . application_token =>
         {
@@ -124,7 +126,7 @@ pub fn handle_client_census_texts_request (
       interactive . views . open_views . register_view_with_authority (
         uri . clone (), viewforest, &pids,
         descriptor . graph_generation,
-        0,
+        descriptor . presentation_generation,
         descriptor . application_token,
         parse_kind (&descriptor . kind)?,
         None);
@@ -176,6 +178,8 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
       view_uri: if uri == "nil" { None }
                 else { Some (ViewUri::from_client_string (uri)) },
       graph_generation: unsigned_field (&record, "graph-generation")?,
+      presentation_generation: unsigned_field (
+        &record, "presentation-generation") . unwrap_or (0),
       server_revision: unsigned_field (&record, "server-revision")?,
       application_token: unsigned_field (&record, "application-token")?,
       dirty,
@@ -214,14 +218,15 @@ fn unsigned_field (record : &Sexp, key : &str) -> Result<u64, String> {
 }
 
 fn parse_kind (kind : &str) -> Result<BufferKind, String> {
-  match kind {
-    "content-view" => Ok (BufferKind::ContentView),
-    "new-empty-content-view" => Ok (BufferKind::NewEmptyContentView),
-    "search-view" => Ok (BufferKind::SearchView),
-    "override-choice-menu" => Ok (BufferKind::OverrideChoiceMenu),
-    other => Err (format! (
-      "buffer kind '{}' cannot be reconstructed as a live view", other)),
-  }
+  let parsed = BufferKind::parse (kind)?;
+  if matches! (parsed,
+    BufferKind::ContentView
+    | BufferKind::NewEmptyContentView
+    | BufferKind::SearchView
+    | BufferKind::OverrideChoiceMenu)
+  { Ok (parsed) }
+  else { Err (format! (
+    "buffer kind '{}' cannot be reconstructed as a live view", kind)) }
 }
 
 fn sha256 (text : &str) -> String {

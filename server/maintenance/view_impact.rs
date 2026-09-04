@@ -1,12 +1,18 @@
 //! Conservative maintenance impact classification for retained editor views.
 
 use super::candidate::ObservedDiskCandidate;
+use super::archive::VerifiedInitialArchive;
+use super::types::{
+  ActiveMaintenance, BufferKind, ViewDisposition, ViewSettlementRecord,
+  ViewSettlementRequirement,
+};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnodeKind, MpVognode, MpPhantom};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::impact_ids_from_viewforest;
+use crate::runtime::interactive_session::InteractiveSession;
 
 use std::collections::BTreeSet;
 
@@ -21,6 +27,146 @@ pub struct ViewImpactAssessment {
   pub observed_ids         : BTreeSet<ID>,
   pub resolved_primary_ids : BTreeSet<ID>,
   pub changed_primary_ids  : BTreeSet<ID>,
+}
+
+/// Produce the complete, deterministic settlement inventory before asking
+/// either editor to change a buffer.  Dirty current text comes only from the
+/// verified initial archive; clean views use their retained accepted forest.
+pub fn plan_incident_view_settlements (
+  active      : &ActiveMaintenance,
+  archive     : &VerifiedInitialArchive,
+  interactive : &InteractiveSession,
+  candidate   : &ObservedDiskCandidate,
+) -> Result<Vec<ViewSettlementRecord>, String> {
+  let archived : std::collections::BTreeMap<_, _> = archive . buffers . iter ()
+    . map (|snapshot| (snapshot . buffer_id . as_str (), snapshot))
+    . collect ();
+  let mut settlements = Vec::new ();
+  for (buffer_id, frozen) in &active . buffer_census {
+    let archived_buffer = archived . get (buffer_id . as_str ()) . copied ();
+    if frozen . dirty && archived_buffer . is_none () {
+      return Err (format! (
+        "dirty buffer '{}' is absent from the verified archive", buffer_id)); }
+    if !frozen . dirty && archived_buffer . is_some () {
+      return Err (format! (
+        "clean buffer '{}' unexpectedly appears in the verified archive",
+        buffer_id)); }
+
+    let uri = frozen . view_uri . as_ref ()
+      . map (|value| crate::types::views_state::ViewUri::from_client_string (
+        value . clone ()));
+    let state = uri . as_ref () . and_then (|uri|
+      interactive . views . open_views . views . get (uri));
+    let authority_current = state . map (|state|
+      state . client_buffer_id . as_deref () == Some (buffer_id)
+      && state . graph_generation == frozen . graph_generation
+      && state . presentation_generation == frozen . presentation_generation
+      && state . revision == frozen . server_revision
+      && state . client_application_token == frozen . application_token)
+      . unwrap_or (false);
+    let assessment = match state {
+      Some (state) if authority_current => classify_view_impact (
+        &state . viewforest,
+        archived_buffer . map (|snapshot| snapshot . current_text . as_str ()),
+        &candidate . base_graph,
+        &candidate . graph,
+        candidate),
+      _ if is_graph_view_kind (&frozen . kind) => uncertain_assessment (
+        "the frozen client authority has no exact retained server forest"),
+      _ => ViewImpactAssessment {
+        impacted: frozen . dirty,
+        parse_uncertain: false,
+        uncertainty_reason: None,
+        observed_ids: BTreeSet::new (),
+        resolved_primary_ids: BTreeSet::new (),
+        changed_primary_ids: changed_ids (candidate),
+      },
+    };
+    let (planned_disposition, requirement) = planned_settlement (
+      &frozen . kind, frozen . dirty, &assessment, state . is_some ());
+    settlements . push (ViewSettlementRecord {
+      buffer_id: buffer_id . clone (),
+      buffer_key: archived_buffer . map (|snapshot| snapshot . buffer_key . clone ()),
+      kind: frozen . kind . clone (),
+      view_uri: frozen . view_uri . clone (),
+      dirty: frozen . dirty,
+      impacted: assessment . impacted,
+      parse_uncertain: assessment . parse_uncertain,
+      uncertainty_reason: assessment . uncertainty_reason,
+      observed_ids: assessment . observed_ids . into_iter ()
+        . map (|id| id . to_string ()) . collect (),
+      resolved_primary_ids: assessment . resolved_primary_ids . into_iter ()
+        . map (|id| id . to_string ()) . collect (),
+      base_server_revision: frozen . server_revision,
+      base_application_token: frozen . application_token,
+      planned_disposition,
+      requirement,
+      acknowledged: false,
+    });
+  }
+  Ok (settlements)
+}
+
+fn changed_ids (candidate : &ObservedDiskCandidate) -> BTreeSet<ID> {
+  candidate . added_primary_ids
+    . union (&candidate . deleted_primary_ids) . cloned ()
+    . chain (candidate . modified_primary_ids . iter () . cloned ())
+    . collect ()
+}
+
+fn uncertain_assessment (reason : &str) -> ViewImpactAssessment {
+  ViewImpactAssessment {
+    impacted: true,
+    parse_uncertain: true,
+    uncertainty_reason: Some (reason . into ()),
+    observed_ids: BTreeSet::new (),
+    resolved_primary_ids: BTreeSet::new (),
+    changed_primary_ids: BTreeSet::new (),
+  }
+}
+
+fn is_graph_view_kind (kind : &BufferKind) -> bool {
+  matches! (kind,
+    BufferKind::ContentView
+    | BufferKind::NewEmptyContentView
+    | BufferKind::SearchView
+    | BufferKind::OverrideChoiceMenu)
+}
+
+fn planned_settlement (
+  kind      : &BufferKind,
+  dirty     : bool,
+  impact    : &ViewImpactAssessment,
+  has_forest : bool,
+) -> (ViewDisposition, ViewSettlementRequirement) {
+  use BufferKind::*;
+  use ViewDisposition::*;
+  use ViewSettlementRequirement::*;
+  match kind {
+    ContentView | NewEmptyContentView | SearchView if dirty && impact . impacted =>
+      (Interrupted, RetirementAck),
+    ContentView | NewEmptyContentView | SearchView if dirty =>
+      (ReleasedUnimpacted, ReleaseAck),
+    ContentView | NewEmptyContentView | SearchView
+      if impact . impacted && has_forest => (Refreshed, ApplicationAck),
+    ContentView | NewEmptyContentView | SearchView if impact . impacted =>
+      (DetachedDerived, ReleaseAck),
+    ContentView | NewEmptyContentView | SearchView =>
+      (RetainedClean, ReleaseAck),
+    OverrideChoiceMenu if dirty => (Interrupted, RetirementAck),
+    OverrideChoiceMenu => (ClosedDisposable, CloseAck),
+    MetadataEditor | ForkConfirmation | RelationshipKindMenu if dirty =>
+      // Until the descriptor names its parent workflow, conservative
+      // retirement is the only safe disposition.
+      (Interrupted, RetirementAck),
+    MetadataEditor | ForkConfirmation | RelationshipKindMenu =>
+      (ClosedDisposable, CloseAck),
+    ReloadSelector | DiskConflict | IdStack | DerivedReport if dirty =>
+      (DetachedDerived, ReleaseAck),
+    ReloadSelector | DiskConflict | IdStack | DerivedReport =>
+      (ClosedDisposable, CloseAck),
+    DurableReport | RawSkgFile => (RetainedClean, ReleaseAck),
+  }
 }
 
 /// Classify one view against the exact semantic G0 -> G1 change.  Dirty text
@@ -53,10 +199,7 @@ pub fn classify_view_impact (
     if let Some (pid) = g1 . pid_of (id) {
       resolved_primary_ids . insert (pid); }
   }
-  let changed_primary_ids : BTreeSet<ID> = candidate . added_primary_ids
-    . union (&candidate . deleted_primary_ids) . cloned ()
-    . chain (candidate . modified_primary_ids . iter () . cloned ())
-    . collect ();
+  let changed_primary_ids = changed_ids (candidate);
   let semantically_intersects = resolved_primary_ids
     . iter () . any (|pid| changed_primary_ids . contains (pid));
   ViewImpactAssessment {
@@ -174,5 +317,29 @@ mod tests {
       "* (skg (node (id x) (source main)) broken\n") . is_err ());
     assert! (impact_ids_from_current_text (
       "* (skg (node (source main))) no id\n") . is_err ());
+  }
+
+  #[test]
+  fn settlement_matrix_never_refreshes_dirty_text () {
+    let orthogonal = ViewImpactAssessment {
+      impacted: false, parse_uncertain: false, uncertainty_reason: None,
+      observed_ids: BTreeSet::new (), resolved_primary_ids: BTreeSet::new (),
+      changed_primary_ids: BTreeSet::new (),
+    };
+    let impacted = ViewImpactAssessment {
+      impacted: true, ..orthogonal . clone ()
+    };
+    assert_eq! (planned_settlement (
+      &BufferKind::ContentView, true, &impacted, true),
+      (ViewDisposition::Interrupted,
+       ViewSettlementRequirement::RetirementAck));
+    assert_eq! (planned_settlement (
+      &BufferKind::SearchView, true, &orthogonal, true),
+      (ViewDisposition::ReleasedUnimpacted,
+       ViewSettlementRequirement::ReleaseAck));
+    assert_eq! (planned_settlement (
+      &BufferKind::ContentView, false, &impacted, true),
+      (ViewDisposition::Refreshed,
+       ViewSettlementRequirement::ApplicationAck));
   }
 }

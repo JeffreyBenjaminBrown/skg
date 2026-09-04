@@ -52,12 +52,32 @@ pub struct CensusDescriptor {
   pub kind                 : String,
   pub view_uri             : Option<ViewUri>,
   pub graph_generation     : u64,
+  pub presentation_generation : u64,
   pub server_revision      : u64,
   pub application_token    : u64,
   pub dirty                : bool,
   pub undo_required        : bool,
   pub last_fetched_sha256  : String,
   pub current_sha256       : String,
+}
+
+impl CensusDescriptor {
+  pub fn frozen_record (&self) -> Result<crate::maintenance::FrozenBufferRecord, String> {
+    Ok (crate::maintenance::FrozenBufferRecord {
+      buffer_id: self . buffer_id . clone (),
+      kind: crate::maintenance::BufferKind::parse (&self . kind)?,
+      view_uri: self . view_uri . as_ref ()
+        . map (ViewUri::repr_in_client),
+      graph_generation: self . graph_generation,
+      presentation_generation: self . presentation_generation,
+      server_revision: self . server_revision,
+      application_token: self . application_token,
+      dirty: self . dirty,
+      undo_required: self . undo_required,
+      last_fetched_sha256: self . last_fetched_sha256 . clone (),
+      current_sha256: self . current_sha256 . clone (),
+    })
+  }
 }
 
 pub struct InteractiveSession {

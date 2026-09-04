@@ -232,7 +232,7 @@ pub fn verify_initial_archive (
       &buffer_fields, "buffer-id", &context)?;
     if !buffer_ids . insert (buffer_id . clone ()) {
       return Err (format! ("duplicate archive buffer ID '{}'", buffer_id)); }
-    let kind = parse_buffer_kind (&require_nonempty_text (
+    let kind = BufferKind::parse (&require_nonempty_text (
       &buffer_fields, "kind", &context)?)?;
     let name = require_text (&buffer_fields, "name", &context)?;
     let view_uri_text = require_text (&buffer_fields, "view-uri", &context)?;
@@ -333,6 +333,28 @@ pub fn verify_initial_archive (
       &tree, &last_path, &context)?;
     let current_text = captured_utf8_artifact (
       &tree, &current_path, &context)?;
+    let frozen = expected . active . buffer_census . get (&buffer_id)
+      . ok_or_else (|| format! (
+        "{} is absent from the frozen maintenance census", context))?;
+    if !frozen . dirty
+    || frozen . kind != kind
+    || frozen . view_uri != view_uri . as_ref () . map (ViewUri::repr_in_client)
+    || frozen . graph_generation != graph_generation
+    || frozen . presentation_generation != presentation_generation
+    || frozen . server_revision != server_revision
+    || frozen . application_token != application_token
+    {
+      return Err (format! (
+        "{} authority does not match the frozen maintenance census", context)); }
+    let last_sha = tree . files . get (&last_path)
+      . expect ("required captured last-fetched artifact exists") . sha256 . clone ();
+    let current_sha = tree . files . get (&current_path)
+      . expect ("required captured current artifact exists") . sha256 . clone ();
+    if frozen . last_fetched_sha256 != last_sha
+    || frozen . current_sha256 != current_sha
+    {
+      return Err (format! (
+        "{} text checksums do not match the frozen maintenance census", context)); }
     verified_buffers . push (VerifiedBufferSnapshot {
       buffer_key: key,
       buffer_id,
@@ -395,25 +417,6 @@ pub fn verify_initial_archive (
     total_file_bytes: tree . total_bytes,
     buffers: verified_buffers,
   })
-}
-
-fn parse_buffer_kind (value : &str) -> Result<BufferKind, String> {
-  match value {
-    "content-view" => Ok (BufferKind::ContentView),
-    "new-empty-content-view" => Ok (BufferKind::NewEmptyContentView),
-    "search-view" => Ok (BufferKind::SearchView),
-    "override-choice-menu" => Ok (BufferKind::OverrideChoiceMenu),
-    "metadata-editor" => Ok (BufferKind::MetadataEditor),
-    "fork-confirmation" => Ok (BufferKind::ForkConfirmation),
-    "reload-selector" => Ok (BufferKind::ReloadSelector),
-    "relationship-kind-menu" => Ok (BufferKind::RelationshipKindMenu),
-    "disk-conflict" => Ok (BufferKind::DiskConflict),
-    "id-stack" => Ok (BufferKind::IdStack),
-    "derived-report" => Ok (BufferKind::DerivedReport),
-    "durable-report" => Ok (BufferKind::DurableReport),
-    "raw-skg-file" => Ok (BufferKind::RawSkgFile),
-    other => Err (format! ("unsupported archive buffer kind '{}'", other)),
-  }
 }
 
 fn captured_utf8_artifact (
@@ -981,6 +984,87 @@ mod tests {
     }
   }
 
+  fn dirty_fixture () -> Fixture {
+    let temporary = tempfile::tempdir () . unwrap ();
+    let root = temporary . path () . to_path_buf ();
+    #[cfg(unix)]
+    fs::set_permissions (&root, fs::Permissions::from_mode (0o700)) . unwrap ();
+    let last = "* (skg (node (id old) (source main))) café\n" . as_bytes ();
+    let current = "* (skg (node (id new) (source main))) café\n" . as_bytes ();
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract (
+      MaintenanceOrigin::ExplicitPartialReload, None,
+      "client-session" . into (), "emacs" . into (), "all" . into (),
+      crate::types::store_state::GraphGeneration::INITIAL,
+      crate::types::store_state::ManifestRevision::INITIAL,
+      vec![crate::maintenance::FrozenBufferRecord {
+        buffer_id: "buffer-1" . into (),
+        kind: BufferKind::ContentView,
+        view_uri: Some ("view-uri" . into ()),
+        graph_generation: 1,
+        presentation_generation: 2,
+        server_revision: 3,
+        application_token: 4,
+        dirty: true,
+        undo_required: false,
+        last_fetched_sha256: sha256 (last),
+        current_sha256: sha256 (current),
+      }]) . unwrap ();
+    let final_path = root . join (&active . archive_directory_name);
+    create_private_directory (&final_path);
+    create_private_directory (&final_path . join ("buffer-snapshots"));
+    create_private_directory (&final_path . join ("interrupted-buffers"));
+    let base = "buffer-snapshots/root_deadbeef";
+    create_private_directory (&final_path . join (base));
+    let files : Vec<(String, Vec<u8>)> = vec![
+      ("incident.org" . into (), b"* incident\n" . to_vec ()),
+      ("interrupted-buffers/README.org" . into (), b"* pending\n" . to_vec ()),
+      (format! ("{}/README.org", base), b"* buffer\n" . to_vec ()),
+      (format! ("{}/metadata.sexp", base), b"((kind content-view))\n" . to_vec ()),
+      (format! ("{}/last-fetched.org", base), last . to_vec ()),
+      (format! ("{}/unsaved-changes.org", base), current . to_vec ()),
+      (format! ("{}/diff.txt", base), b"--- old\n+++ new\n" . to_vec ()),
+    ];
+    for (path, bytes) in &files {
+      write_private (&final_path . join (path), bytes); }
+    let root_artifacts = files[..2] . iter ()
+      . map (|(path, bytes)| artifact_record (path, bytes))
+      . collect::<Vec<_>> () . join (" ");
+    let buffer_artifacts = files[2..] . iter ()
+      . map (|(path, bytes)| artifact_record (path, bytes))
+      . collect::<Vec<_>> () . join (" ");
+    let manifest = format! (concat! (
+      "((archive-format-version 1) (manifest-kind \"initial\") ",
+      "(incident-id {}) (maintenance-epoch {}) (origin {}) ",
+      "(started-at-utc {}) (archive-directory-name {}) ",
+      "(client-kind \"emacs\") (client-version \"test\") ",
+      "(client-session-id \"client-session\") ",
+      "(client-archive-identity {}) (server-archive-identity {}) ",
+      "(source-set \"all\") (g0-graph-generation 1) ",
+      "(g0-manifest-revision 1) (directory-sync \"test\") ",
+      "(artifacts ({})) (buffers (((buffer-key \"root_deadbeef\") ",
+      "(buffer-id \"buffer-1\") (kind \"content-view\") ",
+      "(name \"View\") (view-uri \"view-uri\") (root-ids (\"old\")) ",
+      "(recipe \"single-root:old\") (graph-generation 1) ",
+      "(presentation-generation 2) (server-revision 3) ",
+      "(application-token 4) (undo ((status \"empty\") ",
+      "(kind \"undo-fu-session\") (version \"0.8\"))) ",
+      "(artifacts ({})) (initial-disposition \"pending-classification\")))) ",
+      "(initial-status \"prepared-for-publication\"))\n"),
+      quoted (active . incident_id . as_str ()), active . epoch . get (),
+      quoted (active . origin . label ()), quoted (&active . started_at_utc),
+      quoted (&active . archive_directory_name),
+      quoted (&root . to_string_lossy ()), quoted (&root . to_string_lossy ()),
+      root_artifacts, buffer_artifacts);
+    let manifest_sha256 = sha256 (manifest . as_bytes ());
+    write_private (&final_path . join ("manifest.initial.sexp"), manifest . as_bytes ());
+    let marker = format! (
+      "((archive-format-version 1) (incident-id {}) (manifest-sha256 {}))\n",
+      quoted (active . incident_id . as_str ()), quoted (&manifest_sha256));
+    write_private (&final_path . join ("ARCHIVE-READY"), marker . as_bytes ());
+    Fixture { _temporary: temporary, root, active, manifest_sha256 }
+  }
+
   fn expectation (fixture : &Fixture) -> InitialArchiveExpectation<'_> {
     InitialArchiveExpectation {
       archive_root: &fixture . root,
@@ -996,6 +1080,17 @@ mod tests {
     assert_eq! (verified . artifact_count, 2);
     assert_eq! (verified . manifest_sha256, fixture . manifest_sha256);
     assert! (verified . total_file_bytes > 0);
+  }
+
+  #[test]
+  fn captures_exact_utf8_dirty_text_bound_to_the_frozen_census () {
+    let fixture = dirty_fixture ();
+    let verified = verify_initial_archive (expectation (&fixture)) . unwrap ();
+    assert_eq! (verified . buffers . len (), 1);
+    assert_eq! (verified . buffers[0] . buffer_id, "buffer-1");
+    assert_eq! (verified . buffers[0] . root_ids, vec![ID::from ("old")]);
+    assert_eq! (verified . buffers[0] . current_text,
+      "* (skg (node (id new) (source main))) café\n");
   }
 
   #[test]
