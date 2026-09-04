@@ -207,7 +207,8 @@ end
 do
   ---Byte accumulator for length-prefixed responses.
   M.lp_buffer = ''
-  ---If nil, expecting a header; if an integer, body bytes remaining.
+  ---If nil, expect a header; an integer is an ordinary body length; an
+  ---artifact table retains total and descriptor byte lengths.
   M.lp_bytes_left = nil
   ---Number of one-shot responses still expected. Incremented by
   ---register_response_handler for one-shot handlers, decremented by

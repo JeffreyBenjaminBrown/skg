@@ -41,6 +41,61 @@
     (skg-lp-handle-generic-chunk nil (substring message-bytes 20))
     (should (equal seen payload))))
 
+(ert-deftest test-skg-lp-artifact-frame-keeps-tail-opaque-across-splits ()
+  (let* ((skg-lp--buf (unibyte-string))
+         (skg-lp--bytes-left nil)
+         (skg-lp--pending-count 0)
+         (skg--request-records (make-hash-table :test #'equal))
+         (skg--request-draft nil)
+         (skg--active-request-id "artifact-request")
+         (descriptor
+          (concat
+           "((response-type maintenance-evidence) (note \"niño\")"
+           " (request-id artifact-request) (frame-kind maintenance-evidence)"
+           " (terminal-status complete))"))
+         (descriptor-bytes (encode-coding-string descriptor 'utf-8-unix))
+         (artifact-bytes (unibyte-string 0 255 254 195 40 10))
+         (body (concat descriptor-bytes artifact-bytes))
+         (wire
+          (concat
+           (format
+            (concat "Content-Length: %d\r\n"
+                    "Content-Type: application/x-skg-artifact-bundle\r\n"
+                    "Descriptor-Length: %d\r\n\r\n")
+            (length body) (length descriptor-bytes))
+           body))
+         seen-descriptor
+         seen-artifacts)
+    (skg-register-response-handler
+     'maintenance-evidence
+     (lambda (_tcp-proc payload opaque)
+       (setq seen-descriptor payload
+             seen-artifacts opaque))
+     t)
+    (let ((record skg--request-draft))
+      (setf (skg--request-record-id record) "artifact-request")
+      (puthash "artifact-request" record skg--request-records)
+      (setq skg--request-draft nil))
+    (skg-lp-handle-generic-chunk nil (substring wire 0 31))
+    (skg-lp-handle-generic-chunk
+     nil (substring wire 31 (- (length wire) 3)))
+    (should-not seen-descriptor)
+    (skg-lp-handle-generic-chunk nil (substring wire (- (length wire) 3)))
+    (should (equal descriptor seen-descriptor))
+    (should (equal artifact-bytes seen-artifacts))
+    (should-not (multibyte-string-p seen-artifacts))
+    (should (= 0 (hash-table-count skg--request-records)))))
+
+(ert-deftest test-skg-lp-artifact-header-refuses-an-impossible-boundary ()
+  (should
+   (equal
+    (skg-lp-step
+     (concat "Content-Length: 4\r\n"
+             "Content-Type: application/x-skg-artifact-bundle\r\n"
+             "Descriptor-Length: 5\r\n\r\nbody")
+     nil)
+    '(:error "Malformed artifact-bundle header"))))
+
 (ert-deftest test-skg-request-ids-separate-like-typed-queued-requests ()
   (let ((skg--request-records (make-hash-table :test #'equal))
         (skg--request-draft nil)

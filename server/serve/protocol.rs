@@ -136,6 +136,7 @@ pub enum TcpToClient {
   ReconciliationReady,
   MaintenanceOffer,
   MaintenanceStatus,
+  MaintenanceEvidence,
   Error,
 }
 
@@ -186,4 +187,5 @@ impl TcpToClient {
       TcpToClient::ReconciliationReady => "reconciliation-ready",
       TcpToClient::MaintenanceOffer => "maintenance-offer",
       TcpToClient::MaintenanceStatus => "maintenance-status",
+      TcpToClient::MaintenanceEvidence => "maintenance-evidence",
       TcpToClient::Error            => "error", }} }

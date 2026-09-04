@@ -8,6 +8,9 @@ use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 
+pub const ARTIFACT_BUNDLE_CONTENT_TYPE : &str =
+  "application/x-skg-artifact-bundle";
+
 thread_local! {
   /// The one foreground operation owned by this serial connection thread.
   /// Search keeps it across idle-loop snapshot/enrichment continuations.
@@ -111,6 +114,47 @@ pub fn send_response_with_length_prefix (
     if response_terminal_status (&enveloped) . is_some () {
       clear_request_context (); }
     Ok (( ))
+}
+
+/// Send one descriptor plus exact opaque artifact bytes as a single frame.
+/// `Content-Length` covers both portions; `Descriptor-Length` is the sole
+/// boundary between the UTF-8 S-expression and bytes which must never be
+/// decoded by the generic response path.
+pub fn send_artifact_bundle_with_length_prefix (
+  stream         : &mut TcpStream,
+  descriptor     : &str,
+  artifact_bytes : &[u8],
+) -> std::io::Result<()> {
+  let enveloped = envelope_response (descriptor);
+  if sexp::parse (&enveloped) . is_err () {
+    return Err (std::io::Error::new (
+      std::io::ErrorKind::InvalidInput,
+      "artifact bundle descriptor is not an S-expression")); }
+  let descriptor_bytes = enveloped . as_bytes ();
+  let content_length = descriptor_bytes . len ()
+    . checked_add (artifact_bytes . len ())
+    . ok_or_else (|| std::io::Error::new (
+      std::io::ErrorKind::InvalidInput,
+      "artifact bundle is too large"))?;
+  let header = format! (
+    "Content-Length: {}\r\nContent-Type: {}\r\nDescriptor-Length: {}\r\n\r\n",
+    content_length, ARTIFACT_BUNDLE_CONTENT_TYPE, descriptor_bytes . len ());
+  tracing::debug! (
+    descriptor_bytes = descriptor_bytes . len (),
+    artifact_bytes = artifact_bytes . len (),
+    "Sending maintenance artifact bundle");
+  if let Err (error) = stream . write_all (header . as_bytes ())
+    . and_then (|_| stream . write_all (descriptor_bytes))
+    . and_then (|_| stream . write_all (artifact_bytes))
+    . and_then (|_| stream . flush ())
+  {
+    tracing::error! ("Failed to send artifact bundle: {}", error);
+    LAST_SEND_FAILURE . with (|slot|
+      *slot . borrow_mut () = Some (error . to_string ()));
+    return Err (error); }
+  if response_terminal_status (&enveloped) . is_some () {
+    clear_request_context (); }
+  Ok (( ))
 }
 
 pub fn take_send_failure () -> Option<String> {

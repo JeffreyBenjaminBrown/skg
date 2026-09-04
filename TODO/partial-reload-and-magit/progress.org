@@ -397,6 +397,13 @@ what's imperfect about what's done; choices determining the future.
   silently refreshed; clean impacted views are assigned exact reapplication.
 - The focused Rust maintenance suite passes (23/23), as does the complete
   Neovim suite after the census-schema extension.
+- Extended the length-prefixed transport with one typed artifact-bundle frame:
+  its exact total and UTF-8 descriptor lengths are in the header, request and
+  incident identity live in the descriptor, and the remaining bytes stay
+  opaque in both clients.  Rust, Emacs and Neovim tests cover arbitrary chunk
+  splits, multibyte descriptors, invalid descriptor boundaries and non-UTF-8
+  artifacts.  All 343 Emacs tests, the complete Neovim suite and
+  =cargo check --tests= pass.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

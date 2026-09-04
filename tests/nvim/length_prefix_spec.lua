@@ -15,6 +15,14 @@ local function framed (payload)
                        #payload, payload)
 end
 
+local function artifact_framed (descriptor, bytes)
+  return string.format(
+    'Content-Length: %d\r\n'
+    .. 'Content-Type: application/x-skg-artifact-bundle\r\n'
+    .. 'Descriptor-Length: %d\r\n\r\n%s%s',
+    #descriptor + #bytes, #descriptor, descriptor, bytes)
+end
+
 local function activate_request ()
   local record = state.take_request_record()
   state.active_request_id = record.id
@@ -46,6 +54,28 @@ describe('skg.length_prefix dispatch', function ()
     length_prefix.handle_generic_chunk(message:sub(1, 20))
     length_prefix.handle_generic_chunk(message:sub(21))
     assert.are.equal(payload, seen)
+  end)
+
+  it('keeps artifact bytes opaque across arbitrary chunk splits', function ()
+    local seen_descriptor = nil
+    local seen_artifacts = nil
+    state.register_response_handler('maintenance-evidence',
+      function (payload_text, _, artifact_bytes)
+        seen_descriptor = payload_text
+        seen_artifacts = artifact_bytes
+      end, true)
+    local record = activate_request()
+    local descriptor = response(
+      record, 'maintenance-evidence', ' (note "niño")', 'complete')
+    local artifacts = string.char(0, 255, 254, 195, 40, 10)
+    local message = artifact_framed(descriptor, artifacts)
+    length_prefix.handle_generic_chunk(message:sub(1, 31))
+    length_prefix.handle_generic_chunk(message:sub(32, -4))
+    assert.is_nil(seen_descriptor)
+    length_prefix.handle_generic_chunk(message:sub(-3))
+    assert.are.equal(descriptor, seen_descriptor)
+    assert.are.equal(artifacts, seen_artifacts)
+    assert.is_nil(state.request_records[record.id])
   end)
 
   it('dispatches two messages arriving in one chunk', function ()
@@ -169,6 +199,39 @@ describe('skg.length_prefix step machine', function ()
     assert.are.equal('header', step.kind)
     assert.are.equal(5, step.length)
     assert.are.equal('ab', step.remainder)
+  end)
+
+  it('parses and validates an artifact descriptor boundary', function ()
+    local step = length_prefix.step(
+      'Content-Length: 9\r\n'
+      .. 'Content-Type: application/x-skg-artifact-bundle\r\n'
+      .. 'Descriptor-Length: 5\r\n\r\nab', nil)
+    assert.are.equal('header', step.kind)
+    assert.are.equal(9, step.length)
+    assert.are.equal(5, step.descriptor_length)
+    assert.are.equal('artifact', step.body_state.kind)
+    assert.are.equal('ab', step.remainder)
+  end)
+
+  it('refuses an artifact descriptor longer than its body', function ()
+    local step = length_prefix.step(
+      'Content-Length: 4\r\n'
+      .. 'Content-Type: application/x-skg-artifact-bundle\r\n'
+      .. 'Descriptor-Length: 5\r\n\r\nbody', nil)
+    assert.are.equal('error', step.kind)
+    assert.are.equal('Malformed artifact-bundle header', step.message)
+  end)
+
+  it('validates descriptor UTF-8 without inspecting opaque bytes', function ()
+    local invalid = length_prefix.try_consume_body(
+      string.char(255) .. 'opaque',
+      { kind = 'artifact', length = 7, descriptor_length = 1 })
+    assert.are.equal('error', invalid.kind)
+    local valid = length_prefix.try_consume_body(
+      '()' .. string.char(255, 254),
+      { kind = 'artifact', length = 4, descriptor_length = 2 })
+    assert.are.equal('done', valid.kind)
+    assert.are.equal(string.char(255, 254), valid.artifact_bytes)
   end)
 
   it('waits for a complete body, then splits payload and remainder',

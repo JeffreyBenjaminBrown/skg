@@ -41,6 +41,17 @@ If there is buffered data and a handler matched, continues the loop."
              nil ; continue loop -- more data may contain another LP message
            (cl-return nil)))
 
+        ;; Artifact frames keep the descriptor textual and the following
+        ;; bytes opaque.  They share one Content-Length so a disconnect can
+        ;; never make a partial artifact look like a complete response.
+        (`(:artifact-done ,descriptor ,artifact-bytes ,remainder)
+         (setq skg-lp--buf        remainder
+               skg-lp--bytes-left nil)
+         (skg-lp--dispatch-frame tcp-proc descriptor artifact-bytes)
+         (if (> (length skg-lp--buf) 0)
+             nil
+           (cl-return nil)))
+
         ;; Hard error → reset state and signal.
         (`(:error ,msg)
          (setq skg-lp--buf                (unibyte-string)
@@ -48,8 +59,8 @@ If there is buffered data and a handler matched, continues the loop."
          (skg-fail-all-requests msg)
          (error "%s" msg)))))
 
-(defun skg-lp--dispatch-frame (tcp-proc payload)
-  "Dispatch PAYLOAD to its request record and clean up once on terminal."
+(defun skg-lp--dispatch-frame (tcp-proc payload &optional artifact-bytes)
+  "Dispatch PAYLOAD and optional opaque ARTIFACT-BYTES, cleaning up once."
   (condition-case err
       (let* ((response (read payload))
              (request-id (cadr (assoc 'request-id response)))
@@ -66,7 +77,9 @@ If there is buffered data and a handler matched, continues the loop."
           (if-let ((handler
                     (gethash (format "%s" frame-kind)
                              skg--server-push-handlers)))
-              (funcall handler tcp-proc payload)
+              (if artifact-bytes
+                  (funcall handler tcp-proc payload artifact-bytes)
+                (funcall handler tcp-proc payload))
             (skg-log 'warn 'dispatch
                      "no server-push handler for frame %s" frame-kind)))
          ((not request-id)
@@ -92,6 +105,9 @@ If there is buffered data and a handler matched, continues the loop."
                 (skg--dispatching-request-id request-id))
             (unwind-protect
                 (cond
+                 ((and handler-entry artifact-bytes)
+                  (funcall (cadr handler-entry)
+                           tcp-proc payload artifact-bytes))
                  (handler-entry
                   (funcall (cadr handler-entry) tcp-proc payload))
                  ((eq frame-kind 'error)
@@ -121,8 +137,9 @@ If there is buffered data and a handler matched, continues the loop."
 Inputs: BUF (unibyte accumulator), BYTES-LEFT (nil → need header; N → need N bytes).
 Returns one of:
   (:need-more BUF LEFT)
-  (:header LEN REMAINDER)
+  (:header LEN-OR-ARTIFACT-SPEC REMAINDER)
   (:done ORG-TEXT REMAINDER)
+  (:artifact-done DESCRIPTOR OPAQUE-BYTES REMAINDER)
   (:error MESSAGE)"
   (if (null bytes-left)
       ;; Need a header
@@ -133,7 +150,10 @@ Returns one of:
     ;; Need BYTES-LEFT bytes of body
     (pcase (skg-lp-try-consume-body buf bytes-left)
       (`(:incomplete)                  `(:need-more ,buf ,bytes-left))
-      (`(:done ,org-text ,remainder)   `(:done ,org-text ,remainder)))))
+      (`(:done ,org-text ,remainder)   `(:done ,org-text ,remainder))
+      (`(:artifact-done ,descriptor ,bytes ,remainder)
+       `(:artifact-done ,descriptor ,bytes ,remainder))
+      (`(:error ,msg)                  `(:error ,msg)))))
 
 (defun skg-lp-append-chunk (buf chunk)
   "Return BUF with CHUNK (UTF-8 encoded bytes) appended."
@@ -144,39 +164,79 @@ Returns one of:
     (concat buf bytes)) )
 
 (defun skg-lp-try-parse-header (response)
-  "Extracts the length of the response bytes-so-far,
-and the bytes-so-far itself, from `response`.
+  "Extract a normal length or artifact frame spec from RESPONSE.
 Returns one of:
   (:incomplete)
-  (:ok LEN BYTES-SO-FAR)
+  (:ok LEN-OR-ARTIFACT-SPEC BYTES-SO-FAR)
   (:error MESSAGE)"
   (let ((sep (string-match "\r\n\r\n" response)) )
     (if (not sep)
         '(:incomplete)
-      (let* ((header
-              (substring response 0 (+ sep 4)) )
-             (bytes-so-far ;; might be partial
-              (substring response (+ sep 4)) )
-             (len (and (string-match "Content-Length: \\([0-9]+\\)"
-                                     header)
-                       (string-to-number
-                        (match-string 1 header)) )) )
-        (if len
-            (list :ok len bytes-so-far)
-          (list :error
-                "Malformed header in length-prefixed response")) )) ))
+      (let* ((header (substring response 0 sep))
+             (bytes-so-far (substring response (+ sep 4)))
+             (lines (split-string header "\r\n" t))
+             (lengths (skg-lp--header-values lines "Content-Length"))
+             (content-types (skg-lp--header-values lines "Content-Type"))
+             (descriptor-lengths
+              (skg-lp--header-values lines "Descriptor-Length")))
+        (cond
+         ((or (/= (length lengths) 1)
+              (not (string-match-p "\\`[0-9]+\\'" (car lengths))))
+          (list :error "Malformed header in length-prefixed response"))
+         ((or descriptor-lengths
+              (member "application/x-skg-artifact-bundle" content-types))
+          (let ((total (string-to-number (car lengths))))
+            (if (or (not (equal content-types
+                                '("application/x-skg-artifact-bundle")))
+                    (/= (length descriptor-lengths) 1)
+                    (not (string-match-p
+                          "\\`[0-9]+\\'" (car descriptor-lengths)))
+                    (> (string-to-number (car descriptor-lengths)) total))
+                (list :error "Malformed artifact-bundle header")
+              (list :ok
+                    (list :artifact total
+                          (string-to-number (car descriptor-lengths)))
+                    bytes-so-far))))
+         (t (list :ok (string-to-number (car lengths)) bytes-so-far)))))))
+
+(defun skg-lp--header-values (lines name)
+  "Return all values for exact header NAME among LINES."
+  (let ((prefix (concat name ": "))
+        values)
+    (dolist (line lines (nreverse values))
+      (when (string-prefix-p prefix line)
+        (push (substring line (length prefix)) values)))))
 
 (defun skg-lp-try-consume-body (byte-acc bytes-left)
-  "If BYTE-ACC contains BYTES-LEFT (or more, but it shouldn't),
-then return (:done ORG-TEXT REMAINDER),
-else return (:incomplete)."
-  (let ((have (length byte-acc)) )
-    (if (< have bytes-left)
-        '(:incomplete)
-      (let* ((payload-bytes (substring byte-acc 0 bytes-left))
-             (remainder     (substring byte-acc bytes-left))
-             (org-text      (decode-coding-string payload-bytes
-                                                  'utf-8 t)) )
-        (list :done org-text remainder)) )) )
+  "Consume one normal body or one descriptor-plus-artifacts body."
+  (if (and (consp bytes-left) (eq (car bytes-left) :artifact))
+      (let ((total (nth 1 bytes-left))
+            (descriptor-length (nth 2 bytes-left)))
+        (if (< (length byte-acc) total)
+            '(:incomplete)
+          (let* ((body (substring byte-acc 0 total))
+                 (descriptor-bytes (substring body 0 descriptor-length))
+                 (artifact-bytes (substring body descriptor-length))
+                 (remainder (substring byte-acc total)))
+            (pcase (skg-lp--decode-utf8-exact descriptor-bytes)
+              (`(:ok ,descriptor)
+               (list :artifact-done descriptor artifact-bytes remainder))
+              (`(:error ,message) (list :error message))))))
+    (let ((have (length byte-acc)))
+      (if (< have bytes-left)
+          '(:incomplete)
+        (let* ((payload-bytes (substring byte-acc 0 bytes-left))
+               (remainder (substring byte-acc bytes-left))
+               (org-text (decode-coding-string payload-bytes 'utf-8 t)))
+          (list :done org-text remainder))))))
+
+(defun skg-lp--decode-utf8-exact (bytes)
+  "Decode BYTES as UTF-8 only when the round trip is byte-exact."
+  (condition-case nil
+      (let ((text (decode-coding-string bytes 'utf-8-unix)))
+        (if (equal bytes (encode-coding-string text 'utf-8-unix))
+            (list :ok text)
+          (list :error "Artifact descriptor is not valid UTF-8")))
+    (error (list :error "Artifact descriptor is not valid UTF-8"))))
 
 (provide 'skg-length-prefix)

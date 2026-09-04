@@ -254,7 +254,9 @@ ordinary request draft which may have caused a reconnect."
   (defvar skg-lp--buf (unibyte-string)
     "Unibyte byte accumulator for length-prefixed responses.")
   (defvar skg-lp--bytes-left nil
-    "If nil, expecting header. If an integer, number of body bytes remaining.")
+    "Receiver body state.
+Nil means expect a header; an integer is an ordinary byte length; an
+`(:artifact TOTAL DESCRIPTOR-LENGTH)' list preserves the binary boundary.")
   (defvar skg-lp--pending-count 0
     "Number of one-shot responses still expected.
 Incremented by `skg-register-response-handler' for one-shot handlers,
