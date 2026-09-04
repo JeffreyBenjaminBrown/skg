@@ -44,6 +44,7 @@ local function reset ()
   state.maintenance_client_incident = nil
   state.pending_maintenance_offer = nil
   state.maintenance_state = nil
+  state.connection_handshake_state = nil
   state.request_draft = nil
   for _, buf in ipairs(registry.buffers()) do
     if vim.api.nvim_buf_is_valid(buf) then
@@ -196,5 +197,54 @@ describe('skg Neovim maintenance handshake', function ()
     }
     maintenance.handle_census_stale({ buffer_id })
     assert.are.equal('view', registry.record(buf).view_uri)
+  end)
+
+  it('adopts the handshake epoch before submitting reconnect census',
+     function ()
+    local buf = new_buffer()
+    registry.unlock_after_maintenance(buf, 9)
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9,
+      registered_buffer_ids = { registry.record(buf).id },
+    }
+    local misc = require('skg.misc_requests')
+    local real_submit = misc.submit_buffer_census
+    local census_submitted = false
+    misc.submit_buffer_census = function () census_submitted = true end
+    misc.install_connection_verification(nil, {
+      f('source-inventory', {}), f('active-source-set', 'all'),
+      f('maintenance-archive-folder', 'archive'),
+      f('maintenance-archive-identity', '/archive'),
+      f('maintenance-epoch', 9), f('maintenance-state', 'active'),
+      f('census-required', 'true'), f('graph-generation', 1),
+      f('manifest-revision', 2), f('typedb-health', 'healthy'),
+      f('tantivy-health', 'healthy'), f('content', 'connected'),
+    }, {})
+    misc.submit_buffer_census = real_submit
+    assert.is_true(census_submitted)
+    assert.are.equal('active', state.maintenance_state.state)
+    assert.are.equal(9, registry.record(buf).maintenance_epoch)
+    assert.is_false(vim.bo[buf].modifiable)
+  end)
+
+  it('resumes maintenance only after a completed reconnect census',
+     function ()
+    local misc = require('skg.misc_requests')
+    local real_stale = maintenance.handle_census_stale
+    local real_resume = maintenance.resume_after_census
+    local stale, resumed
+    maintenance.handle_census_stale = function (ids) stale = ids end
+    maintenance.resume_after_census = function () resumed = true end
+    misc.handle_buffer_census_response({}, {
+      f('text-required-buffer-ids', {}),
+      f('stale-buffer-ids', { 'protected' }),
+      f('census-complete', 'true'),
+    })
+    vim.wait(200, function () return resumed == true end, 10)
+    maintenance.handle_census_stale = real_stale
+    maintenance.resume_after_census = real_resume
+    assert.are.same({ 'protected' }, stale)
+    assert.is_true(resumed)
+    assert.are.equal('verified', state.connection_handshake_state)
   end)
 end)

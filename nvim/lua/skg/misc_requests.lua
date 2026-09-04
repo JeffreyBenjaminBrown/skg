@@ -36,7 +36,7 @@ local function handshake_request ()
   }) .. '\n'
 end
 
-local function install_connection_verification (_payload_text, response, tcp)
+function M.install_connection_verification (_payload_text, response, tcp)
   config.install_source_inventory(
     payload.field(response, 'source-inventory'))
   state.active_source_set_name =
@@ -48,8 +48,8 @@ local function install_connection_verification (_payload_text, response, tcp)
     payload.field_text(response, 'maintenance-archive-identity')
   state.maintenance_state = {
     epoch = payload.field(response, 'maintenance-epoch'),
-    state = payload.field(response, 'maintenance-state'),
-    census_required = payload.field(response, 'census-required'),
+    state = payload.field_text(response, 'maintenance-state'),
+    census_required = payload.field_text(response, 'census-required'),
   }
   config.store_state = {
     graph_generation = payload.field(response, 'graph-generation'),
@@ -58,6 +58,7 @@ local function install_connection_verification (_payload_text, response, tcp)
     tantivy_health = payload.field(response, 'tantivy-health'),
   }
   state.connection_handshake_state = 'census'
+  require('skg.maintenance').adopt_handshake_epoch()
   M.show_handshake_telescope_warnings(response)
   M.show_pending_recovery_incidents(response)
   local content = payload.field(response, 'content')
@@ -84,10 +85,12 @@ function M.handle_buffer_census_response (tcp, response)
   local registry = require('skg.buffer_registry')
   local required = payload.string_list(
     payload.field(response, 'text-required-buffer-ids'))
-  registry.mark_census_buffers_stale(payload.string_list(
+  require('skg.maintenance').handle_census_stale(payload.string_list(
     payload.field(response, 'stale-buffer-ids')))
   if #required == 0 then
     state.connection_handshake_state = 'verified'
+    vim.schedule(function ()
+      require('skg.maintenance').resume_after_census() end)
     return
   end
   state.connection_handshake_state = 'census-texts'
@@ -95,11 +98,14 @@ function M.handle_buffer_census_response (tcp, response)
     tcp, '((request . "client census texts"))\n', {
       ['client-census'] = {
         handler = function (_payload_text, final_response)
-          registry.mark_census_buffers_stale(payload.string_list(
-            payload.field(final_response, 'stale-buffer-ids')))
+          require('skg.maintenance').handle_census_stale(
+            payload.string_list(payload.field(
+              final_response, 'stale-buffer-ids')))
           if payload.field_text(final_response, 'census-complete') ~= 'true' then
             error('Skg server did not complete the buffer census') end
           state.connection_handshake_state = 'verified'
+          vim.schedule(function ()
+            require('skg.maintenance').resume_after_census() end)
         end,
         one_shot = true,
       },
@@ -112,7 +118,7 @@ function M.enqueue_connection_handshake (tcp)
   client.submit_priority_request(tcp, handshake_request(), {
     ['verify-connection'] = {
       handler = function (payload_text, response)
-        install_connection_verification(payload_text, response, tcp) end,
+        M.install_connection_verification(payload_text, response, tcp) end,
       one_shot = true,
     },
   })
@@ -138,7 +144,7 @@ function M.connection_verify ()
   if not already_connected then return end
   state.register_response_handler('verify-connection',
     function (payload_text, response)
-      install_connection_verification(payload_text, response, state.tcp) end,
+      M.install_connection_verification(payload_text, response, state.tcp) end,
     true)
   client.submit_request(handshake_request())
 end
