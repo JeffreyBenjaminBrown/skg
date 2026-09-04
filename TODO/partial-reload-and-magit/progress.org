@@ -428,6 +428,13 @@ what's imperfect about what's done; choices determining the future.
   creates =FINALIZED= last.  Exact non-UTF-8 evidence and a second idempotent
   finalization pass are covered.  All 345 Emacs tests pass (two optional
   undo-fu-session tests remain skipped when that package is absent).
+- Added the equivalent Neovim final archive writer and the same portable final
+  manifest/report/index schema.  It validates safe evidence paths, contiguous
+  offsets, each artifact and the complete opaque stream before staging; installs
+  whole evidence categories by rename; verifies already-installed categories
+  on replay; and publishes =FINALIZED= only after every durable final artifact.
+  Exact non-UTF-8 evidence, idempotent replay and changed-stream refusal are
+  covered, and the complete Neovim suite passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

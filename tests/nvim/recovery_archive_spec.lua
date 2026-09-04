@@ -114,6 +114,81 @@ local function cleanup (value)
   require('skg.state').maintenance_archive_identity = nil
 end
 
+local function f (name, value)
+  return { sexpr.symbol(name), value }
+end
+
+local function final_bundle (initial)
+  local manifest = sexpr.read(read_bytes(
+    initial.path .. '/manifest.initial.sexp'))
+  local buffer_record = payload.field(manifest, 'buffers')[1]
+  local buffer_id = payload.field_text(buffer_record, 'buffer-id')
+  local buffer_key = payload.field_text(buffer_record, 'buffer-key')
+  local readme = '* Modified node niño\n'
+  local raw = string.char(0, 255, 254, 195, 40, 10)
+  local opaque = readme .. raw
+  local node_root = 'modified-nodes/node-00000000-deadbeefcafe'
+  local raw_relative = node_root
+    .. '/raw/path-00000000-012345abcdef.after.skg'
+  local records = {
+    {
+      f('artifact-key', 'artifact-00000000'),
+      f('relative-path', node_root .. '/README.org'),
+      f('purpose', 'node-readme'),
+      f('byte-offset', 0),
+      f('byte-length', #readme),
+      f('sha256', vim.fn.sha256(readme)),
+    },
+    {
+      f('artifact-key', 'artifact-00000001'),
+      f('relative-path', raw_relative),
+      f('purpose', 'raw-after'),
+      f('byte-offset', #readme),
+      f('byte-length', #raw),
+      f('sha256', vim.fn.sha256(raw)),
+    },
+  }
+  return {
+    descriptor = {
+      f('artifact-bundle-format-version', 1),
+      f('incident-id', incident_id),
+      f('maintenance-epoch', 4),
+      f('candidate-id', 'abcdefab-1234-4234-8234-abcdefabcdef'),
+      f('g0-graph-generation', 7),
+      f('g0-manifest-revision', 9),
+      f('g1-graph-generation', 8),
+      f('g1-manifest-revision', 10),
+      f('tantivy-generation', 12),
+      f('server-evidence-sha256', string.rep('a', 64)),
+      f('transfer-manifest-sha256', string.rep('b', 64)),
+      f('artifact-bytes-sha256', vim.fn.sha256(opaque)),
+      f('artifact-count', 2),
+      f('artifact-bytes', #opaque),
+      f('artifacts', records),
+    },
+    opaque = opaque,
+    settlements = {
+      {
+        f('buffer-id', buffer_id),
+        f('buffer-key', buffer_key),
+        f('kind', 'content-view'),
+        f('view-uri', 'view:archive-fixture'),
+        f('dirty', 'true'),
+        f('impacted', 'true'),
+        f('parse-uncertain', 'nil'),
+        f('observed-ids', { 'root-a' }),
+        f('resolved-primary-ids', { 'root-a' }),
+        f('base-server-revision', 11),
+        f('base-application-token', 5),
+        f('planned-disposition', 'interrupted'),
+        f('required-ack', 'retirement-ack'),
+      },
+    },
+    raw = raw,
+    raw_relative = raw_relative,
+  }
+end
+
 describe('skg recovery archive', function ()
   it('uses a deterministic, cross-client canonical S-expression', function ()
     assert.are.equal(
@@ -200,5 +275,54 @@ describe('skg recovery archive', function ()
     end
     cleanup(value)
     assert.is_false(ok)
+  end)
+
+  it('finalizes opaque evidence replay-safely with FINALIZED last',
+     function ()
+    local value = fixture()
+    local ok, error_text = xpcall(function ()
+      local initial = archive.publish_initial(value.offer, { value.buf }, {
+        client_nonce = '0123456789abcdef01234567',
+      })
+      local bundle = final_bundle(initial)
+      local result = archive.finalize(
+        initial, bundle.descriptor, bundle.opaque, bundle.settlements)
+      local replayed = archive.finalize(
+        initial, bundle.descriptor, bundle.opaque, bundle.settlements)
+      local final_bytes = read_bytes(initial.path .. '/manifest.final.sexp')
+      local final = sexpr.read(final_bytes)
+      assert.are.equal(result.manifest_sha256, vim.fn.sha256(final_bytes))
+      assert.are.equal(result.manifest_sha256, replayed.manifest_sha256)
+      assert.are.equal(bundle.raw,
+        read_bytes(initial.path .. '/' .. bundle.raw_relative))
+      assert.are.equal('final', payload.field_text(final, 'manifest-kind'))
+      assert.are.equal(2, #payload.field(final, 'node-artifacts'))
+      assert.are.equal('file',
+        vim.uv.fs_lstat(initial.path .. '/FINALIZED').type)
+      assert.is_truthy(read_bytes(initial.path
+        .. '/interrupted-buffers/README.org'):find(
+          'buffer%-snapshots/.*/unsaved%-changes.org'))
+    end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('refuses changed opaque final evidence before FINALIZED', function ()
+    local value = fixture()
+    local ok, error_text = xpcall(function ()
+      local initial = archive.publish_initial(value.offer, { value.buf }, {
+        client_nonce = 'fedcba9876543210fedcba98',
+      })
+      local bundle = final_bundle(initial)
+      local changed = bundle.opaque:sub(1, -2) .. 'c'
+      local finalized, final_error = pcall(
+        archive.finalize, initial, bundle.descriptor, changed,
+        bundle.settlements)
+      assert.is_false(finalized)
+      assert.is_truthy(tostring(final_error):find('checksum', 1, true))
+      assert.is_nil(vim.uv.fs_lstat(initial.path .. '/FINALIZED'))
+    end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
   end)
 end)

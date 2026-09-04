@@ -6,6 +6,7 @@
 -- before any risky maintenance step may begin.
 
 local registry = require('skg.buffer_registry')
+local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -751,6 +752,548 @@ function M.publish_initial (offer, buffers, options)
     archive_name = offer.archive_name,
     manifest_sha256 = manifest_sha256,
     sizes = sizes,
+  }
+end
+
+local evidence_categories = {
+  'new-nodes', 'deleted-nodes', 'modified-nodes', 'invalid-paths',
+}
+
+local evidence_category_set = {}
+for _, category in ipairs(evidence_categories) do
+  evidence_category_set[category] = true end
+
+local function required_field (value, key, context)
+  if not sexpr.is_list(value) then
+    fail(context .. ' is not a field list') end
+  local result = payload.field(value, key)
+  if result == nil then fail(context .. ' lacks ' .. key) end
+  return result
+end
+
+local function required_text (value, key, context)
+  local result = required_field(value, key, context)
+  if sexpr.is_list(result) or sexpr.is_pair(result) then
+    fail(context .. ' has non-atomic ' .. key) end
+  return sexpr.atom_text(result)
+end
+
+local function required_integer (value, key, context)
+  local result = required_field(value, key, context)
+  if type(result) ~= 'number' or result < 0 or result ~= math.floor(result)
+     or result > 9007199254740991 then
+    fail(context .. ' has invalid ' .. key) end
+  return result
+end
+
+local function required_list (value, key, context)
+  local result = required_field(value, key, context)
+  if not sexpr.is_list(result) then
+    fail(context .. ' has malformed ' .. key .. ' list') end
+  return result
+end
+
+local function sha256_valid (value)
+  return type(value) == 'string' and #value == 64
+    and value:match('^[0-9a-f]+$') ~= nil
+end
+
+local function read_exact_sexpr (path)
+  local bytes = read_regular_file(path)
+  local ok, value, position = pcall(sexpr.read, bytes)
+  if not ok then fail('invalid machine record ' .. path .. ': ' .. value) end
+  if not bytes:sub(position):match('^%s*$') then
+    fail('machine record has trailing data: ' .. path) end
+  return value
+end
+
+local function safe_evidence_components (relative)
+  if type(relative) ~= 'string' or relative:sub(1, 1) == '/'
+     or relative:find('\\', 1, true) then
+    fail('unsafe evidence path: ' .. tostring(relative)) end
+  local components = {}
+  for component in (relative .. '/'):gmatch('(.-)/') do
+    table.insert(components, component) end
+  if #components < 3 or table.concat(components, '/') ~= relative
+     or not evidence_category_set[components[1]] then
+    fail('unsafe evidence path: ' .. relative) end
+  local prefix, digits, digest = components[2]:match(
+    '^(node%-)(%d+)%-(%x+)$')
+  if not prefix then
+    prefix, digits, digest = components[2]:match(
+      '^(path%-)(%d+)%-(%x+)$') end
+  if not prefix or #digits ~= 8 or #digest ~= 12
+     or not digest:match('^[0-9a-f]+$') then
+    fail('unsafe evidence path: ' .. relative) end
+  for _, component in ipairs(components) do
+    if component == '' or component == '.' or component == '..'
+       or not component:match('^[A-Za-z0-9._-]+$') then
+      fail('unsafe evidence path: ' .. relative) end
+  end
+  return components
+end
+
+local function parse_evidence_bundle (descriptor, opaque_bytes)
+  if type(opaque_bytes) ~= 'string' then
+    fail('artifact bundle did not remain opaque bytes') end
+  local context = 'maintenance evidence descriptor'
+  local version = required_integer(
+    descriptor, 'artifact-bundle-format-version', context)
+  local count = required_integer(descriptor, 'artifact-count', context)
+  local declared_bytes = required_integer(
+    descriptor, 'artifact-bytes', context)
+  local payload_sha = required_text(
+    descriptor, 'artifact-bytes-sha256', context)
+  local transfer_sha = required_text(
+    descriptor, 'transfer-manifest-sha256', context)
+  local wire_records = required_list(descriptor, 'artifacts', context)
+  if version ~= 1 then
+    fail('unsupported evidence bundle version: ' .. tostring(version)) end
+  if not sha256_valid(payload_sha) or not sha256_valid(transfer_sha) then
+    fail('evidence bundle has an invalid checksum') end
+  if #wire_records ~= count or #opaque_bytes ~= declared_bytes
+     or vim.fn.sha256(opaque_bytes) ~= payload_sha then
+    fail('opaque evidence inventory/checksum does not match') end
+  local seen_keys, seen_paths, records = {}, {}, {}
+  local expected_offset = 0
+  for index, wire_record in ipairs(wire_records) do
+    local record_context = 'evidence artifact ' .. tostring(index - 1)
+    local key = required_text(wire_record, 'artifact-key', record_context)
+    local relative = required_text(
+      wire_record, 'relative-path', record_context)
+    local purpose = required_text(wire_record, 'purpose', record_context)
+    local offset = required_integer(wire_record, 'byte-offset', record_context)
+    local length = required_integer(wire_record, 'byte-length', record_context)
+    local sha = required_text(wire_record, 'sha256', record_context)
+    if key ~= string.format('artifact-%08d', index - 1) then
+      fail('artifact key/order changed at ' .. tostring(index - 1)) end
+    safe_evidence_components(relative)
+    if purpose == '' or not sha256_valid(sha) or offset ~= expected_offset
+       or length > #opaque_bytes - offset
+       or seen_keys[key] or seen_paths[relative] then
+      fail('invalid or overlapping ' .. record_context) end
+    local bytes = opaque_bytes:sub(offset + 1, offset + length)
+    if vim.fn.sha256(bytes) ~= sha then
+      fail(record_context .. ' checksum mismatch') end
+    seen_keys[key], seen_paths[relative] = true, true
+    table.insert(records, {
+      key = key, relative_path = relative, purpose = purpose,
+      byte_offset = offset, byte_length = length, sha256 = sha, bytes = bytes,
+    })
+    expected_offset = offset + length
+  end
+  if expected_offset ~= #opaque_bytes then
+    fail('artifact records do not consume the opaque body') end
+  return {
+    records = records,
+    transfer_manifest_sha256 = transfer_sha,
+    artifact_bytes_sha256 = payload_sha,
+  }
+end
+
+local function ensure_private_relative_directory (root, relative)
+  local cursor = root
+  for component in relative:gmatch('[^/]+') do
+    cursor = cursor .. '/' .. component
+    local stat = vim.uv.fs_lstat(cursor)
+    if stat then require_directory(cursor, 448, 'evidence directory')
+    else mkdir_private(cursor, false) end
+  end
+  return cursor
+end
+
+local function expected_evidence_directories (records, category)
+  local expected = { [category] = true }
+  for _, record in ipairs(records) do
+    local accumulated = nil
+    local parent = vim.fs.dirname(record.relative_path)
+    for component in parent:gmatch('[^/]+') do
+      accumulated = accumulated and (accumulated .. '/' .. component)
+        or component
+      expected[accumulated] = true
+    end
+  end
+  return expected
+end
+
+local function verify_evidence_category (incident_root, category, records)
+  local expected_files = {}
+  for _, record in ipairs(records) do
+    expected_files[record.relative_path] = record end
+  local expected_directories = expected_evidence_directories(records, category)
+  local seen_files = 0
+  local function walk (directory)
+    require_directory(directory, 448, 'evidence directory')
+    local relative_directory = directory:sub(#incident_root + 2)
+    if not expected_directories[relative_directory] then
+      fail('undeclared evidence directory: ' .. relative_directory) end
+    local scanner, scan_error = vim.uv.fs_scandir(directory)
+    if not scanner then fail('cannot scan evidence directory: ' .. scan_error) end
+    while true do
+      local name, kind = vim.uv.fs_scandir_next(scanner)
+      if not name then break end
+      local path = directory .. '/' .. name
+      local stat = vim.uv.fs_lstat(path)
+      if not stat or stat.type ~= kind then
+        fail('evidence entry changed during traversal: ' .. path) end
+      if kind == 'link' then fail('evidence entry is a symlink: ' .. path)
+      elseif kind == 'directory' then walk(path)
+      elseif kind == 'file' then
+        if mode_bits(stat) ~= 384 or (stat.nlink and stat.nlink ~= 1) then
+          fail('evidence entry is not a private regular file: ' .. path) end
+        local relative = path:sub(#incident_root + 2)
+        local record = expected_files[relative]
+        local bytes = record and read_regular_file(path) or nil
+        if not record or #bytes ~= record.byte_length
+           or vim.fn.sha256(bytes) ~= record.sha256 then
+          fail('undeclared or changed evidence artifact: ' .. relative) end
+        seen_files = seen_files + 1
+      else fail('special evidence entry is forbidden: ' .. path) end
+    end
+  end
+  walk(incident_root .. '/' .. category)
+  if seen_files ~= #records then
+    fail('evidence category ' .. category .. ' is incomplete') end
+end
+
+local function atom_list (value, key, context)
+  local result = {}
+  for _, item in ipairs(required_list(value, key, context)) do
+    if sexpr.is_list(item) or sexpr.is_pair(item) then
+      fail(context .. ' has a non-atomic ' .. key .. ' member') end
+    table.insert(result, sexpr.atom_text(item))
+  end
+  return result
+end
+
+local function normalize_settlements (settlements, initial_buffers)
+  if not sexpr.is_list(settlements) then
+    fail('view settlements are not a proper list') end
+  local valid_dispositions = {
+    interrupted = true, ['released-unimpacted'] = true, refreshed = true,
+    ['retained-clean'] = true, closed = true, ['detached-derived'] = true,
+    ['maintenance-aborted'] = true, failed = true,
+  }
+  local valid_acks = {
+    ['retirement-ack'] = true, ['release-ack'] = true,
+    ['application-ack'] = true, ['close-ack'] = true,
+  }
+  local seen, normalized = {}, {}
+  for _, record in ipairs(settlements) do
+    local context = 'view settlement'
+    local buffer_id = required_text(record, 'buffer-id', context)
+    local buffer_key = required_text(record, 'buffer-key', context)
+    local disposition = required_text(record, 'planned-disposition', context)
+    local required_ack = required_text(record, 'required-ack', context)
+    if seen[buffer_id] then
+      fail('duplicate settlement for buffer ' .. buffer_id) end
+    if not valid_dispositions[disposition] then
+      fail('unknown buffer disposition: ' .. disposition) end
+    if not valid_acks[required_ack] then
+      fail('unknown settlement acknowledgement: ' .. required_ack) end
+    seen[buffer_id] = buffer_key
+    table.insert(normalized, {
+      field('buffer-id', buffer_id),
+      field('buffer-key', buffer_key),
+      field('kind', required_text(record, 'kind', context)),
+      field('view-uri', required_text(record, 'view-uri', context)),
+      field('dirty', required_text(record, 'dirty', context)),
+      field('impacted', required_text(record, 'impacted', context)),
+      field('parse-uncertain', required_text(
+        record, 'parse-uncertain', context)),
+      field('observed-ids', atom_list(record, 'observed-ids', context)),
+      field('resolved-primary-ids', atom_list(
+        record, 'resolved-primary-ids', context)),
+      field('base-server-revision', required_integer(
+        record, 'base-server-revision', context)),
+      field('base-application-token', required_integer(
+        record, 'base-application-token', context)),
+      field('disposition', disposition),
+      field('required-ack', required_ack),
+      field('acknowledged', 'true'),
+    })
+  end
+  for _, buffer in ipairs(initial_buffers) do
+    local buffer_id = required_text(buffer, 'buffer-id', 'initial buffer')
+    local buffer_key = required_text(buffer, 'buffer-key', 'initial buffer')
+    if seen[buffer_id] ~= buffer_key then
+      fail('dirty buffer ' .. buffer_id .. ' has no exact final settlement') end
+  end
+  return normalized
+end
+
+local function final_artifact_record (record)
+  return {
+    field('artifact-key', record.key),
+    field('path', record.relative_path),
+    field('purpose', record.purpose),
+    field('byte-offset', record.byte_offset),
+    field('bytes', record.byte_length),
+    field('sha256', record.sha256),
+  }
+end
+
+local function final_manifest_value (
+    initial, initial_sha, descriptor, evidence, settlements, root_artifacts)
+  local context = 'maintenance evidence descriptor'
+  local node_artifacts = {}
+  for _, record in ipairs(evidence.records) do
+    table.insert(node_artifacts, final_artifact_record(record)) end
+  return {
+    field('archive-format-version', M.archive_format_version),
+    field('manifest-kind', 'final'),
+    field('incident-id', required_text(descriptor, 'incident-id', context)),
+    field('maintenance-epoch', required_integer(
+      descriptor, 'maintenance-epoch', context)),
+    field('initial-manifest-sha256', initial_sha),
+    field('origin', required_text(initial, 'origin', 'initial manifest')),
+    field('started-at-utc', required_text(
+      initial, 'started-at-utc', 'initial manifest')),
+    field('client-kind', required_text(
+      initial, 'client-kind', 'initial manifest')),
+    field('client-version', required_text(
+      initial, 'client-version', 'initial manifest')),
+    field('candidate-id', required_text(descriptor, 'candidate-id', context)),
+    field('g0-graph-generation', required_integer(
+      descriptor, 'g0-graph-generation', context)),
+    field('g0-manifest-revision', required_integer(
+      descriptor, 'g0-manifest-revision', context)),
+    field('g1-graph-generation', required_integer(
+      descriptor, 'g1-graph-generation', context)),
+    field('g1-manifest-revision', required_integer(
+      descriptor, 'g1-manifest-revision', context)),
+    field('tantivy-generation', required_integer(
+      descriptor, 'tantivy-generation', context)),
+    field('server-evidence-sha256', required_text(
+      descriptor, 'server-evidence-sha256', context)),
+    field('transfer-manifest-sha256', evidence.transfer_manifest_sha256),
+    field('artifact-bytes-sha256', evidence.artifact_bytes_sha256),
+    field('node-artifacts', node_artifacts),
+    field('root-artifacts', root_artifacts),
+    field('buffers', required_list(initial, 'buffers', 'initial manifest')),
+    field('buffer-dispositions', settlements),
+    field('directory-sync', 'libuv-fsync'),
+    field('terminal-status', 'completed'),
+  }
+end
+
+local function final_incident_report (descriptor, evidence, settlements)
+  local lines = {
+    '* Skg maintenance recovery incident (finalized)', '',
+    '- Incident :: =' .. required_text(
+      descriptor, 'incident-id', 'evidence descriptor') .. '=',
+    '- Candidate :: =' .. required_text(
+      descriptor, 'candidate-id', 'evidence descriptor') .. '=',
+    '- Selected graph :: =' .. tostring(required_integer(
+      descriptor, 'g1-graph-generation', 'evidence descriptor')) .. '=',
+    '- Node evidence artifacts :: ' .. tostring(#evidence.records), '',
+    '** Buffer dispositions', '',
+  }
+  if #settlements == 0 then
+    table.insert(lines, 'No buffers were registered.')
+  else
+    for _, record in ipairs(settlements) do
+      table.insert(lines, string.format('- =%s= :: %s',
+        required_text(record, 'buffer-id', 'final settlement'),
+        required_text(record, 'disposition', 'final settlement'))) end
+  end
+  table.insert(lines, '')
+  return table.concat(lines, '\n')
+end
+
+local function interrupted_index (settlements)
+  local lines = { '* Interrupted buffers', '' }
+  local count = 0
+  for _, record in ipairs(settlements) do
+    if required_text(record, 'disposition', 'final settlement')
+       == 'interrupted' then
+      local key = required_text(record, 'buffer-key', 'final settlement')
+      if not key:match('^[A-Za-z0-9][A-Za-z0-9._-]*$') then
+        fail('unsafe interrupted buffer key: ' .. key) end
+      table.insert(lines, string.format(
+        '- [[file:../buffer-snapshots/%s/unsaved-changes.org][%s]]',
+        key, key))
+      count = count + 1
+    end
+  end
+  if count == 0 then table.insert(lines, 'No dirty buffer was interrupted.') end
+  table.insert(lines, '')
+  return table.concat(lines, '\n')
+end
+
+local function replace_private_file (path, bytes, incident_root, token)
+  local temporary = vim.fs.dirname(path) .. '/.' .. vim.fs.basename(path)
+    .. '.' .. token .. '.tmp'
+  write_private_file(temporary, bytes, incident_root)
+  local ok, error_text = vim.uv.fs_rename(temporary, path)
+  if not ok then fail('cannot atomically replace archive file: ' .. error_text) end
+  if read_regular_file(path) ~= bytes then
+    fail('atomic replacement failed exact reread: ' .. path) end
+end
+
+local function finalized_marker (
+    incident_id, manifest_sha, transfer_sha)
+  return {
+    field('archive-format-version', M.archive_format_version),
+    field('incident-id', incident_id),
+    field('manifest-sha256', manifest_sha),
+    field('transfer-manifest-sha256', transfer_sha),
+  }
+end
+
+local function bytes_artifact_record (relative, bytes)
+  return {
+    field('path', relative),
+    field('bytes', #bytes),
+    field('sha256', vim.fn.sha256(bytes)),
+  }
+end
+
+---Append exact server evidence and final dispositions to INITIAL_RESULT.
+---DESCRIPTOR is the parsed UTF-8 bundle descriptor; OPAQUE_BYTES is its exact
+---binary tail; SETTLEMENTS have already been applied and acknowledged.
+function M.finalize (initial_result, descriptor, opaque_bytes, settlements)
+  local incident_root = initial_result and initial_result.path
+  local initial_sha = initial_result and initial_result.manifest_sha256
+  if type(incident_root) ~= 'string' or not sha256_valid(initial_sha) then
+    fail('initial archive result is incomplete') end
+  require_directory(incident_root, 448, 'incident directory')
+  local initial_path = incident_root .. '/manifest.initial.sexp'
+  local ready_path = incident_root .. '/ARCHIVE-READY'
+  local initial_bytes = read_regular_file(initial_path)
+  local initial = read_exact_sexpr(initial_path)
+  local ready = read_exact_sexpr(ready_path)
+  local incident_id = required_text(
+    descriptor, 'incident-id', 'evidence descriptor')
+  local epoch = required_integer(
+    descriptor, 'maintenance-epoch', 'evidence descriptor')
+  local evidence = parse_evidence_bundle(descriptor, opaque_bytes)
+  local normalized_settlements = normalize_settlements(
+    settlements, required_list(initial, 'buffers', 'initial manifest'))
+  local transfer_sha = evidence.transfer_manifest_sha256
+  local token = transfer_sha:sub(1, 20)
+  local attempt_nonce = new_nonce()
+  local attempt_token = token .. '-' .. attempt_nonce
+  local staging = incident_root .. '/.finalizing.' .. token .. '.'
+    .. attempt_nonce .. '.partial'
+  local report_bytes = final_incident_report(
+    descriptor, evidence, normalized_settlements)
+  local index_bytes = interrupted_index(normalized_settlements)
+  local root_artifacts = {
+    bytes_artifact_record('incident.org', report_bytes),
+    bytes_artifact_record('interrupted-buffers/README.org', index_bytes),
+  }
+  local final_value = final_manifest_value(
+    initial, initial_sha, descriptor, evidence,
+    normalized_settlements, root_artifacts)
+  local final_bytes = M.canonical_sexpr(final_value) .. '\n'
+  local final_sha = vim.fn.sha256(final_bytes)
+  local marker_bytes = M.canonical_sexpr(finalized_marker(
+    incident_id, final_sha, transfer_sha)) .. '\n'
+  local final_manifest_path = incident_root .. '/manifest.final.sexp'
+  local finalized_path = incident_root .. '/FINALIZED'
+
+  if vim.fn.sha256(initial_bytes) ~= initial_sha
+     or required_text(initial, 'manifest-kind', 'initial manifest') ~= 'initial'
+     or not strict_uuid(incident_id)
+     or not strict_uuid(required_text(
+       descriptor, 'candidate-id', 'evidence descriptor'))
+     or required_text(initial, 'incident-id', 'initial manifest') ~= incident_id
+     or required_integer(initial, 'maintenance-epoch', 'initial manifest')
+        ~= epoch
+     or required_integer(initial, 'g0-graph-generation', 'initial manifest')
+        ~= required_integer(
+          descriptor, 'g0-graph-generation', 'evidence descriptor')
+     or required_integer(initial, 'g0-manifest-revision', 'initial manifest')
+        ~= required_integer(
+          descriptor, 'g0-manifest-revision', 'evidence descriptor')
+     or required_text(ready, 'incident-id', 'ARCHIVE-READY') ~= incident_id
+     or required_text(ready, 'manifest-sha256', 'ARCHIVE-READY') ~= initial_sha
+  then
+    fail('evidence does not belong to this exact ready archive') end
+  for _, key in ipairs({
+    'server-evidence-sha256', 'transfer-manifest-sha256',
+    'artifact-bytes-sha256',
+  }) do
+    if not sha256_valid(required_text(descriptor, key, 'evidence descriptor')) then
+      fail('evidence descriptor has an invalid ' .. key) end
+  end
+
+  mkdir_private(staging, false)
+  for _, category in ipairs(evidence_categories) do
+    local records = {}
+    for _, record in ipairs(evidence.records) do
+      if safe_evidence_components(record.relative_path)[1] == category then
+        table.insert(records, record) end
+    end
+    local destination = incident_root .. '/' .. category
+    if #records > 0 then
+      if vim.uv.fs_lstat(destination) then
+        verify_evidence_category(incident_root, category, records)
+      else
+        mkdir_private(staging .. '/' .. category, false)
+        for _, record in ipairs(records) do
+          ensure_private_relative_directory(
+            staging, vim.fs.dirname(record.relative_path))
+          write_private_file(staging .. '/' .. record.relative_path,
+            record.bytes, staging)
+        end
+        verify_evidence_category(staging, category, records)
+        each_directory_postorder(staging .. '/' .. category, sync_directory)
+        local renamed, rename_error = vim.uv.fs_rename(
+          staging .. '/' .. category, destination)
+        if not renamed then
+          fail('cannot install evidence category: ' .. rename_error) end
+        sync_directory(incident_root)
+        verify_evidence_category(incident_root, category, records)
+      end
+    elseif vim.uv.fs_lstat(destination) then
+      fail('archive contains undeclared evidence category: ' .. category)
+    end
+  end
+  local empty, scan_error = vim.uv.fs_scandir(staging)
+  if not empty then fail('cannot inspect finalization staging: ' .. scan_error) end
+  if not vim.uv.fs_scandir_next(empty) then
+    local removed, remove_error = vim.uv.fs_rmdir(staging)
+    if not removed then fail('cannot remove empty staging: ' .. remove_error) end
+  end
+
+  if vim.uv.fs_lstat(finalized_path) then
+    if read_regular_file(final_manifest_path) ~= final_bytes
+       or read_regular_file(finalized_path) ~= marker_bytes
+       or read_regular_file(incident_root .. '/incident.org') ~= report_bytes
+       or read_regular_file(incident_root .. '/interrupted-buffers/README.org')
+          ~= index_bytes then
+      fail('existing FINALIZED archive differs from this exact replay') end
+  else
+    replace_private_file(incident_root .. '/incident.org', report_bytes,
+      incident_root, attempt_token)
+    replace_private_file(incident_root .. '/interrupted-buffers/README.org',
+      index_bytes, incident_root, attempt_token)
+    if vim.uv.fs_lstat(final_manifest_path) then
+      if read_regular_file(final_manifest_path) ~= final_bytes then
+        fail('existing final manifest differs from exact replay') end
+    else
+      replace_private_file(final_manifest_path, final_bytes,
+        incident_root, attempt_token)
+    end
+    sync_directory(incident_root)
+    local marker_temp = incident_root .. '/.FINALIZED.' .. attempt_token .. '.tmp'
+    write_private_file(marker_temp, marker_bytes, incident_root)
+    local renamed, rename_error = vim.uv.fs_rename(marker_temp, finalized_path)
+    if not renamed then fail('cannot publish FINALIZED: ' .. rename_error) end
+    sync_directory(incident_root)
+    sync_directory(vim.fs.dirname(incident_root))
+  end
+  if read_regular_file(final_manifest_path) ~= final_bytes
+     or read_regular_file(finalized_path) ~= marker_bytes then
+    fail('final archive failed durable checksum reread') end
+  return {
+    path = incident_root,
+    manifest_sha256 = final_sha,
+    transfer_manifest_sha256 = transfer_sha,
+    artifact_bytes_sha256 = evidence.artifact_bytes_sha256,
+    sizes = M.size_report(vim.fs.dirname(incident_root), incident_root),
   }
 end
 
