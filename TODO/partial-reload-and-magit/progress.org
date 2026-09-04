@@ -490,6 +490,13 @@ what's imperfect about what's done; choices determining the future.
   authority without rerendering.  Applied searches remain explicitly
   membership/ranking-stale.  The focused Rust maintenance suite passes (31/31),
   and =cargo check --tests= passes.
+- Closed a generation-authority omission found while implementing the first
+  client consumer.  Every settlement now journals and transmits its frozen
+  base graph and presentation generations as well as revision/token, and every
+  ACK must echo all four exact base counters before its action can settle.
+  Older journal records deserialize fail-closed with zero generation authority.
+  The focused Rust maintenance suite remains 31/31 and
+  =cargo check --tests= passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

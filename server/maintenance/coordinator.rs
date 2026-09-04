@@ -517,6 +517,8 @@ impl MaintenanceCoordinator {
     buffer_id        : &str,
     requirement      : ViewSettlementRequirement,
     view_uri         : Option<&str>,
+    base_graph_generation : u64,
+    base_presentation_generation : u64,
     base_revision    : u64,
     application_token : u64,
     application_ack  : Option<&ViewApplicationAcknowledgement>,
@@ -532,6 +534,8 @@ impl MaintenanceCoordinator {
         "buffer '{}' has no planned settlement", buffer_id))?;
     if record . requirement != requirement
     || record . view_uri . as_deref () != view_uri
+    || record . base_graph_generation != base_graph_generation
+    || record . base_presentation_generation != base_presentation_generation
     || record . base_server_revision != base_revision
     || record . base_application_token != application_token
     {
@@ -1018,6 +1022,8 @@ mod tests {
       uncertainty_reason: None,
       observed_ids: vec!["node" . into ()],
       resolved_primary_ids: vec!["node" . into ()],
+      base_graph_generation: 1,
+      base_presentation_generation: 0,
       base_server_revision: 4,
       base_application_token: 9,
       planned_disposition: ViewDisposition::Interrupted,
@@ -1082,23 +1088,28 @@ mod tests {
       vec![settlement ("one"), settlement ("two")]) . unwrap ();
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9, None)
+      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 1, 0,
+      4, 9, None)
       . is_err ());
     assert! (!coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9, None)
+      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 1, 0,
+      4, 9, None)
       . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "two",
-      ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 4, 9, None)
+      ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 1, 0,
+      4, 9, None)
       . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9, None)
+      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 1, 0,
+      4, 9, None)
       . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "one",
-      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9, None)
+      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 1, 0,
+      4, 9, None)
       . is_err ());
     assert! (coordinator . archive_finalized (
       &active . incident_id, active . epoch, "final" . into (),
@@ -1169,15 +1180,18 @@ mod tests {
     changed . resulting_application_token = 11;
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "view",
-      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 4, 9,
+      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,
+      4, 9,
       Some (&changed)) . is_err ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "view",
-      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 4, 9,
+      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,
+      4, 9,
       Some (&exact)) . unwrap ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "view",
-      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 4, 9,
+      ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,
+      4, 9,
       Some (&exact)) . unwrap ());
   }
 }

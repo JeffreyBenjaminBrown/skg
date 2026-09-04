@@ -97,6 +97,8 @@ pub fn plan_incident_view_settlements (
         . map (|id| id . to_string ()) . collect (),
       resolved_primary_ids: assessment . resolved_primary_ids . into_iter ()
         . map (|id| id . to_string ()) . collect (),
+      base_graph_generation: frozen . graph_generation,
+      base_presentation_generation: frozen . presentation_generation,
       base_server_revision: frozen . server_revision,
       base_application_token: frozen . application_token,
       planned_disposition,

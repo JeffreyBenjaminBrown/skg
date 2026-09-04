@@ -309,6 +309,10 @@ pub struct ViewSettlementRecord {
   pub uncertainty_reason     : Option<String>,
   pub observed_ids           : Vec<String>,
   pub resolved_primary_ids   : Vec<String>,
+  #[serde(default)]
+  pub base_graph_generation  : u64,
+  #[serde(default)]
+  pub base_presentation_generation : u64,
   pub base_server_revision   : u64,
   pub base_application_token : u64,
   pub planned_disposition    : ViewDisposition,

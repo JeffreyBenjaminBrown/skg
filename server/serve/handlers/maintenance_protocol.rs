@@ -593,6 +593,8 @@ fn validate_application_base (
   || record . dirty
   || frozen . view_uri != record . view_uri
   || frozen . kind != record . kind
+  || frozen . graph_generation != record . base_graph_generation
+  || frozen . presentation_generation != record . base_presentation_generation
   || frozen . server_revision != record . base_server_revision
   || frozen . application_token != record . base_application_token
   || state . client_buffer_id . as_deref () != Some (&record . buffer_id)
@@ -690,6 +692,9 @@ fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp 
       record . uncertainty_reason . as_deref () . unwrap_or ("none")),
     list_field ("observed-ids", &record . observed_ids),
     list_field ("resolved-primary-ids", &record . resolved_primary_ids),
+    integer_field ("base-graph-generation", record . base_graph_generation),
+    integer_field ("base-presentation-generation",
+      record . base_presentation_generation),
     integer_field ("base-server-revision", record . base_server_revision),
     integer_field ("base-application-token", record . base_application_token),
     atom_field ("planned-disposition", record . planned_disposition . label ()),
@@ -941,6 +946,10 @@ fn acknowledge_view_settlement (
   let view_uri = if view_uri == "none" { None } else { Some (view_uri) };
   let base_revision = unsigned_request_field (
     request, "base-server-revision")?;
+  let base_graph_generation = unsigned_request_field (
+    request, "base-graph-generation")?;
+  let base_presentation_generation = unsigned_request_field (
+    request, "base-presentation-generation")?;
   let application_token = unsigned_request_field (
     request, "base-application-token")?;
   let application_ack = if requirement
@@ -978,6 +987,8 @@ fn acknowledge_view_settlement (
       &buffer_id,
       requirement . clone (),
       view_uri . as_deref (),
+      base_graph_generation,
+      base_presentation_generation,
       base_revision,
       application_token,
       application_ack . as_ref ()))?;
@@ -1516,7 +1527,8 @@ mod tests {
       kind: BufferKind::SearchView, view_uri: Some ("search:terms" . into ()),
       dirty: false, impacted: false, parse_uncertain: false,
       uncertainty_reason: None, observed_ids: Vec::new (),
-      resolved_primary_ids: Vec::new (), base_server_revision: 4,
+      resolved_primary_ids: Vec::new (), base_graph_generation: 1,
+      base_presentation_generation: 3, base_server_revision: 4,
       base_application_token: 7,
       planned_disposition: ViewDisposition::RetainedClean,
       requirement: ViewSettlementRequirement::ReleaseAck,
@@ -1592,6 +1604,7 @@ mod tests {
       dirty: false, impacted: true, parse_uncertain: false,
       uncertainty_reason: None, observed_ids: vec!["node" . into ()],
       resolved_primary_ids: vec!["node" . into ()],
+      base_graph_generation: 1, base_presentation_generation: 3,
       base_server_revision: 4, base_application_token: 7,
       planned_disposition: ViewDisposition::Refreshed,
       requirement: ViewSettlementRequirement::ApplicationAck,
