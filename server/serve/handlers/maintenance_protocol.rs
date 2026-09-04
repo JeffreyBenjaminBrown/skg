@@ -13,6 +13,7 @@ use crate::maintenance::selection::select_archived_candidate;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
   CandidateId,
+  BufferKind,
   ClientEvidenceTransferRecord,
   CoordinatorState,
   IncidentId,
@@ -21,6 +22,7 @@ use crate::maintenance::{
   MaintenancePhase,
   TerminalDisposition,
   TerminalMaintenance,
+  ViewSettlementRecord,
   ViewSettlementRequirement,
 };
 use crate::runtime::ServerRuntime;
@@ -37,6 +39,8 @@ use crate::serve::util::{
 use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
 use std::net::TcpStream;
+
+use crate::types::views_state::{ViewState, ViewUri};
 
 const ARCHIVE_FORMAT_VERSION : u32 = 1;
 
@@ -541,7 +545,18 @@ fn acknowledge_view_settlement (
     request, "base-server-revision")?;
   let application_token = unsigned_request_field (
     request, "base-application-token")?;
-  require_archive_owner (runtime, &incident, epoch)?;
+  let active = require_archive_owner (runtime, &incident, epoch)?;
+  let record = active . view_settlements . get (&buffer_id)
+    . ok_or_else (|| format! (
+      "buffer '{}' has no planned settlement", buffer_id))?;
+  let effect = {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    let state = record . view_uri . as_ref () . and_then (|uri|
+      interactive . views . open_views . views . get (
+        &ViewUri::from_client_string (uri . clone ())));
+    prepare_server_settlement_effect (&active, record, state)?
+  };
   let all_settled = runtime . transition_maintenance (|coordinator|
     coordinator . acknowledge_view_settlement (
       &incident,
@@ -551,6 +566,7 @@ fn acknowledge_view_settlement (
       view_uri . as_deref (),
       base_revision,
       application_token))?;
+  apply_server_settlement_effect (runtime, effect);
   Ok (Sexp::List (vec![
     atom_field ("status", if all_settled {
       "all-views-settled"
@@ -565,6 +581,86 @@ fn acknowledge_view_settlement (
       "settle-remaining-views"
     }),
   ]) . to_string ())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ServerSettlementEffect {
+  None,
+  Unregister (ViewUri),
+  Preserve {
+    uri              : ViewUri,
+    graph_generation : u64,
+    search_stale     : bool,
+  },
+}
+
+fn prepare_server_settlement_effect (
+  active : &crate::maintenance::ActiveMaintenance,
+  record : &ViewSettlementRecord,
+  state  : Option<&ViewState>,
+) -> Result<ServerSettlementEffect, String> {
+  if record . acknowledged { return Ok (ServerSettlementEffect::None); }
+  if record . requirement == ViewSettlementRequirement::ApplicationAck {
+    return Err (format! (
+      "buffer '{}' cannot ACK application before its staged rendering",
+      record . buffer_id)); }
+  let uri = record . view_uri . as_ref ()
+    . map (|uri| ViewUri::from_client_string (uri . clone ()));
+  if let Some (state) = state {
+    let frozen = active . buffer_census . get (&record . buffer_id)
+      . ok_or_else (|| "settlement is absent from the frozen census"
+        . to_string ())?;
+    if state . client_buffer_id . as_deref () != Some (&record . buffer_id)
+    || state . revision != frozen . server_revision
+    || state . client_application_token != frozen . application_token
+    || state . graph_generation != frozen . graph_generation
+    || state . presentation_generation != frozen . presentation_generation
+    {
+      return Err (format! (
+        "buffer '{}' server authority advanced before settlement",
+        record . buffer_id)); }
+  }
+  match record . requirement {
+    ViewSettlementRequirement::RetirementAck
+    | ViewSettlementRequirement::CloseAck => Ok (uri
+      . map (ServerSettlementEffect::Unregister)
+      . unwrap_or (ServerSettlementEffect::None)),
+    ViewSettlementRequirement::ReleaseAck => {
+      let Some (uri) = uri else { return Ok (ServerSettlementEffect::None); };
+      if state . is_none () { return Ok (ServerSettlementEffect::None); }
+      let selected = active . selected_store . as_ref ()
+        . ok_or_else (|| "view release precedes coherent store selection"
+          . to_string ())?;
+      Ok (ServerSettlementEffect::Preserve {
+        uri,
+        graph_generation: selected . graph_generation . get (),
+        search_stale: record . kind == BufferKind::SearchView,
+      })
+    }
+    ViewSettlementRequirement::ApplicationAck => unreachable! (),
+  }
+}
+
+fn apply_server_settlement_effect (
+  runtime : &ServerRuntime,
+  effect  : ServerSettlementEffect,
+) {
+  let mut interactive = runtime . interactive . lock ()
+    . expect ("interactive session poisoned after settlement journal");
+  match effect {
+    ServerSettlementEffect::None => {}
+    ServerSettlementEffect::Unregister (uri) =>
+      interactive . views . open_views . unregister_view (&uri),
+    ServerSettlementEffect::Preserve {
+      uri, graph_generation, search_stale,
+    } => {
+      let state = interactive . views . open_views . views . get_mut (&uri)
+        . expect ("validated settlement view disappeared during one request");
+      state . graph_generation = graph_generation;
+      state . presentation_stale = true;
+      state . search_stale |= search_stale;
+    }
+  }
 }
 
 fn unsigned_request_field (request : &str, key : &str) -> Result<u64, String> {
@@ -824,10 +920,13 @@ mod tests {
   use super::*;
   use crate::maintenance::{
     CandidateSummary,
+    FrozenBufferRecord,
     MaintenanceCoordinator,
     ObservationSequence,
     SelectedStoreRecord,
+    ViewDisposition,
   };
+  use crate::types::tree::forest::ViewForest;
   use crate::types::store_state::{GraphGeneration, ManifestRevision};
 
   #[test]
@@ -875,5 +974,59 @@ mod tests {
     assert! (payload . contains ("(byte-length 11)"));
     assert! (payload . contains (
       "modified-nodes/node-00000000-deadbeef/semantic.diff"));
+  }
+
+  #[test]
+  fn nonrendered_settlement_effects_require_exact_old_authority () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let mut active = coordinator . begin_with_archive_contract (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, vec![FrozenBufferRecord {
+        buffer_id: "buffer" . into (), kind: BufferKind::SearchView,
+        view_uri: Some ("search:terms" . into ()), graph_generation: 1,
+        presentation_generation: 3, server_revision: 4,
+        application_token: 7, dirty: false, undo_required: false,
+        last_fetched_sha256: "a" . repeat (64),
+        current_sha256: "a" . repeat (64),
+      }]) . unwrap ();
+    active . selected_store = Some (SelectedStoreRecord {
+      graph_generation: GraphGeneration::INITIAL . successor (),
+      manifest_revision: ManifestRevision::INITIAL . successor (),
+      tantivy_generation: 2, tantivy_outcome: "committed" . into (),
+    });
+    let record = ViewSettlementRecord {
+      buffer_id: "buffer" . into (), buffer_key: None,
+      kind: BufferKind::SearchView, view_uri: Some ("search:terms" . into ()),
+      dirty: false, impacted: false, parse_uncertain: false,
+      uncertainty_reason: None, observed_ids: Vec::new (),
+      resolved_primary_ids: Vec::new (), base_server_revision: 4,
+      base_application_token: 7,
+      planned_disposition: ViewDisposition::RetainedClean,
+      requirement: ViewSettlementRequirement::ReleaseAck,
+      acknowledged: false,
+    };
+    let state = ViewState {
+      viewforest: ViewForest::new (), pids: Default::default (), revision: 4,
+      graph_generation: 1, presentation_generation: 3,
+      client_application_token: 7, client_buffer_id: Some ("buffer" . into ()),
+      kind: BufferKind::SearchView, recipe: Some ("terms" . into ()),
+      presentation_stale: false, search_stale: false,
+    };
+    assert_eq! (prepare_server_settlement_effect (
+      &active, &record, Some (&state)) . unwrap (),
+      ServerSettlementEffect::Preserve {
+        uri: ViewUri::SearchView ("terms" . into ()),
+        graph_generation: 2,
+        search_stale: true,
+      });
+    let mut changed = state;
+    changed . revision = 5;
+    assert! (prepare_server_settlement_effect (
+      &active, &record, Some (&changed)) . is_err ());
+    let mut application = record . clone ();
+    application . requirement = ViewSettlementRequirement::ApplicationAck;
+    assert! (prepare_server_settlement_effect (
+      &active, &application, Some (&changed)) . is_err ());
   }
 }

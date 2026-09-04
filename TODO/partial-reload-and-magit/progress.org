@@ -456,6 +456,13 @@ what's imperfect about what's done; choices determining the future.
   Safe pre-mutation terminals can unlock, while failure after mutation remains
   locked.  The focused Rust maintenance suite passes (26/26), and
   =cargo check --tests= passes.
+- Made non-rendered view settlement ACKs perform their exact server-side
+  lifecycle effect.  Retirement and close unregister only the frozen matching
+  forest; release carries that forest forward to the selected graph while
+  marking presentation stale and, for searches, membership/ranking stale.
+  Advanced revision/token/generation authority refuses the ACK, exact replay
+  is a no-op, and application ACKs remain blocked until a staged rendering is
+  present.  The focused Rust maintenance suite passes (27/27).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
