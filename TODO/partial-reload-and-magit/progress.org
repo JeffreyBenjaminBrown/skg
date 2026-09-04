@@ -404,6 +404,15 @@ what's imperfect about what's done; choices determining the future.
   splits, multibyte descriptors, invalid descriptor boundaries and non-UTF-8
   artifacts.  All 343 Emacs tests, the complete Neovim suite and
   =cargo check --tests= pass.
+- Made process-owned candidate evidence directly replayable into the portable
+  final archive.  Changed nodes now receive deterministic opaque-safe paths
+  under =new-nodes/=, =deleted-nodes/= or =modified-nodes/=, human README and
+  source-outcome records, semantic before/after/diff files, and exact available
+  raw-after bytes.  The replay builder revalidates each durable artifact and
+  emits ordered offsets, lengths and SHA-256s over one opaque byte stream.
+- While exercising nested evidence paths, found and fixed an umask-dependent
+  permission hole: every newly created intermediate evidence directory is now
+  mode 0700 from first creation.  The focused maintenance suite passes (24/24).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
