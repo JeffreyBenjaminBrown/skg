@@ -228,7 +228,7 @@ fn pending_problem_payload (
   details : &[String],
 ) -> String {
   Sexp::List (vec![
-    field ("pending-reason", &format! ("{:?}", reason)),
+    field ("pending-reason", reason . label ()),
     list_field ("details", details),
   ]) . to_string ()
 }

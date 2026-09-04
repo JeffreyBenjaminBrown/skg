@@ -863,7 +863,7 @@ pub fn handle_maintenance_status_request (
     CoordinatorState::Active (active) => active_status_sexp (&active),
     CoordinatorState::Pending (pending) => Sexp::List (vec![
       atom_field ("status", "pending"),
-      atom_field ("pending-reason", &format! ("{:?}", pending . reason)),
+      atom_field ("pending-reason", pending . reason . label ()),
       atom_field ("candidate-id", pending . candidate . as_ref ()
         . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     ]),
@@ -871,7 +871,7 @@ pub fn handle_maintenance_status_request (
       sexp::parse (&terminal_payload (&terminal))
         . expect ("terminal payload is valid"),
     other => Sexp::List (vec![
-      atom_field ("status", &format! ("{:?}", other)),
+      atom_field ("status", other . label ()),
     ]),
   } . to_string ();
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", Ok (payload));
@@ -884,7 +884,7 @@ fn active_status_sexp (
     atom_field ("status", "active"),
     atom_field ("active-incident-id", active . incident_id . as_str ()),
     integer_field ("maintenance-epoch", active . epoch . get ()),
-    atom_field ("phase", &format! ("{:?}", active . phase)),
+    atom_field ("phase", active . phase . label ()),
     atom_field ("origin", active . origin . label ()),
     atom_field ("archive-directory-name", &active . archive_directory_name),
   ];

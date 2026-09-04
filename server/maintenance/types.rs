@@ -130,6 +130,26 @@ pub enum MaintenancePhase {
   AwaitingClient,
 }
 
+impl MaintenancePhase {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::PreparingArchive => "preparing-archive",
+      Self::AwaitingArchiveWaiver => "awaiting-archive-waiver",
+      Self::ArchiveReady => "archive-ready",
+      Self::RunningExternalMutation => "running-external-mutation",
+      Self::FinalObservation => "final-observation",
+      Self::SelectingPartial => "selecting-partial",
+      Self::FullRebuildExclusive => "full-rebuild-exclusive",
+      Self::Presenting => "presenting",
+      Self::AwaitingScalarAuthorization => "awaiting-scalar-authorization",
+      Self::FinalizingArchive => "finalizing-archive",
+      Self::BlockedInvalidAfterMutation => "blocked-invalid-after-mutation",
+      Self::BlockedStoreHealth => "blocked-store-health",
+      Self::AwaitingClient => "awaiting-client",
+    }
+  }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TerminalDisposition {
@@ -329,6 +349,17 @@ pub enum PendingReason {
   InvalidDisk,
   UnstableDisk,
   ObservationFailure,
+}
+
+impl PendingReason {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::ValidDiskDifference => "valid-disk-difference",
+      Self::InvalidDisk => "invalid-disk",
+      Self::UnstableDisk => "unstable-disk",
+      Self::ObservationFailure => "observation-failure",
+    }
+  }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -534,6 +565,17 @@ pub struct StatePolicy {
 }
 
 impl CoordinatorState {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::Idle => "idle",
+      Self::Observing => "observing",
+      Self::Pending (_) => "pending",
+      Self::Active (_) => "active",
+      Self::Terminal (_) => "terminal",
+      Self::BlockedStoreHealth { .. } => "blocked-store-health",
+    }
+  }
+
   pub fn policy (&self) -> StatePolicy {
     match self {
       Self::Idle | Self::Observing

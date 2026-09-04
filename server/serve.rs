@@ -1022,14 +1022,6 @@ fn verify_connection_response (
     Sexp::Atom (Atom::S (value . to_string ())) };
   let field = |key : &str, value : Sexp| -> Sexp {
     Sexp::List (vec! [atom (key), value]) };
-  let maintenance_state = match &maintenance . state {
-    CoordinatorState::Idle => "idle",
-    CoordinatorState::Observing => "observing",
-    CoordinatorState::Pending (_) => "pending",
-    CoordinatorState::Active (_) => "active",
-    CoordinatorState::Terminal (_) => "terminal",
-    CoordinatorState::BlockedStoreHealth { .. } => "blocked-store-health",
-  };
   let source_entries : Vec<Sexp> = config . ordered_sources ()
     . into_iter ()
     . enumerate ()
@@ -1102,7 +1094,7 @@ fn verify_connection_response (
       selected . manifest_revision . get () as i64))),
     field ("maintenance-epoch", Sexp::Atom (Atom::I (
       maintenance . epoch . get () as i64))),
-    field ("maintenance-state", atom (maintenance_state)),
+    field ("maintenance-state", atom (maintenance . state . label ())),
     field ("census-required", atom (
       if census_required { "true" } else { "nil" })),
     field ("maintenance-archive-folder", atom (

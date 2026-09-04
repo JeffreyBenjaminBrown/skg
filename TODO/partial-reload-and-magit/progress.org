@@ -503,6 +503,10 @@ what's imperfect about what's done; choices determining the future.
   only a concise coordinator-state label instead of Debug-serializing durable
   incident details (which could include staged clean view text).  Focused wire
   and handshake tests and =cargo check --tests= pass.
+- Replaced the remaining Rust =Debug= spellings in maintenance status and
+  observation-problem frames with explicit stable kebab-case labels for every
+  coordinator state, maintenance phase and pending reason.  The focused Rust
+  maintenance suite remains 32/32.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
