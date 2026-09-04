@@ -420,6 +420,14 @@ what's imperfect about what's done; choices determining the future.
   path/offset/length/SHA-256 in the framed descriptor.  A replacement request
   can therefore receive the same transfer without repeating selection.  The
   focused Rust maintenance/protocol suite passes (25/25).
+- Added Emacs's replay-safe final archive writer.  It rejects noncontiguous,
+  overlapping, unsafe, changed or non-opaque artifact bundles before writing;
+  installs each missing evidence category by same-filesystem rename; verifies
+  an already-installed category on retry; atomically rewrites =incident.org=
+  and the interrupted-buffer index; writes a checksummed final manifest; and
+  creates =FINALIZED= last.  Exact non-UTF-8 evidence and a second idempotent
+  finalization pass are covered.  All 345 Emacs tests pass (two optional
+  undo-fu-session tests remain skipped when that package is absent).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

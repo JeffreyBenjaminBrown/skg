@@ -85,6 +85,68 @@
         skg--maintenance-archive-folder nil
         skg--maintenance-archive-identity nil))
 
+(defun skg-test-recovery--final-bundle (initial-result)
+  (let* ((initial
+          (skg-recovery--read-exact-sexpr
+           (expand-file-name "manifest.initial.sexp"
+                             (plist-get initial-result :path))))
+         (buffer-record (car (cadr (assoc 'buffers initial))))
+         (buffer-id (cadr (assoc 'buffer-id buffer-record)))
+         (buffer-key (cadr (assoc 'buffer-key buffer-record)))
+         (readme (skg--utf8-unix-bytes "* Modified node niño\n"))
+         (raw (unibyte-string 0 255 254 195 40 10))
+         (opaque (concat readme raw))
+         (node-root "modified-nodes/node-00000000-deadbeefcafe")
+         (records
+          (list
+           `((artifact-key "artifact-00000000")
+             (relative-path ,(concat node-root "/README.org"))
+             (purpose "node-readme")
+             (byte-offset 0)
+             (byte-length ,(length readme))
+             (sha256 ,(secure-hash 'sha256 readme)))
+           `((artifact-key "artifact-00000001")
+             (relative-path
+              ,(concat node-root "/raw/path-00000000-012345abcdef.after.skg"))
+             (purpose "raw-after")
+             (byte-offset ,(length readme))
+             (byte-length ,(length raw))
+             (sha256 ,(secure-hash 'sha256 raw)))))
+         (descriptor
+          `((artifact-bundle-format-version 1)
+            (incident-id ,skg-test-recovery-incident-id)
+            (maintenance-epoch 4)
+            (candidate-id "abcdefab-1234-4234-8234-abcdefabcdef")
+            (g0-graph-generation 7)
+            (g0-manifest-revision 9)
+            (g1-graph-generation 8)
+            (g1-manifest-revision 10)
+            (tantivy-generation 12)
+            (server-evidence-sha256 ,(make-string 64 ?a))
+            (transfer-manifest-sha256 ,(make-string 64 ?b))
+            (artifact-bytes-sha256 ,(secure-hash 'sha256 opaque))
+            (artifact-count 2)
+            (artifact-bytes ,(length opaque))
+            (artifacts ,records)))
+         (settlements
+          (list
+           `((buffer-id ,buffer-id)
+             (buffer-key ,buffer-key)
+             (kind "content-view")
+             (view-uri "view:archive-fixture")
+             (dirty "true")
+             (impacted "true")
+             (parse-uncertain "nil")
+             (observed-ids ("root-a"))
+             (resolved-primary-ids ("root-a"))
+             (base-server-revision 11)
+             (base-application-token 5)
+             (planned-disposition "interrupted")
+             (required-ack "retirement-ack")))))
+    (list :descriptor descriptor :opaque opaque :settlements settlements
+          :raw raw :raw-relative
+          (concat node-root "/raw/path-00000000-012345abcdef.after.skg"))))
+
 (ert-deftest test-skg-recovery-canonical-sexpr-matches-portable-fixture ()
   (should
    (equal
@@ -207,6 +269,79 @@
           (should (file-directory-p partial))
           (should-not (file-exists-p final))
           (should (equal before (skg-buffer-raw-text buffer))))
+      (skg-test-recovery--cleanup fixture))))
+
+(ert-deftest test-skg-recovery-finalizes-opaque-evidence-replay-safely ()
+  (let* ((fixture (skg-test-recovery--fixture))
+         (buffer (plist-get fixture :buffer))
+         (skg-recovery-archive-native-undo-function
+          (lambda (&rest _)
+            '(:status empty :kind undo-fu-session :version "not-required"))))
+    (unwind-protect
+        (let* ((initial
+                (skg-recovery-archive-publish-initial
+                 (plist-get fixture :offer)
+                 :buffers (list buffer)
+                 :client-nonce "0123456789abcdef01234567"))
+               (bundle (skg-test-recovery--final-bundle initial))
+               (result
+                (skg-recovery-archive-finalize
+                 initial (plist-get bundle :descriptor)
+                 (plist-get bundle :opaque)
+                 (plist-get bundle :settlements)))
+               (replayed
+                (skg-recovery-archive-finalize
+                 initial (plist-get bundle :descriptor)
+                 (plist-get bundle :opaque)
+                 (plist-get bundle :settlements)))
+               (root (plist-get initial :path))
+               (final-bytes (skg-recovery--read-bytes
+                             (expand-file-name "manifest.final.sexp" root)))
+               (final (skg-recovery--read-exact-sexpr
+                       (expand-file-name "manifest.final.sexp" root))))
+          (should (equal (plist-get result :manifest-sha256)
+                         (secure-hash 'sha256 final-bytes)))
+          (should (equal (plist-get replayed :manifest-sha256)
+                         (plist-get result :manifest-sha256)))
+          (should (equal (plist-get bundle :raw)
+                         (skg-recovery--read-bytes
+                          (expand-file-name
+                           (plist-get bundle :raw-relative) root))))
+          (should (equal (cadr (assoc 'manifest-kind final)) "final"))
+          (should (= (length (cadr (assoc 'node-artifacts final))) 2))
+          (should (file-exists-p (expand-file-name "FINALIZED" root)))
+          (should (string-match-p
+                   "buffer-snapshots/.*/unsaved-changes.org"
+                   (decode-coding-string
+                    (skg-recovery--read-bytes
+                     (expand-file-name
+                      "interrupted-buffers/README.org" root))
+                    'utf-8-unix t))))
+      (skg-test-recovery--cleanup fixture))))
+
+(ert-deftest test-skg-recovery-refuses-changed-opaque-final-evidence ()
+  (let* ((fixture (skg-test-recovery--fixture))
+         (buffer (plist-get fixture :buffer))
+         (skg-recovery-archive-native-undo-function
+          (lambda (&rest _)
+            '(:status empty :kind undo-fu-session :version "not-required"))))
+    (unwind-protect
+        (let* ((initial
+                (skg-recovery-archive-publish-initial
+                 (plist-get fixture :offer)
+                 :buffers (list buffer)
+                 :client-nonce "fedcba9876543210fedcba98"))
+               (bundle (skg-test-recovery--final-bundle initial))
+               (changed (concat (substring (plist-get bundle :opaque) 0 -1)
+                                (unibyte-string 99))))
+          (should-error
+           (skg-recovery-archive-finalize
+            initial (plist-get bundle :descriptor) changed
+            (plist-get bundle :settlements))
+           :type 'skg-recovery-archive-error)
+          (should-not (file-exists-p
+                       (expand-file-name "FINALIZED"
+                                         (plist-get initial :path)))))
       (skg-test-recovery--cleanup fixture))))
 
 (provide 'test-skg-recovery-archive)

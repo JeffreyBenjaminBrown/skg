@@ -5,6 +5,7 @@
 ;; checksum is the exact boundary the server must acknowledge before doing so.
 
 (require 'cl-lib)
+(require 'rx)
 (require 'subr-x)
 (require 'skg-buffer-registry)
 (require 'skg-config)
@@ -785,5 +786,644 @@ path, manifest checksum, and size report."
             :archive-name archive-name
             :manifest-sha256 manifest-sha256
             :sizes sizes))))
+
+(defconst skg-recovery--evidence-categories
+  '("new-nodes" "deleted-nodes" "modified-nodes" "invalid-paths"))
+
+(defun skg-recovery--required-field (alist key context)
+  (let ((entry (assoc key alist)))
+    (unless (and entry (proper-list-p entry) (= (length entry) 2))
+      (skg-recovery--fail "%s lacks exactly one %s field" context key))
+    (cadr entry)))
+
+(defun skg-recovery--required-text (alist key context)
+  (let ((value (skg-recovery--required-field alist key context)))
+    (format "%s" value)))
+
+(defun skg-recovery--required-list (alist key context)
+  (let ((value (skg-recovery--required-field alist key context)))
+    (unless (proper-list-p value)
+      (skg-recovery--fail "%s has a malformed %s list" context key))
+    value))
+
+(defun skg-recovery--required-nonnegative-integer (alist key context)
+  (let ((value (skg-recovery--required-field alist key context)))
+    (unless (and (integerp value) (>= value 0))
+      (skg-recovery--fail "%s has an invalid %s" context key))
+    value))
+
+(defun skg-recovery--sha256-p (value)
+  (and (stringp value)
+       (string-match-p "\\`[0-9a-f]\\{64\\}\\'" value)))
+
+(defun skg-recovery--read-exact-sexpr (path)
+  (let* ((bytes (skg-recovery--read-bytes path))
+         (text (decode-coding-string bytes 'utf-8-unix))
+         value end)
+    (unless (equal bytes (encode-coding-string text 'utf-8-unix))
+      (skg-recovery--fail "machine record is not exact UTF-8: %s" path))
+    (condition-case error-data
+        (pcase-let ((`(,parsed . ,position) (read-from-string text)))
+          (setq value parsed end position))
+      (error (skg-recovery--fail "invalid machine record %s: %s"
+                                 path (error-message-string error-data))))
+    (unless (string-match-p "\\`[[:space:]]*\\'" (substring text end))
+      (skg-recovery--fail "machine record has trailing data: %s" path))
+    value))
+
+(defun skg-recovery--safe-evidence-path-components (relative)
+  (unless (and (stringp relative)
+               (not (file-name-absolute-p relative))
+               (not (string-match-p "\\\\" relative)))
+    (skg-recovery--fail "unsafe evidence path: %S" relative))
+  (let ((components (split-string relative "/" nil)))
+    (unless (and (>= (length components) 3)
+                 (equal relative (string-join components "/"))
+                 (member (car components)
+                         skg-recovery--evidence-categories)
+                 (string-match-p
+                  (rx string-start (or "node-" "path-")
+                      (= 8 digit) "-" (= 12 (in "0-9a-f")) string-end)
+                  (cadr components))
+                 (cl-every
+                  (lambda (component)
+                    (and (not (member component '("" "." "..")))
+                         (string-match-p
+                          (rx string-start (+ (in "A-Za-z0-9._-"))
+                              string-end)
+                          component)))
+                  components))
+      (skg-recovery--fail "unsafe evidence path: %S" relative))
+    components))
+
+(defun skg-recovery--parse-evidence-bundle (descriptor opaque-bytes)
+  (unless (and (stringp opaque-bytes)
+               (not (multibyte-string-p opaque-bytes)))
+    (skg-recovery--fail "artifact bundle did not remain opaque bytes"))
+  (let* ((context "maintenance evidence descriptor")
+         (version (skg-recovery--required-nonnegative-integer
+                   descriptor 'artifact-bundle-format-version context))
+         (declared-count (skg-recovery--required-nonnegative-integer
+                          descriptor 'artifact-count context))
+         (declared-bytes (skg-recovery--required-nonnegative-integer
+                          descriptor 'artifact-bytes context))
+         (payload-sha (skg-recovery--required-text
+                       descriptor 'artifact-bytes-sha256 context))
+         (transfer-sha (skg-recovery--required-text
+                        descriptor 'transfer-manifest-sha256 context))
+         (wire-records (skg-recovery--required-list
+                        descriptor 'artifacts context))
+         (expected-offset 0)
+         (seen-keys (make-hash-table :test #'equal))
+         (seen-paths (make-hash-table :test #'equal))
+         records)
+    (unless (= version 1)
+      (skg-recovery--fail "unsupported evidence bundle version: %s" version))
+    (unless (and (skg-recovery--sha256-p payload-sha)
+                 (skg-recovery--sha256-p transfer-sha))
+      (skg-recovery--fail "evidence bundle has an invalid checksum"))
+    (unless (and (proper-list-p wire-records)
+                 (= (length wire-records) declared-count)
+                 (= (length opaque-bytes) declared-bytes)
+                 (equal (secure-hash 'sha256 opaque-bytes) payload-sha))
+      (skg-recovery--fail "opaque evidence inventory/checksum does not match"))
+    (cl-loop
+     for wire-record in wire-records
+     for index from 0
+     do
+     (let* ((record-context (format "evidence artifact %d" index))
+            (key (skg-recovery--required-text
+                  wire-record 'artifact-key record-context))
+            (relative (skg-recovery--required-text
+                       wire-record 'relative-path record-context))
+            (purpose (skg-recovery--required-text
+                      wire-record 'purpose record-context))
+            (offset (skg-recovery--required-nonnegative-integer
+                     wire-record 'byte-offset record-context))
+            (length (skg-recovery--required-nonnegative-integer
+                     wire-record 'byte-length record-context))
+            (sha (skg-recovery--required-text
+                  wire-record 'sha256 record-context))
+            end bytes)
+       (unless (equal key (format "artifact-%08d" index))
+         (skg-recovery--fail "artifact key/order changed at %d" index))
+       (skg-recovery--safe-evidence-path-components relative)
+       (unless (and (not (string-empty-p purpose))
+                    (skg-recovery--sha256-p sha)
+                    (= offset expected-offset)
+                    (<= length (- (length opaque-bytes) offset))
+                    (not (gethash key seen-keys))
+                    (not (gethash relative seen-paths)))
+         (skg-recovery--fail "invalid or overlapping %s" record-context))
+       (setq end (+ offset length)
+             bytes (substring opaque-bytes offset end)
+             expected-offset end)
+       (unless (equal (secure-hash 'sha256 bytes) sha)
+         (skg-recovery--fail "%s checksum mismatch" record-context))
+       (puthash key t seen-keys)
+       (puthash relative t seen-paths)
+       (push (list :key key :relative-path relative :purpose purpose
+                   :byte-offset offset :byte-length length :sha256 sha
+                   :bytes bytes)
+             records)))
+    (unless (= expected-offset (length opaque-bytes))
+      (skg-recovery--fail "artifact records do not consume the opaque body"))
+    (list :records (nreverse records)
+          :transfer-manifest-sha256 transfer-sha
+          :artifact-bytes-sha256 payload-sha)))
+
+(defun skg-recovery--ensure-private-relative-directory (root relative)
+  (let ((cursor root))
+    (dolist (component (split-string relative "/" t))
+      (setq cursor (expand-file-name component cursor))
+      (if (file-exists-p cursor)
+          (skg-recovery--require-directory cursor "evidence directory")
+        (skg-recovery--make-private-directory cursor)))
+    cursor))
+
+(defun skg-recovery--expected-evidence-directories (records category)
+  (let ((result (make-hash-table :test #'equal)))
+    (puthash category t result)
+    (dolist (record records)
+      (let* ((relative (plist-get record :relative-path))
+             (components (butlast (split-string relative "/" t)))
+             accumulated)
+        (dolist (component components)
+          (setq accumulated (if accumulated
+                                (concat accumulated "/" component)
+                              component))
+          (puthash accumulated t result))))
+    result))
+
+(defun skg-recovery--verify-evidence-category
+    (incident-root category records)
+  (let ((expected-files (make-hash-table :test #'equal))
+        (expected-directories
+         (skg-recovery--expected-evidence-directories records category))
+        (category-root (expand-file-name category incident-root))
+        (seen-files 0))
+    (dolist (record records)
+      (puthash (plist-get record :relative-path) record expected-files))
+    (cl-labels
+        ((walk
+          (directory)
+          (skg-recovery--require-directory directory "evidence directory")
+          (let ((relative-directory
+                 (directory-file-name
+                  (file-relative-name directory incident-root))))
+            (unless (gethash relative-directory expected-directories)
+              (skg-recovery--fail
+               "undeclared evidence directory: %s" relative-directory)))
+          (dolist (path (directory-files
+                         directory t directory-files-no-dot-files-regexp t))
+            (let ((attributes (file-attributes path 'integer)))
+              (unless attributes
+                (skg-recovery--fail "evidence entry vanished: %s" path))
+              (pcase (file-attribute-type attributes)
+                ((pred stringp)
+                 (skg-recovery--fail "evidence entry is a symlink: %s" path))
+                ('t (walk path))
+                ('nil
+                 (unless (and (file-regular-p path)
+                              (or (not (file-modes path))
+                                  (= (logand (file-modes path) #o777) #o600)))
+                   (skg-recovery--fail
+                    "evidence entry is not a private regular file: %s" path))
+                 (let* ((relative (file-relative-name path incident-root))
+                        (record (gethash relative expected-files))
+                        (bytes (and record (skg-recovery--read-bytes path))))
+                   (unless (and record
+                                (= (length bytes)
+                                   (plist-get record :byte-length))
+                                (equal (secure-hash 'sha256 bytes)
+                                       (plist-get record :sha256)))
+                     (skg-recovery--fail
+                      "undeclared or changed evidence artifact: %s" relative))
+                   (cl-incf seen-files)))
+                (_ (skg-recovery--fail
+                    "special evidence entry is forbidden: %s" path)))))))
+      (walk category-root))
+    (unless (= seen-files (hash-table-count expected-files))
+      (skg-recovery--fail "evidence category %s is incomplete" category))))
+
+(defun skg-recovery--normalize-settlements (settlements initial-buffers)
+  (unless (proper-list-p settlements)
+    (skg-recovery--fail "view settlements are not a proper list"))
+  (let ((seen (make-hash-table :test #'equal))
+        normalized)
+    (dolist (record settlements)
+      (let* ((context "view settlement")
+             (buffer-id (skg-recovery--required-text
+                         record 'buffer-id context))
+             (buffer-key (skg-recovery--required-text
+                          record 'buffer-key context))
+             (disposition (skg-recovery--required-text
+                           record 'planned-disposition context))
+             (required-ack (skg-recovery--required-text
+                            record 'required-ack context)))
+        (when (gethash buffer-id seen)
+          (skg-recovery--fail "duplicate settlement for buffer %s" buffer-id))
+        (unless (member disposition
+                        '("interrupted" "released-unimpacted"
+                          "refreshed" "retained-clean" "closed"
+                          "detached-derived" "maintenance-aborted" "failed"))
+          (skg-recovery--fail "unknown buffer disposition: %s" disposition))
+        (unless (member required-ack
+                        '("retirement-ack" "release-ack"
+                          "application-ack" "close-ack"))
+          (skg-recovery--fail "unknown settlement acknowledgement: %s"
+                              required-ack))
+        (puthash buffer-id buffer-key seen)
+        (push
+         (list
+          (skg-recovery--field 'buffer-id buffer-id)
+          (skg-recovery--field 'buffer-key buffer-key)
+          (skg-recovery--field
+           'kind (skg-recovery--required-text record 'kind context))
+          (skg-recovery--field
+           'view-uri (skg-recovery--required-text record 'view-uri context))
+          (skg-recovery--field
+           'dirty (skg-recovery--required-text record 'dirty context))
+          (skg-recovery--field
+           'impacted (skg-recovery--required-text record 'impacted context))
+          (skg-recovery--field
+           'parse-uncertain
+           (skg-recovery--required-text record 'parse-uncertain context))
+          (skg-recovery--field
+           'observed-ids
+           (mapcar (lambda (value) (format "%s" value))
+                   (skg-recovery--required-list
+                    record 'observed-ids context)))
+          (skg-recovery--field
+           'resolved-primary-ids
+           (mapcar (lambda (value) (format "%s" value))
+                   (skg-recovery--required-list
+                    record 'resolved-primary-ids context)))
+          (skg-recovery--field
+           'base-server-revision
+           (skg-recovery--required-nonnegative-integer
+            record 'base-server-revision context))
+          (skg-recovery--field
+           'base-application-token
+           (skg-recovery--required-nonnegative-integer
+            record 'base-application-token context))
+          (skg-recovery--field 'disposition disposition)
+          (skg-recovery--field 'required-ack required-ack)
+          (skg-recovery--field 'acknowledged "true"))
+         normalized)))
+    (dolist (buffer initial-buffers)
+      (let ((buffer-id (skg-recovery--required-text
+                        buffer 'buffer-id "initial buffer"))
+            (buffer-key (skg-recovery--required-text
+                         buffer 'buffer-key "initial buffer")))
+        (unless (equal (gethash buffer-id seen) buffer-key)
+          (skg-recovery--fail
+           "dirty buffer %s has no exact final settlement" buffer-id))))
+    (nreverse normalized)))
+
+(defun skg-recovery--final-artifact-record (record)
+  (list
+   (skg-recovery--field 'artifact-key (plist-get record :key))
+   (skg-recovery--field 'path (plist-get record :relative-path))
+   (skg-recovery--field 'purpose (plist-get record :purpose))
+   (skg-recovery--field 'byte-offset (plist-get record :byte-offset))
+   (skg-recovery--field 'bytes (plist-get record :byte-length))
+   (skg-recovery--field 'sha256 (plist-get record :sha256))))
+
+(defun skg-recovery--final-manifest
+    (initial initial-sha descriptor evidence settlements root-artifacts)
+  (let ((context "maintenance evidence descriptor"))
+    (list
+     (skg-recovery--field 'archive-format-version
+                          skg-recovery-archive-format-version)
+     (skg-recovery--field 'manifest-kind "final")
+     (skg-recovery--field
+      'incident-id (skg-recovery--required-text descriptor 'incident-id context))
+     (skg-recovery--field
+      'maintenance-epoch
+      (skg-recovery--required-nonnegative-integer
+       descriptor 'maintenance-epoch context))
+     (skg-recovery--field 'initial-manifest-sha256 initial-sha)
+     (skg-recovery--field
+      'origin (skg-recovery--required-text initial 'origin "initial manifest"))
+     (skg-recovery--field
+      'started-at-utc
+      (skg-recovery--required-text initial 'started-at-utc "initial manifest"))
+     (skg-recovery--field
+      'client-kind
+      (skg-recovery--required-text initial 'client-kind "initial manifest"))
+     (skg-recovery--field
+      'client-version
+      (skg-recovery--required-text initial 'client-version "initial manifest"))
+     (skg-recovery--field
+      'candidate-id
+      (skg-recovery--required-text descriptor 'candidate-id context))
+     (skg-recovery--field
+      'g0-graph-generation
+      (skg-recovery--required-nonnegative-integer
+       descriptor 'g0-graph-generation context))
+     (skg-recovery--field
+      'g0-manifest-revision
+      (skg-recovery--required-nonnegative-integer
+       descriptor 'g0-manifest-revision context))
+     (skg-recovery--field
+      'g1-graph-generation
+      (skg-recovery--required-nonnegative-integer
+       descriptor 'g1-graph-generation context))
+     (skg-recovery--field
+      'g1-manifest-revision
+      (skg-recovery--required-nonnegative-integer
+       descriptor 'g1-manifest-revision context))
+     (skg-recovery--field
+      'tantivy-generation
+      (skg-recovery--required-nonnegative-integer
+       descriptor 'tantivy-generation context))
+     (skg-recovery--field
+      'server-evidence-sha256
+      (skg-recovery--required-text descriptor 'server-evidence-sha256 context))
+     (skg-recovery--field
+      'transfer-manifest-sha256
+      (plist-get evidence :transfer-manifest-sha256))
+     (skg-recovery--field
+      'artifact-bytes-sha256 (plist-get evidence :artifact-bytes-sha256))
+     (skg-recovery--field
+      'node-artifacts
+      (mapcar #'skg-recovery--final-artifact-record
+              (plist-get evidence :records)))
+     (skg-recovery--field 'root-artifacts root-artifacts)
+     (skg-recovery--field 'buffers
+                          (skg-recovery--required-list
+                           initial 'buffers "initial manifest"))
+     (skg-recovery--field 'buffer-dispositions settlements)
+     (skg-recovery--field 'directory-sync
+                          (if (fboundp 'unix-sync)
+                              "unix-sync" "unavailable"))
+     (skg-recovery--field 'terminal-status "completed"))))
+
+(defun skg-recovery--final-incident-report
+    (descriptor evidence settlements)
+  (concat
+   "* Skg maintenance recovery incident (finalized)\n\n"
+   (format "- Incident :: =%s=\n"
+           (skg-recovery--required-text
+            descriptor 'incident-id "evidence descriptor"))
+   (format "- Candidate :: =%s=\n"
+           (skg-recovery--required-text
+            descriptor 'candidate-id "evidence descriptor"))
+   (format "- Selected graph :: =%s=\n"
+           (skg-recovery--required-nonnegative-integer
+            descriptor 'g1-graph-generation "evidence descriptor"))
+   (format "- Node evidence artifacts :: %d\n\n"
+           (length (plist-get evidence :records)))
+   "** Buffer dispositions\n\n"
+   (if settlements
+       (mapconcat
+        (lambda (record)
+          (format "- =%s= :: %s\n"
+                  (skg-recovery--required-text
+                   record 'buffer-id "final settlement")
+                  (skg-recovery--required-text
+                   record 'disposition "final settlement")))
+        settlements "")
+     "No buffers were registered.\n")))
+
+(defun skg-recovery--interrupted-index (settlements)
+  (concat
+   "* Interrupted buffers\n\n"
+   (let (links)
+     (dolist (record settlements)
+       (when (equal (skg-recovery--required-text
+                     record 'disposition "final settlement")
+                    "interrupted")
+         (let ((key (skg-recovery--required-text
+                     record 'buffer-key "final settlement")))
+           (unless (string-match-p
+                    (rx string-start alnum
+                        (* (in "A-Za-z0-9._-")) string-end)
+                    key)
+             (skg-recovery--fail "unsafe interrupted buffer key: %s" key))
+           (push (format "- [[file:../buffer-snapshots/%s/unsaved-changes.org][%s]]\n"
+                         key key)
+                 links))))
+     (if links (apply #'concat (nreverse links))
+       "No dirty buffer was interrupted.\n"))))
+
+(defun skg-recovery--replace-private-file (path bytes incident-root token)
+  (let ((temporary (expand-file-name
+                    (format ".%s.%s.tmp" (file-name-nondirectory path) token)
+                    (file-name-directory path))))
+    (skg-recovery--write-private-file temporary bytes incident-root)
+    (rename-file temporary path t)
+    (unless (equal (skg-recovery--read-bytes path) bytes)
+      (skg-recovery--fail "atomic replacement failed exact reread: %s" path))))
+
+(defun skg-recovery--finalized-marker (incident-id manifest-sha transfer-sha)
+  (list
+   (skg-recovery--field 'archive-format-version
+                        skg-recovery-archive-format-version)
+   (skg-recovery--field 'incident-id incident-id)
+   (skg-recovery--field 'manifest-sha256 manifest-sha)
+   (skg-recovery--field 'transfer-manifest-sha256 transfer-sha)))
+
+(defun skg-recovery--bytes-artifact-record (relative bytes)
+  (list
+   (skg-recovery--field 'path relative)
+   (skg-recovery--field 'bytes (length bytes))
+   (skg-recovery--field 'sha256 (secure-hash 'sha256 bytes))))
+
+(cl-defun skg-recovery-archive-finalize
+    (initial-result descriptor opaque-bytes settlements)
+  "Append exact server evidence and final dispositions to INITIAL-RESULT.
+DESCRIPTOR is the parsed UTF-8 artifact descriptor and OPAQUE-BYTES is the
+unibyte tail delivered with it.  SETTLEMENTS are the exact records already
+applied and acknowledged by the editor.  The operation is replay-safe and
+creates FINALIZED only after every other durable artifact."
+  (let* ((incident-root (plist-get initial-result :path))
+         (initial-sha (plist-get initial-result :manifest-sha256))
+         (initial-path (and incident-root
+                            (expand-file-name "manifest.initial.sexp"
+                                              incident-root)))
+         (ready-path (and incident-root
+                          (expand-file-name "ARCHIVE-READY" incident-root))))
+    (unless (and (stringp incident-root) (stringp initial-sha)
+                 (skg-recovery--sha256-p initial-sha))
+      (skg-recovery--fail "initial archive result is incomplete"))
+    (skg-recovery--require-directory incident-root "incident directory")
+    (let* ((initial-bytes (skg-recovery--read-bytes initial-path))
+           (initial (skg-recovery--read-exact-sexpr initial-path))
+           (ready (skg-recovery--read-exact-sexpr ready-path))
+           (incident-id (skg-recovery--required-text
+                         descriptor 'incident-id "evidence descriptor"))
+           (epoch (skg-recovery--required-nonnegative-integer
+                   descriptor 'maintenance-epoch "evidence descriptor"))
+           (evidence (skg-recovery--parse-evidence-bundle
+                      descriptor opaque-bytes))
+           (normalized-settlements
+            (skg-recovery--normalize-settlements
+             settlements
+             (skg-recovery--required-list
+              initial 'buffers "initial manifest")))
+           (transfer-sha (plist-get evidence :transfer-manifest-sha256))
+           (token (substring transfer-sha 0 20))
+           (attempt-nonce (skg-recovery--new-nonce))
+           (attempt-token (format "%s-%s" token attempt-nonce))
+           (staging (expand-file-name
+                     (format ".finalizing.%s.%s.partial"
+                             token attempt-nonce)
+                     incident-root))
+           (incident-report
+            (skg--utf8-unix-bytes
+             (skg-recovery--final-incident-report
+              descriptor evidence normalized-settlements)))
+           (interrupted-index
+            (skg--utf8-unix-bytes
+             (skg-recovery--interrupted-index normalized-settlements)))
+           (root-artifacts
+            (list
+             (skg-recovery--bytes-artifact-record
+              "incident.org" incident-report)
+             (skg-recovery--bytes-artifact-record
+              "interrupted-buffers/README.org" interrupted-index)))
+           (final-value
+            (skg-recovery--final-manifest
+             initial initial-sha descriptor evidence normalized-settlements
+             root-artifacts))
+           (final-bytes
+            (skg--utf8-unix-bytes
+             (concat (skg-recovery-canonical-sexpr final-value) "\n")))
+           (final-sha (secure-hash 'sha256 final-bytes))
+           (marker-bytes
+            (skg--utf8-unix-bytes
+             (concat
+              (skg-recovery-canonical-sexpr
+               (skg-recovery--finalized-marker
+                incident-id final-sha transfer-sha))
+              "\n")))
+           (final-manifest-path
+            (expand-file-name "manifest.final.sexp" incident-root))
+           (finalized-path (expand-file-name "FINALIZED" incident-root)))
+      (unless (and (equal (secure-hash 'sha256 initial-bytes) initial-sha)
+                   (skg-recovery--strict-uuid-p incident-id)
+                   (skg-recovery--strict-uuid-p
+                    (skg-recovery--required-text
+                     descriptor 'candidate-id "evidence descriptor"))
+                   (equal (skg-recovery--required-text
+                           initial 'manifest-kind "initial manifest")
+                          "initial")
+                   (equal (skg-recovery--required-text
+                           initial 'incident-id "initial manifest")
+                          incident-id)
+                   (= (skg-recovery--required-nonnegative-integer
+                       initial 'maintenance-epoch "initial manifest") epoch)
+                   (= (skg-recovery--required-nonnegative-integer
+                       initial 'g0-graph-generation "initial manifest")
+                      (skg-recovery--required-nonnegative-integer
+                       descriptor 'g0-graph-generation "evidence descriptor"))
+                   (= (skg-recovery--required-nonnegative-integer
+                       initial 'g0-manifest-revision "initial manifest")
+                      (skg-recovery--required-nonnegative-integer
+                       descriptor 'g0-manifest-revision "evidence descriptor"))
+                   (equal (skg-recovery--required-text
+                           ready 'incident-id "ARCHIVE-READY") incident-id)
+                   (equal (skg-recovery--required-text
+                           ready 'manifest-sha256 "ARCHIVE-READY") initial-sha))
+        (skg-recovery--fail
+         "evidence does not belong to this exact ready archive"))
+      (dolist (key '(server-evidence-sha256 transfer-manifest-sha256
+                     artifact-bytes-sha256))
+        (unless (skg-recovery--sha256-p
+                 (skg-recovery--required-text descriptor key
+                                               "evidence descriptor"))
+          (skg-recovery--fail "evidence descriptor has an invalid %s" key)))
+
+      ;; Install whole top-level evidence categories.  A prior completed
+      ;; rename is accepted only after its exact closed inventory is proved.
+      (skg-recovery--make-private-directory staging)
+      (dolist (category skg-recovery--evidence-categories)
+        (let* ((records
+                (cl-remove-if-not
+                 (lambda (record)
+                   (equal (car (skg-recovery--safe-evidence-path-components
+                                (plist-get record :relative-path)))
+                          category))
+                 (plist-get evidence :records)))
+               (destination (expand-file-name category incident-root)))
+          (when records
+            (if (file-exists-p destination)
+                (skg-recovery--verify-evidence-category
+                 incident-root category records)
+              (skg-recovery--make-private-directory
+               (expand-file-name category staging))
+              (dolist (record records)
+                (let* ((relative (plist-get record :relative-path))
+                       (parent (directory-file-name
+                                (file-name-directory relative))))
+                  (skg-recovery--ensure-private-relative-directory
+                   staging parent)
+                  (skg-recovery--write-private-file
+                   (expand-file-name relative staging)
+                   (plist-get record :bytes) staging)))
+              (skg-recovery--verify-evidence-category staging category records)
+              (skg-recovery--sync-filesystem)
+              (rename-file (expand-file-name category staging)
+                           destination nil)
+              (skg-recovery--sync-filesystem)
+              (skg-recovery--verify-evidence-category
+               incident-root category records)))
+          (when (and (null records) (file-exists-p destination))
+            (skg-recovery--fail
+             "archive contains undeclared evidence category: %s" category))))
+      (when (null (directory-files
+                   staging nil directory-files-no-dot-files-regexp t))
+        (delete-directory staging))
+
+      (if (file-exists-p finalized-path)
+          (unless (and (equal (skg-recovery--read-bytes final-manifest-path)
+                              final-bytes)
+                       (equal (skg-recovery--read-bytes finalized-path)
+                              marker-bytes)
+                       (equal (skg-recovery--read-bytes
+                               (expand-file-name "incident.org" incident-root))
+                              incident-report)
+                       (equal (skg-recovery--read-bytes
+                               (expand-file-name
+                                "interrupted-buffers/README.org"
+                                incident-root))
+                              interrupted-index))
+            (skg-recovery--fail
+             "existing FINALIZED archive differs from this exact replay"))
+        (skg-recovery--replace-private-file
+         (expand-file-name "incident.org" incident-root)
+         incident-report incident-root attempt-token)
+        (skg-recovery--replace-private-file
+         (expand-file-name "interrupted-buffers/README.org" incident-root)
+         interrupted-index incident-root attempt-token)
+        (if (file-exists-p final-manifest-path)
+            (unless (equal (skg-recovery--read-bytes final-manifest-path)
+                           final-bytes)
+              (skg-recovery--fail
+               "existing final manifest differs from exact replay"))
+          (skg-recovery--replace-private-file
+           final-manifest-path final-bytes incident-root attempt-token))
+        (skg-recovery--sync-filesystem)
+        (let ((temporary (expand-file-name
+                          (format ".FINALIZED.%s.tmp" attempt-token)
+                          incident-root)))
+          (skg-recovery--write-private-file temporary marker-bytes incident-root)
+          (rename-file temporary finalized-path nil))
+        (skg-recovery--sync-filesystem))
+      (unless (and (equal (skg-recovery--read-bytes final-manifest-path)
+                          final-bytes)
+                   (equal (skg-recovery--read-bytes finalized-path)
+                          marker-bytes))
+        (skg-recovery--fail "final archive failed durable checksum reread"))
+      (let ((sizes (skg-recovery-archive-size-report
+                    (file-name-directory incident-root) incident-root)))
+        (list :path incident-root
+              :manifest-sha256 final-sha
+              :transfer-manifest-sha256 transfer-sha
+              :artifact-bytes-sha256
+              (plist-get evidence :artifact-bytes-sha256)
+              :sizes sizes)))))
 
 (provide 'skg-recovery-archive)
