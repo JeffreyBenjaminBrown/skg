@@ -9,6 +9,7 @@ use crate::maintenance::{
   CoordinatorState,
   IncidentId,
   MaintenanceEpoch,
+  MaintenanceIdOutcome,
   MaintenanceOrigin,
   MaintenancePhase,
   PendingReason,
@@ -174,9 +175,12 @@ fn run_target_observation (
     || snapshot . selected . manifest_revision != active . g0_manifest_revision
     {
       return Err ("target observation G0 was superseded" . into ()); }
-    let targets = resolve_target_pids (
+    let (targets, requested_id_outcomes) = resolve_target_pids (
       &snapshot . env . config, &snapshot . selected . graph,
       &active . targets . paths, &active . targets . ids)?;
+    runtime . transition_maintenance (|coordinator|
+      coordinator . record_requested_id_outcomes (
+        &incident, epoch, requested_id_outcomes . clone ()))?;
     let candidate = match observe_targeted_disk (
       &snapshot . env . config, &snapshot . selected, sequence, &targets)
     {
@@ -242,11 +246,28 @@ fn resolve_target_pids (
   graph  : &crate::dbs::in_rust_graph::InRustGraph,
   paths  : &[String],
   ids    : &[String],
-) -> Result<BTreeSet<crate::types::misc::ID>, String> {
+) -> Result<(BTreeSet<crate::types::misc::ID>, Vec<MaintenanceIdOutcome>), String> {
   let mut result = BTreeSet::new ();
-  for id in ids {
-    let id = crate::types::misc::ID::from (id . as_str ());
-    result . insert (graph . pid_of (&id) . unwrap_or (id));
+  let mut outcomes = Vec::new ();
+  for value in ids {
+    let id = crate::types::misc::ID::from (value . as_str ());
+    match graph . pid_of (&id) {
+      Some (pid) => {
+        result . insert (pid . clone ());
+        outcomes . push (MaintenanceIdOutcome {
+          requested_id: value . clone (),
+          pid: Some (pid . to_string ()),
+          reason: None,
+          paths: possible_target_paths (config, &pid),
+        });
+      }
+      None => outcomes . push (MaintenanceIdOutcome {
+        requested_id: value . clone (),
+        pid: None,
+        reason: Some ("ID is not present in the selected graph" . into ()),
+        paths: Vec::new (),
+      }),
+    }
   }
   for value in paths {
     let path = Path::new (value);
@@ -264,9 +285,18 @@ fn resolve_target_pids (
     };
     result . insert (pid);
   }
-  if result . is_empty () {
-    return Err ("partial reload has no resolved telescope" . into ()); }
-  Ok (result)
+  Ok ((result, outcomes))
+}
+
+fn possible_target_paths (
+  config : &crate::types::misc::SkgConfig,
+  pid    : &crate::types::misc::ID,
+) -> Vec<String> {
+  config . ordered_sources () . into_iter () . map (|source| {
+    config . sources . get (&source)
+      . expect ("ordered source exists") . path
+      . join (format! ("{}.skg", pid)) . to_string_lossy () . into_owned ()
+  }) . collect ()
 }
 
 fn run_observation (

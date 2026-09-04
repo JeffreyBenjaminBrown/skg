@@ -236,8 +236,9 @@ fn observe_targeted_disk_inner (
   covered_sequence : ObservationSequence,
   targets          : &BTreeSet<ID>,
 ) -> Result<DiskObservation, String> {
-  if targets . is_empty () {
-    return Err ("targeted observation has no resolved telescope" . into ()); }
+  // An explicit request containing only unknown IDs deliberately resolves to
+  // an empty target set.  It still gets a no-op candidate so its durable
+  // archive can reach a terminal result carrying per-ID rejection reasons.
   let captured = capture_targeted_telescopes (config, targets)?;
   let mut manifest = selected . manifest . clone ();
   for target in targets {
@@ -733,6 +734,13 @@ mod tests {
     let loaded = read_all_skg_files_with_manifest (&config) . unwrap ();
     let selected = SelectedStoreState::initial (
       InRustGraph::from_nodecompletes (&loaded . nodes), loaded . manifest);
+
+    let empty = observe_targeted_disk (
+      &config, &selected, ObservationSequence::INITIAL, &BTreeSet::new ());
+    let DiskObservation::Valid (empty) = empty else {
+      panic! ("empty resolved target set did not produce a no-op candidate"); };
+    assert! (empty . definitions . is_empty ());
+    assert_eq! (empty . manifest, selected . manifest);
 
     // The explicit operation still needs one candidate identity and the
     // archive/presentation lifecycle even when the selected bytes are exact.

@@ -235,6 +235,7 @@ impl MaintenanceCoordinator {
       undo_required_buffer_ids,
       buffer_census,
       targets,
+      requested_id_outcomes: Vec::new (),
       undo_waivers: Default::default (),
       server_evidence: None,
       client_evidence_transfer: None,
@@ -340,6 +341,49 @@ impl MaintenanceCoordinator {
     active . candidate = Some (candidate);
     active . blocking_reason = None;
     active . phase = MaintenancePhase::ArchiveReady;
+    Ok (true)
+  }
+
+  /// Journal how each requested ID resolved before an explicit target is
+  /// selected.  Replays must reproduce the exact same resolution and paths.
+  pub fn record_requested_id_outcomes (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    mut outcomes : Vec<MaintenanceIdOutcome>,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::ExplicitPartialReload
+    || active . phase != MaintenancePhase::FinalObservation
+    {
+      return Err (format! (
+        "requested-ID resolution is invalid during {:?}", active . phase)); }
+    for outcome in &mut outcomes {
+      outcome . paths . sort ();
+      outcome . paths . dedup ();
+      if outcome . requested_id . is_empty ()
+      || outcome . pid . as_deref () == Some ("")
+      || outcome . pid . is_some () == outcome . reason . is_some ()
+      {
+        return Err ("requested-ID resolution record is inconsistent" . into ()); }
+    }
+    outcomes . sort_by (|left, right|
+      left . requested_id . cmp (&right . requested_id));
+    let actual : Vec<&str> = outcomes . iter ()
+      . map (|outcome| outcome . requested_id . as_str ()) . collect ();
+    let expected : Vec<&str> = active . targets . ids . iter ()
+      . map (String::as_str) . collect ();
+    if actual != expected {
+      return Err (format! (
+        "requested-ID resolution inventory is {:?}, expected {:?}",
+        actual, expected)); }
+    if !active . requested_id_outcomes . is_empty () {
+      if active . requested_id_outcomes != outcomes {
+        return Err (
+          "incident already records another requested-ID resolution" . into ()); }
+      return Ok (false);
+    }
+    active . requested_id_outcomes = outcomes;
     Ok (true)
   }
 
@@ -789,6 +833,7 @@ impl MaintenanceCoordinator {
       archive_manifest_sha256: manifest_sha256,
       registered_buffer_ids: active . registered_buffer_ids . clone (),
       selected_store: active . selected_store . clone (),
+      requested_id_outcomes: active . requested_id_outcomes . clone (),
     };
     self . state = CoordinatorState::Terminal (terminal . clone ());
     Ok (terminal)
@@ -1165,6 +1210,14 @@ mod tests {
       &active . incident_id, active . epoch) . unwrap ());
     assert! (!coordinator . begin_target_observation (
       &active . incident_id, active . epoch) . unwrap ());
+    let outcomes = vec![MaintenanceIdOutcome {
+      requested_id: "node" . into (), pid: Some ("node" . into ()),
+      reason: None, paths: vec!["/source/node.skg" . into ()],
+    }];
+    assert! (coordinator . record_requested_id_outcomes (
+      &active . incident_id, active . epoch, outcomes . clone ()) . unwrap ());
+    assert! (!coordinator . record_requested_id_outcomes (
+      &active . incident_id, active . epoch, outcomes . clone ()) . unwrap ());
     let sequence = coordinator . next_observation_sequence ();
     let observed = CandidateSummary {
       id: CandidateId::new (),
@@ -1181,6 +1234,7 @@ mod tests {
       panic! ("incident stopped being active"); };
     assert_eq! (recorded . phase, MaintenancePhase::ArchiveReady);
     assert_eq! (recorded . candidate, Some (observed));
+    assert_eq! (recorded . requested_id_outcomes, outcomes);
   }
 
   #[test]

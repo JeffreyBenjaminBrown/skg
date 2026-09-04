@@ -345,6 +345,9 @@ fn terminal_payload (terminal : &TerminalMaintenance) -> String {
     fields . push (integer_field (
       "selected-manifest-revision", selected . manifest_revision . get ()));
   }
+  fields . push (requested_id_outcomes_sexp (
+    &terminal . requested_id_outcomes,
+    terminal . disposition == TerminalDisposition::Completed));
   Sexp::List (fields) . to_string ()
 }
 
@@ -723,6 +726,8 @@ fn candidate_selected_payload (
   fields . splice (0..0, maintenance_selection_identity_fields (
     active, "candidate-selected"));
   append_selected_fields (&mut fields, active)?;
+  fields . push (requested_id_outcomes_sexp (
+    &active . requested_id_outcomes, false));
   fields . push (Sexp::List (vec![
     Sexp::Atom (Atom::S ("view-settlements" . into ())),
     Sexp::List (settlements . iter () . map (settlement_sexp) . collect ()),
@@ -739,6 +744,8 @@ fn scalar_challenge_payload (
   fields . splice (0..0, maintenance_selection_identity_fields (
     active, "needs-scalar-authorization"));
   append_selected_fields (&mut fields, active)?;
+  fields . push (requested_id_outcomes_sexp (
+    &active . requested_id_outcomes, false));
   fields . push (atom_field ("operation", &challenge . operation));
   fields . push (list_field ("pids", &challenge . pids));
   fields . push (atom_field ("prompt", &challenge . prompt));
@@ -759,6 +766,28 @@ fn maintenance_selection_identity_fields (
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     atom_field ("phase", active . phase . label ()),
   ]
+}
+
+fn requested_id_outcomes_sexp (
+  outcomes : &[crate::maintenance::MaintenanceIdOutcome],
+  terminal : bool,
+) -> Sexp {
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S ("requested-id-outcomes" . into ())),
+    Sexp::List (outcomes . iter () . map (|outcome| Sexp::List (vec![
+      atom_field ("requested-id", &outcome . requested_id),
+      atom_field ("pid", outcome . pid . as_deref () . unwrap_or ("nil")),
+      atom_field ("status", if outcome . reason . is_some () {
+        "rejected"
+      } else if terminal {
+        "acknowledged"
+      } else {
+        "resolved"
+      }),
+      atom_field ("reason", outcome . reason . as_deref () . unwrap_or ("nil")),
+      list_field ("paths", &outcome . paths),
+    ])) . collect ()),
+  ])
 }
 
 fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp {
@@ -992,6 +1021,8 @@ fn active_status_sexp (
         . map (settlement_sexp) . collect ()),
     ]));
   }
+  fields . push (requested_id_outcomes_sexp (
+    &active . requested_id_outcomes, false));
   Sexp::List (fields)
 }
 
@@ -1599,6 +1630,28 @@ mod tests {
         "(requested-paths (source/node.skg))"), "{}", payload);
       assert! (payload . contains ("(requested-ids (alias))"), "{}", payload);
     }
+  }
+
+  #[test]
+  fn terminal_id_outcomes_acknowledge_only_ids_resolved_against_g0 () {
+    let outcomes = vec![
+      crate::maintenance::MaintenanceIdOutcome {
+        requested_id: "alias" . into (), pid: Some ("primary" . into ()),
+        reason: None, paths: vec!["/source/primary.skg" . into ()],
+      },
+      crate::maintenance::MaintenanceIdOutcome {
+        requested_id: "unknown" . into (), pid: None,
+        reason: Some ("ID is not present in the selected graph" . into ()),
+        paths: Vec::new (),
+      },
+    ];
+    let active = requested_id_outcomes_sexp (&outcomes, false) . to_string ();
+    let terminal = requested_id_outcomes_sexp (&outcomes, true) . to_string ();
+    assert! (active . contains ("(status resolved)"), "{}", active);
+    assert! (!active . contains ("(status acknowledged)"), "{}", active);
+    assert! (terminal . contains ("(status acknowledged)"), "{}", terminal);
+    assert! (terminal . contains ("(status rejected)"), "{}", terminal);
+    assert! (terminal . contains ("ID is not present in the selected graph"));
   }
 
   #[test]

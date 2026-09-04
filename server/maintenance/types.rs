@@ -479,6 +479,17 @@ pub struct MaintenanceTargets {
   pub ids   : Vec<String>,
 }
 
+/// Durable resolution of one user-supplied ID in an explicit partial reload.
+/// A missing reason means the ID resolved against G0; the terminal wire calls
+/// it acknowledged only after the entire incident completes successfully.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MaintenanceIdOutcome {
+  pub requested_id : String,
+  pub pid          : Option<String>,
+  pub reason       : Option<String>,
+  pub paths        : Vec<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ActiveMaintenance {
   pub incident_id       : IncidentId,
@@ -511,6 +522,8 @@ pub struct ActiveMaintenance {
   pub buffer_census     : BTreeMap<String, FrozenBufferRecord>,
   #[serde(default)]
   pub targets           : MaintenanceTargets,
+  #[serde(default)]
+  pub requested_id_outcomes : Vec<MaintenanceIdOutcome>,
   #[serde(default)]
   pub undo_waivers      : BTreeMap<String, String>,
   #[serde(default)]
@@ -545,6 +558,8 @@ pub struct TerminalMaintenance {
   pub archive_manifest_sha256 : Option<String>,
   pub registered_buffer_ids : Vec<String>,
   pub selected_store    : Option<SelectedStoreRecord>,
+  #[serde(default)]
+  pub requested_id_outcomes : Vec<MaintenanceIdOutcome>,
 }
 
 fn initial_graph_generation () -> GraphGeneration {
