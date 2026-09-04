@@ -96,6 +96,7 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  #[cfg(test)]
   pub fn begin (
     &mut self,
     origin    : MaintenanceOrigin,
@@ -104,6 +105,7 @@ impl MaintenanceCoordinator {
     self . begin_for_client (origin, candidate, "test-client" . into ())
   }
 
+  #[cfg(test)]
   pub fn begin_for_client (
     &mut self,
     origin       : MaintenanceOrigin,
@@ -116,13 +118,18 @@ impl MaintenanceCoordinator {
     let manifest_revision = candidate . as_ref ()
       . map (|candidate| candidate . base_manifest_revision)
       . unwrap_or (ManifestRevision::INITIAL);
-    self . begin_with_archive_contract (
+    let targets = if origin == MaintenanceOrigin::ExplicitPartialReload {
+      MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["test-target" . into ()],
+      }
+    } else { MaintenanceTargets::default () };
+    self . begin_with_archive_contract_and_targets (
       origin, candidate, client_session_id, "emacs" . into (), "all" . into (),
-      graph_generation, manifest_revision, Vec::new ())
+      graph_generation, manifest_revision, Vec::new (), targets)
   }
 
   #[allow(clippy::too_many_arguments)]
-  pub fn begin_with_archive_contract (
+  pub fn begin_with_archive_contract_and_targets (
     &mut self,
     origin       : MaintenanceOrigin,
     candidate    : Option<CandidateSummary>,
@@ -132,7 +139,23 @@ impl MaintenanceCoordinator {
     g0_graph_generation : GraphGeneration,
     g0_manifest_revision : ManifestRevision,
     buffer_records : Vec<FrozenBufferRecord>,
+    mut targets  : MaintenanceTargets,
   ) -> Result<ActiveMaintenance, String> {
+    targets . paths . sort ();
+    targets . paths . dedup ();
+    targets . ids . sort ();
+    targets . ids . dedup ();
+    if origin == MaintenanceOrigin::ExplicitPartialReload
+       && targets . paths . is_empty () && targets . ids . is_empty ()
+    {
+      return Err (
+        "explicit partial reload requires at least one path or ID" . into ()); }
+    if origin != MaintenanceOrigin::ExplicitPartialReload
+       && (!targets . paths . is_empty () || !targets . ids . is_empty ())
+    {
+      return Err (format! (
+        "maintenance origin '{}' does not accept partial-reload targets",
+        origin . label ())); }
     if client_session_id . is_empty () {
       return Err ("maintenance requires an owning client session" . into ()); }
     if !matches! (client_kind . as_str (), "emacs" | "neovim") {
@@ -211,6 +234,7 @@ impl MaintenanceCoordinator {
       dirty_buffer_ids,
       undo_required_buffer_ids,
       buffer_census,
+      targets,
       undo_waivers: Default::default (),
       server_evidence: None,
       client_evidence_transfer: None,
@@ -1010,6 +1034,36 @@ mod tests {
     assert_eq! (&active . archive_directory_name[22..24], "Z_");
   }
 
+  #[test]
+  fn explicit_partial_reload_freezes_one_normalized_target_set () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None,
+      "client-session" . into (), "emacs" . into (), "all" . into (),
+      GraphGeneration::INITIAL, ManifestRevision::INITIAL, Vec::new (),
+      MaintenanceTargets {
+        paths: vec!["z.skg" . into (), "a.skg" . into (), "z.skg" . into ()],
+        ids: vec!["extra" . into (), "node" . into (), "extra" . into ()],
+      }) . unwrap ();
+    assert_eq! (active . targets . paths, vec!["a.skg", "z.skg"]);
+    assert_eq! (active . targets . ids, vec!["extra", "node"]);
+
+    let mut empty = MaintenanceCoordinator::new ();
+    assert! (empty . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None,
+      "client-session" . into (), "emacs" . into (), "all" . into (),
+      GraphGeneration::INITIAL, ManifestRevision::INITIAL, Vec::new (),
+      MaintenanceTargets::default ()) . is_err ());
+    let mut pull = MaintenanceCoordinator::new ();
+    assert! (pull . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::Pull, None,
+      "client-session" . into (), "emacs" . into (), "all" . into (),
+      GraphGeneration::INITIAL, ManifestRevision::INITIAL, Vec::new (),
+      MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["not-a-pull-target" . into ()],
+      }) . is_err ());
+  }
+
   fn settlement (id : &str) -> ViewSettlementRecord {
     ViewSettlementRecord {
       buffer_id: id . into (),
@@ -1044,10 +1098,11 @@ mod tests {
       last_fetched_sha256: "a" . repeat (64),
       current_sha256: "b" . repeat (64),
     };
-    let active = coordinator . begin_with_archive_contract (
+    let active = coordinator . begin_with_archive_contract_and_targets (
       MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
-      ManifestRevision::INITIAL, vec![frozen ("one"), frozen ("two")])
+      ManifestRevision::INITIAL, vec![frozen ("one"), frozen ("two")],
+      MaintenanceTargets { paths: Vec::new (), ids: vec!["node" . into ()] })
       . unwrap ();
     coordinator . archive_ready (
       &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
@@ -1134,7 +1189,7 @@ mod tests {
   #[test]
   fn application_settlement_acknowledges_only_the_exact_staged_offer () {
     let mut coordinator = MaintenanceCoordinator::new ();
-    let active = coordinator . begin_with_archive_contract (
+    let active = coordinator . begin_with_archive_contract_and_targets (
       MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, vec![FrozenBufferRecord {
@@ -1144,7 +1199,9 @@ mod tests {
         application_token: 9, dirty: false, undo_required: false,
         last_fetched_sha256: "a" . repeat (64),
         current_sha256: "a" . repeat (64),
-      }]) . unwrap ();
+      }], MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+      }) . unwrap ();
     let CoordinatorState::Active (state) = &mut coordinator . state else {
       unreachable! () };
     state . phase = MaintenancePhase::Presenting;

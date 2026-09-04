@@ -21,6 +21,7 @@ use crate::maintenance::{
   MaintenanceEpoch,
   MaintenanceOrigin,
   MaintenancePhase,
+  MaintenanceTargets,
   TerminalDisposition,
   TerminalMaintenance,
   ScalarReleaseRecord,
@@ -54,6 +55,7 @@ use std::collections::HashSet;
 use std::net::TcpStream;
 
 use crate::types::misc::ID;
+use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{
@@ -79,6 +81,12 @@ fn begin_maintenance (
   runtime : &ServerRuntime,
 ) -> Result<String, String> {
   let origin = parse_origin (&value_from_request_sexp ("origin", request)?)?;
+  let parsed = sexp::parse (request)
+    . map_err (|error| format! ("invalid maintenance request: {}", error))?;
+  let targets = MaintenanceTargets {
+    paths: optional_string_list (&parsed, "paths")?,
+    ids: optional_string_list (&parsed, "ids")?,
+  };
   let snapshot = runtime . selected_snapshot ();
   let (client, source_set, census) = {
     let interactive = runtime . interactive . lock ()
@@ -128,7 +136,7 @@ fn begin_maintenance (
     . map (CensusDescriptor::frozen_record)
     . collect::<Result<Vec<_>, _>> ()?;
   let active = runtime . transition_maintenance (|coordinator|
-    coordinator . begin_with_archive_contract (
+    coordinator . begin_with_archive_contract_and_targets (
       origin,
       candidate,
       client . session_id . clone (),
@@ -136,7 +144,8 @@ fn begin_maintenance (
       source_set,
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision,
-      frozen_census))?;
+      frozen_census,
+      targets))?;
   Ok (maintenance_offer_payload (&active,
     &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
     &snapshot . env . config . maintenance_archive_identity . to_string_lossy ()))
@@ -887,6 +896,8 @@ fn active_status_sexp (
     atom_field ("phase", active . phase . label ()),
     atom_field ("origin", active . origin . label ()),
     atom_field ("archive-directory-name", &active . archive_directory_name),
+    list_field ("requested-paths", &active . targets . paths),
+    list_field ("requested-ids", &active . targets . ids),
   ];
   if active . selected_store . is_some () {
     let _ = append_selected_fields (&mut fields, active);
@@ -1369,6 +1380,21 @@ fn parse_origin (value : &str) -> Result<MaintenanceOrigin, String> {
   }
 }
 
+fn optional_string_list (sexp : &Sexp, key : &str)
+  -> Result<Vec<String>, String>
+{
+  let present = match sexp {
+    Sexp::List (items) => items . iter () . any (|item| match item {
+      Sexp::List (parts) => matches! (parts . first (),
+        Some (Sexp::Atom (Atom::S (candidate))) if candidate == key),
+      _ => false,
+    }),
+    _ => false,
+  };
+  if present { extract_string_list_from_sexp (sexp, key) }
+  else { Ok (Vec::new ()) }
+}
+
 fn maintenance_offer_payload (
   active                    : &crate::maintenance::ActiveMaintenance,
   archive_folder            : &str,
@@ -1388,6 +1414,8 @@ fn maintenance_offer_payload (
     integer_field ("g0-manifest-revision", active . g0_manifest_revision . get ()),
     atom_field ("candidate-id", active . candidate . as_ref ()
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
+    list_field ("requested-paths", &active . targets . paths),
+    list_field ("requested-ids", &active . targets . ids),
     list_field ("registered-buffer-ids", &active . registered_buffer_ids),
     list_field ("dirty-buffer-ids", &active . dirty_buffer_ids),
     list_field ("undo-required-buffer-ids", &active . undo_required_buffer_ids),
@@ -1459,6 +1487,25 @@ mod tests {
   use crate::types::store_state::{GraphGeneration, ManifestRevision};
 
   #[test]
+  fn partial_reload_offer_and_status_repeat_the_frozen_targets () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
+        paths: vec!["source/node.skg" . into ()],
+        ids: vec!["alias" . into ()],
+      }) . unwrap ();
+    let offer = maintenance_offer_payload (&active, "archive", "/archive");
+    let status = active_status_sexp (&active) . to_string ();
+    for payload in [offer, status] {
+      assert! (payload . contains (
+        "(requested-paths (source/node.skg))"), "{}", payload);
+      assert! (payload . contains ("(requested-ids (alias))"), "{}", payload);
+    }
+  }
+
+  #[test]
   fn evidence_descriptor_names_every_exact_artifact_slice () {
     let summary = CandidateSummary {
       id: CandidateId::new (),
@@ -1508,7 +1555,7 @@ mod tests {
   #[test]
   fn nonrendered_settlement_effects_require_exact_old_authority () {
     let mut coordinator = MaintenanceCoordinator::new ();
-    let mut active = coordinator . begin_with_archive_contract (
+    let mut active = coordinator . begin_with_archive_contract_and_targets (
       MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, vec![FrozenBufferRecord {
@@ -1518,7 +1565,9 @@ mod tests {
         application_token: 7, dirty: false, undo_required: false,
         last_fetched_sha256: "a" . repeat (64),
         current_sha256: "a" . repeat (64),
-      }]) . unwrap ();
+      }], MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+      }) . unwrap ();
     active . selected_store = Some (SelectedStoreRecord {
       graph_generation: GraphGeneration::INITIAL . successor (),
       manifest_revision: ManifestRevision::INITIAL . successor (),

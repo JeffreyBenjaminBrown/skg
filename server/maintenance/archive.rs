@@ -992,7 +992,7 @@ mod tests {
     let last = "* (skg (node (id old) (source main))) café\n" . as_bytes ();
     let current = "* (skg (node (id new) (source main))) café\n" . as_bytes ();
     let mut coordinator = MaintenanceCoordinator::new ();
-    let active = coordinator . begin_with_archive_contract (
+    let active = coordinator . begin_with_archive_contract_and_targets (
       MaintenanceOrigin::ExplicitPartialReload, None,
       "client-session" . into (), "emacs" . into (), "all" . into (),
       crate::types::store_state::GraphGeneration::INITIAL,
@@ -1009,7 +1009,9 @@ mod tests {
         undo_required: false,
         last_fetched_sha256: sha256 (last),
         current_sha256: sha256 (current),
-      }]) . unwrap ();
+      }], crate::maintenance::MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+      }) . unwrap ();
     let final_path = root . join (&active . archive_directory_name);
     create_private_directory (&final_path);
     create_private_directory (&final_path . join ("buffer-snapshots"));

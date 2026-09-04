@@ -470,6 +470,15 @@ pub struct FrozenBufferRecord {
   pub current_sha256          : String,
 }
 
+/// The exact partial-reload selector authorized when maintenance begins.
+/// Paths retain the client's spelling for reporting; the server resolves and
+/// validates them against its own source catalog before observing disk.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MaintenanceTargets {
+  pub paths : Vec<String>,
+  pub ids   : Vec<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ActiveMaintenance {
   pub incident_id       : IncidentId,
@@ -500,6 +509,8 @@ pub struct ActiveMaintenance {
   pub undo_required_buffer_ids : Vec<String>,
   #[serde(default)]
   pub buffer_census     : BTreeMap<String, FrozenBufferRecord>,
+  #[serde(default)]
+  pub targets           : MaintenanceTargets,
   #[serde(default)]
   pub undo_waivers      : BTreeMap<String, String>,
   #[serde(default)]
