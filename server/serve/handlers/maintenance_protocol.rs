@@ -184,16 +184,18 @@ fn run_maintenance_origin (
   require_archive_owner (runtime, &incident, epoch)?;
   let started = runtime . transition_maintenance (|coordinator|
     coordinator . begin_target_observation (&incident, epoch))?;
-  if started {
-    if let Err (error) = runtime . schedule_maintenance_target_observation (
-        incident . clone (), epoch)
-    {
-      let _ = runtime . transition_maintenance (|coordinator|
-        coordinator . block_invalid_disk (
-          &incident, epoch, error . clone ()));
-      return Err (format! (
-        "could not schedule maintenance target observation: {}", error));
-    }
+  // Schedule replays too.  This is the durable restart edge: an incident can
+  // journal FinalObservation before its process-local worker receives the
+  // job.  The single observation worker silently discards duplicate jobs
+  // after the first one advances the exact incident.
+  if let Err (error) = runtime . schedule_maintenance_target_observation (
+      incident . clone (), epoch)
+  {
+    let _ = runtime . transition_maintenance (|coordinator|
+      coordinator . block_invalid_disk (
+        &incident, epoch, error . clone ()));
+    return Err (format! (
+      "could not schedule maintenance target observation: {}", error));
   }
   Ok (Sexp::List (vec![
     atom_field ("status", "origin-operation-started"),
@@ -718,7 +720,8 @@ fn candidate_selected_payload (
   settlements : &[ViewSettlementRecord],
 ) -> Result<String, String> {
   let mut fields = archive_verification_fields (verified);
-  fields . insert (0, atom_field ("status", "candidate-selected"));
+  fields . splice (0..0, maintenance_selection_identity_fields (
+    active, "candidate-selected"));
   append_selected_fields (&mut fields, active)?;
   fields . push (Sexp::List (vec![
     Sexp::Atom (Atom::S ("view-settlements" . into ())),
@@ -733,8 +736,8 @@ fn scalar_challenge_payload (
   challenge : &ScalarReleaseRecord,
 ) -> Result<String, String> {
   let mut fields = archive_verification_fields (verified);
-  fields . insert (0, atom_field (
-    "status", "needs-scalar-authorization"));
+  fields . splice (0..0, maintenance_selection_identity_fields (
+    active, "needs-scalar-authorization"));
   append_selected_fields (&mut fields, active)?;
   fields . push (atom_field ("operation", &challenge . operation));
   fields . push (list_field ("pids", &challenge . pids));
@@ -742,6 +745,20 @@ fn scalar_challenge_payload (
   fields . push (atom_field (
     "next-action", "approve-maintenance-scalar-release"));
   Ok (Sexp::List (fields) . to_string ())
+}
+
+fn maintenance_selection_identity_fields (
+  active : &crate::maintenance::ActiveMaintenance,
+  status : &str,
+) -> Vec<Sexp> {
+  vec![
+    atom_field ("status", status),
+    atom_field ("incident-id", active . incident_id . as_str ()),
+    integer_field ("maintenance-epoch", active . epoch . get ()),
+    atom_field ("candidate-id", active . candidate . as_ref ()
+      . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
+    atom_field ("phase", active . phase . label ()),
+  ]
 }
 
 fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp {
@@ -952,6 +969,8 @@ fn active_status_sexp (
     integer_field ("maintenance-epoch", active . epoch . get ()),
     atom_field ("phase", active . phase . label ()),
     atom_field ("origin", active . origin . label ()),
+    atom_field ("candidate-id", active . candidate . as_ref ()
+      . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     atom_field ("archive-directory-name", &active . archive_directory_name),
     list_field ("requested-paths", &active . targets . paths),
     list_field ("requested-ids", &active . targets . ids),
@@ -1801,6 +1820,12 @@ mod tests {
     let payload = scalar_challenge_payload (
       &active, &verified, &challenge) . unwrap ();
     assert! (payload . contains ("needs-scalar-authorization"));
+    assert! (payload . contains (&format! (
+      "(incident-id {})", active . incident_id)));
+    assert! (payload . contains (&format! (
+      "(maintenance-epoch {})", active . epoch . get ())));
+    assert! (payload . contains (&format! (
+      "(candidate-id {})", active . candidate . as_ref () . unwrap () . id)));
     assert! (payload . contains ("ugly-pid"));
     assert! (!payload . contains ("view-settlements"));
     assert! (!payload . contains ("SECRET-STAGED-TEXT"));

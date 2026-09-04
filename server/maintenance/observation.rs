@@ -154,17 +154,17 @@ fn run_target_observation (
     fn from (error : &str) -> Self { Self::Operational (error . into ()) }
   }
 
-  let result = (|| -> Result<String, Failure> {
+  let result = (|| -> Result<Option<String>, Failure> {
     let active = {
       let coordinator = runtime . maintenance . lock ()
         . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
       let CoordinatorState::Active (active) = &coordinator . state else {
-        return Err ("target observation lost its active incident" . into ()); };
+        return Ok (None); };
       if active . incident_id != incident || active . epoch != epoch
       || active . origin != MaintenanceOrigin::ExplicitPartialReload
       || active . phase != MaintenancePhase::FinalObservation
       {
-        return Err ("target observation authority is stale" . into ()); }
+        return Ok (None); }
       active . clone ()
     };
     let sequence = runtime . transition_maintenance (|coordinator|
@@ -200,11 +200,13 @@ fn run_target_observation (
       . ok_or_else (|| "verified initial archive was not retained"
         . to_string ())?;
     crate::serve::handlers::maintenance_protocol::select_and_stage_candidate (
-      runtime, &incident, epoch, &verified) . map_err (Failure::Operational)
+      runtime, &incident, epoch, &verified)
+      . map (Some) . map_err (Failure::Operational)
   })();
 
   let payload = match result {
-    Ok (payload) => payload,
+    Ok (Some (payload)) => payload,
+    Ok (None) => return,
     Err (failure) => {
       let error = match failure {
         Failure::InvalidDisk (error) => {
