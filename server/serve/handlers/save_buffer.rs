@@ -8,6 +8,8 @@ use crate::save::{
   update_graph_including_nodeMerges,
 };
 use crate::serve::ViewsState;
+use crate::runtime::ServerRuntime;
+use crate::maintenance::QueuedObservationReason;
 use crate::source_sets::ActiveSourceSet;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::telescope_hoist::{
@@ -74,6 +76,15 @@ pub struct SaveResponse {
   pub scalar_release_confirmation : Option<String>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RequestedSaveAuthority {
+  buffer_id         : String,
+  kind              : String,
+  graph_generation  : u64,
+  server_revision   : u64,
+  application_token : u64,
+}
+
 #[derive(Clone)]
 pub struct SavePointPosition {
   pub point_lines_below_focused_headline    : usize,
@@ -113,9 +124,12 @@ pub fn handle_save_buffer_request (
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
   collateral_scheduler : &mut CollateralScheduler,
+  runtime    : &ServerRuntime,
+  pre_parse_refusal : Option<&str>,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
+  let requested_authority = requested_save_authority (request);
   let save_point_position : Option<SavePointPosition> =
     save_point_position_from_request (request);
   let fork_approved : bool =
@@ -143,11 +157,30 @@ pub fn handle_save_buffer_request (
         &viewuri_from_request_result, views_state );
     let lock_sexp : String =
       format_lock_views_sexp ( &uris_to_lock );
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream,
       & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
+      if let Some (reason) = pre_parse_refusal {
+        let response_sexp = empty_response_sexp (
+          reason, &[], &save_point_position) . to_string ();
+        let _ = send_response_with_length_prefix (
+          stream,
+          &tag_sexp_response (TcpToClient::SaveResult, &response_sexp));
+        return; }
+      let requested_authority = match &requested_authority {
+        Ok (authority) => authority,
+        Err (reason) => {
+          let error = SaveError::StaleViewAuthority (reason . clone ());
+          let response_sexp = empty_response_sexp (
+            &format_save_error_as_org (&error), &[], &save_point_position)
+            . to_string ();
+          let _ = send_response_with_length_prefix (
+            stream,
+            &tag_sexp_response (TcpToClient::SaveResult, &response_sexp));
+          return; }
+      };
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
@@ -163,6 +196,7 @@ pub fn handle_save_buffer_request (
             &fork_sources,
             &hoist_approved_pids,
             &scalar_approved_pids,
+            Some (requested_authority),
             Some (collateral_scheduler) ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
@@ -170,32 +204,61 @@ pub fn handle_save_buffer_request (
             match (&save_response . hoist_confirmation,
                    &save_response . fork_confirmation,
                    &save_response . scalar_release_confirmation) {
-              (Some (candidates), _, _) =>
-                send_response_with_length_prefix (
+              (Some (candidates), _, _) => {
+                let _ = send_response_with_length_prefix (
                   stream,
                   & tag_sexp_response (
                     TcpToClient::TelescopeHoistConfirmation,
-                    &hoist_confirmation_response (candidates) )),
-              (None, Some (to_minibuffer), _) =>
+                    &hoist_confirmation_response (candidates) )); },
+              (None, Some (to_minibuffer), _) => {
                 // A save that found forks and was not approved: nothing
                 // committed; send the confirmation buffer instead of a
                 // save-result.
-                send_response_with_length_prefix (
+                let _ = send_response_with_length_prefix (
                   stream,
                   & tag_sexp_response (
                     TcpToClient::ForkConfirmation,
                     & format_fork_confirmation_response_sexp (
-                      & save_response . saved_view, to_minibuffer ))),
-              (None, None, Some (confirmation)) =>
-                send_response_with_length_prefix (stream, confirmation),
-              (None, None, None) =>
-                send_response_with_length_prefix (
+                      & save_response . saved_view, to_minibuffer ))); },
+              (None, None, Some (confirmation)) => {
+                let _ = send_response_with_length_prefix (stream, confirmation); },
+              (None, None, None) => {
+                if let Ok (view_uri) = &viewuri_from_request_result {
+                  let graph_generation = env . in_rust_graph . load_full ()
+                    . graph_generation . get ();
+                  let presentation_generation = collateral_scheduler
+                    . presentation_generation ();
+                  let resulting_token = requested_authority
+                    . application_token . saturating_add (1);
+                  let _ = views_state . open_views
+                    . set_client_application_authority (
+                      view_uri, graph_generation, presentation_generation,
+                      resulting_token);
+                }
+                let mut payload = save_response . to_sexp_string ();
+                if let Ok (view_uri) = &viewuri_from_request_result {
+                  if let Some (state) =
+                    views_state . open_views . views . get (view_uri)
+                  {
+                    payload = crate::serve::util::add_view_authority_to_response (
+                      &payload, state); }}
+                let _ = send_response_with_length_prefix (
                   stream,
                   & tag_sexp_response (
                     TcpToClient::SaveResult,
-                    & save_response . to_sexp_string () )), }}
+                    &payload )); }, };
+          }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
+              if let SaveError::DiskSelectionChanged { paths, .. } = save_error {
+                if let Err (observation_error) = runtime
+                  . schedule_path_observation (
+                    paths . clone (),
+                    QueuedObservationReason::SaveFenceMismatch)
+                {
+                  tracing::error! (
+                    %observation_error,
+                    "save fence refused safely, but exact observation could not be queued"); }}
               // Warnings always accompany errors (decided 2026-06-12):
               // a failed validation carries the parse-time warnings it
               // collected before aborting.
@@ -209,7 +272,7 @@ pub fn handle_save_buffer_request (
                   warnings,
                   & save_point_position )
                 . to_string ();
-              send_response_with_length_prefix (
+              let _ = send_response_with_length_prefix (
                 stream,
                 & tag_sexp_response (
                   TcpToClient::SaveResult, & response_sexp ));
@@ -223,7 +286,7 @@ pub fn handle_save_buffer_request (
                   &[],
                   &save_point_position )
                 . to_string ();
-              send_response_with_length_prefix (
+              let _ = send_response_with_length_prefix (
                 stream,
                 & tag_sexp_response (
                   TcpToClient::SaveResult, &response_sexp )); }} }}; }
@@ -237,7 +300,7 @@ pub fn handle_save_buffer_request (
           &[],
           &save_point_position )
         . to_string ();
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
           TcpToClient::SaveResult, &response_sexp )); }} }
@@ -320,6 +383,59 @@ fn nat_from_request (
   key     : &str,
 ) -> Option<usize> {
   value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
+
+fn requested_save_authority (
+  request : &str,
+) -> Result<RequestedSaveAuthority, String> {
+  let integer = |key : &str| -> Result<u64, String> {
+    value_from_request_sexp (key, request)? . parse::<u64> ()
+      . map_err (|_| format! ("{} must be an unsigned integer", key)) };
+  Ok (RequestedSaveAuthority {
+    buffer_id: value_from_request_sexp ("client-buffer-id", request)?,
+    kind: value_from_request_sexp ("view-kind", request)?,
+    graph_generation: integer ("graph-generation")?,
+    server_revision: integer ("server-revision")?,
+    application_token: integer ("client-application-token")?,
+  })
+}
+
+fn validate_save_authority (
+  requested  : &RequestedSaveAuthority,
+  view_uri   : &Result<ViewUri, String>,
+  views_state : &ViewsState,
+  current_graph_generation : u64,
+) -> Result<(), SaveError> {
+  let uri = view_uri . as_ref () . map_err (|reason|
+    SaveError::StaleViewAuthority (reason . clone ()))?;
+  if requested . graph_generation != current_graph_generation {
+    return Err (SaveError::StaleViewAuthority (format! (
+      "buffer names graph generation {}, but selected generation is {}",
+      requested . graph_generation, current_graph_generation))); }
+  let Some (state) = views_state . open_views . views . get (uri) else {
+    if requested . kind == "new-empty-content-view"
+       && requested . server_revision == 0
+       && requested . application_token == 1
+    { return Ok (( )); }
+    return Err (SaveError::StaleViewAuthority (format! (
+      "view '{}' is not registered by the server",
+      uri . repr_in_client ()))); };
+  if state . graph_generation != requested . graph_generation
+     || state . revision != requested . server_revision
+     || state . client_application_token != requested . application_token
+  {
+    return Err (SaveError::StaleViewAuthority (format! (
+      "view '{}' expected graph/revision/token {}/{}/{}, client supplied {}/{}/{}",
+      uri . repr_in_client (), state . graph_generation, state . revision,
+      state . client_application_token, requested . graph_generation,
+      requested . server_revision, requested . application_token)));
+  }
+  if let Some (buffer_id) = &state . client_buffer_id {
+    if buffer_id != &requested . buffer_id {
+      return Err (SaveError::StaleViewAuthority (format! (
+        "view '{}' belongs to client buffer {}, not {}",
+        uri . repr_in_client (), buffer_id, requested . buffer_id))); }}
+  Ok (( ))
+}
 
 /// Whether this save request carries '(fork-approved . "true")', set by
 /// the client when the user approves a fork-confirmation. Absent or any
@@ -424,7 +540,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
     viewuri_from_request_result, views_state, active_source_set,
     fork_approved, fork_sources, hoist_approved_pids,
-    &HashSet::new (), None ) . await
+    &HashSet::new (), None, None ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -439,6 +555,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   fork_sources                 : &HashMap<ID, SourceName>,
   hoist_approved_pids         : &HashSet<ID>,
   scalar_approved_pids        : &HashSet<ID>,
+  requested_authority         : Option<&RequestedSaveAuthority>,
   mut collateral_scheduler    : Option<&mut CollateralScheduler>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
@@ -522,6 +639,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   { // The ordinary-save and nodeMerge phases execute separately, but their
     // filesystem validity is one save-level decision. Check their union now,
     // before either phase writes or deletes anything.
+    if let Some (authority) = requested_authority {
+      validate_save_authority (
+        authority, viewuri_from_request_result, views_state,
+        env . in_rust_graph . load_full () . graph_generation . get ())?; }
     let all_filesystem_outputs : Vec<DefineNode> =
       nonmerge_defineNodes . iter () . cloned ()
       .chain ( nodeMerges . iter ()
@@ -546,7 +667,11 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &mut env . tantivy_index,
       &env . driver,
       &env . in_rust_graph,
-      hoist_approved_pids ) . await
+      hoist_approved_pids,
+      requested_authority . map (|authority|
+        authority . graph_generation)
+        . unwrap_or_else (|| env . in_rust_graph . load_full ()
+          . graph_generation . get ()) ) . await
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.

@@ -14,6 +14,7 @@ with an indefinitive ActiveNode (no ID yet) and a placeholder title."
            "* (skg (node (source %s) indef)) life, the universe and everything\n"
            source)))
     (skg-open-org-buffer-from-text
-     nil org-text (skg-content-view-buffer-name org-text))))
+     nil org-text (skg-content-view-buffer-name org-text)
+     nil 'new-empty-content-view '((kind . "new-empty")))))
 
 (provide 'skg-view-new-empty)

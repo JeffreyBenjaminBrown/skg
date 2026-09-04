@@ -6,7 +6,7 @@
 (defun skg-reload ()
   "Unload *almost* all skg features and reload from disk.
 
-Two files are deliberately absent from the unload list:
+Six files are deliberately absent from the unload list:
 
 - `skg-buffer' defines `skg-content-view-mode' and the
   permanent-local `skg-view-uri'. `unload-feature' would
@@ -21,10 +21,25 @@ Two files are deliberately absent from the unload list:
   long-running Emacs session where the feature was already
   provided by older code.
 
-Both files are idempotent on re-evaluation (no top-level
-hooks, no advice, just `defvar', `define-derived-mode',
-`define-key', and `defun's), so we pick up edits to them via
-plain `load-file' instead.
+- `skg-state' owns the live TCP process and its request coordinator.
+  Unloading it forgets the process without closing it, so the next
+  `skg-client-init' leaks the old server connection and opens a new
+  one.  Its `defvar' state survives a plain re-evaluation while its
+  functions and request-record accessors are refreshed.
+
+- `skg-buffer-registry' owns stable application tokens and lifecycle records
+  for already-open buffers.  Its `defvar' table and permanent-local records
+  survive while a plain re-evaluation refreshes the registry functions.
+
+- `skg-request-reload-paths' owns live filesystem-watch descriptors.
+  Those watches likewise must survive, while re-evaluation safely
+  refreshes their symbol callbacks, hook, and server-push handler.
+
+- `skg-worktree-guard' installs process-boundary advice.  Plain
+  re-evaluation refreshes its functions without duplicating advice.
+
+All six files are idempotent on re-evaluation, so we pick up
+edits to them via plain `load-file' instead.
 
 The herald rule table (`heralds--transform-rules', fetched from
 the server at connect time) is captured before the unload and
@@ -43,6 +58,10 @@ toggle, even though the server is fine. `unwind-protect' restores
 the table whether or not the reload itself succeeds; the reload
 error still propagates so the user can fix it."
   (interactive)
+  (when (and (boundp 'skg--active-request-id)
+             skg--active-request-id)
+    (user-error "skg: wait for request %s before reloading client code"
+                skg--active-request-id))
   (let* ((herald-rules (and (boundp 'heralds--transform-rules)
                             heralds--transform-rules))
          (elisp-dir
@@ -65,8 +84,9 @@ error still propagates so the user can fix it."
 The destructive half of `skg-reload', kept separate so the
 herald-table preservation in `skg-reload' can be exercised without
 actually unloading the world.  See `skg-reload' for why
-`skg-buffer' and `skg-keymaps-and-aliases' are reloaded by hand
-rather than via `unload-feature'."
+`skg-buffer', `skg-keymaps-and-aliases', `skg-state', `skg-buffer-registry',
+`skg-request-reload-paths', and `skg-worktree-guard' are reloaded by
+hand rather than via `unload-feature'."
   (let ((skg-features
          '( skg-client
             skg-compare-sexpr
@@ -98,7 +118,6 @@ rather than via `unload-feature'."
             skg-sexpr-org-bijection
             skg-sexpr-search
             skg-activeNode-defaults
-            skg-state
             skg-test-utils
             skg-readable-ids
             skg-file-minor-mode
@@ -108,8 +127,12 @@ rather than via `unload-feature'."
     (dolist (feat skg-features)
       (when (featurep feat)
         (unload-feature feat t)))
+    (load-file (expand-file-name "skg-state.el"                elisp-dir))
+    (load-file (expand-file-name "skg-buffer-registry.el"      elisp-dir))
     (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
     (load-file (expand-file-name "skg-init.el"                elisp-dir))
+    (load-file (expand-file-name "skg-worktree-guard.el"      elisp-dir))
+    (load-file (expand-file-name "skg-request-reload-paths.el" elisp-dir))
     (load-file (expand-file-name "skg-buffer.el"              elisp-dir))))
 
 (provide 'skg-reload)

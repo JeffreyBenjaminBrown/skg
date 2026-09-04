@@ -74,7 +74,7 @@ skg_begin_reload_batch() {
   [ -n "$port" ] || return 1
   exec {SKG_RELOAD_BATCH_FD}<>"/dev/tcp/127.0.0.1/$port" || return 1
   request_id="pull-all-$$-$RANDOM-begin"
-  printf '((request . "begin reload batch") (request-id . "%s"))\n' \
+  printf '((request . "begin reload batch") (role . "control") (request-id . "%s"))\n' \
     "$request_id" >&"$SKG_RELOAD_BATCH_FD"
   response="$(_skg_read_lp_body "$SKG_RELOAD_BATCH_FD")" || {
     exec {SKG_RELOAD_BATCH_FD}>&-

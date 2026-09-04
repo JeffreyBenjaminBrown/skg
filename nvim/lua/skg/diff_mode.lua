@@ -23,6 +23,7 @@ function M.toggle (approved_pids)
     error('Cannot toggle diff mode: unsaved skg buffer(s): '
           .. table.concat(names, ', ')) end
   lock.begin_stream('diff-mode toggle')
+  lock.register_stream_request_cleanup('diff-mode toggle')
   lock.lock_all_skg_buffers()
   state.register_response_handler('git-diff-mode',
     function (_payload_text, response)

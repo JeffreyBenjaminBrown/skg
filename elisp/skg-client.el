@@ -13,6 +13,7 @@
 (require 'skg-view-new-empty)
 (require 'skg-request-file-path)
 (require 'skg-request-herald-rules)
+(require 'skg-maintenance)
 (require 'skg-request-diff-analysis)
 (require 'skg-request-edge-source-info)
 (require 'skg-request-export-org)
@@ -35,7 +36,6 @@
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
-  (skg-connection-verify)
   ;; Re-fetch the herald rule table from the (possibly rebuilt) server,
   ;; DISCARDING any cached table first and WAITING for the reply. So a
   ;; reconnect -- including one right after `skg-reload', which
@@ -76,7 +76,8 @@
            (process-live-p skg-rust-tcp-proc ))
     (skg-clear-request-coordinator)
     (skg-lp-reset)
-    (setq skg--git-diff-mode-enabled
+    (setq skg--connection-handshake-state nil
+          skg--git-diff-mode-enabled
           ;; The server starts each connection with diff mode off.
           nil
           skg--server-source-inventory nil
@@ -99,7 +100,8 @@
      ;; What sentinels do: When Emacs detects that a process changes state — it exits, is killed, the TCP connection closes (maybe abnormally), etc. — Emacs calls that process's sentinel function with the process and a string describing the event (e.g. "deleted\n", "connection broken by remote peer\n").
      ;; What this sentinel does: If the server crashes or the connection drops mid-save, skg--tcp-sentinel fires and unlocks all save-locked buffers. Without it, a server crash would leave buffers permanently locked.
      skg-rust-tcp-proc
-     #'skg--tcp-sentinel) )
+     #'skg--tcp-sentinel)
+    (skg--submit-connection-handshake skg-rust-tcp-proc))
   skg-rust-tcp-proc)
 
 (defun skg--server-unavailable-message (err)
@@ -131,10 +133,9 @@ the request record named by its request-id."
     (if (string-prefix-p "((busy-initializing" trimmed)
         (let ((parsed (car (read-from-string trimmed))))
           (message "%s" (cdr (assq 'busy-initializing parsed)))
-          (skg--end-stream)
-          (skg--unlock-all-save-locked)
           (when (fboundp 'skg-stop-reload-observation)
             (skg-stop-reload-observation))
+          (setq skg--connection-handshake-state nil)
           (skg-clear-request-coordinator)
           (skg-lp-reset))
       (skg-lp-handle-generic-chunk tcp-proc string) )) )
@@ -142,10 +143,9 @@ the request record named by its request-id."
 (defun skg--tcp-sentinel (_proc event)
   "Clean up when the TCP connection closes."
   (when (not (string-prefix-p "open" event))
-    (skg--end-stream)
-    (skg--unlock-all-save-locked)
     (when (fboundp 'skg-stop-reload-observation)
       (skg-stop-reload-observation))
+    (setq skg--connection-handshake-state nil)
     (skg-clear-request-coordinator)
     (skg-lp-reset)) )
 

@@ -38,6 +38,17 @@ function M.end_stream ()
   M.stream_in_progress = nil
 end
 
+function M.register_stream_request_cleanup (label)
+  state.set_request_failure_handler(function (reason)
+    vim.notify(string.format('skg: %s interrupted: %s', label, reason),
+               vim.log.levels.ERROR)
+  end)
+  state.set_request_finalizer(function ()
+    M.end_stream()
+    M.unlock_all_save_locked()
+  end)
+end
+
 ---@param buf integer
 function M.lock_for_save (buf)
   if not vim.b[buf].skg_save_locked then
@@ -94,13 +105,5 @@ function M.unlock_non_collateral_buffers (saved_uri, collateral_uris)
     table.insert(keep, uri) end
   M.unlock_buffers_not_in_uri_list(keep)
 end
-
--- A server crash or busy-initializing teardown mid-save must not
--- leave buffers permanently locked: join the connection-reset hooks
--- the client runs from its sentinel.
-table.insert(state.connection_reset_hooks, function ()
-  M.end_stream()
-  M.unlock_all_save_locked()
-end)
 
 return M

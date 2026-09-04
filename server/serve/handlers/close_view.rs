@@ -15,12 +15,12 @@ pub fn handle_close_view_request (
   match view_uri_from_request (request) {
     Ok (uri) => {
       views_state . open_views . unregister_view (&uri);
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::CloseView, "view closed" )); },
     Err (_) => {
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::CloseView, "Error: missing view-uri" )); }} }

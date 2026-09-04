@@ -11,6 +11,8 @@ pub enum RequestType {
   TextSearch,
   SnapshotResponse,
   VerifyConnection,
+  ClientCensus,
+  ClientCensusTexts,
   Shutdown,
   GetFilePath,
   GitDiffModeToggle,
@@ -34,6 +36,12 @@ pub enum RequestType {
   ApplyCollateral,
   ViewVisited,
   ObservePresentation,
+  BeginMaintenance,
+  MaintenanceArchiveReady,
+  MaintenanceArchiveFailed,
+  ApproveUndoWaiver,
+  CancelMaintenance,
+  MaintenanceStatus,
 }
 
 impl RequestType {
@@ -47,6 +55,8 @@ impl RequestType {
       "text search"              => Ok (RequestType::TextSearch),
       "snapshot response"        => Ok (RequestType::SnapshotResponse),
       "verify connection"        => Ok (RequestType::VerifyConnection),
+      "client census"            => Ok (RequestType::ClientCensus),
+      "client census texts"      => Ok (RequestType::ClientCensusTexts),
       "shutdown"                 => Ok (RequestType::Shutdown),
       "get file path"            => Ok (RequestType::GetFilePath),
       "git diff mode toggle"     => Ok (RequestType::GitDiffModeToggle),
@@ -70,6 +80,12 @@ impl RequestType {
       "apply collateral"         => Ok (RequestType::ApplyCollateral),
       "view visited"             => Ok (RequestType::ViewVisited),
       "observe presentation"     => Ok (RequestType::ObservePresentation),
+      "begin maintenance"        => Ok (RequestType::BeginMaintenance),
+      "maintenance archive ready" => Ok (RequestType::MaintenanceArchiveReady),
+      "maintenance archive failed" => Ok (RequestType::MaintenanceArchiveFailed),
+      "approve undo waiver"      => Ok (RequestType::ApproveUndoWaiver),
+      "cancel maintenance"       => Ok (RequestType::CancelMaintenance),
+      "maintenance status"       => Ok (RequestType::MaintenanceStatus),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -95,6 +111,7 @@ pub enum TcpToClient {
   GetFilePath,
   HeraldRules,
   VerifyConnection,
+  ClientCensus,
   Shutdown,
   GitDiffMode,
   RebuildDbs,
@@ -117,6 +134,8 @@ pub enum TcpToClient {
   ViewVisited,
   PresentationObserved,
   ReconciliationReady,
+  MaintenanceOffer,
+  MaintenanceStatus,
   Error,
 }
 
@@ -142,6 +161,7 @@ impl TcpToClient {
       TcpToClient::GetFilePath      => "get-file-path",
       TcpToClient::HeraldRules      => "herald-rules",
       TcpToClient::VerifyConnection => "verify-connection",
+      TcpToClient::ClientCensus     => "client-census",
       TcpToClient::Shutdown         => "shutdown",
       TcpToClient::GitDiffMode      => "git-diff-mode",
       TcpToClient::RebuildDbs       => "rebuild-dbs",
@@ -164,4 +184,6 @@ impl TcpToClient {
       TcpToClient::ViewVisited => "view-visited",
       TcpToClient::PresentationObserved => "presentation-observed",
       TcpToClient::ReconciliationReady => "reconciliation-ready",
+      TcpToClient::MaintenanceOffer => "maintenance-offer",
+      TcpToClient::MaintenanceStatus => "maintenance-status",
       TcpToClient::Error            => "error", }} }

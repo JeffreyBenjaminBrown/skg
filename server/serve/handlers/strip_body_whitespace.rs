@@ -42,7 +42,7 @@ pub fn handle_strip_body_whitespace_request (
       Err (e) => {
         tracing::error!("Body whitespace strip failed: {}", e);
         format! ("Body whitespace strip failed: {}", e) }};
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::StripBodyWhitespace, &msg )); }

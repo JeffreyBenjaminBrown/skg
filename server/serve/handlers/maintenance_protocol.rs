@@ -1,0 +1,428 @@
+//! Bootstrap and archive-acknowledgement endpoints for maintenance incidents.
+
+use crate::maintenance::archive::{
+  InitialArchiveExpectation,
+  verify_initial_archive,
+};
+use crate::maintenance::selection::select_archived_candidate;
+use crate::maintenance::{
+  CandidateId,
+  CoordinatorState,
+  IncidentId,
+  MaintenanceEpoch,
+  MaintenanceOrigin,
+};
+use crate::runtime::ServerRuntime;
+use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
+use crate::serve::protocol::TcpToClient;
+use crate::serve::util::{
+  send_response_with_length_prefix,
+  tag_terminal_sexp_response,
+  tag_terminal_text_response,
+  value_from_request_sexp,
+};
+
+use sexp::{Atom, Sexp};
+use sha2::{Digest, Sha256};
+use std::net::TcpStream;
+
+const ARCHIVE_FORMAT_VERSION : u32 = 1;
+
+pub fn handle_begin_maintenance_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = begin_maintenance (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceOffer, "complete", result);
+}
+
+fn begin_maintenance (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let origin = parse_origin (&value_from_request_sexp ("origin", request)?)?;
+  let snapshot = runtime . selected_snapshot ();
+  let (client, source_set, census) = {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    let client = interactive . attached_client . clone ()
+      . ok_or_else (|| "no interactive client is attached" . to_string ())?;
+    if !client . census_complete {
+      return Err ("client census is not complete" . into ()); }
+    (
+      client,
+      interactive . active_source_set . name . 0 . clone (),
+      interactive . live_census . values () . cloned () . collect::<Vec<_>> (),
+    )
+  };
+  validate_client_archive_capability (&client, &census)?;
+  let dirty_raw : Vec<_> = census . iter () . filter (|descriptor|
+      descriptor . dirty && descriptor . kind == "raw-skg-file")
+    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
+  if !dirty_raw . is_empty () {
+    return Err (format! (
+      "maintenance refuses modified raw .skg buffers: {}",
+      dirty_raw . join (", "))); }
+  if origin == MaintenanceOrigin::Pull && source_set != "all" {
+    return Err (format! (
+      "pull requires source-set 'all'; the retained source-set is '{}'",
+      source_set)); }
+
+  let candidate = match value_from_request_sexp ("candidate-id", request) {
+    Ok (value) if value != "none" => {
+      let id = CandidateId::parse (&value)?;
+      let candidate = runtime . candidate (&id) . ok_or_else (|| format! (
+        "candidate {} is no longer retained", id))?;
+      Some (candidate . summary . clone ())
+    }
+    _ => None,
+  };
+  if origin == MaintenanceOrigin::PendingReconciliation && candidate . is_none () {
+    return Err ("pending reconciliation requires the exact candidate ID" . into ()); }
+  if let Some (candidate) = &candidate {
+    if candidate . base_graph_generation != snapshot . selected . graph_generation
+    || candidate . base_manifest_revision != snapshot . selected . manifest_revision
+    {
+      return Err (format! ("candidate {} was superseded", candidate . id)); }
+  }
+
+  let mut registered : Vec<String> = census . iter ()
+    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
+  let mut dirty : Vec<String> = census . iter ()
+    . filter (|descriptor| descriptor . dirty)
+    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
+  let mut undo_required : Vec<String> = census . iter ()
+    . filter (|descriptor| descriptor . dirty && descriptor . undo_required)
+    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
+  registered . sort ();
+  dirty . sort ();
+  undo_required . sort ();
+  let active = runtime . transition_maintenance (|coordinator|
+    coordinator . begin_with_archive_contract (
+      origin,
+      candidate,
+      client . session_id . clone (),
+      client . kind . label () . into (),
+      source_set,
+      snapshot . selected . graph_generation,
+      snapshot . selected . manifest_revision,
+      registered,
+      dirty,
+      undo_required))?;
+  Ok (maintenance_offer_payload (&active,
+    &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
+    &snapshot . env . config . maintenance_archive_identity . to_string_lossy ()))
+}
+
+pub fn handle_maintenance_archive_ready_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = archive_ready (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn archive_ready (request : &str, runtime : &ServerRuntime)
+  -> Result<String, String>
+{
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let manifest_sha256 = value_from_request_sexp ("manifest-sha256", request)?;
+  let lock_sha256 = value_from_request_sexp ("lock-census-sha256", request)?;
+  let active = matching_active (runtime, &incident, epoch)?;
+  let attached = attached_client (runtime)?;
+  if attached . session_id != active . archive_owner_session_id {
+    return Err ("archive ACK came from a different client session" . into ()); }
+  if lock_sha256 != lock_census_sha256 (&active . registered_buffer_ids) {
+    return Err ("maintenance epoch lock census checksum does not match" . into ()); }
+  let snapshot = runtime . selected_snapshot ();
+  if snapshot . selected . graph_generation != active . g0_graph_generation
+  || snapshot . selected . manifest_revision != active . g0_manifest_revision
+  {
+    return Err ("selected G0 changed while the initial archive was prepared" . into ()); }
+  let verified = verify_initial_archive (InitialArchiveExpectation {
+    archive_root: &snapshot . env . config . maintenance_archive_identity,
+    active: &active,
+    manifest_sha256: &manifest_sha256,
+  })?;
+  runtime . retain_verified_archive (incident . clone (), verified . clone ());
+  runtime . transition_maintenance (|coordinator| coordinator . archive_ready (
+    &incident, epoch, manifest_sha256 . clone ()))?;
+  let mut fields = vec![
+    atom_field ("verified-manifest-sha256", &manifest_sha256),
+    atom_field ("archive-path", &verified . path . to_string_lossy ()),
+    integer_field ("artifact-count", verified . artifact_count as u64),
+    integer_field ("archive-file-bytes", verified . total_file_bytes),
+  ];
+  if active . candidate . is_some () {
+    let selected = select_archived_candidate (runtime, &incident, epoch)?;
+    fields . insert (0, atom_field ("status", "candidate-selected"));
+    fields . push (integer_field (
+      "g1-graph-generation", selected . graph_generation));
+    fields . push (integer_field (
+      "g1-manifest-revision", selected . manifest_revision));
+    fields . push (integer_field (
+      "tantivy-generation", selected . tantivy_generation));
+    fields . push (atom_field (
+      "tantivy-outcome", &selected . tantivy_outcome));
+    fields . push (atom_field (
+      "server-evidence-sha256", &selected . evidence . bundle_sha256));
+    fields . push (integer_field (
+      "server-evidence-artifact-count",
+      selected . evidence . artifact_count as u64));
+    fields . push (integer_field (
+      "server-evidence-bytes", selected . evidence . total_file_bytes));
+  } else {
+    fields . insert (0, atom_field ("status", "archive-ready"));
+    fields . push (atom_field (
+      "next-action", "origin-specific-operation-required"));
+  }
+  Ok (Sexp::List (fields) . to_string ())
+}
+
+pub fn handle_maintenance_archive_failed_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = (|| -> Result<String, String> {
+    let incident = IncidentId::parse (
+      &value_from_request_sexp ("incident-id", request)?)?;
+    let epoch = MaintenanceEpoch::parse (
+      &value_from_request_sexp ("maintenance-epoch", request)?)?;
+    let buffer_key = value_from_request_sexp ("buffer-key", request)?;
+    let reason = value_from_request_sexp ("reason", request)?;
+    require_archive_owner (runtime, &incident, epoch)?;
+    runtime . transition_maintenance (|coordinator|
+      coordinator . archive_undo_failed (
+        &incident, epoch, buffer_key . clone (), reason . clone ()))?;
+    Ok (Sexp::List (vec![
+      atom_field ("status", "undo-waiver-required"),
+      atom_field ("buffer-key", &buffer_key),
+      atom_field ("reason", &reason),
+    ]) . to_string ())
+  })();
+  send_result (stream, TcpToClient::MaintenanceStatus,
+    "needs-authorization", result);
+}
+
+pub fn handle_approve_undo_waiver_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = (|| -> Result<String, String> {
+    let incident = IncidentId::parse (
+      &value_from_request_sexp ("incident-id", request)?)?;
+    let epoch = MaintenanceEpoch::parse (
+      &value_from_request_sexp ("maintenance-epoch", request)?)?;
+    let buffer_key = value_from_request_sexp ("buffer-key", request)?;
+    let reason = value_from_request_sexp ("reason", request)?;
+    require_archive_owner (runtime, &incident, epoch)?;
+    runtime . transition_maintenance (|coordinator|
+      coordinator . approve_undo_waiver (
+        &incident, epoch, buffer_key . clone (), reason . clone ()))?;
+    Ok (Sexp::List (vec![
+      atom_field ("status", "retry-initial-archive"),
+      atom_field ("waived-buffer-key", &buffer_key),
+      atom_field ("waived-reason", &reason),
+    ]) . to_string ())
+  })();
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+pub fn handle_cancel_maintenance_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = (|| -> Result<String, String> {
+    let incident = IncidentId::parse (
+      &value_from_request_sexp ("incident-id", request)?)?;
+    let epoch = MaintenanceEpoch::parse (
+      &value_from_request_sexp ("maintenance-epoch", request)?)?;
+    require_archive_owner (runtime, &incident, epoch)?;
+    runtime . transition_maintenance (|coordinator|
+      coordinator . cancel_before_archive (&incident, epoch))?;
+    Ok (Sexp::List (vec![
+      atom_field ("status", "cancelled-before-archive"),
+      integer_field ("unlock-maintenance-epoch", epoch . get ()),
+    ]) . to_string ())
+  })();
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+pub fn handle_maintenance_status_request (
+  stream  : &mut TcpStream,
+  runtime : &ServerRuntime,
+) {
+  let coordinator = runtime . maintenance . lock () . unwrap () . clone ();
+  let payload = match coordinator . state {
+    CoordinatorState::Active (active) => Sexp::List (vec![
+      atom_field ("status", "active"),
+      atom_field ("active-incident-id", active . incident_id . as_str ()),
+      integer_field ("maintenance-epoch", active . epoch . get ()),
+      atom_field ("phase", &format! ("{:?}", active . phase)),
+      atom_field ("origin", active . origin . label ()),
+      atom_field ("archive-directory-name", &active . archive_directory_name),
+    ]),
+    CoordinatorState::Pending (pending) => Sexp::List (vec![
+      atom_field ("status", "pending"),
+      atom_field ("pending-reason", &format! ("{:?}", pending . reason)),
+      atom_field ("candidate-id", pending . candidate . as_ref ()
+        . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
+    ]),
+    other => Sexp::List (vec![
+      atom_field ("status", &format! ("{:?}", other)),
+    ]),
+  } . to_string ();
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", Ok (payload));
+}
+
+fn matching_active (
+  runtime  : &ServerRuntime,
+  incident : &IncidentId,
+  epoch    : MaintenanceEpoch,
+) -> Result<crate::maintenance::ActiveMaintenance, String> {
+  let coordinator = runtime . maintenance . lock ()
+    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+  let CoordinatorState::Active (active) = &coordinator . state else {
+    return Err ("no maintenance incident is active" . into ()); };
+  if &active . incident_id != incident || active . epoch != epoch {
+    return Err (format! (
+      "stale maintenance envelope; current incident is {} epoch {}",
+      active . incident_id, active . epoch . get ())); }
+  Ok (active . clone ())
+}
+
+fn attached_client (runtime : &ServerRuntime) -> Result<AttachedClient, String> {
+  runtime . interactive . lock ()
+    . map_err (|_| "interactive session poisoned" . to_string ())?
+    . attached_client . clone ()
+    . ok_or_else (|| "no interactive client is attached" . to_string ())
+}
+
+fn require_archive_owner (
+  runtime  : &ServerRuntime,
+  incident : &IncidentId,
+  epoch    : MaintenanceEpoch,
+) -> Result<crate::maintenance::ActiveMaintenance, String> {
+  let active = matching_active (runtime, incident, epoch)?;
+  if attached_client (runtime)? . session_id != active . archive_owner_session_id {
+    return Err ("maintenance message came from a different client session" . into ()); }
+  Ok (active)
+}
+
+fn validate_client_archive_capability (
+  client : &AttachedClient,
+  census : &[CensusDescriptor],
+) -> Result<(), String> {
+  if client . capabilities . archive_format_version != ARCHIVE_FORMAT_VERSION {
+    return Err (format! (
+      "client archive format {} is unsupported; server requires {}",
+      client . capabilities . archive_format_version, ARCHIVE_FORMAT_VERSION)); }
+  if !census . iter () . any (|descriptor|
+       descriptor . dirty && descriptor . undo_required)
+  {
+    return Ok (( )); }
+  match client . kind . label () {
+    "emacs" if client . capabilities . native_undo_kind == "undo-fu-session"
+      && client . capabilities . native_undo_version == "0.8" => Ok (( )),
+    "neovim" if client . capabilities . native_undo_kind == "nvim-wundo"
+      && client . capabilities . native_undo_version == client . version => Ok (( )),
+    _ => Err (format! (
+      "dirty buffers have undo history, but client advertised {} {}",
+      client . capabilities . native_undo_kind,
+      client . capabilities . native_undo_version)),
+  }
+}
+
+fn parse_origin (value : &str) -> Result<MaintenanceOrigin, String> {
+  match value {
+    "explicit-partial-reload" => Ok (MaintenanceOrigin::ExplicitPartialReload),
+    "pending-reconciliation" => Ok (MaintenanceOrigin::PendingReconciliation),
+    "pull" => Ok (MaintenanceOrigin::Pull),
+    "full-rebuild" => Ok (MaintenanceOrigin::FullRebuild),
+    "config-replacement" => Ok (MaintenanceOrigin::ConfigReplacement),
+    "recovery" => Ok (MaintenanceOrigin::Recovery),
+    other => Err (format! ("unsupported maintenance origin '{}'", other)),
+  }
+}
+
+fn maintenance_offer_payload (
+  active                    : &crate::maintenance::ActiveMaintenance,
+  archive_folder            : &str,
+  archive_server_identity   : &str,
+) -> String {
+  Sexp::List (vec![
+    atom_field ("status", "accepted-lock-and-publish-initial-archive"),
+    atom_field ("allocated-incident-id", active . incident_id . as_str ()),
+    integer_field ("maintenance-epoch", active . epoch . get ()),
+    atom_field ("origin", active . origin . label ()),
+    atom_field ("started-at-utc", &active . started_at_utc),
+    atom_field ("archive-directory-name", &active . archive_directory_name),
+    atom_field ("maintenance-archive-folder", archive_folder),
+    atom_field ("maintenance-archive-identity", archive_server_identity),
+    atom_field ("source-set", &active . source_set),
+    integer_field ("g0-graph-generation", active . g0_graph_generation . get ()),
+    integer_field ("g0-manifest-revision", active . g0_manifest_revision . get ()),
+    atom_field ("candidate-id", active . candidate . as_ref ()
+      . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
+    list_field ("registered-buffer-ids", &active . registered_buffer_ids),
+    list_field ("dirty-buffer-ids", &active . dirty_buffer_ids),
+    list_field ("undo-required-buffer-ids", &active . undo_required_buffer_ids),
+    atom_field ("lock-census-sha256",
+      &lock_census_sha256 (&active . registered_buffer_ids)),
+  ]) . to_string ()
+}
+
+pub fn lock_census_sha256 (ids : &[String]) -> String {
+  let mut ids = ids . to_vec ();
+  ids . sort ();
+  let mut digest = Sha256::new ();
+  for id in ids {
+    digest . update (id . as_bytes ());
+    digest . update ([0]);
+  }
+  format! ("{:x}", digest . finalize ())
+}
+
+fn atom_field (key : &str, value : &str) -> Sexp {
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S (key . into ())),
+    Sexp::Atom (Atom::S (value . into ())),
+  ])
+}
+
+fn integer_field (key : &str, value : u64) -> Sexp {
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S (key . into ())),
+    Sexp::Atom (Atom::I (value as i64)),
+  ])
+}
+
+fn list_field (key : &str, values : &[String]) -> Sexp {
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S (key . into ())),
+    Sexp::List (values . iter () . map (|value|
+      Sexp::Atom (Atom::S (value . clone ()))) . collect ()),
+  ])
+}
+
+fn send_result (
+  stream        : &mut TcpStream,
+  response_type : TcpToClient,
+  status        : &str,
+  result        : Result<String, String>,
+) {
+  let response = match result {
+    Ok (payload) => tag_terminal_sexp_response (response_type, status, &payload),
+    Err (error) => tag_terminal_text_response (
+      TcpToClient::Error, "failed", &error),
+  };
+  let _ = send_response_with_length_prefix (stream, &response);
+}

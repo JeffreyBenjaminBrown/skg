@@ -13,6 +13,8 @@ thread_local! {
   /// Search keeps it across idle-loop snapshot/enrichment continuations.
   static CURRENT_REQUEST_CONTEXT : RefCell<Option<RequestContext>> =
     const { RefCell::new (None) };
+  static LAST_SEND_FAILURE : RefCell<Option<String>> =
+    const { RefCell::new (None) };
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -85,7 +87,7 @@ pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
   stream   : &mut TcpStream,
   response : &str,
-) {
+) -> std::io::Result<()> {
     let enveloped = envelope_response (response);
     let payload : &[u8] = enveloped . as_bytes ();
     let preview_len : usize = // PITFALL: floor_char_boundary is needed
@@ -98,16 +100,35 @@ pub fn send_response_with_length_prefix (
              if payload . len () > 200 { "..." } else { "" });
     let header : String = format! ( "Content-Length: {}\r\n\r\n",
                                      payload . len () );
-    if let Err (e) = stream . write_all ( header . as_bytes () ) {
-      tracing::error!("Failed to send length-prefixed response: {}", e);
-      return; }
-    if let Err (e) = stream . write_all (payload) {
-      tracing::error!("Failed to send length-prefixed response: {}", e);
-      return; }
-    if let Err (e) = stream . flush () {
-      tracing::error!("Failed to flush length-prefixed response: {}", e); }
+    if let Err (error) = stream . write_all (header . as_bytes ())
+      . and_then (|_| stream . write_all (payload))
+      . and_then (|_| stream . flush ())
+    {
+      tracing::error! ("Failed to send length-prefixed response: {}", error);
+      LAST_SEND_FAILURE . with (|slot|
+        *slot . borrow_mut () = Some (error . to_string ()));
+      return Err (error); }
     if response_terminal_status (&enveloped) . is_some () {
       clear_request_context (); }
+    Ok (( ))
+}
+
+pub fn take_send_failure () -> Option<String> {
+  LAST_SEND_FAILURE . with (|slot| slot . borrow_mut () . take ())
+}
+
+pub fn ensure_request_has_terminal_response (
+  stream       : &mut TcpStream,
+  request_type : RequestType,
+) -> std::io::Result<()> {
+  if !request_context_active () { return Ok (( )); }
+  let message = format! (
+    "request handler for {:?} returned without a terminal response",
+    request_type);
+  tracing::error! ("{}", message);
+  send_response_with_length_prefix (
+    stream, &tag_terminal_text_response (
+      TcpToClient::Error, "failed", &message))
 }
 
 fn envelope_response (response : &str) -> String {
@@ -252,6 +273,34 @@ pub(crate) fn format_buffer_response_sexp (
     format_string_list_sexp ("errors", errors),
     format_string_list_sexp ("warnings", warnings) ] )
     . to_string () }
+
+/// Add the exact server/client application identity for a newly rendered or
+/// foreground-updated view.  Clients must retain these fields with the text;
+/// later saves and background ACKs name the same authority explicitly.
+pub(crate) fn add_view_authority_to_response (
+  response : &str,
+  state    : &crate::types::views_state::ViewState,
+) -> String {
+  let Ok (Sexp::List (mut fields)) = sexp::parse (response) else {
+    unreachable! ("buffer response formatter produced invalid sexp"); };
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("graph-generation" . into ())),
+    Sexp::Atom (Atom::I (state . graph_generation as i64)),
+  ]));
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("presentation-generation" . into ())),
+    Sexp::Atom (Atom::I (state . presentation_generation as i64)),
+  ]));
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("server-revision" . into ())),
+    Sexp::Atom (Atom::I (state . revision as i64)),
+  ]));
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("client-application-token" . into ())),
+    Sexp::Atom (Atom::I (state . client_application_token as i64)),
+  ]));
+  Sexp::List (fields) . to_string ()
+}
 
 /// Format the override-choice buffer response: a content-view
 /// response that additionally tells the client which URI the server

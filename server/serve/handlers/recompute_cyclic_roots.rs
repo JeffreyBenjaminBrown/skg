@@ -41,7 +41,7 @@ pub fn handle_recompute_cyclic_roots_request (
   env    : &SkgEnv,
 ) {
   if RECOMPUTE_RUNNING . swap (true, Ordering::AcqRel) {
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream, &tag_terminal_text_response (
         TcpToClient::RecomputeCyclicRoots, "complete",
         "Cyclic-root recomputation is already running."));
@@ -112,7 +112,7 @@ pub fn handle_recompute_cyclic_roots_request (
       ("failed", format! (
         "Cyclic-root recomputation failed; the prior cache is still active. {}",
         error)) }, };
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream, &tag_terminal_text_response (
       TcpToClient::RecomputeCyclicRoots, status, &message));
 }

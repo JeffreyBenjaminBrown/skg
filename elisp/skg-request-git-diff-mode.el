@@ -25,6 +25,7 @@ rerender-done."
              (mapconcat #'buffer-name unsaved-buffers ", "))))
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream "diff-mode toggle")
+    (skg--register-stream-request-cleanup "diff-mode toggle")
     (skg--lock-all-skg-buffers)
     (skg-register-response-handler
      'git-diff-mode

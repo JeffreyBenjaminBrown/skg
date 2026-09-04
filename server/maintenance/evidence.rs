@@ -1,0 +1,577 @@
+//! Durable, process-owned evidence published before candidate selection.
+//!
+//! The client archive proves that editor state is recoverable.  This bundle
+//! proves what the server is about to do to the derived stores and gives a
+//! restarted process immutable G0/G1 reconstruction inputs.  It is published
+//! as one private directory rename before the first store mutation.
+
+use super::candidate::{
+  ObservedDiskCandidate,
+  SemanticChangeEvidence,
+  SemanticNodeEvidence,
+  config_identity,
+  source_catalog_blake3,
+};
+use super::journal::MaintenanceJournalStore;
+use super::types::{ActiveMaintenance, CandidateSummary, IncidentId, MaintenanceEpoch};
+use crate::save::nodecompletes_from_graph;
+use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::store_state::{
+  GraphGeneration,
+  ManifestRevision,
+  SelectedPathManifest,
+  SelectedStoreState,
+};
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+
+#[cfg(unix)]
+use std::os::unix::fs::{
+  DirBuilderExt,
+  MetadataExt,
+  OpenOptionsExt,
+  PermissionsExt,
+};
+
+const EVIDENCE_FORMAT_VERSION : u32 = 1;
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MaintenanceEvidenceBundle {
+  pub format_version       : u32,
+  pub incident_id          : IncidentId,
+  pub maintenance_epoch    : MaintenanceEpoch,
+  pub candidate             : CandidateSummary,
+  pub config_identity       : PathBuf,
+  pub source_catalog_blake3 : String,
+  pub g0_graph_generation   : GraphGeneration,
+  pub g0_manifest_revision  : ManifestRevision,
+  pub g0_manifest           : SelectedPathManifest,
+  pub g1_manifest           : SelectedPathManifest,
+  pub g0_nodes              : Vec<SemanticNodeEvidence>,
+  pub g1_nodes              : Vec<SemanticNodeEvidence>,
+  pub transition_delta      : Vec<EvidenceDefinition>,
+  pub added_primary_ids     : BTreeSet<ID>,
+  pub deleted_primary_ids   : BTreeSet<ID>,
+  pub modified_primary_ids  : BTreeSet<ID>,
+  pub semantic_evidence     : BTreeMap<ID, SemanticChangeEvidence>,
+  pub warnings              : Vec<String>,
+  pub artifacts             : Vec<EvidenceArtifact>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "kind")]
+pub enum EvidenceDefinition {
+  Save { node : SemanticNodeEvidence },
+  Delete { id : ID, source : SourceName },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct EvidenceArtifact {
+  pub relative_path : PathBuf,
+  pub purpose       : String,
+  pub source_path   : Option<PathBuf>,
+  pub byte_length   : u64,
+  pub sha256        : String,
+  pub blake3        : String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct EvidenceEnvelope {
+  payload        : MaintenanceEvidenceBundle,
+  payload_blake3 : String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PublishedMaintenanceEvidence {
+  pub path             : PathBuf,
+  pub bundle_sha256    : String,
+  pub artifact_count   : usize,
+  pub total_file_bytes : u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct MaintenanceEvidenceStore {
+  directory       : PathBuf,
+  config_identity : PathBuf,
+}
+
+struct ArtifactBytes {
+  metadata : EvidenceArtifact,
+  bytes    : Vec<u8>,
+}
+
+impl MaintenanceEvidenceStore {
+  pub fn alongside (journal : &MaintenanceJournalStore) -> Self {
+    Self {
+      directory: journal . directory () . join ("evidence"),
+      config_identity: journal . config_identity () . to_path_buf (),
+    }
+  }
+
+  #[cfg(test)]
+  fn at_root (directory : PathBuf, config_identity : PathBuf) -> Self {
+    Self { directory, config_identity }
+  }
+
+  pub fn publish_candidate (
+    &self,
+    active    : &ActiveMaintenance,
+    config    : &SkgConfig,
+    selected  : &SelectedStoreState,
+    candidate : &ObservedDiskCandidate,
+  ) -> Result<PublishedMaintenanceEvidence, String> {
+    validate_candidate_contract (active, config, selected, candidate)?;
+    create_private_directory_all (&self . directory)?;
+    let final_path = self . directory . join (active . incident_id . as_str ());
+    if final_path . exists () {
+      let (bundle, publication) = self . load (&active . incident_id)?;
+      if bundle . candidate != candidate . summary {
+        return Err ("incident evidence already names another candidate" . into ()); }
+      return Ok (publication);
+    }
+
+    let temporary = self . directory . join (format! (
+      ".{}.{}.tmp", active . incident_id, uuid::Uuid::new_v4 ()));
+    create_private_directory (&temporary)?;
+    let result = (|| {
+      let (mut bundle, artifacts) = build_bundle (
+        active, config, selected, candidate)?;
+      for artifact in &artifacts {
+        let path = temporary . join (&artifact . metadata . relative_path);
+        let parent = path . parent ()
+          . ok_or_else (|| "evidence artifact has no parent" . to_string ())?;
+        create_private_directory_all (parent)?;
+        write_private_file (&path, &artifact . bytes)?;
+      }
+      bundle . artifacts = artifacts . iter ()
+        . map (|artifact| artifact . metadata . clone ()) . collect ();
+      let payload_bytes = serde_yaml::to_string (&bundle)
+        . map_err (|error| error . to_string ())? . into_bytes ();
+      let envelope = EvidenceEnvelope {
+        payload: bundle,
+        payload_blake3: blake3_hex (&payload_bytes),
+      };
+      let envelope_bytes = serde_yaml::to_string (&envelope)
+        . map_err (|error| error . to_string ())? . into_bytes ();
+      write_private_file (&temporary . join ("bundle.yaml"), &envelope_bytes)?;
+      sync_tree_directories (&temporary)?;
+      validate_evidence_directory (
+        &temporary, &self . config_identity, Some (&active . incident_id))?;
+      fs::rename (&temporary, &final_path)
+        . map_err (|error| error . to_string ())?;
+      sync_directory (&self . directory)?;
+      let (_, publication) = self . load (&active . incident_id)?;
+      Ok (publication)
+    })();
+    // Incomplete temporary directories are intentionally retained.  They are
+    // crash evidence and, unlike the final path, never grant mutation authority.
+    result
+  }
+
+  pub fn load (
+    &self,
+    incident : &IncidentId,
+  ) -> Result<(MaintenanceEvidenceBundle, PublishedMaintenanceEvidence), String> {
+    validate_evidence_directory (
+      &self . directory . join (incident . as_str ()),
+      &self . config_identity,
+      Some (incident))
+  }
+}
+
+fn validate_candidate_contract (
+  active    : &ActiveMaintenance,
+  config    : &SkgConfig,
+  selected  : &SelectedStoreState,
+  candidate : &ObservedDiskCandidate,
+) -> Result<(), String> {
+  let Some (expected) = &active . candidate else {
+    return Err ("maintenance incident has no disk candidate" . into ()); };
+  if expected != &candidate . summary {
+    return Err ("maintenance incident does not name this exact candidate" . into ()); }
+  if active . g0_graph_generation != selected . graph_generation
+  || active . g0_manifest_revision != selected . manifest_revision
+  || candidate . summary . base_graph_generation != selected . graph_generation
+  || candidate . summary . base_manifest_revision != selected . manifest_revision
+  {
+    return Err ("candidate evidence does not share the active G0" . into ()); }
+  if config_identity (config) != candidate . config_identity {
+    return Err ("candidate evidence configuration identity changed" . into ()); }
+  if source_catalog_blake3 (config) != candidate . source_catalog_blake3 {
+    return Err ("candidate evidence source catalog changed" . into ()); }
+  let candidate_paths : BTreeSet<&PathBuf> = candidate . manifest . keys () . collect ();
+  let byte_paths : BTreeSet<&PathBuf> = candidate . selected_bytes . keys () . collect ();
+  if candidate_paths != byte_paths {
+    return Err ("candidate selected-byte inventory is incomplete" . into ()); }
+  for (path, bytes) in &candidate . selected_bytes {
+    if candidate . manifest . get (path)
+       != Some (&crate::types::store_state::PathDigest::of_bytes (bytes))
+    {
+      return Err (format! (
+        "candidate bytes do not match manifest at {}", path . display ())); }
+  }
+  Ok (( ))
+}
+
+fn build_bundle (
+  active    : &ActiveMaintenance,
+  config    : &SkgConfig,
+  selected  : &SelectedStoreState,
+  candidate : &ObservedDiskCandidate,
+) -> Result<(MaintenanceEvidenceBundle, Vec<ArtifactBytes>), String> {
+  let mut artifacts = Vec::new ();
+  for (index, (path, bytes)) in candidate . selected_bytes . iter () . enumerate () {
+    artifacts . push (artifact (
+      PathBuf::from (format! ("candidate-bytes/{:08}.bin", index)),
+      "candidate-selected-bytes", Some (path . clone ()), bytes . clone ()));
+  }
+  for (index, (pid, evidence)) in candidate . evidence . iter () . enumerate () {
+    let directory = PathBuf::from (format! ("semantic/{:08}", index));
+    let pid_metadata = serde_yaml::to_string (&BTreeMap::from ([
+      ("primary_id", pid . to_string ()),
+    ])) . map_err (|error| error . to_string ())? . into_bytes ();
+    artifacts . push (artifact (
+      directory . join ("identity.yaml"), "semantic-identity", None,
+      pid_metadata));
+    if let Some (before) = &evidence . before {
+      artifacts . push (artifact (
+        directory . join ("before.semantic.yaml"), "semantic-before", None,
+        serde_yaml::to_string (before)
+          . map_err (|error| error . to_string ())? . into_bytes ())); }
+    if let Some (after) = &evidence . after {
+      artifacts . push (artifact (
+        directory . join ("after.semantic.yaml"), "semantic-after", None,
+        serde_yaml::to_string (after)
+          . map_err (|error| error . to_string ())? . into_bytes ())); }
+    artifacts . push (artifact (
+      directory . join ("semantic.diff"), "semantic-diff", None,
+      evidence . diff . as_bytes () . to_vec ()));
+  }
+
+  let mut g0_nodes : Vec<SemanticNodeEvidence> =
+    nodecompletes_from_graph (&selected . graph) . iter ()
+      . map (SemanticNodeEvidence::from) . collect ();
+  let mut g1_nodes : Vec<SemanticNodeEvidence> =
+    nodecompletes_from_graph (&candidate . graph) . iter ()
+      . map (SemanticNodeEvidence::from) . collect ();
+  g0_nodes . sort_by (|left, right| left . pid . cmp (&right . pid));
+  g1_nodes . sort_by (|left, right| left . pid . cmp (&right . pid));
+  let transition_delta = candidate . definitions . iter () . map (|definition|
+    match definition {
+      DefineNode::Save (SaveNode (node)) => EvidenceDefinition::Save {
+        node: SemanticNodeEvidence::from (node),
+      },
+      DefineNode::Delete (DeleteNode { id, source }) => EvidenceDefinition::Delete {
+        id: id . clone (), source: source . clone (),
+      },
+    }) . collect ();
+  let bundle = MaintenanceEvidenceBundle {
+    format_version: EVIDENCE_FORMAT_VERSION,
+    incident_id: active . incident_id . clone (),
+    maintenance_epoch: active . epoch,
+    candidate: candidate . summary . clone (),
+    config_identity: config_identity (config),
+    source_catalog_blake3: source_catalog_blake3 (config),
+    g0_graph_generation: selected . graph_generation,
+    g0_manifest_revision: selected . manifest_revision,
+    g0_manifest: selected . manifest . clone (),
+    g1_manifest: candidate . manifest . clone (),
+    g0_nodes,
+    g1_nodes,
+    transition_delta,
+    added_primary_ids: candidate . added_primary_ids . clone (),
+    deleted_primary_ids: candidate . deleted_primary_ids . clone (),
+    modified_primary_ids: candidate . modified_primary_ids . clone (),
+    semantic_evidence: candidate . evidence . clone (),
+    warnings: candidate . warnings . clone (),
+    artifacts: Vec::new (),
+  };
+  Ok ((bundle, artifacts))
+}
+
+fn artifact (
+  relative_path : PathBuf,
+  purpose       : &str,
+  source_path   : Option<PathBuf>,
+  bytes         : Vec<u8>,
+) -> ArtifactBytes {
+  ArtifactBytes {
+    metadata: EvidenceArtifact {
+      relative_path,
+      purpose: purpose . into (),
+      source_path,
+      byte_length: bytes . len () as u64,
+      sha256: sha256_hex (&bytes),
+      blake3: blake3_hex (&bytes),
+    },
+    bytes,
+  }
+}
+
+fn validate_evidence_directory (
+  directory       : &Path,
+  config_identity : &Path,
+  incident        : Option<&IncidentId>,
+) -> Result<(MaintenanceEvidenceBundle, PublishedMaintenanceEvidence), String> {
+  require_private_directory (directory)?;
+  let bundle_path = directory . join ("bundle.yaml");
+  let bundle_bytes = fs::read (&bundle_path)
+    . map_err (|error| format! ("could not read {}: {}",
+      bundle_path . display (), error))?;
+  require_private_regular_file (&bundle_path)?;
+  let envelope : EvidenceEnvelope = serde_yaml::from_slice (&bundle_bytes)
+    . map_err (|error| format! ("invalid evidence bundle: {}", error))?;
+  if envelope . payload . format_version != EVIDENCE_FORMAT_VERSION {
+    return Err (format! ("unsupported evidence bundle version {}",
+      envelope . payload . format_version)); }
+  if let Some (expected) = incident {
+    if &envelope . payload . incident_id != expected {
+      return Err ("evidence directory has the wrong incident ID" . into ()); }}
+  if envelope . payload . config_identity != config_identity {
+    return Err ("evidence bundle belongs to a different config" . into ()); }
+  let payload_bytes = serde_yaml::to_string (&envelope . payload)
+    . map_err (|error| error . to_string ())? . into_bytes ();
+  if blake3_hex (&payload_bytes) != envelope . payload_blake3 {
+    return Err ("evidence payload checksum mismatch" . into ()); }
+
+  let mut expected_files : BTreeSet<PathBuf> =
+    BTreeSet::from ([PathBuf::from ("bundle.yaml")]);
+  let mut total_file_bytes = bundle_bytes . len () as u64;
+  for artifact in &envelope . payload . artifacts {
+    validate_relative_artifact_path (&artifact . relative_path)?;
+    if !expected_files . insert (artifact . relative_path . clone ()) {
+      return Err (format! ("duplicate evidence artifact {}",
+        artifact . relative_path . display ())); }
+    let path = directory . join (&artifact . relative_path);
+    require_private_regular_file (&path)?;
+    let bytes = fs::read (&path) . map_err (|error| error . to_string ())?;
+    if bytes . len () as u64 != artifact . byte_length
+    || sha256_hex (&bytes) != artifact . sha256
+    || blake3_hex (&bytes) != artifact . blake3
+    {
+      return Err (format! ("evidence artifact checksum mismatch at {}",
+        artifact . relative_path . display ())); }
+    total_file_bytes += bytes . len () as u64;
+  }
+  let actual_files = regular_file_inventory (directory)?;
+  if actual_files != expected_files {
+    return Err (format! (
+      "evidence file inventory mismatch: expected {:?}, found {:?}",
+      expected_files, actual_files)); }
+  Ok ((envelope . payload, PublishedMaintenanceEvidence {
+    path: directory . to_path_buf (),
+    bundle_sha256: sha256_hex (&bundle_bytes),
+    artifact_count: expected_files . len (),
+    total_file_bytes,
+  }))
+}
+
+fn regular_file_inventory (root : &Path) -> Result<BTreeSet<PathBuf>, String> {
+  let mut files = BTreeSet::new ();
+  for entry in walkdir::WalkDir::new (root) . follow_links (false) {
+    let entry = entry . map_err (|error| error . to_string ())?;
+    if entry . path () == root { continue; }
+    let metadata = fs::symlink_metadata (entry . path ())
+      . map_err (|error| error . to_string ())?;
+    if metadata . file_type () . is_symlink () {
+      return Err (format! ("symlink is forbidden in evidence: {}",
+        entry . path () . display ())); }
+    if metadata . is_dir () {
+      require_private_directory (entry . path ())?;
+    } else if metadata . is_file () {
+      require_private_regular_file (entry . path ())?;
+      files . insert (entry . path () . strip_prefix (root)
+        . map_err (|error| error . to_string ())? . to_path_buf ());
+    } else {
+      return Err (format! ("special file is forbidden in evidence: {}",
+        entry . path () . display ())); }
+  }
+  Ok (files)
+}
+
+fn validate_relative_artifact_path (path : &Path) -> Result<(), String> {
+  if path . is_absolute () || path . components () . any (|component|
+      !matches! (component, std::path::Component::Normal (_)))
+  {
+    return Err (format! ("unsafe evidence artifact path {}", path . display ())); }
+  if path == Path::new ("bundle.yaml") {
+    return Err ("artifact may not replace bundle.yaml" . into ()); }
+  Ok (( ))
+}
+
+fn write_private_file (path : &Path, bytes : &[u8]) -> Result<(), String> {
+  let mut options = OpenOptions::new ();
+  options . write (true) . create_new (true);
+  #[cfg(unix)]
+  options . mode (0o600);
+  let mut file = options . open (path) . map_err (|error| format! (
+    "could not create {}: {}", path . display (), error))?;
+  file . write_all (bytes) . map_err (|error| error . to_string ())?;
+  file . sync_all () . map_err (|error| error . to_string ())?;
+  drop (file);
+  Ok (( ))
+}
+
+fn create_private_directory (path : &Path) -> Result<(), String> {
+  let mut builder = fs::DirBuilder::new ();
+  #[cfg(unix)]
+  builder . mode (0o700);
+  builder . create (path) . map_err (|error| format! (
+    "could not create {}: {}", path . display (), error))
+}
+
+fn create_private_directory_all (path : &Path) -> Result<(), String> {
+  fs::create_dir_all (path) . map_err (|error| error . to_string ())?;
+  #[cfg(unix)]
+  fs::set_permissions (path, fs::Permissions::from_mode (0o700))
+    . map_err (|error| error . to_string ())?;
+  Ok (( ))
+}
+
+fn require_private_directory (path : &Path) -> Result<(), String> {
+  let metadata = fs::symlink_metadata (path) . map_err (|error| format! (
+    "could not inspect {}: {}", path . display (), error))?;
+  if metadata . file_type () . is_symlink () || !metadata . is_dir () {
+    return Err (format! ("evidence path is not a real directory: {}",
+      path . display ())); }
+  #[cfg(unix)]
+  if metadata . permissions () . mode () & 0o777 != 0o700 {
+    return Err (format! ("evidence directory is not mode 0700: {}",
+      path . display ())); }
+  Ok (( ))
+}
+
+fn require_private_regular_file (path : &Path) -> Result<(), String> {
+  let metadata = fs::symlink_metadata (path) . map_err (|error| format! (
+    "could not inspect {}: {}", path . display (), error))?;
+  if metadata . file_type () . is_symlink () || !metadata . is_file () {
+    return Err (format! ("evidence artifact is not a regular file: {}",
+      path . display ())); }
+  #[cfg(unix)]
+  {
+    if metadata . permissions () . mode () & 0o777 != 0o600 {
+      return Err (format! ("evidence artifact is not mode 0600: {}",
+        path . display ())); }
+    if metadata . nlink () != 1 {
+      return Err (format! ("evidence artifact is hard-linked: {}",
+        path . display ())); }
+  }
+  Ok (( ))
+}
+
+fn sync_tree_directories (root : &Path) -> Result<(), String> {
+  let mut directories : Vec<PathBuf> = walkdir::WalkDir::new (root)
+    . follow_links (false) . into_iter () . filter_map (Result::ok)
+    .filter (|entry| entry . file_type () . is_dir ())
+    .map (|entry| entry . into_path ()) . collect ();
+  directories . sort_by_key (|path| std::cmp::Reverse (path . components () . count ()));
+  for directory in directories { sync_directory (&directory)?; }
+  Ok (( ))
+}
+
+fn sync_directory (path : &Path) -> Result<(), String> {
+  #[cfg(unix)]
+  {
+    let mut directory = File::open (path) . map_err (|error| error . to_string ())?;
+    let mut byte = [0u8; 0];
+    directory . read (&mut byte) . ok ();
+    directory . sync_all () . map_err (|error| error . to_string ())?;
+  }
+  Ok (( ))
+}
+
+fn sha256_hex (bytes : &[u8]) -> String {
+  format! ("{:x}", Sha256::digest (bytes))
+}
+
+fn blake3_hex (bytes : &[u8]) -> String {
+  blake3::hash (bytes) . to_hex () . to_string ()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::dbs::in_rust_graph::InRustGraph;
+  use crate::maintenance::{
+    CandidateId,
+    MaintenanceCoordinator,
+    MaintenanceOrigin,
+    ObservationSequence,
+  };
+  use crate::types::misc::SkgConfig;
+  use crate::types::store_state::SelectedStoreState;
+  use std::sync::Arc;
+  use tempfile::tempdir;
+
+  #[test]
+  fn rejects_undeclared_and_nonprivate_artifacts () {
+    let temporary = tempdir () . unwrap ();
+    let root = temporary . path () . join ("evidence");
+    let store = MaintenanceEvidenceStore::at_root (
+      root . clone (), PathBuf::from ("/config"));
+    create_private_directory_all (&root) . unwrap ();
+    let incident = IncidentId::new ();
+    let directory = root . join (incident . as_str ());
+    create_private_directory (&directory) . unwrap ();
+    write_private_file (&directory . join ("undeclared"), b"x") . unwrap ();
+    assert! (store . load (&incident) . is_err ());
+  }
+
+  #[test]
+  fn relative_artifact_paths_cannot_escape () {
+    assert! (validate_relative_artifact_path (Path::new ("bytes/1.bin")) . is_ok ());
+    assert! (validate_relative_artifact_path (Path::new ("../outside")) . is_err ());
+    assert! (validate_relative_artifact_path (Path::new ("/outside")) . is_err ());
+  }
+
+  #[test]
+  fn candidate_bundle_round_trips_and_rejects_an_extra_file () {
+    let temporary = tempdir () . unwrap ();
+    let config_path = temporary . path () . join ("skgconfig.toml");
+    fs::write (&config_path, b"") . unwrap ();
+    let mut config = SkgConfig::dummyFromSources (Default::default ());
+    config . config_path = config_path . clone ();
+    let selected = SelectedStoreState::initial (
+      InRustGraph::new (), Default::default ());
+    let summary = CandidateSummary {
+      id: CandidateId::new (),
+      base_graph_generation: selected . graph_generation,
+      base_manifest_revision: selected . manifest_revision,
+      covered_sequence: ObservationSequence::INITIAL,
+      changed_primary_ids: Vec::new (),
+    };
+    let candidate = ObservedDiskCandidate {
+      summary: summary . clone (),
+      config_identity: config_identity (&config),
+      source_catalog_blake3: source_catalog_blake3 (&config),
+      manifest: Default::default (),
+      base_graph: Arc::new (InRustGraph::new ()),
+      graph: Arc::new (InRustGraph::new ()),
+      definitions: Vec::new (),
+      added_primary_ids: Default::default (),
+      deleted_primary_ids: Default::default (),
+      modified_primary_ids: Default::default (),
+      evidence: Default::default (),
+      selected_bytes: Default::default (),
+      warnings: Vec::new (),
+    };
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation, Some (summary)) . unwrap ();
+    let store = MaintenanceEvidenceStore::at_root (
+      temporary . path () . join ("evidence"), config_identity (&config));
+    let publication = store . publish_candidate (
+      &active, &config, &selected, &candidate) . unwrap ();
+    let (loaded, loaded_publication) = store . load (&active . incident_id) . unwrap ();
+    assert_eq! (loaded . candidate, candidate . summary);
+    assert_eq! (loaded_publication, publication);
+    write_private_file (&publication . path . join ("extra"), b"no") . unwrap ();
+    assert! (store . load (&active . incident_id) . is_err ());
+  }
+}

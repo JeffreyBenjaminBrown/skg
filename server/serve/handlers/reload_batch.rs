@@ -140,7 +140,7 @@ fn send_batch_response (
     Sexp::List (vec![
       atom ("active-count"), Sexp::Atom (Atom::I (active_count as i64))]),
   ]) . to_string ();
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::ReloadBatch, &payload));
 }
 

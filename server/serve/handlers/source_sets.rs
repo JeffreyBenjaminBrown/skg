@@ -139,7 +139,7 @@ fn send_source_sets_response (
       TcpToClient::SourceSets . repr_in_client (),
       escape_string (&active . name . 0),
       names_sexp );
-  send_response_with_length_prefix (stream, &response); }
+  let _ = send_response_with_length_prefix (stream, &response); }
 
 fn send_active_source_set_response (
   stream : &mut TcpStream,
@@ -155,7 +155,7 @@ fn send_active_source_set_response (
       escape_string (name),
       escape_string (name),
       if terminal { " (terminal-status complete)" } else { "" });
-  send_response_with_length_prefix (stream, &response); }
+  let _ = send_response_with_length_prefix (stream, &response); }
 
 /// The unwinding refusal shape (the quiet shape): the endpoint's
 /// normal active-source-set response-type carrying explanatory text
@@ -175,7 +175,7 @@ fn refuse_unwinding (
       TcpToClient::ActiveSourceSet . repr_in_client (),
       escape_string (&active . name . 0),
       escape_string (msg));
-  send_response_with_length_prefix (stream, &response);
+  let _ = send_response_with_length_prefix (stream, &response);
   stream_empty_rerender (stream); }
 
 fn escape_string (

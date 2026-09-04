@@ -14,6 +14,7 @@
 local heralds = require('skg.heralds')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
+local registry = require('skg.buffer_registry')
 
 local M = {}
 
@@ -151,7 +152,7 @@ end
 ---@param buffer_name string
 ---@param view_uri string|nil
 ---@return integer bufnr
-function M.open_org_buffer_from_text (org_text, buffer_name, view_uri)
+function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
   local uri = view_uri or M.generate_uuid()
   local buf = nil
   for _, existing in ipairs(vim.api.nvim_list_bufs()) do
@@ -168,6 +169,19 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
   M.configure_view_buffer(buf, uri)
+  options = options or {}
+  registry.register(buf, options.kind or 'content-view', {
+    lifecycle = options.lifecycle,
+    disposable = options.disposable,
+    continuation_id = options.continuation_id,
+    recipe = options.recipe,
+    root_ids = options.root_ids,
+    last_fetched = org_text,
+    server_revision = options.server_revision,
+    graph_generation = options.graph_generation,
+    presentation_generation = options.presentation_generation,
+    application_token = options.application_token,
+  })
   vim.bo[buf].modified = false
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })

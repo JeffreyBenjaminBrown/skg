@@ -6,8 +6,17 @@ use super::{
   format_errors_warnings_sexp,
   tag_server_push_sexp_response,
   tag_sexp_response,
+  value_from_request_sexp,
   TcpToClient,
 };
+
+#[test]
+fn request_value_accepts_numeric_atoms () {
+  let request = "((request . \"view visited\") (visit-sequence . 2))";
+  assert_eq! (
+    value_from_request_sexp ("visit-sequence", request),
+    Ok ("2" . to_string ()));
+}
 
 #[test]
 fn response_envelope_carries_request_frame_and_terminal_status () {

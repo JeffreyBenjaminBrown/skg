@@ -14,7 +14,9 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct GraphGeneration (u64);
 
 impl GraphGeneration {
@@ -27,7 +29,20 @@ impl GraphGeneration {
       . expect ("graph generation exhausted u64")) }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct ManifestRevision (u64);
+
+impl ManifestRevision {
+  pub const INITIAL : Self = Self (1);
+
+  pub fn get (self) -> u64 { self . 0 }
+
+  pub fn successor (self) -> Self {
+    Self (self . 0 . checked_add (1)
+      . expect ("manifest revision exhausted u64")) }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct PathDigest ([u8; 32]);
 
 impl PathDigest {
@@ -70,6 +85,7 @@ pub enum StoreHealth {
 pub struct SelectedStoreState {
   pub graph             : Arc<InRustGraph>,
   pub graph_generation  : GraphGeneration,
+  pub manifest_revision : ManifestRevision,
   pub manifest          : SelectedPathManifest,
   pub path_outcomes     : BTreeMap<PathBuf, SelectedPathOutcome>,
   pub cyclic_roots      : BTreeSet<ID>,
@@ -92,6 +108,7 @@ impl SelectedStoreState {
     Self {
       graph: Arc::new (graph),
       graph_generation,
+      manifest_revision: ManifestRevision::INITIAL,
       manifest,
       path_outcomes,
       cyclic_roots: BTreeSet::new (),
@@ -106,6 +123,19 @@ impl SelectedStoreState {
     next . graph = Arc::new (graph);
     next . graph_generation = self . graph_generation . successor ();
     next }
+
+  /// Select byte-different disk which folds to the existing semantic graph.
+  /// Derived stores and graph generation stay fixed; only the exact selected
+  /// byte authority advances.
+  pub fn with_semantically_equal_manifest (
+    &self,
+    manifest : SelectedPathManifest,
+  ) -> Self {
+    let mut next = self . clone ();
+    next . manifest_revision = self . manifest_revision . successor ();
+    next . manifest = manifest;
+    next
+  }
 
   pub fn with_acknowledged_rebuild (
     &self,
@@ -123,6 +153,7 @@ impl SelectedStoreState {
     Self {
       graph: Arc::new (graph),
       graph_generation,
+      manifest_revision: self . manifest_revision . successor (),
       manifest,
       path_outcomes,
       cyclic_roots: self . cyclic_roots . clone (),
@@ -154,6 +185,7 @@ impl SelectedStoreState {
     Self {
       graph: Arc::new (graph),
       graph_generation,
+      manifest_revision: self . manifest_revision . successor (),
       manifest,
       path_outcomes,
       cyclic_roots: self . cyclic_roots . clone (),
@@ -216,9 +248,25 @@ mod tests {
       InRustGraph::new (),
       BTreeMap::from ([(path . clone (), digest)]));
     assert_eq! (state . graph_generation, GraphGeneration::INITIAL);
+    assert_eq! (state . manifest_revision, ManifestRevision::INITIAL);
     assert_eq! (state . manifest . get (&path), Some (&digest));
     assert_eq! (
       state . path_outcomes . get (&path) . unwrap () . graph_generation,
       state . graph_generation);
     assert_eq! (digest . to_hex () . len (), 64); }
+
+  #[test]
+  fn semantic_noop_advances_only_manifest_revision () {
+    let old_path = PathBuf::from ("/source/n.skg");
+    let new_path = PathBuf::from ("/source/m.skg");
+    let state = SelectedStoreState::initial (
+      InRustGraph::new (),
+      BTreeMap::from ([(old_path, PathDigest::of_bytes (b"old"))]));
+    let next = state . with_semantically_equal_manifest (
+      BTreeMap::from ([(new_path, PathDigest::of_bytes (b"new"))]));
+    assert_eq! (next . graph_generation, state . graph_generation);
+    assert_eq! (
+      next . manifest_revision, state . manifest_revision . successor ());
+    assert! (Arc::ptr_eq (&next . graph, &state . graph));
+  }
 }

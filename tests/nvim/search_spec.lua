@@ -69,11 +69,27 @@ describe('skg.search', function ()
           .. ' (content "dog"))'))
       elseif line:find('snapshot response', 1, true) then
         snapshot = line
-        respond(helpers.framed(
+        local buffer_id = line:match(
+          '%(client%-buffer%-id%s+%.%s+"([^"]+)"%)')
+        assert(buffer_id, line)
+        local enrichment_frame = helpers.framed(
           '((response-type search-enrichment) (terms "dog")'
           .. ' (content "* (skg (node (id r1))) first result'
           .. ' enriched\\n* (skg (node (id r2))) second result'
-          .. ' enriched") (warnings ()))'))
+          .. ' enriched") (warnings ()) (operation-id enrich-1)'
+          .. ' (view-uri "search:dog")'
+          .. ' (client-buffer-id "' .. buffer_id .. '")'
+          .. ' (graph-generation 1) (presentation-generation 0)'
+          .. ' (viewforest-base-revision 0)'
+          .. ' (resulting-server-revision 1)'
+          .. ' (view-base-graph-generation 1)'
+          .. ' (view-base-presentation-generation 0)'
+          .. ' (expected-client-application-token 1)'
+          .. ' (resulting-client-application-token 2))')
+        respond(enrichment_frame)
+      elseif line:find('apply collateral', 1, true) then
+        respond(helpers.framed(
+          '((response-type collateral-applied) (content "applied"))'))
       end
     end)
     search.search('dog')

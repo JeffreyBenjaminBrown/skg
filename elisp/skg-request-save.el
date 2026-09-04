@@ -89,9 +89,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
          (skg--current-save-point-position)))
     (skg-add-folded-markers)
     (skg-add-focused-marker)
+    (unless skg--buffer-record
+      (user-error "Cannot save: this buffer has no explicit Skg application record"))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (save-buffer (current-buffer))
            (saved-uri skg-view-uri)
+           (save-authority skg--buffer-record)
            (buffer-contents (buffer-string))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
@@ -100,7 +103,8 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     fork-approved
                                     fork-sources
                                     hoist-approved-pids
-                                    scalar-approved-pids))
+                                    scalar-approved-pids
+                                    save-authority))
                                   "\n")))
       (progn ;; Rust needs these markers, but the user doesn't.
         (skg-remove-focused-marker)
@@ -118,6 +122,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                (if (derived-mode-p 'skg-content-view-mode) "on" "off")))
 
       (skg--begin-stream "save")
+      (skg--register-stream-request-cleanup "save")
 
       ;; Lock ALL skg content-view buffers immediately, before sending.
       ;; This eliminates the race window between the send and the
@@ -187,7 +192,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 (defun skg--save-request-sexp (view-uri save-point-position
                                         &optional fork-approved fork-sources
                                         hoist-approved-pids
-                                        scalar-approved-pids)
+                                        scalar-approved-pids authority)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
 include (fork-approved . \"true\") so the server commits any forks it
 finds instead of returning a fork-confirmation. FORK-SOURCES, when
@@ -216,7 +221,19 @@ field (fork-sources ((N . SOURCE) ...))."
    (when hoist-approved-pids
      `((hoist-approved-pids ,@hoist-approved-pids)))
    (when scalar-approved-pids
-     `((allow-ugly-telescopes ,@scalar-approved-pids)))))
+     `((allow-ugly-telescopes ,@scalar-approved-pids)))
+   (when authority
+     `((client-buffer-id . ,(skg--buffer-record-id authority))
+       (view-kind . ,(symbol-name (skg--buffer-record-kind authority)))
+       (graph-generation
+        . ,(number-to-string
+            (or (skg--buffer-record-graph-generation authority) 0)))
+       (server-revision
+        . ,(number-to-string
+            (or (skg--buffer-record-server-revision authority) 0)))
+       (client-application-token
+        . ,(number-to-string
+            (or (skg--buffer-record-application-token authority) 0)))))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -669,11 +686,12 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
              (content-value (cadr (assoc 'content response)))
              (errors-list   (cadr (assoc 'errors response)))
              (warnings-list (cadr (assoc 'warnings response)))
+             (authority (skg--view-authority-from-response response))
              (save-point-position
               (skg--save-point-position-from-response response)))
         (when content-value
           (skg-replace-buffer-with-new-content
-           nil content-value save-point-position))
+           nil content-value save-point-position authority))
         (when skg--disk-conflict-resolution-in-progress
           (setq skg--disk-conflict-resolution-in-progress nil)
           (when (and content-value
@@ -709,12 +727,71 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
                (string-match-p "\\`[0-9]+\\'" value))
           (string-to-number value)))))))
 
+(defun skg--view-authority-from-response (response)
+  "Return application authority plist from RESPONSE, or nil when absent."
+  (when (assoc 'client-application-token response)
+    (list :graph-generation
+          (skg--nat-from-response response 'graph-generation)
+          :presentation-generation
+          (skg--nat-from-response response 'presentation-generation)
+          :server-revision
+          (skg--nat-from-response response 'server-revision)
+          :application-token
+          (skg--nat-from-response response 'client-application-token))))
+
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content
                                                       &optional
-                                                      save-point-position)
+                                                      save-point-position
+                                                      authority)
   "Replace the current buffer contents with NEW-CONTENT from Rust.
 After inserting content, folds marked headlines, removes fold markers,
-moves point to focused headline, and removes focus marker."
+moves point to focused headline, and removes focus marker.
+When AUTHORITY includes base fields, this is a background installation and
+every component of the registered application record must still match."
+  (when (and authority skg--buffer-record)
+    (let ((expected-token (plist-get authority :expected-application-token))
+          (result-token (plist-get authority :application-token)))
+      (when (and (plist-get authority :client-buffer-id)
+                 (not (equal (plist-get authority :client-buffer-id)
+                             (skg--buffer-record-id skg--buffer-record))))
+        (error "Skg server offer names a different client buffer"))
+      (when (and (plist-member authority :view-uri)
+                 (not (equal (plist-get authority :view-uri)
+                             (skg--buffer-record-view-uri
+                              skg--buffer-record))))
+        (error "Skg view URI changed before application"))
+      (when (and expected-token
+                 (/= expected-token
+                     (skg--buffer-record-application-token
+                      skg--buffer-record)))
+        (error "Skg application token changed before application"))
+      (when (and expected-token result-token
+                 (/= result-token (1+ expected-token)))
+        (error "Skg server offer does not advance exactly one token"))
+      (when (and (plist-member authority :base-server-revision)
+                 (/= (plist-get authority :base-server-revision)
+                     (skg--buffer-record-server-revision
+                      skg--buffer-record)))
+        (error "Skg server revision changed before application"))
+      (when (and (plist-member authority :base-graph-generation)
+                 (/= (plist-get authority :base-graph-generation)
+                     (skg--buffer-record-graph-generation
+                      skg--buffer-record)))
+        (error "Skg graph generation changed before application"))
+      (when (and (plist-member authority :base-presentation-generation)
+                 (/= (plist-get authority :base-presentation-generation)
+                     (skg--buffer-record-presentation-generation
+                      skg--buffer-record)))
+        (error "Skg presentation generation changed before application"))
+      (when (and (plist-get authority :require-clean)
+                 (skg-buffer-dirty-p))
+        (error "Skg refuses to replace a dirty buffer"))
+      (when (and result-token
+                 (not expected-token)
+                 (/= result-token
+                     (1+ (skg--buffer-record-application-token
+                          skg--buffer-record))))
+        (error "Skg save response has an obsolete application token"))))
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert new-content)
@@ -741,8 +818,26 @@ moves point to focused headline, and removes focus marker."
       (skg-remove-folded-markers))
     (skg--restore-save-point-position save-point-position)
     (setq skg--last-rendered-content new-content)
-    (setq skg--application-token (1+ skg--application-token)
-          skg--background-refresh-stale nil)
+    (let ((next-token
+           (or (plist-get authority :application-token)
+               (1+ skg--application-token))))
+      (setq skg--application-token next-token)
+      (when skg--buffer-record
+        (setf
+         (skg--buffer-record-last-fetched skg--buffer-record) new-content
+         (skg--buffer-record-last-fetched-sha256 skg--buffer-record)
+         (skg--sha256-text new-content)
+         (skg--buffer-record-application-token skg--buffer-record) next-token
+         (skg--buffer-record-graph-generation skg--buffer-record)
+         (or (plist-get authority :graph-generation)
+             (skg--buffer-record-graph-generation skg--buffer-record))
+         (skg--buffer-record-presentation-generation skg--buffer-record)
+         (or (plist-get authority :presentation-generation)
+             (skg--buffer-record-presentation-generation skg--buffer-record))
+         (skg--buffer-record-server-revision skg--buffer-record)
+         (or (plist-get authority :server-revision)
+             (skg--buffer-record-server-revision skg--buffer-record)))))
+    (setq skg--background-refresh-stale nil)
     (set-buffer-modified-p
      ;; Clear modified flag and re-register the one-shot hook
      ;; AFTER all buffer modifications are done.
@@ -852,19 +947,31 @@ COLUMN is a character offset from the line's start; nil means column 0."
           (cadr (assoc 'presentation-generation response)))
          (base-revision
           (cadr (assoc 'viewforest-base-revision response)))
+         (base-graph-generation
+          (cadr (assoc 'view-base-graph-generation response)))
+         (base-presentation-generation
+          (cadr (assoc 'view-base-presentation-generation response)))
+         (expected-token
+          (cadr (assoc 'expected-client-application-token response)))
+         (result-token
+          (cadr (assoc 'resulting-client-application-token response)))
+         (result-revision
+          (cadr (assoc 'resulting-server-revision response)))
+         (client-buffer-id (cadr (assoc 'client-buffer-id response)))
          (content (cadr (assoc 'content response)))
          (needs-authorization
           (cadr (assoc 'needs-authorization response)))
-         (buf (and uri (skg-find-buffer-by-uri uri)))
+         (buf (or (skg-find-buffer-by-id client-buffer-id)
+                  (and uri (skg-find-buffer-by-uri uri))))
          (applied nil)
-         (client-token 0))
+         (client-token expected-token))
     (cond
-     (needs-authorization
+     ((equal needs-authorization "true")
       (ding)
       (message "SKG background refresh needs authorization: %s"
                (or (cadr (assoc 'prompt response)) "protected text")))
      ((not (buffer-live-p buf)) nil)
-     ((buffer-modified-p buf)
+     ((with-current-buffer buf (skg-buffer-dirty-p))
       (with-current-buffer buf
         (setq skg--background-refresh-stale
               `((operation-id . ,operation-id)
@@ -873,9 +980,32 @@ COLUMN is a character offset from the line's start; nil means column 0."
                (buffer-name buf)))
      ((stringp content)
       (with-current-buffer buf
-        (skg-replace-buffer-with-new-content nil content)
-        (setq applied t
-              client-token skg--application-token))))
+        (condition-case err
+            (progn
+              (skg-replace-buffer-with-new-content
+               nil content nil
+               (list :client-buffer-id client-buffer-id
+                     :view-uri uri
+                     :base-server-revision base-revision
+                     :base-graph-generation base-graph-generation
+                     :base-presentation-generation
+                     base-presentation-generation
+                     :expected-application-token expected-token
+                     :graph-generation graph-generation
+                     :presentation-generation presentation-generation
+                     :server-revision result-revision
+                     :application-token result-token
+                     :require-clean t))
+              (setq applied t
+                    client-token skg--application-token))
+          (error
+           (setq skg--background-refresh-stale
+                 `((operation-id . ,operation-id)
+                   (graph-generation . ,graph-generation)
+                   (reason . ,(error-message-string err))))
+           (skg-log 'error 'save
+                    "background offer refused for %s: %S"
+                    (buffer-name) err))))))
     (skg-register-response-handler 'collateral-applied #'ignore t)
     (skg-submit-request
      tcp-proc

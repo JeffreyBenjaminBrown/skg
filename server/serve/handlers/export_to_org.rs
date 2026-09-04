@@ -69,7 +69,7 @@ pub fn handle_export_to_org_request (
     "export-to-org", &active, ugly_pids,
     &approved_pids_from_request (request) );
   if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream, &challenge_response (&release) . unwrap () );
     return; }
   let release_warning : Option<String> = match release {
@@ -100,6 +100,6 @@ fn send_export_result (
         Vec::new () ), };
   let response : String =
     format_buffer_response_sexp (&content, &errors, &warnings);
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_sexp_response (TcpToClient::ExportToOrg, &response) ); }

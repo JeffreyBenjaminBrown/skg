@@ -6,12 +6,28 @@
 
 (require 'cl-lib)
 (require 'org-id)
+(require 'skg-log)
 
 (defvar skg-rust-tcp-proc nil
   "Persistent TCP connection to the Rust backend. See
 https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html")
 
-(cl-defstruct skg--request-record id incident-id handlers)
+(defvar skg--client-session-id
+  (format "emacs-%d-%s" (emacs-pid) (org-id-uuid))
+  "Stable identity of this Emacs process across Skg reconnects and code reloads.")
+
+(defvar skg--connection-handshake-state nil
+  "Nil, `sent', or `verified' for the current TCP connection.")
+
+(defvar skg--active-source-set-name "server-default"
+  "Name claimed in a reconnect handshake; replaced by server authority.")
+
+(defvar skg--maintenance-archive-folder nil)
+(defvar skg--maintenance-archive-identity nil)
+(defvar skg--maintenance-state nil)
+
+(cl-defstruct skg--request-record
+  id incident-id handlers terminal-handler failure-handler finalizer finalized-p)
 
 (defvar skg--request-records (make-hash-table :test #'equal)
   "Sent request records keyed by connection-local request ID.")
@@ -131,21 +147,103 @@ INCIDENT-ID keeps retries in one longer reconciliation episode."
     (pcase-let ((`(,request-id ,tcp-proc ,wire)
                  (pop skg--request-queue)))
       (setq skg--active-request-id request-id)
-      (process-send-string tcp-proc wire))))
+      (condition-case err
+          (process-send-string tcp-proc wire)
+        (error
+         (skg-fail-all-requests
+          (format "request send failed: %s" (error-message-string err))))))))
 
-(defun skg--finish-request (request-id)
-  (when-let ((record (gethash request-id skg--request-records)))
+(defun skg-set-request-terminal-handler (handler)
+  "Set HANDLER for the terminal outcome of the request being drafted."
+  (setf (skg--request-record-terminal-handler (skg--ensure-request-draft))
+        handler))
+
+(defun skg-set-request-failure-handler (handler)
+  "Set HANDLER for transport/protocol failure of the request being drafted."
+  (setf (skg--request-record-failure-handler (skg--ensure-request-draft))
+        handler))
+
+(defun skg-set-request-finalizer (finalizer)
+  "Set idempotent FINALIZER for the request being drafted."
+  (setf (skg--request-record-finalizer (skg--ensure-request-draft))
+        finalizer))
+
+(defun skg-submit-priority-request (tcp-proc request-text handlers
+                                             &optional content)
+  "Queue an internal REQUEST-TEXT before ordinary drafts.
+HANDLERS has the request-record handler representation.  This is reserved for
+the connection handshake: it deliberately does not consume or mutate the
+ordinary request draft which may have caused a reconnect."
+  (let* ((record (make-skg--request-record
+                  :id (skg--fresh-request-id) :handlers handlers))
+         (request-id (skg--request-record-id record))
+         (wire (skg--request-wire request-text request-id nil content)))
+    (puthash request-id record skg--request-records)
+    (setq skg-lp--pending-count
+          (+ skg-lp--pending-count (cl-count-if #'cddr handlers)))
+    (setq skg--request-queue
+          (cons (list request-id tcp-proc wire) skg--request-queue))
+    (skg--dispatch-next-request)
+    request-id))
+
+(defun skg--finalize-request-record (record reason)
+  "Finalize RECORD exactly once, passing REASON to its finalizer."
+  (unless (skg--request-record-finalized-p record)
+    (setf (skg--request-record-finalized-p record) t)
     (let ((unfired-one-shots
            (cl-count-if #'cddr (skg--request-record-handlers record))))
       (setq skg-lp--pending-count
             (max 0 (- skg-lp--pending-count unfired-one-shots))))
+    (when-let ((finalizer (skg--request-record-finalizer record)))
+      (condition-case err
+          (funcall finalizer reason)
+        (error
+         (skg-log 'error 'request-finalizer
+                  "finalizer failed for %s: %S"
+                  (skg--request-record-id record) err))))))
+
+(defun skg--finish-request (request-id &optional terminal-status)
+  (when-let ((record (gethash request-id skg--request-records)))
+    (when-let ((handler (skg--request-record-terminal-handler record)))
+      (condition-case err
+          (funcall handler terminal-status)
+        (error
+         (skg-log 'error 'request-terminal
+                  "terminal handler failed for %s: %S" request-id err))))
+    (skg--finalize-request-record record
+                                  (or terminal-status 'terminal))
     (remhash request-id skg--request-records))
   (when (equal request-id skg--active-request-id)
     (setq skg--active-request-id nil)
     (skg--dispatch-next-request)))
 
-(defun skg-clear-request-coordinator ()
+(defun skg-fail-all-requests (reason)
+  "Fail and finalize every draft, active, and queued request exactly once."
+  ;; Prevent any finalizer from dispatching a successor on the dead socket.
+  (setq skg--request-queue nil
+        skg--active-request-id nil
+        skg--dispatching-request-id nil)
+  (let (records)
+    (maphash (lambda (_id record) (push record records))
+             skg--request-records)
+    (when skg--request-draft (push skg--request-draft records))
+    (setq skg--request-draft nil)
+    (dolist (record records)
+      (unless (skg--request-record-finalized-p record)
+        (when-let ((handler (skg--request-record-failure-handler record)))
+          (condition-case err
+              (funcall handler reason)
+            (error
+             (skg-log 'error 'request-failure
+                      "failure handler failed for %s: %S"
+                      (skg--request-record-id record) err))))
+        (skg--finalize-request-record record reason))))
   (clrhash skg--request-records)
+  (setq skg-lp--pending-count 0))
+
+(defun skg-clear-request-coordinator ()
+  "Reset through typed request failure; intended for connection replacement."
+  (skg-fail-all-requests "request coordinator reset")
   (setq skg--request-draft nil
         skg--request-queue nil
         skg--active-request-id nil

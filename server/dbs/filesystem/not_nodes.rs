@@ -5,6 +5,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
 /// If a source path does not exist:
 /// - If it is marked owned (in the config), create it.
 /// - If it is foreign, fail.
@@ -184,6 +187,7 @@ pub fn load_config (
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   resolve_source_directory_identities (&mut config)?;
+  validate_and_create_maintenance_archive_root (&mut config)?;
   Ok (config) }
 
 /// Load config from TOML file with optional overrides for testing.
@@ -250,7 +254,74 @@ pub fn load_config_with_overrides (
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   resolve_source_directory_identities (&mut config)?;
+  validate_and_create_maintenance_archive_root (&mut config)?;
   Ok (config) }
+
+/// Establish a private archive root whose physical identity cannot overlap a
+/// source in either direction. This makes source observation and archive
+/// traversal disjoint by construction instead of relying on exclusions.
+fn validate_and_create_maintenance_archive_root (
+  config : &mut SkgConfig,
+) -> io::Result<()> {
+  let configured : &Path = &config . maintenance_archive_folder;
+  if configured . as_os_str () . is_empty () {
+    return Err (io::Error::new (
+      io::ErrorKind::InvalidInput,
+      "maintenance_archive_folder may not be empty")); }
+  if configured . components () . any (|component| matches! (
+       component, std::path::Component::ParentDir))
+  {
+    return Err (io::Error::new (
+      io::ErrorKind::InvalidInput,
+      "maintenance_archive_folder may not contain '..'")); }
+  let archive_path : PathBuf = if configured . is_absolute () {
+    configured . to_path_buf ()
+  } else {
+    config . data_root . join (configured) };
+  reject_archive_source_overlap (&archive_path, config)?;
+  create_private_directory_all (&archive_path)?;
+  let identity : PathBuf = fs::canonicalize (&archive_path)?;
+  reject_archive_source_overlap (&identity, config)?;
+  config . maintenance_archive_identity = identity;
+  Ok (( ))
+}
+
+fn reject_archive_source_overlap (
+  archive : &Path,
+  config  : &SkgConfig,
+) -> io::Result<()> {
+  for source in config . sources . values () {
+    let source_identity : &Path = config . sources
+      . directory_identity (&source . name)
+      . unwrap_or (&source . path);
+    if archive == source_identity
+    || archive . starts_with (source_identity)
+    || source_identity . starts_with (archive)
+    {
+      return Err (io::Error::new (
+        io::ErrorKind::InvalidInput,
+        format! (
+          "maintenance archive '{}' and source '{}' ({}) must be structurally disjoint",
+          archive . display (), source . name, source_identity . display ()))); }}
+  Ok (( ))
+}
+
+fn create_private_directory_all (path : &Path) -> io::Result<()> {
+  #[cfg(unix)]
+  {
+    let mut builder = fs::DirBuilder::new ();
+    builder . recursive (true) . mode (0o700) . create (path)?;
+    fs::set_permissions (path, fs::Permissions::from_mode (0o700))?;
+  }
+  #[cfg(not(unix))]
+  {
+    fs::create_dir_all (path)?;
+    tracing::warn! (
+      path = %path . display (),
+      "cannot enforce POSIX 0700 permissions on this platform");
+  }
+  Ok (( ))
+}
 
 fn validate_source_sets (
   config : &SkgConfig,
@@ -341,6 +412,58 @@ mod tests {
     assert! (error . contains ("first"), "{}", error);
     assert! (error . contains ("alias"), "{}", error);
     assert! (error . contains ("same physical directory"), "{}", error);
+  }
+
+  #[test]
+  fn archive_root_defaults_beside_config_and_is_disjoint () {
+    let temp = tempdir () . unwrap ();
+    let path : PathBuf = write_config (
+      temp . path (),
+      "\n[[sources]]\nname = \"notes\"\npath = \"owned/notes\"\n" );
+    let config : SkgConfig = load_config (path . to_str () . unwrap ())
+      . unwrap ();
+    assert_eq! (
+      config . maintenance_archive_folder,
+      PathBuf::from ("unsaved-work-interrupted-by-rebuild"));
+    assert_eq! (
+      config . maintenance_archive_identity,
+      fs::canonicalize (temp . path () . join (
+        "unsaved-work-interrupted-by-rebuild")) . unwrap ());
+    #[cfg(unix)]
+    assert_eq! (
+      fs::metadata (&config . maintenance_archive_identity)
+        . unwrap () . permissions () . mode () & 0o777,
+      0o700);
+  }
+
+  #[test]
+  fn archive_root_may_not_contain_or_be_contained_by_a_source () {
+    for archive in ["owned", "owned/notes/incidents"] {
+      let temp = tempdir () . unwrap ();
+      let path : PathBuf = temp . path () . join ("skgconfig.toml");
+      fs::write (&path, format! (
+        "db_name = \"test\"\ntantivy_folder = \"tantivy\"\nmaintenance_archive_folder = {:?}\n\n[[sources]]\nname = \"notes\"\npath = \"owned/notes\"\n",
+        archive)) . unwrap ();
+      let error = load_config (path . to_str () . unwrap ())
+        . err () . expect ("overlapping archive was accepted")
+        . to_string ();
+      assert! (error . contains ("structurally disjoint"), "{}", error);
+    }
+  }
+
+  #[test]
+  fn archive_root_rejects_parent_traversal () {
+    let temp = tempdir () . unwrap ();
+    let path : PathBuf = temp . path () . join ("skgconfig.toml");
+    fs::write (&path, concat! (
+      "db_name = \"test\"\n",
+      "tantivy_folder = \"tantivy\"\n",
+      "maintenance_archive_folder = \"../archive\"\n",
+      "\n[[sources]]\nname = \"notes\"\npath = \"owned/notes\"\n"))
+      . unwrap ();
+    let error = load_config (path . to_str () . unwrap ())
+      . err () . expect ("parent traversal was accepted") . to_string ();
+    assert! (error . contains ("may not contain '..'"), "{}", error);
   }
 
   #[cfg(unix)]

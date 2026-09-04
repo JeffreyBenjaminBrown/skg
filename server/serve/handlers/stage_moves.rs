@@ -25,6 +25,6 @@ pub fn handle_stage_moves_request (
         vec! [e] ), };
   let response : String =
     format_buffer_response_sexp (&content, &errors, &[]);
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     &tag_sexp_response (TcpToClient::StageMoves, &response) ); }

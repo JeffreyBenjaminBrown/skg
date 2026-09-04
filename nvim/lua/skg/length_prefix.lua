@@ -38,6 +38,7 @@ function M.handle_generic_chunk (chunk)
     elseif step.kind == 'error' then
       state.lp_buffer = ''
       state.lp_bytes_left = nil
+      state.fail_all_requests(step.message)
       error(step.message)
     end
   end
@@ -50,6 +51,7 @@ function M.dispatch_frame (payload)
   if not parsed_ok then
     log.log('error', 'dispatch', 'could not parse frame: %s',
             tostring(response))
+    state.fail_all_requests('response parse failed: ' .. tostring(response))
     return end
   local request_id = M.field_atom(response, 'request-id')
   local incident_id = M.field_atom(response, 'incident-id')
@@ -81,7 +83,9 @@ function M.dispatch_frame (payload)
   if incident_id ~= record.incident_id then
     vim.notify('SKG protocol failure: incident identity changed',
                vim.log.levels.ERROR)
-    state.finish_request(request_id)
+    if record.failure_handler then
+      pcall(record.failure_handler, 'incident identity mismatch') end
+    state.finish_request(request_id, 'protocol-failed')
     return end
   local entry = record.handlers[frame_kind]
   state.dispatching_request_id = request_id
@@ -101,7 +105,13 @@ function M.dispatch_frame (payload)
   if entry and entry.one_shot then
     record.handlers[frame_kind] = nil
     state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
-  if terminal_status then state.finish_request(request_id) end
+  if terminal_status then
+    state.finish_request(request_id, terminal_status)
+  elseif not handler_ok then
+    if record.failure_handler then
+      pcall(record.failure_handler, tostring(handler_error)) end
+    state.finish_request(request_id, 'handler-failed')
+  end
   if not handler_ok then
     log.log('error', 'dispatch', 'dispatch error: %s for payload: %s',
             tostring(handler_error), payload:sub(1, 80)) end

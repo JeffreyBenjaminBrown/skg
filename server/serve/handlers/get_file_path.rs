@@ -22,7 +22,7 @@ pub fn handle_get_file_path_request_with_source_set (
     "id", request ) {
     Ok  (v) => ID (v),
     Err (e) => {
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::GetFilePath,
@@ -32,14 +32,14 @@ pub fn handle_get_file_path_request_with_source_set (
     "source", request ) {
     Ok  (v) => SourceName (v),
     Err (e) => {
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
   if ! active . contains_source (&source) {
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream,
       & tag_text_response (
         TcpToClient::GetFilePath,
@@ -53,7 +53,7 @@ pub fn handle_get_file_path_request_with_source_set (
     id ) {
     Ok  (p) => p,
     Err (e) => {
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::GetFilePath,
@@ -78,7 +78,7 @@ pub fn handle_get_file_path_request_with_source_set (
     . map ( |p| p . to_string_lossy () . into_owned () )
     . unwrap_or_else ( |_| canonical_raw . to_string_lossy ()
                        . into_owned () );
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::GetFilePath, &rel_path )); }

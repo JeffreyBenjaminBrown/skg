@@ -39,13 +39,15 @@ use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::store_state::{
   GraphGeneration,
+  PathDigest,
   SelectedPathManifest,
 };
 use crate::dbs::tantivy::background_writer::TantivyGeneration;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
@@ -150,7 +152,9 @@ pub(crate) async fn apply_define_nodes_to_stores (
                { let total_input : usize = node_defs . len ();
                  total_input } );
     let prepared = prepare_fs_update (
-      &node_defs, source_moves, &config, hoist_approved_pids) ?;
+      &node_defs, source_moves, &config, hoist_approved_pids) ?
+      . with_selected_fence (&old_selected . manifest);
+    prepared . validate_selected_fence ()?;
     let (deleted_count, written_count) : (usize, usize) = {
       let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_fs_from_savenode_defs") . entered ();
@@ -269,10 +273,32 @@ pub async fn update_graph_including_nodeMerges (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
+  expected_graph_generation : u64,
 ) -> Result<(), Box<dyn Error>> {
   // Serialize this store mutation against any concurrent save / reload /
   // rebuild so no RCU update is lost (last-store-wins on the ArcSwap).
   let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
+  let selected_before = graph . load_full ();
+  if selected_before . graph_generation . get ()
+     != expected_graph_generation
+  {
+    return Err (Box::new (SaveError::StaleViewAuthority (format! (
+      "save expected graph generation {}, but writer acquired generation {}",
+      expected_graph_generation,
+      selected_before . graph_generation . get ())))); }
+  { // Exact save fence.  It covers the union of the ordinary and merge
+    // phases, including every collateral cleanup/tombstone, before either
+    // phase can write its first byte.
+    let all_filesystem_outputs : Vec<DefineNode> =
+      save_instructions . iter () . cloned ()
+      . chain (nodeMerge_instructions . iter ()
+        . flat_map (|node_merge| node_merge . to_vec ()))
+      . collect ();
+    prepare_fs_update (
+      &all_filesystem_outputs, source_moves, &config,
+      hoist_approved_pids)?
+      . with_selected_fence (&selected_before . manifest)
+      . validate_selected_fence ()?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "validate_override_invariants_after_save" ). entered();
     validate_override_invariants_after_save (
@@ -634,24 +660,85 @@ pub(crate) fn preflight_fs_from_saveinstructions_with_hoist_approval (
 
 pub(crate) struct PreparedFilesystemUpdate {
   writes       : Vec<PreparedTelescopeWrite>,
-  deletions    : Vec<String>,
   deleted_pids : HashSet<ID>,
+  path_manifest : BTreeMap<PathBuf, PreparedPathMutation>,
+}
+
+#[derive(Clone, Debug)]
+struct PreparedPathMutation {
+  expected_before : Option<Option<PathDigest>>,
+  proposed_after  : Option<Vec<u8>>,
 }
 
 impl PreparedFilesystemUpdate {
+  /// Attach the exact selected byte/absence fact for every path this batch
+  /// can create, replace, move, or delete.  The outer option distinguishes an
+  /// attached expectation from an expected absence.
+  pub(crate) fn with_selected_fence (
+    mut self,
+    selected : &SelectedPathManifest,
+  ) -> Self {
+    for (path, mutation) in &mut self . path_manifest {
+      mutation . expected_before = Some (selected . get (path) . copied ()); }
+    self
+  }
+
+  /// Re-read every prospective target immediately before the first write.
+  /// A mismatch is returned as a typed save refusal so the connection layer
+  /// can enqueue exact observation of the named paths.
+  pub(crate) fn validate_selected_fence (
+    &self,
+  ) -> Result<(), SaveError> {
+    let mut paths : Vec<PathBuf> = Vec::new ();
+    let mut details : Vec<String> = Vec::new ();
+    for (path, mutation) in &self . path_manifest {
+      let Some (expected) = mutation . expected_before else {
+        return Err (SaveError::DiskSelectionChanged {
+          paths: vec![path . clone ()],
+          details: vec![format! (
+            "internal save fence omitted the selected before value for {}",
+            path . display ())],
+        }); };
+      let actual : Result<Option<PathDigest>, String> =
+        exact_regular_path_digest (path);
+      match actual {
+        Ok (actual) if actual == expected => {},
+        Ok (actual) => {
+          paths . push (path . clone ());
+          details . push (format! (
+            "{}: expected {}, found {}",
+            path . display (), describe_digest (expected),
+            describe_digest (actual))); }
+        Err (reason) => {
+          paths . push (path . clone ());
+          details . push (format! ("{}: {}", path . display (), reason)); }
+      }
+    }
+    if paths . is_empty () { Ok (( )) }
+    else { Err (SaveError::DiskSelectionChanged { paths, details }) }
+  }
+
   pub(crate) fn apply (
     &self,
     config : &SkgConfig,
   ) -> io::Result<(usize, usize)> {
     // Mutation starts only after the whole batch has passed ownership and
-    // serialization preflight.
-    for path in &self . deletions {
-      match std::fs::remove_file (&path) {
-        Ok (( ))                                          => {},
-        Err (e) if e . kind () == io::ErrorKind::NotFound => {},
-        Err (e)                                           => return Err (e), } }
-    for telescope in &self . writes {
-      telescope . apply (config) ?; }
+    // serialization preflight.  Apply the consolidated final path manifest,
+    // so a path mentioned by more than one instruction is still written at
+    // most once with the exact bytes represented by this prepared value.
+    for (path, mutation) in &self . path_manifest {
+      match &mutation . proposed_after {
+        Some (bytes) => {
+          if let Some (parent) = path . parent () {
+            std::fs::create_dir_all (parent)?; }
+          let unchanged = std::fs::read (path)
+            . map (|old| old == *bytes) . unwrap_or (false);
+          if !unchanged { std::fs::write (path, bytes)?; }}
+        None => match std::fs::remove_file (path) {
+          Ok (( ))                                          => {},
+          Err (e) if e . kind () == io::ErrorKind::NotFound => {},
+          Err (e)                                           => return Err (e), },
+      }}
     for telescope in &self . writes {
       telescope . verify_hoist (config) ?; }
     Ok (( self . deleted_pids . len (), self . writes . len () ))
@@ -661,10 +748,13 @@ impl PreparedFilesystemUpdate {
     &self,
     manifest : &mut SelectedPathManifest,
   ) {
-    for path in &self . deletions {
-      manifest . remove (std::path::Path::new (path)); }
-    for telescope in &self . writes {
-      telescope . apply_to_manifest (manifest); }
+    for (path, mutation) in &self . path_manifest {
+      match &mutation . proposed_after {
+        Some (bytes) => {
+          manifest . insert (
+            path . clone (), PathDigest::of_bytes (bytes)); }
+        None => { manifest . remove (path); }
+      }}
   }
 }
 
@@ -709,11 +799,115 @@ pub(crate) fn prepare_fs_update (
   // legitimately retains a section holding the node's private
   // memberships. (source_moves still matter to TypeDB/Tantivy,
   // handled elsewhere.)
+  let mut path_manifest : BTreeMap<PathBuf, PreparedPathMutation> =
+    BTreeMap::new ();
+  // `apply` performs whole-node deletions first, followed by telescope
+  // rewrites in this order.  Repeated paths therefore deliberately replace
+  // the proposed after value here in the same order.
+  for path in &prepared_deletions {
+    path_manifest . insert (PathBuf::from (path), PreparedPathMutation {
+      expected_before: None,
+      proposed_after: None,
+    }); }
+  for telescope in &prepared_writes {
+    for (path, proposed_after) in telescope . proposed_path_values () {
+      path_manifest . insert (path, PreparedPathMutation {
+        expected_before: None,
+        proposed_after,
+      }); }}
+
   Ok ( PreparedFilesystemUpdate {
     writes       : prepared_writes,
-    deletions    : prepared_deletions,
     deleted_pids,
+    path_manifest,
   } ) }
+
+fn exact_regular_path_digest (
+  path : &Path,
+) -> Result<Option<PathDigest>, String> {
+  match std::fs::symlink_metadata (path) {
+    Ok (metadata) if metadata . file_type () . is_file () =>
+      std::fs::read (path)
+        . map (|bytes| Some (PathDigest::of_bytes (&bytes)))
+        . map_err (|error| format! ("could not read exact bytes: {}", error)),
+    Ok (metadata) => Err (format! (
+      "expected a regular file or absence, found filesystem type {:?}",
+      metadata . file_type ())),
+    Err (error) if error . kind () == io::ErrorKind::NotFound => Ok (None),
+    Err (error) => Err (format! ("could not inspect path: {}", error)),
+  }
+}
+
+fn describe_digest (digest : Option<PathDigest>) -> String {
+  digest . map (|digest| format! ("BLAKE3 {}", digest . to_hex ()))
+    . unwrap_or_else (|| "absence" . into ())
+}
+
+#[cfg(test)]
+mod save_fence_tests {
+  use super::*;
+
+  fn prepared_for (
+    path            : PathBuf,
+    proposed_after  : Option<Vec<u8>>,
+    selected_before : &SelectedPathManifest,
+  ) -> PreparedFilesystemUpdate {
+    PreparedFilesystemUpdate {
+      writes: Vec::new (),
+      deleted_pids: HashSet::new (),
+      path_manifest: BTreeMap::from ([
+        (path, PreparedPathMutation {
+          expected_before: None,
+          proposed_after,
+        }),
+      ]),
+    } . with_selected_fence (selected_before)
+  }
+
+  #[test]
+  fn exact_non_ascii_bytes_pass_and_same_length_rewrite_fails () {
+    let temp = tempfile::tempdir () . unwrap ();
+    let path = temp . path () . join ("n.skg");
+    let before = "title: café\n" . as_bytes ();
+    std::fs::write (&path, before) . unwrap ();
+    let selected = SelectedPathManifest::from ([
+      (path . clone (), PathDigest::of_bytes (before)),
+    ]);
+    let prepared = prepared_for (
+      path . clone (), Some (b"title: after\n" . to_vec ()), &selected);
+    prepared . validate_selected_fence () . unwrap ();
+
+    std::fs::write (&path, "title: cafe\n" . as_bytes ()) . unwrap ();
+    let error = prepared . validate_selected_fence () . unwrap_err ();
+    let SaveError::DiskSelectionChanged { paths, .. } = error else {
+      panic! ("wrong save-fence error"); };
+    assert_eq! (paths, vec![path]);
+  }
+
+  #[test]
+  fn unexpected_create_and_delete_both_fail_closed () {
+    let temp = tempfile::tempdir () . unwrap ();
+    let created = temp . path () . join ("created.skg");
+    let create_prepared = prepared_for (
+      created . clone (), Some (b"ours" . to_vec ()),
+      &SelectedPathManifest::new ());
+    std::fs::write (&created, b"theirs") . unwrap ();
+    assert! (matches! (
+      create_prepared . validate_selected_fence (),
+      Err (SaveError::DiskSelectionChanged { .. })));
+
+    let deleted = temp . path () . join ("deleted.skg");
+    std::fs::write (&deleted, b"selected") . unwrap ();
+    let selected = SelectedPathManifest::from ([
+      (deleted . clone (), PathDigest::of_bytes (b"selected")),
+    ]);
+    let delete_prepared = prepared_for (deleted . clone (), None, &selected);
+    std::fs::remove_file (&deleted) . unwrap ();
+    assert! (matches! (
+      delete_prepared . validate_selected_fence (),
+      Err (SaveError::DiskSelectionChanged { .. })));
+  }
+}
 
 
 /// Updates the index with the provided DefineNodes.

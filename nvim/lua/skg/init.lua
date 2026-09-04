@@ -45,9 +45,20 @@ function M.init (config_toml_path)
   state.register_server_push_handler(
     'reconciliation-ready',
     require('skg.misc_requests').reconciliation_ready_handler)
+  state.register_server_push_handler(
+    'maintenance-offer',
+    require('skg.maintenance').server_offer_handler)
+  vim.api.nvim_create_user_command('SkgReconcilePendingChanges',
+    function () require('skg.maintenance').reconcile_pending() end,
+    { force = true })
+  vim.api.nvim_create_user_command('SkgMaintenanceStatus',
+    function () require('skg.maintenance').status() end,
+    { force = true })
+  vim.api.nvim_create_user_command('SkgCancelMaintenance',
+    function () require('skg.maintenance').cancel() end,
+    { force = true })
   client.port = config.port_from_toml(absolute)
   client.connect()
-  require('skg.misc_requests').connection_verify()
   require('skg.herald_rules').request_herald_rules()
 end
 

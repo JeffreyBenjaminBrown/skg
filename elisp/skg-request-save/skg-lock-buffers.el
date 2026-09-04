@@ -86,4 +86,14 @@ Signals an error if another stream is already in flight."
   "Clear the streaming-in-progress guard."
   (setq skg--stream-in-progress nil))
 
+(defun skg--register-stream-request-cleanup (label)
+  "Make the current request own cleanup for transient stream LABEL."
+  (skg-set-request-failure-handler
+   (lambda (reason)
+     (message "skg: %s interrupted: %s" label reason)))
+  (skg-set-request-finalizer
+   (lambda (_reason)
+     (skg--end-stream)
+     (skg--unlock-all-save-locked))))
+
 (provide 'skg-lock-buffers)

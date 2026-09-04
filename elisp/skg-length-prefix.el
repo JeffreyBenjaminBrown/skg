@@ -45,6 +45,7 @@ If there is buffered data and a handler matched, continues the loop."
         (`(:error ,msg)
          (setq skg-lp--buf                (unibyte-string)
                skg-lp--bytes-left         nil)
+         (skg-fail-all-requests msg)
          (error "%s" msg)))))
 
 (defun skg-lp--dispatch-frame (tcp-proc payload)
@@ -78,7 +79,11 @@ If there is buffered data and a handler matched, continues the loop."
           (ding)
           (skg-log 'error 'dispatch
                    "incident-id mismatch on request %s" request-id)
-          (skg--finish-request (format "%s" request-id)))
+          (when-let ((failure
+                      (skg--request-record-failure-handler record)))
+            (funcall failure "incident identity mismatch"))
+          (skg--finish-request (format "%s" request-id)
+                               'protocol-failed))
          (t
           (setq request-id (format "%s" request-id))
           (let ((handler-entry
@@ -104,10 +109,12 @@ If there is buffered data and a handler matched, continues the loop."
                 (setq skg-lp--pending-count
                       (max 0 (1- skg-lp--pending-count))))
               (when terminal-status
-                (skg--finish-request request-id)))))))
+                (skg--finish-request request-id terminal-status)))))))
     (error
      (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
-              err (substring payload 0 (min 80 (length payload)))))))
+              err (substring payload 0 (min 80 (length payload))))
+     (skg-fail-all-requests
+      (format "response dispatch failed: %s" (error-message-string err))))))
 
 (defun skg-lp-step (buf bytes-left)
   "One pure(ish) step of the LP machine.

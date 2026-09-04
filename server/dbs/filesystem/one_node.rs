@@ -181,6 +181,22 @@ pub(crate) fn serialize_telescope_manifest (
 }
 
 impl PreparedTelescopeWrite {
+  /// The exact final bytes/absence this telescope would establish, in the
+  /// same order as `apply`.  The save-level transaction uses this to build a
+  /// complete before/after fence before any member of a multi-node batch is
+  /// allowed to mutate the filesystem.
+  pub(crate) fn proposed_path_values (
+    &self,
+  ) -> Vec<(PathBuf, Option<Vec<u8>>)> {
+    let mut values : Vec<(PathBuf, Option<Vec<u8>>)> = self . writes . iter ()
+      . map (|(_, path, yaml)|
+        (PathBuf::from (path), Some (yaml . as_bytes () . to_vec ())))
+      . collect ();
+    values . extend (self . deletions . iter () . map (|path|
+      (PathBuf::from (path), None)));
+    values
+  }
+
   pub(crate) fn apply (
     &self,
     config : &SkgConfig,

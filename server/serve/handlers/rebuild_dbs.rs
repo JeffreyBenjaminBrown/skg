@@ -38,7 +38,7 @@ pub fn handle_rebuild_dbs_request (
     Err (e) => {
       tracing::error!("Rebuild failed: {}", e);
       format! ("Rebuild failed: {}", e) } };
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::RebuildDbs, &msg )); }

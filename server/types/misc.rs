@@ -390,6 +390,17 @@ pub struct SkgConfig {
   pub db_name        : String,
   pub tantivy_folder : PathBuf,
 
+  /// As written in skgconfig.toml. Relative paths are resolved beside the
+  /// config file, while retaining this spelling lets a host editor resolve
+  /// the same archive root when the server sees a mounted path.
+  #[serde(default = "default_maintenance_archive_folder")]
+  pub maintenance_archive_folder : PathBuf,
+
+  /// Canonical server-side identity of the archive root. Config loading fills
+  /// this only after proving it is disjoint from every source directory.
+  #[serde(skip)]
+  pub maintenance_archive_identity : PathBuf,
+
   #[serde(default = "default_port")]
   pub port           : u16,  // TCP port for Rust-Emacs comms.
 
@@ -484,6 +495,9 @@ fn default_source_set_name () -> SourceSetName {
 
 fn default_owned_folder () -> String {
   "owned" . to_string () }
+
+fn default_maintenance_archive_folder () -> PathBuf {
+  PathBuf::from ("unsaved-work-interrupted-by-rebuild") }
 
 fn default_port() -> u16 {
   DEFAULT_PORT }
@@ -639,6 +653,10 @@ impl SkgConfig {
       owned_folder       : "owned" . to_string (),
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
+      maintenance_archive_folder:
+        default_maintenance_archive_folder (),
+      maintenance_archive_identity:
+        PathBuf::from ("/tmp/unsaved-work-interrupted-by-rebuild"),
       port               : 0,
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       delete_on_quit     : false,
@@ -662,6 +680,10 @@ impl SkgConfig {
       owned_folder       : "owned" . to_string (),
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
+      maintenance_archive_folder:
+        default_maintenance_archive_folder (),
+      maintenance_archive_identity:
+        PathBuf::from ("/tmp/unsaved-work-interrupted-by-rebuild"),
       port               : DEFAULT_PORT,
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       delete_on_quit     : false,

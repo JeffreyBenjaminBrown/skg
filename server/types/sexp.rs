@@ -63,8 +63,8 @@ pub fn extract_string_list_from_sexp (
     _ => Err ( "Expected list as top-level S-expression"
                 . to_string () ) } }
 
-/// Extract a string value from an S-expression key-value pair.
-/// Expected format: (.. (key . "value") ..)
+/// Extract an atom's text from an S-expression key-value pair.
+/// Expected format: (.. (key . "value") ..) or (.. (key . 123) ..)
 pub fn extract_v_from_kv_pair_in_sexp (
   sexp : &Sexp,
   key  : &str,
@@ -75,11 +75,10 @@ pub fn extract_v_from_kv_pair_in_sexp (
         if let Sexp::List (pair) = item {
           if pair . len() == 3 {
             if let ( Sexp::Atom ( Atom::S (k) ),
-                     Sexp::Atom ( Atom::S (dot) ),
-                     Sexp::Atom ( Atom::S (value) ) ) =
-              ( &pair[0], &pair[1], &pair[2] )
+                     Sexp::Atom ( Atom::S (dot) ) ) =
+              ( &pair[0], &pair[1] )
             { if k == key && dot == "." {
-              return Ok ( value . clone() ); }} }} }
+              return atom_to_string (&pair[2]); }} }} }
       Err ( format! (
         "No {} field found in S-expression", key ) ) },
     _ => Err ( "Expected list as top-level S-expression"

@@ -13,6 +13,7 @@ local log = require('skg.log')
 local messages = require('skg.messages')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -83,6 +84,9 @@ function M.request_save_buffer (fork_approved, fork_sources,
     error(string.format(
       "Cannot save: view uri is nil in buffer '%s'. Re-open the view.",
       vim.api.nvim_buf_get_name(save_buf))) end
+  local save_authority = assert(
+    registry.record(save_buf),
+    'Cannot save: this buffer has no explicit Skg application record')
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil
@@ -95,7 +99,8 @@ function M.request_save_buffer (fork_approved, fork_sources,
     M.save_request_string(saved_uri, save_point_position,
                           fork_approved, fork_sources,
                           hoist_approved_pids,
-                          scalar_approved_pids)
+                          scalar_approved_pids,
+                          save_authority)
   do -- The server needs these markers, but the user doesn't.
     focus.remove_focused_marker()
     folds.remove_folded_markers()
@@ -103,6 +108,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
       M.strip_bare_skg_at_headline(focus.owning_headline_line()) end
   end
   lock.begin_stream('save')
+  lock.register_stream_request_cleanup('save')
   -- Lock ALL skg view buffers before sending, eliminating the race
   -- window between the send and the server's early response.
   lock.lock_all_skg_buffers()
@@ -161,7 +167,7 @@ end
 ---@return string
 function M.save_request_string (view_uri, position, fork_approved,
                                 fork_sources, hoist_approved_pids,
-                                scalar_approved_pids)
+                                scalar_approved_pids, authority)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-uri'), view_uri),
@@ -190,6 +196,21 @@ function M.save_request_string (view_uri, position, fork_approved,
     for _, pid in ipairs(scalar_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
+  if authority then
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('client-buffer-id'), authority.id))
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('view-kind'), authority.kind))
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('graph-generation'),
+      tostring(authority.graph_generation or 0)))
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('server-revision'),
+      tostring(authority.server_revision or 0)))
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('client-application-token'),
+      tostring(authority.application_token or 0)))
+  end
   return sexpr.to_string(request) .. '\n'
 end
 
@@ -297,7 +318,16 @@ function M.handle_save_response (save_buf, response)
   if content_text then
     M.replace_buffer_with_new_content(
       save_buf, content_text,
-      M.save_point_position_from_response(response))
+      M.save_point_position_from_response(response), {
+        graph_generation = tonumber(
+          payload.field_text(response, 'graph-generation')),
+        presentation_generation = tonumber(
+          payload.field_text(response, 'presentation-generation')),
+        server_revision = tonumber(
+          payload.field_text(response, 'server-revision')),
+        application_token = tonumber(
+          payload.field_text(response, 'client-application-token')),
+      })
   end
   if #errors > 0 or #warnings > 0 then
     M.show_save_errors_and_warnings(errors, warnings,
@@ -333,7 +363,36 @@ end
 ---@param new_content string
 ---@param save_point_position table|nil
 function M.replace_buffer_with_new_content (buf, new_content,
-                                            save_point_position)
+                                            save_point_position, authority)
+  local record = registry.record(buf)
+  if authority and record then
+    local expected_token = authority.expected_application_token
+    if authority.client_buffer_id
+       and authority.client_buffer_id ~= record.id then
+      error('Skg server offer names a different client buffer') end
+    if authority.view_uri and authority.view_uri ~= record.view_uri then
+      error('Skg view URI changed before application') end
+    if expected_token and expected_token ~= record.application_token then
+      error('Skg application token changed before application') end
+    if expected_token and authority.application_token
+       and authority.application_token ~= expected_token + 1 then
+      error('Skg server offer does not advance exactly one token') end
+    if authority.base_server_revision
+       and authority.base_server_revision ~= record.server_revision then
+      error('Skg server revision changed before application') end
+    if authority.base_graph_generation
+       and authority.base_graph_generation ~= record.graph_generation then
+      error('Skg graph generation changed before application') end
+    if authority.base_presentation_generation
+       and authority.base_presentation_generation
+           ~= record.presentation_generation then
+      error('Skg presentation generation changed before application') end
+    if authority.require_clean and registry.dirty(buf) then
+      error('Skg refuses to replace a dirty buffer') end
+    if authority.application_token and not expected_token
+       and authority.application_token ~= record.application_token + 1 then
+      error('Skg save response has an obsolete application token') end
+  end
   buffer.disarm_first_change_warning(buf)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
@@ -361,7 +420,19 @@ function M.replace_buffer_with_new_content (buf, new_content,
   end
   vim.bo[buf].modified = false
   vim.b[buf].skg_application_token =
-    (vim.b[buf].skg_application_token or 0) + 1
+    (authority and authority.application_token)
+    or ((vim.b[buf].skg_application_token or 0) + 1)
+  vim.b[buf].skg_last_fetched = new_content
+  vim.b[buf].skg_last_fetched_sha256 = vim.fn.sha256(new_content)
+  if authority then
+    vim.b[buf].skg_graph_generation =
+      authority.graph_generation or vim.b[buf].skg_graph_generation
+    vim.b[buf].skg_presentation_generation =
+      authority.presentation_generation
+      or vim.b[buf].skg_presentation_generation
+    vim.b[buf].skg_server_revision =
+      authority.server_revision or vim.b[buf].skg_server_revision
+  end
   vim.b[buf].skg_background_refresh_stale = nil
   buffer.arm_first_change_warning(buf)
   vim.notify('Buffer updated with processed content from Rust')
@@ -759,25 +830,56 @@ function M.background_collateral_offer_handler (_payload_text, response)
     payload.field_text(response, 'presentation-generation')
   local base_revision =
     payload.field_text(response, 'viewforest-base-revision')
+  local base_graph_generation = tonumber(
+    payload.field_text(response, 'view-base-graph-generation'))
+  local base_presentation_generation = tonumber(
+    payload.field_text(response, 'view-base-presentation-generation'))
+  local expected_token = tonumber(
+    payload.field_text(response, 'expected-client-application-token'))
+  local result_token = tonumber(
+    payload.field_text(response, 'resulting-client-application-token'))
+  local result_revision = tonumber(
+    payload.field_text(response, 'resulting-server-revision'))
+  local client_buffer_id = payload.field_text(response, 'client-buffer-id')
   local needs_authorization =
     payload.field_text(response, 'needs-authorization')
   local content = payload.field(response, 'content')
-  local buf = uri and buffer.find_buffer_by_uri(uri) or nil
+  local buf = registry.find_by_id(client_buffer_id)
+    or (uri and buffer.find_buffer_by_uri(uri) or nil)
   local applied = false
-  local client_token = 0
+  local client_token = expected_token or 0
   if needs_authorization == 'true' then
     vim.notify('SKG background refresh needs authorization: '
       .. (payload.field_text(response, 'prompt') or 'protected text'),
       vim.log.levels.WARN)
-  elseif buf and vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified then
+  elseif buf and vim.api.nvim_buf_is_valid(buf) and registry.dirty(buf) then
     vim.b[buf].skg_background_refresh_stale = true
     vim.notify('SKG left modified buffer '
       .. vim.api.nvim_buf_get_name(buf)
       .. ' stale; save or refresh it explicitly', vim.log.levels.WARN)
   elseif buf and content ~= nil and not sexpr.is_list(content) then
-    M.replace_buffer_with_new_content(buf, sexpr.atom_text(content), nil)
-    applied = true
-    client_token = vim.b[buf].skg_application_token or 0
+    local ok, err = pcall(M.replace_buffer_with_new_content,
+      buf, sexpr.atom_text(content), nil, {
+        client_buffer_id = client_buffer_id,
+        view_uri = uri,
+        base_server_revision = tonumber(base_revision),
+        base_graph_generation = base_graph_generation,
+        base_presentation_generation = base_presentation_generation,
+        expected_application_token = expected_token,
+        graph_generation = tonumber(graph_generation),
+        presentation_generation = tonumber(presentation_generation),
+        server_revision = result_revision,
+        application_token = result_token,
+        require_clean = true,
+      })
+    if ok then
+      applied = true
+      client_token = vim.b[buf].skg_application_token or 0
+    else
+      vim.b[buf].skg_background_refresh_stale = true
+      log.log('error', 'save', 'background offer refused for %s: %s',
+              vim.api.nvim_buf_get_name(buf), tostring(err))
+    end
   end
   state.register_response_handler('collateral-applied', function () end, true)
   require('skg.client').submit_request(sexpr.to_string({

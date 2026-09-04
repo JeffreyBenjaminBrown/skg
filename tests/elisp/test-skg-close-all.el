@@ -62,6 +62,18 @@ nor clear their `skg-view-uri'. Before the fix,
                            "test-uri-*fake-skg-preserved*")))
       (when (buffer-live-p buf) (kill-buffer buf)))))
 
+(ert-deftest test-skg-reload-preserves-live-connection-state ()
+  "Hot reload must not forget a live process or its request sequence."
+  (load-file (expand-file-name
+              "../../elisp/skg-reload.el"
+              test-skg-close-all--this-dir))
+  (let ((skg-rust-tcp-proc 'live-process-sentinel)
+        (skg--active-request-id nil)
+        (skg--next-request-number 91))
+    (skg-reload)
+    (should (eq skg-rust-tcp-proc 'live-process-sentinel))
+    (should (= skg--next-request-number 91))))
+
 (ert-deftest test-skg-reload-refreshes-keymap-bindings ()
   "Edits to bindings in `skg-keymaps-and-aliases.el' must take
 effect on reload. Before the fix, `defvar MAP (let ((m …)) …)'

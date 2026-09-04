@@ -312,3 +312,95 @@ what's imperfect about what's done; choices determining the future.
   original journal and any already-published evidence refs. Its structured
   failure makes Emacs assign a fresh incident and queue an exact full sweep,
   which classifies and presents the changed bytes as the successor.
+
+* execution of '7_plan.org'
+** what's done and went well
+- The pre-execution baseline passes: =cargo check --lib=, all 334 Emacs tests,
+  and the complete Neovim suite.
+- Added the configured maintenance archive root and made config loading create
+  it privately, retain both its host-resolvable configured spelling and its
+  canonical server identity, and reject parent traversal or overlap with a
+  source in either direction.  Focused default, permission, overlap, traversal,
+  and symlink-aware config tests pass.
+- Added manifest revision as an identity distinct from graph generation,
+  including the semantic-no-op transition which advances exact byte authority
+  without pretending the graph or derived stores changed.
+- Added the typed maintenance vocabulary and a pure coordinator with explicit
+  origins, phases, pending reasons, archive states, dispositions and per-state
+  edit/save/query policy.  Its focused happy-path, stale-candidate, pending,
+  and disconnect model tests pass.
+- Added versioned, private, checksummed, atomic maintenance journals under the
+  config-keyed state root.  Malformed and incomplete publications are retained
+  and reported.  Focused round-trip, compaction-refusal and corruption tests
+  pass.
+- Added a generation-gate implementation with RAII query/selection leases and
+  the process runtime foundations: immutable selected-runtime publications,
+  retained interactive session, retained coordinator, journal and an exclusive
+  single-interactive connection slot.
+- Wired the process runtime through the listener and request dispatch.  The
+  sole interactive session, open forests, collateral scheduler, maintenance
+  coordinator, candidates and observer now survive sequential replacement
+  connections; role verification refuses a concurrent interactive socket and
+  requires a census before ordinary requests.
+- Made foreground request teardown total in both clients, made response writes
+  report failure, and added the two-step descriptor/text census.  A reconnect
+  reattaches an exact retained URI/revision/token or reconstructs a missing
+  same-generation forest only from checksummed last-fetched text; mismatches
+  preserve editor text but remove live save authority.
+- Moved direct source observation into a process-owned nonrecursive Rust
+  watcher and cancellable worker.  It builds immutable full-corpus candidates,
+  distinguishes byte equality, semantic equality, valid semantic changes,
+  invalid input and unstable reads, and advances only manifest revision for a
+  revalidated semantic no-op.
+- Ordinary Skg saves now prepare and fence the union of every replacement,
+  creation and tombstone immediately before their first write, using exact
+  selected BLAKE3 bytes/absence rather than watcher timing.  The same boundary
+  catches same-length non-ASCII rewrites and unexpected creation/deletion, and
+  pending valid or invalid disk work rejects a save before parsing its plan.
+- Added explicit view kind/recipe and graph, presentation, revision, client
+  buffer and application-token authority to retained forests and both editor
+  registries.  View creation and successful saves carry that authority on the
+  wire.  Background collateral offers now name the exact base record and
+  required next token; clients refuse stale or dirty installation and Rust
+  advances its forest only after the exact next token is acknowledged.
+- Pinned search enrichment to one generation lease, staged its complete
+  immutable enrichment payload before waiting for editor text, and made its
+  eventual application use the same exact buffer/revision/token authority and
+  acknowledgement boundary as collateral presentation.
+- Added native recovery-history adapters for both editors: Emacs delegates to
+  undo-fu-session's public serializer (and refuses active Undo Tree mode),
+  while Neovim uses its native =:wundo= format.  Both fail closed when a dirty
+  buffer has history that cannot be archived; the explicit exact-buffer waiver
+  is a separate server-journaled confirmation.
+- Added matching portable, private, checksummed archive writers in Emacs and
+  Neovim.  They stage exact buffer text, last-fetched text, unified diffs,
+  recipes/workflow metadata and opaque native undo sidecars, then publish the
+  incident by one directory rename without overwriting an existing incident.
+- Extended the durable coordinator's archive contract to freeze the owning
+  editor/session, source set, exact G0, complete registered/dirty/undo census,
+  server-allocated timestamped directory, and exact undo waivers.  Disconnect
+  preserves the precise suspended phase and reconnect restores it.
+- Added a strict server-side archive verifier and the begin/archive-ready/
+  failure/waiver/cancel/status protocol.  The verifier walks through held
+  no-follow directory descriptors on Unix, enforces private modes and a closed
+  file inventory, hashes every artifact, and checks the client manifest against
+  the frozen server contract before durably accepting =ARCHIVE-READY=.
+
+** Changes to the plan's envisioned order.
+- Archive-root validation was implemented alongside the first shared identity
+  types, before the client archive writer.  Every later archive and handshake
+  path now has one validated config fact to consume.
+
+** what's imperfect about what's done
+- The census currently reconstructs only live view forests; recipes, attached
+  workflows and stale-state detail still need the fuller descriptor schema.
+- Older foreground rerender streams still need to be routed through the same
+  exact application/ACK authority used by retained collateral offers.
+- The archive bootstrap is complete, but store selection, final node-evidence
+  transfer, per-view disposition and terminal archive finalization are still
+  in progress; a verified initial archive intentionally leaves its epoch lock
+  installed until those later phases are durable.
+
+** choices determining the future
+- None.  The Undo Tree discovery is resolved by the agreed fail-closed active-
+  mode check; merely having the package installed has no effect.

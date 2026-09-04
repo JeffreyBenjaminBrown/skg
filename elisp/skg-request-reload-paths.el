@@ -154,16 +154,25 @@
     (ignore-errors (file-notify-rm-watch descriptor)))
   (setq skg--reload-watch-descriptors nil))
 
+(defun skg--reload-observation-active-p ()
+  "Whether every installed source-directory watch is still live."
+  (and skg--reload-watch-descriptors
+       (cl-every #'file-notify-valid-p skg--reload-watch-descriptors)))
+
 (defun skg-start-reload-observation ()
-  "Install one nonrecursive watch per authoritative source directory."
-  (skg-stop-reload-observation)
-  (dolist (source (skg--source-paths))
-    (when (file-directory-p (cdr source))
-      (push (file-notify-add-watch
-             (cdr source) '(change attribute-change)
-             #'skg--reload-file-notify-callback)
-            skg--reload-watch-descriptors)))
-  (skg--request-reload-full-sweep))
+  "Install one nonrecursive watch per authoritative source directory.
+Keep live watches across client-code reloads.  A connection failure removes
+them in the TCP sentinel, so a genuine reconnect still installs fresh watches
+and requests the exact sweep needed to cover its unobserved interval."
+  (unless (skg--reload-observation-active-p)
+    (skg-stop-reload-observation)
+    (dolist (source (skg--source-paths))
+      (when (file-directory-p (cdr source))
+        (push (file-notify-add-watch
+               (cdr source) '(change attribute-change)
+               #'skg--reload-file-notify-callback)
+              skg--reload-watch-descriptors)))
+    (skg--request-reload-full-sweep)))
 
 ;;; ---- the request ---------------------------------------------------
 
@@ -199,6 +208,7 @@ TERMINAL-CALLBACK with the parsed terminal response, when non-nil."
       (condition-case err
           (progn
             (skg--begin-stream "reload")
+            (skg--register-stream-request-cleanup "reload")
             (skg--lock-all-skg-buffers)
             (skg-register-response-handler ; refresh safe touched buffers
              'collateral-view

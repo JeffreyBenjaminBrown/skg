@@ -1,4 +1,4 @@
-//! Connection-local, single-worker background view rendering.
+//! Retained-session, single-worker background view rendering.
 //!
 //! A graph transition replaces the remaining queue rather than appending to
 //! it.  Workers never touch TCP or `OpenViews`; they return an immutable
@@ -62,6 +62,10 @@ struct BatchContext {
 struct WorkerResult {
   uri           : ViewUri,
   base_revision : u64,
+  base_view_graph_generation : u64,
+  base_view_presentation_generation : u64,
+  base_client_application_token : u64,
+  client_buffer_id : Option<String>,
   generation    : RenderGeneration,
   epoch         : u64,
   result        : Result<(ViewForest, String, Vec<String>), String>,
@@ -70,8 +74,26 @@ struct WorkerResult {
 struct PendingOffer {
   uri           : ViewUri,
   base_revision : u64,
+  base_view_graph_generation : u64,
+  base_view_presentation_generation : u64,
+  base_client_application_token : u64,
+  client_buffer_id : Option<String>,
   generation    : RenderGeneration,
   viewforest    : Option<ViewForest>,
+  batch_epoch   : Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ViewApplicationOffer {
+  pub operation_id : String,
+  pub uri           : ViewUri,
+  pub client_buffer_id : Option<String>,
+  pub base_revision : u64,
+  pub base_graph_generation : u64,
+  pub base_presentation_generation : u64,
+  pub expected_client_application_token : u64,
+  pub resulting_graph_generation : u64,
+  pub resulting_presentation_generation : u64,
 }
 
 pub struct CollateralScheduler {
@@ -156,6 +178,10 @@ impl CollateralScheduler {
     Ok (( ))
   }
 
+  pub fn presentation_generation (&self) -> u64 {
+    self . presentation_generation
+  }
+
   /// Observe HEAD/index independently of worktree selection. A changed
   /// signature rerenders every view only while diff mode is enabled.
   pub fn observe_presentation (
@@ -217,6 +243,10 @@ impl CollateralScheduler {
       return; };
     let viewforest = state . viewforest . clone ();
     let base_revision = state . revision;
+    let base_view_graph_generation = state . graph_generation;
+    let base_view_presentation_generation = state . presentation_generation;
+    let base_client_application_token = state . client_application_token;
+    let client_buffer_id = state . client_buffer_id . clone ();
     let input_ids = active_ids_in_viewforest (&viewforest);
     match decide (
       "background-rerender", &batch . active_source_set, &input_ids,
@@ -224,7 +254,10 @@ impl CollateralScheduler {
     {
       ScalarReleaseDecision::Challenge { pids, prompt, .. } => {
         self . offer_challenge (
-          stream, &uri, base_revision, &batch, pids, &prompt);
+          stream, &uri, base_revision, base_view_graph_generation,
+          base_view_presentation_generation,
+          base_client_application_token,
+          client_buffer_id, &batch, pids, &prompt);
         return; }
       ScalarReleaseDecision::AllowWithWarning { .. }
       | ScalarReleaseDecision::Allow => {}
@@ -244,6 +277,10 @@ impl CollateralScheduler {
       let _ = sender . send (WorkerResult {
         uri,
         base_revision,
+        base_view_graph_generation,
+        base_view_presentation_generation,
+        base_client_application_token,
+        client_buffer_id,
         generation: batch . generation,
         epoch: batch . epoch,
         result,
@@ -263,6 +300,15 @@ impl CollateralScheduler {
        || self . epoch . load (Ordering::Acquire) != finished . epoch
        || views_state . open_views . view_revision (&finished . uri)
           != Some (finished . base_revision)
+       || views_state . open_views . views . get (&finished . uri)
+          . map (|state| state . client_application_token)
+          != Some (finished . base_client_application_token)
+       || views_state . open_views . views . get (&finished . uri)
+          . map (|state| state . graph_generation)
+          != Some (finished . base_view_graph_generation)
+       || views_state . open_views . views . get (&finished . uri)
+          . map (|state| state . presentation_generation)
+          != Some (finished . base_view_presentation_generation)
        || batch . env . in_rust_graph . load_full () . graph_generation
           != finished . generation . graph
     { return; }
@@ -283,7 +329,12 @@ impl CollateralScheduler {
         let uri = finished . uri . clone ();
         let batch = batch . clone ();
         self . offer_challenge (
-          stream, &uri, finished . base_revision, &batch, pids, &prompt);
+          stream, &uri, finished . base_revision,
+          finished . base_view_graph_generation,
+          finished . base_view_presentation_generation,
+          finished . base_client_application_token,
+          finished . client_buffer_id,
+          &batch, pids, &prompt);
         return; }
       ScalarReleaseDecision::AllowWithWarning { warning } =>
         warnings . push (warning),
@@ -292,15 +343,26 @@ impl CollateralScheduler {
     let operation_id = self . fresh_operation_id ();
     let payload = offer_payload (
       &finished . uri, &content, finished . generation,
-      finished . base_revision, &warnings, None);
-    send_response_with_length_prefix (stream,
+      finished . base_revision, finished . base_view_graph_generation,
+      finished . base_view_presentation_generation,
+      finished . base_client_application_token,
+      finished . client_buffer_id . as_deref (), &warnings, None);
+    if send_response_with_length_prefix (stream,
       &tag_server_push_sexp_response (
-        TcpToClient::CollateralView, &operation_id, &payload));
+        TcpToClient::CollateralView, &operation_id, &payload)) . is_err () {
+      return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
       uri: finished . uri,
       base_revision: finished . base_revision,
+      base_view_graph_generation: finished . base_view_graph_generation,
+      base_view_presentation_generation:
+        finished . base_view_presentation_generation,
+      base_client_application_token:
+        finished . base_client_application_token,
+      client_buffer_id: finished . client_buffer_id,
       generation: finished . generation,
       viewforest: Some (viewforest),
+      batch_epoch: Some (finished . epoch),
     }));
   }
 
@@ -309,23 +371,79 @@ impl CollateralScheduler {
     stream : &mut TcpStream,
     uri    : &ViewUri,
     base_revision : u64,
+    base_view_graph_generation : u64,
+    base_view_presentation_generation : u64,
+    base_client_application_token : u64,
+    client_buffer_id : Option<String>,
     batch  : &BatchContext,
     pids   : Vec<ID>,
     prompt : &str,
   ) {
     let operation_id = self . fresh_operation_id ();
     let payload = offer_payload (
-      uri, "", batch . generation, base_revision, &[],
+      uri, "", batch . generation, base_revision,
+      base_view_graph_generation, base_view_presentation_generation,
+      base_client_application_token, client_buffer_id . as_deref (), &[],
       Some ((pids, prompt)));
-    send_response_with_length_prefix (stream,
+    if send_response_with_length_prefix (stream,
       &tag_server_push_sexp_response (
-        TcpToClient::CollateralView, &operation_id, &payload));
+        TcpToClient::CollateralView, &operation_id, &payload)) . is_err () {
+      return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
       uri: uri . clone (),
       base_revision,
+      base_view_graph_generation,
+      base_view_presentation_generation,
+      base_client_application_token,
+      client_buffer_id,
       generation: batch . generation,
       viewforest: None,
+      batch_epoch: Some (batch . epoch),
     }));
+  }
+
+  /// Stage text returned by a foreground continuation without advancing the
+  /// retained forest.  The same exact ACK path as collateral work owns the
+  /// eventual forest/token transition.
+  pub fn stage_view_application (
+    &mut self,
+    views_state : &ViewsState,
+    uri         : &ViewUri,
+    generation  : RenderGeneration,
+    viewforest  : impl Into<ViewForest>,
+  ) -> Result<ViewApplicationOffer, String> {
+    let viewforest = viewforest . into ();
+    if self . pending_offer . is_some () {
+      return Err ("another view application is awaiting acknowledgement"
+        . into ()); }
+    let state = views_state . open_views . views . get (uri)
+      . ok_or_else (|| format! (
+        "view '{}' closed before application could be staged",
+        uri . repr_in_client ()))?;
+    let operation_id = self . fresh_operation_id ();
+    let offer = ViewApplicationOffer {
+      operation_id: operation_id . clone (),
+      uri: uri . clone (),
+      client_buffer_id: state . client_buffer_id . clone (),
+      base_revision: state . revision,
+      base_graph_generation: state . graph_generation,
+      base_presentation_generation: state . presentation_generation,
+      expected_client_application_token: state . client_application_token,
+      resulting_graph_generation: generation . graph . get (),
+      resulting_presentation_generation: generation . presentation,
+    };
+    self . pending_offer = Some ((operation_id, PendingOffer {
+      uri: uri . clone (),
+      base_revision: state . revision,
+      base_view_graph_generation: state . graph_generation,
+      base_view_presentation_generation: state . presentation_generation,
+      base_client_application_token: state . client_application_token,
+      client_buffer_id: state . client_buffer_id . clone (),
+      generation,
+      viewforest: Some (viewforest),
+      batch_epoch: None,
+    }));
+    Ok (offer)
   }
 
   pub fn handle_apply_ack (
@@ -344,7 +462,7 @@ impl CollateralScheduler {
         parse_u64_field (request, "presentation-generation")?;
       let base_revision = parse_u64_field (
         request, "viewforest-base-revision")?;
-      let _client_token = parse_u64_field (request, "client-token")?;
+      let client_token = parse_u64_field (request, "client-token")?;
       let Some ((pending_id, pending)) = self . pending_offer . take ()
       else { return Err ("No collateral offer is pending" . into ()); };
       if pending_id != operation_id || pending . uri != uri {
@@ -356,26 +474,58 @@ impl CollateralScheduler {
          || pending . base_revision != base_revision
       {
         return Err ("Collateral ACK changed its render identity" . into ()); }
-      if ! applied { return Ok ("client rejected obsolete or dirty view"); }
+      let Some (current) = views_state . open_views . views . get (&uri) else {
+        return Err ("Collateral view closed before its ACK" . into ()); };
+      if current . revision != pending . base_revision
+      || current . graph_generation
+         != pending . base_view_graph_generation
+      || current . presentation_generation
+         != pending . base_view_presentation_generation
+      || current . client_application_token
+         != pending . base_client_application_token
+      || (pending . client_buffer_id . is_some ()
+          && current . client_buffer_id != pending . client_buffer_id)
+      {
+        return Err ("Collateral view authority advanced before its ACK"
+          . into ()); }
+      if ! applied {
+        if client_token != pending . base_client_application_token {
+          return Err ("Rejected collateral ACK changed the client token"
+            . into ()); }
+        return Ok ("client rejected obsolete or dirty view"); }
+      let resulting_client_token = pending . base_client_application_token
+        . checked_add (1)
+        . ok_or ("client application token exhausted")?;
+      if client_token != resulting_client_token {
+        return Err (format! (
+          "Collateral ACK token {} is not the required next token {}",
+          client_token, resulting_client_token)); }
       let Some (viewforest) = pending . viewforest else {
         return Err ("Cannot apply a text-free authorization challenge"
           . into ()); };
-      let current_graph = self . batch . as_ref ()
-        . map (|batch| batch . generation . graph);
-      if current_graph != Some (pending . generation . graph) {
-        return Err ("Collateral offer belongs to an obsolete graph generation"
-          . into ()); }
+      if let Some (epoch) = pending . batch_epoch {
+        let current_batch = self . batch . as_ref ()
+          . map (|batch| (batch . epoch, batch . generation . graph));
+        if current_batch != Some ((epoch, pending . generation . graph)) {
+          return Err (
+            "Collateral offer belongs to an obsolete graph generation"
+              . into ()); }}
       if ! views_state . open_views . update_view_if_revision (
           &pending . uri, pending . base_revision, viewforest)
       { return Err ("Collateral view advanced before its ACK" . into ()); }
+      views_state . open_views . set_client_application_authority (
+        &pending . uri,
+        pending . generation . graph . get (),
+        pending . generation . presentation,
+        resulting_client_token)?;
       Ok ("collateral view application acknowledged")
     })();
-    match result {
+    let _ = match result {
       Ok (message) => send_response_with_length_prefix (stream,
         &tag_text_response (TcpToClient::CollateralApplied, message)),
       Err (error) => send_response_with_length_prefix (stream,
         &tag_text_response (TcpToClient::Error, &error)),
-    }
+    };
   }
 
   fn fresh_operation_id (&mut self) -> String {
@@ -411,6 +561,10 @@ fn offer_payload (
   content       : &str,
   generation    : RenderGeneration,
   base_revision : u64,
+  base_view_graph_generation : u64,
+  base_view_presentation_generation : u64,
+  base_client_application_token : u64,
+  client_buffer_id : Option<&str>,
   warnings      : &[String],
   challenge     : Option<(Vec<ID>, &str)>,
 ) -> String {
@@ -422,9 +576,21 @@ fn offer_payload (
       generation . presentation as i64))),
     pair ("viewforest-base-revision", Sexp::Atom (Atom::I (
       base_revision as i64))),
+    pair ("view-base-graph-generation", Sexp::Atom (Atom::I (
+      base_view_graph_generation as i64))),
+    pair ("view-base-presentation-generation", Sexp::Atom (Atom::I (
+      base_view_presentation_generation as i64))),
+    pair ("resulting-server-revision", Sexp::Atom (Atom::I (
+      base_revision . saturating_add (1) as i64))),
+    pair ("expected-client-application-token", Sexp::Atom (Atom::I (
+      base_client_application_token as i64))),
+    pair ("resulting-client-application-token", Sexp::Atom (Atom::I (
+      base_client_application_token . saturating_add (1) as i64))),
     pair ("warnings", Sexp::List (warnings . iter ()
       . map (|warning| atom (warning)) . collect ())),
   ];
+  if let Some (buffer_id) = client_buffer_id {
+    fields . push (pair ("client-buffer-id", atom (buffer_id))); }
   if let Some ((pids, prompt)) = challenge {
     fields . push (pair ("needs-authorization", atom ("true")));
     fields . push (pair ("pids", Sexp::List (pids . iter ()
@@ -434,6 +600,38 @@ fn offer_payload (
     fields . push (pair ("content", atom (content)));
   }
   Sexp::List (fields) . to_string ()
+}
+
+pub fn add_application_offer_to_response (
+  response : &str,
+  offer    : &ViewApplicationOffer,
+) -> Result<String, String> {
+  let Sexp::List (mut fields) = sexp::parse (response)
+    . map_err (|error| format! ("invalid view response: {}", error))?
+  else { return Err ("view response is not a list" . into ()); };
+  fields . extend (vec![
+    pair ("operation-id", atom (&offer . operation_id)),
+    pair ("view-uri", atom (&offer . uri . repr_in_client ())),
+    pair ("graph-generation", Sexp::Atom (Atom::I (
+      offer . resulting_graph_generation as i64))),
+    pair ("presentation-generation", Sexp::Atom (Atom::I (
+      offer . resulting_presentation_generation as i64))),
+    pair ("viewforest-base-revision", Sexp::Atom (Atom::I (
+      offer . base_revision as i64))),
+    pair ("resulting-server-revision", Sexp::Atom (Atom::I (
+      offer . base_revision . saturating_add (1) as i64))),
+    pair ("view-base-graph-generation", Sexp::Atom (Atom::I (
+      offer . base_graph_generation as i64))),
+    pair ("view-base-presentation-generation", Sexp::Atom (Atom::I (
+      offer . base_presentation_generation as i64))),
+    pair ("expected-client-application-token", Sexp::Atom (Atom::I (
+      offer . expected_client_application_token as i64))),
+    pair ("resulting-client-application-token", Sexp::Atom (Atom::I (
+      offer . expected_client_application_token . saturating_add (1) as i64))),
+  ]);
+  if let Some (buffer_id) = &offer . client_buffer_id {
+    fields . push (pair ("client-buffer-id", atom (buffer_id))); }
+  Ok (Sexp::List (fields) . to_string ())
 }
 
 #[cfg(test)]
@@ -461,5 +659,40 @@ mod tests {
     assert_eq! (scheduler . in_flight, Some (uri . clone ()));
     assert! (scheduler . queue . contains (&uri));
     assert_eq! (scheduler . epoch . load (Ordering::Acquire), 1);
+  }
+
+  #[test]
+  fn offer_names_complete_base_and_resulting_application_authority () {
+    let uri = ViewUri::ContentView ("view-uri" . into ());
+    let payload = offer_payload (
+      &uri,
+      "* rendered\n",
+      RenderGeneration {
+        graph: GraphGeneration::INITIAL . successor (),
+        presentation: 9,
+      },
+      4,
+      GraphGeneration::INITIAL . get (),
+      7,
+      12,
+      Some ("client-buffer"),
+      &[],
+      None,
+    );
+    let Sexp::List (fields) = sexp::parse (&payload) . unwrap () else {
+      panic! ("offer payload is not a list"); };
+    let field = |key : &str| fields . iter () . find_map (|entry| match entry {
+      Sexp::List (parts) if parts . len () == 2
+        && parts[0] == atom (key) => crate::types::sexp::atom_to_string (
+          &parts[1]) . ok (),
+      _ => None,
+    });
+    assert_eq! (field ("viewforest-base-revision") . as_deref (), Some ("4"));
+    assert_eq! (field ("resulting-server-revision") . as_deref (), Some ("5"));
+    assert_eq! (field ("view-base-graph-generation") . as_deref (), Some ("1"));
+    assert_eq! (field ("view-base-presentation-generation") . as_deref (), Some ("7"));
+    assert_eq! (field ("expected-client-application-token") . as_deref (), Some ("12"));
+    assert_eq! (field ("resulting-client-application-token") . as_deref (), Some ("13"));
+    assert_eq! (field ("client-buffer-id") . as_deref (), Some ("client-buffer"));
   }
 }

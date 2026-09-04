@@ -27,7 +27,7 @@
   (let ((opened nil)
         (shown nil))
     (cl-letf (((symbol-function 'skg-open-org-buffer-from-text)
-               (lambda (_tcp-proc content buffer-name view-uri)
+               (lambda (_tcp-proc content buffer-name view-uri &rest _registry)
                  (setq opened (list content buffer-name view-uri))))
               ((symbol-function 'skg-big-nonfatal-message)
                (lambda (buffer-name message-text content)

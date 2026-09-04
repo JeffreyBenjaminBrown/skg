@@ -51,6 +51,7 @@ function M.connect ()
     error(M.server_unavailable_message(
       connect_result or 'connection timed out')) end
   state.tcp = tcp
+  state.connection_handshake_state = nil
   state.lp_reset()
   tcp:read_start(function (err, chunk)
     -- The uv read callback: forward data (or closure) to the main
@@ -63,6 +64,7 @@ function M.connect ()
     else
       vim.schedule(function () M.handle_rust_response(chunk) end) end
   end)
+  require('skg.misc_requests').enqueue_connection_handshake(tcp)
   return state.tcp
 end
 
@@ -101,6 +103,7 @@ function M.handle_rust_response (chunk)
       message = tostring(parsed[1].cdr) end
     vim.notify(message)
     state.run_connection_reset_hooks()
+    state.connection_handshake_state = nil
     state.clear_request_coordinator()
     state.lp_reset()
   else
@@ -115,6 +118,7 @@ end
 function M.sentinel (event)
   log.log('info', 'tcp', 'connection closed: %s', event)
   state.close_connection()
+  state.connection_handshake_state = nil
   state.run_connection_reset_hooks()
   state.clear_request_coordinator()
   state.lp_reset()
@@ -146,6 +150,25 @@ local function request_wire (request_text, request_id, incident_id, content)
   return wire
 end
 
+local function write_request (tcp, text)
+  tcp:write(text, function (error)
+    if error then
+      vim.schedule(function ()
+        state.transport_failed('request send failed: ' .. tostring(error))
+      end)
+    end
+  end)
+end
+
+---Queue an internal connection request without consuming an ordinary draft.
+function M.submit_priority_request (tcp, request_text, handlers, content)
+  local record = state.new_internal_request(handlers)
+  local wire = request_wire(request_text, record.id, nil, content)
+  state.enqueue_priority_request(
+    record, wire, function (text) write_request(tcp, text) end)
+  return record.id
+end
+
 ---Submit one complete foreground operation through the serial coordinator.
 function M.submit_request (request_text, content, incident_id)
   local tcp = M.connect()
@@ -153,7 +176,8 @@ function M.submit_request (request_text, content, incident_id)
   record.incident_id = incident_id
   local wire = request_wire(
     request_text, record.id, record.incident_id, content)
-  state.enqueue_request(record, wire, function (text) tcp:write(text) end)
+  state.enqueue_request(record, wire,
+                        function (text) write_request(tcp, text) end)
   return record.id
 end
 
@@ -164,13 +188,14 @@ function M.submit_request_continuation (request_text, content)
     error('skg: no active request is being dispatched') end
   local tcp = M.connect()
   local record = state.request_records[request_id]
-  tcp:write(request_wire(
+  write_request(tcp, request_wire(
     request_text, request_id, record and record.incident_id, content))
 end
 
 ---Manually close the connection to the Rust server.
 function M.connection_end ()
   state.close_connection()
+  state.connection_handshake_state = nil
   state.run_connection_reset_hooks()
   state.clear_request_coordinator()
   state.lp_reset()

@@ -15,7 +15,10 @@ function M.view_new_empty ()
     '* (skg (node (source %s) indef)) life, the universe and everything\n',
     source)
   buffer.open_org_buffer_from_text(
-    org_text, buffer.content_view_buffer_name(org_text))
+    org_text, buffer.content_view_buffer_name(org_text), nil, {
+      kind = 'new-empty-content-view',
+      recipe = { kind = 'new-empty' },
+    })
 end
 
 return M

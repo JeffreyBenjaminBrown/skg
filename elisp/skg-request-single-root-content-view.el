@@ -129,6 +129,7 @@ retry."
                   (let ((u (cadr (assoc 'view-uri response))))
                     (when u (format "%s" u))))
                  (effective-uri (or server-uri view-uri))
+                 (authority (skg--view-authority-from-response response))
                  (to-minibuffer ;; Optional one-line echo: minibuffer only, never buffer text, never a popped window.
                   (cadr (assoc 'to-minibuffer response)))
                  (has-errors (skg--message-list-nonempty-p errors-list))
@@ -139,7 +140,12 @@ retry."
               (let ((buf-name (skg-content-view-buffer-name
                                content-value)))
                 (skg-open-org-buffer-from-text
-                 tcp-proc content-value buf-name effective-uri)))
+                 tcp-proc content-value buf-name effective-uri
+                 (if (string-prefix-p "override-menu:" effective-uri)
+                     'override-choice-menu
+                   'content-view)
+                 `((kind . "single-root") (root-id . ,node-id))
+                 authority)))
             (when to-minibuffer
               (message "%s" to-minibuffer))
             (when (or has-errors has-warnings)

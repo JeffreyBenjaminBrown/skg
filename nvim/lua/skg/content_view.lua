@@ -110,7 +110,21 @@ function M.handle_content_view (payload_text, response, view_uri)
       buffer.open_org_buffer_from_text(
         content_text,
         buffer.content_view_buffer_name(content_text),
-        effective_uri) end
+        effective_uri, {
+          kind = server_uri and server_uri:find('^override%-menu:')
+                 and 'override-choice-menu' or 'content-view',
+          disposable = server_uri and server_uri:find('^override%-menu:')
+                       ~= nil,
+          recipe = { kind = 'single-root' },
+          graph_generation = tonumber(
+            payload.field_text(response, 'graph-generation')),
+          presentation_generation = tonumber(
+            payload.field_text(response, 'presentation-generation')),
+          server_revision = tonumber(
+            payload.field_text(response, 'server-revision')),
+          application_token = tonumber(
+            payload.field_text(response, 'client-application-token')),
+        }) end
     if to_minibuffer then
       -- Echo area only -- never buffer text, never a popped window.
       vim.notify(to_minibuffer) end

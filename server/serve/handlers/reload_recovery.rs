@@ -97,11 +97,11 @@ pub fn handle_reload_recovery_request (
   let incident_id = match value_from_request_sexp ("incident-id", request) {
     Ok (incident) => incident,
     Err (error) => {
-      send_response_with_length_prefix (stream, &tag_terminal_text_response (
+      let _ = send_response_with_length_prefix (stream, &tag_terminal_text_response (
         TcpToClient::ReloadRecovery, "failed", &error));
       return; }};
   if value_from_request_sexp ("approved", request) . as_deref () != Ok ("true") {
-    send_response_with_length_prefix (stream, &tag_terminal_text_response (
+    let _ = send_response_with_length_prefix (stream, &tag_terminal_text_response (
       TcpToClient::ReloadRecovery, "failed",
       "Recovery requires explicit client approval"));
     return; }
@@ -114,17 +114,17 @@ pub fn handle_reload_recovery_request (
         incident_id))
     } else { Err (format! (
       "No unresolved recovery incident named '{}'", incident_id)) };
-    match result {
+    let _ = match result {
       Ok (message) => send_response_with_length_prefix (
         stream, &tag_terminal_text_response (
           TcpToClient::ReloadRecovery, "complete", &message)),
       Err (error) => send_response_with_length_prefix (
         stream, &tag_terminal_text_response (
           TcpToClient::ReloadRecovery, "failed", &error)),
-    }
+    };
     return; }
   if action != "recover" {
-    send_response_with_length_prefix (stream, &tag_terminal_text_response (
+    let _ = send_response_with_length_prefix (stream, &tag_terminal_text_response (
       TcpToClient::ReloadRecovery, "failed", "Unknown recovery action"));
     return; }
   let _write_guard = block_on (
@@ -132,7 +132,7 @@ pub fn handle_reload_recovery_request (
   match recover_incident (config, &incident_id) {
     Ok (report) => {
       let payload = recovery_report_sexp (&report) . to_string ();
-      send_response_with_length_prefix (stream, &tag_terminal_sexp_response (
+      let _ = send_response_with_length_prefix (stream, &tag_terminal_sexp_response (
         TcpToClient::ReloadRecovery, "complete", &payload)); }
     Err (error) if error . contains (
         "Recovery stopped because disk changed after the incident") => {
@@ -146,12 +146,12 @@ pub fn handle_reload_recovery_request (
           Sexp::Atom (Atom::S ("true" . into ())),
         ]),
       ]) . to_string ();
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream, &tag_terminal_sexp_response (
           TcpToClient::ReloadRecovery, "failed", &payload)); }
-    Err (error) => send_response_with_length_prefix (
+      Err (error) => { let _ = send_response_with_length_prefix (
       stream, &tag_terminal_text_response (
-        TcpToClient::ReloadRecovery, "failed", &error)),
+        TcpToClient::ReloadRecovery, "failed", &error)); }
   }
 }
 

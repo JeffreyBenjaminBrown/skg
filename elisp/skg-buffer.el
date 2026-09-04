@@ -6,6 +6,7 @@
 (require 'heralds-minor-mode)
 (require 'skg-sexpr-search)
 (require 'skg-keymaps-and-aliases)
+(require 'skg-buffer-registry)
 
 
 (defun skg--org-mode-with-options ()
@@ -138,7 +139,8 @@ and truncates to a reasonable length."
   (skg-open-org-buffer-from-text
    nil "" "*skg-empty*"))
 
-(defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-uri)
+(defun skg-open-org-buffer-from-text
+    (_tcp-proc org-text buffer-name &optional view-uri kind recipe authority)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
 If VIEW-URI is provided, set it as the buffer's skg-view-uri;
 otherwise generate a new UUID."
@@ -154,6 +156,15 @@ otherwise generate a new UUID."
       (setq skg-view-uri uri)
       (setq-local skg--last-rendered-content org-text)
       (setq skg-contentView-initialRoot-source source)
+      (skg-register-buffer
+       buffer (or kind 'content-view)
+       :view-uri uri :recipe recipe :last-fetched org-text
+       :disposable (eq kind 'override-choice-menu)
+       :graph-generation (plist-get authority :graph-generation)
+       :presentation-generation
+       (plist-get authority :presentation-generation)
+       :server-revision (plist-get authority :server-revision)
+       :application-token (plist-get authority :application-token))
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook
                 #'skg-warn-if-other-buffer-modified nil t)

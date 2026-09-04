@@ -19,6 +19,9 @@ function M.list_source_sets ()
       local active = payload.field_text(response, 'active')
       local sets =
         payload.string_list(payload.field(response, 'sets'))
+      if active then
+        state.active_source_set_name = active
+        vim.g.skg_active_source_set_name = active end
       vim.notify(string.format(
         'Active source-set: %s; available: %s',
         active or '?', table.concat(sets, ', ')))
@@ -30,6 +33,10 @@ end
 function M.active_source_set ()
   state.register_response_handler('active-source-set',
     function (_payload_text, response)
+      local active = payload.field_text(response, 'active')
+      if active then
+        state.active_source_set_name = active
+        vim.g.skg_active_source_set_name = active end
       vim.notify(payload.field_text(response, 'content') or '?')
     end, true)
   client.submit_request('((request . "active source set"))\n')
@@ -49,9 +56,14 @@ function M.set_active_source_set (name, approved_pids)
     return end
   state.register_response_handler('active-source-set',
     function (_payload_text, response)
+      local active = payload.field_text(response, 'active')
+      if active then
+        state.active_source_set_name = active
+        vim.g.skg_active_source_set_name = active end
       vim.notify(payload.field_text(response, 'content') or '?')
     end, true)
   lock.begin_stream('rerender')
+  lock.register_stream_request_cleanup('source-set switch')
   lock.lock_all_skg_buffers()
   rerender.register_rerender_stream_handlers()
   rerender.register_ugly_confirmation(function (pids)

@@ -124,7 +124,7 @@ pub fn handle_titles_by_ids_request_with_source_set (
     "titles-by-ids", active, ugly_pids,
     &approved_pids_from_request (request) );
   if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream, &challenge_response (&release) . unwrap () );
     return; }
   let warnings : Vec<String> = match release {
@@ -146,7 +146,7 @@ pub fn handle_titles_by_ids_request_with_source_set (
       warnings . iter ()
       . map ( |warning| elisp_string_literal (warning) )
       . collect::<Vec<String>> () . join (" ") );
-  send_response_with_length_prefix (stream, &response); }
+  let _ = send_response_with_length_prefix (stream, &response); }
 
 fn elisp_string_literal (
   s : &str,
@@ -212,4 +212,4 @@ fn send_error_response (
         Sexp::Atom ( Atom::S (
           msg . to_string () )), ] ),
     ] ) . to_string ();
-  send_response_with_length_prefix (stream, &response); }
+  let _ = send_response_with_length_prefix (stream, &response); }

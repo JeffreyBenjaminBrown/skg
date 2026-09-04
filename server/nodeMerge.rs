@@ -108,7 +108,9 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
       &primary_definenodes,
       &[], // No source-moves during a merge.
       &config,
-      hoist_approved_pids ) ?;
+      hoist_approved_pids ) ?
+      . with_selected_fence (&old_selected . manifest);
+    prepared . validate_selected_fence ()?;
     prepared . apply (&config) ?;
     prepared . apply_to_manifest (&mut selected_manifest);
     tracing::info!("   Filesystem merge complete."); }

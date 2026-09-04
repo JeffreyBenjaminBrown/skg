@@ -5,6 +5,22 @@
 
 local M = {}
 
+if not vim.g.skg_client_session_id then
+  vim.g.skg_client_session_id = string.format(
+    'nvim-%d-%s', vim.fn.getpid(),
+    vim.fn.sha256(tostring(vim.uv.hrtime())):sub(1, 24))
+end
+
+M.client_session_id = vim.g.skg_client_session_id
+M.connection_handshake_state = nil
+M.active_source_set_name = vim.g.skg_active_source_set_name
+  or 'server-default'
+M.maintenance_archive_folder = nil
+M.maintenance_archive_identity = nil
+M.maintenance_state = nil
+M.maintenance_client_incident = M.maintenance_client_incident or nil
+M.pending_maintenance_offer = M.pending_maintenance_offer or nil
+
 ---The persistent TCP connection to the Rust backend: a vim.uv tcp
 ---handle, or nil when disconnected.
 M.tcp = nil
@@ -31,6 +47,16 @@ end
 local function fresh_request_id ()
   M.next_request_number = M.next_request_number + 1
   return string.format('nvim-%d-%d', vim.fn.getpid(), M.next_request_number)
+end
+
+function M.new_internal_request (handlers)
+  local record = { id = fresh_request_id(), handlers = handlers or {} }
+  M.request_records[record.id] = record
+  for _, entry in pairs(record.handlers) do
+    if entry.one_shot then
+      M.lp_pending_count = M.lp_pending_count + 1 end
+  end
+  return record
 end
 
 function M.ensure_request_draft ()
@@ -71,6 +97,18 @@ function M.response_handler_registered (frame_kind)
   return record and record.handlers[frame_kind] or nil
 end
 
+function M.set_request_terminal_handler (handler)
+  M.ensure_request_draft().terminal_handler = handler
+end
+
+function M.set_request_failure_handler (handler)
+  M.ensure_request_draft().failure_handler = handler
+end
+
+function M.set_request_finalizer (finalizer)
+  M.ensure_request_draft().finalizer = finalizer
+end
+
 function M.take_request_record ()
   local record = M.request_draft
     or { id = fresh_request_id(), handlers = {} }
@@ -83,7 +121,8 @@ function M.dispatch_next_request ()
   if M.active_request_id or #M.request_queue == 0 then return end
   local queued = table.remove(M.request_queue, 1)
   M.active_request_id = queued.id
-  queued.send(queued.wire)
+  local ok, err = pcall(queued.send, queued.wire)
+  if not ok then M.fail_all_requests('request send failed: ' .. tostring(err)) end
 end
 
 function M.enqueue_request (record, wire, send)
@@ -92,13 +131,35 @@ function M.enqueue_request (record, wire, send)
   M.dispatch_next_request()
 end
 
-function M.finish_request (request_id)
+function M.enqueue_priority_request (record, wire, send)
+  table.insert(M.request_queue, 1,
+               { id = record.id, wire = wire, send = send })
+  M.dispatch_next_request()
+end
+
+local function finalize_record (record, reason)
+  if not record or record.finalized then return end
+  record.finalized = true
+  for _, entry in pairs(record.handlers) do
+    if entry.one_shot then
+      M.lp_pending_count = math.max(0, M.lp_pending_count - 1) end
+  end
+  if record.finalizer then
+    local ok, err = pcall(record.finalizer, reason)
+    if not ok then
+      vim.schedule(function ()
+        vim.notify('skg request finalizer failed: ' .. tostring(err),
+                   vim.log.levels.ERROR) end)
+    end
+  end
+end
+
+function M.finish_request (request_id, terminal_status)
   local record = M.request_records[request_id]
   if record then
-    for _, entry in pairs(record.handlers) do
-      if entry.one_shot then
-        M.lp_pending_count = math.max(0, M.lp_pending_count - 1) end
-    end
+    if record.terminal_handler then
+      pcall(record.terminal_handler, terminal_status) end
+    finalize_record(record, terminal_status or 'terminal')
     M.request_records[request_id] = nil
   end
   if M.active_request_id == request_id then
@@ -106,7 +167,33 @@ function M.finish_request (request_id)
     M.dispatch_next_request() end
 end
 
+
+function M.fail_all_requests (reason)
+  M.request_queue = {}
+  M.active_request_id = nil
+  M.dispatching_request_id = nil
+  local records = {}
+  for _, record in pairs(M.request_records) do
+    table.insert(records, record) end
+  if M.request_draft then table.insert(records, M.request_draft) end
+  M.request_draft = nil
+  for _, record in ipairs(records) do
+    if not record.finalized then
+      if record.failure_handler then
+        pcall(record.failure_handler, reason) end
+      finalize_record(record, reason)
+    end
+  end
+  M.request_records = {}
+  M.lp_pending_count = 0
+end
+
+function M.transport_failed (reason)
+  M.fail_all_requests(reason)
+end
+
 function M.clear_request_coordinator ()
+  M.fail_all_requests('request coordinator reset')
   M.request_records = {}
   M.request_draft = nil
   M.request_queue = {}

@@ -28,7 +28,7 @@ pub fn handle_edge_source_info_request (
       Ok  (body) => body,
       Err (msg)  => format! (
         "(error {})", quoted (&msg) ) };
-  send_response_with_length_prefix ( stream, & format! (
+  let _ = send_response_with_length_prefix ( stream, & format! (
     "((response-type {}) {})",
     TcpToClient::EdgeSourceInfo . repr_in_client (),
     response )); }

@@ -18,6 +18,7 @@
            (let* ((response (read payload))
                   (active (cadr (assoc 'active response)))
                   (sets (cadr (assoc 'sets response))))
+             (setq skg--active-source-set-name (format "%s" active))
              (message "Active source-set: %s; available: %s"
                       active
                       (mapconcat #'identity sets ", ")))
@@ -40,6 +41,8 @@
        (condition-case err
            (let* ((response (read payload))
                   (content (cadr (assoc 'content response))))
+             (when-let ((active (cadr (assoc 'active response))))
+               (setq skg--active-source-set-name (format "%s" active)))
              (message "%s" content))
          (error
           (message "skg-active-source-set: %S" err))))
@@ -65,11 +68,13 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
          (condition-case err
              (let* ((response (read payload))
                     (content (cadr (assoc 'content response))))
+               (setq skg--active-source-set-name name)
                (message "%s" content))
            (error
             (message "skg-set-active-source-set: %S" err))))
        t)
       (skg--begin-stream "rerender")
+      (skg--register-stream-request-cleanup "source-set switch")
       (skg--lock-all-skg-buffers)
       (skg--register-rerender-stream-handlers)
       (skg--register-rerender-ugly-confirmation

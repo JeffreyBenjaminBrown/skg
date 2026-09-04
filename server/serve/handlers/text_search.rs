@@ -20,7 +20,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats,
   fetch_all_graphnodestats_with_source_set};
-use crate::types::env::SkgEnv;
+use crate::runtime::RuntimeQueryLease;
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
@@ -32,6 +32,7 @@ use crate::serve::handlers::scalar_release::{
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
+  add_view_authority_to_response,
   send_response_with_length_prefix,
   tag_terminal_text_response,
   tag_text_response,
@@ -54,7 +55,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tantivy::{TantivyDocument, Searcher};
 use tantivy::schema::document::Value;
-use typedb_driver::TypeDBDriver;
 
 /// Maps each ID to search hits (plural -- IDs can have aliases,
 /// so one ID might get multiple matches).
@@ -119,6 +119,12 @@ pub struct SearchEnrichmentPayload {
   pub search_results : Vec<ID>,
   pub ancestry_by_id : HashMap<ID, AncestryTree>,
   pub graphnodestats : AllGraphNodeStats,
+  pub title_and_source_by_id : HashMap<ID, (String, SourceName)>,
+  pub graph          : Arc<InRustGraph>,
+  pub config         : SkgConfig,
+  pub active_source_set : ActiveSourceSet,
+  pub graph_generation : crate::types::store_state::GraphGeneration,
+  pub presentation_generation : u64,
   /// Load-bearing across the asynchronous snapshot exchange: enrichment
   /// must not broaden a preflight decision to exclude ugly telescopes.
   pub include_ugly_telescopes : bool,
@@ -131,12 +137,14 @@ pub struct SearchEnrichmentPayload {
 pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
-  env              : &SkgEnv,
+  lease            : RuntimeQueryLease,
+  presentation_generation : u64,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
   active            : &ActiveSourceSet,
 ) {
+  let env = &lease . snapshot . env;
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
     . map_err ( |e| format! (
@@ -145,7 +153,7 @@ pub fn handle_text_search_request (
     Ok (s) => s,
     Err (err) => {
       tracing::error! ( "{}", err );
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::Error, &err ));
@@ -156,7 +164,7 @@ pub fn handle_text_search_request (
     match search_choice_from_request (&sexp) {
       Ok (choice) => choice,
       Err (error) => {
-        send_response_with_length_prefix (
+        let _ = send_response_with_length_prefix (
           stream,
           & tag_text_response (TcpToClient::Error, &error) );
         return; }};
@@ -167,7 +175,7 @@ pub fn handle_text_search_request (
       wait_for_tantivy_writes_idle ();
       if let StoreHealth::Poisoned (reason) =
           &env . in_rust_graph . load_full () . tantivy_health {
-        send_response_with_length_prefix (
+        let _ = send_response_with_length_prefix (
           stream,
           &tag_text_response (
             TcpToClient::Error,
@@ -179,7 +187,7 @@ pub fn handle_text_search_request (
         match has_ugly_telescope (&env . tantivy_index) {
           Ok (has_ugly) => has_ugly,
           Err (error) => {
-            send_response_with_length_prefix (
+            let _ = send_response_with_length_prefix (
               stream,
               & tag_text_response (
                 TcpToClient::Error,
@@ -188,7 +196,7 @@ pub fn handle_text_search_request (
       if ! active . is_all ()
          && index_has_ugly
          && search_choice . is_none () {
-        send_response_with_length_prefix (
+        let _ = send_response_with_length_prefix (
           stream, &search_challenge_response () );
         return; }
       let include_ugly_telescopes : bool =
@@ -206,7 +214,7 @@ pub fn handle_text_search_request (
                            &search_opts ) {
         Ok (( best_matches, searcher )) => {
           if best_matches . is_empty () {
-            send_response_with_length_prefix (
+            let _ = send_response_with_length_prefix (
               stream,
               & tag_terminal_text_response (
                 TcpToClient::SearchResults,
@@ -224,7 +232,7 @@ pub fn handle_text_search_request (
               Some (active) ),
               active );
           if matches_by_id . is_empty () {
-            send_response_with_length_prefix (
+            let _ = send_response_with_length_prefix (
               stream,
               & tag_terminal_text_response (
                 TcpToClient::SearchResults,
@@ -251,7 +259,7 @@ pub fn handle_text_search_request (
             &env . in_rust_graph_snapshot (), &approved );
           if matches! (
             release, ScalarReleaseDecision::Challenge { .. } ) {
-            send_response_with_length_prefix (
+            let _ = send_response_with_length_prefix (
               stream, &search_challenge_response () );
             return; }
           let warnings : Vec<String> = match release {
@@ -267,20 +275,28 @@ pub fn handle_text_search_request (
           if views_state . open_views . views . contains_key (&uri) {
             // Replace prior search with the same terms.
             views_state . open_views . unregister_view (&uri); }
-          views_state . open_views . register_view (
-            uri, viewforest, &search_results );
-          send_response_with_length_prefix (
+          views_state . open_views . register_view_with_authority (
+            uri . clone (), viewforest, &search_results,
+            env . in_rust_graph . load_full () . graph_generation . get (),
+            presentation_generation,
+            1,
+            crate::maintenance::BufferKind::SearchView,
+            Some (format! ("search:{}", search_terms)) );
+          let response = add_view_authority_to_response (
+            &mk_search_results_sexp (&rendered, &warnings),
+            views_state . open_views . views . get (&uri)
+              . expect ("registered search view exists"));
+          let _ = send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,
-            & mk_search_results_sexp (&rendered, &warnings) );
+            &response );
           spawn_enrichment_thread (
             // phase 2 (enriched) search results, backgrounded
-            enrichment_slot, search_cancelled,
-            &env . driver, &env . config,
+            enrichment_slot, search_cancelled, lease,
             &search_terms, &search_results, active,
-            include_ugly_telescopes ); },
+            include_ugly_telescopes, presentation_generation ); },
         Err (e) => {
-          send_response_with_length_prefix (
+          let _ = send_response_with_length_prefix (
             stream,
             & tag_text_response (
               TcpToClient::Error,
@@ -290,7 +306,7 @@ pub fn handle_text_search_request (
         format! (
           "Error extracting search terms: {}", err );
       tracing::error! ( "{}", error_msg ) ;
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response (
           TcpToClient::Error, &error_msg )); }} }
@@ -323,12 +339,12 @@ fn filter_match_groups_to_active_sources (
 fn spawn_enrichment_thread (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
-  typedb_driver    : &Arc<TypeDBDriver>,
-  config           : &SkgConfig,
+  lease            : RuntimeQueryLease,
   search_terms     : &str,
   search_results   : &[ID],
   active           : &ActiveSourceSet,
   include_ugly_telescopes : bool,
+  presentation_generation : u64,
 ) {
   { // Clear stale enrichment before spawning.
     // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
@@ -339,20 +355,22 @@ fn spawn_enrichment_thread (
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
-  let config_clone  : SkgConfig         = config . clone ();
   let active_clone  : ActiveSourceSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
-  let max_depth : usize = config . max_ancestry_depth;
   std::thread::spawn ( move || {
+    let env = &lease . snapshot . env;
+    let config = &env . config;
+    let graph = env . in_rust_graph_snapshot ();
+    let graph_generation = lease . snapshot . selected . graph_generation;
+    let max_depth : usize = config . max_ancestry_depth;
     tracing::info! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
     let ancestry_by_id : HashMap<ID, AncestryTree> =
       futures::executor::block_on (
         ancestry_by_id_from_ids_async (
-          &ids_clone, &config_clone . db_name,
-          &driver_clone, max_depth ));
+          &ids_clone, &config . db_name,
+          &env . driver, max_depth ));
     tracing::info! ("search enrichment: ancestry computed ({} entries)",
               ancestry_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
@@ -368,14 +386,18 @@ fn spawn_enrichment_thread (
       for tree in ancestry_by_id . values () {
         collect_ids_from_ancestry_node ( tree, &mut id_set ); }
       id_set . extend (
-        render_enriched_search_buffer::collect_override_relative_ids (
-          &ids_clone, &active_clone ) );
+        render_enriched_search_buffer::collect_override_relative_ids_from_graph (
+          &ids_clone, &active_clone, &graph ) );
       id_set . into_iter () . collect () };
+    let title_and_source_by_id = all_enriched_ids . iter ()
+      . filter_map (|id| crate::dbs::tantivy::title_and_source_by_id (
+        &env . tantivy_index, id) . map (|value| (id . clone (), value)))
+      . collect ();
     let graphnodestats : AllGraphNodeStats =
       futures::executor::block_on (
         fetch_all_graphnodestats_with_source_set (
-          &config_clone . db_name,
-          &driver_clone,
+          &config . db_name,
+          &env . driver,
           &all_enriched_ids,
           Some (&active_clone) ) )
       . unwrap_or_else ( |e| {
@@ -394,6 +416,12 @@ fn spawn_enrichment_thread (
       search_results : ids_clone,
       ancestry_by_id,
       graphnodestats,
+      title_and_source_by_id,
+      graph,
+      config: config . clone (),
+      active_source_set: active_clone,
+      graph_generation,
+      presentation_generation,
       include_ugly_telescopes } ); } ); }
 
 fn collect_ids_from_ancestry_node(

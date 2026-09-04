@@ -1,10 +1,12 @@
 pub mod close_view;
+pub mod client_census;
 pub mod collateral_scheduler;
 pub mod diff_analysis;
 pub mod edge_source_info;
 pub mod export_to_org;
 pub mod get_file_path;
 pub mod herald_rules;
+pub mod maintenance_protocol;
 pub mod rebuild_dbs;
 pub mod recompute_cyclic_roots;
 pub mod reload_paths;

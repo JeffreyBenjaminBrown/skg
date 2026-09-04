@@ -149,7 +149,7 @@ pub(crate) fn authorize_prepared_rerenders (
     &env . in_rust_graph_snapshot (), approved_pids );
   match release {
     ScalarReleaseDecision::Challenge { .. } => {
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream, &challenge_response (&release) . unwrap () );
       false },
     ScalarReleaseDecision::AllowWithWarning { warning } => {
@@ -164,7 +164,7 @@ pub(crate) fn stream_prepared_rerenders (
   views_state : &mut ViewsState,
   prepared    : PreparedRerenders,
 ) {
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderLock,
@@ -172,13 +172,13 @@ pub(crate) fn stream_prepared_rerenders (
   for view in prepared . views {
     views_state . open_views . update_view (
       &view . uri, view . viewforest);
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
         TcpToClient::RerenderView,
         & format_single_view_sexp (&view . uri, &view . text) )); }
 
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
@@ -195,12 +195,12 @@ pub(crate) fn stream_prepared_rerenders (
 pub fn stream_empty_rerender (
   stream : &mut TcpStream,
 ) {
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp ( &[] ) ));
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
@@ -230,7 +230,7 @@ pub fn handle_git_diff_toggle_and_rerender (
         "Git diff mode requires active source-set all; current active source-set is {}. Switch the source-set to all first.",
         active_source_set . name . 0 );
       tracing::info! ( msg = %msg, "Git diff mode toggle refused" );
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
       stream_empty_rerender (stream);
@@ -247,7 +247,7 @@ pub fn handle_git_diff_toggle_and_rerender (
   let msg : String =
     git_diff_mode_message (views_state . diff_mode_enabled, &env . config);
   tracing::info! ( msg = %msg, "Git diff mode toggled" );
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
   stream_prepared_rerenders (stream, views_state, prepared); }

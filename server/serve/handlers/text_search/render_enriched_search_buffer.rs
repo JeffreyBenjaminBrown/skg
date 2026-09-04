@@ -22,6 +22,29 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   config         : &SkgConfig,
   active         : &ActiveSourceSet,
 ) {
+  let mut ids = HashSet::new ();
+  for ancestry in ancestry_by_id . values () {
+    collect_ancestry_ids (ancestry, &mut ids); }
+  let titles = ids . into_iter () . filter_map (|id|
+    title_and_source_by_id (tantivy_index, &id) . map (|value| (id, value)))
+    . collect ();
+  let graph = snapshot_global ();
+  insert_containerward_ancestries_from_snapshot (
+    viewforest, search_results, ancestry_by_id, &titles,
+    graph . as_deref (), config, active);
+}
+
+/// Generation-pinned form used by the live search pipeline.  Every title,
+/// source and edge fact was captured while its query lease was held.
+pub(crate) fn insert_containerward_ancestries_from_snapshot (
+  viewforest     : &mut Tree<ViewNode>,
+  search_results : &[ID],
+  ancestry_by_id : &HashMap<ID, AncestryTree>,
+  titles         : &HashMap<ID, (String, SourceName)>,
+  graph          : Option<&InRustGraph>,
+  config         : &SkgConfig,
+  active         : &ActiveSourceSet,
+) {
   // Search results ("hits") are forest roots.
   // Match them by ID from search_results.
   let level1_ids : Vec<(NodeId, ID)> = {
@@ -43,7 +66,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
           // the ancestry ends up first among siblings.
           insert_containerward_ancestry_tree (
             child, node_id, *node_nid,
-            viewforest, tantivy_index, config, active ); } } } } }
+            viewforest, titles, graph, config, active ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
 /// as indefinitive non-content ActiveNode children
@@ -53,7 +76,8 @@ fn insert_containerward_ancestry_tree(
   contained_id  : &ID, // the node this ancestry step CONTAINS
   parent_nid    : NodeId,
   viewforest        : &mut Tree<ViewNode>,
-  tantivy_index : &TantivyIndex,
+  titles        : &HashMap<ID, (String, SourceName)>,
+  graph          : Option<&InRustGraph>,
   config        : &SkgConfig,
   active        : &ActiveSourceSet,
 ) {
@@ -62,8 +86,7 @@ fn insert_containerward_ancestry_tree(
     // MEMBERSHIP must not surface through enrichment ancestry even
     // when both nodes are public. The edge's owner is the
     // container (this ancestry step).
-    let edge_visible : bool =
-      snapshot_global ()
+    let edge_visible : bool = graph
       . and_then ( |snap| snap . edge_source (
         node . id (), NodeRelation::Contains, contained_id ))
       . map ( |source| active . contains_source (&source) )
@@ -73,14 +96,14 @@ fn insert_containerward_ancestry_tree(
   let child_nid : NodeId = match
     prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
-      viewforest, tantivy_index, config, active ) {
+      viewforest, titles, config, active ) {
         Some (child_nid) => child_nid,
         None => return, };
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       insert_containerward_ancestry_tree (
         child, node . id (), child_nid,
-        viewforest, tantivy_index, config, active ); } } }
+        viewforest, titles, graph, config, active ); } } }
 
 /// Which way an override graft walks from a node, and the backpath
 /// birth role it stamps on each grafted relative.
@@ -109,6 +132,16 @@ pub fn insert_override_ancestries_into_search_view (
   active         : &ActiveSourceSet,
 ) {
   let Some (graph) = snapshot_global () else { return; };
+  insert_override_ancestries_from_graph (
+    viewforest, search_results, active, &graph);
+}
+
+pub(crate) fn insert_override_ancestries_from_graph (
+  viewforest     : &mut Tree<ViewNode>,
+  search_results : &[ID],
+  active         : &ActiveSourceSet,
+  graph          : &InRustGraph,
+) {
   let level1_ids : Vec<(NodeId, ID)> = {
     let root_ref : NodeRef<ViewNode> = viewforest . root ();
     root_ref . children ()
@@ -124,7 +157,7 @@ pub fn insert_override_ancestries_into_search_view (
       let mut path : HashSet<ID> =
         HashSet::from ([ node_id . clone () ]);
       graft_override_chain (
-        node_id, *node_nid, dir, &graph,
+        node_id, *node_nid, dir, graph,
         viewforest, active, &mut path ); }} }
 
 /// Every id that 'insert_override_ancestries_into_search_view' would
@@ -140,8 +173,16 @@ pub fn collect_override_relative_ids (
   search_results : &[ID],
   active         : &ActiveSourceSet,
 ) -> HashSet<ID> {
+  let Some (graph) = snapshot_global () else { return HashSet::new (); };
+  collect_override_relative_ids_from_graph (search_results, active, &graph)
+}
+
+pub(crate) fn collect_override_relative_ids_from_graph (
+  search_results : &[ID],
+  active         : &ActiveSourceSet,
+  graph          : &InRustGraph,
+) -> HashSet<ID> {
   let mut out : HashSet<ID> = HashSet::new ();
-  let Some (graph) = snapshot_global () else { return out; };
   for root in search_results {
     for dir in [ OverrideDir::Overriddenward,
                  OverrideDir::Overriderward ] {
@@ -212,18 +253,18 @@ fn prepend_containing_child_from_tantivy (
   node_id       : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
   viewforest        : &mut Tree<ViewNode>,
-  tantivy_index : &TantivyIndex,
+  titles        : &HashMap<ID, (String, SourceName)>,
   _config       : &SkgConfig,
   active        : &ActiveSourceSet,
 ) -> Option<NodeId> {
   let viewnode : ViewNode =
-    match title_and_source_by_id ( tantivy_index, node_id ) {
+    match titles . get (node_id) {
       Some ((title, source)) => {
         if ! active . contains_source (&source) {
           return None;
         } else {
           mk_indefinitive_viewnode_with_birth (
-            node_id . clone (), source, title,
+            node_id . clone (), source . clone (), title . clone (),
             ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER) ) }},
       None =>
         mk_indefinitive_viewnode_with_birth (
@@ -233,3 +274,10 @@ fn prepend_containing_child_from_tantivy (
   let mut parent_mut : NodeMut<ViewNode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some (parent_mut . prepend (viewnode) . id ()) }
+
+fn collect_ancestry_ids (node : &AncestryTree, ids : &mut HashSet<ID>) {
+  ids . insert (node . id () . clone ());
+  if let AncestryTree::Inner (_, children) = node {
+    for child in children { collect_ancestry_ids (child, ids); }
+  }
+}

@@ -1,0 +1,374 @@
+use crate::types::store_state::{GraphGeneration, ManifestRevision};
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::path::PathBuf;
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct IncidentId (String);
+
+impl IncidentId {
+  pub fn new () -> Self { Self (uuid::Uuid::new_v4 () . to_string ()) }
+
+  pub fn parse (value : &str) -> Result<Self, String> {
+    uuid::Uuid::parse_str (value)
+      . map (|uuid| Self (uuid . to_string ()))
+      . map_err (|_| format! ("invalid incident UUID '{}'", value)) }
+
+  pub fn as_str (&self) -> &str { &self . 0 }
+}
+
+impl fmt::Display for IncidentId {
+  fn fmt (&self, formatter : &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter . write_str (&self . 0) }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct CandidateId (String);
+
+impl CandidateId {
+  pub fn new () -> Self { Self (uuid::Uuid::new_v4 () . to_string ()) }
+
+  pub fn parse (value : &str) -> Result<Self, String> {
+    uuid::Uuid::parse_str (value)
+      . map (|uuid| Self (uuid . to_string ()))
+      . map_err (|_| format! ("invalid candidate UUID '{}'", value)) }
+
+  pub fn as_str (&self) -> &str { &self . 0 }
+}
+
+impl fmt::Display for CandidateId {
+  fn fmt (&self, formatter : &mut fmt::Formatter<'_>) -> fmt::Result {
+    formatter . write_str (&self . 0) }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct MaintenanceEpoch (u64);
+
+impl MaintenanceEpoch {
+  pub const INITIAL : Self = Self (0);
+
+  pub fn get (self) -> u64 { self . 0 }
+
+  pub fn parse (value : &str) -> Result<Self, String> {
+    value . parse::<u64> () . map (Self)
+      . map_err (|_| format! ("invalid maintenance epoch '{}'", value)) }
+
+  pub fn successor (self) -> Self {
+    Self (self . 0 . checked_add (1)
+      . expect ("maintenance epoch exhausted u64")) }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct ObservationSequence (u64);
+
+impl ObservationSequence {
+  pub const INITIAL : Self = Self (0);
+
+  pub fn get (self) -> u64 { self . 0 }
+
+  pub fn successor (self) -> Self {
+    Self (self . 0 . checked_add (1)
+      . expect ("observation sequence exhausted u64")) }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub struct PresentationGeneration (u64);
+
+impl PresentationGeneration {
+  pub const INITIAL : Self = Self (1);
+
+  pub fn get (self) -> u64 { self . 0 }
+
+  pub fn successor (self) -> Self {
+    Self (self . 0 . checked_add (1)
+      . expect ("presentation generation exhausted u64")) }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaintenanceOrigin {
+  UnsolicitedObservation,
+  ExplicitPartialReload,
+  PendingReconciliation,
+  Pull,
+  FullRebuild,
+  ConfigReplacement,
+  Recovery,
+}
+
+impl MaintenanceOrigin {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::UnsolicitedObservation => "unsolicited-observation",
+      Self::ExplicitPartialReload => "explicit-partial-reload",
+      Self::PendingReconciliation => "pending-reconciliation",
+      Self::Pull => "pull",
+      Self::FullRebuild => "full-rebuild",
+      Self::ConfigReplacement => "config-replacement",
+      Self::Recovery => "recovery",
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaintenancePhase {
+  PreparingArchive,
+  AwaitingArchiveWaiver,
+  ArchiveReady,
+  RunningExternalMutation,
+  FinalObservation,
+  SelectingPartial,
+  FullRebuildExclusive,
+  Presenting,
+  FinalizingArchive,
+  BlockedInvalidAfterMutation,
+  BlockedStoreHealth,
+  AwaitingClient,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TerminalDisposition {
+  Completed,
+  MaintenanceAborted,
+  FailedBeforeArchive,
+  FailedAfterArchive,
+  Dismissed,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BufferKind {
+  ContentView,
+  NewEmptyContentView,
+  SearchView,
+  OverrideChoiceMenu,
+  MetadataEditor,
+  ForkConfirmation,
+  ReloadSelector,
+  RelationshipKindMenu,
+  DiskConflict,
+  IdStack,
+  DerivedReport,
+  DurableReport,
+  RawSkgFile,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ViewDisposition {
+  Interrupted,
+  ReleasedUnimpacted,
+  Refreshed,
+  RetainedClean,
+  ClosedDisposable,
+  DetachedDerived,
+  MaintenanceAborted,
+  Failed (String),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PendingReason {
+  ValidDiskDifference,
+  InvalidDisk,
+  UnstableDisk,
+  ObservationFailure,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum QueuedObservationReason {
+  Startup,
+  FilesystemEvent,
+  ClientHint,
+  WatcherGap,
+  ExternalBatchEnded,
+  SelectedGenerationAdvanced,
+  SourceCatalogChanged,
+  SaveFenceMismatch,
+}
+
+impl QueuedObservationReason {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::Startup => "startup",
+      Self::FilesystemEvent => "filesystem-event",
+      Self::ClientHint => "client-hint",
+      Self::WatcherGap => "watcher-gap",
+      Self::ExternalBatchEnded => "external-batch-ended",
+      Self::SelectedGenerationAdvanced => "selected-generation-advanced",
+      Self::SourceCatalogChanged => "source-catalog-changed",
+      Self::SaveFenceMismatch => "save-fence-mismatch",
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ArchiveStatus {
+  NotRequired,
+  Preparing,
+  UndoFailed { buffer_key : String, reason : String },
+  UndoWaiverApproved { buffer_key : String, reason : String },
+  Ready { manifest_sha256 : String },
+  Finalized { manifest_sha256 : String },
+  Incomplete { reason : String },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CandidateSummary {
+  pub id                   : CandidateId,
+  pub base_graph_generation : GraphGeneration,
+  pub base_manifest_revision : ManifestRevision,
+  pub covered_sequence     : ObservationSequence,
+  pub changed_primary_ids  : Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct PendingDiskState {
+  pub reason      : PendingReason,
+  pub candidate   : Option<CandidateSummary>,
+  pub details     : Vec<String>,
+  pub offer_sent  : bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ServerEvidenceRecord {
+  pub path             : PathBuf,
+  pub bundle_sha256    : String,
+  pub artifact_count   : u64,
+  pub total_file_bytes : u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SelectedStoreRecord {
+  pub graph_generation   : GraphGeneration,
+  pub manifest_revision  : ManifestRevision,
+  pub tantivy_generation : u64,
+  pub tantivy_outcome    : String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ActiveMaintenance {
+  pub incident_id       : IncidentId,
+  pub epoch             : MaintenanceEpoch,
+  pub origin            : MaintenanceOrigin,
+  pub phase             : MaintenancePhase,
+  pub candidate         : Option<CandidateSummary>,
+  pub archive_status    : ArchiveStatus,
+  #[serde(default)]
+  pub started_at_utc    : String,
+  #[serde(default)]
+  pub archive_directory_name : String,
+  #[serde(default)]
+  pub archive_owner_session_id : String,
+  #[serde(default)]
+  pub archive_owner_client_kind : String,
+  #[serde(default)]
+  pub source_set        : String,
+  #[serde(default = "initial_graph_generation")]
+  pub g0_graph_generation : GraphGeneration,
+  #[serde(default = "initial_manifest_revision")]
+  pub g0_manifest_revision : ManifestRevision,
+  #[serde(default)]
+  pub registered_buffer_ids : Vec<String>,
+  #[serde(default)]
+  pub dirty_buffer_ids  : Vec<String>,
+  #[serde(default)]
+  pub undo_required_buffer_ids : Vec<String>,
+  #[serde(default)]
+  pub undo_waivers      : BTreeMap<String, String>,
+  #[serde(default)]
+  pub server_evidence   : Option<ServerEvidenceRecord>,
+  #[serde(default)]
+  pub selected_store    : Option<SelectedStoreRecord>,
+  #[serde(default)]
+  pub blocking_reason   : Option<String>,
+  #[serde(default)]
+  pub suspended_phase   : Option<MaintenancePhase>,
+  pub client_connected  : bool,
+  pub terminal          : Option<TerminalDisposition>,
+}
+
+fn initial_graph_generation () -> GraphGeneration {
+  GraphGeneration::INITIAL
+}
+
+fn initial_manifest_revision () -> ManifestRevision {
+  ManifestRevision::INITIAL
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "state", content = "details")]
+pub enum CoordinatorState {
+  Idle,
+  Observing,
+  Pending (PendingDiskState),
+  Active (ActiveMaintenance),
+  BlockedStoreHealth { reason : String },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StatePolicy {
+  pub edits_allowed      : bool,
+  pub skg_saves_allowed  : bool,
+  pub queries_allowed    : bool,
+  pub raw_saves_allowed  : bool,
+  pub maintenance_locked : bool,
+}
+
+impl CoordinatorState {
+  pub fn policy (&self) -> StatePolicy {
+    match self {
+      Self::Idle | Self::Observing => StatePolicy {
+        edits_allowed: true,
+        skg_saves_allowed: true,
+        queries_allowed: true,
+        raw_saves_allowed: true,
+        maintenance_locked: false,
+      },
+      Self::Pending (_) => StatePolicy {
+        edits_allowed: true,
+        skg_saves_allowed: false,
+        queries_allowed: true,
+        raw_saves_allowed: true,
+        maintenance_locked: false,
+      },
+      Self::Active (active) => match active . phase {
+        MaintenancePhase::FullRebuildExclusive => StatePolicy {
+          edits_allowed: false,
+          skg_saves_allowed: false,
+          queries_allowed: false,
+          raw_saves_allowed: false,
+          maintenance_locked: true,
+        },
+        MaintenancePhase::BlockedInvalidAfterMutation
+        | MaintenancePhase::BlockedStoreHealth => StatePolicy {
+          edits_allowed: false,
+          skg_saves_allowed: false,
+          queries_allowed: false,
+          raw_saves_allowed: false,
+          maintenance_locked: true,
+        },
+        _ => StatePolicy {
+          edits_allowed: false,
+          skg_saves_allowed: false,
+          queries_allowed: true,
+          raw_saves_allowed: false,
+          maintenance_locked: true,
+        },
+      },
+      Self::BlockedStoreHealth { .. } => StatePolicy {
+        edits_allowed: false,
+        skg_saves_allowed: false,
+        queries_allowed: false,
+        raw_saves_allowed: false,
+        maintenance_locked: true,
+      },
+    }
+  }
+}

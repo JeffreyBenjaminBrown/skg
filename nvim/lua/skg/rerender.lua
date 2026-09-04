@@ -22,6 +22,7 @@ end
 
 function M.request_rerender_all_views_with_approval (approved_pids)
   lock.begin_stream('rerender')
+  lock.register_stream_request_cleanup('rerender')
   lock.lock_all_skg_buffers()
   M.register_rerender_stream_handlers()
   M.register_ugly_confirmation(function (pids)

@@ -214,7 +214,8 @@ headline and not back on the focused headline."
         (with-current-buffer buf
           (org-mode)
           (cl-letf (((symbol-function 'skg-replace-buffer-with-new-content)
-                     (lambda (_tcp-proc new-content &optional _position)
+                     (lambda (_tcp-proc new-content &optional _position
+                              _authority)
                        (erase-buffer)
                        (insert new-content)))
                     ((symbol-function 'skg-big-nonfatal-message)

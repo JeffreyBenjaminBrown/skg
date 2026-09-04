@@ -128,7 +128,10 @@ describe('skg.content_view responses', function ()
     local original_notify = vim.notify
     vim.notify = function (msg) notified = msg end
     content_view.request_single_root_content_view_from_id('abc')
-    vim.wait(2000, function () return notified ~= nil end, 10)
+    vim.wait(2000, function ()
+      return notified ~= nil
+        and tostring(notified):find('errors and warnings') ~= nil
+    end, 10)
     vim.notify = original_notify
     assert.is_truthy(
       tostring(notified):find('errors and warnings'))

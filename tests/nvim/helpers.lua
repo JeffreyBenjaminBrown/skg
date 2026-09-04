@@ -94,15 +94,43 @@ function M.fake_server (on_request)
       if err or chunk == nil then return end
       pending = pending .. chunk
       while true do
+        if pending:find('^Content%-Length:') then
+          local boundary = pending:find('\r\n\r\n', 1, true)
+          if not boundary then break end
+          local length = tonumber(pending:sub(1, boundary - 1):match(
+            '^Content%-Length:%s*(%d+)$'))
+          if not length or #pending < boundary + 3 + length then break end
+          pending = pending:sub(boundary + 4 + length)
+        end
         local line, rest = pending:match('^([^\n]*)\n(.*)$')
         if not line then break end
         pending = rest
         local request_id = line:match(
           '%(%s*request%-id%s+%.%s+"([^"]+)"%)')
         M.current_request_id = request_id
-        on_request(line, function (text)
+        local respond = function (text)
           connection:write(envelope_framed_for_request(text, request_id))
-        end)
+        end
+        if line:find('(role . "interactive")', 1, true) then
+          respond(M.framed(
+            '((response-type verify-connection) (content "connected")'
+            .. ' (source-inventory ()) (telescope-warnings ())'
+            .. ' (pending-recovery-incidents ()) (active-source-set all)'
+            .. ' (graph-generation 1) (manifest-revision 1)'
+            .. ' (maintenance-epoch 0) (maintenance-state idle)'
+            .. ' (census-required true)'
+            .. ' (maintenance-archive-folder archive)'
+            .. ' (maintenance-archive-identity /tmp/archive)'
+            .. ' (typedb-health healthy) (tantivy-health healthy))'))
+        elseif line:find('(request . "client census")', 1, true)
+            or line:find('(request . "client census texts")', 1, true) then
+          respond(M.framed(
+            '((response-type client-census) (census-complete true)'
+            .. ' (write-enabled true) (text-required-buffer-ids ())'
+            .. ' (stale-buffer-ids ()) (restored-buffer-ids ()))'))
+        else
+          on_request(line, respond)
+        end
         M.current_request_id = nil
       end
     end)
@@ -133,6 +161,7 @@ end
 function M.reset_client_state ()
   local state = require('skg.state')
   state.close_connection()
+  state.connection_handshake_state = nil
   state.clear_request_coordinator()
   state.lp_reset()
   state.connection_reset_hooks = {}

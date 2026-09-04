@@ -8,6 +8,7 @@ local client = require('skg.client')
 local heralds = require('skg.heralds')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -136,7 +137,18 @@ function M.display_search_phase1 (response, search_terms)
   local buf = buffer.open_org_buffer_from_text(
     content and (vim.trim(content) .. '\n') or '',
     buffer.search_buffer_name(search_terms),
-    'search:' .. search_terms)
+    'search:' .. search_terms, {
+      kind = 'search-view',
+      recipe = { kind = 'search', terms = search_terms },
+      graph_generation = tonumber(
+        payload.field_text(response, 'graph-generation')),
+      presentation_generation = tonumber(
+        payload.field_text(response, 'presentation-generation')),
+      server_revision = tonumber(
+        payload.field_text(response, 'server-revision')),
+      application_token = tonumber(
+        payload.field_text(response, 'client-application-token')),
+    })
   vim.bo[buf].modified = false
   for _, hook in ipairs(M.search_buffer_setup_hooks) do
     pcall(hook)
@@ -151,28 +163,85 @@ function M.display_search_enrichment (response)
   local terms = payload.field_text(response, 'terms')
   local content = payload.field_text(response, 'content')
   if not terms or not content then return end
-  local buf = buffer.find_buffer_by_uri('search:' .. terms)
-  if not buf then return end
-  vim.bo[buf].modifiable = true
-  buffer.disarm_first_change_warning(buf)
-  local cursor_saved = nil
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_get_buf(win) == buf then
-      cursor_saved = { win, vim.api.nvim_win_get_cursor(win) }
-      break end
+  local operation_id = payload.field_text(response, 'operation-id')
+  local uri = payload.field_text(response, 'view-uri')
+  local client_buffer_id = payload.field_text(response, 'client-buffer-id')
+  local graph_generation = tonumber(
+    payload.field_text(response, 'graph-generation'))
+  local presentation_generation = tonumber(
+    payload.field_text(response, 'presentation-generation'))
+  local base_revision = tonumber(
+    payload.field_text(response, 'viewforest-base-revision'))
+  local result_revision = tonumber(
+    payload.field_text(response, 'resulting-server-revision'))
+  local base_graph_generation = tonumber(
+    payload.field_text(response, 'view-base-graph-generation'))
+  local base_presentation_generation = tonumber(
+    payload.field_text(response, 'view-base-presentation-generation'))
+  local expected_token = tonumber(
+    payload.field_text(response, 'expected-client-application-token'))
+  local result_token = tonumber(
+    payload.field_text(response, 'resulting-client-application-token'))
+  local buf = registry.find_by_id(client_buffer_id)
+    or (uri and buffer.find_buffer_by_uri(uri) or nil)
+  local applied = false
+  local client_token = expected_token or 0
+  if buf then
+    local cursor_saved = nil
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      if vim.api.nvim_win_get_buf(win) == buf then
+        cursor_saved = { win, vim.api.nvim_win_get_cursor(win) }
+        break end
+    end
+    local ok, err = pcall(
+      require('skg.save').replace_buffer_with_new_content,
+      buf, content, nil, {
+        client_buffer_id = client_buffer_id,
+        view_uri = uri,
+        base_server_revision = base_revision,
+        base_graph_generation = base_graph_generation,
+        base_presentation_generation = base_presentation_generation,
+        expected_application_token = expected_token,
+        graph_generation = graph_generation,
+        presentation_generation = presentation_generation,
+        server_revision = result_revision,
+        application_token = result_token,
+        require_clean = true,
+      })
+    vim.bo[buf].modifiable = true
+    if ok then
+      applied = true
+      client_token = vim.b[buf].skg_application_token or 0
+      if cursor_saved then
+        local line_count = vim.api.nvim_buf_line_count(buf)
+        local cursor = cursor_saved[2]
+        pcall(vim.api.nvim_win_set_cursor, cursor_saved[1],
+              { math.min(cursor[1], line_count), cursor[2] })
+      end
+      heralds.enable(buf)
+      vim.notify('Search results enriched.')
+    else
+      vim.b[buf].skg_search_stale = true
+      vim.notify('SKG left search enrichment unapplied: ' .. tostring(err),
+                 vim.log.levels.WARN)
+    end
   end
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false,
-    vim.split(vim.trim(content) .. '\n', '\n'))
-  if cursor_saved then
-    local line_count = vim.api.nvim_buf_line_count(buf)
-    local cursor = cursor_saved[2]
-    pcall(vim.api.nvim_win_set_cursor, cursor_saved[1],
-          { math.min(cursor[1], line_count), cursor[2] })
+  if operation_id then
+    state.register_response_handler('collateral-applied', function () end, true)
+    client.submit_request(sexpr.to_string({
+      sexpr.pair(sexpr.symbol('request'), 'apply collateral'),
+      sexpr.pair(sexpr.symbol('operation-id'), operation_id),
+      sexpr.pair(sexpr.symbol('view-uri'), uri),
+      sexpr.pair(sexpr.symbol('applied'), applied and 'true' or 'false'),
+      sexpr.pair(sexpr.symbol('graph-generation'),
+                 tostring(graph_generation)),
+      sexpr.pair(sexpr.symbol('presentation-generation'),
+                 tostring(presentation_generation)),
+      sexpr.pair(sexpr.symbol('viewforest-base-revision'),
+                 tostring(base_revision)),
+      sexpr.pair(sexpr.symbol('client-token'), tostring(client_token)),
+    }) .. '\n')
   end
-  vim.bo[buf].modified = false
-  buffer.arm_first_change_warning(buf)
-  heralds.enable(buf)
-  vim.notify('Search results enriched.')
   M.display_warnings(
     response, 'Search enrichment completed with warnings')
 end
@@ -195,11 +264,21 @@ function M.handle_snapshot_request (response)
   if not buf then return end
   vim.bo[buf].modifiable = false
   vim.notify('Enriching search results...')
-  local contents = table.concat(
-    vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
+  local record = assert(registry.record(buf))
+  local contents = registry.raw_text(buf)
   client.submit_request_continuation(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'snapshot response'),
-    sexpr.pair(sexpr.symbol('terms'), terms) }) .. '\n', contents)
+    sexpr.pair(sexpr.symbol('terms'), terms),
+    sexpr.pair(sexpr.symbol('client-buffer-id'), record.id),
+    sexpr.pair(sexpr.symbol('graph-generation'),
+               tostring(record.graph_generation)),
+    sexpr.pair(sexpr.symbol('presentation-generation'),
+               tostring(record.presentation_generation)),
+    sexpr.pair(sexpr.symbol('server-revision'),
+               tostring(record.server_revision)),
+    sexpr.pair(sexpr.symbol('client-application-token'),
+               tostring(record.application_token)),
+  }) .. '\n', contents)
 end
 
 return M

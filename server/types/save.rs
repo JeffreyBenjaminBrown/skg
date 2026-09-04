@@ -114,6 +114,11 @@ impl std::fmt::Display for SaveError {
         write!(f, "Database error: {}", err),
       SaveError::IoError (err) =>
         write!(f, "IO error: {}", err),
+      SaveError::DiskSelectionChanged { paths, .. } =>
+        write!(f, "disk selection changed at {} save target(s)",
+               paths . len ()),
+      SaveError::StaleViewAuthority (reason) =>
+        write! (f, "stale view save authority: {}", reason),
       SaveError::BufferValidationErrors { errors, .. } => {
         write!(f, "Buffer validation errors: {} error(s) found",
                errors . len()) }} }}
@@ -141,6 +146,19 @@ pub fn format_save_error_as_org (
     SaveError::IoError (err) => {
       format!("* NOTHING WAS SAVED\n\nI/O error found when interpreting buffer text as save instructions.\n\n** Error Details\n{}",
               err) },
+    SaveError::DiskSelectionChanged { paths, details } => {
+      let path_list = paths . iter ()
+        . map (|path| format! ("- {}", path . display ()))
+        . collect::<Vec<String>> () . join ("\n");
+      let detail_list = details . iter ()
+        . map (|detail| format! ("- {}", detail))
+        . collect::<Vec<String>> () . join ("\n");
+      format! (
+        "* NOTHING WAS SAVED\n\nThe exact on-disk bytes changed after the current graph was selected.  Skg refused the save before changing any file or store and queued those paths for reconciliation.\n\n** Drifted paths\n{}\n\n** Details\n{}\n\n** Resolution\nRun =skg-reconcile-pending-changes= after the observation finishes; the rejected save is not retried automatically.\n",
+        path_list, detail_list) },
+    SaveError::StaleViewAuthority (reason) => format! (
+      "* NOTHING WAS SAVED\n\nThis buffer no longer has exact authority to save its server view.\n\n** Details\n{}\n\n** Resolution\nKeep the local text intact, reconcile or reopen a fresh live view, and copy the intended edits explicitly.\n",
+      reason),
     SaveError::BufferValidationErrors { errors, .. } => {
       let mut content : String =
         String::from ("* NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n");

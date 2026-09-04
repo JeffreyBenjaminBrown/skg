@@ -16,12 +16,28 @@ use crate::dbs::typedb::util::delete_database;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
-use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
+use crate::serve::handlers::client_census::{
+  handle_client_census_request,
+  handle_client_census_texts_request,
+};
+use crate::serve::handlers::collateral_scheduler::{
+  CollateralScheduler,
+  RenderGeneration,
+  add_application_offer_to_response,
+};
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
 use crate::serve::handlers::edge_source_info::handle_edge_source_info_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
+use crate::serve::handlers::maintenance_protocol::{
+  handle_approve_undo_waiver_request,
+  handle_begin_maintenance_request,
+  handle_cancel_maintenance_request,
+  handle_maintenance_archive_failed_request,
+  handle_maintenance_archive_ready_request,
+  handle_maintenance_status_request,
+};
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_roots_request;
 use crate::serve::handlers::reload_batch::{
@@ -46,23 +62,34 @@ use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
-use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_containerward_ancestries_into_search_view, insert_override_ancestries_into_search_view};
+use crate::serve::handlers::text_search::render_enriched_search_buffer::{
+  insert_containerward_ancestries_from_snapshot,
+  insert_override_ancestries_from_graph,
+};
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
-use crate::serve::util::{ begin_request_context, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_server_push_sexp_response, tag_text_response, value_from_request_sexp};
+use crate::runtime::{
+  InteractiveConnectionGuard,
+  ServerRuntime,
+};
+use crate::maintenance::{CoordinatorState, PendingReason};
+use crate::runtime::interactive_session::{
+  AttachedClient,
+  ClientCapabilities,
+  ClientKind,
+  InteractiveSession,
+};
+use crate::serve::util::{ begin_request_context, ensure_request_has_terminal_response, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_server_push_sexp_response, tag_terminal_text_response, tag_text_response, take_send_failure, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::source_sets::ActiveSourceSet;
 use crate::source_sets::apply_source_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
-use crate::types::misc::SourceSetName;
 use crate::types::misc::SkgConfig;
 use crate::telescope::invariants::TelescopeViolation;
 use crate::types::store_state::{
-  PathIndexState,
-  SelectedPathValue,
   SelectedStoreState,
   StoreHealth,
 };
@@ -92,6 +119,60 @@ pub struct ViewsState {
   // If Emacs crashes or the TCP connection drops without sending close-view messages, OpenViews is still freed, because ViewsState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
 }
 
+enum ConnectionRole {
+  Interactive { _guard : InteractiveConnectionGuard },
+  Control,
+}
+
+impl ConnectionRole {
+  fn interactive (&self) -> bool {
+    matches! (self, Self::Interactive { .. }) }
+
+  fn permits (&self, request_type : RequestType) -> bool {
+    match self {
+      Self::Interactive { .. } => !matches! (
+        request_type,
+        RequestType::BeginReloadBatch | RequestType::EndReloadBatch),
+      Self::Control => matches! (
+        request_type,
+        RequestType::BeginReloadBatch
+        | RequestType::EndReloadBatch
+        | RequestType::Shutdown),
+    }
+  }
+}
+
+fn authenticate_connection (
+  runtime      : &ServerRuntime,
+  request      : &str,
+  request_type : RequestType,
+) -> Result<ConnectionRole, String> {
+  let role = value_from_request_sexp ("role", request)
+    . map_err (|_| "the first request must carry role=interactive or role=control"
+      . to_string ())?;
+  match role . as_str () {
+    "interactive" => {
+      if request_type != RequestType::VerifyConnection {
+        return Err (
+          "an interactive connection must begin with verify connection"
+            . into ()); }
+      runtime . interactive_slot . try_attach ()
+        . map (|guard| ConnectionRole::Interactive { _guard: guard })
+    }
+    "control" => {
+      if !matches! (request_type,
+        RequestType::BeginReloadBatch
+        | RequestType::EndReloadBatch
+        | RequestType::Shutdown)
+      {
+        return Err ("the control role requested a non-control endpoint"
+          . into ()); }
+      Ok (ConnectionRole::Control)
+    }
+    _ => Err (format! ("unknown connection role '{}'", role)),
+  }
+}
+
 /// Pipes TCP input from Emacs into handle_emacs.
 pub fn serve (
   env            : SkgEnv,
@@ -106,13 +187,20 @@ pub fn serve (
       %error, "could not completely load fatal-reload recovery journals"),
   }
 
+  let runtime = Arc::new (ServerRuntime::new (env)
+    . map_err (|error| std::io::Error::new (
+      std::io::ErrorKind::Other, error))?);
+  runtime . start_background_services ()
+    . map_err (|error| std::io::Error::new (
+      std::io::ErrorKind::Other, error))?;
+
   for stream_res in emacs_listener . incoming() { // the loop
     match stream_res {
       Ok (stream) => {
         let stream : TcpStream = stream; // for type sig
-        let env_clone : SkgEnv = env . clone (); // Cloning permits the main thread to keep the env. If it were moved here, ownership would transfer into the first spawned thread, making it unavailable for the next connection.
+        let runtime = Arc::clone (&runtime);
         thread::spawn ( move || {
-          handle_emacs (stream, env_clone) } ); }
+          handle_connection (stream, runtime) } ); }
       Err (e) => {
         tracing::error!(error = %e, "Connection failed"); }} }
   Ok (( )) }
@@ -121,26 +209,10 @@ pub fn serve (
 ///   handle_sexp_document_request
 ///   handle_text_search_request
 /// API: See /api.md
-fn handle_emacs (
+fn handle_connection (
   mut stream : TcpStream,
-  mut env    : SkgEnv,
+  runtime    : Arc<ServerRuntime>,
 ) {
-  let mut views_state : ViewsState =
-    ViewsState {
-      diff_mode_enabled : false,
-      open_views        : OpenViews::new (), };
-  let mut active_source_set : ActiveSourceSet =
-    ActiveSourceSet::default_from_config (
-      &env . config )
-      . unwrap_or_else ( |e| {
-        tracing::error! (
-          error = %e,
-          "failed to initialize active source-set; falling back to all");
-        ActiveSourceSet::named (
-          &env . config,
-          SourceSetName::from ("all"))
-        . expect ("reserved source-set all should always resolve") });
-
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new ( Mutex::new (None) );
@@ -148,15 +220,12 @@ fn handle_emacs (
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
-  let mut interactive_verified = false;
+  let mut role : Option<ConnectionRole> = None;
   let mut seen_reconciliation_generation = reconciliation_generation ();
-  let mut collateral_scheduler = CollateralScheduler::new ();
-  if let Err (error) = collateral_scheduler . seed_presentation (&env) {
-    tracing::warn! (%error, "could not seed Git presentation signature"); }
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
-  tracing::info!(peer = %peer, "Emacs connected");
+  tracing::info!(peer = %peer, "Skg socket connected");
   stream . set_read_timeout (
     Some ( Duration::from_millis (100) ))
     . expect ("set_read_timeout failed");
@@ -172,199 +241,85 @@ fn handle_emacs (
         tracing::info! ( request = request_header . trim_end (), "Received request" );
         if let Err (error) = begin_request_context (&request_header) {
           tracing::error! ("{}", error);
-          send_response_with_length_prefix (
+          let _ = send_response_with_length_prefix (
             &mut stream,
             &tag_text_response (TcpToClient::Error, &error));
           request_header . clear ();
           continue; }
-        let request_type = request_type_from_request (&request_header);
-        if ! matches! (request_type,
-          Ok (RequestType::ApplyCollateral
-              | RequestType::ViewVisited
-              | RequestType::ObservePresentation))
-        { collateral_scheduler . preempt (); }
-        match request_type {
-          // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
-          Ok (RequestType::SingleRootContentView) =>
-            handle_single_root_view_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &active_source_set ),
-          Ok (RequestType::SaveBuffer) =>
-            // PITFALL: Uses the same BufReader that read the request,
-            // so that any already-buffered header/payload are visible.
-            handle_save_buffer_request (
-              &mut reader,
-              &mut stream,
-              &request_header,
-              &mut env,
-              &mut views_state,
-              &active_source_set,
-              &mut collateral_scheduler ),
-          Ok (RequestType::CloseView) =>
-            handle_close_view_request (
-              &mut stream,
-              &request_header,
-              &mut views_state ),
-          Ok (RequestType::SnapshotResponse) => {
-            snapshot_requested = false;
-            handle_snapshot_response (
-              &mut reader,
-              &mut stream,
-              &request_header,
-              &enrichment_slot,
-              &env,
-              &mut views_state,
-              &active_source_set ); }
-          Ok (RequestType::TextSearch) => {
-            // Cancel any in-flight background search
-            search_cancelled . store (true, Ordering::SeqCst);
-            snapshot_requested = false;
-            handle_text_search_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &enrichment_slot,
-              &search_cancelled,
-              &mut views_state,
-              &active_source_set ); }
-          Ok (RequestType::VerifyConnection) => {
-            interactive_verified = true;
-            handle_verify_connection_request (
-              &mut stream, &env ); },
-          Ok (RequestType::Shutdown) =>
-            // Never returns - exits process
-            handle_shutdown_request ( &mut stream, &env ),
-          Ok (RequestType::GetFilePath) =>
-            handle_get_file_path_request_with_source_set ( &mut stream,
-                                           &request_header,
-                                           &env . config,
-                                           &active_source_set ),
-          Ok (RequestType::TitlesByIds) =>
-            handle_titles_by_ids_request_with_source_set (
-              &mut stream, &request_header,
-              &env . tantivy_index, &env . config,
-              views_state . diff_mode_enabled,
-              &active_source_set,
-              &env . in_rust_graph_snapshot () ),
-          Ok (RequestType::DiffAnalysis) =>
-            handle_diff_analysis_request_with_source_set (
-              &mut stream, &request_header, &env . config,
-              &active_source_set ),
-          Ok (RequestType::StageMoves) =>
-            handle_stage_moves_request (
-              &mut stream, &env . config ),
-          Ok (RequestType::EdgeSourceInfo) =>
-            handle_edge_source_info_request (
-              &mut stream, &request_header, &env ),
-          Ok (RequestType::ListSourceSets)
-          | Ok (RequestType::ActiveSourceSet)
-          | Ok (RequestType::SetActiveSourceSet) =>
-            handle_source_set_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &mut active_source_set,
-              &enrichment_slot,
-              &search_cancelled ),
-          Ok (RequestType::HeraldRules) =>
-            handle_herald_rules_request ( &mut stream ),
-          Ok (RequestType::GitDiffModeToggle) =>
-            handle_git_diff_toggle_and_rerender (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &active_source_set ),
-          Ok (RequestType::ExportToOrg) =>
-            handle_export_to_org_request ( &mut stream,
-                                           &env . config,
-                                           &request_header ),
-          Ok (RequestType::RebuildDbs) =>
-            handle_rebuild_dbs_request ( &mut stream,
-                                         &mut env,
-                                         &mut views_state ),
-          Ok (RequestType::StripBodyWhitespace) =>
-            handle_strip_body_whitespace_request ( &mut stream,
-                                                   &mut env ),
-          Ok (RequestType::RerenderAllViews) =>
-            handle_rerender_all_views_request (
-              &mut stream,
-              &request_header,
-              &env,
-              &mut views_state,
-              &active_source_set ),
-          Ok (RequestType::ReloadPaths) =>
-            handle_reload_paths_request (
-              &mut stream,
-              &request_header,
-              &mut env,
-              &mut views_state,
-              &active_source_set,
-              &mut collateral_scheduler ),
-          Ok (RequestType::ReloadRecover) =>
-            handle_reload_recovery_request (
-              &mut stream, &request_header, &env . config),
-          Ok (RequestType::BeginReloadBatch) =>
-            handle_begin_reload_batch_request (
-              &mut stream, &mut owned_reload_batch_tokens),
-          Ok (RequestType::EndReloadBatch) =>
-            handle_end_reload_batch_request (
-              &mut stream, &request_header,
-              &mut owned_reload_batch_tokens),
-          Ok (RequestType::RecomputeCyclicRoots) =>
-            handle_recompute_cyclic_roots_request (
-              &mut stream, &env),
-          Ok (RequestType::ApplyCollateral) =>
-            collateral_scheduler . handle_apply_ack (
-              &mut stream, &request_header, &mut views_state),
-          Ok (RequestType::ViewVisited) => {
-            let result = value_from_request_sexp ("view-uri", &request_header)
-              . and_then (|uri| value_from_request_sexp (
-                  "visit-sequence", &request_header)
-                . and_then (|sequence| sequence . parse::<u64> ()
-                  . map_err (|_| "Invalid visit-sequence" . to_string ())
-                  . map (|sequence| (uri, sequence))));
-            match result {
-              Ok ((uri, sequence)) => {
-                collateral_scheduler . note_visit (
-                  ViewUri::from_client_string (uri), sequence);
-                send_response_with_length_prefix (
-                  &mut stream, &tag_text_response (
-                    TcpToClient::ViewVisited, "visit recorded")); }
-              Err (error) => send_response_with_length_prefix (
-                &mut stream, &tag_text_response (
-                  TcpToClient::Error, &error)), } },
-          Ok (RequestType::ObservePresentation) => {
-            match collateral_scheduler . observe_presentation (
-                &views_state, &env, &active_source_set)
-            {
-              Ok (changed) => send_response_with_length_prefix (
-                &mut stream, &tag_text_response (
-                  TcpToClient::PresentationObserved,
-                  if changed {
-                    if views_state . diff_mode_enabled {
-                      "Git presentation changed; diff-mode views queued"
-                    } else {
-                      "Git presentation changed; diff mode is disabled" }
-                  } else { "Git presentation is unchanged" })),
-              Err (error) => send_response_with_length_prefix (
-                &mut stream, &tag_text_response (
-                  TcpToClient::Error, &format! (
-                    "Git presentation observation failed: {}", error))),
-            } },
-          Err (err) => {
-            tracing::error!(error = %err, "Error determining request type");
-            send_response_with_length_prefix (
-              &mut stream,
-              & tag_text_response (
-                TcpToClient::Error,
-                & format! (
-                  "Error determining request type: {}",
-                  err ))); } };
+        let request_type = match request_type_from_request (&request_header) {
+          Ok (request_type) => request_type,
+          Err (error) => {
+            tracing::error! (%error, "Error determining request type");
+            let _ = send_response_with_length_prefix (
+              &mut stream, &tag_terminal_text_response (
+                TcpToClient::Error, "failed", &error));
+            request_header . clear ();
+            continue; }};
+        if role . is_none () {
+          match authenticate_connection (
+              &runtime, &request_header, request_type)
+          {
+            Ok (authenticated) => role = Some (authenticated),
+            Err (error) => {
+              let _ = send_response_with_length_prefix (
+                &mut stream, &tag_terminal_text_response (
+                  TcpToClient::Error, "failed", &error));
+              break; }
+          }}
+        let authenticated = role . as_ref ()
+          . expect ("authentication filled role");
+        if !authenticated . permits (request_type) {
+          let _ = send_response_with_length_prefix (
+            &mut stream, &tag_terminal_text_response (
+              TcpToClient::Error, "failed",
+              "The control role is not allowed to access that endpoint"));
+          request_header . clear ();
+          continue; }
+        if authenticated . interactive ()
+           && !matches! (request_type,
+             RequestType::VerifyConnection
+             | RequestType::ClientCensus
+             | RequestType::ClientCensusTexts)
+           && !runtime . interactive . lock () . unwrap ()
+             . attached_client . as_ref ()
+             . map (|client| client . census_complete)
+             . unwrap_or (false)
+        {
+          let _ = send_response_with_length_prefix (
+            &mut stream, &tag_terminal_text_response (
+              TcpToClient::Error, "failed",
+              "client census must complete before ordinary requests"));
+          // A payload-bearing unauthorized request cannot safely remain on
+          // this byte stream.  Closing also makes the mandatory handshake
+          // order unambiguous on retry.
+          break; }
+        if authenticated . interactive ()
+        && !matches! (request_type,
+          RequestType::ApplyCollateral
+          | RequestType::ViewVisited
+          | RequestType::ObservePresentation
+          | RequestType::ClientCensus
+          | RequestType::ClientCensusTexts)
+        {
+          runtime . interactive . lock () . unwrap ()
+            . collateral_scheduler . preempt (); }
+        dispatch_request (
+          &runtime,
+          &mut reader,
+          &mut stream,
+          &request_header,
+          request_type,
+          &enrichment_slot,
+          &search_cancelled,
+          &mut snapshot_requested,
+          &mut owned_reload_batch_tokens);
+        if request_type != RequestType::TextSearch {
+          let _ = ensure_request_has_terminal_response (
+            &mut stream, request_type); }
+        if let Some (error) = take_send_failure () {
+          tracing::warn! (%error,
+            "response transport failed; abandoning connection-owned work");
+          break; }
         request_header . clear(); }
       Err (ref e)
         if e . kind () == std::io::ErrorKind::WouldBlock
@@ -381,7 +336,7 @@ fn handle_emacs (
                 guard . as_ref () . unwrap () . terms . clone ();
               drop (guard); // release the lock
               tracing::debug! ("slot drain: requesting snapshot for '{}'", terms);
-              send_response_with_length_prefix (
+              let _ = send_response_with_length_prefix (
                 &mut stream,
                 & tag_text_response (
                   TcpToClient::RequestSnapshot,
@@ -389,7 +344,8 @@ fn handle_emacs (
               snapshot_requested = true; }}}
         if ! request_context_active () {
           let reconciliation = reconciliation_generation ();
-          if interactive_verified
+          if role . as_ref () . map (ConnectionRole::interactive)
+             . unwrap_or (false)
              && reconciliation > seen_reconciliation_generation
           {
             let payload = Sexp::List (vec![
@@ -404,19 +360,398 @@ fn handle_emacs (
                 Sexp::Atom (Atom::I (reconciliation as i64)),
               ]),
             ]) . to_string ();
-            send_response_with_length_prefix (
+            let _ = send_response_with_length_prefix (
               &mut stream, &tag_server_push_sexp_response (
                 TcpToClient::ReconciliationReady,
                 &format! ("reconciliation-{}", reconciliation),
                 &payload));
             seen_reconciliation_generation = reconciliation;
           }
-          collateral_scheduler . pump (&mut stream, &views_state); }
+          if role . as_ref () . map (ConnectionRole::interactive)
+             . unwrap_or (false)
+          {
+            let events : Vec<_> = {
+              let mut interactive = runtime . interactive . lock () . unwrap ();
+              interactive . queued_server_events . drain (..) . collect ()
+            };
+            for event in events {
+              let response_type = match event . frame_kind . as_str () {
+                "maintenance-offer" => TcpToClient::MaintenanceOffer,
+                "maintenance-status" => TcpToClient::MaintenanceStatus,
+                other => {
+                  tracing::error! (frame_kind = other,
+                    "discarding unknown queued server event kind");
+                  continue; }
+              };
+              let _ = send_response_with_length_prefix (
+                &mut stream, &tag_server_push_sexp_response (
+                  response_type, &event . operation_id, &event . payload));
+            }
+            let mut interactive = runtime . interactive . lock () . unwrap ();
+            let InteractiveSession {
+              views, collateral_scheduler, ..
+            } = &mut *interactive;
+            collateral_scheduler . pump (&mut stream, views); }}
+        if let Some (error) = take_send_failure () {
+          tracing::warn! (%error,
+            "server-push transport failed; retaining session work");
+          break; }
       }
       Err (_) => break, // real error
     }}
   release_connection_reload_batches (&mut owned_reload_batch_tokens);
-  tracing::info!(peer = %peer, "Emacs disconnected"); }
+  if role . as_ref () . map (ConnectionRole::interactive)
+     . unwrap_or (false)
+  {
+    runtime . maintenance . lock () . unwrap () . disconnected ();
+    runtime . persist_maintenance_state ();
+    if let Ok (mut interactive) = runtime . interactive . lock () {
+      if let Some (client) = &mut interactive . attached_client {
+        client . census_complete = false; }} }
+  tracing::info!(peer = %peer, "Skg socket disconnected"); }
+
+#[allow(clippy::too_many_arguments)]
+fn dispatch_request (
+  runtime           : &ServerRuntime,
+  reader            : &mut BufReader<TcpStream>,
+  stream            : &mut TcpStream,
+  request           : &str,
+  request_type      : RequestType,
+  enrichment_slot   : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
+  search_cancelled  : &Arc<AtomicBool>,
+  snapshot_requested : &mut bool,
+  owned_reload_batch_tokens : &mut HashSet<String>,
+) {
+  match request_type {
+    RequestType::SingleRootContentView => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        let InteractiveSession { views, active_source_set, .. } = interactive;
+        handle_single_root_view_request (
+          stream, request, env, views, active_source_set); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::SaveBuffer => {
+      // The same BufReader which parsed the request must consume its payload.
+      // A policy refusal is therefore implemented in the save handler itself.
+      // Retain coordinator admission across the transaction: an observation
+      // which finishes concurrently waits, then notices the selected
+      // generation change and scans again.
+      let maintenance = runtime . maintenance . lock () . unwrap ();
+      let save_refusal = skg_save_policy_refusal (&maintenance . state);
+      if let Err (error) = runtime . with_store_transition (
+          false, |env, interactive| {
+            let InteractiveSession {
+              views, active_source_set, collateral_scheduler, ..
+            } = interactive;
+            handle_save_buffer_request (
+              reader, stream, request, env, views,
+              active_source_set, collateral_scheduler, runtime,
+              save_refusal . as_deref ()); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::CloseView => {
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      handle_close_view_request (stream, request, &mut interactive . views); }
+    RequestType::SnapshotResponse => {
+      *snapshot_requested = false;
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      let InteractiveSession {
+        views, active_source_set, collateral_scheduler, ..
+      } = &mut *interactive;
+      handle_snapshot_response (
+        reader, stream, request, enrichment_slot, views,
+        active_source_set, collateral_scheduler); }
+    RequestType::TextSearch => {
+      search_cancelled . store (true, Ordering::SeqCst);
+      *snapshot_requested = false;
+      let lease = match runtime . query_lease () {
+        Ok (lease) => lease,
+        Err (error) => { send_runtime_error (stream, &error); return; }};
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      let presentation_generation = interactive . collateral_scheduler
+        . presentation_generation ();
+      let InteractiveSession { views, active_source_set, .. } =
+        &mut *interactive;
+      handle_text_search_request (
+        stream, request, lease, presentation_generation,
+        enrichment_slot, search_cancelled, views, active_source_set); }
+    RequestType::VerifyConnection => {
+      let lease = match runtime . query_lease () {
+        Ok (lease) => lease,
+        Err (error) => { send_runtime_error (stream, &error); return; }};
+      let census_required = {
+        let mut interactive = runtime . interactive . lock () . unwrap ();
+        match install_client_handshake (
+            request, &lease . snapshot . env, &mut interactive)
+        {
+          Ok (required) => required,
+          Err (error) => { send_runtime_error (stream, &error); return; }
+        }};
+      let active_source_set_name = runtime . interactive . lock () . unwrap ()
+        . active_source_set . name . 0 . clone ();
+      if let Err (error) = runtime . transition_maintenance (|coordinator| {
+          coordinator . reconnected ();
+          Ok (( ))
+        })
+      {
+        send_runtime_error (stream, &error);
+        return;
+      }
+      handle_verify_connection_request (
+        stream, &lease . snapshot . env, &active_source_set_name,
+        census_required,
+        runtime . maintenance . lock () . unwrap () . clone ()); }
+    RequestType::ClientCensus => {
+      let snapshot = runtime . selected_snapshot ();
+      let writes_allowed = runtime . maintenance . lock () . unwrap ()
+        . state . policy () . skg_saves_allowed;
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      handle_client_census_request (
+        reader, stream, &snapshot . env, &mut interactive, writes_allowed); }
+    RequestType::ClientCensusTexts => {
+      let snapshot = runtime . selected_snapshot ();
+      let writes_allowed = runtime . maintenance . lock () . unwrap ()
+        . state . policy () . skg_saves_allowed;
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      handle_client_census_texts_request (
+        reader, stream, &snapshot . env, &mut interactive, writes_allowed); }
+    RequestType::Shutdown => {
+      let snapshot = runtime . selected_snapshot ();
+      handle_shutdown_request (stream, &snapshot . env); }
+    RequestType::GetFilePath => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        handle_get_file_path_request_with_source_set (
+          stream, request, &env . config, &interactive . active_source_set); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::TitlesByIds => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        handle_titles_by_ids_request_with_source_set (
+          stream, request, &env . tantivy_index, &env . config,
+          interactive . views . diff_mode_enabled,
+          &interactive . active_source_set,
+          &env . in_rust_graph_snapshot ()); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::DiffAnalysis => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        handle_diff_analysis_request_with_source_set (
+          stream, request, &env . config,
+          &interactive . active_source_set); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::StageMoves => {
+      let snapshot = runtime . selected_snapshot ();
+      handle_stage_moves_request (stream, &snapshot . env . config); }
+    RequestType::EdgeSourceInfo => {
+      if let Err (error) = with_query_session (runtime, |env, _| {
+        handle_edge_source_info_request (stream, request, env); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::ListSourceSets
+    | RequestType::ActiveSourceSet
+    | RequestType::SetActiveSourceSet => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        let InteractiveSession { views, active_source_set, .. } = interactive;
+        handle_source_set_request (
+          stream, request, env, views, active_source_set,
+          enrichment_slot, search_cancelled); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::HeraldRules => handle_herald_rules_request (stream),
+    RequestType::GitDiffModeToggle => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        let InteractiveSession { views, active_source_set, .. } = interactive;
+        handle_git_diff_toggle_and_rerender (
+          stream, request, env, views, active_source_set); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::ExportToOrg => {
+      let snapshot = runtime . selected_snapshot ();
+      handle_export_to_org_request (
+        stream, &snapshot . env . config, request); }
+    RequestType::RebuildDbs => {
+      if let Err (error) = runtime . with_store_transition (
+          true, |env, interactive| {
+            handle_rebuild_dbs_request (stream, env, &mut interactive . views);
+          })
+      { send_runtime_error (stream, &error); }}
+    RequestType::StripBodyWhitespace => {
+      if let Err (error) = runtime . with_store_transition (
+          false, |env, _| {
+            handle_strip_body_whitespace_request (stream, env); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::RerenderAllViews => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        let InteractiveSession { views, active_source_set, .. } = interactive;
+        handle_rerender_all_views_request (
+          stream, request, env, views, active_source_set); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::ReloadPaths => {
+      if let Err (error) = runtime . with_store_transition (
+          false, |env, interactive| {
+            let InteractiveSession {
+              views, active_source_set, collateral_scheduler, ..
+            } = interactive;
+            handle_reload_paths_request (
+              stream, request, env, views, active_source_set,
+              collateral_scheduler); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::ReloadRecover => {
+      runtime . with_writer_env (|env| {
+        handle_reload_recovery_request (stream, request, &env . config); }); }
+    RequestType::BeginReloadBatch =>
+      handle_begin_reload_batch_request (stream, owned_reload_batch_tokens),
+    RequestType::EndReloadBatch =>
+      handle_end_reload_batch_request (
+        stream, request, owned_reload_batch_tokens),
+    RequestType::RecomputeCyclicRoots => {
+      if let Err (error) = runtime . with_store_transition (
+          false, |env, _| {
+            handle_recompute_cyclic_roots_request (stream, env); })
+      { send_runtime_error (stream, &error); }}
+    RequestType::ApplyCollateral => {
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      let InteractiveSession { views, collateral_scheduler, .. } =
+        &mut *interactive;
+      collateral_scheduler . handle_apply_ack (stream, request, views); }
+    RequestType::ViewVisited => {
+      let result = value_from_request_sexp ("view-uri", request)
+        . and_then (|uri| value_from_request_sexp (
+            "visit-sequence", request)
+          . and_then (|sequence| sequence . parse::<u64> ()
+            . map_err (|_| "Invalid visit-sequence" . to_string ())
+            . map (|sequence| (uri, sequence))));
+      match result {
+        Ok ((uri, sequence)) => {
+          runtime . interactive . lock () . unwrap ()
+            . collateral_scheduler . note_visit (
+              ViewUri::from_client_string (uri), sequence);
+          let _ = send_response_with_length_prefix (
+            stream, &tag_text_response (
+              TcpToClient::ViewVisited, "visit recorded")); }
+        Err (error) => send_runtime_error (stream, &error),
+      }}
+    RequestType::ObservePresentation => {
+      if let Err (error) = with_query_session (runtime, |env, interactive| {
+        let diff_mode_enabled = interactive . views . diff_mode_enabled;
+        let InteractiveSession {
+          views, active_source_set, collateral_scheduler, ..
+        } = interactive;
+        match collateral_scheduler . observe_presentation (
+            views, env, active_source_set)
+        {
+          Ok (changed) => { let _ = send_response_with_length_prefix (
+            stream, &tag_text_response (
+              TcpToClient::PresentationObserved,
+              if changed {
+                if diff_mode_enabled {
+                  "Git presentation changed; diff-mode views queued"
+                } else {
+                  "Git presentation changed; diff mode is disabled" }
+              } else { "Git presentation is unchanged" })); }
+          Err (error) => { send_runtime_error (stream, &format! (
+            "Git presentation observation failed: {}", error)); }
+        }})
+      { send_runtime_error (stream, &error); }}
+    RequestType::BeginMaintenance =>
+      handle_begin_maintenance_request (stream, request, runtime),
+    RequestType::MaintenanceArchiveReady =>
+      handle_maintenance_archive_ready_request (stream, request, runtime),
+    RequestType::MaintenanceArchiveFailed =>
+      handle_maintenance_archive_failed_request (stream, request, runtime),
+    RequestType::ApproveUndoWaiver =>
+      handle_approve_undo_waiver_request (stream, request, runtime),
+    RequestType::CancelMaintenance =>
+      handle_cancel_maintenance_request (stream, request, runtime),
+    RequestType::MaintenanceStatus =>
+      handle_maintenance_status_request (stream, runtime),
+  }
+}
+
+fn with_query_session (
+  runtime  : &ServerRuntime,
+  function : impl FnOnce (&SkgEnv, &mut InteractiveSession),
+) -> Result<(), String> {
+  let lease = runtime . query_lease ()?;
+  let mut interactive = runtime . interactive . lock () . unwrap ();
+  function (&lease . snapshot . env, &mut interactive);
+  Ok (())
+}
+
+fn send_runtime_error (stream : &mut TcpStream, error : &str) {
+  let _ = send_response_with_length_prefix (
+    stream, &tag_terminal_text_response (
+      TcpToClient::Error, "failed", error));
+}
+
+fn skg_save_policy_refusal (state : &CoordinatorState) -> Option<String> {
+  if state . policy () . skg_saves_allowed { return None; }
+  let status = match state {
+    CoordinatorState::Pending (pending) => match (
+      &pending . reason, &pending . candidate)
+    {
+      (PendingReason::ValidDiskDifference, Some (candidate)) => format! (
+        "disk reconciliation is pending for candidate {} (changed primary IDs: {}); run skg-reconcile-pending-changes / :SkgReconcilePendingChanges",
+        candidate . id,
+        if candidate . changed_primary_ids . is_empty () {
+          "none" . into ()
+        } else { candidate . changed_primary_ids . join (", ") }),
+      (reason, _) => format! (
+        "disk reconciliation is pending ({:?}): {}; run skg-reconcile-pending-changes / :SkgReconcilePendingChanges",
+        reason,
+        if pending . details . is_empty () {
+          "see the maintenance status report" . into ()
+        } else { pending . details . join ("; ") }),
+    },
+    CoordinatorState::Active (active) => format! (
+      "maintenance incident {} is {:?}; Skg saves remain disabled until its terminal disposition",
+      active . incident_id, active . phase),
+    CoordinatorState::BlockedStoreHealth { reason } => format! (
+      "Skg saves are disabled because store health is blocked: {}", reason),
+    CoordinatorState::Idle | CoordinatorState::Observing =>
+      "Skg save policy is temporarily unavailable" . into (),
+  };
+  Some (format! ("* NOTHING WAS SAVED\n\n{}\n\nThe rejected save will not be retried automatically.", status))
+}
+
+fn install_client_handshake (
+  request     : &str,
+  env         : &SkgEnv,
+  interactive : &mut InteractiveSession,
+) -> Result<bool, String> {
+  let kind = match value_from_request_sexp ("client-kind", request)? . as_str () {
+    "emacs" => ClientKind::Emacs,
+    "neovim" => ClientKind::Neovim,
+    other => return Err (format! ("unsupported interactive client '{}'", other)),
+  };
+  let version = value_from_request_sexp ("client-version", request)?;
+  let session_id = value_from_request_sexp ("client-session-id", request)?;
+  if session_id . is_empty () || session_id . len () > 256 {
+    return Err ("client-session-id must contain 1 through 256 bytes" . into ()); }
+  let archive_format_version = value_from_request_sexp (
+    "archive-format-version", request)? . parse::<u32> ()
+    . map_err (|_| "archive-format-version must be an integer" . to_string ())?;
+  let native_undo_kind = value_from_request_sexp ("native-undo-kind", request)?;
+  let native_undo_version = value_from_request_sexp (
+    "native-undo-version", request)?;
+  let claimed_source_set = value_from_request_sexp ("source-set", request)?;
+  if claimed_source_set != "server-default"
+  && claimed_source_set != interactive . active_source_set . name . 0 {
+    return Err (format! (
+      "client source-set '{}' does not match retained session source-set '{}'",
+      claimed_source_set, interactive . active_source_set . name)); }
+  // Verification admits the socket but never grants ordinary request/write
+  // authority by itself.  Even an empty editor must explicitly close the
+  // census phase so reconnect and restart have the same protocol.
+  let census_required = true;
+  interactive . attached_client = Some (AttachedClient {
+    kind,
+    version,
+    session_id,
+    capabilities: ClientCapabilities {
+      archive_format_version,
+      native_undo_kind,
+      native_undo_version,
+    },
+    census_complete: false,
+  });
+  if env . config . maintenance_archive_identity . as_os_str () . is_empty () {
+    return Err ("server has no validated maintenance archive root" . into ()); }
+  Ok (census_required)
+}
 
 /// Handle the snapshot that Emacs sent back.
 /// Parses the buffer text, inserts ancestry, sets graphnodestats,
@@ -429,15 +764,15 @@ fn handle_snapshot_response (
   stream          : &mut TcpStream,
   request         : &str,
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  env             : &SkgEnv,
   views_state      : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
 ) {
   let terms : String
     = match value_from_request_sexp ("terms", request)
     { Ok (t) => t,
       Err (e) => { tracing::error! ( "snapshot response: bad terms: {}", e);
-                   send_response_with_length_prefix (
+                   let _ = send_response_with_length_prefix (
                      stream, &tag_text_response (
                        TcpToClient::Error,
                        &format! ("Snapshot response has bad terms: {}", e)));
@@ -446,7 +781,7 @@ fn handle_snapshot_response (
     = match read_length_prefixed_content (reader)
     { Ok (text) => text,
       Err (e) => { tracing::error! ( "snapshot response: failed to read content: {}", e);
-                   send_response_with_length_prefix (
+                   let _ = send_response_with_length_prefix (
                      stream, &tag_text_response (
                        TcpToClient::Error,
                        &format! ("Snapshot response content failed: {}", e)));
@@ -458,7 +793,7 @@ fn handle_snapshot_response (
       Some (p) => p,
       None => { tracing::warn! (
                   "snapshot response: no enrichment payload");
-                send_response_with_length_prefix (
+                let _ = send_response_with_length_prefix (
                   stream, &tag_text_response (
                     TcpToClient::Error,
                     "Snapshot response has no pending enrichment"));
@@ -466,12 +801,70 @@ fn handle_snapshot_response (
   if payload . terms != terms {
     tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
                     payload . terms, terms);
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream, &tag_text_response (
         TcpToClient::Error,
         &format! ("Snapshot terms mismatch: '{}' vs '{}'",
                   payload . terms, terms)));
     return; }
+  let client_buffer_id = match value_from_request_sexp (
+      "client-buffer-id", request)
+  {
+    Ok (value) if !value . is_empty () => value,
+    Ok (_) => {
+      send_runtime_error (stream, "snapshot client-buffer-id is empty");
+      return; }
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  let unsigned = |key : &str| -> Result<u64, String> {
+    value_from_request_sexp (key, request)? . parse::<u64> ()
+      . map_err (|_| format! ("snapshot field '{}' must be unsigned", key))
+  };
+  let client_graph_generation = match unsigned ("graph-generation") {
+    Ok (value) => value,
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  let client_presentation_generation = match unsigned (
+      "presentation-generation")
+  {
+    Ok (value) => value,
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  let client_server_revision = match unsigned ("server-revision") {
+    Ok (value) => value,
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  let client_application_token = match unsigned (
+      "client-application-token")
+  {
+    Ok (value) => value,
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  if payload . active_source_set . name != active_source_set . name {
+    send_runtime_error (
+      stream, "search source-set changed before enrichment snapshot");
+    return; }
+  let uri = ViewUri::SearchView (terms . clone ());
+  {
+    let Some (state) = views_state . open_views . views . get_mut (&uri)
+    else {
+      send_runtime_error (stream, "search view closed before enrichment");
+      return;
+    };
+    if state . graph_generation != client_graph_generation
+    || state . presentation_generation != client_presentation_generation
+    || state . revision != client_server_revision
+    || state . client_application_token != client_application_token
+    || (state . client_buffer_id . is_some ()
+        && state . client_buffer_id . as_deref ()
+           != Some (client_buffer_id . as_str ()))
+    {
+      send_runtime_error (
+        stream, "search application authority changed before enrichment");
+      return;
+    }
+    state . client_buffer_id = Some (client_buffer_id . clone ());
+  }
   let parse_result : Result<(Tree<MpViewnode>,
                              Vec<BufferValidationError>), String>
     = org_to_uninterpreted_nodes (&buffer_text);
@@ -481,45 +874,46 @@ fn handle_snapshot_response (
         Ok (f) => f,
         Err (e) => {
           tracing::error! ("snapshot response: check failed: {}", e);
-          send_response_with_length_prefix (
+          let _ = send_response_with_length_prefix (
             stream, &tag_text_response (
               TcpToClient::Error,
               &format! ("Snapshot structure check failed: {}", e)));
           return; }},
     Err (e) => {
       tracing::error! ("snapshot response: parse failed: {}", e);
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream, &tag_text_response (
           TcpToClient::Error,
           &format! ("Snapshot parse failed: {}", e)));
       return; }};
-  insert_containerward_ancestries_into_search_view (
+  insert_containerward_ancestries_from_snapshot (
     &mut viewforest, &payload . search_results,
-    &payload . ancestry_by_id, &env . tantivy_index,
-    &env . config, active_source_set );
-  insert_override_ancestries_into_search_view (
+    &payload . ancestry_by_id, &payload . title_and_source_by_id,
+    Some (&payload . graph), &payload . config,
+    &payload . active_source_set );
+  insert_override_ancestries_from_graph (
     &mut viewforest, &payload . search_results,
-    active_source_set );
+    &payload . active_source_set, &payload . graph );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
       &mut viewforest, root_treeid,
       &payload . graphnodestats,
-      &env . config ); }
+      &payload . config ); }
   mark_view_roots_parent_absent (
     &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,
     & payload . graphnodestats . container_to_contents,
     & payload . graphnodestats . content_to_containers,
-    & env . config,
-    Some (active_source_set) );
+    & payload . config,
+    Some (&payload . active_source_set) );
   apply_source_set_to_viewforest (
     &mut viewforest,
-    active_source_set );
+    &payload . active_source_set );
   if ! payload . include_ugly_telescopes {
     exclude_ugly_nodes_from_viewforest (
-      &mut viewforest, &env . in_rust_graph_snapshot () ); }
+      &mut viewforest, &payload . graph ); }
   let rendered_pids : Vec<_> =
     viewforest . root () . descendants ()
     . filter_map ( |node| match &node . value () . kind {
@@ -533,14 +927,14 @@ fn handle_snapshot_response (
       rendered_pids . iter () . cloned () . collect ()
     } else { std::collections::HashSet::new () };
   let release = decide_scalar_release (
-    "search-enrichment", active_source_set, &rendered_pids,
-    &env . in_rust_graph_snapshot (), &approved );
+    "search-enrichment", &payload . active_source_set, &rendered_pids,
+    &payload . graph, &approved );
   if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
     // Preflight and the load-bearing payload should make this unreachable.
     // Fail closed rather than serialize if a future change violates either.
     tracing::error! (
       "search enrichment reached the release boundary without approval" );
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream, &tag_text_response (
         TcpToClient::Error,
         "Search enrichment failed its scalar-release check"));
@@ -549,34 +943,57 @@ fn handle_snapshot_response (
     ScalarReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
   let enriched : String =
-    viewforest_to_string ( &viewforest, &env . config )
+    viewforest_to_string ( &viewforest, &payload . config )
     . expect ("search viewforest rendering never fails");
-  let enriched_sexp : String =
-    mk_search_enrichment_sexp (
-      &terms, &enriched, &release_warnings );
-  { let uri : ViewUri = // update ViewsState with enriched viewforest
-      ViewUri::SearchView ( terms . clone () );
-    views_state . open_views . update_view ( &uri, viewforest ); }
+  let offer = match collateral_scheduler . stage_view_application (
+      views_state,
+      &uri,
+      RenderGeneration {
+        graph: payload . graph_generation,
+        presentation: payload . presentation_generation,
+      },
+      viewforest)
+  {
+    Ok (offer) => offer,
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  let enriched_sexp = match add_application_offer_to_response (
+      &mk_search_enrichment_sexp (
+        &terms, &enriched, &release_warnings),
+      &offer)
+  {
+    Ok (response) => response,
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
   tracing::debug! (bytes = enriched_sexp . len (),
                    "snapshot response: sending enrichment");
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream, &enriched_sexp ); }
 
 fn handle_verify_connection_request (
   stream : &mut std::net::TcpStream,
   env    : &SkgEnv,
+  active_source_set_name : &str,
+  census_required : bool,
+  maintenance : crate::maintenance::MaintenanceCoordinator,
 ) {
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & verify_connection_response (
       &env . config,
       &env . startup_warnings,
-      &env . in_rust_graph . load_full ())); }
+      &env . in_rust_graph . load_full (),
+      active_source_set_name,
+      census_required,
+      &maintenance)); }
 
 fn verify_connection_response (
   config   : &SkgConfig,
   warnings : &[(crate::types::misc::ID, TelescopeViolation)],
   selected : &SelectedStoreState,
+  active_source_set_name : &str,
+  census_required : bool,
+  maintenance : &crate::maintenance::MaintenanceCoordinator,
 ) -> String {
   let atom = |value : &str| -> Sexp {
     Sexp::Atom (Atom::S (value . to_string ())) };
@@ -635,27 +1052,6 @@ fn verify_connection_response (
         field ("fatal", Sexp::List (fatal)),
       ])
     }) . collect ();
-  let path_entries : Vec<Sexp> = selected . path_outcomes . iter ()
-    . map ( |(path, outcome)| {
-      let (index_state, tantivy_generation) = match outcome . index_state {
-        PathIndexState::Acknowledged { tantivy_generation } =>
-          ("acknowledged", tantivy_generation),
-        PathIndexState::SelectedAwaitingIndex { tantivy_generation } =>
-          ("selected-awaiting-index", Some (tantivy_generation)), };
-      Sexp::List (vec! [
-        field ("path", atom (&path . to_string_lossy ())),
-        field ("value", match outcome . value {
-          SelectedPathValue::Present (digest) => atom (&digest . to_hex ()),
-          SelectedPathValue::Absent => atom ("absent"), }),
-        field ("graph-generation", Sexp::Atom (Atom::I (
-          outcome . graph_generation . get () as i64))),
-        field ("index-state", atom (index_state)),
-        field ("tantivy-generation", tantivy_generation
-          . map ( |generation| Sexp::Atom (Atom::I (
-            generation . get () as i64)))
-          . unwrap_or_else ( || atom ("nil"))),
-      ]) })
-    . collect ();
   let health = |health : &StoreHealth| -> Sexp { match health {
     StoreHealth::Healthy => atom ("healthy"),
     StoreHealth::Poisoned (reason) => Sexp::List (vec! [
@@ -668,9 +1064,21 @@ fn verify_connection_response (
     field ("source-inventory", Sexp::List (source_entries)),
     field ("telescope-warnings", Sexp::List (warning_entries)),
     field ("pending-recovery-incidents", Sexp::List (recovery_entries)),
+    field ("active-source-set", atom (active_source_set_name)),
     field ("graph-generation", Sexp::Atom (Atom::I (
       selected . graph_generation . get () as i64))),
-    field ("path-outcomes", Sexp::List (path_entries)),
+    field ("manifest-revision", Sexp::Atom (Atom::I (
+      selected . manifest_revision . get () as i64))),
+    field ("maintenance-epoch", Sexp::Atom (Atom::I (
+      maintenance . epoch . get () as i64))),
+    field ("maintenance-state", atom (&format! (
+      "{:?}", maintenance . state))),
+    field ("census-required", atom (
+      if census_required { "true" } else { "nil" })),
+    field ("maintenance-archive-folder", atom (
+      &config . maintenance_archive_folder . to_string_lossy ())),
+    field ("maintenance-archive-identity", atom (
+      &config . maintenance_archive_identity . to_string_lossy ())),
     field ("typedb-health", health (&selected . typedb_health)),
     field ("tantivy-health", health (&selected . tantivy_health)),
   ]) . to_string ()
@@ -680,7 +1088,7 @@ fn handle_shutdown_request (
   stream : &mut std::net::TcpStream,
   env    : &SkgEnv,
 ) {
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::Shutdown, "Server shutting down..." ));
@@ -745,7 +1153,8 @@ mod connection_tests {
          crate::types::store_state::PathDigest::of_bytes (b"pid: X\n")),
       ]));
     let response : String = verify_connection_response (
-      &config, &warnings, &selected);
+      &config, &warnings, &selected, "all", false,
+      &crate::maintenance::MaintenanceCoordinator::new ());
     let first : usize = response . find ("(name first)") . unwrap ();
     let second : usize = response . find ("(name second)") . unwrap ();
     assert! (first < second, "{}", response);
@@ -756,7 +1165,8 @@ mod connection_tests {
       "(kind ignored-foreign-pid-collision)"), "{}", response);
     assert! (response . contains ("/tmp/second/X.skg"), "{}", response);
     assert! (response . contains ("(graph-generation 1)"), "{}", response);
-    assert! (response . contains ("(index-state acknowledged)"), "{}", response);
+    assert! (response . contains ("(manifest-revision 1)"), "{}", response);
+    assert! (! response . contains ("path-outcomes"), "{}", response);
     assert! (response . contains ("(tantivy-health healthy)"), "{}", response);
   }
 }

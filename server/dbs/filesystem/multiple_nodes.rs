@@ -172,7 +172,7 @@ pub fn nodecomplete_from_telescope_on_disk (
 /// with no title in any section is a hard load error; every other
 /// fold complaint comes back as a violation for the caller to
 /// report.
-fn fold_grouped_sections (
+pub(crate) fn fold_grouped_sections (
   mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,

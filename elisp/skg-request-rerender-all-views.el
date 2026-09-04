@@ -18,6 +18,7 @@ Locks all skg buffers, then registers handlers for the
 streaming protocol: rerender-lock, rerender-view*, rerender-done."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream "rerender")
+    (skg--register-stream-request-cleanup "rerender")
     (skg--lock-all-skg-buffers)
     (skg--register-rerender-stream-handlers)
     (skg--register-rerender-ugly-confirmation

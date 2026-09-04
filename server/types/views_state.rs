@@ -1,8 +1,8 @@
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::ViewNodeKind;
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{Phantom, ViewNodeKind, Vognode};
+use crate::maintenance::BufferKind;
 use super::misc::ID;
 
 use std::collections::{HashMap, HashSet};
@@ -43,6 +43,18 @@ pub struct ViewState {
   /// Monotonic server-side base revision. Background render offers name the
   /// revision they cloned and cannot replace a view which advanced meanwhile.
   pub revision : u64,
+  pub graph_generation       : u64,
+  pub presentation_generation : u64,
+  pub client_application_token : u64,
+  pub client_buffer_id       : Option<String>,
+  pub kind                   : BufferKind,
+  pub recipe                 : Option<String>,
+  /// The forest/text was deliberately preserved across a graph transition;
+  /// generated herald/presentation details may therefore name G0 facts.
+  pub presentation_stale     : bool,
+  /// Search membership/ranking is never rerun automatically after
+  /// maintenance, independently of whether displayed node text was refreshed.
+  pub search_stale           : bool,
 }
 
 //
@@ -120,9 +132,53 @@ impl OpenViews {
       let revision = self . views . get (&uri)
         . map (|state| state . revision . saturating_add (1))
         . unwrap_or (0);
-      let state : ViewState =
-        ViewState { viewforest, pids, revision };
+      let (graph_generation, presentation_generation,
+           client_application_token, client_buffer_id, kind, recipe,
+           presentation_stale, search_stale) =
+        self . views . get (&uri) . map (|state| (
+          state . graph_generation,
+          state . presentation_generation,
+          state . client_application_token,
+          state . client_buffer_id . clone (),
+          state . kind . clone (),
+          state . recipe . clone (),
+          state . presentation_stale,
+          state . search_stale,
+        )) . unwrap_or_else (|| (
+          1, 0, 1, None, default_kind_for_uri (&uri), None, false, false));
+      let state : ViewState = ViewState {
+        viewforest, pids, revision,
+        graph_generation,
+        presentation_generation,
+        client_application_token,
+        client_buffer_id,
+        kind,
+        recipe,
+        presentation_stale,
+        search_stale,
+      };
       self . views . insert ( uri, state ); }
+
+  pub fn register_view_with_authority (
+    &mut self,
+    uri                     : ViewUri,
+    viewforest              : impl Into<ViewForest>,
+    pids                    : &[ID],
+    graph_generation        : u64,
+    presentation_generation : u64,
+    client_application_token : u64,
+    kind                    : BufferKind,
+    recipe                  : Option<String>,
+  ) {
+    self . register_view (uri . clone (), viewforest, pids);
+    let state = self . views . get_mut (&uri)
+      . expect ("newly registered view exists");
+    state . graph_generation = graph_generation;
+    state . presentation_generation = presentation_generation;
+    state . client_application_token = client_application_token;
+    state . kind = kind;
+    state . recipe = recipe;
+  }
 
   pub fn update_view (
     &mut self,
@@ -147,10 +203,52 @@ impl OpenViews {
                uri . clone (),
                ViewState { viewforest : new_viewforest,
                            pids,
-                           revision: 0 } ); }}
+                           revision: 0,
+                           graph_generation: 1,
+                           presentation_generation: 0,
+                           client_application_token: 1,
+                           client_buffer_id: None,
+                           kind: default_kind_for_uri (uri),
+                           recipe: None,
+                           presentation_stale: false,
+                           search_stale: false } ); }}
 
   pub fn view_revision (&self, uri : &ViewUri) -> Option<u64> {
     self . views . get (uri) . map (|state| state . revision)
+  }
+
+  pub fn set_client_application_authority (
+    &mut self,
+    uri                     : &ViewUri,
+    graph_generation        : u64,
+    presentation_generation : u64,
+    client_application_token : u64,
+  ) -> Result<(), String> {
+    let state = self . views . get_mut (uri)
+      . ok_or_else (|| format! (
+        "view '{}' is not registered", uri . repr_in_client ()))?;
+    state . graph_generation = graph_generation;
+    state . presentation_generation = presentation_generation;
+    state . client_application_token = client_application_token;
+    state . presentation_stale = false;
+    Ok (( ))
+  }
+
+  /// Advance a preserved forest's graph association without claiming it was
+  /// rerendered.  This is the maintenance-only orthogonal-view transition.
+  pub fn preserve_across_maintenance (
+    &mut self,
+    uri              : &ViewUri,
+    graph_generation : u64,
+    search_stale     : bool,
+  ) -> Result<(), String> {
+    let state = self . views . get_mut (uri)
+      . ok_or_else (|| format! (
+        "view '{}' is not registered", uri . repr_in_client ()))?;
+    state . graph_generation = graph_generation;
+    state . presentation_stale = true;
+    state . search_stale |= search_stale;
+    Ok (( ))
   }
 
   /// Apply one client-acknowledged background result only if its cloned base
@@ -182,6 +280,14 @@ impl OpenViews {
       . collect () }
 }
 
+fn default_kind_for_uri (uri : &ViewUri) -> BufferKind {
+  match uri {
+    ViewUri::ContentView (_) => BufferKind::ContentView,
+    ViewUri::SearchView (_) => BufferKind::SearchView,
+    ViewUri::OverrideMenu (_) => BufferKind::OverrideChoiceMenu,
+  }
+}
+
 //
 // Functions
 //
@@ -205,6 +311,32 @@ pub fn pids_from_viewforest (
         Some ( t . id . clone () ),
       _ => None } )
     . collect () }
+
+/// Every concrete ID visibly represented by a graph-ish node in a retained
+/// forest.  This deliberately differs from `pids_from_viewforest`: collateral
+/// rendering cares only about current Active nodes, while maintenance impact
+/// must also protect a user's view of nodes represented by Deleted, Unknown,
+/// and Git-diff phantoms.
+///
+/// Inactive vognodes remain excluded because their anonymity is a privacy
+/// boundary, not missing bookkeeping.
+pub fn impact_ids_from_viewforest (
+  viewforest : &ViewForest,
+) -> HashSet<ID> {
+  viewforest . nodes ()
+    . filter_map (|node| match &node . value () . kind {
+      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+        Some (active . id . clone ()),
+      ViewNodeKind::Phantom (Phantom::Diff (phantom)) =>
+        Some (phantom . id . clone ()),
+      ViewNodeKind::Phantom (Phantom::Deleted (phantom)) =>
+        Some (phantom . id . clone ()),
+      ViewNodeKind::Phantom (Phantom::Unknown (phantom)) =>
+        Some (phantom . id . clone ()),
+      _ => None,
+    })
+    . collect ()
+}
 
 /// Collect all IDs (primary + extras) for every root
 /// -- i.e. every level-1 headline -- in the view.

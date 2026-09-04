@@ -14,6 +14,110 @@ local messages = require('skg.messages')
 
 local M = {}
 
+M.archive_format_version = 1
+
+local function client_version ()
+  local version = vim.version()
+  return string.format('%d.%d.%d', version.major, version.minor, version.patch)
+end
+
+local function handshake_request ()
+  return sexpr.to_string({
+    sexpr.pair(sexpr.symbol('request'), 'verify connection'),
+    sexpr.pair(sexpr.symbol('role'), 'interactive'),
+    sexpr.pair(sexpr.symbol('client-kind'), 'neovim'),
+    sexpr.pair(sexpr.symbol('client-version'), client_version()),
+    sexpr.pair(sexpr.symbol('client-session-id'), state.client_session_id),
+    sexpr.pair(sexpr.symbol('archive-format-version'),
+               M.archive_format_version),
+    sexpr.pair(sexpr.symbol('native-undo-kind'), 'nvim-wundo'),
+    sexpr.pair(sexpr.symbol('native-undo-version'), client_version()),
+    sexpr.pair(sexpr.symbol('source-set'), state.active_source_set_name),
+  }) .. '\n'
+end
+
+local function install_connection_verification (_payload_text, response, tcp)
+  config.install_source_inventory(
+    payload.field(response, 'source-inventory'))
+  state.active_source_set_name =
+    payload.field_text(response, 'active-source-set') or 'all'
+  vim.g.skg_active_source_set_name = state.active_source_set_name
+  state.maintenance_archive_folder =
+    payload.field_text(response, 'maintenance-archive-folder')
+  state.maintenance_archive_identity =
+    payload.field_text(response, 'maintenance-archive-identity')
+  state.maintenance_state = {
+    epoch = payload.field(response, 'maintenance-epoch'),
+    state = payload.field(response, 'maintenance-state'),
+    census_required = payload.field(response, 'census-required'),
+  }
+  config.store_state = {
+    graph_generation = payload.field(response, 'graph-generation'),
+    manifest_revision = payload.field(response, 'manifest-revision'),
+    typedb_health = payload.field(response, 'typedb-health'),
+    tantivy_health = payload.field(response, 'tantivy-health'),
+  }
+  state.connection_handshake_state = 'census'
+  M.show_handshake_telescope_warnings(response)
+  M.show_pending_recovery_incidents(response)
+  local content = payload.field(response, 'content')
+  local message = 'connected'
+  if content ~= nil and not sexpr.is_nil(content) then
+    message = sexpr.is_list(content) and sexpr.to_string(content)
+              or sexpr.atom_text(content) end
+  vim.notify(message)
+  M.submit_buffer_census(tcp or state.tcp)
+end
+
+function M.submit_buffer_census (tcp)
+  local registry = require('skg.buffer_registry')
+  client.submit_priority_request(tcp, '((request . "client census"))\n', {
+    ['client-census'] = {
+      handler = function (_payload_text, response)
+        M.handle_buffer_census_response(tcp, response) end,
+      one_shot = true,
+    },
+  }, registry.census_payload())
+end
+
+function M.handle_buffer_census_response (tcp, response)
+  local registry = require('skg.buffer_registry')
+  local required = payload.string_list(
+    payload.field(response, 'text-required-buffer-ids'))
+  registry.mark_census_buffers_stale(payload.string_list(
+    payload.field(response, 'stale-buffer-ids')))
+  if #required == 0 then
+    state.connection_handshake_state = 'verified'
+    return
+  end
+  state.connection_handshake_state = 'census-texts'
+  client.submit_priority_request(
+    tcp, '((request . "client census texts"))\n', {
+      ['client-census'] = {
+        handler = function (_payload_text, final_response)
+          registry.mark_census_buffers_stale(payload.string_list(
+            payload.field(final_response, 'stale-buffer-ids')))
+          if payload.field_text(final_response, 'census-complete') ~= 'true' then
+            error('Skg server did not complete the buffer census') end
+          state.connection_handshake_state = 'verified'
+        end,
+        one_shot = true,
+      },
+    }, registry.census_texts_payload(required))
+end
+
+function M.enqueue_connection_handshake (tcp)
+  if state.connection_handshake_state then return end
+  state.connection_handshake_state = 'sent'
+  client.submit_priority_request(tcp, handshake_request(), {
+    ['verify-connection'] = {
+      handler = function (payload_text, response)
+        install_connection_verification(payload_text, response, tcp) end,
+      one_shot = true,
+    },
+  })
+end
+
 ---The Neovim port has no partial-reload dirty-buffer handshake yet. Keep the
 ---server-owned batch-close event visible instead of pretending it reconciled.
 function M.reconciliation_ready_handler (_payload, response)
@@ -29,26 +133,14 @@ end
 ---Verify the connection to the Rust server by sending a simple ping;
 ---the server's confirmation is echoed to the user.
 function M.connection_verify ()
+  local already_connected = state.tcp and not state.tcp:is_closing()
+  client.connect()
+  if not already_connected then return end
   state.register_response_handler('verify-connection',
-    function (_payload, response)
-      config.install_source_inventory(
-        payload.field(response, 'source-inventory'))
-      config.store_state = {
-        graph_generation = payload.field(response, 'graph-generation'),
-        path_outcomes = payload.field(response, 'path-outcomes'),
-        typedb_health = payload.field(response, 'typedb-health'),
-        tantivy_health = payload.field(response, 'tantivy-health'),
-      }
-      M.show_handshake_telescope_warnings(response)
-      M.show_pending_recovery_incidents(response)
-      local content = payload.field(response, 'content')
-      local message = 'connected'
-      if content ~= nil and not sexpr.is_nil(content) then
-        message = sexpr.is_list(content) and sexpr.to_string(content)
-                  or sexpr.atom_text(content) end
-      vim.notify(message)
-    end, true)
-  client.submit_request('((request . "verify connection"))\n')
+    function (payload_text, response)
+      install_connection_verification(payload_text, response, state.tcp) end,
+    true)
+  client.submit_request(handshake_request())
 end
 
 ---Neovim does not yet implement the destructive confirmation UI. Never let

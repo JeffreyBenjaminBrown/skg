@@ -198,6 +198,13 @@ async fn switch_refusals_take_the_unwinding_shape (
           search_results : vec![],
           ancestry_by_id : HashMap::new (),
           graphnodestats : AllGraphNodeStats::empty (),
+          title_and_source_by_id: HashMap::new (),
+          graph: env . in_rust_graph_snapshot (),
+          config: config . clone (),
+          active_source_set: active . clone (),
+          graph_generation: env . in_rust_graph . load_full ()
+            . graph_generation,
+          presentation_generation: 0,
           include_ugly_telescopes : true, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));

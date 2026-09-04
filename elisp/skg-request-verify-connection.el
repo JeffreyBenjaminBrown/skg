@@ -2,7 +2,38 @@
 ;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
+(require 'cl-lib)
 (require 'skg-length-prefix)
+
+(defconst skg--maintenance-archive-format-version 1)
+
+(defun skg--installed-undo-fu-session-version ()
+  "Return the installed undo-fu-session version string, or nil.
+This inspects the public package header without enabling any package mode."
+  (when-let ((library (locate-library "undo-fu-session")))
+    (require 'lisp-mnt)
+    (with-temp-buffer
+      (insert-file-contents library)
+      (lm-header "version"))))
+
+(defun skg--connection-handshake-request ()
+  "Return the role-bearing handshake for this Emacs process."
+  (let* ((undo-version (skg--installed-undo-fu-session-version))
+         (supported (equal undo-version "0.8")))
+    (concat
+     (prin1-to-string
+      `((request . "verify connection")
+        (role . "interactive")
+        (client-kind . "emacs")
+        (client-version . ,emacs-version)
+        (client-session-id . ,skg--client-session-id)
+        (archive-format-version . ,skg--maintenance-archive-format-version)
+        (native-undo-kind . ,(if supported
+                                 "undo-fu-session"
+                               "unavailable"))
+        (native-undo-version . ,(or undo-version "unavailable"))
+        (source-set . ,skg--active-source-set-name)))
+     "\n")))
 
 (defun skg--show-handshake-telescope-warnings (response)
   "Display structured load WARNINGS carried by RESPONSE."
@@ -36,6 +67,87 @@
                  (length warnings))
          content)))))
 
+(defun skg--install-connection-verification (tcp-proc payload)
+  "Install authoritative server state from handshake PAYLOAD."
+  (let* ((response (read payload))
+         (content (cadr (assoc 'content response))))
+    (skg-install-source-inventory response)
+    (setq skg--active-source-set-name
+          (format "%s" (cadr (assoc 'active-source-set response)))
+          skg--maintenance-archive-folder
+          (cadr (assoc 'maintenance-archive-folder response))
+          skg--maintenance-archive-identity
+          (cadr (assoc 'maintenance-archive-identity response))
+          skg--maintenance-state
+          `((epoch . ,(cadr (assoc 'maintenance-epoch response)))
+            (state . ,(cadr (assoc 'maintenance-state response)))
+            (census-required . ,(cadr (assoc 'census-required response))))
+          skg--server-store-state
+          `((graph-generation
+             . ,(cadr (assoc 'graph-generation response)))
+            (manifest-revision
+             . ,(cadr (assoc 'manifest-revision response)))
+            (typedb-health
+             . ,(cadr (assoc 'typedb-health response)))
+            (tantivy-health
+             . ,(cadr (assoc 'tantivy-health response)))
+            ))
+    (setq skg--connection-handshake-state 'census)
+    (skg--show-handshake-telescope-warnings response)
+    (when (fboundp 'skg-install-pending-recovery-incidents)
+      (skg-install-pending-recovery-incidents response))
+    (message "%s" (or (and content (format "%s" content))
+                       "connected; reconciling buffer census"))
+    (skg--submit-buffer-census tcp-proc)))
+
+(defun skg--submit-buffer-census (tcp-proc)
+  "Send compact descriptors without embedding any complete view text."
+  (require 'skg-buffer-registry)
+  (skg-submit-priority-request
+   tcp-proc
+   "((request . \"client census\"))\n"
+   `((client-census ,#'skg--handle-buffer-census-response . t))
+   (prin1-to-string (skg-buffer-census))))
+
+(defun skg--handle-buffer-census-response (tcp-proc payload)
+  "Complete census or answer the server's targeted text request."
+  (let* ((response (read payload))
+         (required (mapcar (lambda (value) (format "%s" value))
+                           (or (cadr (assoc 'text-required-buffer-ids
+                                           response))
+                               nil)))
+         (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
+    (skg-mark-census-buffers-stale stale)
+    (if required
+        (progn
+          (setq skg--connection-handshake-state 'census-texts)
+          (skg-submit-priority-request
+           tcp-proc
+           "((request . \"client census texts\"))\n"
+           `((client-census ,#'skg--finish-buffer-census . t))
+           (prin1-to-string (skg-buffer-census-texts required))))
+      (setq skg--connection-handshake-state 'verified))))
+
+(defun skg--finish-buffer-census (_tcp-proc payload)
+  "Install the terminal disposition of requested census texts."
+  (let* ((response (read payload))
+         (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
+    (skg-mark-census-buffers-stale stale)
+    (unless (equal (format "%s" (cadr (assoc 'census-complete response)))
+                   "true")
+      (error "Skg server did not complete the buffer census"))
+    (setq skg--connection-handshake-state 'verified)))
+
+(defun skg--submit-connection-handshake (tcp-proc)
+  "Put the mandatory handshake first without consuming an ordinary draft."
+  (unless skg--connection-handshake-state
+    (setq skg--connection-handshake-state 'sent)
+    (skg-submit-priority-request
+     tcp-proc
+     (skg--connection-handshake-request)
+     `((verify-connection
+        ,#'skg--install-connection-verification . t)))))
+
 (defun skg-connection-verify ()
   "Verify connection to the Rust server,
 by sending a simple ping to the Rust server
@@ -48,32 +160,16 @@ because each of the client's `request-*` functions
 calls `(skg-tcp-connect-to-rust)`
 (which is idempotent and cheap to rerun)."
   (interactive)
-  (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (request-sexp "((request . \"verify connection\"))\n"))
+  (let* ((already-connected (and skg-rust-tcp-proc
+                                 (process-live-p skg-rust-tcp-proc)))
+         (tcp-proc (skg-tcp-connect-to-rust)))
+    (unless already-connected
+      ;; `skg-tcp-connect-to-rust' installed the mandatory handshake.
+      (cl-return-from skg-connection-verify nil))
     (skg-register-response-handler
      'verify-connection
-     (lambda (_tcp-proc payload)
-       (let* ((response (read payload))
-              (content (cadr (assoc 'content response))))
-         (skg-install-source-inventory response)
-         (setq skg--server-store-state
-               `((graph-generation
-                  . ,(cadr (assoc 'graph-generation response)))
-                 (path-outcomes
-                  . ,(cadr (assoc 'path-outcomes response)))
-                 (typedb-health
-                  . ,(cadr (assoc 'typedb-health response)))
-                 (tantivy-health
-                  . ,(cadr (assoc 'tantivy-health response)))))
-         (when (and (not noninteractive)
-                    (fboundp 'skg-start-reload-observation))
-           (skg-start-reload-observation))
-         (skg--show-handshake-telescope-warnings response)
-         (when (fboundp 'skg-install-pending-recovery-incidents)
-           (skg-install-pending-recovery-incidents response))
-         (message "%s" (or (and content (format "%s" content))
-                           "connected"))))
+     #'skg--install-connection-verification
      t)
-    (skg-submit-request tcp-proc request-sexp)))
+    (skg-submit-request tcp-proc (skg--connection-handshake-request))))
 
 (provide 'skg-request-verify-connection)

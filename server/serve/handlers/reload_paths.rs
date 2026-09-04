@@ -220,7 +220,7 @@ pub fn handle_reload_paths_request (
         Sexp::Atom (Atom::S ("true" . into ())),
       ]),
     ]) . to_string ();
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream, &tag_terminal_sexp_response (
         TcpToClient::ReloadPaths, "complete", &payload));
     return; }
@@ -350,7 +350,7 @@ fn present_committed_reload (
             "reload rerender needs authorization but request has no incident-id" );
         } else {
           retain_pending_reload (incident_id, pending);
-          send_response_with_length_prefix (stream, &challenge); }
+          let _ = send_response_with_length_prefix (stream, &challenge); }
         return; },
       Err (error) => {
         if !incident_id . is_empty () {
@@ -364,7 +364,7 @@ fn present_committed_reload (
     &pending . message, &pending . requested_outcomes,
     &presentation, &pending . affected_paths, &env . config . sources,
     &pending . warnings, pending . recovery_available );
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     &tag_terminal_sexp_response (
       TcpToClient::ReloadPaths,
@@ -953,7 +953,7 @@ fn send_reload_error (
   msg    : &str,
 ) {
   tracing::error! ("{}", msg);
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     &tag_terminal_text_response (TcpToClient::ReloadPaths, "failed", msg)); }
 

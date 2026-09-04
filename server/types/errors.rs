@@ -2,6 +2,7 @@ use super::misc::{ID, SourceName};
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 #[derive (Debug)]
 pub enum TextLinkParseError {
@@ -14,6 +15,14 @@ pub enum SaveError {
   ParseError (String),
   DatabaseError(Box<dyn Error>),
   IoError (io::Error),
+  /// The exact bytes at one or more prospective filesystem targets no
+  /// longer match the selected manifest.  This is a normal concurrency
+  /// refusal, not an I/O failure: no filesystem or store mutation began.
+  DiskSelectionChanged {
+    paths   : Vec<PathBuf>,
+    details : Vec<String>,
+  },
+  StaleViewAuthority (String),
   // A failed save carries, alongside its errors, the nonfatal
   // warnings collected before the abort (e.g. discarded col-headline
   // text). Decided 2026-06-12: warnings always accompany errors.

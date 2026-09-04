@@ -306,7 +306,7 @@ pub async fn update_views_after_save (
     let still_locked : &[ViewUri] = if collateral_scheduler . is_some () {
       &[]
     } else { &collateral_uris };
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
         TcpToClient::SaveRelaxLock,
@@ -323,7 +323,7 @@ pub async fn update_views_after_save (
     for rendered in collateral_views {
       views_state . open_views . update_view (
         &rendered . uri, rendered . viewforest);
-      send_response_with_length_prefix (
+      let _ = send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
           TcpToClient::CollateralView,
@@ -495,7 +495,7 @@ pub async fn rerender_views_after_reload (
     if dirty_uris . contains (&rendered . uri) { continue; }
     views_state . open_views . update_view (
       &rendered . uri, rendered . viewforest);
-    send_response_with_length_prefix (
+    let _ = send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
         TcpToClient::CollateralView,

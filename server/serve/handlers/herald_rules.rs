@@ -11,7 +11,7 @@ use std::net::TcpStream;
 pub fn handle_herald_rules_request (
   stream : &mut TcpStream,
 ) {
-  send_response_with_length_prefix (
+  let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::HeraldRules,

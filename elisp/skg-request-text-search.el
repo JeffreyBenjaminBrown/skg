@@ -4,6 +4,7 @@
 
 (require 'skg-client)
 (require 'skg-buffer)
+(require 'skg-buffer-registry)
 (require 'skg-length-prefix)
 (require 'skg-request-save) ; Shared warning presentation.
 (require 'heralds-minor-mode)
@@ -94,9 +95,9 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      t)
     (skg-register-response-handler
      ;; Register phase 2 handler for search results 'enriched' with containerward paths and graphnodestats. Persists until fired or replaced.
-     'search-enrichment
-     (lambda (_tcp-proc payload)
-       (skg--display-search-enrichment payload))
+    'search-enrichment
+     (lambda (tcp-proc payload)
+       (skg--display-search-enrichment tcp-proc payload))
      t)
     (skg-register-response-handler
      ;; Rust asks for a snapshot of the search buffer so it can
@@ -140,6 +141,7 @@ kill-buffer-hook to send close-view to the server."
   (let* ((response (read payload))
          (content (skg--as-string (cadr (assoc 'content response))))
          (warnings (cadr (assoc 'warnings response)))
+         (authority (skg--view-authority-from-response response))
          (view-uri (concat "search:" search-terms)))
     (when content
       (with-current-buffer
@@ -152,6 +154,21 @@ kill-buffer-hook to send close-view to the server."
         (setq skg-view-uri view-uri)
         (setq skg--search-request-spec
               (list search-terms regex body operators ugly-choice))
+        (skg-register-buffer
+         (current-buffer) 'search-view
+         :view-uri view-uri
+         :recipe `((kind . "search")
+                   (terms . ,search-terms)
+                   (regex . ,regex)
+                   (body . ,body)
+                   (operators . ,operators)
+                   (ugly-choice . ,ugly-choice))
+         :last-fetched content
+         :graph-generation (plist-get authority :graph-generation)
+         :presentation-generation
+         (plist-get authority :presentation-generation)
+         :server-revision (plist-get authority :server-revision)
+         :application-token (plist-get authority :application-token))
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)
         (switch-to-buffer (current-buffer)) ))
@@ -189,7 +206,7 @@ Modified search buffers are preserved and reported rather than overwritten."
         ((null value) nil)
         (t (format "%s" value))))
 
-(defun skg--display-search-enrichment (payload)
+(defun skg--display-search-enrichment (tcp-proc payload)
   "Replace search buffer with results
 'enriched' with containerward paths and graphnodestats.
 PAYLOAD contains response-type, terms, and content.
@@ -197,16 +214,80 @@ Exits readonly after replacing content."
   (let* ((response (read payload))
          (terms   (skg--as-string (cadr (assoc 'terms   response))))
          (content (skg--as-string (cadr (assoc 'content response))))
-         (warnings (cadr (assoc 'warnings response))))
+         (warnings (cadr (assoc 'warnings response)))
+         (operation-id (cadr (assoc 'operation-id response)))
+         (uri (cadr (assoc 'view-uri response)))
+         (client-buffer-id (cadr (assoc 'client-buffer-id response)))
+         (graph-generation
+          (skg--nat-from-response response 'graph-generation))
+         (presentation-generation
+          (skg--nat-from-response response 'presentation-generation))
+         (base-revision
+          (skg--nat-from-response response 'viewforest-base-revision))
+         (result-revision
+          (skg--nat-from-response response 'resulting-server-revision))
+         (base-graph-generation
+          (skg--nat-from-response response 'view-base-graph-generation))
+         (base-presentation-generation
+          (skg--nat-from-response
+           response 'view-base-presentation-generation))
+         (expected-token
+          (skg--nat-from-response
+           response 'expected-client-application-token))
+         (result-token
+          (skg--nat-from-response
+           response 'resulting-client-application-token))
+         (applied nil)
+         (client-token expected-token))
     (when (and terms content)
-      (let ((buf (get-buffer (skg-search-buffer-name terms))))
+      (let ((buf (or (skg-find-buffer-by-id client-buffer-id)
+                     (and uri (skg-find-buffer-by-uri uri)))))
         (when (buffer-live-p buf)
           (with-current-buffer buf
             (let ((old-point (point)))
-              (skg--replace-search-content content)
-              (goto-char (min old-point (point-max))))
+              (condition-case err
+                  (progn
+                    (skg-replace-buffer-with-new-content
+                     nil content nil
+                     (list
+                      :client-buffer-id client-buffer-id
+                      :view-uri uri
+                      :base-server-revision base-revision
+                      :base-graph-generation base-graph-generation
+                      :base-presentation-generation
+                      base-presentation-generation
+                      :expected-application-token expected-token
+                      :graph-generation graph-generation
+                      :presentation-generation presentation-generation
+                      :server-revision result-revision
+                      :application-token result-token
+                      :require-clean t))
+                    (setq applied t
+                          client-token skg--application-token)
+                    (goto-char (min old-point (point-max))))
+                (error
+                 (setf (skg--buffer-record-search-stale
+                        skg--buffer-record) t)
+                 (skg-log 'error 'search
+                          "search enrichment refused for %s: %S"
+                          (buffer-name) err))))
             (setq buffer-read-only nil)
-            (message "Search results enriched.") )) ))
+            (when applied (message "Search results enriched.")) )) ))
+    (when operation-id
+      (skg-register-response-handler 'collateral-applied #'ignore t)
+      (skg-submit-request
+       tcp-proc
+       (concat
+        (prin1-to-string
+         `((request . "apply collateral")
+           (operation-id . ,operation-id)
+           (view-uri . ,uri)
+           (applied . ,(if applied "true" "false"))
+           (graph-generation . ,graph-generation)
+           (presentation-generation . ,presentation-generation)
+           (viewforest-base-revision . ,base-revision)
+           (client-token . ,client-token)))
+        "\n")))
     (when warnings
       (skg-big-nonfatal-message
        "*SKG Search Warnings*"
@@ -227,11 +308,23 @@ Exits readonly after replacing content."
       (with-current-buffer buf
         (setq buffer-read-only t)
         (message "Enriching search results...")
-        (let* ((buffer-contents (buffer-string))
+        (let* ((record skg--buffer-record)
+               (buffer-contents (skg-buffer-raw-text))
                (request-s-exp
                 (concat (prin1-to-string
                          `((request . "snapshot response")
-                           (terms . ,terms)))
+                           (terms . ,terms)
+                           (client-buffer-id
+                            . ,(skg--buffer-record-id record))
+                           (graph-generation
+                            . ,(skg--buffer-record-graph-generation record))
+                           (presentation-generation
+                            . ,(skg--buffer-record-presentation-generation
+                                record))
+                           (server-revision
+                            . ,(skg--buffer-record-server-revision record))
+                           (client-application-token
+                            . ,(skg--buffer-record-application-token record))))
                         "\n")))
           (skg-submit-request-continuation
            tcp-proc request-s-exp buffer-contents))))))
