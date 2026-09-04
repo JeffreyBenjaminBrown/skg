@@ -38,6 +38,7 @@ use crate::serve::handlers::maintenance_protocol::{
   handle_maintenance_archive_ready_request,
   handle_maintenance_evidence_request,
   handle_maintenance_status_request,
+  handle_maintenance_view_settled_request,
 };
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_roots_request;
@@ -661,6 +662,8 @@ fn dispatch_request (
       handle_maintenance_status_request (stream, runtime),
     RequestType::MaintenanceEvidence =>
       handle_maintenance_evidence_request (stream, request, runtime),
+    RequestType::MaintenanceViewSettled =>
+      handle_maintenance_view_settled_request (stream, request, runtime),
   }
 }
 

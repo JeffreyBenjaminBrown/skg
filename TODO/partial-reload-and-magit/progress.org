@@ -435,6 +435,12 @@ what's imperfect about what's done; choices determining the future.
   on replay; and publishes =FINALIZED= only after every durable final artifact.
   Exact non-UTF-8 evidence, idempotent replay and changed-stream refusal are
   covered, and the complete Neovim suite passes.
+- Exposed the journaled per-view settlement gate as an exact protocol ACK.
+  Every ACK must repeat the incident, epoch, buffer, required action, URI,
+  server revision and application token frozen in the settlement plan.  The
+  last ACK advances to archive finalization; an exact replay there succeeds,
+  while any changed authority is still refused.  The focused Rust maintenance
+  suite passes (25/25).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

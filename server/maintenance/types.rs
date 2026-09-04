@@ -242,6 +242,17 @@ impl ViewSettlementRequirement {
       Self::CloseAck => "close-ack",
     }
   }
+
+  pub fn parse (value : &str) -> Result<Self, String> {
+    match value {
+      "retirement-ack" => Ok (Self::RetirementAck),
+      "release-ack" => Ok (Self::ReleaseAck),
+      "application-ack" => Ok (Self::ApplicationAck),
+      "close-ack" => Ok (Self::CloseAck),
+      other => Err (format! (
+        "unsupported view settlement acknowledgement '{}'", other)),
+    }
+  }
 }
 
 /// One durable promise for one buffer frozen in the maintenance census.

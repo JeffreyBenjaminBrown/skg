@@ -421,7 +421,9 @@ impl MaintenanceCoordinator {
     application_token : u64,
   ) -> Result<bool, String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
-    if active . phase != MaintenancePhase::Presenting {
+    if !matches! (active . phase,
+      MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
+    {
       return Err (format! (
         "view settlement ACK is invalid during {:?}", active . phase)); }
     let record = active . view_settlements . get_mut (buffer_id)
@@ -434,7 +436,13 @@ impl MaintenanceCoordinator {
     {
       return Err (format! (
         "buffer '{}' settlement ACK changed its frozen authority", buffer_id)); }
-    if record . acknowledged { return Ok (false); }
+    if record . acknowledged {
+      return Ok (active . view_settlements . values ()
+        . all (|record| record . acknowledged)); }
+    if active . phase == MaintenancePhase::FinalizingArchive {
+      return Err (
+        "finalizing archive contains an unacknowledged view settlement"
+          . into ()); }
     record . acknowledged = true;
     let complete = active . view_settlements . values ()
       . all (|record| record . acknowledged);
@@ -835,6 +843,14 @@ mod tests {
       &active . incident_id, active . epoch, "two",
       ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 4, 9)
       . unwrap ());
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "one",
+      ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 4, 9)
+      . unwrap ());
+    assert! (coordinator . acknowledge_view_settlement (
+      &active . incident_id, active . epoch, "one",
+      ViewSettlementRequirement::RetirementAck, Some ("wrong"), 4, 9)
+      . is_err ());
     let CoordinatorState::Active (active) = &coordinator . state else {
       panic! ("incident vanished"); };
     assert_eq! (active . phase, MaintenancePhase::FinalizingArchive);

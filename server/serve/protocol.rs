@@ -43,6 +43,7 @@ pub enum RequestType {
   CancelMaintenance,
   MaintenanceStatus,
   MaintenanceEvidence,
+  MaintenanceViewSettled,
 }
 
 impl RequestType {
@@ -88,6 +89,7 @@ impl RequestType {
       "cancel maintenance"       => Ok (RequestType::CancelMaintenance),
       "maintenance status"       => Ok (RequestType::MaintenanceStatus),
       "maintenance evidence"     => Ok (RequestType::MaintenanceEvidence),
+      "maintenance view settled" => Ok (RequestType::MaintenanceViewSettled),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md

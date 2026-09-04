@@ -19,6 +19,7 @@ use crate::maintenance::{
   MaintenanceEpoch,
   MaintenanceOrigin,
   MaintenancePhase,
+  ViewSettlementRequirement,
 };
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
@@ -332,6 +333,65 @@ pub fn handle_maintenance_evidence_request (
     Err (error) => send_result (
       stream, TcpToClient::MaintenanceEvidence, "failed", Err (error)),
   }
+}
+
+pub fn handle_maintenance_view_settled_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = acknowledge_view_settlement (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn acknowledge_view_settlement (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let buffer_id = value_from_request_sexp ("buffer-id", request)?;
+  if buffer_id . is_empty () {
+    return Err ("view settlement ACK has an empty buffer ID" . into ()); }
+  let requirement = ViewSettlementRequirement::parse (
+    &value_from_request_sexp ("required-ack", request)?)?;
+  let view_uri = value_from_request_sexp ("view-uri", request)?;
+  let view_uri = if view_uri == "none" { None } else { Some (view_uri) };
+  let base_revision = unsigned_request_field (
+    request, "base-server-revision")?;
+  let application_token = unsigned_request_field (
+    request, "base-application-token")?;
+  require_archive_owner (runtime, &incident, epoch)?;
+  let all_settled = runtime . transition_maintenance (|coordinator|
+    coordinator . acknowledge_view_settlement (
+      &incident,
+      epoch,
+      &buffer_id,
+      requirement . clone (),
+      view_uri . as_deref (),
+      base_revision,
+      application_token))?;
+  Ok (Sexp::List (vec![
+    atom_field ("status", if all_settled {
+      "all-views-settled"
+    } else {
+      "view-settlement-recorded"
+    }),
+    atom_field ("buffer-id", &buffer_id),
+    atom_field ("required-ack", requirement . label ()),
+    atom_field ("next-action", if all_settled {
+      "finalize-archive"
+    } else {
+      "settle-remaining-views"
+    }),
+  ]) . to_string ())
+}
+
+fn unsigned_request_field (request : &str, key : &str) -> Result<u64, String> {
+  value_from_request_sexp (key, request)? . parse::<u64> ()
+    . map_err (|_| format! ("{} is not an unsigned integer", key))
 }
 
 fn maintenance_evidence (
