@@ -966,13 +966,36 @@ local function atom_list (value, key, context)
   return result
 end
 
+local function normalize_settlement_application (record, required_ack)
+  local application = payload.field(record, 'application')
+  if required_ack == 'application-ack' then
+    if application == nil then
+      fail('application settlement has no exact rendered identity') end
+    local context = 'view application'
+    return field('application', {
+      field('content-sha256', required_text(
+        application, 'content-sha256', context)),
+      field('resulting-graph-generation', required_integer(
+        application, 'resulting-graph-generation', context)),
+      field('resulting-presentation-generation', required_integer(
+        application, 'resulting-presentation-generation', context)),
+      field('resulting-server-revision', required_integer(
+        application, 'resulting-server-revision', context)),
+      field('resulting-application-token', required_integer(
+        application, 'resulting-application-token', context)),
+    })
+  elseif application ~= nil then
+    fail('non-application settlement unexpectedly carries rendered identity')
+  end
+end
+
 local function normalize_settlements (settlements, initial_buffers)
   if not sexpr.is_list(settlements) then
     fail('view settlements are not a proper list') end
   local valid_dispositions = {
     interrupted = true, ['released-unimpacted'] = true, refreshed = true,
-    ['retained-clean'] = true, closed = true, ['detached-derived'] = true,
-    ['maintenance-aborted'] = true, failed = true,
+    ['retained-clean'] = true, ['closed-disposable'] = true,
+    ['detached-derived'] = true, ['maintenance-aborted'] = true, failed = true,
   }
   local valid_acks = {
     ['retirement-ack'] = true, ['release-ack'] = true,
@@ -992,7 +1015,7 @@ local function normalize_settlements (settlements, initial_buffers)
     if not valid_acks[required_ack] then
       fail('unknown settlement acknowledgement: ' .. required_ack) end
     seen[buffer_id] = buffer_key
-    table.insert(normalized, {
+    local normalized_record = {
       field('buffer-id', buffer_id),
       field('buffer-key', buffer_key),
       field('kind', required_text(record, 'kind', context)),
@@ -1004,6 +1027,10 @@ local function normalize_settlements (settlements, initial_buffers)
       field('observed-ids', atom_list(record, 'observed-ids', context)),
       field('resolved-primary-ids', atom_list(
         record, 'resolved-primary-ids', context)),
+      field('base-graph-generation', required_integer(
+        record, 'base-graph-generation', context)),
+      field('base-presentation-generation', required_integer(
+        record, 'base-presentation-generation', context)),
       field('base-server-revision', required_integer(
         record, 'base-server-revision', context)),
       field('base-application-token', required_integer(
@@ -1011,7 +1038,10 @@ local function normalize_settlements (settlements, initial_buffers)
       field('disposition', disposition),
       field('required-ack', required_ack),
       field('acknowledged', 'true'),
-    })
+    }
+    local application = normalize_settlement_application(record, required_ack)
+    if application then table.insert(normalized_record, application) end
+    table.insert(normalized, normalized_record)
   end
   for _, buffer in ipairs(initial_buffers) do
     local buffer_id = required_text(buffer, 'buffer-id', 'initial buffer')

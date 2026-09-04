@@ -178,10 +178,37 @@ local function final_bundle (initial)
         f('parse-uncertain', 'nil'),
         f('observed-ids', { 'root-a' }),
         f('resolved-primary-ids', { 'root-a' }),
+        f('base-graph-generation', 7),
+        f('base-presentation-generation', 3),
         f('base-server-revision', 11),
         f('base-application-token', 5),
         f('planned-disposition', 'interrupted'),
         f('required-ack', 'retirement-ack'),
+      },
+      {
+        f('buffer-id', 'rendered-buffer'),
+        f('buffer-key', 'none'),
+        f('kind', 'content-view'),
+        f('view-uri', 'view:rendered-fixture'),
+        f('dirty', 'nil'),
+        f('impacted', 'true'),
+        f('parse-uncertain', 'nil'),
+        f('observed-ids', {}),
+        f('resolved-primary-ids', {}),
+        f('base-graph-generation', 7),
+        f('base-presentation-generation', 3),
+        f('base-server-revision', 12),
+        f('base-application-token', 6),
+        f('planned-disposition', 'refreshed'),
+        f('required-ack', 'application-ack'),
+        f('application', {
+          f('content', 'private rendered text'),
+          f('content-sha256', string.rep('c', 64)),
+          f('resulting-graph-generation', 8),
+          f('resulting-presentation-generation', 4),
+          f('resulting-server-revision', 13),
+          f('resulting-application-token', 7),
+        }),
       },
     },
     raw = raw,
@@ -285,6 +312,15 @@ describe('skg recovery archive', function ()
         client_nonce = '0123456789abcdef01234567',
       })
       local bundle = final_bundle(initial)
+      local missing_application = vim.deepcopy(bundle.settlements)
+      table.remove(missing_application[2], #missing_application[2])
+      local accepted, validation_error = pcall(
+        archive.finalize, initial, bundle.descriptor, bundle.opaque,
+        missing_application)
+      assert.is_false(accepted)
+      assert.is_truthy(tostring(validation_error):find(
+        'no exact rendered identity', 1, true))
+      assert.is_nil(vim.uv.fs_lstat(initial.path .. '/FINALIZED'))
       local result = archive.finalize(
         initial, bundle.descriptor, bundle.opaque, bundle.settlements)
       local replayed = archive.finalize(
@@ -297,6 +333,14 @@ describe('skg recovery archive', function ()
         read_bytes(initial.path .. '/' .. bundle.raw_relative))
       assert.are.equal('final', payload.field_text(final, 'manifest-kind'))
       assert.are.equal(2, #payload.field(final, 'node-artifacts'))
+      local dispositions = payload.field(final, 'buffer-dispositions')
+      assert.are.equal(2, #dispositions)
+      local rendered_identity = payload.field(dispositions[2], 'application')
+      assert.are.equal(string.rep('c', 64),
+        payload.field_text(rendered_identity, 'content-sha256'))
+      assert.are.equal(8,
+        payload.field(rendered_identity, 'resulting-graph-generation'))
+      assert.is_nil(payload.field(rendered_identity, 'content'))
       assert.are.equal('file',
         vim.uv.fs_lstat(initial.path .. '/FINALIZED').type)
       assert.is_truthy(read_bytes(initial.path
