@@ -518,6 +518,21 @@ what's imperfect about what's done; choices determining the future.
   repeating local actions.  Hot code reload now refreshes this machinery while
   preserving its live incident state.  All 356 Emacs tests pass (the two
   optional undo-fu-session tests remain skipped when that package is absent).
+- Completed the matching Neovim selected-candidate path.  Its buffer registry
+  now validates the complete frozen authority before release, retirement,
+  close or exact rendered application; preserves authored text, native undo,
+  window positions and the prior modifiable state; and records the resulting
+  graph, presentation, revision and application-token authority without
+  clearing stale search membership.
+- Neovim now drives the complete durable handshake: stable settlement replay,
+  exact ACK retries without repeating local edits, opaque evidence transfer,
+  replay-safe final archive publication, final-archive ACK, completion,
+  terminal-census validation and the final terminal ACK.  Its reconnect census
+  locks before reporting editor state and resumes the retained phase only after
+  census completion.  Deliberate Lua reload preserves incident/archive
+  authority and runs every in-flight request finalizer before reconnecting.
+  Focused tests exercise the full evidence-to-terminal chain and the complete
+  Neovim suite passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -527,16 +542,15 @@ what's imperfect about what's done; choices determining the future.
 ** what's imperfect about what's done
 - The census currently reconstructs only live view forests; recipes, attached
   workflows and stale-state detail still need the fuller descriptor schema.
-- A same-Emacs-process socket replacement resumes presentation exactly.  The
-  server-restart/new-editor cases still need explicit reconciliation for a
-  locally applied but unacknowledged clean offer and for clean frozen views
-  absent from the replacement editor.
+- A same-editor-process socket replacement resumes presentation exactly in
+  both clients.  The server-restart/new-editor cases still need explicit
+  reconciliation for a locally applied but unacknowledged clean offer and for
+  clean frozen views absent from the replacement editor.
 - Older foreground rerender streams still need to be routed through the same
   exact application/ACK authority used by retained collateral offers.
-- The Neovim client does not yet execute offered view actions and the final
-  archive handshake.  Emacs does so for an already-selected disk candidate;
-  origin-specific pull, explicit reload and rebuild execution still need to be
-  connected to the common post-archive path.
+- Both clients can finish an already-selected disk candidate.  Origin-specific
+  pull, explicit reload and rebuild execution still need to be connected to
+  the common post-archive path.
 - Attached workflow parentage is not present in the current census schema, so
   workflow buffers are classified conservatively (dirty ones are interrupted,
   clean ones close) rather than being settled with their parent.  The durable
