@@ -125,6 +125,115 @@
         (and skg--buffer-record
              (skg--buffer-record-logical-dirty skg--buffer-record)))))
 
+(defun skg--maintenance-settlement-value (settlement key)
+  (cadr (assoc key settlement)))
+
+(defun skg--maintenance-settlement-text (settlement key)
+  (when-let ((value (skg--maintenance-settlement-value settlement key)))
+    (format "%s" value)))
+
+(defun skg--maintenance-settlement-nat (settlement key)
+  (let ((value (skg--maintenance-settlement-value settlement key)))
+    (cond
+     ((natnump value) value)
+     ((and (stringp value) (string-match-p "\\`[0-9]+\\'" value))
+      (string-to-number value))
+     (t (error "Maintenance settlement has invalid %s" key)))))
+
+(defun skg--maintenance-settlement-uri (settlement)
+  (let ((uri (skg--maintenance-settlement-text settlement 'view-uri)))
+    (unless (member uri '(nil "nil" "none")) uri)))
+
+(defun skg-validate-maintenance-buffer-base (buffer settlement epoch)
+  "Return BUFFER's record after proving SETTLEMENT's exact frozen base."
+  (unless (buffer-live-p buffer)
+    (error "Maintenance buffer is no longer live"))
+  (with-current-buffer buffer
+    (unless skg--buffer-record
+      (error "Maintenance buffer is no longer registered"))
+    (let ((buffer-id (skg--maintenance-settlement-text
+                      settlement 'buffer-id))
+          (kind (intern (skg--maintenance-settlement-text settlement 'kind)))
+          (uri (skg--maintenance-settlement-uri settlement))
+          (dirty (equal (skg--maintenance-settlement-text
+                         settlement 'dirty)
+                        "true")))
+      (unless (and
+               (equal epoch
+                      (skg--buffer-record-maintenance-epoch
+                       skg--buffer-record))
+               (equal buffer-id (skg--buffer-record-id skg--buffer-record))
+               (eq kind (skg--buffer-record-kind skg--buffer-record))
+               (equal uri (skg--buffer-record-view-uri skg--buffer-record))
+               (= (skg--maintenance-settlement-nat
+                   settlement 'base-graph-generation)
+                  (skg--buffer-record-graph-generation skg--buffer-record))
+               (= (skg--maintenance-settlement-nat
+                   settlement 'base-presentation-generation)
+                  (skg--buffer-record-presentation-generation
+                   skg--buffer-record))
+               (= (skg--maintenance-settlement-nat
+                   settlement 'base-server-revision)
+                  (skg--buffer-record-server-revision skg--buffer-record))
+               (= (skg--maintenance-settlement-nat
+                   settlement 'base-application-token)
+                  (skg--buffer-record-application-token skg--buffer-record))
+               (eq dirty (and (skg-buffer-dirty-p buffer) t)))
+        (error "Maintenance buffer %s changed from its frozen authority"
+               buffer-id))
+      skg--buffer-record)))
+
+(defun skg-release-buffer-across-maintenance
+    (buffer settlement epoch graph-generation)
+  "Preserve BUFFER exactly while associating it with selected graph G1."
+  (with-current-buffer buffer
+    (skg-validate-maintenance-buffer-base buffer settlement epoch)
+    (setf (skg--buffer-record-graph-generation skg--buffer-record)
+          graph-generation
+          (skg--buffer-record-presentation-stale skg--buffer-record) t
+          (skg--buffer-record-search-stale skg--buffer-record)
+          (or (skg--buffer-record-search-stale skg--buffer-record)
+              (eq (skg--buffer-record-kind skg--buffer-record)
+                  'search-view)))
+    skg--buffer-record))
+
+(defun skg-retire-buffer-for-maintenance
+    (buffer settlement epoch incident-id)
+  "Detach BUFFER from Skg authority without changing text or undo history."
+  (with-current-buffer buffer
+    (skg-validate-maintenance-buffer-base buffer settlement epoch)
+    (remove-hook 'kill-buffer-hook #'skg-send-close-view t)
+    (when (boundp 'skg-view-uri) (setq skg-view-uri nil))
+    (setf (skg--buffer-record-view-uri skg--buffer-record) nil
+          (skg--buffer-record-lifecycle skg--buffer-record)
+          'detached-recovery
+          (skg--buffer-record-presentation-stale skg--buffer-record) t
+          (skg--buffer-record-search-stale skg--buffer-record)
+          (or (skg--buffer-record-search-stale skg--buffer-record)
+              (eq (skg--buffer-record-kind skg--buffer-record)
+                  'search-view)))
+    (let* ((short-incident (substring incident-id 0 (min 8 (length incident-id))))
+           (short-buffer (substring
+                          (skg--buffer-record-id skg--buffer-record)
+                          0 (min 8 (length
+                                    (skg--buffer-record-id
+                                     skg--buffer-record)))))
+           (desired (format "%s [recovery %s/%s]"
+                            (buffer-name) short-incident short-buffer)))
+      (unless (equal desired (buffer-name))
+        (rename-buffer (generate-new-buffer-name desired) nil)))
+    skg--buffer-record))
+
+(defun skg-close-buffer-for-maintenance (buffer settlement epoch)
+  "Close one disposable clean BUFFER after exact settlement validation."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (skg-validate-maintenance-buffer-base buffer settlement epoch)
+      (remove-hook 'kill-buffer-hook #'skg-send-close-view t)
+      (unless (kill-buffer buffer)
+        (error "Maintenance close was refused for buffer %s"
+               (skg--maintenance-settlement-text settlement 'buffer-id))))))
+
 (defun skg-apply-server-text
     (buffer text expected-uri expected-token graph-generation
             presentation-generation server-revision)

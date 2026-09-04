@@ -1,0 +1,260 @@
+;;; test-skg-maintenance.el --- Durable maintenance client tests -*- lexical-binding: t; -*-
+
+(load-file (expand-file-name "../../elisp/skg-test-utils.el"
+                             (file-name-directory load-file-name)))
+(require 'ert)
+(require 'skg-maintenance)
+
+(defun skg-test-maintenance--settlement
+    (buffer-id kind uri dirty requirement disposition)
+  `((buffer-id ,buffer-id)
+    (buffer-key "none")
+    (kind ,kind)
+    (view-uri ,uri)
+    (dirty ,dirty)
+    (impacted "true")
+    (parse-uncertain "nil")
+    (uncertainty-reason "none")
+    (observed-ids ())
+    (resolved-primary-ids ())
+    (base-graph-generation 1)
+    (base-presentation-generation 3)
+    (base-server-revision 4)
+    (base-application-token 7)
+    (planned-disposition ,disposition)
+    (required-ack ,requirement)
+    (acknowledged "nil")))
+
+(defmacro skg-test-maintenance--with-buffer (kind &rest body)
+  (declare (indent 1))
+  `(let ((buffer (generate-new-buffer " *skg-maintenance-test*"))
+         (skg--buffer-registry (make-hash-table :test #'equal))
+         (skg--server-store-state '((graph-generation . 1))))
+     (unwind-protect
+         (with-current-buffer buffer
+           (org-mode)
+           (insert "* Original\n")
+           (setq skg-view-uri "view")
+           (skg-register-buffer
+            buffer ,kind :view-uri "view" :last-fetched "* Original\n"
+            :graph-generation 1 :presentation-generation 3
+            :server-revision 4 :application-token 7)
+           (skg-lock-buffer-for-maintenance buffer 9)
+           (set-buffer-modified-p nil)
+           ,@body)
+       (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
+(ert-deftest test-skg-maintenance-settlement-inventory-is-exact ()
+  (let ((one (skg-test-maintenance--settlement
+              "one" "content-view" "view-one" "nil"
+              "release-ack" "retained-clean"))
+        (two (skg-test-maintenance--settlement
+              "two" "content-view" "view-two" "nil"
+              "release-ack" "retained-clean")))
+    (should (equal (skg--maintenance-validate-settlements
+                    (list one two) '("two" "one"))
+                   (list one two)))
+    (should-error
+     (skg--maintenance-validate-settlements (list one one) '("one" "two")))
+    (should-error
+     (skg--maintenance-validate-settlements (list one) '("one" "two")))))
+
+(ert-deftest test-skg-maintenance-release-preserves-authored-bytes ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (settlement (skg-test-maintenance--settlement
+                        id "content-view" "view" "nil"
+                        "release-ack" "retained-clean"))
+           (before (skg-buffer-raw-text)))
+      (skg-release-buffer-across-maintenance buffer settlement 9 2)
+      (should (equal before (skg-buffer-raw-text)))
+      (should (= 2 (skg--buffer-record-graph-generation skg--buffer-record)))
+      (should (= 4 (skg--buffer-record-server-revision skg--buffer-record)))
+      (should (= 7 (skg--buffer-record-application-token skg--buffer-record)))
+      (should (skg--buffer-record-presentation-stale skg--buffer-record)))))
+
+(ert-deftest test-skg-maintenance-retirement-keeps-text-and-undo ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (set-buffer-modified-p t)
+    (setq buffer-undo-list '((1 . 2)))
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (settlement (skg-test-maintenance--settlement
+                        id "content-view" "view" "true"
+                        "retirement-ack" "interrupted"))
+           (before (skg-buffer-raw-text))
+           (undo-before buffer-undo-list))
+      (skg-retire-buffer-for-maintenance
+       buffer settlement 9 "12345678-1234-4234-8234-123456789abc")
+      (should (equal before (skg-buffer-raw-text)))
+      (should (equal undo-before buffer-undo-list))
+      (should-not skg-view-uri)
+      (should-not (skg--buffer-record-view-uri skg--buffer-record))
+      (should (eq 'detached-recovery
+                  (skg--buffer-record-lifecycle skg--buffer-record))))))
+
+(ert-deftest test-skg-maintenance-application-checks-and-advances-authority ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (content "* Rendered\n")
+           (application
+            `((content ,content)
+              (content-sha256 ,(skg--sha256-text content))
+              (resulting-graph-generation 2)
+              (resulting-presentation-generation 8)
+              (resulting-server-revision 5)
+              (resulting-application-token 8)
+              (warnings ())))
+           (settlement
+            (append
+             (skg-test-maintenance--settlement
+              id "content-view" "view" "nil"
+              "application-ack" "refreshed")
+             `((application ,application))))
+           (state '(:epoch 9 :g1-graph-generation 2)))
+      (skg--maintenance-apply-rendered-view
+       buffer settlement application state)
+      (should (equal content
+                     (skg--buffer-record-last-fetched skg--buffer-record)))
+      (should (= 2 (skg--buffer-record-graph-generation skg--buffer-record)))
+      (should (= 8 (skg--buffer-record-presentation-generation
+                    skg--buffer-record)))
+      (should (= 5 (skg--buffer-record-server-revision skg--buffer-record)))
+      (should (= 8 (skg--buffer-record-application-token skg--buffer-record)))
+      (let ((changed (copy-tree application)))
+        (setf (cadr (assoc 'content-sha256 changed)) (make-string 64 ?f))
+        (should-error
+         (skg--maintenance-apply-rendered-view
+          buffer settlement changed state))))))
+
+(ert-deftest test-skg-maintenance-application-ack-echoes-all-authority ()
+  (let* ((settlement (skg-test-maintenance--settlement
+                      "buffer" "content-view" "view" "nil"
+                      "application-ack" "refreshed"))
+         (application
+          `((content "* Rendered\n")
+            (content-sha256 ,(make-string 64 ?a))
+            (resulting-graph-generation 2)
+            (resulting-presentation-generation 8)
+            (resulting-server-revision 5)
+            (resulting-application-token 8)
+            (warnings ())))
+         (settlement (append settlement `((application ,application))))
+         (fields (skg--maintenance-ack-fields settlement)))
+    (dolist (key '(base-graph-generation base-presentation-generation
+                   base-server-revision base-application-token
+                   content-sha256 resulting-graph-generation
+                   resulting-presentation-generation
+                   resulting-server-revision resulting-application-token))
+      (should (assoc key fields)))))
+
+(ert-deftest test-skg-maintenance-status-filters-durable-acknowledgements ()
+  (let* ((one (skg-test-maintenance--settlement
+               "one" "content-view" "view-one" "nil"
+               "release-ack" "retained-clean"))
+         (two (skg-test-maintenance--settlement
+               "two" "content-view" "view-two" "nil"
+               "release-ack" "retained-clean"))
+         (old (list (copy-tree one) (copy-tree two)))
+         (scheduled nil)
+         (skg--maintenance-client-incident
+          (list :registered-buffer-ids '("one" "two")
+                :settlements old
+                :pending-settlements nil
+                :acknowledged-settlements nil
+                :locally-applied '("two")
+                :in-flight-settlement two
+                :phase 'view-settlement-ack-pending)))
+    (setq two (cons '(acknowledged "true")
+                    (assq-delete-all 'acknowledged two)))
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest _args)
+                 (setq scheduled function))))
+      (skg--maintenance-install-settlements (list one two)))
+    (should (eq scheduled #'skg--maintenance-settle-next))
+    (should (equal '("one")
+                   (mapcar (lambda (record)
+                             (skg--maintenance-text record 'buffer-id))
+                           (plist-get skg--maintenance-client-incident
+                                      :pending-settlements))))
+    (should (equal '("two")
+                   (mapcar (lambda (record)
+                             (skg--maintenance-text record 'buffer-id))
+                           (plist-get skg--maintenance-client-incident
+                                      :acknowledged-settlements))))
+    (setf (plist-get skg--maintenance-client-incident :locally-applied) nil)
+    (should-error
+     (skg--maintenance-install-settlements (list one two)))))
+
+(ert-deftest test-skg-maintenance-retry-does-not-reapply-local-action ()
+  (let* ((settlement (skg-test-maintenance--settlement
+                      "one" "content-view" "view-one" "nil"
+                      "release-ack" "retained-clean"))
+         (applied 0)
+         sent
+         (skg--maintenance-client-incident
+          (list :incident-id "incident"
+                :epoch 9
+                :phase 'settling-views
+                :pending-settlements (list settlement)
+                :locally-applied '("one")
+                :in-flight-settlement nil)))
+    (cl-letf (((symbol-function 'skg--maintenance-apply-settlement)
+               (lambda (_settlement) (cl-incf applied)))
+              ((symbol-function 'skg--maintenance-send-settlement-ack)
+               (lambda (record) (setq sent record))))
+      (skg--maintenance-settle-next))
+    (should (= applied 0))
+    (should (eq sent settlement))
+    (should (eq settlement
+                (plist-get skg--maintenance-client-incident
+                           :in-flight-settlement)))))
+
+(ert-deftest test-skg-maintenance-terminal-unlocks-exact-census ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (manifest (make-string 64 ?a))
+           (scheduled nil)
+           (skg--maintenance-state '((epoch . 9) (state . active)))
+           (skg--maintenance-client-incident
+            (list :incident-id "12345678-1234-4234-8234-123456789abc"
+                  :epoch 9
+                  :phase 'completing
+                  :registered-buffer-ids (list id)
+                  :g1-graph-generation 2
+                  :g1-manifest-revision 6
+                  :final-archive (list :manifest-sha256 manifest
+                                       :path "/archive")))
+           (payload
+            (prin1-to-string
+             `((status terminal)
+               (incident-id "12345678-1234-4234-8234-123456789abc")
+               (maintenance-epoch 9)
+               (disposition completed)
+               (manifest-sha256 ,manifest)
+               (unlock-buffer-ids (,id))
+               (selected-graph-generation 2)
+               (selected-manifest-revision 6)))))
+      (cl-letf (((symbol-function 'run-at-time)
+                 (lambda (_seconds _repeat function &rest _args)
+                   (setq scheduled function))))
+        (skg--maintenance-handle-terminal nil payload))
+      (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record))
+      (should (eq scheduled #'skg--maintenance-send-terminal-ack))
+      (should (eq (plist-get skg--maintenance-client-incident :phase)
+                  'terminal-received))
+      (should (equal (cdr (assq 'state skg--maintenance-state))
+                     'terminal)))))
+
+(ert-deftest test-skg-maintenance-census-stale-preserves-active-debt ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let ((id (skg--buffer-record-id skg--buffer-record))
+          (skg--maintenance-state '((epoch . 9) (state . active)))
+          skg--maintenance-client-incident)
+      (setq skg--maintenance-client-incident
+            (list :registered-buffer-ids (list id)))
+      (skg-maintenance-handle-census-stale (list id))
+      (should (equal "view" (skg--buffer-record-view-uri
+                             skg--buffer-record)))
+      (should (equal "view" skg-view-uri)))))
+
+(provide 'test-skg-maintenance)

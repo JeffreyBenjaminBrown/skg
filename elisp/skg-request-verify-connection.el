@@ -92,6 +92,8 @@ This inspects the public package header without enabling any package mode."
             (tantivy-health
              . ,(cadr (assoc 'tantivy-health response)))
             ))
+    (when (fboundp 'skg-maintenance-adopt-handshake-epoch)
+      (skg-maintenance-adopt-handshake-epoch))
     (setq skg--connection-handshake-state 'census)
     (skg--show-handshake-telescope-warnings response)
     (when (fboundp 'skg-install-pending-recovery-incidents)
@@ -117,7 +119,9 @@ This inspects the public package header without enabling any package mode."
                                            response))
                                nil)))
          (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
-    (skg-mark-census-buffers-stale stale)
+    (if (fboundp 'skg-maintenance-handle-census-stale)
+        (skg-maintenance-handle-census-stale stale)
+      (skg-mark-census-buffers-stale stale))
     (if required
         (progn
           (setq skg--connection-handshake-state 'census-texts)
@@ -126,17 +130,23 @@ This inspects the public package header without enabling any package mode."
            "((request . \"client census texts\"))\n"
            `((client-census ,#'skg--finish-buffer-census . t))
            (prin1-to-string (skg-buffer-census-texts required))))
-      (setq skg--connection-handshake-state 'verified))))
+      (setq skg--connection-handshake-state 'verified)
+      (when (fboundp 'skg-resume-maintenance-after-census)
+        (run-at-time 0 nil #'skg-resume-maintenance-after-census)))))
 
 (defun skg--finish-buffer-census (_tcp-proc payload)
   "Install the terminal disposition of requested census texts."
   (let* ((response (read payload))
          (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
-    (skg-mark-census-buffers-stale stale)
+    (if (fboundp 'skg-maintenance-handle-census-stale)
+        (skg-maintenance-handle-census-stale stale)
+      (skg-mark-census-buffers-stale stale))
     (unless (equal (format "%s" (cadr (assoc 'census-complete response)))
                    "true")
       (error "Skg server did not complete the buffer census"))
-    (setq skg--connection-handshake-state 'verified)))
+    (setq skg--connection-handshake-state 'verified)
+    (when (fboundp 'skg-resume-maintenance-after-census)
+      (run-at-time 0 nil #'skg-resume-maintenance-after-census))))
 
 (defun skg--submit-connection-handshake (tcp-proc)
   "Put the mandatory handshake first without consuming an ordinary draft."

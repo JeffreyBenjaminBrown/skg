@@ -507,6 +507,17 @@ what's imperfect about what's done; choices determining the future.
   observation-problem frames with explicit stable kebab-case labels for every
   coordinator state, maintenance phase and pending reason.  The focused Rust
   maintenance suite remains 32/32.
+- Completed the Emacs client side of a selected-candidate incident.  It now
+  validates and applies every exact release, retirement, close or rendered-view
+  settlement; preserves point/window position and native undo where required;
+  ACKs all frozen and resulting authority; downloads and finalizes the opaque
+  evidence archive; and unlocks only after validating the journaled terminal
+  census and selected generations.  A reconnect census preserves locally
+  applied presentation debt, status filters durable ACK bits, and lost view,
+  evidence, final-archive, completion and terminal replies retry without
+  repeating local actions.  Hot code reload now refreshes this machinery while
+  preserving its live incident state.  All 356 Emacs tests pass (the two
+  optional undo-fu-session tests remain skipped when that package is absent).
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -516,17 +527,21 @@ what's imperfect about what's done; choices determining the future.
 ** what's imperfect about what's done
 - The census currently reconstructs only live view forests; recipes, attached
   workflows and stale-state detail still need the fuller descriptor schema.
+- A same-Emacs-process socket replacement resumes presentation exactly.  The
+  server-restart/new-editor cases still need explicit reconciliation for a
+  locally applied but unacknowledged clean offer and for clean frozen views
+  absent from the replacement editor.
 - Older foreground rerender streams still need to be routed through the same
   exact application/ACK authority used by retained collateral offers.
-- The server-side archive, selection, evidence, disposition and terminal gates
-  are durable, but the clients do not yet execute the offered view actions and
-  finalization handshake; a verified initial archive therefore intentionally
-  leaves its epoch lock installed until that client work completes.
+- The Neovim client does not yet execute offered view actions and the final
+  archive handshake.  Emacs does so for an already-selected disk candidate;
+  origin-specific pull, explicit reload and rebuild execution still need to be
+  connected to the common post-archive path.
 - Attached workflow parentage is not present in the current census schema, so
   workflow buffers are classified conservatively (dirty ones are interrupted,
   clean ones close) rather than being settled with their parent.  The durable
-  settlement inventory and ACK gate are in place, but clients do not yet apply
-  or acknowledge these records.
+  settlement inventory and ACK gate are in place, but workflow-parent-aware
+  settlement is not yet implemented.
 
 ** choices determining the future
 - None.  The Undo Tree discovery is resolved by the agreed fail-closed active-
