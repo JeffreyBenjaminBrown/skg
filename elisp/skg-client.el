@@ -134,8 +134,6 @@ the request record named by its request-id."
     (if (string-prefix-p "((busy-initializing" trimmed)
         (let ((parsed (car (read-from-string trimmed))))
           (message "%s" (cdr (assq 'busy-initializing parsed)))
-          (when (fboundp 'skg-stop-reload-observation)
-            (skg-stop-reload-observation))
           (setq skg--connection-handshake-state nil)
           (skg-clear-request-coordinator)
           (skg-lp-reset))
@@ -144,8 +142,6 @@ the request record named by its request-id."
 (defun skg--tcp-sentinel (_proc event)
   "Clean up when the TCP connection closes."
   (when (not (string-prefix-p "open" event))
-    (when (fboundp 'skg-stop-reload-observation)
-      (skg-stop-reload-observation))
     (setq skg--connection-handshake-state nil)
     (skg-clear-request-coordinator)
     (skg-lp-reset)) )

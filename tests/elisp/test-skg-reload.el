@@ -137,40 +137,21 @@
       (with-current-buffer view (set-buffer-modified-p nil))
       (kill-buffer view))))
 
-(ert-deftest test-skg-reload-request-locks-and-reports-dirty-uri ()
-  (let ((view (generate-new-buffer "*skg dirty request test*"))
-        (skg--active-request-id nil)
-        (skg--stream-in-progress nil)
-        submitted)
-    (unwind-protect
-        (progn
-          (with-current-buffer view
-            (setq-local skg-view-uri "dirty-request-uri")
-            (insert "local")
-            (set-buffer-modified-p t))
-          (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
-                     (lambda () 'fake-process))
-                    ((symbol-function 'skg-submit-request)
-                     (lambda (_tcp request &optional _content incident)
-                       (setq submitted (list (read request) incident)))))
-            (skg-reload-paths '("/source/node.skg") nil "same-incident"))
-          (should (equal (cadr submitted) "same-incident"))
-          (should (equal
-                   (cadr (assoc 'dirty-view-uris (car submitted)))
-                   "dirty-request-uri"))
-          (with-current-buffer view
-            (should skg--save-lock-overlay)))
-      (skg--end-stream)
-      (skg--unlock-all-save-locked)
-      (setq skg--request-draft nil)
-      (with-current-buffer view (set-buffer-modified-p nil))
-      (kill-buffer view))))
+(ert-deftest test-skg-reload-paths-enters-maintenance ()
+  (let (submitted)
+    (cl-letf (((symbol-function 'skg--confirm-explicit-reload-with-dirty-views)
+               (lambda () t))
+              ((symbol-function 'skg-begin-maintenance)
+               (lambda (&rest arguments) (setq submitted arguments))))
+      (skg-reload-paths '("/source/node.skg") '("node-id")))
+    (should (equal (car submitted) "explicit-partial-reload"))
+    (should (equal (nth 2 submitted) '("/source/node.skg")))
+    (should (equal (nth 3 submitted) '("node-id")))))
 
 (ert-deftest test-skg-recovery-disk-race-starts-a-successor-incident ()
   "Changed recovery bytes stay unresolved and trigger a fresh exact sweep."
   (let ((skg--pending-recovery-incidents
          '(((incident-id old-incident))))
-        (skg--reload-observation-incident-id "old-incident")
         handler
         submitted-incident
         (sweeps 0))
@@ -194,10 +175,6 @@
                   (content \"disk changed\")\
                   (successor-required true))")
       (should (= sweeps 1))
-      (should-not (equal skg--reload-observation-incident-id
-                         "old-incident"))
-      (should (string-prefix-p
-               "incident-" skg--reload-observation-incident-id))
       (should skg--pending-recovery-incidents))))
 
 (ert-deftest test-skg-reload-preserves-herald-rules-on-load-error ()
@@ -225,27 +202,6 @@ error AND leave the captured table installed."
                  (error "simulated load error during reload"))))
       (should-error (skg-reload))
       (should (equal heralds--transform-rules '(skg test-sentinel))))))
-
-(ert-deftest test-skg-reload-path-scan-uses-only-direct-regular-files ()
-  "Nested .skg files and .skg-named directories are outside a source."
-  (let* ((root (make-temp-file "skg-reload-paths" t))
-         (source (expand-file-name "owned/source" root))
-         (nested (expand-file-name "nested" source))
-         (config (expand-file-name "skgconfig.toml" root))
-         (skg-config-dir (file-name-as-directory root)))
-    (unwind-protect
-        (progn
-          (make-directory nested t)
-          (make-directory (expand-file-name "directory.skg" source))
-          (with-temp-file config
-            (insert "[[sources]]\npath = \"owned/source\"\n"))
-          (with-temp-file (expand-file-name "direct.skg" source)
-            (insert "pid: direct\n"))
-          (with-temp-file (expand-file-name "nested.skg" nested)
-            (insert "pid: nested\n"))
-          (should (equal (skg--reload-all-skg-files)
-                         (list (expand-file-name "direct.skg" source)))))
-      (delete-directory root t))))
 
 (ert-deftest test-skg-reload-selection-is-a-distinct-id-stack-entry-path ()
   "Only the explicit reload command installs TO-RELOAD selection state."
@@ -348,97 +304,22 @@ error AND leave the captured table installed."
 (ert-deftest test-skg-reload-selection-refuses-ordinary-save ()
   (should-error (skg--reload-selection-refuse-save) :type 'user-error))
 
-(ert-deftest test-skg-reload-observation-callback-only-enqueues-candidates ()
-  "The notification callback does no content read, stat or hash."
-  (let ((skg--server-source-inventory
-         '((:name "s" :directory "/data/source")))
-        (skg--reload-observation-paths (make-hash-table :test 'equal))
-        (skg--reload-observation-sequence 0)
-        skg--reload-observation-incident-id
-        scheduled)
-    (cl-letf (((symbol-function 'skg--schedule-reload-observation)
-               (lambda (delay) (setq scheduled delay)))
-              ((symbol-function 'file-attributes)
-               (lambda (&rest _) (ert-fail "callback statted a file")))
-              ((symbol-function 'insert-file-contents)
-               (lambda (&rest _) (ert-fail "callback read a file"))))
-      (skg--reload-file-notify-callback
-       '(watch changed "/data/source/node.skg"))
-      (should (= (hash-table-count skg--reload-observation-paths) 1))
-      (should (= scheduled 0.35))
-      (should (string-prefix-p
-               "incident-" skg--reload-observation-incident-id))
-      (skg--reload-file-notify-callback
-       '(watch changed "/data/source/nested/node.skg"))
-      (should (= (hash-table-count skg--reload-observation-paths) 1)))))
-
-(ert-deftest test-skg-reload-observation-reuses-live-watches ()
-  "Hot client reload must not turn live watches into an expensive sweep."
-  (let ((skg--reload-watch-descriptors '(watch-a watch-b))
-        stopped added swept)
-    (cl-letf (((symbol-function 'file-notify-valid-p) (lambda (_) t))
-              ((symbol-function 'skg-stop-reload-observation)
-               (lambda () (setq stopped t)))
-              ((symbol-function 'file-notify-add-watch)
-               (lambda (&rest _) (setq added t)))
-              ((symbol-function 'skg--request-reload-full-sweep)
-               (lambda () (setq swept t))))
-      (skg-start-reload-observation)
-      (should-not stopped)
-      (should-not added)
-      (should-not swept))))
-
-(ert-deftest test-skg-reload-observation-replaces-stale-watches-and-sweeps ()
-  "A stopped watcher leaves a gap that only an exact sweep can cover."
-  (let ((skg--server-source-inventory nil)
-        (skg--reload-watch-descriptors '(stale-watch))
-        stopped swept)
-    (cl-letf (((symbol-function 'file-notify-valid-p) (lambda (_) nil))
-              ((symbol-function 'skg-stop-reload-observation)
-               (lambda ()
-                 (setq stopped t
-                       skg--reload-watch-descriptors nil)))
-              ((symbol-function 'skg--source-paths) (lambda () nil))
-              ((symbol-function 'skg--request-reload-full-sweep)
-               (lambda () (setq swept t))))
-      (skg-start-reload-observation)
-      (should stopped)
-      (should swept))))
-
-(ert-deftest test-skg-reload-observation-deferred-retains_same_incident ()
-  (let ((skg--reload-observation-paths (make-hash-table :test 'equal))
-        (skg--reload-observation-in-flight t)
-        skg--reload-observation-timer
-        skg--reload-observation-incident-id
-        scheduled)
-    (puthash "/s/a.skg" 7 skg--reload-observation-paths)
-    (cl-letf (((symbol-function 'skg--schedule-reload-observation)
-               (lambda (delay) (setq scheduled delay))))
-      (skg--finish-reload-observation
-       '(("/s/a.skg" . 7)) nil "incident-original"
-       '((deferred true) (terminal-status complete)))
-      (should (equal (gethash "/s/a.skg" skg--reload-observation-paths) 7))
-      (should (equal skg--reload-observation-incident-id
-                     "incident-original"))
-      (should (= scheduled 1.0)))))
-
-(ert-deftest test-skg-reload-observation-does-not-erase_a_newer_event ()
-  (let ((skg--reload-observation-paths (make-hash-table :test 'equal))
-        (skg--reload-observation-in-flight t)
-        (skg--reload-observation-full-sweep nil)
-        skg--reload-observation-timer
-        skg--reload-observation-incident-id
-        scheduled)
-    ;; Sequence 7 was sent; sequence 8 arrived while it was in flight.
-    (puthash "/s/a.skg" 8 skg--reload-observation-paths)
-    (cl-letf (((symbol-function 'skg--schedule-reload-observation)
-               (lambda (delay) (setq scheduled delay))))
-      (skg--finish-reload-observation
-       '(("/s/a.skg" . 7)) nil "incident-old"
-       '((terminal-status complete)))
-      (should (equal (gethash "/s/a.skg" skg--reload-observation-paths) 8))
-      (should (string-prefix-p
-               "incident-" skg--reload-observation-incident-id))
-      (should (= scheduled 0)))))
+(ert-deftest test-skg-reload-full-sweep-is-only-an-observation-hint ()
+  (let (handler submitted)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+               (lambda () 'fake-process))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (type callback terminal)
+                 (setq handler (list type callback terminal))))
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp request &rest _)
+                 (setq submitted (read request)))))
+      (skg--request-reload-full-sweep))
+    (should (equal (car handler) 'reload-paths))
+    (should (nth 2 handler))
+    (should (equal (cdr (assoc 'full-sweep submitted)) "true"))
+    (should-not (assoc 'incident-id submitted))
+    (funcall (cadr handler) nil
+             "((observation-queued true) (terminal-status complete))")))
 
 (provide 'test-skg-reload)

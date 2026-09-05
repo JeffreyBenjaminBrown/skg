@@ -139,16 +139,11 @@ function M.enqueue_connection_handshake (tcp)
   })
 end
 
----The Neovim port has no partial-reload dirty-buffer handshake yet. Keep the
----server-owned batch-close event visible instead of pretending it reconciled.
+---Report the exact process-owned sweep which batch closure already queued.
 function M.reconciliation_ready_handler (_payload, response)
   local generation = payload.field_text(response, 'sweep-generation') or '?'
-  messages.big_nonfatal_message(
-    'skg://messages/reconciliation-required',
-    'WARNING: An external reload batch finished but Neovim cannot safely reconcile it.',
-    '* Reload reconciliation required\nThe external batch requested full sweep generation '
-      .. generation
-      .. '. The Neovim client does not yet implement the dirty-buffer census and partial-reload UI. Connect with Emacs to reconcile, or restart after manually making every Skg view safe.')
+  vim.notify('Skg queued post-batch disk observation generation '
+    .. generation)
 end
 
 ---Verify the connection to the Rust server by sending a simple ping;
