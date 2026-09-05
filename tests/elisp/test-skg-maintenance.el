@@ -439,7 +439,64 @@
                " (error \"malformed target\"))")))
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'server-blocked))
-    (should (string-match-p "malformed target" warning))))
+    (should (equal
+             (plist-get skg--maintenance-client-incident :blocking-reason)
+             "malformed target"))
+    (should (string-match-p "skg-retry-maintenance" warning))))
+
+(ert-deftest test-skg-blocked-status-retains-exact-recovery-instructions ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9 :origin "pull"
+           :requested-paths nil :requested-ids nil :phase waiting-for-server))
+        warning)
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _arguments)
+                 (setq warning message))))
+      (skg--maintenance-resume-active
+       '((status active) (active-incident-id "incident")
+         (maintenance-epoch 9) (phase "blocked-store-health")
+         (origin "pull") (requested-paths ()) (requested-ids ())
+         (blocking-reason "TypeDB is unavailable"))))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'server-blocked))
+    (should (equal
+             (plist-get skg--maintenance-client-incident :server-phase)
+             "blocked-store-health"))
+    (should (equal
+             (plist-get skg--maintenance-client-incident :blocking-reason)
+             "TypeDB is unavailable"))
+    (should (string-match-p "skg-retry-maintenance" warning))))
+
+(ert-deftest test-skg-retry-maintenance-sends-exact-envelope-and-awaits-push ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9 :phase server-blocked
+           :server-phase "blocked-invalid-after-mutation"
+           :blocking-reason "malformed source"))
+        request request-incident handler)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+               (lambda () 'tcp))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (kind callback &optional _one-shot)
+                 (should (eq kind 'maintenance-status))
+                 (setq handler callback)))
+              ((symbol-function 'skg-set-request-failure-handler) #'ignore)
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp text &optional _content incident)
+                 (setq request text request-incident incident))))
+      (skg-retry-maintenance))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'maintenance-retry-pending))
+    (should (equal request-incident "incident"))
+    (let ((parsed (read request)))
+      (should (equal (cdr (assoc 'request parsed)) "retry maintenance"))
+      (should (= (cdr (assoc 'maintenance-epoch parsed)) 9)))
+    (funcall handler nil
+             "((status maintenance-retry-queued) (incident-id incident) (maintenance-epoch 9) (recovery-mode targeted))")
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'waiting-for-origin-observation))
+    (should-not (plist-get skg--maintenance-client-incident :server-phase))
+    (should-not (plist-get skg--maintenance-client-incident
+                           :blocking-reason))))
 
 (ert-deftest test-skg-maintenance-settlement-inventory-is-exact ()
   (let ((one (skg-test-maintenance--settlement

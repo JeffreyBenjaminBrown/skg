@@ -1182,12 +1182,20 @@ checksummed final marker."
                  incident-id origin)))
      ((member phase '("blocked-invalid-after-mutation"
                       "blocked-store-health"))
-      (setf (plist-get state :phase) 'server-blocked)
-      (display-warning
-       'skg
-       (format "Maintenance %s remains locked in server phase %s"
-               incident-id phase)
-       :error))
+      (let ((reason (or (skg--maintenance-text response 'blocking-reason)
+                        "unspecified")))
+        (setf (plist-get state :phase) 'server-blocked
+              (plist-get state :server-phase) phase
+              (plist-get state :blocking-reason) reason)
+        (setq skg--maintenance-client-incident state)
+        (display-warning
+         'skg
+         (format
+          (concat "Maintenance %s remains locked in server phase %s: %s. "
+                  "Repair the reported problem, then run "
+                  "M-x skg-retry-maintenance.")
+          incident-id phase reason)
+         :error)))
      (t
       (setf (plist-get state :phase) 'waiting-for-server)
       (message "Skg maintenance %s is in server phase %s"
@@ -1416,12 +1424,19 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
         (skg--maintenance-text response 'incident-id)
         (skg--maintenance-field response 'maintenance-epoch))
        (setf (plist-get skg--maintenance-client-incident :phase)
-             'server-blocked)
+             'server-blocked
+             (plist-get skg--maintenance-client-incident :server-phase)
+             (skg--maintenance-text response 'phase)
+             (plist-get skg--maintenance-client-incident :blocking-reason)
+             (skg--maintenance-text response 'error))
        (display-warning
         'skg
-        (format "Explicit reload remains locked in server phase %s: %s"
-                (skg--maintenance-text response 'phase)
-                (skg--maintenance-text response 'error))
+        (format
+         (concat "Maintenance remains locked in server phase %s: %s. "
+                 "Repair the reported problem, then run "
+                 "M-x skg-retry-maintenance.")
+         (skg--maintenance-text response 'phase)
+         (skg--maintenance-text response 'error))
         :error))
       ((or "active" "terminal" "idle")
        (skg--maintenance-handle-status tcp-proc payload))
@@ -1457,6 +1472,55 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
        (concat
         (prin1-to-string
          `((request . "cancel maintenance")
+           (maintenance-epoch . ,epoch)))
+        "\n")
+       nil incident-id))))
+
+(defun skg--maintenance-handle-retry (_tcp-proc payload)
+  "Resume asynchronous maintenance handling after a retry PAYLOAD."
+  (let* ((response (read payload))
+         (status (skg--maintenance-text response 'status))
+         (incident-id (skg--maintenance-text response 'incident-id))
+         (epoch (skg--maintenance-field response 'maintenance-epoch))
+         (mode (skg--maintenance-text response 'recovery-mode)))
+    (skg--maintenance-require-client-incident incident-id epoch)
+    (unless (equal status "maintenance-retry-queued")
+      (error "Server did not queue blocked maintenance recovery"))
+    (setf (plist-get skg--maintenance-client-incident :phase)
+          'waiting-for-origin-observation
+          (plist-get skg--maintenance-client-incident :server-phase) nil
+          (plist-get skg--maintenance-client-incident :blocking-reason) nil)
+    (message "Skg queued %s maintenance recovery for %s"
+             mode incident-id)))
+
+(defun skg-retry-maintenance ()
+  "Retry a repaired invalid-disk or store-health maintenance block.
+The server preserves the incident and epoch, observes fresh disk, and never
+repeats the incident's external origin operation."
+  (interactive)
+  (let* ((state skg--maintenance-client-incident)
+         (incident-id (plist-get state :incident-id))
+         (epoch (plist-get state :epoch)))
+    (unless (and state incident-id epoch
+                 (eq (plist-get state :phase) 'server-blocked))
+      (user-error "Skg has no client-known blocked maintenance incident"))
+    (setf (plist-get state :phase) 'maintenance-retry-pending)
+    (let ((tcp-proc (skg-tcp-connect-to-rust)))
+      (skg-register-response-handler
+       'maintenance-status #'skg--maintenance-handle-retry t)
+      (skg-set-request-failure-handler
+       (lambda (reason)
+         (when skg--maintenance-client-incident
+           (setf (plist-get skg--maintenance-client-incident :phase)
+                 'server-blocked))
+         (display-warning
+          'skg (format "Maintenance retry was not acknowledged: %s" reason)
+          :warning)))
+      (skg-submit-request
+       tcp-proc
+       (concat
+        (prin1-to-string
+         `((request . "retry maintenance")
            (maintenance-epoch . ,epoch)))
         "\n")
        nil incident-id))))
