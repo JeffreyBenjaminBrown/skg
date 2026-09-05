@@ -141,6 +141,7 @@ function M.display_search_phase1 (response, search_terms, regex, body,
   if not content then return end
   local view_uri = payload.field_text(response, 'view-uri')
     or requested_view_uri or ('search:' .. search_terms)
+  local root_ids_value = payload.field(response, 'root-ids')
   local buf = buffer.open_org_buffer_from_text(
     content and (vim.trim(content) .. '\n') or '',
     buffer.search_buffer_name(search_terms),
@@ -152,6 +153,7 @@ function M.display_search_phase1 (response, search_terms, regex, body,
         regex = regex == true, body = body == true,
         operators = operators == true, ugly_choice = ugly_choice,
       },
+      root_ids = root_ids_value and payload.string_list(root_ids_value) or nil,
       graph_generation = tonumber(
         payload.field_text(response, 'graph-generation')),
       presentation_generation = tonumber(

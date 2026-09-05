@@ -56,7 +56,8 @@ function M.request_single_root_content_view_from_id (node_id,
   state.register_response_handler('content-view',
     function (payload_text, response)
       state.remove_response_handler('ugly-telescope-confirmation')
-      M.handle_content_view(payload_text, response, view_uri, fresh_view)
+      M.handle_content_view(
+        payload_text, response, view_uri, fresh_view, node_id)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
@@ -84,7 +85,8 @@ end
 ---@param payload_text string
 ---@param response any
 ---@param view_uri string
-function M.handle_content_view (payload_text, response, view_uri, fresh_view)
+function M.handle_content_view (payload_text, response, view_uri, fresh_view,
+                                node_id)
   local ok, err = pcall(function ()
     local switch_uri = payload.field_text(response, 'switch-to-view')
     if switch_uri then
@@ -110,6 +112,7 @@ function M.handle_content_view (payload_text, response, view_uri, fresh_view)
     local to_minibuffer = payload.field_text(response, 'to-minibuffer')
     local server_uri = payload.field_text(response, 'view-uri')
     local effective_uri = server_uri or view_uri
+    local root_ids_value = payload.field(response, 'root-ids')
     if content_text and content_text ~= '' then
       buffer.open_org_buffer_from_text(
         content_text,
@@ -120,7 +123,9 @@ function M.handle_content_view (payload_text, response, view_uri, fresh_view)
           disposable = server_uri and server_uri:find('^override%-menu:')
                        ~= nil,
           force_new = fresh_view == true,
-          recipe = { kind = 'single-root' },
+          recipe = { kind = 'single-root', root_id = node_id },
+          root_ids = root_ids_value
+            and payload.string_list(root_ids_value) or nil,
           graph_generation = tonumber(
             payload.field_text(response, 'graph-generation')),
           presentation_generation = tonumber(

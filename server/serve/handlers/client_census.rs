@@ -12,7 +12,7 @@ use crate::serve::util::{
 use crate::types::env::SkgEnv;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::sexp::{atom_to_string, extract_v_from_kv_pair_in_sexp};
-use crate::types::views_state::{ViewUri, pids_from_viewforest};
+use crate::types::views_state::{ViewState, ViewUri, pids_from_viewforest};
 
 use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
@@ -42,17 +42,14 @@ pub fn handle_client_census_request (
 
     for descriptor in descriptors {
       let Some (uri) = descriptor . view_uri . clone () else { continue; };
+      let descriptor_kind = validate_live_descriptor (&descriptor)?;
       if !live_uris . insert (uri . clone ()) {
         return Err (format! (
           "client census names view '{}' more than once",
           uri . repr_in_client ())); }
       match interactive . views . open_views . views . get_mut (&uri) {
-        Some (state)
-          if state . graph_generation == descriptor . graph_generation
-          && state . presentation_generation
-             == descriptor . presentation_generation
-          && state . revision == descriptor . server_revision
-          && state . client_application_token == descriptor . application_token =>
+        Some (state) if state_matches_descriptor (
+          state, &descriptor, &descriptor_kind) =>
         {
           state . client_buffer_id = Some (descriptor . buffer_id . clone ());
         }
@@ -112,6 +109,7 @@ pub fn handle_client_census_texts_request (
         continue; }
       let Some (uri) = descriptor . view_uri . clone () else {
         continue; };
+      let descriptor_kind = validate_live_descriptor (&descriptor)?;
       let (maybe_placed, parse_errors, _) = org_to_uninterpreted_viewforest (
         &last_fetched).map_err (|error| format! (
           "could not reconstruct '{}': {}", buffer_id, error))?;
@@ -128,14 +126,25 @@ pub fn handle_client_census_texts_request (
         descriptor . graph_generation,
         descriptor . presentation_generation,
         descriptor . application_token,
-        parse_kind (&descriptor . kind)?,
-        None);
+        descriptor_kind,
+        descriptor . source_set . clone (),
+        Some (descriptor . recipe . clone ()));
       interactive . views . open_views . views . get_mut (&uri)
         . expect ("reconstructed census view exists")
         . revision = descriptor . server_revision;
-      interactive . views . open_views . views . get_mut (&uri)
-        . expect ("reconstructed census view exists")
-        . client_buffer_id = Some (descriptor . buffer_id . clone ());
+      let state = interactive . views . open_views . views . get_mut (&uri)
+        . expect ("reconstructed census view exists");
+      state . client_buffer_id = Some (descriptor . buffer_id . clone ());
+      state . presentation_stale = descriptor . presentation_stale;
+      state . search_stale = descriptor . search_stale;
+      let restored_roots : HashSet<String> = state . root_ids . iter ()
+        . map (|id| id . 0 . clone ()) . collect ();
+      let described_roots : HashSet<String> = descriptor . root_ids . iter ()
+        . cloned () . collect ();
+      if restored_roots != described_roots {
+        interactive . views . open_views . unregister_view (&uri);
+        stale . push (descriptor . buffer_id);
+        continue; }
       restored . push (descriptor . buffer_id);
     }
     stale . extend (
@@ -308,6 +317,89 @@ fn parse_kind (kind : &str) -> Result<BufferKind, String> {
     "buffer kind '{}' cannot be reconstructed as a live view", kind)) }
 }
 
+fn validate_live_descriptor (
+  descriptor : &CensusDescriptor,
+) -> Result<BufferKind, String> {
+  if descriptor . lifecycle != "live-view" {
+    return Err (format! (
+      "buffer '{}' has a view URI but lifecycle '{}'",
+      descriptor . buffer_id, descriptor . lifecycle)); }
+  let kind = parse_kind (&descriptor . kind)?;
+  let recipe_kind = recipe_atom (&descriptor . recipe, "kind")
+    . ok_or_else (|| format! (
+      "live buffer '{}' recipe has no kind", descriptor . buffer_id))?;
+  match kind {
+    BufferKind::ContentView | BufferKind::OverrideChoiceMenu => {
+      if recipe_kind != "single-root" {
+        return Err (format! (
+          "buffer '{}' has a non-content recipe", descriptor . buffer_id)); }
+      let root = recipe_atom (&descriptor . recipe, "root-id")
+        . ok_or_else (|| format! (
+          "buffer '{}' recipe has no root-id", descriptor . buffer_id))?;
+      if ! descriptor . root_ids . contains (&root) {
+        return Err (format! (
+          "buffer '{}' recipe root is absent from its roots",
+          descriptor . buffer_id)); }
+      if matches! (kind, BufferKind::OverrideChoiceMenu)
+         && !descriptor . disposable
+      {
+        return Err (format! (
+          "override menu '{}' is not disposable", descriptor . buffer_id)); }
+    }
+    BufferKind::NewEmptyContentView if recipe_kind != "new-empty" => {
+      return Err (format! (
+        "buffer '{}' has a non-empty-view recipe", descriptor . buffer_id)); }
+    BufferKind::SearchView => {
+      if recipe_kind != "search"
+         || recipe_atom (&descriptor . recipe, "terms") . is_none ()
+      {
+        return Err (format! (
+          "buffer '{}' has an incomplete search recipe",
+          descriptor . buffer_id)); }
+      for axis in ["body", "operators", "regex"] {
+        if !matches! (recipe_atom (&descriptor . recipe, axis) . as_deref (),
+          Some ("true" | "nil"))
+        {
+          return Err (format! (
+            "buffer '{}' search recipe has invalid {}",
+            descriptor . buffer_id, axis)); }
+      }
+    }
+    _ => {}
+  }
+  Ok (kind)
+}
+
+fn recipe_atom (recipe : &str, key : &str) -> Option<String> {
+  let Sexp::List (entries) = sexp::parse (recipe) . ok ()? else {
+    return None; };
+  entries . iter () . find_map (|entry| {
+    let Sexp::List (parts) = entry else { return None; };
+    if parts . len () != 2 { return None; }
+    if atom_to_string (&parts [0]) . ok ()? != key { return None; }
+    atom_to_string (&parts [1]) . ok ()
+  })
+}
+
+fn state_matches_descriptor (
+  state      : &ViewState,
+  descriptor : &CensusDescriptor,
+  kind       : &BufferKind,
+) -> bool {
+  let roots : HashSet<String> = state . root_ids . iter ()
+    . map (|id| id . 0 . clone ()) . collect ();
+  state . graph_generation == descriptor . graph_generation
+  && state . presentation_generation == descriptor . presentation_generation
+  && state . revision == descriptor . server_revision
+  && state . client_application_token == descriptor . application_token
+  && &state . kind == kind
+  && state . recipe . as_deref () == Some (&descriptor . recipe)
+  && state . source_set == descriptor . source_set
+  && state . presentation_stale == descriptor . presentation_stale
+  && state . search_stale == descriptor . search_stale
+  && roots == descriptor . root_ids . iter () . cloned () . collect ()
+}
+
 fn sha256 (text : &str) -> String {
   format! ("{:x}", Sha256::digest (text . as_bytes ()))
 }
@@ -360,7 +452,9 @@ mod tests {
       "(lifecycle . \"live-view\") (disposable . \"nil\") ",
       "(continuation-id . \"continuation-1\") ",
       "(view-uri . \"search:dog\") ",
-      "(recipe . \"((terms \\\"dog\\\") (kind \\\"search\\\"))\") ",
+      "(recipe . \"((body \\\"nil\\\") (kind \\\"search\\\") ",
+      "(operators \\\"true\\\") (regex \\\"true\\\") ",
+      "(terms \\\"dog\\\"))\") ",
       "(root-ids (\"z\" \"a\" \"z\")) (source-set . \"private\") ",
       "(graph-generation . 7) (presentation-generation . 3) ",
       "(server-revision . 11) (application-token . 5) ",
@@ -378,7 +472,8 @@ mod tests {
     let descriptor = &parsed [0];
     assert_eq! (descriptor . lifecycle, "live-view");
     assert_eq! (descriptor . continuation_id . as_deref (), Some ("continuation-1"));
-    assert_eq! (descriptor . recipe, "((terms dog) (kind search))");
+    assert_eq! (descriptor . recipe,
+      "((body nil) (kind search) (operators true) (regex true) (terms dog))");
     assert_eq! (descriptor . root_ids, ["a", "z"]);
     assert_eq! (descriptor . source_set, "private");
     assert_eq! (descriptor . maintenance_epoch, Some (9));
@@ -391,10 +486,54 @@ mod tests {
   #[test]
   fn rejects_non_list_recipes_and_non_boolean_flags () {
     let malformed_recipe = complete_descriptor ("")
-      . replace ("((terms \\\"dog\\\") (kind \\\"search\\\"))", "not-a-list");
+      . replace (
+        "((body \\\"nil\\\") (kind \\\"search\\\") (operators \\\"true\\\") (regex \\\"true\\\") (terms \\\"dog\\\"))",
+        "not-a-list");
     assert! (parse_descriptors (&malformed_recipe) . is_err ());
     let malformed_flag = complete_descriptor ("")
       . replace ("(logical-dirty . \"true\")", "(logical-dirty . \"maybe\")");
     assert! (parse_descriptors (&malformed_flag) . is_err ());
+  }
+
+  #[test]
+  fn retained_authority_includes_recipe_roots_source_set_and_staleness () {
+    let descriptor = parse_descriptors (&complete_descriptor (""))
+      . unwrap () . remove (0);
+    let kind = validate_live_descriptor (&descriptor) . unwrap ();
+    let state = ViewState {
+      viewforest: crate::types::tree::forest::ViewForest::new (),
+      pids: Default::default (),
+      root_ids: ["a", "z"] . into_iter ()
+        . map (crate::types::misc::ID::from) . collect (),
+      revision: 11,
+      graph_generation: 7,
+      presentation_generation: 3,
+      client_application_token: 5,
+      client_buffer_id: None,
+      kind: BufferKind::SearchView,
+      recipe: Some (descriptor . recipe . clone ()),
+      source_set: "private" . into (),
+      presentation_stale: true,
+      search_stale: true,
+    };
+    assert! (state_matches_descriptor (&state, &descriptor, &kind));
+    let mut changed = state;
+    changed . source_set = "all" . into ();
+    assert! (!state_matches_descriptor (&changed, &descriptor, &kind));
+  }
+
+  #[test]
+  fn content_recipe_root_must_appear_in_the_descriptor_roots () {
+    let mut descriptor = parse_descriptors (&complete_descriptor (""))
+      . unwrap () . remove (0);
+    descriptor . kind = "content-view" . into ();
+    descriptor . view_uri = Some (ViewUri::ContentView ("view" . into ()));
+    descriptor . recipe = crate::types::views_state::single_root_recipe (
+      &crate::types::misc::ID::from ("requested"));
+    assert! (validate_live_descriptor (&descriptor) . is_err ());
+    descriptor . root_ids . push ("requested" . into ());
+    assert_eq! (
+      validate_live_descriptor (&descriptor) . unwrap (),
+      BufferKind::ContentView);
   }
 }

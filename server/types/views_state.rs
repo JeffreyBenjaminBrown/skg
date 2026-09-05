@@ -5,6 +5,7 @@ use crate::types::viewnode::{Phantom, ViewNodeKind, Vognode};
 use crate::maintenance::BufferKind;
 use super::misc::ID;
 
+use sexp::{Atom, Sexp};
 use std::collections::{HashMap, HashSet};
 
 //
@@ -49,6 +50,8 @@ pub struct ViewState {
   pub client_buffer_id       : Option<String>,
   pub kind                   : BufferKind,
   pub recipe                 : Option<String>,
+  pub root_ids               : HashSet<ID>,
+  pub source_set             : String,
   /// The forest/text was deliberately preserved across a graph transition;
   /// generated herald/presentation details may therefore name G0 facts.
   pub presentation_stale     : bool,
@@ -134,7 +137,7 @@ impl OpenViews {
         . unwrap_or (0);
       let (graph_generation, presentation_generation,
            client_application_token, client_buffer_id, kind, recipe,
-           presentation_stale, search_stale) =
+           source_set, presentation_stale, search_stale) =
         self . views . get (&uri) . map (|state| (
           state . graph_generation,
           state . presentation_generation,
@@ -142,18 +145,21 @@ impl OpenViews {
           state . client_buffer_id . clone (),
           state . kind . clone (),
           state . recipe . clone (),
+          state . source_set . clone (),
           state . presentation_stale,
           state . search_stale,
         )) . unwrap_or_else (|| (
-          1, 0, 1, None, default_kind_for_uri (&uri), None, false, false));
+          1, 0, 1, None, default_kind_for_uri (&uri), None,
+          "all" . into (), false, false));
       let state : ViewState = ViewState {
-        viewforest, pids, revision,
+        viewforest, pids, revision, root_ids: rids,
         graph_generation,
         presentation_generation,
         client_application_token,
         client_buffer_id,
         kind,
         recipe,
+        source_set,
         presentation_stale,
         search_stale,
       };
@@ -168,6 +174,7 @@ impl OpenViews {
     presentation_generation : u64,
     client_application_token : u64,
     kind                    : BufferKind,
+    source_set              : String,
     recipe                  : Option<String>,
   ) {
     self . register_view (uri . clone (), viewforest, pids);
@@ -177,6 +184,7 @@ impl OpenViews {
     state . presentation_generation = presentation_generation;
     state . client_application_token = client_application_token;
     state . kind = kind;
+    state . source_set = source_set;
     state . recipe = recipe;
   }
 
@@ -198,11 +206,13 @@ impl OpenViews {
         = self . views . get_mut (uri)
         { vs . viewforest = new_viewforest;
           vs . pids = pids;
+          vs . root_ids = rids;
           vs . revision = vs . revision . saturating_add (1); }
       else { self . views . insert (
                uri . clone (),
                ViewState { viewforest : new_viewforest,
                            pids,
+                           root_ids: rids,
                            revision: 0,
                            graph_generation: 1,
                            presentation_generation: 0,
@@ -210,6 +220,7 @@ impl OpenViews {
                            client_buffer_id: None,
                            kind: default_kind_for_uri (uri),
                            recipe: None,
+                           source_set: "all" . into (),
                            presentation_stale: false,
                            search_stale: false } ); }}
 
@@ -278,6 +289,40 @@ impl OpenViews {
       . filter ( |(_, vs)| vs . pids . contains (pid) )
       . map ( |(uri, _)| uri . clone () )
       . collect () }
+}
+
+fn recipe_entry (key : &str, value : &str) -> Sexp {
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S (key . into ())),
+    Sexp::Atom (Atom::S (value . into ())),
+  ])
+}
+
+pub fn single_root_recipe (root_id : &ID) -> String {
+  Sexp::List (vec![
+    recipe_entry ("kind", "single-root"),
+    recipe_entry ("root-id", &root_id . 0),
+  ]) . to_string ()
+}
+
+pub fn search_recipe (
+  terms       : &str,
+  regex       : bool,
+  body        : bool,
+  operators   : bool,
+  ugly_choice : Option<&str>,
+) -> String {
+  let truth = |value| if value { "true" } else { "nil" };
+  let mut entries = vec![
+    recipe_entry ("body", truth (body)),
+    recipe_entry ("kind", "search"),
+    recipe_entry ("operators", truth (operators)),
+    recipe_entry ("regex", truth (regex)),
+    recipe_entry ("terms", terms),
+  ];
+  if let Some (choice) = ugly_choice {
+    entries . push (recipe_entry ("ugly-choice", choice)); }
+  Sexp::List (entries) . to_string ()
 }
 
 fn default_kind_for_uri (uri : &ViewUri) -> BufferKind {

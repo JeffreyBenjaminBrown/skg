@@ -316,6 +316,7 @@ function M.handle_save_response (save_buf, response)
   local warnings =
     payload.string_list(payload.field(response, 'warnings'))
   if content_text then
+    local root_ids_value = payload.field(response, 'root-ids')
     M.replace_buffer_with_new_content(
       save_buf, content_text,
       M.save_point_position_from_response(response), {
@@ -327,6 +328,8 @@ function M.handle_save_response (save_buf, response)
           payload.field_text(response, 'server-revision')),
         application_token = tonumber(
           payload.field_text(response, 'client-application-token')),
+        root_ids = root_ids_value and payload.string_list(root_ids_value)
+          or nil,
       })
   end
   if #errors > 0 or #warnings > 0 then
@@ -432,6 +435,7 @@ function M.replace_buffer_with_new_content (buf, new_content,
       or vim.b[buf].skg_presentation_generation
     vim.b[buf].skg_server_revision =
       authority.server_revision or vim.b[buf].skg_server_revision
+    if authority.root_ids then vim.b[buf].skg_root_ids = authority.root_ids end
   end
   vim.b[buf].skg_background_refresh_stale = nil
   buffer.arm_first_change_warning(buf)

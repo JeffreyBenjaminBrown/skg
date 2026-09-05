@@ -163,12 +163,13 @@ kill-buffer-hook to send close-view to the server."
         (skg-register-buffer
          (current-buffer) 'search-view
          :view-uri view-uri
-         :recipe `((kind . "search")
-                   (terms . ,search-terms)
-                   (regex . ,regex)
-                   (body . ,body)
-                   (operators . ,operators)
-                   (ugly-choice . ,ugly-choice))
+         :recipe (append `((kind . "search")
+                           (terms . ,search-terms)
+                           (regex . ,regex)
+                           (body . ,body)
+                           (operators . ,operators))
+                         (when ugly-choice
+                           `((ugly-choice . ,ugly-choice))))
          :last-fetched content
          :graph-generation (plist-get authority :graph-generation)
          :presentation-generation

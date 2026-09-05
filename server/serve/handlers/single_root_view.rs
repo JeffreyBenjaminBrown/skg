@@ -21,7 +21,7 @@ use crate::serve::util::{
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::{ViewUri, single_root_recipe};
 use crate::maintenance::BufferKind;
 
 use futures::executor::block_on;
@@ -180,7 +180,8 @@ pub fn handle_single_root_view_request (
                   0,
                   1,
                   BufferKind::OverrideChoiceMenu,
-                  Some (format! ("override-menu:{}", pid)) );
+                  active_source_set . name . 0 . clone (),
+                  Some (single_root_recipe (&pid)) );
                 let mut warnings : Vec<String> = Vec::new ();
                 if let ScalarReleaseDecision::AllowWithWarning {
                   warning,
@@ -233,7 +234,8 @@ pub fn handle_single_root_view_request (
                     0,
                     1,
                     BufferKind::ContentView,
-                    Some (format! ("single-root:{}", node_id)) ); }
+                    active_source_set . name . 0 . clone (),
+                    Some (single_root_recipe (&node_id)) ); }
                 let warnings : Vec<String> =
                   { let mut warnings : Vec<String> =
                       render_warnings;

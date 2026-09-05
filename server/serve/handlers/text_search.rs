@@ -38,7 +38,7 @@ use crate::serve::util::{
   tag_text_response,
 };
 use crate::types::git::MembershipAxes;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::{ViewUri, search_recipe};
 use crate::types::store_state::StoreHealth;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
@@ -293,7 +293,16 @@ pub fn handle_text_search_request (
             presentation_generation,
             1,
             crate::maintenance::BufferKind::SearchView,
-            Some (format! ("search:{}", search_terms)) );
+            active . name . 0 . clone (),
+            Some (search_recipe (
+              &search_terms,
+              search_opts . regex,
+              search_opts . body,
+              search_opts . operators,
+              search_choice . map (|choice| match choice {
+                SearchUglinessChoice::Include => "include",
+                SearchUglinessChoice::Exclude => "exclude",
+              }))));
           let response = add_view_authority_to_response (
             &mk_search_results_sexp (&rendered, &warnings, &uri),
             views_state . open_views . views . get (&uri)

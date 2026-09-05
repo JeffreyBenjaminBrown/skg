@@ -343,6 +343,14 @@ pub(crate) fn add_view_authority_to_response (
     Sexp::Atom (Atom::S ("client-application-token" . into ())),
     Sexp::Atom (Atom::I (state . client_application_token as i64)),
   ]));
+  let mut root_ids : Vec<String> = state . root_ids . iter ()
+    . map (|id| id . 0 . clone ()) . collect ();
+  root_ids . sort ();
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("root-ids" . into ())),
+    Sexp::List (root_ids . into_iter ()
+      . map (|id| Sexp::Atom (Atom::S (id))) . collect ()),
+  ]));
   Sexp::List (fields) . to_string ()
 }
 

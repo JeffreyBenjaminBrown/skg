@@ -2105,9 +2105,11 @@ mod tests {
     };
     let state = ViewState {
       viewforest: ViewForest::new (), pids: Default::default (), revision: 4,
+      root_ids: Default::default (),
       graph_generation: 1, presentation_generation: 3,
       client_application_token: 7, client_buffer_id: Some ("buffer" . into ()),
       kind: BufferKind::SearchView, recipe: Some ("terms" . into ()),
+      source_set: "all" . into (),
       presentation_stale: false, search_stale: false,
     };
     assert_eq! (prepare_server_settlement_effect (

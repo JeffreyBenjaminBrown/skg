@@ -730,14 +730,19 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
 (defun skg--view-authority-from-response (response)
   "Return application authority plist from RESPONSE, or nil when absent."
   (when (assoc 'client-application-token response)
-    (list :graph-generation
-          (skg--nat-from-response response 'graph-generation)
-          :presentation-generation
-          (skg--nat-from-response response 'presentation-generation)
-          :server-revision
-          (skg--nat-from-response response 'server-revision)
-          :application-token
-          (skg--nat-from-response response 'client-application-token))))
+    (append
+     (list :graph-generation
+           (skg--nat-from-response response 'graph-generation)
+           :presentation-generation
+           (skg--nat-from-response response 'presentation-generation)
+           :server-revision
+           (skg--nat-from-response response 'server-revision)
+           :application-token
+           (skg--nat-from-response response 'client-application-token))
+     (when (assoc 'root-ids response)
+       (list :root-ids
+             (mapcar (lambda (id) (format "%s" id))
+                     (or (cadr (assoc 'root-ids response)) nil)))))))
 
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content
                                                       &optional
@@ -836,7 +841,10 @@ every component of the registered application record must still match."
              (skg--buffer-record-presentation-generation skg--buffer-record))
          (skg--buffer-record-server-revision skg--buffer-record)
          (or (plist-get authority :server-revision)
-             (skg--buffer-record-server-revision skg--buffer-record)))))
+             (skg--buffer-record-server-revision skg--buffer-record)))
+        (when (plist-member authority :root-ids)
+          (setf (skg--buffer-record-root-ids skg--buffer-record)
+                (plist-get authority :root-ids)))))
     (setq skg--background-refresh-stale nil)
     (set-buffer-modified-p
      ;; Clear modified flag and re-register the one-shot hook

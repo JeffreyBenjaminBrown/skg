@@ -159,6 +159,7 @@ otherwise generate a new UUID."
       (skg-register-buffer
        buffer (or kind 'content-view)
        :view-uri uri :recipe recipe :last-fetched org-text
+       :root-ids (plist-get authority :root-ids)
        :disposable (eq kind 'override-choice-menu)
        :graph-generation (plist-get authority :graph-generation)
        :presentation-generation

@@ -166,6 +166,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
         uri . clone (),
         ViewState { viewforest : tree_all . into (),
                     pids       : HashSet::new (),
+                    root_ids   : HashSet::new (),
                     revision   : 0,
                     graph_generation: env . in_rust_graph . load_full ()
                       . graph_generation . get (),
@@ -174,6 +175,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
                     client_buffer_id: None,
                     kind: skg::maintenance::BufferKind::SearchView,
                     recipe: Some ("search:ovr-sub" . into ()),
+                    source_set: "all" . into (),
                     presentation_stale: false,
                     search_stale: false });
       let enrichment_slot
@@ -351,6 +353,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         ViewState {
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
           pids       : HashSet::from ([ID::from ("active-search-hit")]),
+          root_ids   : HashSet::new (),
           revision   : 0,
           graph_generation: env . in_rust_graph . load_full ()
             . graph_generation . get (),
@@ -359,6 +362,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           client_buffer_id: None,
           kind: skg::maintenance::BufferKind::SearchView,
           recipe: Some ("search:shared ranking term" . into ()),
+          source_set: "public" . into (),
           presentation_stale: false,
           search_stale: false, });
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
