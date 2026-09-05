@@ -915,7 +915,12 @@ also requires the same archive-owner client session.
    Only fields appropriate to the origin are present.  Pull requires active
    source-set `all`, and its logical repository/source mapping must match the
    server's configured Git topology.  Every origin refuses entry if a visited
-   configured raw `.skg` buffer is modified.
+   configured raw `.skg` buffer is modified.  `pending-reconciliation` must
+   name the exact pending candidate.  An `explicit-partial-reload` with
+   `candidate-id none` instead supersedes any incidental watcher candidate or
+   observation and constructs a new candidate from only its requested targets;
+   the mandatory post-maintenance complete sweep rediscovers and offers any
+   untargeted disk changes.
 
 2. The terminal `maintenance-offer` allocates incident ID, maintenance epoch,
    UTC start, strict archive directory name, archive folder/identity, G0,

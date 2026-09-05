@@ -253,9 +253,14 @@ impl MaintenanceCoordinator {
     match &self . state {
       CoordinatorState::Idle => {}
       CoordinatorState::Pending (pending) => {
-        if origin == MaintenanceOrigin::FullRebuild && candidate . is_none () {
-          // A full rebuild deliberately supersedes an incidental watcher
-          // candidate with its own post-archive complete observation.
+        if candidate . is_none () && matches! (origin,
+          MaintenanceOrigin::ExplicitPartialReload
+          | MaintenanceOrigin::FullRebuild)
+        {
+          // These origins deliberately build their own post-archive candidate.
+          // An explicit reload must retain its exact target boundary instead of
+          // silently selecting an incidental complete watcher candidate; the
+          // mandatory terminal full sweep rediscovers any untargeted changes.
         } else {
           match (pending . candidate . as_ref (), candidate . as_ref ()) {
             (Some (expected), Some (actual)) if expected . id == actual . id => {}
@@ -271,7 +276,9 @@ impl MaintenanceCoordinator {
         }
       }
       CoordinatorState::Observing
-        if origin == MaintenanceOrigin::FullRebuild => {}
+        if candidate . is_none () && matches! (origin,
+          MaintenanceOrigin::ExplicitPartialReload
+          | MaintenanceOrigin::FullRebuild) => {}
       CoordinatorState::Observing =>
         return Err ("wait for the current observation to finish" . into ()),
       CoordinatorState::Active (active) =>
@@ -2012,6 +2019,43 @@ mod tests {
     assert_eq! (active . origin, MaintenanceOrigin::FullRebuild);
     assert! (active . candidate . is_none ());
     assert_eq! (active . phase, MaintenancePhase::PreparingArchive);
+  }
+
+  #[test]
+  fn explicit_reload_replaces_a_pending_candidate_with_targeted_observation () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let pending = candidate ();
+    coordinator . set_pending_valid (pending) . unwrap ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+    assert_eq! (active . origin, MaintenanceOrigin::ExplicitPartialReload);
+    assert! (active . candidate . is_none ());
+    assert_eq! (active . targets . ids, ["test-target"]);
+    assert_eq! (active . phase, MaintenancePhase::PreparingArchive);
+  }
+
+  #[test]
+  fn explicit_reload_supersedes_an_in_progress_ordinary_observation () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    coordinator . observation_started () . unwrap ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+    assert_eq! (active . origin, MaintenanceOrigin::ExplicitPartialReload);
+    assert! (active . candidate . is_none ());
+    assert! (matches! (coordinator . state, CoordinatorState::Active (_)));
+  }
+
+  #[test]
+  fn pending_reconciliation_still_requires_its_exact_candidate () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let pending = candidate ();
+    let pending_id = pending . id . clone ();
+    coordinator . set_pending_valid (pending) . unwrap ();
+    let error = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation, None) . unwrap_err ();
+    assert_eq! (error, format! (
+      "pending candidate {} must be named explicitly", pending_id));
+    assert! (matches! (coordinator . state, CoordinatorState::Pending (_)));
   }
 
   #[test]
