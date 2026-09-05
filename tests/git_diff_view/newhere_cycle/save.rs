@@ -28,7 +28,7 @@ fn test_newhere_cycle_survives_save()
 
     // Round-trip through the save pipeline.
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      graph_handle_from_config (&config) ?;
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -74,7 +74,7 @@ fn test_newhere_cycle_survives_save_staged()
 
     // Round-trip through the save pipeline.
     let graph : InRustGraphHandle =
-      new_handle (InRustGraph::new ());
+      graph_handle_from_config (&config) ?;
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

@@ -39,7 +39,7 @@ async fn test_delete_id_col_scaffold_respawns (
         GIT_DIFF_VIEW, "skg id");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -81,7 +81,7 @@ async fn test_delete_id_scaffolds_aborts (
         GIT_DIFF_VIEW, "(skg id)");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -120,7 +120,7 @@ async fn test_edit_id_scaffold_aborts (
         "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -163,7 +163,7 @@ async fn test_reorder_id_scaffolds_saves (
         . replace ("*** (skg id) SWAP", "*** (skg id) 3");
       assert_ne! (input, GIT_DIFF_VIEW);
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -199,7 +199,7 @@ async fn test_move_id_scaffolds_to_child_aborts (
 ";
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -248,7 +248,7 @@ async fn test_delete_id_col_scaffold_respawns_staged (
         GIT_DIFF_VIEW_STAGED, "skg id");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

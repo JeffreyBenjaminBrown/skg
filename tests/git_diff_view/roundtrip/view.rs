@@ -91,7 +91,7 @@ async fn assert_diff_buffer_roundtrips (
   tantivy : &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
 {
-  let graph : InRustGraphHandle = new_handle (InRustGraph::new ());
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : true,
     open_views        : OpenViews::new (), };

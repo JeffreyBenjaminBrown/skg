@@ -59,7 +59,7 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
     let (rendered, _pids, _) : (String, Vec<ID>, _) =
       multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
-    let graph : InRustGraphHandle = new_handle (InRustGraph::new ());
+    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
       open_views        : OpenViews::new (), };

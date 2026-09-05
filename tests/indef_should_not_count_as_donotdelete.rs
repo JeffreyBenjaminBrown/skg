@@ -27,12 +27,12 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_test_db};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
 
 #[test]
@@ -59,7 +59,7 @@ async fn indef_should_not_count_as_donotdelete_impl (
     *** (skg (node (id victim) (source main) indef)) victim
   "};
   let graph : InRustGraphHandle =
-    new_handle (InRustGraph::new ());
+    graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),

@@ -20,12 +20,12 @@ use std::sync::Arc;
 
 use skg::assert_metadata_eq;
 use skg::to_org::render::content_view::single_root_view;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
-use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
 
 #[test]
@@ -92,7 +92,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
     ** (skg (unknown (id ghost)))
   "};
   let graph : InRustGraphHandle =
-    new_handle (InRustGraph::new ());
+    graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),

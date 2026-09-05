@@ -36,7 +36,7 @@ async fn test_delete_removed_node_respawns (
         GIT_DIFF_VIEW, "gets-removed");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -77,7 +77,7 @@ async fn test_delete_removed_here_node_respawns (
         without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedM)");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -116,7 +116,7 @@ async fn test_delete_new_here_updates_disk (
       let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged newM)");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -161,7 +161,7 @@ async fn test_add_new_child_creates_on_disk (
         "*** (skg (node (id newer))) newer");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -215,7 +215,7 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
 ";
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -255,7 +255,7 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
 ";
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (),};
@@ -291,7 +291,7 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 ";
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (),};
@@ -328,7 +328,7 @@ async fn test_diff_mode_added_subscribee_shows_newM (
 ";
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (),};
@@ -366,7 +366,7 @@ async fn test_delete_removed_node_respawns_staged (
         GIT_DIFF_VIEW_STAGED, "gets-removed");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

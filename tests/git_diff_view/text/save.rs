@@ -34,7 +34,7 @@ async fn test_delete_text_changed_scaffold_respawns (
         GIT_DIFF_VIEW, "textChanged");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -72,7 +72,7 @@ async fn test_edit_text_changed_node_updates_disk (
         "1 has a new title.", "1 has an even newer title.");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -112,7 +112,7 @@ async fn test_edit_text_changed_scaffold_respawns (
         "** (skg (textChanged unstaged)) User edited this scaffold.");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -154,7 +154,7 @@ async fn test_move_text_changed_scaffold_respawns (
 ";
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -191,7 +191,7 @@ async fn test_move_text_changed_to_unedited_node_respawns (
         "*** (skg (textChanged unstaged))");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -235,7 +235,7 @@ async fn test_delete_text_changed_scaffold_respawns_staged (
         GIT_DIFF_VIEW_STAGED, "textChanged");
 
       let graph : InRustGraphHandle =
-        new_handle (InRustGraph::new ());
+        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
