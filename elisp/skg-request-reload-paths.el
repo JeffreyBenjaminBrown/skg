@@ -17,6 +17,7 @@
 (require 'skg-length-prefix)
 (require 'skg-config)
 (require 'skg-id-search)
+(require 'skg-maintenance)
 (require 'skg-request-save) ; for skg--collateral-view-handler
 (require 'skg-worktree-guard)
 (require 'filenotify)
@@ -663,28 +664,31 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
        (equal (org-get-todo-state) "TO-RELOAD")))
    skg--reload-selection-entries))
 
-(defun skg--submit-reload-selection (&optional incident-id)
+(defun skg--submit-reload-selection ()
   "Submit marked IDs in the transient ID-stack selector."
   (interactive)
   (let* ((selection-buffer (current-buffer))
          (marked (skg--marked-reload-selection-entries))
-         (ids (delete-dups (mapcar #'cdr marked)))
-         (incident-id (or incident-id (skg-fresh-incident-id))))
+         (ids (delete-dups (mapcar #'cdr marked))))
     (if (null ids)
         (message "skg: no ID-stack nodes are marked TO-RELOAD")
-      (skg-reload-paths
-       nil ids incident-id
-       (lambda (response)
-         (when (buffer-live-p selection-buffer)
-           (with-current-buffer selection-buffer
-             (if (cadr (assoc 'deferred response))
-                 (run-at-time
-                  1.0 nil
-                  (lambda ()
-                    (when (buffer-live-p selection-buffer)
-                      (with-current-buffer selection-buffer
-                        (skg--submit-reload-selection incident-id)))))
+      (when (skg--confirm-explicit-reload-with-dirty-views)
+        (skg-begin-maintenance
+         "explicit-partial-reload" nil nil ids
+         (lambda (response)
+           (when (buffer-live-p selection-buffer)
+             (with-current-buffer selection-buffer
                (skg--apply-reload-selection-result response)))))))))
+
+(defun skg--confirm-explicit-reload-with-dirty-views ()
+  "Obtain the one up-front authorization required for dirty rendered views."
+  (let ((dirty (skg--dirty-view-buffers)))
+    (or (null dirty)
+        (yes-or-no-p
+         (format
+          (concat "Archive %d dirty Skg view(s) before the partial reload? "
+                  "Impacted views will become detached recovery buffers. ")
+          (length dirty))))))
 
 (defun skg--apply-reload-selection-result (response)
   "Apply RESPONSE's per-ID outcomes to the current selector."

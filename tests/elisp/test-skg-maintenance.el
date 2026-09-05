@@ -44,6 +44,57 @@
            ,@body)
        (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
+(ert-deftest test-skg-begin-maintenance-sends-exact-explicit-targets ()
+  (let (request registered-handler)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+               (lambda () 'tcp))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (kind handler &optional _one-shot)
+                 (should (eq kind 'maintenance-offer))
+                 (setq registered-handler handler)))
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp text &optional _content _incident)
+                 (setq request text))))
+      (skg-begin-maintenance
+       "explicit-partial-reload" nil '("source/A.skg") '("alias" "B")
+       #'ignore))
+    (let ((parsed (read request)))
+      (should (equal (cdr (assoc 'origin parsed))
+                     "explicit-partial-reload"))
+      (should (equal (cdr (assoc 'paths parsed)) '("source/A.skg")))
+      (should (equal (cdr (assoc 'ids parsed)) '("alias" "B"))))
+    (should (functionp registered-handler))))
+
+(ert-deftest test-skg-archive-ready-schedules-explicit-origin-worker ()
+  (let ((skg--maintenance-client-incident
+         '(:origin "explicit-partial-reload" :phase preparing-archive))
+        scheduled)
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest arguments)
+                 (setq scheduled (cons function arguments)))))
+      (skg--maintenance-handle-selection-response
+       nil "((status archive-ready))"))
+    (should (eq (car scheduled) #'skg--maintenance-run-explicit-origin))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'origin-operation-required))))
+
+(ert-deftest test-skg-origin-failure-push-keeps-the-exact-incident-locked ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9 :phase waiting-for-origin-observation))
+        warning)
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _arguments)
+                 (setq warning message))))
+      (skg--maintenance-server-status
+       nil
+       (concat "((status origin-operation-failed)"
+               " (incident-id incident) (maintenance-epoch 9)"
+               " (phase blocked-invalid-after-mutation)"
+               " (error \"malformed target\"))")))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'server-blocked))
+    (should (string-match-p "malformed target" warning))))
+
 (ert-deftest test-skg-maintenance-settlement-inventory-is-exact ()
   (let ((one (skg-test-maintenance--settlement
               "one" "content-view" "view-one" "nil"
@@ -214,6 +265,7 @@
     (let* ((id (skg--buffer-record-id skg--buffer-record))
            (manifest (make-string 64 ?a))
            (scheduled nil)
+           (callback-count 0)
            (skg--maintenance-state '((epoch . 9) (state . active)))
            (skg--maintenance-client-incident
             (list :incident-id "12345678-1234-4234-8234-123456789abc"
@@ -223,7 +275,10 @@
                   :g1-graph-generation 2
                   :g1-manifest-revision 6
                   :final-archive (list :manifest-sha256 manifest
-                                       :path "/archive")))
+                                       :path "/archive")
+                  :terminal-callback
+                  (lambda (_response) (cl-incf callback-count))
+                  :terminal-callback-fired nil))
            (payload
             (prin1-to-string
              `((status terminal)
@@ -240,6 +295,9 @@
         (skg--maintenance-handle-terminal nil payload))
       (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record))
       (should (eq scheduled #'skg--maintenance-send-terminal-ack))
+      (should (= callback-count 1))
+      (should (plist-get skg--maintenance-client-incident
+                         :terminal-callback-fired))
       (should (eq (plist-get skg--maintenance-client-incident :phase)
                   'terminal-received))
       (should (equal (cdr (assq 'state skg--maintenance-state))
