@@ -34,7 +34,10 @@ use crate::types::store_state::{
   SelectedStoreState,
 };
 use crate::telescope::fold::fold_telescope_collecting_warnings;
-use crate::telescope::invariants::TelescopeViolation;
+use crate::telescope::invariants::{
+  TelescopeViolation,
+  validate_all_telescopes,
+};
 use crate::telescope::types::Telescope;
 
 use serde::{Deserialize, Serialize};
@@ -242,7 +245,10 @@ fn complete_candidate (
     covered_sequence,
     changed_primary_ids,
   };
-  let warnings = load_violations . iter () . map (|(pid, warning)|
+  let mut all_violations = validate_all_telescopes (config, &graph);
+  all_violations . extend (load_violations . clone ());
+  all_violations . sort_by (|left, right| left . 0 . cmp (&right . 0));
+  let warnings = all_violations . iter () . map (|(pid, warning)|
     format! ("{}: {}", pid, warning)) . collect ();
   Arc::new (ObservedDiskCandidate {
     summary,

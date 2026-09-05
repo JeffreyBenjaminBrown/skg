@@ -12,11 +12,18 @@ use super::types::{
   SelectedStoreRecord,
   ServerEvidenceRecord,
 };
-use crate::context::context_origin_types_for_graph;
+use crate::context::{
+  compute_context_types,
+  content_maps_from_nodes,
+  context_origin_types_for_graph,
+  had_id_set_from_nodes,
+  link_dests_from_nodes,
+};
 use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::dbs::tantivy::background_writer::{
   TantivyGenerationStatus,
   latest_tantivy_generation,
+  wait_for_tantivy_writes_idle,
   wait_for_tantivy_generation,
 };
 use crate::dbs::tantivy::write::reconstruct_index_from_nodes;
@@ -24,6 +31,10 @@ use crate::maintenance::candidate::{config_identity, source_catalog_blake3};
 use crate::runtime::ServerRuntime;
 use crate::save::{apply_define_nodes_to_stores, nodecompletes_from_graph};
 use crate::types::store_state::StoreHealth;
+use crate::telescope::invariants::{
+  report_telescope_violations,
+  validate_all_telescopes,
+};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -111,9 +122,210 @@ pub fn select_archived_candidate (
   }
 }
 
+/// Rebuild every derived store from one already-proved complete candidate.
+/// Candidate parsing, folding, validation, archive publication, and evidence
+/// all precede the exclusive gate; only this function spans destruction and
+/// reconstruction.
+pub fn rebuild_archived_candidate (
+  runtime     : &ServerRuntime,
+  incident_id : &IncidentId,
+  epoch       : MaintenanceEpoch,
+) -> Result<CandidateSelectionOutcome, String> {
+  let active = matching_archive_ready (runtime, incident_id, epoch)?;
+  if active . origin != super::types::MaintenanceOrigin::FullRebuild {
+    return Err ("exclusive rebuild selection requires a full-rebuild origin"
+      . into ()); }
+  let summary = active . candidate . as_ref ()
+    . ok_or_else (|| "full rebuild has no complete candidate" . to_string ())?;
+  let candidate = runtime . candidate (&summary . id)
+    . ok_or_else (|| format! (
+      "candidate {} is not retained in this process", summary . id))?;
+  if !matches! (candidate . disk_fence,
+      super::candidate::CandidateDiskFence::Complete)
+  {
+    return Err ("full rebuild requires a complete-disk candidate" . into ()); }
+  let snapshot = runtime . selected_snapshot ();
+  validate_preselection (
+    runtime, &active, &snapshot . env . config, &snapshot . selected,
+    &candidate)?;
+  revalidate_candidate (&snapshot . env . config, &candidate)?;
+
+  let evidence = runtime . maintenance_evidence . publish_candidate (
+    &active, &snapshot . env . config, &snapshot . selected, &candidate)?;
+  let evidence_record = ServerEvidenceRecord {
+    path: evidence . path . clone (),
+    bundle_sha256: evidence . bundle_sha256 . clone (),
+    artifact_count: evidence . artifact_count as u64,
+    total_file_bytes: evidence . total_file_bytes,
+  };
+  runtime . transition_maintenance (|coordinator|
+    coordinator . record_server_evidence (
+      incident_id, epoch, evidence_record . clone ()))?;
+  runtime . transition_maintenance (|coordinator|
+    coordinator . transition (
+      incident_id, epoch, MaintenancePhase::FullRebuildExclusive))?;
+
+  match block_on (rebuild_stores (
+      runtime, incident_id, epoch, candidate . clone ()))
+  {
+    Ok (record) => {
+      runtime . transition_maintenance (|coordinator|
+        coordinator . store_rebuilt (incident_id, epoch, record . clone ()))?;
+      Ok (CandidateSelectionOutcome {
+        graph_generation: record . graph_generation . get (),
+        manifest_revision: record . manifest_revision . get (),
+        tantivy_generation: record . tantivy_generation,
+        tantivy_outcome: record . tantivy_outcome,
+        evidence,
+      })
+    }
+    Err (SelectionFailure::Superseded (reason)) => {
+      runtime . transition_maintenance (|coordinator|
+        coordinator . selection_superseded (
+          incident_id, epoch, reason . clone ()))?;
+      let _ = runtime . schedule_full_observation (
+        QueuedObservationReason::SelectedGenerationAdvanced);
+      Err (format! (
+        "full rebuild candidate was superseded before mutation: {}; exact observation was queued",
+        reason))
+    }
+    Err (SelectionFailure::Stores { reason, queryable_g0 }) => {
+      runtime . transition_maintenance (|coordinator|
+        coordinator . block_store_health (
+          incident_id, epoch, reason . clone ()))?;
+      Err (if queryable_g0 {
+        format! ("full rebuild failed; coherent G0 was restored: {}", reason)
+      } else {
+        format! ("full rebuild failed and stores are unqueryable: {}", reason)
+      })
+    }
+  }
+}
+
 enum SelectionFailure {
   Superseded (String),
   Stores { reason : String, queryable_g0 : bool },
+}
+
+async fn rebuild_stores (
+  runtime     : &ServerRuntime,
+  incident_id : &IncidentId,
+  epoch       : MaintenanceEpoch,
+  candidate   : Arc<ObservedDiskCandidate>,
+) -> Result<SelectedStoreRecord, SelectionFailure> {
+  let expected_generation = candidate . summary . base_graph_generation;
+  let selection = runtime . generation_gate . begin_selection (
+    expected_generation, true) . map_err (SelectionFailure::Superseded)?;
+  let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
+  wait_for_tantivy_writes_idle ();
+  let mut env = runtime . lock_writer_env () . map_err (|reason|
+    SelectionFailure::Stores { reason, queryable_g0: false })?;
+  let old_selected = env . in_rust_graph . load_full ();
+  if let Err (reason) = validate_locked_rebuild (
+      runtime, incident_id, epoch, &env . config, &old_selected, &candidate)
+  {
+    drop (env);
+    drop (_write_guard);
+    selection . retain_generation ();
+    return Err (SelectionFailure::Superseded (reason));
+  }
+
+  let old_nodes = nodecompletes_from_graph (&old_selected . graph);
+  let nodes = nodecompletes_from_graph (&candidate . graph);
+  let had_id_set = had_id_set_from_nodes (&nodes);
+  let all_node_ids = nodes . iter () . map (|node| node . pid . clone ())
+    . collect ();
+  let link_dests = link_dests_from_nodes (&nodes);
+  let (map_to_content, map_to_containers) = content_maps_from_nodes (&nodes);
+  let context = compute_context_types (
+    &had_id_set, &all_node_ids, &link_dests,
+    &map_to_content, &map_to_containers);
+  let mut warnings = validate_all_telescopes (&env . config, &candidate . graph);
+  warnings . extend (candidate . load_violations . clone ());
+  warnings . sort_by (|left, right| left . 0 . cmp (&right . 0));
+
+  if let Err (error) = wipe_then_init_typedb_db (
+      &env . config, &env . driver, &nodes) . await
+  {
+    let reason = format! ("TypeDB full reconstruction failed: {}", error);
+    return fail_rebuild_and_restore (
+      runtime, selection, env, _write_guard, old_selected, old_nodes, reason)
+      . await;
+  }
+  if let Err (error) = reconstruct_index_from_nodes (
+      &nodes, &env . tantivy_index, &context . labels)
+  {
+    let reason = format! ("Tantivy full reconstruction failed: {}", error);
+    return fail_rebuild_and_restore (
+      runtime, selection, env, _write_guard, old_selected, old_nodes, reason)
+      . await;
+  }
+
+  let selected = Arc::new (old_selected . with_acknowledged_rebuild (
+      (*candidate . graph) . clone (), candidate . manifest . clone ())
+    . with_cyclic_roots (context . cyclic_roots));
+  env . startup_warnings = Arc::new (warnings . clone ());
+  env . in_rust_graph . store (selected . clone ());
+  runtime . publish_selected_from_env (&env);
+  if let Err (error) = report_telescope_violations (
+      &warnings, &env . config . data_root)
+  {
+    tracing::warn! (%error, "could not write the full-rebuild telescope report"); }
+  let record = SelectedStoreRecord {
+    graph_generation: selected . graph_generation,
+    manifest_revision: selected . manifest_revision,
+    tantivy_generation: latest_tantivy_generation ()
+      . map (|generation| generation . get ()) . unwrap_or (0),
+    tantivy_outcome: "synchronous-full-rebuild" . into (),
+  };
+  drop (env);
+  drop (_write_guard);
+  selection . publish (record . graph_generation)
+    . map_err (|reason| SelectionFailure::Stores {
+      reason, queryable_g0: false,
+    })?;
+  Ok (record)
+}
+
+async fn fail_rebuild_and_restore (
+  runtime      : &ServerRuntime,
+  selection    : crate::runtime::generation_gate::SelectionLease,
+  env          : std::sync::MutexGuard<'_, crate::types::env::SkgEnv>,
+  write_guard  : tokio::sync::MutexGuard<'static, ()>,
+  old_selected : Arc<crate::types::store_state::SelectedStoreState>,
+  old_nodes    : Vec<crate::types::nodes::complete::NodeComplete>,
+  reason       : String,
+) -> Result<SelectedStoreRecord, SelectionFailure> {
+  let recovery = restore_g0 (
+    &env . config, &env . driver, &env . tantivy_index,
+    &old_selected, &old_nodes) . await;
+  let (queryable_g0, full_reason) = match recovery {
+    Ok (( )) => {
+      env . in_rust_graph . store (old_selected . clone ());
+      (true, format! ("{}; complete G0 stores were reconstructed", reason))
+    }
+    Err (recovery_reason) => {
+      let poisoned = Arc::new (old_selected
+        . with_typedb_poisoned (format! (
+          "full rebuild restoration could not prove TypeDB: {}",
+          recovery_reason))
+        . with_tantivy_poisoned (format! (
+          "{}; G0 restoration failed: {}", reason, recovery_reason)));
+      env . in_rust_graph . store (poisoned);
+      (false, format! (
+        "{}; complete G0 restoration failed: {}", reason, recovery_reason))
+    }
+  };
+  runtime . publish_selected_from_env (&env);
+  drop (env);
+  drop (write_guard);
+  if queryable_g0 {
+    selection . retain_generation ();
+  } else {
+    selection . mark_unqueryable (full_reason . clone ()); }
+  Err (SelectionFailure::Stores {
+    reason: full_reason, queryable_g0,
+  })
 }
 
 async fn select_stores (
@@ -355,6 +567,31 @@ fn validate_locked_preselection (
     || active . phase != MaintenancePhase::SelectingPartial
     {
       return Err ("maintenance authority changed before candidate selection"
+        . into ()); }
+    active . clone ()
+  };
+  validate_preselection (runtime, &active, config, selected, candidate)?;
+  revalidate_candidate (config, candidate)
+}
+
+fn validate_locked_rebuild (
+  runtime     : &ServerRuntime,
+  incident_id : &IncidentId,
+  epoch       : MaintenanceEpoch,
+  config      : &crate::types::misc::SkgConfig,
+  selected    : &crate::types::store_state::SelectedStoreState,
+  candidate   : &ObservedDiskCandidate,
+) -> Result<(), String> {
+  let active = {
+    let coordinator = runtime . maintenance . lock ()
+      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+    let CoordinatorState::Active (active) = &coordinator . state else {
+      return Err ("maintenance ended before full rebuild selection" . into ()); };
+    if &active . incident_id != incident_id || active . epoch != epoch
+    || active . origin != super::types::MaintenanceOrigin::FullRebuild
+    || active . phase != MaintenancePhase::FullRebuildExclusive
+    {
+      return Err ("maintenance authority changed before full rebuild selection"
         . into ()); }
     active . clone ()
   };
