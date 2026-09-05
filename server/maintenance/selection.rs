@@ -305,9 +305,9 @@ async fn rebuild_stores (
   }
 
   if source_catalog_changed {
-    let sources = candidate . config . sources . values ()
-      . map (|source| source . path . clone ()) . collect ();
-    if let Err (error) = runtime . replace_observation_sources (sources) {
+    if let Err (error) = runtime . replace_observation_config (
+        &candidate . config)
+    {
       let reason = format! ("replacement source watches failed: {}", error);
       return fail_rebuild_and_restore (
         runtime, selection, env, _write_guard, old_selected, old_nodes, reason)
@@ -319,9 +319,7 @@ async fn rebuild_stores (
         incident_id, epoch, replacement_source_set . name . 0 . clone ()))
   {
     if source_catalog_changed {
-      let old_sources = env . config . sources . values ()
-        . map (|source| source . path . clone ()) . collect ();
-      let _ = runtime . replace_observation_sources (old_sources);
+      let _ = runtime . replace_observation_config (&env . config);
     }
     return fail_rebuild_and_restore (
       runtime, selection, env, _write_guard, old_selected, old_nodes,
@@ -356,6 +354,11 @@ async fn rebuild_stores (
     . map_err (|reason| SelectionFailure::Stores {
       reason, queryable_g0: false,
     })?;
+  if source_catalog_changed {
+    if let Err (error) = runtime . observe_git_presentation () {
+      tracing::warn! (%error,
+        "could not observe Git presentation after source-catalog replacement"); }
+  }
   Ok (record)
 }
 

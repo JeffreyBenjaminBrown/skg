@@ -646,15 +646,9 @@ fn dispatch_request (
         Err (error) => send_runtime_error (stream, &error),
       }}
     RequestType::ObservePresentation => {
-      if let Err (error) = with_query_session (runtime, |env, interactive| {
-        let diff_mode_enabled = interactive . views . diff_mode_enabled;
-        let InteractiveSession {
-          views, active_source_set, collateral_scheduler, ..
-        } = interactive;
-        match collateral_scheduler . observe_presentation (
-            views, env, active_source_set)
-        {
-          Ok (changed) => { let _ = send_response_with_length_prefix (
+      match runtime . observe_git_presentation () {
+        Ok ((changed, diff_mode_enabled)) => {
+          let _ = send_response_with_length_prefix (
             stream, &tag_text_response (
               TcpToClient::PresentationObserved,
               if changed {
@@ -663,10 +657,9 @@ fn dispatch_request (
                 } else {
                   "Git presentation changed; diff mode is disabled" }
               } else { "Git presentation is unchanged" })); }
-          Err (error) => { send_runtime_error (stream, &format! (
-            "Git presentation observation failed: {}", error)); }
-        }})
-      { send_runtime_error (stream, &error); }}
+        Err (error) => { send_runtime_error (stream, &format! (
+          "Git presentation observation failed: {}", error)); }
+      }}
     RequestType::BeginMaintenance =>
       handle_begin_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceLockedCensus =>

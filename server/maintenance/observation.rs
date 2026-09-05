@@ -24,10 +24,13 @@ use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::QueuedServerEvent;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::reload_batch::reload_batch_active;
+use crate::types::misc::SkgConfig;
 
+use git2::Repository;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use sexp::{Atom, Sexp};
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Weak, mpsc};
 use std::thread;
@@ -39,35 +42,46 @@ enum ObservationSignal {
   FullSweep (QueuedObservationReason),
   MaintenanceTargets (IncidentId, MaintenanceEpoch),
   MaintenanceFinalDisk (IncidentId, MaintenanceEpoch),
+  GitPresentation,
   WatcherFailure (String),
 }
 
 pub struct ObservationService {
-  sender   : mpsc::Sender<ObservationSignal>,
-  _watcher : RecommendedWatcher,
+  sender                : mpsc::Sender<ObservationSignal>,
+  _source_watcher       : RecommendedWatcher,
+  _presentation_watcher : RecommendedWatcher,
 }
 
 impl ObservationService {
   pub fn start (
     runtime : Weak<ServerRuntime>,
-    sources : Vec<PathBuf>,
+    config  : &SkgConfig,
   ) -> Result<Self, String> {
     let (sender, receiver) = mpsc::channel ();
-    let watcher = configured_watcher (&sender, sources)?;
+    let source_watcher = configured_source_watcher (&sender, config)?;
+    let presentation_watcher = configured_presentation_watcher (
+      &sender, config)?;
     thread::Builder::new () . name ("skg-observer" . into ())
       . spawn (move || observation_worker (runtime, receiver))
       . map_err (|error| error . to_string ())?;
-    Ok (Self { sender, _watcher: watcher })
+    Ok (Self {
+      sender,
+      _source_watcher: source_watcher,
+      _presentation_watcher: presentation_watcher,
+    })
   }
 
   /// Prepare every new watch before dropping the old watcher.  Events from
   /// the brief overlap share this worker queue and are harmlessly coalesced;
   /// a setup failure leaves the complete old watch set installed.
-  pub fn replace_sources (&mut self, sources : Vec<PathBuf>)
+  pub fn replace_config (&mut self, config : &SkgConfig)
     -> Result<(), String>
   {
-    let watcher = configured_watcher (&self . sender, sources)?;
-    self . _watcher = watcher;
+    let source_watcher = configured_source_watcher (&self . sender, config)?;
+    let presentation_watcher = configured_presentation_watcher (
+      &self . sender, config)?;
+    self . _source_watcher = source_watcher;
+    self . _presentation_watcher = presentation_watcher;
     Ok (( ))
   }
 
@@ -109,9 +123,9 @@ impl ObservationService {
   }
 }
 
-fn configured_watcher (
+fn configured_source_watcher (
   sender  : &mpsc::Sender<ObservationSignal>,
-  sources : Vec<PathBuf>,
+  config  : &SkgConfig,
 ) -> Result<RecommendedWatcher, String> {
   let callback_sender = sender . clone ();
   let mut watcher = RecommendedWatcher::new (
@@ -124,12 +138,91 @@ fn configured_watcher (
           ObservationSignal::WatcherFailure (error . to_string ())); }
     },
     Config::default ()) . map_err (|error| error . to_string ())?;
-  for source in sources {
-    watcher . watch (&source, RecursiveMode::NonRecursive)
+  for source in config . sources . values () {
+    watcher . watch (&source . path, RecursiveMode::NonRecursive)
       . map_err (|error| format! (
-        "could not watch {}: {}", source . display (), error))?;
+        "could not watch {}: {}", source . path . display (), error))?;
   }
   Ok (watcher)
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct PresentationWatchTarget {
+  path      : PathBuf,
+  recursive : bool,
+}
+
+fn configured_presentation_watcher (
+  sender : &mpsc::Sender<ObservationSignal>,
+  config : &SkgConfig,
+) -> Result<RecommendedWatcher, String> {
+  let callback_sender = sender . clone ();
+  let mut watcher = RecommendedWatcher::new (
+    move |result : notify::Result<Event>| match result {
+      Ok (_) => {
+        let _ = callback_sender . send (ObservationSignal::GitPresentation); }
+      Err (error) => {
+        let _ = callback_sender . send (
+          ObservationSignal::WatcherFailure (error . to_string ())); }
+    },
+    Config::default ()) . map_err (|error| error . to_string ())?;
+  for target in presentation_watch_targets (config)? {
+    let mode = if target . recursive {
+      RecursiveMode::Recursive
+    } else { RecursiveMode::NonRecursive };
+    watcher . watch (&target . path, mode) . map_err (|error| format! (
+      "could not watch Git metadata {}: {}",
+      target . path . display (), error))?;
+  }
+  Ok (watcher)
+}
+
+/// Watch replaceable Git metadata through its containing directories.  A
+/// linked worktree owns HEAD and index in its per-worktree Git directory,
+/// while refs and packed-refs remain in the common directory.
+fn presentation_watch_targets (
+  config : &SkgConfig,
+) -> Result<Vec<PresentationWatchTarget>, String> {
+  let mut targets = BTreeSet::new ();
+  for source in config . sources . values () {
+    let Ok (repo) = Repository::discover (&source . path) else { continue; };
+    if repo . workdir () . is_none () { continue; }
+    let repo_path = canonical_or_original (repo . path ());
+    let common_path = resolve_common_git_dir (&repo_path)?;
+    targets . insert (PresentationWatchTarget {
+      path: repo_path,
+      recursive: false,
+    });
+    targets . insert (PresentationWatchTarget {
+      path: common_path . clone (),
+      recursive: false,
+    });
+    let refs = common_path . join ("refs");
+    if refs . is_dir () {
+      targets . insert (PresentationWatchTarget {
+        path: canonical_or_original (&refs),
+        recursive: true,
+      });
+    }
+  }
+  Ok (targets . into_iter () . collect ())
+}
+
+fn resolve_common_git_dir (repo_path : &Path) -> Result<PathBuf, String> {
+  let marker = repo_path . join ("commondir");
+  let Ok (value) = fs::read_to_string (&marker) else {
+    return Ok (repo_path . to_path_buf ()); };
+  let value = value . trim ();
+  if value . is_empty () {
+    return Err (format! ("Git commondir is empty: {}", marker . display ())); }
+  let path = Path::new (value);
+  Ok (canonical_or_original (&if path . is_absolute () {
+    path . to_path_buf ()
+  } else { repo_path . join (path) }))
+}
+
+fn canonical_or_original (path : &Path) -> PathBuf {
+  path . canonicalize () . unwrap_or_else (|_| path . to_path_buf ())
 }
 
 fn observation_worker (
@@ -141,15 +234,16 @@ fn observation_worker (
     let mut reasons = Vec::new ();
     let mut maintenance_jobs = Vec::new ();
     let mut maintenance_final_jobs = Vec::new ();
+    let mut observe_presentation = false;
     absorb_signal (
       first, &mut paths, &mut reasons, &mut maintenance_jobs,
-      &mut maintenance_final_jobs);
+      &mut maintenance_final_jobs, &mut observe_presentation);
     while let Ok (signal) = receiver . recv_timeout (
         Duration::from_millis (175))
     {
       absorb_signal (
         signal, &mut paths, &mut reasons, &mut maintenance_jobs,
-        &mut maintenance_final_jobs); }
+        &mut maintenance_final_jobs, &mut observe_presentation); }
     let Some (runtime) = runtime . upgrade () else { return; };
     // A process-owned exact sweep is queued when the final bracket closes.
     // Events consumed inside the bracket therefore need no client-side
@@ -162,6 +256,9 @@ fn observation_worker (
       run_target_observation (&runtime, incident, epoch); }
     for (incident, epoch) in maintenance_final_jobs {
       run_final_observation (&runtime, incident, epoch); }
+    if observe_presentation {
+      if let Err (error) = runtime . observe_git_presentation () {
+        tracing::warn! (%error, "Git presentation observation failed"); }}
     thread::yield_now ();
   }
 }
@@ -172,6 +269,7 @@ fn absorb_signal (
   reasons : &mut Vec<String>,
   maintenance_jobs : &mut Vec<(IncidentId, MaintenanceEpoch)>,
   maintenance_final_jobs : &mut Vec<(IncidentId, MaintenanceEpoch)>,
+  observe_presentation : &mut bool,
 ) {
   match signal {
     ObservationSignal::Paths (new_paths, reason) => {
@@ -183,8 +281,10 @@ fn absorb_signal (
       maintenance_jobs . push ((incident, epoch)),
     ObservationSignal::MaintenanceFinalDisk (incident, epoch) =>
       maintenance_final_jobs . push ((incident, epoch)),
+    ObservationSignal::GitPresentation => *observe_presentation = true,
     ObservationSignal::WatcherFailure (error) => {
-      reasons . push (format! ("watcher failure: {}", error)); }
+      reasons . push (format! ("watcher failure: {}", error));
+      *observe_presentation = true; }
   }
 }
 
@@ -603,11 +703,39 @@ fn list_field (key : &str, values : &[String]) -> Sexp {
 
 #[cfg(test)]
 mod tests {
-  use super::validate_live_config_replacement;
-  use crate::types::misc::SkgConfig;
+  use super::{
+    PresentationWatchTarget,
+    presentation_watch_targets,
+    validate_live_config_replacement,
+  };
+  use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
+  use git2::{Repository, Signature};
+  use std::collections::HashMap;
+  use std::path::Path;
+  use tempfile::TempDir;
 
   fn config () -> SkgConfig {
     SkgConfig::dummyFromSources (Default::default ())
+  }
+
+  fn source_config (source : &Path) -> SkgConfig {
+    let name = SourceName::from ("source");
+    SkgConfig::dummyFromSources (HashMap::from ([(name . clone (),
+      SkgfileSource {
+        name,
+        abbreviation: None,
+        path: source . to_path_buf (),
+        user_owns_it: true,
+      })]))
+  }
+
+  fn create_initial_commit (repo : &Repository) {
+    let mut index = repo . index () . unwrap ();
+    let tree_id = index . write_tree () . unwrap ();
+    let tree = repo . find_tree (tree_id) . unwrap ();
+    let signature = Signature::now ("test", "test@example.com") . unwrap ();
+    repo . commit (Some ("HEAD"), &signature, &signature, "initial", &tree,
+                   &[]) . unwrap ();
   }
 
   #[test]
@@ -644,5 +772,44 @@ mod tests {
     let error = validate_live_config_replacement (&old, &new) . unwrap_err ();
     assert! (error . contains ("active audit daemon"), "{}", error);
     assert! (error . contains ("installed shutdown handler"), "{}", error);
+  }
+
+  #[test]
+  fn presentation_watches_index_head_packed_refs_and_loose_refs () {
+    let temporary = TempDir::new () . unwrap ();
+    let repo = Repository::init (temporary . path ()) . unwrap ();
+    create_initial_commit (&repo);
+    let git_dir = repo . path () . canonicalize () . unwrap ();
+    let targets = presentation_watch_targets (
+      &source_config (temporary . path ())) . unwrap ();
+    assert! (targets . contains (&PresentationWatchTarget {
+      path: git_dir . clone (), recursive: false }));
+    assert! (targets . contains (&PresentationWatchTarget {
+      path: git_dir . join ("refs") . canonicalize () . unwrap (),
+      recursive: true,
+    }));
+  }
+
+  #[test]
+  fn linked_worktree_watches_per_worktree_and_common_git_dirs () {
+    let temporary = TempDir::new () . unwrap ();
+    let main_path = temporary . path () . join ("main");
+    let linked_path = temporary . path () . join ("linked");
+    let repo = Repository::init (&main_path) . unwrap ();
+    create_initial_commit (&repo);
+    repo . worktree ("linked", &linked_path, None) . unwrap ();
+    let linked = Repository::open (&linked_path) . unwrap ();
+    let linked_git_dir = linked . path () . canonicalize () . unwrap ();
+    let common_git_dir = repo . path () . canonicalize () . unwrap ();
+    let targets = presentation_watch_targets (
+      &source_config (&linked_path)) . unwrap ();
+    assert! (targets . contains (&PresentationWatchTarget {
+      path: linked_git_dir, recursive: false }));
+    assert! (targets . contains (&PresentationWatchTarget {
+      path: common_git_dir . clone (), recursive: false }));
+    assert! (targets . contains (&PresentationWatchTarget {
+      path: common_git_dir . join ("refs") . canonicalize () . unwrap (),
+      recursive: true,
+    }));
   }
 }

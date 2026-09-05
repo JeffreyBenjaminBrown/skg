@@ -174,10 +174,9 @@ impl ServerRuntime {
   }
 
   pub fn start_background_services (self : &Arc<Self>) -> Result<(), String> {
-    let sources : Vec<PathBuf> = self . selected_snapshot () . env . config
-      . sources . values () . map (|source| source . path . clone ())
-      . collect ();
-    let service = ObservationService::start (Arc::downgrade (self), sources)?;
+    let snapshot = self . selected_snapshot ();
+    let service = ObservationService::start (
+      Arc::downgrade (self), &snapshot . env . config)?;
     *self . observation . lock ()
       . map_err (|_| "observation service lock poisoned" . to_string ())? =
       Some (service);
@@ -235,15 +234,28 @@ impl ServerRuntime {
       . observe_maintenance_final_disk (incident, epoch)
   }
 
-  pub(crate) fn replace_observation_sources (
+  pub(crate) fn replace_observation_config (
     &self,
-    sources : Vec<PathBuf>,
+    config : &crate::types::misc::SkgConfig,
   ) -> Result<(), String> {
     self . observation . lock ()
       . map_err (|_| "observation service lock poisoned" . to_string ())?
       . as_mut ()
       . ok_or_else (|| "observation service is not running" . to_string ())?
-      . replace_sources (sources)
+      . replace_config (config)
+  }
+
+  pub fn observe_git_presentation (&self) -> Result<(bool, bool), String> {
+    let snapshot = self . selected_snapshot ();
+    let mut interactive = self . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    let diff_mode_enabled = interactive . views . diff_mode_enabled;
+    let InteractiveSession {
+      views, active_source_set, collateral_scheduler, ..
+    } = &mut *interactive;
+    collateral_scheduler . observe_presentation (
+      views, &snapshot . env, active_source_set)
+      . map (|changed| (changed, diff_mode_enabled))
   }
 
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
