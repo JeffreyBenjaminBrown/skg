@@ -533,6 +533,31 @@ what's imperfect about what's done; choices determining the future.
   authority and runs every in-flight request finalizer before reconnecting.
   Focused tests exercise the full evidence-to-terminal chain and the complete
   Neovim suite passes.
+- Added one durable explicit-partial-reload target contract.  The maintenance
+  journal now freezes normalized path and ID requests, and the terminal record
+  retains exact per-ID resolution outcomes so clients clear only IDs whose
+  incident actually completed.  Primary and extra IDs resolve against G0,
+  unknown IDs remain rejected with a reason, and an all-unknown request still
+  reaches a durable semantic no-op terminal rather than disappearing.
+- Added exact targeted candidate construction and a server-owned origin worker.
+  Every resolved PID observes all possible direct cross-source telescope paths;
+  extra-ID changes conservatively fall back to the complete corpus, exact byte
+  fences are rechecked before selection, and unrelated worktree changes are not
+  smuggled into the authorized target set.  The asynchronous result carries the
+  incident, epoch and candidate identity and is replay-safe across an ordinary
+  socket reconnect.
+- Routed Emacs's existing ID-stack selector through the common maintenance
+  archive, candidate, settlement, evidence and terminal handshake.  It asks the
+  single dirty-work question before beginning, preserves selector marks until
+  terminal acknowledgement, and reschedules the idempotent server origin after
+  reconnect.  The complete Emacs suite passes: 358 tests, with the two optional
+  undo-fu-session tests skipped when that package is absent.
+- Added matching Neovim path/ID APIs and =:SkgReloadIds=/=:SkgReloadPaths=
+  commands.  Local absolute paths beneath the client config root become stable
+  config-relative paths before crossing a host/container boundary; dirty views
+  receive the same one-time archive warning; server-push candidate selection,
+  failure and terminal outcomes drive the existing exact handshake.  The full
+  Neovim suite passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
