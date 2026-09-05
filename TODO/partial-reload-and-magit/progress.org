@@ -1132,3 +1132,29 @@ what's imperfect about what's done; choices determining the future.
 - All 34 tests in the reload and structured-warning Emacs suites pass, both
   focused Rust capability tests pass, and =cargo check --all-targets= plus
   =git diff --check= are clean.
+
+* the Elisp reload bootstrap resolves its own modules
+
+** diagnosis
+- =skg-state.el= acquired a dependency on the project-local =skg-log.el= during
+  this branch, but =skg-reload.el= neither loaded that stateful module nor put
+  its own directory on =load-path= while resolving =require= forms.
+- An already initialized Emacs could mask the omission because =skg-log= and
+  other transitive dependencies were already present in =features=.  Starting
+  from only the documented =load-file= bootstrap exposed it immediately as
+  =Cannot open load file ... skg-log=.
+
+** repair and validation
+- =skg-log.el= is now explicitly re-evaluated before =skg-state.el=.  This
+  refreshes the logging functions while preserving its live =defvar=
+  configuration, just like the other stateful client modules.
+- =skg--reload-modules= dynamically prepends its own =elisp-dir= to
+  =load-path= for the whole unload/reload transaction.  Every project-local
+  transitive =require= can therefore resolve without asking the user's Emacs
+  configuration to have installed that path first; the outer =load-path=
+  remains unchanged afterward.
+- A clean batch Emacs launched from =docs/= successfully completed the same
+  =load-file ../elisp/skg-reload.el= then =skg-reload= bootstrap with no
+  project directory preinstalled.  Regressions protect both the logging-before-
+  state order and the dynamically self-contained require path.  All 26
+  reload-focused Emacs tests pass and =git diff --check= is clean.
