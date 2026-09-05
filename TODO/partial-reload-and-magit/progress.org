@@ -646,6 +646,38 @@ what's imperfect about what's done; choices determining the future.
   maintained surface and failure actions; setup documents the archive root,
   POSIX privacy, incomplete staging and =undo-fu-session= 0.8; and the
   architecture page draws the server/client ownership boundary.
+- Removed the retired direct-reload presentation and client conflict path after
+  its maintained replacements passed.  The server's old reload handler is now
+  only an observation hint, and the editor no longer carries dead incoming/base
+  conflict state which could suggest a second graph-selection route.
+- Retired the remaining shell/control bypasses.  The old pull helper now
+  delegates to the maintained editor command, and raw rebuild/control requests
+  cannot select disk around the coordinator.
+- Added strict offline retained-incident inspection in both clients.  Listing
+  verifies publication markers, manifest checksum chains, private regular-file
+  artifacts and final dispositions without a server, while retaining corrupt
+  strict-named siblings as visible invalid incidents.
+- Integrated the native undo sidecars into detached recovery.  Opening a
+  recovery buffer restores Emacs undo-fu-session or Neovim =:rundo= history
+  without modifying the archive; active Undo Tree mode still fails closed, and
+  missing, corrupt, incompatible or foreign sidecars fall back to exact text.
+- Added equivalent detached-recovery command surfaces in both clients: list,
+  inspect, independently open exact interrupted text, navigate verified
+  artifacts, open a fresh current-generation view/search, and safely delete a
+  terminal incident.  Recovery buffers carry no live URI/application authority
+  and refuse every write path.
+- Added real-file cross-client fallback tests.  Each suite opens a completely
+  published and finalized archive whose signed client identity names the other
+  editor, verifies the full checksum chain, preserves exact text, and declines
+  only the incompatible native undo sidecar.
+- Made fresh recovery views genuinely side-by-side.  Content recovery bypasses
+  existing-root redirection, while search recovery allocates a distinct
+  =search:recovery:UUID= and carries it through phase one, snapshot and enriched
+  application authority so an older same-terms search cannot be overwritten.
+- Made maintenance state persistent at the point of use: Emacs's mode line and
+  both clients' buffer-entry notifications repeat pending-disk, epoch-lock,
+  preserved-presentation and stale-search warnings.  The public recovery
+  commands are documented and included in Emacs hot re-evaluation order.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -654,6 +686,10 @@ what's imperfect about what's done; choices determining the future.
 - The first real pull integration was added before the full-rebuild entry path.
   That run exposed the stale-census race, so the epoch-first locked-census
   barrier and its reconnect phase were completed before proceeding to rebuild.
+- The obsolete reload and shell bypasses were removed before the fuller
+  workflow-census pass.  Their maintained pull/reload/rebuild replacements and
+  end-to-end tests already made the deletion safe, and removing them reduced
+  the number of constructors and mutation routes the remaining audit must cover.
 
 ** what's imperfect about what's done
 - The census currently reconstructs only live view forests; recipes, attached
@@ -671,11 +707,9 @@ what's imperfect about what's done; choices determining the future.
   clean ones close) rather than being settled with their parent.  The durable
   settlement inventory and ACK gate are in place, but workflow-parent-aware
   settlement is not yet implemented.
-- The mutating reload route is no longer dispatchable, but its private Emacs
-  implementation/conflict UI and the server handler's presentation plumbing
-  are still present as dead migration code.  Lower-level reload construction
-  helpers remain live in integration tests.  The obsolete orchestration must
-  be removed without deleting those tested transaction helpers.
+- The recovery command layer is complete for retained client archives, but the
+  server's remaining invalid-disk/store/fatal-Git recovery actions still need a
+  complete public resume-command audit in both clients.
 
 ** choices determining the future
 - No new architectural choice arose from the locked-census or end-to-end pull
