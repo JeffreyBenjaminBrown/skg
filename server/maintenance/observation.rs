@@ -23,6 +23,7 @@ use crate::maintenance::{
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::QueuedServerEvent;
 use crate::serve::protocol::TcpToClient;
+use crate::serve::handlers::reload_batch::reload_batch_active;
 
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use sexp::{Atom, Sexp};
@@ -150,7 +151,12 @@ fn observation_worker (
         signal, &mut paths, &mut reasons, &mut maintenance_jobs,
         &mut maintenance_final_jobs); }
     let Some (runtime) = runtime . upgrade () else { return; };
-    if !reasons . is_empty () || !paths . is_empty () {
+    // A process-owned exact sweep is queued when the final bracket closes.
+    // Events consumed inside the bracket therefore need no client-side
+    // retention and, critically, may not publish a mid-batch candidate.
+    if (!reasons . is_empty () || !paths . is_empty ())
+       && !reload_batch_active ()
+    {
       run_observation (&runtime, paths, reasons); }
     for (incident, epoch) in maintenance_jobs {
       run_target_observation (&runtime, incident, epoch); }

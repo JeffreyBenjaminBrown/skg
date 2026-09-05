@@ -6,6 +6,8 @@
 //! bracket, and losing the connection releases its tokens.
 
 use crate::serve::protocol::TcpToClient;
+use crate::maintenance::QueuedObservationReason;
+use crate::runtime::ServerRuntime;
 use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
@@ -50,15 +52,20 @@ pub fn reload_batch_active () -> bool {
     . active_count () > 0
 }
 
-/// Monotonic notice that the last process-wide batch bracket closed. Active
-/// interactive connections turn a new value into a server-push full sweep;
-/// a client which connects later already performs a handshake sweep.
+/// Monotonic notice that the last process-wide batch bracket closed.  The
+/// server queues the authoritative sweep itself; an interactive connection
+/// receives this generation only as a visible progress notification.
 pub fn reconciliation_generation () -> u64 {
   RECONCILIATION_GENERATION . load (Ordering::Acquire)
 }
 
-fn request_reconciliation () {
+fn request_reconciliation (runtime : &ServerRuntime) {
   RECONCILIATION_GENERATION . fetch_add (1, Ordering::AcqRel);
+  if let Err (error) = runtime . schedule_full_observation (
+      QueuedObservationReason::ExternalBatchEnded)
+  {
+    tracing::error! (%error,
+      "could not queue the exact sweep after a reload batch"); }
 }
 
 pub fn handle_begin_reload_batch_request (
@@ -80,6 +87,7 @@ pub fn handle_begin_reload_batch_request (
 pub fn handle_end_reload_batch_request (
   stream       : &mut TcpStream,
   request      : &str,
+  runtime      : &ServerRuntime,
   owned_tokens : &mut HashSet<String>,
 ) {
   let token = match value_from_request_sexp ("batch-token", request) {
@@ -98,7 +106,7 @@ pub fn handle_end_reload_batch_request (
       . expect ("reload-batch mutex poisoned");
     state . end (&token);
     state . active_count () };
-  if active_count == 0 { request_reconciliation (); }
+  if active_count == 0 { request_reconciliation (runtime); }
   send_batch_response (
     stream, &token, active_count,
     if active_count == 0 {
@@ -108,7 +116,10 @@ pub fn handle_end_reload_batch_request (
     });
 }
 
-pub fn release_connection_reload_batches (owned_tokens : &mut HashSet<String>) {
+pub fn release_connection_reload_batches (
+  runtime      : &ServerRuntime,
+  owned_tokens : &mut HashSet<String>,
+) {
   if owned_tokens . is_empty () { return; }
   let mut state = registry () . lock ()
     . expect ("reload-batch mutex poisoned");
@@ -116,7 +127,7 @@ pub fn release_connection_reload_batches (owned_tokens : &mut HashSet<String>) {
   for token in owned_tokens . drain () {
     state . end (&token); }
   if was_active && state . active_count () == 0 {
-    request_reconciliation (); }
+    request_reconciliation (runtime); }
   tracing::warn! (
     active_reload_batches = state . active_count (),
     "reload-batch control connection closed; released its tokens");

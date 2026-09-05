@@ -47,6 +47,7 @@ use crate::serve::handlers::maintenance_protocol::{
   handle_finish_maintenance_origin_request,
   handle_run_maintenance_origin_request,
 };
+use crate::serve::handlers::observation_hint::handle_observation_hint_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_roots_request;
 use crate::serve::handlers::reload_batch::{
@@ -55,7 +56,6 @@ use crate::serve::handlers::reload_batch::{
   reconciliation_generation,
   release_connection_reload_batches,
 };
-use crate::serve::handlers::reload_paths::handle_reload_paths_request;
 use crate::serve::handlers::reload_recovery::{
   handle_reload_recovery_request,
   load_recovery_journals,
@@ -409,7 +409,8 @@ fn handle_connection (
       }
       Err (_) => break, // real error
     }}
-  release_connection_reload_batches (&mut owned_reload_batch_tokens);
+  release_connection_reload_batches (
+    &runtime, &mut owned_reload_batch_tokens);
   if role . as_ref () . map (ConnectionRole::interactive)
      . unwrap_or (false)
   {
@@ -586,15 +587,7 @@ fn dispatch_request (
           stream, request, env, views, active_source_set); })
       { send_runtime_error (stream, &error); }}
     RequestType::ReloadPaths => {
-      if let Err (error) = runtime . with_store_transition (
-          false, |env, interactive| {
-            let InteractiveSession {
-              views, active_source_set, collateral_scheduler, ..
-            } = interactive;
-            handle_reload_paths_request (
-              stream, request, env, views, active_source_set,
-              collateral_scheduler); })
-      { send_runtime_error (stream, &error); }}
+      handle_observation_hint_request (stream, request, runtime); }
     RequestType::ReloadRecover => {
       runtime . with_writer_env (|env| {
         handle_reload_recovery_request (stream, request, &env . config); }); }
@@ -602,7 +595,7 @@ fn dispatch_request (
       handle_begin_reload_batch_request (stream, owned_reload_batch_tokens),
     RequestType::EndReloadBatch =>
       handle_end_reload_batch_request (
-        stream, request, owned_reload_batch_tokens),
+        stream, request, runtime, owned_reload_batch_tokens),
     RequestType::RecomputeCyclicRoots => {
       if let Err (error) = runtime . with_store_transition (
           false, |env, _| {
