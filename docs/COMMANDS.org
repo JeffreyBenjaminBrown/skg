@@ -791,19 +791,23 @@ A preflight failure leaves the old stores selected and queryable.  A failure
 after destruction keeps the incident durably locked while Skg attempts to
 restore them.  Read the error, preserve the archive, and use
 =skg-maintenance-status= after fixing the underlying problem or reconnecting.
-*** process-owned disk observation
+*** process-owned disk and Git observation
 The Rust server, not Emacs, watches the direct =.skg= children of every
-configured source.  Observation continues while the editor is disconnected
-and does not itself change the selected graph or stores.  A stable valid
-semantic difference produces a prompt to reconcile now or later.  Choosing
-later keeps the old generation queryable and editable, but blocks every Skg
-view save until the candidate is reconciled or disk is explicitly reverted.
-Invalid or unstable disk is reported as persistent pending work rather than
-being selected silently.
+configured source.  It separately watches each repository's per-worktree and
+common Git metadata, including linked-worktree refs, so staging, unstaging and
+branch/ref changes automatically refresh diff-mode presentation.  Observation
+continues while the editor is disconnected.  Filesystem events are only hints;
+exact source bytes and Git presentation signatures decide whether anything
+changed.
 
-Magit refresh also asks the server to observe both exact source bytes and Git
-presentation.  Raw-file saves need no editor watcher hook.  Reload and
-reconciliation never write a =.skg= file themselves.
+A stable valid semantic source difference produces a prompt to reconcile now
+or later.  Choosing later keeps the old generation queryable and editable,
+but blocks every Skg view save until the candidate is reconciled or disk is
+explicitly reverted.  Invalid or unstable disk is reported as persistent
+pending work rather than being selected silently.  Magit refresh expedites
+both exact checks, but correctness does not depend on that hook.  Raw-file
+saves need no editor watcher hook.  Reload and reconciliation never write a
+=.skg= file themselves.
 *** skg-reload-changed
 Queues a low-priority exact server-side sweep of every configured source.  It
 compares content digests, not mtimes.  This command observes only; if it finds

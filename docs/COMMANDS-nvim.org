@@ -710,14 +710,20 @@ A preflight failure leaves the old stores selected and queryable.  A failure
 after destruction keeps the incident durably locked while Skg attempts to
 restore them.  Read the error, preserve the archive, and use
 =:SkgMaintenanceStatus= after fixing the underlying problem or reconnecting.
-*** process-owned disk observation
+*** process-owned disk and Git observation
 The Rust server, not Neovim, watches the direct =.skg= children of every
-configured source.  Observation continues while the editor is disconnected
-and does not itself change the selected graph or stores.  A stable valid
-semantic difference prompts to reconcile now or later.  Later keeps the old
-generation queryable and editable, but blocks every Skg view save until the
-candidate is reconciled or disk is explicitly reverted.  Invalid or unstable
-disk remains visible pending work rather than being selected silently.
+configured source.  It separately watches each repository's per-worktree and
+common Git metadata, including linked-worktree refs, so staging, unstaging and
+branch/ref changes automatically refresh diff-mode presentation.  Observation
+continues while the editor is disconnected.  Filesystem events are only hints;
+exact source bytes and Git presentation signatures decide whether anything
+changed.
+
+A stable valid semantic source difference prompts to reconcile now or later.
+Later keeps the old generation queryable and editable, but blocks every Skg
+view save until the candidate is reconciled or disk is explicitly reverted.
+Invalid or unstable disk remains visible pending work rather than being
+selected silently.  Correctness does not depend on a Neovim or Neogit hook.
 *** :SkgReconcilePendingChanges
 Reopens the prompt for the latest pending valid disk candidate.  Accepting
 starts archive-first maintenance.  Dirty impacted views become detached

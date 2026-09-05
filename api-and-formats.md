@@ -143,7 +143,10 @@ So far there are these endpoints:
   ```
 
   The server reattaches exact retained authority, reports stale buffer IDs,
-  and requests full text only for reconstructible missing views.  If requested,
+  and requests full text only for reconstructible missing views.  The census
+  response also names `presentation-stale-view-uris`: this one-way status
+  repairs a missed queued-refresh push without detaching an otherwise exact
+  view or removing its save authority.  If requested,
   `client census texts` carries a second length-prefixed payload with
   `buffer-id`, exact `last-fetched`, and exact `current` text.  No ordinary
   endpoint is admitted until the response says `(census-complete true)`.
@@ -631,6 +634,18 @@ So far there are these endpoints:
     ACK. A newer transition replaces obsolete queued/in-flight work but does
     not discard an already offered obligation. Work resumes from the forest
     made authoritative by that exact ACK.
+  - Every queue replacement first marks the exact queued server views
+    presentation-stale and sends a text-free unsolicited status frame:
+    `((response-type refresh-queued) (frame-kind refresh-queued)
+    (server-push true) (operation-id "refresh-G-P-REASON")
+    (reason REASON) (graph-generation G) (presentation-generation P)
+    (queued-view-uris ("URI1" "URI2" ...)))`.
+    Reasons distinguish an ordinary background transition, explicit rerender,
+    diff-mode rerender, source-set switch, or Git-presentation rerender.  This
+    frame grants no application authority and needs no ACK; each client only
+    marks matching live views stale and leaves their text and save authority
+    intact.  An undelivered frame remains queued by the process, and the next
+    client census independently repairs the same stale state.
   - A rendered proposal is an unsolicited frame with no request ID:
     `((response-type collateral-view) (frame-kind collateral-view)
     (server-push true) (operation-id "OP") (view-uri "URI")
@@ -751,10 +766,15 @@ So far there are these endpoints:
   complete-corpus fallback.  Unknown IDs are retained as rejected outcomes,
   while acknowledged IDs clear from the Emacs selection buffer only after the
   incident's terminal ACK.
-- The Rust watcher, not either editor, owns normal source-directory
-  observation.  `skg-reload-changed` and a Magit refresh can still request an
-  exact BLAKE3 full sweep as a hint.  A raw `.skg` save needs no client hook:
-  the server watcher observes it independently of the editor connection.
+- The Rust watchers, not either editor, own normal source-directory and Git
+  presentation observation.  Source watches cover each configured directory.
+  Separate Git watches cover each resolved per-worktree Git directory, the
+  common Git directory and its refs recursively, including linked worktrees.
+  Events are coalesced hints: exact BLAKE3 source comparison and the exact
+  HEAD/index/configured-path presentation signature remain authoritative.
+  `skg-reload-changed` and Magit refresh may expedite those checks, but
+  correctness does not depend on editor hooks or a connection.  A raw `.skg`
+  save likewise needs no client hook.
 
 ## Fatal reload recovery
 
@@ -812,7 +832,9 @@ So far there are these endpoints:
 ## Process-owned observation and pending disk work
 
 The server installs one nonrecursive watcher for every normalized source
-directory and also schedules exact full sweeps at startup, after watcher gaps,
+directory and a separate Git-presentation watcher over each repository's
+per-worktree and common metadata.  It rebuilds both sets after source-catalog
+replacement and schedules exact full sweeps at startup, after watcher gaps,
 after an external batch, after source-catalog replacement, and after a save
 fence discovers drift.  The low-priority observer reads disk without changing
 the selected generation:

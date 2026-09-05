@@ -785,6 +785,27 @@ what's imperfect about what's done; choices determining the future.
   and the complete Neovim suite passes.  The protocol and both command
   references now describe queued foreground completion and exact collateral
   offers rather than the retired =rerender-view= stream.
+- Made Git presentation observation process-owned.  A distinct watcher covers
+  every resolved per-worktree Git directory, common Git directory and recursive
+  refs tree, including linked worktrees; filesystem events coalesce through the
+  observation worker and only the exact HEAD/index/configured-path signature
+  advances presentation generation.  Source-catalog replacement prepares both
+  replacement watcher sets before publication, and the existing Magit refresh
+  hook remains a latency hint rather than a correctness boundary.
+- Every collateral queue replacement now immediately marks its exact server
+  views presentation-stale and emits a text-free =refresh-queued= server push
+  naming reason, graph/presentation generation and ordered URIs.  Both clients
+  expose that debt without touching text or save authority; failed delivery is
+  retained, and census replay independently propagates missed stale URIs after
+  reconnect.  Exact application ACKs retain the stale bit when newer work for
+  the same URI remains queued.
+- Validation after the automatic-presentation/status slice: focused Rust
+  watcher, scheduler, census and rerender tests pass; the exact isolated tests
+  behind two shared-global parallel-run flakes pass; all 406 runnable Emacs
+  tests pass with the three expected optional undo-sidecar skips; and a clean
+  complete Neovim run passes after isolating one concurrent pending-count
+  flake.  =git diff --check= is clean; this environment does not have the
+  =cargo fmt= subcommand installed.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
