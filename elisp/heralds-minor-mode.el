@@ -146,8 +146,8 @@ so no herald rule table is available.")
     (condition-case err
         (or (skg-herald-rules-ensure)
             (progn
-              (message "Heralds disabled: the skg server sent no herald \
-rule table after repeated attempts.")
+              (message "Heralds disabled: no valid herald rule table arrived \
+after repeated attempts; the skg server may be unavailable or unresponsive.")
               nil))
       (error
        (message "Heralds disabled: could not fetch the herald rule table: %s"

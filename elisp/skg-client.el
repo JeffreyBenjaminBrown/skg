@@ -62,11 +62,7 @@
     (if rules
         (message "skg ready on port %s -- %d herald rules loaded."
                  skg-port (1- (length rules)))
-      (message
-       (concat "skg connected on port %s, but the herald rule table"
-               " came back EMPTY, so heralds will not render."
-               " See %slogs/server-to-user.log .")
-       skg-port skg-config-dir))))
+      (user-error "%s" (skg--client-initialization-failure-message)))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()
@@ -105,13 +101,47 @@
     (skg--submit-connection-handshake skg-rust-tcp-proc))
   skg-rust-tcp-proc)
 
-(defun skg--server-unavailable-message (err)
-  "Return a user-facing message for a failed Rust server connection ERR."
+(defun skg--server-log-files ()
+  "Return the user and watcher logs for the active Skg configuration."
   (let* ((logs-dir (expand-file-name
                     "logs"
                     (or skg-config-dir default-directory)))
          (user-log (expand-file-name "server-to-user.log" logs-dir))
          (watch-log (expand-file-name "cargo-watch.log" logs-dir)))
+    (list user-log watch-log)))
+
+(defun skg--client-initialization-failure-message ()
+  "Explain why a connection without herald rules is not ready."
+  (let* ((logs (skg--server-log-files))
+         (reason
+          (cond
+           ((not (and skg-rust-tcp-proc
+                      (process-live-p skg-rust-tcp-proc)))
+            "the server connection closed before initialization completed")
+           ((not (eq skg--connection-handshake-state 'verified))
+            (format
+             (concat "the TCP connection did not complete its handshake or "
+                     "return herald rules after %d attempts")
+             skg-herald-rules-max-attempts))
+           (t
+            (format
+             (concat "the server handshake completed, but no valid herald "
+                     "rule table was installed after %d attempts")
+             skg-herald-rules-max-attempts)))))
+    (format
+     (concat
+      "SKG client initialization failed on port %s: %s.\n"
+      "The client is not ready. The server may be stopped, starting, or "
+      "unresponsive.\n"
+      "Look for the startup error in:\n"
+      "  %s\n"
+      "  %s")
+     (if (boundp 'skg-port) skg-port "[unknown]") reason
+     (car logs) (cadr logs))))
+
+(defun skg--server-unavailable-message (err)
+  "Return a user-facing message for a failed Rust server connection ERR."
+  (let ((logs (skg--server-log-files)))
     (format
      (concat
       "Could not connect to the SKG server on port %s.\n"
@@ -121,9 +151,7 @@
       "  %s\n"
       "Connection error: %s")
      (if (boundp 'skg-port) skg-port "[unknown]")
-     user-log
-     watch-log
-     (error-message-string err))))
+     (car logs) (cadr logs) (error-message-string err))))
 
 (defun skg-handle-rust-response (tcp-proc string)
   "Route the response from Rust to the LP handler.

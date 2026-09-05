@@ -18,8 +18,8 @@
 
 (defconst skg-herald-rules-max-attempts 3
   "How many times `skg-herald-rules-ensure' re-requests the table.
-After this many empty replies it gives up, so a silent or wedged
-server cannot freeze Emacs with fruitless retries.")
+After this many attempts which install no valid table it gives up, so a silent
+or wedged server cannot freeze Emacs with fruitless retries.")
 
 (defconst skg-herald-rules-attempt-timeout 1.0
   "Seconds `skg-herald-rules-ensure' waits for the reply to each attempt.")
@@ -56,8 +56,8 @@ callers that need the table should go through `skg-herald-rules-ensure'."
 If `heralds--transform-rules' is already set, return it at once.
 Otherwise re-request the table up to `skg-herald-rules-max-attempts'
 times -- waiting up to `skg-herald-rules-attempt-timeout' seconds for
-each reply -- and return whatever is installed at the end (nil if every
-attempt came back empty).
+each reply -- and return whatever is installed at the end (nil if no
+attempt installed a valid table).
 
 The attempt cap is the point: it stops a silent or wedged server from
 freezing Emacs by retrying forever. A connection failure propagates (as
