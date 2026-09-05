@@ -19,6 +19,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::runtime::ServerRuntime;
 use skg::serve::ViewsState;
 use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -248,6 +249,7 @@ async fn menu_still_offered_in_diff_mode (
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("all")) ?;
+      let runtime = ServerRuntime::new (env . clone ())?;
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : true,
@@ -260,7 +262,7 @@ async fn menu_still_offered_in_diff_mode (
             &mut server,
             "((request . \"single root content view\") \
               (id . \"Z\") (view-uri . \"diff-menu-uuid\"))",
-            &env, &mut views_state, &active ); } ); } );
+            &env, &mut views_state, &active, &runtime ); } ); } );
       let response : String = {
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
@@ -290,6 +292,7 @@ async fn open_menu_survives_diff_mode_toggle (
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("all")) ?;
+      let runtime = ServerRuntime::new (env . clone ())?;
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
@@ -304,7 +307,7 @@ async fn open_menu_survives_diff_mode_toggle (
               &mut server,
               "((request . \"single root content view\") \
                 (id . \"Z\") (view-uri . \"toggle-menu-uuid\"))",
-              &env, &mut views_state, &active ); } ); } );
+              &env, &mut views_state, &active, &runtime ); } ); } );
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
         let response = read_lp_message ( &mut reader ) ?;
@@ -365,6 +368,7 @@ async fn handler_precedence_and_menu_dedup (
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("all")) ?;
+      let runtime = ServerRuntime::new (env . clone ())?;
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
@@ -383,7 +387,7 @@ async fn handler_precedence_and_menu_dedup (
           scope . spawn ( || {
             handle_single_root_view_request (
               &mut server, request, &env,
-              views_state, &active ); } ); } );
+              views_state, &active, &runtime ); } ); } );
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
         read_lp_message ( &mut reader ) . unwrap () };
