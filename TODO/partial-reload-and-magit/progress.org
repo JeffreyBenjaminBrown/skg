@@ -741,6 +741,30 @@ what's imperfect about what's done; choices determining the future.
 - Validation after the ordinary/raw save slice: all five focused Rust fence
   tests pass; all 403 of 406 runnable Emacs tests pass with the three expected
   optional undo-sidecar skips; and the complete Neovim suite passes.
+- Completed replacement-editor and server-restart reconciliation for retained
+  incidents.  A complete census now journals =census-absent= for a frozen
+  buffer which is genuinely absent and =census-applied= only when a live clean
+  descriptor proves every resulting counter, token, epoch, recipe, root set,
+  stale bit and exact staged-content checksum of an otherwise unacknowledged
+  application.  Neither case rewrites the original planned disposition or
+  claims an ordinary client ACK, so the final archive retains how the debt was
+  actually discharged.
+- Separated immutable archive provenance from transferable incident control.
+  The original producer editor/session and initial manifest checksum remain
+  signed facts, while an attached replacement session may adopt control only
+  after the initial archive is verified and published.  Before selection, a
+  restarted server reconstructs its verified-archive cache from that immutable
+  checksum; after selection, the journaled store and evidence records remain
+  the point-of-no-return authority.
+- Both clients now inspect the retained archive before resuming an adopted
+  incident, reconstruct active or terminal state from the exact journaled
+  checksums, and expose producer, controller, initial/final manifest, transfer
+  and artifact checksum facts in retained-incident inspection.  Focused Rust
+  coordinator/census/recovery tests, focused Emacs maintenance/archive tests
+  and the complete Neovim suite pass.  One full parallel Rust run reproduced
+  four preexisting save-leveling failures caused by shared process state; the
+  complete affected 15-test module passes serially, while all reconnect,
+  coordinator and recovery tests pass.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -759,10 +783,6 @@ what's imperfect about what's done; choices determining the future.
   exposed conventional-name overwrite risks while the policy was still local.
 
 ** what's imperfect about what's done
-- A same-editor-process socket replacement resumes presentation exactly in
-  both clients.  The server-restart/new-editor cases still need explicit
-  reconciliation for a locally applied but unacknowledged clean offer and for
-  clean frozen views absent from the replacement editor.
 - Older foreground rerender streams still need to be routed through the same
   exact application/ACK authority used by retained collateral offers.
 - Both clients can finish an already-selected disk candidate, explicit reload,
