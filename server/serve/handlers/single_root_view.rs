@@ -23,6 +23,7 @@ use crate::types::misc::ID;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::views_state::{ViewUri, single_root_recipe};
 use crate::maintenance::BufferKind;
+use crate::runtime::ServerRuntime;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
@@ -41,6 +42,7 @@ pub fn handle_single_root_view_request (
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  runtime     : &ServerRuntime,
 ) {
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
@@ -195,6 +197,13 @@ pub fn handle_single_root_view_request (
                   &warnings );
                 let state = views_state . open_views . views . get (&menu_uri)
                   . expect ("registered override menu exists");
+                if let Err (error) = runtime . enroll_maintenance_view (
+                    &menu_uri, state)
+                {
+                  views_state . open_views . unregister_view (&menu_uri);
+                  return tag_text_response (TcpToClient::Error, &error); }
+                let state = views_state . open_views . views . get (&menu_uri)
+                  . expect ("enrolled override menu exists");
                 return tag_sexp_response (
                   TcpToClient::ContentView,
                   &add_view_authority_to_response (&formatted, state)); },
@@ -251,6 +260,13 @@ pub fn handle_single_root_view_request (
                 let formatted = if let Ok (view_uri) = &view_uri_result {
                   let state = views_state . open_views . views . get (view_uri)
                     . expect ("registered content view exists");
+                  if let Err (error) = runtime . enroll_maintenance_view (
+                      view_uri, state)
+                  {
+                    views_state . open_views . unregister_view (view_uri);
+                    return tag_text_response (TcpToClient::Error, &error); }
+                  let state = views_state . open_views . views . get (view_uri)
+                    . expect ("enrolled content view exists");
                   add_view_authority_to_response (&formatted, state)
                 } else { formatted };
                 tag_sexp_response (TcpToClient::ContentView, &formatted) },

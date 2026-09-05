@@ -470,7 +470,7 @@ fn dispatch_request (
       if let Err (error) = with_query_session (runtime, |env, interactive| {
         let InteractiveSession { views, active_source_set, .. } = interactive;
         handle_single_root_view_request (
-          stream, request, env, views, active_source_set); })
+          stream, request, env, views, active_source_set, runtime); })
       { send_runtime_error (stream, &error); }}
     RequestType::SaveBuffer => {
       // The same BufReader which parsed the request must consume its payload.
@@ -515,7 +515,7 @@ fn dispatch_request (
         &mut *interactive;
       handle_text_search_request (
         stream, request, lease, presentation_generation,
-        enrichment_slot, search_cancelled, views, active_source_set); }
+        enrichment_slot, search_cancelled, views, active_source_set, runtime); }
     RequestType::VerifyConnection => {
       let lease = match runtime . query_lease () {
         Ok (lease) => lease,
@@ -548,16 +548,16 @@ fn dispatch_request (
         . state . policy () . skg_saves_allowed;
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_client_census_request (
-        reader, stream, &snapshot . env, &mut interactive, writes_allowed,
-        runtime); }
+        reader, stream, request, &snapshot . env, &mut interactive,
+        writes_allowed, runtime); }
     RequestType::ClientCensusTexts => {
       let snapshot = runtime . selected_snapshot ();
       let writes_allowed = runtime . maintenance . lock () . unwrap ()
         . state . policy () . skg_saves_allowed;
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_client_census_texts_request (
-        reader, stream, &snapshot . env, &mut interactive, writes_allowed,
-        runtime); }
+        reader, stream, request, &snapshot . env, &mut interactive,
+        writes_allowed, runtime); }
     RequestType::Shutdown => {
       let snapshot = runtime . selected_snapshot ();
       handle_shutdown_request (stream, &snapshot . env); }

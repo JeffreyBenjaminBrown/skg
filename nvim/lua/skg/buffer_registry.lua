@@ -228,6 +228,10 @@ function M.register (buf, kind, options)
     if type(epoch) ~= 'number' or epoch < 0 or epoch ~= math.floor(epoch) then
       error('Active maintenance has no valid epoch') end
     M.lock_for_maintenance(buf, epoch)
+    local buffer_id = vim.b[buf].skg_buffer_id
+    vim.schedule(function ()
+      require('skg.maintenance').enroll_new_buffer(buffer_id)
+    end)
   end
   if not vim.b[buf].skg_registry_cleanup_installed then
     vim.b[buf].skg_registry_cleanup_installed = true

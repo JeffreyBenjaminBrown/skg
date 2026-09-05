@@ -331,6 +331,24 @@ impl ServerRuntime {
       tracing::error! (%error, "could not persist maintenance state"); }
   }
 
+  /// Persist the server-known half of a view born during maintenance before
+  /// its successful query response is put on the wire.
+  pub fn enroll_maintenance_view (
+    &self,
+    uri   : &crate::types::views_state::ViewUri,
+    state : &crate::types::views_state::ViewState,
+  ) -> Result<bool, String> {
+    let enrollment = crate::maintenance::PendingViewEnrollment {
+      view_uri: uri . repr_in_client (),
+      graph_generation: state . graph_generation,
+      presentation_generation: state . presentation_generation,
+      server_revision: state . revision,
+      application_token: state . client_application_token,
+    };
+    self . transition_maintenance (|coordinator|
+      coordinator . enroll_pending_view (enrollment . clone ()))
+  }
+
   /// Apply one coordinator transition and durably publish it as one critical
   /// section.  A journal failure restores the previous in-memory state, so a
   /// successful protocol response can never describe an unjournaled boundary.

@@ -15,6 +15,8 @@
   "Latest unsolicited valid disk candidate offered by the server.")
 (defvar skg--maintenance-origin-operation-handlers nil
   "Origin labels mapped to their post-archive client adapters.")
+(defvar skg--maintenance-enrollment-census-scheduled nil
+  "Non-nil while one constructor-triggered incident census is queued.")
 
 (defun skg-register-maintenance-origin-handler (origin handler)
   "Register HANDLER for maintenance ORIGIN.
@@ -107,6 +109,41 @@ old implementation."
                    'awaiting-locked-census))
           (skg--maintenance-send-locked-census)
         (skg-maintenance-status t)))))
+
+(defun skg-maintenance-enroll-new-buffer (buffer-id)
+  "Queue one priority census when BUFFER-ID was born in active maintenance."
+  (let ((state skg--maintenance-client-incident))
+    (when (and state
+               (not (member buffer-id
+                            (plist-get state :registered-buffer-ids)))
+               (not skg--maintenance-enrollment-census-scheduled))
+      (setq skg--maintenance-enrollment-census-scheduled t)
+      (run-at-time
+       0 nil
+       (lambda (incident-id epoch)
+         (setq skg--maintenance-enrollment-census-scheduled nil)
+         (when (and skg--maintenance-client-incident
+                    (equal incident-id
+                           (plist-get skg--maintenance-client-incident
+                                      :incident-id))
+                    (equal epoch
+                           (plist-get skg--maintenance-client-incident :epoch)))
+           (skg--submit-buffer-census
+            (skg-tcp-connect-to-rust) incident-id epoch)))
+       (plist-get state :incident-id)
+       (plist-get state :epoch)))))
+
+(defun skg--maintenance-refresh-presentation-buffer-ids (response)
+  "Install RESPONSE's monotonically growing presentation buffer inventory."
+  (when (assoc 'presentation-buffer-ids response)
+    (let* ((state skg--maintenance-client-incident)
+           (old (mapcar (lambda (id) (format "%s" id))
+                        (or (plist-get state :registered-buffer-ids) nil)))
+           (new (skg--maintenance-string-list
+                 response 'presentation-buffer-ids)))
+      (unless (cl-every (lambda (id) (member id new)) old)
+        (error "Maintenance presentation census lost a registered buffer"))
+      (setf (plist-get state :registered-buffer-ids) new))))
 
 (defun skg--maintenance-send-locked-census ()
   "Ask the server to freeze the just-completed epoch-locked census."
@@ -280,6 +317,7 @@ old implementation."
            (skg--maintenance-field response 'tantivy-generation)
            :server-evidence-sha256
            (skg--maintenance-text response 'server-evidence-sha256))))
+    (skg--maintenance-refresh-presentation-buffer-ids response)
     (unless (and source-set source-inventory archive-folder archive-identity
                  (natnump (plist-get values :g1-graph-generation))
                  (natnump (plist-get values :g1-manifest-revision))
@@ -500,10 +538,10 @@ old implementation."
                                     (skg--maintenance-text
                                      record 'buffer-id))
                              :test #'equal)))
-        (unless (and prior
-                     (equal
-                      (skg--maintenance-settlement-without-ack prior)
-                      (skg--maintenance-settlement-without-ack settlement)))
+        (when (and prior
+                   (not (equal
+                         (skg--maintenance-settlement-without-ack prior)
+                         (skg--maintenance-settlement-without-ack settlement))))
           (error "Maintenance changed the durable settlement for %s"
                  buffer-id))))))
 
@@ -1284,6 +1322,7 @@ checksummed final marker."
          (ids (skg--maintenance-string-list response 'requested-ids))
          (settlements (skg--maintenance-field response 'view-settlements))
          (has-scalar (assoc 'scalar-approved response)))
+    (skg--maintenance-refresh-presentation-buffer-ids response)
     (when (and (plist-get state :origin)
                (not (equal (plist-get state :origin) origin)))
       (error "Maintenance status changed its origin"))

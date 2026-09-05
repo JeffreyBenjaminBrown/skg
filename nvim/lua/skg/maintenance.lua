@@ -8,6 +8,7 @@ local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
 local M = {}
+local enrollment_census_scheduled = false
 
 M.defer = function (callback) vim.schedule(callback) end
 M.origin_operation_handlers = {}
@@ -224,9 +225,41 @@ function M.resume_after_census (maintenance_incident_id, maintenance_epoch)
   end
 end
 
+function M.enroll_new_buffer (buffer_id)
+  local incident = state.maintenance_client_incident
+  if not incident or not buffer_id
+     or vim.tbl_contains(incident.registered_buffer_ids or {}, buffer_id)
+     or enrollment_census_scheduled then return end
+  enrollment_census_scheduled = true
+  vim.schedule(function ()
+    enrollment_census_scheduled = false
+    local current = state.maintenance_client_incident
+    if not current or current.incident_id ~= incident.incident_id
+       or current.epoch ~= incident.epoch then return end
+    require('skg.misc_requests').submit_buffer_census(
+      require('skg.client').connect(), current.incident_id, current.epoch)
+  end)
+end
+
+local function refresh_presentation_buffer_ids (response)
+  if not field_present(response, 'presentation-buffer-ids') then return end
+  local incident = assert(state.maintenance_client_incident,
+    'Presentation census arrived without client state')
+  local new = payload.string_list(payload.field(
+    response, 'presentation-buffer-ids'))
+  local present = {}
+  for _, id in ipairs(new) do present[id] = true end
+  for _, id in ipairs(incident.registered_buffer_ids or {}) do
+    if not present[id] then
+      error('Maintenance presentation census lost a registered buffer') end
+  end
+  incident.registered_buffer_ids = new
+end
+
 function M.record_selection (response)
   local incident = assert(state.maintenance_client_incident,
     'Maintenance selection arrived without client state')
+  refresh_presentation_buffer_ids(response)
   local selected_source_set = payload.field_text(response, 'source-set')
   local source_inventory = payload.field(response, 'source-inventory')
   local archive_folder = payload.field_text(
@@ -481,7 +514,7 @@ function M.require_stable_settlements (old, new)
         break
       end
     end
-    if not prior or not vim.deep_equal(
+    if prior and not vim.deep_equal(
         without_ack(prior), without_ack(settlement)) then
       error('Maintenance changed the durable settlement for ' .. buffer_id)
     end
@@ -1022,6 +1055,7 @@ function M.resume_active (response)
   local phase = payload.field_text(response, 'phase')
   M.adopt_active(response)
   local incident = require_client_incident(incident_id, epoch)
+  refresh_presentation_buffer_ids(response)
   local origin = payload.field_text(response, 'origin')
   local paths = payload.string_list(payload.field(response, 'requested-paths'))
   local ids = payload.string_list(payload.field(response, 'requested-ids'))

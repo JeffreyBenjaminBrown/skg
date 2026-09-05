@@ -956,7 +956,7 @@ fn validate_application_base (
   record : &ViewSettlementRecord,
   state  : &ViewState,
 ) -> Result<(), String> {
-  let frozen = active . buffer_census . get (&record . buffer_id)
+  let frozen = active . presentation_buffer (&record . buffer_id)
     . ok_or_else (|| format! (
       "buffer '{}' is absent from the frozen census", record . buffer_id))?;
   if frozen . dirty
@@ -1082,6 +1082,8 @@ fn maintenance_selection_identity_fields (
     atom_field ("candidate-id", active . candidate . as_ref ()
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     atom_field ("phase", active . phase . label ()),
+    list_field ("presentation-buffer-ids",
+      &active . presentation_buffer_ids ()),
   ]
 }
 
@@ -1460,6 +1462,11 @@ fn active_status_sexp (
     list_field ("requested-ids", &active . targets . ids),
     pull_repositories_field (&active . targets . pull_repositories),
     list_field ("registered-buffer-ids", &active . registered_buffer_ids),
+    list_field ("presentation-buffer-ids",
+      &active . presentation_buffer_ids ()),
+    list_field ("pending-view-uris",
+      &active . pending_view_enrollments . keys () . cloned ()
+        . collect::<Vec<_>> ()),
     list_field ("dirty-buffer-ids", &active . dirty_buffer_ids),
     list_field (
       "undo-required-buffer-ids", &active . undo_required_buffer_ids),
@@ -1746,7 +1753,7 @@ pub(crate) fn prepare_server_settlement_effect (
       "buffer '{}' supplied application authority for a non-application settlement",
       record . buffer_id)); }
   if let Some (state) = state {
-    let frozen = active . buffer_census . get (&record . buffer_id)
+    let frozen = active . presentation_buffer (&record . buffer_id)
       . ok_or_else (|| "settlement is absent from the frozen census"
         . to_string ())?;
     if state . client_buffer_id . as_deref () != Some (&record . buffer_id)

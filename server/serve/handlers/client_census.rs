@@ -44,6 +44,7 @@ use std::net::TcpStream;
 pub fn handle_client_census_request (
   reader       : &mut BufReader<TcpStream>,
   stream       : &mut TcpStream,
+  request      : &str,
   env          : &SkgEnv,
   interactive  : &mut InteractiveSession,
   writes_allowed : bool,
@@ -53,6 +54,7 @@ pub fn handle_client_census_request (
     let payload = read_length_prefixed_content (reader)
       . map_err (|error| format! ("could not read client census: {}", error))?;
     let descriptors = parse_descriptors (&payload)?;
+    let requested_epoch = requested_maintenance_epoch (request)?;
     let live_buffer_ids : BTreeSet<String> = descriptors . iter ()
       . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
     let current_generation = env . in_rust_graph . load_full ()
@@ -65,6 +67,10 @@ pub fn handle_client_census_request (
     let mut stale : Vec<String> = Vec::new ();
     let mut presentation_stale : Vec<String> = Vec::new ();
     let mut census_applications = Vec::new ();
+    let mut enrollment_records : Vec<_> = descriptors . iter ()
+      . filter (|descriptor| descriptor . view_uri . is_none ())
+      . map (CensusDescriptor::frozen_record)
+      . collect::<Result<_, _>> ()?;
     interactive . pending_census_texts . clear ();
     interactive . live_census = descriptors . iter () . map (|descriptor|
       (descriptor . buffer_id . clone (), descriptor . clone ())) . collect ();
@@ -83,6 +89,7 @@ pub fn handle_client_census_request (
           state, &descriptor, &descriptor_kind) =>
         {
           state . client_buffer_id = Some (descriptor . buffer_id . clone ());
+          enrollment_records . push (descriptor . frozen_record ()?);
         }
         Some (_) if census_application . is_some () => {
           census_applications . push ((
@@ -92,6 +99,7 @@ pub fn handle_client_census_request (
             state, &descriptor, &descriptor_kind) =>
         {
           state . client_buffer_id = Some (descriptor . buffer_id . clone ());
+          enrollment_records . push (descriptor . frozen_record ()?);
           presentation_stale . push (uri . repr_in_client ());
         }
         Some (_) => stale . push (descriptor . buffer_id . clone ()),
@@ -110,6 +118,10 @@ pub fn handle_client_census_request (
     for uri in absent_server_views {
       interactive . views . open_views . unregister_view (&uri); }
 
+    runtime . transition_maintenance (|coordinator|
+      coordinator . enroll_presentation_census (
+        enrollment_records . clone (), requested_epoch)
+        . map (|_| ( )))?;
     reconcile_maintenance_census (runtime, interactive, &live_buffer_ids)?;
     reconcile_census_applications (
       runtime, interactive, &census_applications)?;
@@ -185,7 +197,7 @@ fn census_application_ack (
     return Err (format! (
       "buffer '{}' has application debt without a staged offer",
       descriptor . buffer_id)); };
-  let Some (frozen) = active . buffer_census . get (&descriptor . buffer_id)
+  let Some (frozen) = active . presentation_buffer (&descriptor . buffer_id)
     else {
       return Err (format! (
         "buffer '{}' application debt is absent from the frozen census",
@@ -308,6 +320,7 @@ fn reconcile_census_applications (
 pub fn handle_client_census_texts_request (
   reader       : &mut BufReader<TcpStream>,
   stream       : &mut TcpStream,
+  request      : &str,
   env          : &SkgEnv,
   interactive  : &mut InteractiveSession,
   writes_allowed : bool,
@@ -317,6 +330,7 @@ pub fn handle_client_census_texts_request (
     let payload = read_length_prefixed_content (reader)
       . map_err (|error| format! ("could not read census texts: {}", error))?;
     let records = parse_text_records (&payload)?;
+    let requested_epoch = requested_maintenance_epoch (request)?;
     let mut restored : Vec<String> = Vec::new ();
     let mut stale : Vec<String> = Vec::new ();
     let mut restored_descriptors = Vec::new ();
@@ -380,6 +394,13 @@ pub fn handle_client_census_texts_request (
     stale . extend (
       interactive . pending_census_texts . keys () . cloned ());
     interactive . pending_census_texts . clear ();
+    let enrollment_records : Vec<_> = restored_descriptors . iter ()
+      . map (CensusDescriptor::frozen_record)
+      . collect::<Result<_, _>> ()?;
+    runtime . transition_maintenance (|coordinator|
+      coordinator . enroll_presentation_census (
+        enrollment_records . clone (), requested_epoch)
+        . map (|_| ( )))?;
     let maintenance = runtime . maintenance . lock ()
       . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
       . clone ();
@@ -465,6 +486,15 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
     });
   }
   Ok (result)
+}
+
+fn requested_maintenance_epoch (request : &str) -> Result<Option<u64>, String> {
+  let parsed = sexp::parse (request)
+    . map_err (|error| format! ("invalid census request: {}", error))?;
+  let Ok (value) = extract_v_from_kv_pair_in_sexp (
+    &parsed, "maintenance-epoch") else { return Ok (None); };
+  value . parse::<u64> () . map (Some)
+    . map_err (|_| "client census maintenance epoch must be unsigned" . into ())
 }
 
 fn parse_text_records (

@@ -21,6 +21,7 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats,
   fetch_all_graphnodestats_with_source_set};
 use crate::runtime::RuntimeQueryLease;
+use crate::runtime::ServerRuntime;
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
@@ -144,6 +145,7 @@ pub fn handle_text_search_request (
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
   active            : &ActiveSourceSet,
+  runtime           : &ServerRuntime,
 ) {
   let env = &lease . snapshot . env;
   let parsed_sexp : Result < Sexp, String > =
@@ -303,6 +305,13 @@ pub fn handle_text_search_request (
                 SearchUglinessChoice::Include => "include",
                 SearchUglinessChoice::Exclude => "exclude",
               }))));
+          let state = views_state . open_views . views . get (&uri)
+            . expect ("registered search view exists");
+          if let Err (error) = runtime . enroll_maintenance_view (&uri, state) {
+            views_state . open_views . unregister_view (&uri);
+            let _ = send_response_with_length_prefix (
+              stream, &tag_text_response (TcpToClient::Error, &error));
+            return; }
           let response = add_view_authority_to_response (
             &mk_search_results_sexp (&rendered, &warnings, &uri),
             views_state . open_views . views . get (&uri)

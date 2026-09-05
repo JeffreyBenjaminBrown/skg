@@ -174,7 +174,9 @@
         (let ((epoch (cdr (assq 'epoch skg--maintenance-state))))
           (unless (natnump epoch)
             (error "Active maintenance has no valid epoch"))
-          (skg-lock-buffer-for-maintenance buffer epoch)))
+          (skg-lock-buffer-for-maintenance buffer epoch)
+          (when (fboundp 'skg-maintenance-enroll-new-buffer)
+            (skg-maintenance-enroll-new-buffer id))))
       (when old-origin-id
         (skg--refresh-attached-workflow-count old-origin-id))
       (when origin-record
