@@ -12,6 +12,27 @@ local M = {}
 M.defer = function (callback) vim.schedule(callback) end
 M.origin_operation_handlers = {}
 
+---Register HANDLER for a maintenance origin's post-archive work.
+---HANDLER receives the process-local incident, durable server phase, and
+---parsed response. It returns true when it handles that phase.
+---@param origin string
+---@param handler fun(incident: table, phase: string, response: any): boolean
+function M.register_origin_operation_handler (origin, handler)
+  M.origin_operation_handlers[origin] = handler
+end
+
+---Dispatch the active incident to its origin adapter.
+---@param phase string
+---@param response any
+---@return boolean handled
+function M.dispatch_origin_operation (phase, response)
+  local incident = assert(state.maintenance_client_incident,
+    'Maintenance origin dispatch has no client state')
+  local origin = incident.offer and incident.offer.origin
+  local handler = origin and M.origin_operation_handlers[origin]
+  return handler and handler(incident, phase, response) == true or false
+end
+
 local function sorted_copy (values)
   local result = vim.deepcopy(values or {})
   table.sort(result)
@@ -90,11 +111,13 @@ local function sha256_valid (value)
     and value:match('^[0-9a-f]+$') ~= nil
 end
 
-local function request (name, fields)
+local function request (name, fields, raw_fields)
   local result = { sexpr.pair(sexpr.symbol('request'), name) }
   for _, entry in ipairs(fields or {}) do
     table.insert(result,
       sexpr.pair(sexpr.symbol(entry[1]), entry[2])) end
+  for _, entry in ipairs(raw_fields or {}) do
+    table.insert(result, entry) end
   return sexpr.to_string(result) .. '\n'
 end
 
@@ -242,9 +265,7 @@ function M.handle_selection_response (_payload_text, response)
     M.install_settlements(payload.field(response, 'view-settlements') or {})
   elseif status == 'archive-ready' then
     incident.phase = 'origin-operation-required'
-    local handler = M.origin_operation_handlers[incident.offer.origin]
-    if handler then submit_later(function () handler(incident) end)
-    else
+    if not M.dispatch_origin_operation('archive-ready', response) then
       vim.notify('Skg maintenance archive is durable; its origin operation '
         .. 'is next')
     end
@@ -280,7 +301,15 @@ function M.run_explicit_origin (incident)
   }), nil, incident.incident_id)
 end
 
-M.origin_operation_handlers['explicit-partial-reload'] = M.run_explicit_origin
+function M.explicit_origin_operation_handler (incident, phase, _response)
+  if phase ~= 'archive-ready' and phase ~= 'final-observation' then
+    return false end
+  submit_later(function () M.run_explicit_origin(incident) end)
+  return true
+end
+
+M.register_origin_operation_handler(
+  'explicit-partial-reload', M.explicit_origin_operation_handler)
 
 function M.send_archive_ready ()
   local incident = assert(state.maintenance_client_incident,
@@ -743,14 +772,15 @@ function M.resume_active (response)
     incident.phase = 'preparing-archive'
     if incident.archive then submit_later(M.send_archive_ready)
     else submit_later(M.publish_initial) end
-  elseif origin == 'explicit-partial-reload' and phase == 'archive-ready' then
-    incident.phase = 'origin-operation-required'
-    submit_later(function () M.run_explicit_origin(incident) end)
-  elseif origin == 'explicit-partial-reload' and phase == 'final-observation' then
-    incident.phase = 'waiting-for-origin-observation'
-    -- Reissue the idempotent trigger so a process-local worker job is restored
-    -- after a reconnect or server restart.
-    submit_later(function () M.run_explicit_origin(incident) end)
+  elseif phase == 'archive-ready' or phase == 'running-external-mutation'
+      or phase == 'final-observation' then
+    incident.phase = phase == 'archive-ready'
+      and 'origin-operation-required' or 'waiting-for-origin-observation'
+    if not M.dispatch_origin_operation(phase, response) then
+      vim.notify('Skg maintenance ' .. incident_id
+        .. ' awaits origin ' .. tostring(origin)
+        .. ' in server phase ' .. phase)
+    end
   elseif phase == 'blocked-invalid-after-mutation'
       or phase == 'blocked-store-health' then
     incident.phase = 'server-blocked'
@@ -838,7 +868,8 @@ function M.publish_initial ()
   end
 end
 
-local function handle_bootstrap (_payload_text, response, terminal_callback)
+local function handle_bootstrap (
+    _payload_text, response, terminal_callback, origin_context)
   local offered_ids = sorted_copy(payload.string_list(
     payload.field(response, 'registered-buffer-ids')))
   local actual_ids = registered_ids()
@@ -852,6 +883,7 @@ local function handle_bootstrap (_payload_text, response, terminal_callback)
       payload.field(response, 'requested-paths')),
     requested_ids = payload.string_list(
       payload.field(response, 'requested-ids')),
+    origin_context = origin_context,
     terminal_callback = terminal_callback,
     terminal_callback_fired = false,
     registered_buffer_ids = offered_ids,
@@ -889,10 +921,16 @@ local function handle_bootstrap (_payload_text, response, terminal_callback)
   M.publish_initial()
 end
 
-function M.begin (origin, candidate_id, paths, ids, terminal_callback)
+---Begin one durable maintenance incident.
+---ORIGIN_CONTEXT is opaque process-local adapter state. ORIGIN_FIELDS are
+---complete s-expression field forms appended to the bootstrap request.
+function M.begin (
+    origin, candidate_id, paths, ids, terminal_callback, origin_context,
+    origin_fields)
   state.register_response_handler('maintenance-offer',
     function (payload_text, response)
-      handle_bootstrap(payload_text, response, terminal_callback) end,
+      handle_bootstrap(
+        payload_text, response, terminal_callback, origin_context) end,
     true)
   local fields = {
     { 'origin', origin },
@@ -900,7 +938,7 @@ function M.begin (origin, candidate_id, paths, ids, terminal_callback)
   }
   if paths and #paths > 0 then table.insert(fields, { 'paths', paths }) end
   if ids and #ids > 0 then table.insert(fields, { 'ids', ids }) end
-  client.submit_request(request('begin maintenance', fields))
+  client.submit_request(request('begin maintenance', fields, origin_fields))
 end
 
 local function report_explicit_outcomes (response)

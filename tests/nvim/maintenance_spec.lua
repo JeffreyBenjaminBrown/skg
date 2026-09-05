@@ -118,6 +118,73 @@ describe('skg Neovim maintenance handshake', function ()
       state.maintenance_client_incident.phase)
   end)
 
+  it('carries opaque origin context and structured bootstrap fields',
+     function ()
+    local client_module = require('skg.client')
+    local context = { local_only = '/client/repository' }
+    local key = string.rep('a', 64)
+    local wire
+    client_module.submit_request = function (request_wire)
+      wire = request_wire
+    end
+    maintenance.begin('pull', nil, nil, nil, nil, context, {
+      { sexpr.symbol('pull-repositories'), {
+        {
+          sexpr.pair(sexpr.symbol('repository-key'), key),
+          { sexpr.symbol('sources'), { 'one' } },
+        },
+      } },
+    })
+    local parsed = sexpr.read(wire)
+    local repositories = payload.field(parsed, 'pull-repositories')
+    assert.are.equal(key,
+      payload.field_text(repositories[1], 'repository-key'))
+    assert.are.same({ 'one' }, payload.string_list(
+      payload.field(repositories[1], 'sources')))
+    assert.is_nil(wire:find('/client/repository', 1, true))
+
+    local handler = state.request_draft.handlers['maintenance-offer'].handler
+    local real_publish = maintenance.publish_initial
+    maintenance.publish_initial = function () end
+    handler(nil, {
+      f('allocated-incident-id', incident_id), f('maintenance-epoch', 9),
+      f('registered-buffer-ids', {}),
+      f('lock-census-sha256', maintenance.lock_census_sha256({})),
+      f('requested-paths', {}), f('requested-ids', {}),
+      f('origin', 'pull'), f('started-at-utc', 'now'),
+      f('archive-directory-name', 'archive'), f('source-set', 'all'),
+      f('g0-graph-generation', 1), f('g0-manifest-revision', 2),
+    })
+    maintenance.publish_initial = real_publish
+    assert.are.equal(context,
+      state.maintenance_client_incident.origin_context)
+  end)
+
+  it('dispatches reconnect phases through the registered origin adapter',
+     function ()
+    local seen
+    maintenance.register_origin_operation_handler('test-origin',
+      function (incident, phase, response)
+        seen = { incident = incident, phase = phase, response = response }
+        return true
+      end)
+    local response = {
+      f('status', 'active'), f('active-incident-id', incident_id),
+      f('maintenance-epoch', 9), f('origin', 'test-origin'),
+      f('requested-paths', {}), f('requested-ids', {}),
+      f('phase', 'running-external-mutation'),
+    }
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9,
+      offer = { origin = 'test-origin' },
+    }
+    maintenance.resume_active(response)
+    assert.are.equal(state.maintenance_client_incident, seen.incident)
+    assert.are.equal('running-external-mutation', seen.phase)
+    assert.are.equal(response, seen.response)
+    maintenance.origin_operation_handlers['test-origin'] = nil
+  end)
+
   it('dispatches an exact asynchronous candidate selection', function ()
     state.maintenance_client_incident = {
       incident_id = incident_id, epoch = 9,
