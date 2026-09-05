@@ -1019,3 +1019,50 @@ what's imperfect about what's done; choices determining the future.
   one-minute sample.  =skg-observer= used about one CPU-second for that sweep
   and slept in =futex_do_wait= afterward instead of consuming a core.  The
   verification development stack and TypeDB were then shut down cleanly.
+
+* first search no longer waits behind hidden quadratic startup work
+
+** reproduction and cause
+- Jeff's exact workflow explained why =skg-client-init= appeared to finish
+  quickly while the first search stalled.  On the captured run, context/index
+  initialization ended and Rust logged =Server ready= at 17:52:31.726, but it
+  did not accept the queued interactive connection until 17:53:40.583: a
+  hidden 68.9-second gap.  Once accepted, verification, census, three already
+  queued herald requests and the search reached Rust together.  The search
+  itself produced phase-one results in about 15 ms and enrichment in another
+  42 ms.
+- Main retired the initialization busy-signal and logged readiness before
+  =serve= constructed =ServerRuntime=.  TCP connection establishment could
+  therefore succeed into the listener backlog even though no request loop was
+  accepting.  Emacs' bounded herald wait returned a prompt confirmation, and
+  the first subsequent request simply remained queued until runtime setup
+  finished.
+- Runtime setup seeded the exact Git presentation signature.  The largest
+  configured source is itself a repository with 29,972 index entries.  The
+  signature code first collected those paths, then rescanned the complete Git
+  index separately for every path to recover its stages: almost 900 million
+  entry comparisons.  This quadratic pass accounts for the otherwise silent
+  CPU-bound interval.  Later searches were fast because it runs only while
+  seeding the process-retained signature.
+
+** repair
+- Git index entries are now grouped by scoped path in one pass and removed
+  from that map as the stable path-order traversal hashes them.  HEAD/index
+  identity and multi-stage ordering are unchanged, but the work is
+  =O(n log n)= rather than =O(n^2)=.
+- Runtime construction, recovery-journal loading, Git signature seeding,
+  watcher installation and background-service startup now all occur before
+  main retires the busy-signal and announces readiness.  =serve= receives the
+  prepared process runtime and only owns the accept loop.  Thus a future slow
+  or failed setup step cannot again produce a false ready/connected interval.
+
+** validation
+- On the same real corpus, the complete post-context runtime setup now took
+  about 0.234 seconds before the truthful =Server ready= log, versus the old
+  hidden 68.9 seconds.
+- A headless Emacs probe reproduced the documented setup workflow against the
+  real server: =skg-client-init= returned in 0.344 seconds and the first search
+  buffer appeared 0.073 seconds after submission.
+- The Git presentation-signature regression passes, both maintained
+  first-search/title-visit integrations pass under Emacs and Neovim, and
+  =cargo check --all-targets= plus =git diff --check= are clean.
