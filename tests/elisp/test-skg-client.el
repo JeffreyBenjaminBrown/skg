@@ -37,4 +37,19 @@
                  "connection refused"
                  (error-message-string err)))))))
 
+(ert-deftest test-skg-connection-verify-defers-to-new-connection-handshake ()
+  "A fresh connection owns the handshake; verification does not send another."
+  (let ((skg-rust-tcp-proc nil)
+        registered
+        submitted)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+               (lambda () 'new-process))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (&rest _args) (setq registered t)))
+              ((symbol-function 'skg-submit-request)
+               (lambda (&rest _args) (setq submitted t))))
+      (should-not (skg-connection-verify))
+      (should-not registered)
+      (should-not submitted))))
+
 (provide 'test-skg-client)

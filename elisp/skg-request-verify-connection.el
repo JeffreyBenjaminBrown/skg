@@ -209,13 +209,11 @@ calls `(skg-tcp-connect-to-rust)`
   (let* ((already-connected (and skg-rust-tcp-proc
                                  (process-live-p skg-rust-tcp-proc)))
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (unless already-connected
-      ;; `skg-tcp-connect-to-rust' installed the mandatory handshake.
-      (cl-return-from skg-connection-verify nil))
-    (skg-register-response-handler
-     'verify-connection
-     #'skg--install-connection-verification
-     t)
-    (skg-submit-request tcp-proc (skg--connection-handshake-request))))
+    (when already-connected
+      (skg-register-response-handler
+       'verify-connection
+       #'skg--install-connection-verification
+       t)
+      (skg-submit-request tcp-proc (skg--connection-handshake-request)))))
 
 (provide 'skg-request-verify-connection)
