@@ -936,3 +936,42 @@ what's imperfect about what's done; choices determining the future.
   active-mode check; merely having the package installed has no effect.
 - No choice remains from late-view enrollment; its two-stage identity and
   monotonic presentation-census rule are the user-approved design.
+
+* post-plan history context and code isolation
+
+** commit context
+- Rewrote the messages of all 147 commits after
+  =547cfaca628dc2a2a84d59adc962f08fb747ad02=.  The first now begins with
+  =TODO/partial-reload-and-magit/6_bugs.org |=; the other 146 begin with
+  =TODO/partial-reload-and-magit/7_plan.org |=.  Keeping each former subject
+  after the separator preserves useful one-line history as well as plan
+  provenance.
+- Preserved the old tip at
+  =backup/partial-reload-and-magit-before-plan-prefixes=.  An ordinal audit
+  compared all 147 old/new pairs: every tree and every non-parent commit header
+  is identical, and removing the new prefix recovers each former message.
+  The two tips have no content diff.
+
+** server code isolation
+- Moved maintenance observation, candidate/archive retention, durable
+  coordinator transitions and presentation observation from
+  =server/runtime/mod.rs= into =server/runtime/maintenance.rs=.  The general
+  runtime module fell from 486 to 221 lines and remains the small owner of
+  query leases, selected-store publication and connection exclusivity.
+- Moved maintenance-time connection gating, idle server pushes, batch
+  reconciliation and disconnect cleanup from =server/serve.rs= into
+  =server/serve/maintenance_connection.rs=.  Moved verification/census
+  handshake construction into the already feature-specific
+  =server/serve/handlers/client_census.rs=, and maintenance endpoint dispatch
+  plus save-refusal rendering into =maintenance_protocol.rs=.
+- As a result, 15,190 of the branch's 17,534 added server lines (86.6%) live in
+  explicitly skippable maintenance, census, observation or collateral modules.
+  The central =server/serve.rs= is now only 97 net lines larger than at the
+  pushed base.  The remaining additions in preexisting general modules own
+  genuinely general contracts: save fencing/publication, retained view state,
+  source configuration and request framing.
+- =cargo check --all-targets= and the moved focused tests pass.  With the
+  required TypeDB process running, =bash bash/all-tests.sh --no-sound= passed
+  all Emacs and Neovim unit suites, all 702 nextest cases, doctests and all 72
+  live integrations in 236 seconds.  The temporary TypeDB process was then
+  stopped.
