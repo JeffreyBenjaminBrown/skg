@@ -101,4 +101,33 @@ describe('skg configured raw-file fence', function ()
     assert.is_false(ok)
     assert.is_truthy(tostring(reason):find('dirty-for-raw', 1, true))
   end)
+
+  it('keeps a pre-inventory read baseline during later enrollment', function ()
+    local old_sources = config.source_inventory
+    config.source_inventory = {}
+    write_bytes(path, 'pid: read\n')
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_name(buf, path)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { 'pid: read' })
+    vim.bo[buf].endofline = true
+    vim.bo[buf].modified = false
+    assert.is_nil(raw_file.enroll(buf, true))
+    write_bytes(path, 'pid: late\n')
+    config.source_inventory = old_sources
+    assert.is_truthy(raw_file.enroll(buf, false))
+    raw_file.queue_observation = function () end
+    local ok, reason = pcall(raw_file.guard_before_save, buf)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(reason):find('disk changed', 1, true))
+  end)
+
+  it('marks a clean raw buffer stale when maintenance unlocks it', function ()
+    local buf = open_raw('pid: old\n')
+    registry.lock_for_maintenance(buf, 12)
+    write_bytes(path, 'pid: new\n')
+    registry.unlock_after_maintenance(buf, 12)
+    assert.is_true(vim.b[buf].skg_raw_externally_stale)
+    assert.is_truthy(table.concat(registry.status_messages(buf), '; ')
+      :find('changed on disk', 1, true))
+  end)
 end)

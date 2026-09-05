@@ -190,6 +190,58 @@
       (when (buffer-live-p buffer) (kill-buffer buffer))
       (delete-directory directory t))))
 
+(ert-deftest test-skg-raw-file-late-enrollment-keeps-its-read-baseline ()
+  (let* ((directory (make-temp-file "skg-raw-late-" t))
+         (path (expand-file-name "node.skg" directory))
+         (buffer (generate-new-buffer " *skg raw late*"))
+         (skg--buffer-registry (make-hash-table :test #'equal)))
+    (unwind-protect
+        (progn
+          (with-temp-file path (insert "pid: read\n"))
+          (with-current-buffer buffer
+            (setq buffer-file-name path)
+            (insert "pid: read\n")
+            (set-buffer-modified-p nil)
+            ;; This is the provisional read fact captured before the source
+            ;; inventory proves that the path belongs to Skg.
+            (skg-record-raw-file-disk-state buffer))
+          (with-temp-file path (insert "pid: late\n"))
+          (with-current-buffer buffer
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t))
+                      ((symbol-function 'skg--queue-raw-file-observation)
+                       #'ignore))
+              (skg-register-raw-file-buffer-if-configured buffer)
+              (should-error (skg--guard-raw-skg-save) :type 'user-error))))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory directory t))))
+
+(ert-deftest test-skg-raw-file-maintenance-unlock-detects-external-change ()
+  (let* ((directory (make-temp-file "skg-raw-unlock-" t))
+         (path (expand-file-name "node.skg" directory))
+         (buffer (generate-new-buffer " *skg raw unlock*"))
+         (skg--buffer-registry (make-hash-table :test #'equal)))
+    (unwind-protect
+        (progn
+          (with-temp-file path (insert "pid: old\n"))
+          (with-current-buffer buffer
+            (setq buffer-file-name path)
+            (insert "pid: old\n")
+            (set-buffer-modified-p nil)
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t)))
+              (skg-register-raw-file-buffer-if-configured buffer))
+            (skg-lock-buffer-for-maintenance buffer 12))
+          (with-temp-file path (insert "pid: new\n"))
+          (skg-unlock-buffer-after-maintenance buffer 12)
+          (with-current-buffer buffer
+            (should skg--raw-file-externally-stale)
+            (should (member
+                     "This raw .skg file changed on disk; revert or reconcile before saving"
+                     (skg-buffer-status-messages)))))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory directory t))))
+
 (ert-deftest test-skg-search-display-preserves-a-dirty-conventional-namesake ()
   (let* ((name (skg-search-buffer-name "dog"))
          (existing (generate-new-buffer name))

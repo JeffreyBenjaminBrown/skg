@@ -464,6 +464,10 @@
       (when skg--maintenance-lock-overlay
         (delete-overlay skg--maintenance-lock-overlay)
         (setq skg--maintenance-lock-overlay nil))
+      (when (and (eq (skg--buffer-record-kind skg--buffer-record)
+                     'raw-skg-file)
+                 (fboundp 'skg-refresh-raw-file-disk-staleness))
+        (skg-refresh-raw-file-disk-staleness buffer))
       (let ((origin-id
              (and (eq (skg--buffer-record-lifecycle skg--buffer-record)
                       'detached-recovery)
@@ -491,7 +495,10 @@
      (when (skg--buffer-record-presentation-stale skg--buffer-record)
        " presentation-stale")
      (when (skg--buffer-record-search-stale skg--buffer-record)
-       " search-stale"))))
+       " search-stale")
+     (when (and (boundp 'skg--raw-file-externally-stale)
+                skg--raw-file-externally-stale)
+       " external-file-stale"))))
 
 (defun skg-buffer-status-messages ()
   "Return warnings which remain relevant to the current Skg buffer."
@@ -510,7 +517,10 @@
             "This preserved presentation is stale; generated heralds may describe an older graph"
           "This preserved presentation may describe an older graph"))
       (when (skg--buffer-record-search-stale skg--buffer-record)
-        "Search membership and ranking are stale; rerun the search explicitly")))))
+        "Search membership and ranking are stale; rerun the search explicitly")
+      (when (and (boundp 'skg--raw-file-externally-stale)
+                 skg--raw-file-externally-stale)
+        "This raw .skg file changed on disk; revert or reconcile before saving")))))
 
 (defun skg-warn-buffer-status-on-entry ()
   "Repeat persistent maintenance and staleness warnings on buffer entry."

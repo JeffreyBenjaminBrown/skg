@@ -507,6 +507,10 @@ end
 function M.unlock_after_maintenance (buf, epoch)
   if not M.record(buf) or vim.b[buf].skg_maintenance_epoch ~= epoch then
     return end
+  local raw_file = package.loaded['skg.raw_file']
+  if vim.b[buf].skg_buffer_kind == 'raw-skg-file'
+     and raw_file and raw_file.refresh_staleness then
+    raw_file.refresh_staleness(buf) end
   vim.b[buf].skg_maintenance_epoch = nil
   if vim.b[buf].skg_lifecycle == 'detached-recovery'
      and vim.b[buf].skg_origin_buffer_id then
@@ -684,6 +688,9 @@ function M.status_messages (buf)
   if record.search_stale then
     table.insert(messages,
       'Search membership and ranking are stale; rerun the search explicitly') end
+  if vim.b[buf].skg_raw_externally_stale == true then
+    table.insert(messages,
+      'This raw .skg file changed on disk; revert or reconcile before saving') end
   return messages
 end
 

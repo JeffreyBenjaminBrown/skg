@@ -24,13 +24,20 @@ local function current_disk_state (path)
   local descriptor, open_error = vim.uv.fs_open(path, 'r', 438)
   if not descriptor then
     return { kind = 'unsafe', reason = open_error or 'could not open path' } end
-  local bytes, read_error = vim.uv.fs_read(descriptor, stat.size, 0)
+  local chunks, offset, read_error = {}, 0, nil
+  while true do
+    local chunk, error_text = vim.uv.fs_read(descriptor, 65536, offset)
+    if not chunk then read_error = error_text or 'could not read path'; break end
+    if chunk == '' then break end
+    table.insert(chunks, chunk)
+    offset = offset + #chunk
+  end
   local _, close_error = vim.uv.fs_close(descriptor)
-  if not bytes then
-    return { kind = 'unsafe', reason = read_error or 'could not read path' } end
+  if read_error then
+    return { kind = 'unsafe', reason = read_error } end
   if close_error then
     return { kind = 'unsafe', reason = close_error } end
-  return { kind = 'regular', digest = vim.fn.sha256(bytes) }
+  return { kind = 'regular', digest = vim.fn.sha256(table.concat(chunks)) }
 end
 
 local function recorded_disk_state (buf)
@@ -76,7 +83,10 @@ end
 
 function M.enroll (buf, refreshed_from_disk)
   local record = registry.register_raw_file_if_configured(buf)
-  if record and (refreshed_from_disk or not recorded_disk_state(buf)) then
+  -- BufReadPost can precede the verified server source inventory.  Capture
+  -- that actual read even before registration so a later enrollment cannot
+  -- bless an intervening external rewrite.
+  if refreshed_from_disk or (record and not recorded_disk_state(buf)) then
     M.record_disk_state(buf) end
   return record
 end
@@ -94,6 +104,16 @@ function M.queue_observation ()
   end, true)
   client.submit_request(
     '((request . "reload paths") (full-sweep . "true"))\n')
+end
+
+function M.refresh_staleness (buf)
+  local record = registry.record(buf)
+  if not record or record.kind ~= 'raw-skg-file' then return false end
+  local stale = not same_state(
+    recorded_disk_state(buf),
+    current_disk_state(vim.api.nvim_buf_get_name(buf)))
+  vim.b[buf].skg_raw_externally_stale = stale
+  return stale
 end
 
 local function queue_observation_safely ()

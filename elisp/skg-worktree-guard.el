@@ -67,6 +67,19 @@ Every other filesystem type or inspection failure returns (unsafe REASON)."
     ('unsafe (format "unsafe state (%s)" (or (cadr state) "unknown")))
     (_ "no recorded state")))
 
+(defun skg-refresh-raw-file-disk-staleness (&optional buffer)
+  "Refresh and return BUFFER's external raw-file staleness flag."
+  (with-current-buffer (or buffer (current-buffer))
+    (when (and skg--buffer-record
+               (eq (skg--buffer-record-kind skg--buffer-record)
+                   'raw-skg-file))
+      (let ((actual (skg--raw-file-current-disk-state buffer-file-name)))
+        (setq skg--raw-file-externally-stale
+              (not (and (skg--raw-file-safe-disk-state-p
+                         skg--raw-file-recorded-disk-state)
+                        (skg--raw-file-safe-disk-state-p actual)
+                        (equal skg--raw-file-recorded-disk-state actual))))))))
+
 (defun skg--queue-raw-file-observation ()
   "Queue a nonmutating exact sweep after a raw-file event."
   (if (fboundp 'skg--request-reload-full-sweep)

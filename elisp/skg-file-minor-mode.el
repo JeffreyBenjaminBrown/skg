@@ -25,6 +25,11 @@ and .skg filenames.  The server-owned watcher observes a plain save."
         (add-hook 'before-save-hook #'skg--guard-raw-skg-save nil t)
         (add-hook 'after-save-hook #'skg--raw-skg-after-save nil t)
         (add-hook 'after-revert-hook #'skg-record-raw-file-disk-state nil t)
+        ;; The verified server inventory can arrive after find-file-hook.
+        ;; Preserve what this buffer actually read so later enrollment cannot
+        ;; bless an intervening external rewrite as its before state.
+        (unless skg--raw-file-recorded-disk-state
+          (skg-record-raw-file-disk-state (current-buffer)))
         (skg-register-raw-file-buffer-if-configured (current-buffer)))
     (remove-hook 'before-save-hook #'skg--guard-raw-skg-save t)
     (remove-hook 'after-save-hook #'skg--raw-skg-after-save t)
