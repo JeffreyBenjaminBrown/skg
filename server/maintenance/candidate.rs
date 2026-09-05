@@ -124,7 +124,28 @@ pub fn observe_complete_disk (
   selected          : &SelectedStoreState,
   covered_sequence  : ObservationSequence,
 ) -> DiskObservation {
-  match observe_complete_disk_inner (config, selected, covered_sequence) {
+  match observe_complete_disk_inner (
+      config, selected, covered_sequence, false)
+  {
+    Ok (result) => result,
+    Err (error) => DiskObservation::Invalid {
+      details: vec![error],
+    },
+  }
+}
+
+/// Observe the complete disk for an already-authorized maintenance origin.
+/// Unlike unsolicited observation, exact byte equality and semantic equality
+/// still return a candidate: the incident must finalize its archive and reach
+/// one durable terminal outcome even when the external operation was a no-op.
+pub fn observe_complete_maintenance_disk (
+  config            : &SkgConfig,
+  selected          : &SelectedStoreState,
+  covered_sequence  : ObservationSequence,
+) -> DiskObservation {
+  match observe_complete_disk_inner (
+      config, selected, covered_sequence, true)
+  {
     Ok (result) => result,
     Err (error) => DiskObservation::Invalid {
       details: vec![error],
@@ -136,9 +157,15 @@ fn observe_complete_disk_inner (
   config            : &SkgConfig,
   selected          : &SelectedStoreState,
   covered_sequence  : ObservationSequence,
+  retain_noop_candidate : bool,
 ) -> Result<DiskObservation, String> {
   let captured = capture_selected_corpus (config)?;
   if captured . manifest == selected . manifest {
+    if retain_noop_candidate {
+      return Ok (DiskObservation::Valid (complete_candidate (
+        config, selected, covered_sequence,
+        captured . manifest, captured . selected_bytes,
+        selected . graph . clone (), Vec::new ()))); }
     return Ok (DiskObservation::ByteEquivalent); }
 
   let (nodes, violations) = fold_grouped_sections (
@@ -166,10 +193,35 @@ fn observe_complete_disk_inner (
   let before_nodes = nodes_by_pid (nodecompletes_from_graph (&selected . graph));
   let after_nodes = nodes_by_pid (nodes);
   if before_nodes == after_nodes {
+    if retain_noop_candidate {
+      return Ok (DiskObservation::Valid (complete_candidate (
+        config, selected, covered_sequence,
+        captured . manifest, captured . selected_bytes,
+        Arc::new (graph), violations . into_iter () . map (|(pid, warning)|
+          format! ("{}: {}", pid, warning)) . collect ()))); }
     return Ok (DiskObservation::SemanticallyEqual {
       manifest: captured . manifest,
       selected_bytes: captured . selected_bytes,
     }); }
+
+  Ok (DiskObservation::Valid (complete_candidate (
+    config, selected, covered_sequence,
+    captured . manifest, captured . selected_bytes, Arc::new (graph),
+    violations . into_iter () . map (|(pid, warning)|
+      format! ("{}: {}", pid, warning)) . collect ())))
+}
+
+fn complete_candidate (
+  config           : &SkgConfig,
+  selected         : &SelectedStoreState,
+  covered_sequence : ObservationSequence,
+  manifest         : SelectedPathManifest,
+  selected_bytes   : BTreeMap<PathBuf, Vec<u8>>,
+  graph            : Arc<InRustGraph>,
+  warnings         : Vec<String>,
+) -> Arc<ObservedDiskCandidate> {
+  let before_nodes = nodes_by_pid (nodecompletes_from_graph (&selected . graph));
+  let after_nodes = nodes_by_pid (nodecompletes_from_graph (&graph));
 
   let changes = classify_changes (&before_nodes, &after_nodes);
   let changed_primary_ids : Vec<String> = changes . all () . into_iter ()
@@ -193,23 +245,22 @@ fn observe_complete_disk_inner (
     covered_sequence,
     changed_primary_ids,
   };
-  Ok (DiskObservation::Valid (Arc::new (ObservedDiskCandidate {
+  Arc::new (ObservedDiskCandidate {
     summary,
     config_identity: config_identity (config),
     source_catalog_blake3: source_catalog_blake3 (config),
-    manifest: captured . manifest,
+    manifest,
     base_graph: selected . graph . clone (),
-    graph: Arc::new (graph),
+    graph,
     definitions,
     added_primary_ids: changes . added,
     deleted_primary_ids: changes . deleted,
     modified_primary_ids: changes . modified,
     evidence,
-    selected_bytes: captured . selected_bytes,
-    warnings: violations . into_iter () . map (|(pid, warning)|
-      format! ("{}: {}", pid, warning)) . collect (),
+    selected_bytes,
+    warnings,
     disk_fence: CandidateDiskFence::Complete,
-  })))
+  })
 }
 
 /// Observe just the named primary telescopes while retaining every unrelated
@@ -296,7 +347,7 @@ fn observe_targeted_disk_inner (
     // corpus fallback instead of pretending an untouched normalized node is
     // enough to recompute every alias resolution.
     return observe_complete_disk_inner (
-      config, selected, covered_sequence);
+      config, selected, covered_sequence, true);
   }
   let after_values : Vec<NodeComplete> =
     after_nodes . values () . cloned () . collect ();
@@ -759,6 +810,42 @@ mod tests {
       &BTreeSet::from ([ID::from ("A")]));
     let DiskObservation::Valid (reformatted) = reformatted else {
       panic! ("semantic no-op explicit target did not produce a candidate"); };
+    assert! (reformatted . definitions . is_empty ());
+    assert! (reformatted . summary . changed_primary_ids . is_empty ());
+    assert_ne! (reformatted . manifest, selected . manifest);
+  }
+
+  #[test]
+  fn complete_maintenance_observation_retains_exact_and_semantic_noops () {
+    let temporary = tempdir () . unwrap ();
+    let source_path = temporary . path () . join ("owned");
+    fs::create_dir (&source_path) . unwrap ();
+    let a_path = source_path . join ("A.skg");
+    fs::write (&a_path, "pid: A\ntitle: unchanged\n") . unwrap ();
+    let source_name = SourceName::from ("owned");
+    let mut entries = HashMap::new ();
+    entries . insert (source_name . clone (), SkgfileSource {
+      name: source_name, abbreviation: None,
+      path: source_path, user_owns_it: true,
+    });
+    let config = SkgConfig::dummyFromSources (entries);
+    let loaded = read_all_skg_files_with_manifest (&config) . unwrap ();
+    let selected = SelectedStoreState::initial (
+      InRustGraph::from_nodecompletes (&loaded . nodes), loaded . manifest);
+
+    let exact = observe_complete_maintenance_disk (
+      &config, &selected, ObservationSequence::INITIAL);
+    let DiskObservation::Valid (exact) = exact else {
+      panic! ("maintenance byte equality did not produce a candidate"); };
+    assert! (exact . definitions . is_empty ());
+    assert_eq! (exact . manifest, selected . manifest);
+    assert! (matches! (exact . disk_fence, CandidateDiskFence::Complete));
+
+    fs::write (&a_path, "pid: A\n\ntitle: unchanged\n") . unwrap ();
+    let reformatted = observe_complete_maintenance_disk (
+      &config, &selected, ObservationSequence::INITIAL);
+    let DiskObservation::Valid (reformatted) = reformatted else {
+      panic! ("maintenance semantic equality did not produce a candidate"); };
     assert! (reformatted . definitions . is_empty ());
     assert! (reformatted . summary . changed_primary_ids . is_empty ());
     assert_ne! (reformatted . manifest, selected . manifest);
