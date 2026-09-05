@@ -1008,8 +1008,9 @@ COLUMN is a character offset from the line's start; nil means column 0."
 (defun skg--background-collateral-offer-handler (tcp-proc payload)
   "Apply a revision-checked background view offer, then ACK or reject it."
   (let* ((response (read payload))
-         (operation-id (cadr (assoc 'operation-id response)))
-         (uri (cadr (assoc 'view-uri response)))
+         (operation-id
+          (skg--atom-string (cadr (assoc 'operation-id response))))
+         (uri (skg--atom-string (cadr (assoc 'view-uri response))))
          (graph-generation (cadr (assoc 'graph-generation response)))
          (presentation-generation
           (cadr (assoc 'presentation-generation response)))
@@ -1025,15 +1026,20 @@ COLUMN is a character offset from the line's start; nil means column 0."
           (cadr (assoc 'resulting-client-application-token response)))
          (result-revision
           (cadr (assoc 'resulting-server-revision response)))
-         (client-buffer-id (cadr (assoc 'client-buffer-id response)))
+         (client-buffer-id
+          (skg--atom-string (cadr (assoc 'client-buffer-id response))))
          (base-source-set
-          (cadr (assoc 'view-base-source-set response)))
+          (skg--atom-string
+           (cadr (assoc 'view-base-source-set response))))
          (result-source-set
-          (cadr (assoc 'resulting-source-set response)))
+          (skg--atom-string
+           (cadr (assoc 'resulting-source-set response))))
          (content (cadr (assoc 'content response)))
          (needs-authorization
-          (cadr (assoc 'needs-authorization response)))
-         (render-error (cadr (assoc 'render-error response)))
+          (skg--atom-string
+           (cadr (assoc 'needs-authorization response))))
+         (render-error
+          (skg--atom-string (cadr (assoc 'render-error response))))
          (buf (or (skg-find-buffer-by-id client-buffer-id)
                   (and uri (skg-find-buffer-by-uri uri))))
          (applied nil)

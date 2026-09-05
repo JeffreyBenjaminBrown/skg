@@ -273,6 +273,49 @@ headline and not back on the focused headline."
       (kill-buffer saved)
       (kill-buffer later))))
 
+(ert-deftest test-background-offer-normalizes-unquoted-wire-atoms ()
+  "Symbol-shaped wire atoms still match string-valued buffer authority."
+  (let ((buf (generate-new-buffer "*test-background-wire-atoms*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--server-store-state '((graph-generation . 2)))
+        (skg--active-source-set-name "all")
+        acknowledgement)
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "view-uri"
+                      skg--application-token 2)
+          (insert "* (skg (node (id root))) root\n")
+          (skg-register-buffer
+           buf 'content-view :lifecycle 'live-view :disposable nil
+           :view-uri skg-view-uri :last-fetched (buffer-string)
+           :graph-generation 2 :presentation-generation 0
+           :server-revision 1 :application-token 2)
+          (set-buffer-modified-p nil)
+          (cl-letf (((symbol-function 'skg-register-response-handler)
+                     (lambda (&rest _)))
+                    ((symbol-function 'skg-submit-request)
+                     (lambda (_tcp request &rest _)
+                       (setq acknowledgement (read request)))))
+            (skg--background-collateral-offer-handler
+             nil
+             "((operation-id collateral-1) (view-uri view-uri)\
+ (content \"* (skg (node (id root))) updated\\n\")\
+ (warnings ()) (graph-generation 3) (presentation-generation 0)\
+ (viewforest-base-revision 1) (resulting-server-revision 2)\
+ (view-base-graph-generation 2)\
+ (view-base-presentation-generation 0)\
+ (expected-client-application-token 2)\
+ (resulting-client-application-token 3)\
+ (view-base-source-set all) (resulting-source-set all))"))
+          (should (string-match-p "updated" (buffer-string)))
+          (should (= 3 (skg--buffer-record-graph-generation
+                        skg--buffer-record)))
+          (should (equal "true" (cdr (assoc 'applied acknowledgement))))
+          (should (equal "view-uri"
+                         (cdr (assoc 'view-uri acknowledgement)))))
+      (kill-buffer buf))))
+
 (ert-deftest test-save-response-failure-with-errors-and-warnings-shows_both ()
   (let ((buf (generate-new-buffer "*test-save-response-errors-warnings*"))
         (shown nil)
