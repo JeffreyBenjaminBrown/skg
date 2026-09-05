@@ -1269,3 +1269,34 @@ what's imperfect about what's done; choices determining the future.
   verification, one census and one herald request.  It completed with
   =skg ready on port 1731 -- 24 herald rules loaded= and no warning or protocol
   error.  The maintenance journal remained idle.  No code change was needed.
+
+* early connections once again report that the server is initializing
+
+** diagnosis and repair
+- The server's exceptional =busy-initializing= signal and useful status text
+  had remained intact.  Its Emacs handler, however, reset handshake state to
+  nil.  The new synchronous initialization barrier consequently kept waiting;
+  when the server later closed its temporary initialization socket, the TCP
+  sentinel replaced the friendly status with a generic long-form connection
+  failure.
+- Busy initialization is now an explicit handshake outcome with its own saved
+  server message.  =skg-client-init= returns that short message without
+  signaling an error or attempting the ordinary herald request.  Closure of
+  the temporary socket preserves the outcome, and the next user attempt
+  discards that socket and opens a fresh one.
+- The TCP sentinel now also ignores events from an obsolete socket after a
+  replacement connection has begun.  Thus a late close notification cannot
+  erase the new handshake.  The documented busy-signal contract records the
+  restored Emacs behavior.
+
+** live validation
+- Against a deliberately restarted real server, an attempt made immediately
+  after its listener opened returned
+  =Server is initializing, please wait. See .../server-to-user.log for progress.=
+  promptly and without an error/backtrace.  After =Server ready=, the next
+  attempt completed normally with 24 herald rules.
+- A second live test kept the same Emacs process alive across both calls.  Its
+  early call returned the wait message and its later retry connected cleanly,
+  proving that busy-socket retirement and same-session retry compose correctly.
+  All 438 Emacs tests have 435 expected passes and three expected skips for the
+  absent =undo-fu-session=; =git diff --check= is clean.
