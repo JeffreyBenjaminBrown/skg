@@ -236,6 +236,7 @@ impl MaintenanceCoordinator {
       buffer_census,
       targets,
       requested_id_outcomes: Vec::new (),
+      external_mutation: None,
       undo_waivers: Default::default (),
       server_evidence: None,
       client_evidence_transfer: None,
@@ -283,6 +284,62 @@ impl MaintenanceCoordinator {
     active . archive_status = ArchiveStatus::Ready { manifest_sha256 };
     active . phase = MaintenancePhase::ArchiveReady;
     Ok (( ))
+  }
+
+  /// Journal the pull point of no return before the client launches Git.
+  /// A lost response is replayable but never grants authority to a different
+  /// origin or to an incident whose archive is not already durable.
+  pub fn authorize_external_mutation (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::Pull {
+      return Err ("external mutation authorization currently belongs only to pull"
+        . into ()); }
+    if !matches! (active . archive_status, ArchiveStatus::Ready { .. }) {
+      return Err ("external mutation requires an acknowledged initial archive"
+        . into ()); }
+    if active . phase == MaintenancePhase::RunningExternalMutation {
+      return Ok (false); }
+    if active . phase != MaintenancePhase::ArchiveReady
+    || active . candidate . is_some ()
+    || active . external_mutation . is_some ()
+    {
+      return Err (format! (
+        "external mutation authorization is invalid during {:?}",
+        active . phase)); }
+    active . phase = MaintenancePhase::RunningExternalMutation;
+    Ok (true)
+  }
+
+  /// Record how the client-owned Git chain ended before observing actual disk.
+  /// Exit status is diagnostic only: every outcome advances to the same exact
+  /// final observation because a failed or lost child may still have written.
+  pub fn external_mutation_finished (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    record      : ExternalMutationRecord,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::Pull {
+      return Err ("external mutation completion currently belongs only to pull"
+        . into ()); }
+    if active . phase == MaintenancePhase::FinalObservation {
+      if active . external_mutation . as_ref () == Some (&record) {
+        return Ok (false); }
+      return Err ("external mutation completion changed its durable outcome"
+        . into ());
+    }
+    if active . phase != MaintenancePhase::RunningExternalMutation {
+      return Err (format! (
+        "external mutation completion is invalid during {:?}",
+        active . phase)); }
+    active . external_mutation = Some (record);
+    active . phase = MaintenancePhase::FinalObservation;
+    Ok (true)
   }
 
   /// Begin the server-owned observation for an archive-ready explicit reload.
@@ -1235,6 +1292,36 @@ mod tests {
     assert_eq! (recorded . phase, MaintenancePhase::ArchiveReady);
     assert_eq! (recorded . candidate, Some (observed));
     assert_eq! (recorded . requested_id_outcomes, outcomes);
+  }
+
+  #[test]
+  fn pull_journals_authorization_and_every_exit_before_final_observation () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (MaintenanceOrigin::Pull, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    assert! (coordinator . authorize_external_mutation (
+      &active . incident_id, active . epoch) . unwrap ());
+    assert! (!coordinator . authorize_external_mutation (
+      &active . incident_id, active . epoch) . unwrap ());
+    let record = ExternalMutationRecord {
+      outcome: ExternalMutationOutcome::Failed,
+      details: vec!["repo-a exited 1" . into ()],
+    };
+    assert! (coordinator . external_mutation_finished (
+      &active . incident_id, active . epoch, record . clone ()) . unwrap ());
+    assert! (!coordinator . external_mutation_finished (
+      &active . incident_id, active . epoch, record . clone ()) . unwrap ());
+    let changed = ExternalMutationRecord {
+      outcome: ExternalMutationOutcome::Completed,
+      details: Vec::new (),
+    };
+    assert! (coordinator . external_mutation_finished (
+      &active . incident_id, active . epoch, changed) . is_err ());
+    let CoordinatorState::Active (retained) = &coordinator . state else {
+      panic! ("pull incident stopped being active"); };
+    assert_eq! (retained . phase, MaintenancePhase::FinalObservation);
+    assert_eq! (retained . external_mutation, Some (record));
   }
 
   #[test]

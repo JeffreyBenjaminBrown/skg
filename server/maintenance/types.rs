@@ -114,6 +114,40 @@ impl MaintenanceOrigin {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+pub enum ExternalMutationOutcome {
+  Completed,
+  Failed,
+  Indeterminate,
+}
+
+impl ExternalMutationOutcome {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::Completed => "completed",
+      Self::Failed => "failed",
+      Self::Indeterminate => "indeterminate",
+    }
+  }
+
+  pub fn parse (value : &str) -> Result<Self, String> {
+    match value {
+      "completed" => Ok (Self::Completed),
+      "failed" => Ok (Self::Failed),
+      "indeterminate" => Ok (Self::Indeterminate),
+      other => Err (format! (
+        "unsupported external mutation outcome '{}'", other)),
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ExternalMutationRecord {
+  pub outcome : ExternalMutationOutcome,
+  pub details : Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum MaintenancePhase {
   PreparingArchive,
   AwaitingArchiveWaiver,
@@ -524,6 +558,8 @@ pub struct ActiveMaintenance {
   pub targets           : MaintenanceTargets,
   #[serde(default)]
   pub requested_id_outcomes : Vec<MaintenanceIdOutcome>,
+  #[serde(default)]
+  pub external_mutation : Option<ExternalMutationRecord>,
   #[serde(default)]
   pub undo_waivers      : BTreeMap<String, String>,
   #[serde(default)]
