@@ -263,6 +263,10 @@ impl CollateralScheduler {
     self . presentation_generation
   }
 
+  pub fn presentation_signature_hex (&self) -> Option<String> {
+    self . presentation_signature . map (PresentationSignature::to_hex)
+  }
+
   /// Observe HEAD/index independently of worktree selection. A changed
   /// signature rerenders every view only while diff mode is enabled.
   pub fn observe_presentation (

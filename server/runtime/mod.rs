@@ -267,6 +267,22 @@ impl ServerRuntime {
     Ok ((changed, diff_mode_enabled))
   }
 
+  /// Perform an exact Git observation and return the process-retained
+  /// generation/signature pair established by it.  Maintenance journals this
+  /// beside the candidate observation sequence at the G1 presentation fence.
+  pub fn exact_git_presentation_identity (&self) -> Result<(u64, String), String> {
+    self . observe_git_presentation ()?;
+    let interactive = self . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    let generation = interactive . collateral_scheduler
+      . presentation_generation ();
+    let signature = interactive . collateral_scheduler
+      . presentation_signature_hex ()
+      . ok_or_else (|| "Git presentation signature is not initialized"
+        . to_string ())?;
+    Ok ((generation, signature))
+  }
+
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
     let protected = {
       let coordinator = self . maintenance . lock () . unwrap ();

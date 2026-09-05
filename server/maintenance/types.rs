@@ -603,6 +603,16 @@ pub struct MaintenanceIdOutcome {
   pub paths        : Vec<String>,
 }
 
+/// The exact Git-presentation boundary paired with the disk observation which
+/// produced G1.  Changes observed after this boundary are ordinary retained
+/// presentation work, not a reason to reopen the semantic incident.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MaintenancePresentationFence {
+  pub candidate_observation_sequence : ObservationSequence,
+  pub signature_blake3                : String,
+  pub presentation_generation         : u64,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ActiveMaintenance {
   pub incident_id       : IncidentId,
@@ -660,6 +670,8 @@ pub struct ActiveMaintenance {
   pub client_evidence_acknowledged : bool,
   #[serde(default)]
   pub selected_store    : Option<SelectedStoreRecord>,
+  #[serde(default)]
+  pub presentation_fence : Option<MaintenancePresentationFence>,
   #[serde(default)]
   pub scalar_release    : Option<ScalarReleaseRecord>,
   #[serde(default)]

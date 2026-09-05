@@ -295,6 +295,7 @@ impl MaintenanceCoordinator {
       client_evidence_transfer: None,
       client_evidence_acknowledged: false,
       selected_store: None,
+      presentation_fence: None,
       scalar_release: None,
       view_settlements: Default::default (),
       blocking_reason: None,
@@ -719,6 +720,50 @@ impl MaintenanceCoordinator {
     active . blocking_reason = None;
     active . phase = MaintenancePhase::Presenting;
     Ok (( ))
+  }
+
+  /// Bind the selected G1 candidate's disk observation to the exact Git
+  /// presentation seen before maintenance view classification/rendering.
+  /// A later Git signature is deliberately not folded into this record: it is
+  /// ordinary retained presentation debt against the already-selected G1.
+  pub fn record_presentation_fence (
+    &mut self,
+    incident_id              : &IncidentId,
+    epoch                    : MaintenanceEpoch,
+    signature_blake3         : String,
+    presentation_generation : u64,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if !matches! (active . phase,
+      MaintenancePhase::Presenting
+      | MaintenancePhase::AwaitingScalarAuthorization
+      | MaintenancePhase::FinalizingArchive)
+    {
+      return Err (format! (
+        "presentation fence is invalid during {:?}", active . phase)); }
+    let candidate = active . candidate . as_ref ()
+      . ok_or_else (|| "presentation fence has no selected candidate"
+        . to_string ())?;
+    if active . selected_store . is_none () {
+      return Err ("presentation fence precedes coherent G1 selection" . into ()); }
+    if signature_blake3 . len () != 64
+    || !signature_blake3 . bytes () . all (|byte| byte . is_ascii_hexdigit ())
+    {
+      return Err ("presentation fence has an invalid BLAKE3 signature" . into ());
+    }
+    let fence = MaintenancePresentationFence {
+      candidate_observation_sequence: candidate . covered_sequence,
+      signature_blake3: signature_blake3 . to_ascii_lowercase (),
+      presentation_generation,
+    };
+    if let Some (existing) = &active . presentation_fence {
+      if existing != &fence {
+        return Err ("incident already records another presentation fence"
+          . into ()); }
+      return Ok (false);
+    }
+    active . presentation_fence = Some (fence);
+    Ok (true)
   }
 
   pub fn replace_full_rebuild_source_set (
@@ -1161,10 +1206,11 @@ impl MaintenanceCoordinator {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if disposition == TerminalDisposition::Completed
     && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
-        || !active . client_evidence_acknowledged)
+        || !active . client_evidence_acknowledged
+        || active . presentation_fence . is_none ())
     {
       return Err (
-        "completed maintenance requires an acknowledged finalized archive"
+        "completed maintenance requires an acknowledged finalized archive and presentation fence"
           . into ()); }
     let manifest_sha256 = match &active . archive_status {
       ArchiveStatus::Finalized { manifest_sha256 } =>
@@ -1418,8 +1464,10 @@ mod tests {
   #[test]
   fn happy_path_requires_exact_incident_epoch_and_final_archive () {
     let mut coordinator = MaintenanceCoordinator::new ();
+    let candidate = candidate ();
+    coordinator . set_pending_valid (candidate . clone ()) . unwrap ();
     let active = coordinator . begin (
-      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+      MaintenanceOrigin::PendingReconciliation, Some (candidate)) . unwrap ();
     coordinator . archive_ready (
       &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
     coordinator . record_server_evidence (
@@ -1437,6 +1485,15 @@ mod tests {
         manifest_revision: ManifestRevision::INITIAL . successor (),
         tantivy_generation: 1, tantivy_outcome: "committed" . into (),
       }) . unwrap ();
+    assert! (coordinator . record_presentation_fence (
+      &active . incident_id, active . epoch, "a" . repeat (64), 3)
+      . unwrap ());
+    assert! (!coordinator . record_presentation_fence (
+      &active . incident_id, active . epoch, "a" . repeat (64), 3)
+      . unwrap ());
+    assert! (coordinator . record_presentation_fence (
+      &active . incident_id, active . epoch, "b" . repeat (64), 4)
+      . unwrap_err () . contains ("another presentation fence"));
     coordinator . record_client_evidence_transfer (
       &active . incident_id, active . epoch, ClientEvidenceTransferRecord {
         server_bundle_sha256: "server" . into (),

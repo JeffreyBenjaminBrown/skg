@@ -414,7 +414,12 @@ fn handle_connection (
                 server_event_send_failed = true;
                 break; }
             }
-            if ! snapshot_requested && !server_event_send_failed {
+            let maintenance_locked = runtime . maintenance . lock () . unwrap ()
+              . state . policy () . maintenance_locked;
+            if collateral_pump_allowed (
+                snapshot_requested, server_event_send_failed,
+                maintenance_locked)
+            {
               let mut interactive = runtime . interactive . lock () . unwrap ();
               let InteractiveSession {
                 views, collateral_scheduler, ..
@@ -438,6 +443,14 @@ fn handle_connection (
       if let Some (client) = &mut interactive . attached_client {
         client . census_complete = false; }} }
   tracing::info!(peer = %peer, "Skg socket disconnected"); }
+
+fn collateral_pump_allowed (
+  snapshot_requested  : bool,
+  server_event_failed : bool,
+  maintenance_locked  : bool,
+) -> bool {
+  !snapshot_requested && !server_event_failed && !maintenance_locked
+}
 
 #[allow(clippy::too_many_arguments)]
 fn dispatch_request (
@@ -1183,6 +1196,14 @@ mod connection_tests {
   use crate::types::misc::{SkgfileSource, SourceName};
   use std::collections::HashMap;
   use std::path::PathBuf;
+
+  #[test]
+  fn collateral_pump_waits_for_snapshot_event_and_maintenance_boundaries () {
+    assert! (collateral_pump_allowed (false, false, false));
+    assert! (!collateral_pump_allowed (true, false, false));
+    assert! (!collateral_pump_allowed (false, true, false));
+    assert! (!collateral_pump_allowed (false, false, true));
+  }
 
   #[test]
   fn verification_carries_the_ordered_normalized_source_inventory () {

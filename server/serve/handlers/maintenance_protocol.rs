@@ -444,6 +444,24 @@ fn complete_maintenance (
   let manifest_sha256 = sha256_request_field (request, "manifest-sha256")?;
   require_completion_owner (
     runtime, &incident, epoch, &manifest_sha256)?;
+  // Close delayed watcher gaps at the terminal boundary.  The incident keeps
+  // its original G1 presentation fence; a different current signature is
+  // ordinary retained refresh work and remains queued until maintenance
+  // unlocks.  This also upgrades an older/incomplete post-selection journal
+  // which predates the explicit presentation-fence record.
+  let (presentation_generation, signature_blake3) =
+    runtime . exact_git_presentation_identity ()?;
+  let missing_fence = matches! (
+    &runtime . maintenance . lock ()
+      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+      . state,
+    CoordinatorState::Active (active) if active . presentation_fence . is_none ());
+  if missing_fence {
+    runtime . transition_maintenance (|coordinator|
+      coordinator . record_presentation_fence (
+        &incident, epoch, signature_blake3 . clone (),
+        presentation_generation))?;
+  }
   let terminal = runtime . transition_maintenance (|coordinator|
     coordinator . finish (
       &incident, epoch, TerminalDisposition::Completed))?;
@@ -654,6 +672,12 @@ pub(crate) fn select_and_stage_candidate (
       rebuild_archived_candidate (runtime, incident, epoch)?; }
     _ => { select_archived_candidate (runtime, incident, epoch)?; }
   }
+  let (presentation_generation, signature_blake3) =
+    runtime . exact_git_presentation_identity ()?;
+  runtime . transition_maintenance (|coordinator|
+    coordinator . record_presentation_fence (
+      incident, epoch, signature_blake3 . clone (),
+      presentation_generation))?;
   let active = matching_active (runtime, incident, epoch)?;
   let candidate_id = active . candidate . as_ref ()
     . expect ("selected incident has candidate") . id . clone ();
@@ -711,13 +735,42 @@ struct MaintenanceRenderedView {
 fn stage_application_settlements (
   runtime       : &ServerRuntime,
   active        : &crate::maintenance::ActiveMaintenance,
-  mut settlements : Vec<ViewSettlementRecord>,
+  settlements   : Vec<ViewSettlementRecord>,
   approved_pids : &HashSet<ID>,
 ) -> Result<ApplicationStaging, String> {
   if !settlements . iter () . any (|record|
       record . requirement == ViewSettlementRequirement::ApplicationAck)
   {
     return Ok (ApplicationStaging::Ready (settlements)); }
+
+  const PRESENTATION_ADVANCED : &str =
+    "maintenance Git presentation advanced while views rendered";
+  for attempt in 0..3 {
+    // Watcher delivery is only an optimization.  This exact check closes a
+    // delayed event gap before each attempt and puts a post-G1 change into the
+    // ordinary retained presentation queue.
+    runtime . observe_git_presentation ()?;
+    match stage_application_settlements_once (
+        runtime, active, settlements . clone (), approved_pids)
+    {
+      Err (error) if error == PRESENTATION_ADVANCED && attempt < 2 => continue,
+      Err (error) if error == PRESENTATION_ADVANCED => return Err (
+        "Git presentation remained unstable across three maintenance render attempts"
+          . into ()),
+      result => return result,
+    }
+  }
+  unreachable! ()
+}
+
+fn stage_application_settlements_once (
+  runtime       : &ServerRuntime,
+  active        : &crate::maintenance::ActiveMaintenance,
+  mut settlements : Vec<ViewSettlementRecord>,
+  approved_pids : &HashSet<ID>,
+) -> Result<ApplicationStaging, String> {
+  const PRESENTATION_ADVANCED : &str =
+    "maintenance Git presentation advanced while views rendered";
 
   let selected = active . selected_store . as_ref ()
     . ok_or_else (|| "view rendering precedes coherent store selection"
@@ -791,17 +844,23 @@ fn stage_application_settlements (
     });
   }
 
+  // Recompute rather than trusting watcher timing.  A changed signature bumps
+  // the presentation generation and queues ordinary post-maintenance work;
+  // this attempt is discarded and repeated against the new boundary.
+  runtime . observe_git_presentation ()?;
+
   {
     let interactive = runtime . interactive . lock ()
       . map_err (|_| "interactive session poisoned" . to_string ())?;
     if interactive . views . diff_mode_enabled != diff_mode_enabled
-    || interactive . active_source_set != active_source_set
-    || interactive . collateral_scheduler . presentation_generation ()
+    || interactive . active_source_set != active_source_set {
+      return Err (
+        "maintenance source-set or diff-mode inputs advanced while views rendered"
+          . into ()); }
+    if interactive . collateral_scheduler . presentation_generation ()
          != presentation_generation
     {
-      return Err (
-        "maintenance presentation inputs advanced while views rendered"
-          . into ()); }
+      return Err (PRESENTATION_ADVANCED . into ()); }
     for rendered in &rendered_views {
       let record = &settlements[rendered . settlement_index];
       let state = interactive . views . open_views . views
@@ -952,6 +1011,7 @@ fn candidate_selected_payload (
   fields . splice (0..0, maintenance_selection_identity_fields (
     active, "candidate-selected"));
   append_selected_fields (&mut fields, active)?;
+  append_presentation_fence_fields (&mut fields, active);
   fields . push (atom_field ("source-set", &active . source_set));
   fields . push (source_inventory_field (config));
   fields . push (atom_field ("maintenance-archive-folder",
@@ -977,6 +1037,7 @@ fn scalar_challenge_payload (
   fields . splice (0..0, maintenance_selection_identity_fields (
     active, "needs-scalar-authorization"));
   append_selected_fields (&mut fields, active)?;
+  append_presentation_fence_fields (&mut fields, active);
   fields . push (atom_field ("source-set", &active . source_set));
   fields . push (source_inventory_field (config));
   fields . push (atom_field ("maintenance-archive-folder",
@@ -1005,6 +1066,19 @@ fn maintenance_selection_identity_fields (
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     atom_field ("phase", active . phase . label ()),
   ]
+}
+
+fn append_presentation_fence_fields (
+  fields : &mut Vec<Sexp>,
+  active : &crate::maintenance::ActiveMaintenance,
+) {
+  let Some (fence) = &active . presentation_fence else { return; };
+  fields . push (integer_field ("presentation-fence-observation-sequence",
+    fence . candidate_observation_sequence . get ()));
+  fields . push (atom_field (
+    "presentation-fence-signature-blake3", &fence . signature_blake3));
+  fields . push (integer_field ("presentation-fence-generation",
+    fence . presentation_generation));
 }
 
 fn requested_id_outcomes_sexp (
@@ -1298,6 +1372,7 @@ fn active_status_sexp (
         &config . maintenance_archive_identity . to_string_lossy ()));
     }
   }
+  append_presentation_fence_fields (&mut fields, active);
   if let Some (scalar) = &active . scalar_release {
     fields . push (atom_field ("operation", &scalar . operation));
     fields . push (list_field ("pids", &scalar . pids));
@@ -2050,7 +2125,7 @@ mod tests {
   #[test]
   fn partial_reload_offer_and_status_repeat_the_frozen_targets () {
     let mut coordinator = MaintenanceCoordinator::new ();
-    let active = coordinator . begin_with_archive_contract_and_targets (
+    let mut active = coordinator . begin_with_archive_contract_and_targets (
       MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
@@ -2058,15 +2133,28 @@ mod tests {
         ids: vec!["alias" . into ()],
         ..MaintenanceTargets::default ()
       }) . unwrap ();
+    active . presentation_fence = Some (
+      crate::maintenance::MaintenancePresentationFence {
+        candidate_observation_sequence: ObservationSequence::INITIAL,
+        signature_blake3: "a" . repeat (64),
+        presentation_generation: 7,
+      });
     let offer = maintenance_offer_payload (
       "locked-census-accepted-publish-initial-archive",
       &active, "archive", "/archive");
     let status = active_status_sexp (&active, None) . to_string ();
-    for payload in [offer, status] {
+    for payload in [&offer, &status] {
       assert! (payload . contains (
         "(requested-paths (source/node.skg))"), "{}", payload);
       assert! (payload . contains ("(requested-ids (alias))"), "{}", payload);
     }
+    assert! (status . contains (
+      "(presentation-fence-observation-sequence 0)"), "{}", status);
+    assert! (status . contains (
+      "(presentation-fence-signature-blake3 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"),
+      "{}", status);
+    assert! (status . contains (
+      "(presentation-fence-generation 7)"), "{}", status);
   }
 
   #[test]
