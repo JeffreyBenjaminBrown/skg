@@ -26,6 +26,16 @@ local function settlement (buffer_id, requirement, acknowledged)
   }
 end
 
+local function replace_field (record, name, value)
+  for _, entry in ipairs(record) do
+    if sexpr.is_list(entry) and sexpr.atom_text(entry[1]) == name then
+      entry[2] = value
+      return
+    end
+  end
+  error('missing test field ' .. name)
+end
+
 local function bootstrap_response (status, buffer_ids)
   local response = {
     f('status', status),
@@ -428,6 +438,40 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal('waiting-for-origin-observation', incident.phase)
     assert.is_nil(incident.server_phase)
     assert.is_nil(incident.blocking_reason)
+  end)
+
+  it('retires invalid post-pull dirty work before allowing retry', function ()
+    local retirement = settlement('dirty', 'retirement-ack', false)
+    replace_field(retirement, 'dirty', 'true')
+    replace_field(retirement, 'planned-disposition', 'interrupted')
+    table.insert(retirement, f('settlement-resolution', 'pending'))
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9, phase = 'server-blocked',
+      registered_buffer_ids = { 'dirty', 'clean' }, locally_applied = {},
+    }
+    local scheduled, applied, sent
+    local real_apply = maintenance.apply_settlement
+    local real_send = maintenance.send_preselection_retirement_ack
+    maintenance.defer = function (callback) scheduled = callback end
+    maintenance.apply_settlement = function (record) applied = record end
+    maintenance.send_preselection_retirement_ack = function (record)
+      sent = record end
+    maintenance.install_preselection_retirements({ retirement })
+    scheduled()
+    assert.are.equal(retirement, applied)
+    assert.are.equal(retirement, sent)
+    assert.is_true(state.maintenance_client_incident.locally_applied.dirty)
+    maintenance.handle_preselection_retirement_ack(nil, {
+      f('status', 'all-invalid-dirty-buffers-retired'),
+      f('buffer-id', 'dirty'), f('required-ack', 'retirement-ack'),
+    })
+    scheduled()
+    maintenance.apply_settlement = real_apply
+    maintenance.send_preselection_retirement_ack = real_send
+    assert.are.equal('server-blocked',
+      state.maintenance_client_incident.phase)
+    assert.are.same({},
+      state.maintenance_client_incident.pending_preselection_retirements)
   end)
 
   it('offers a deduplicated explicit ID API without prompting when clean',

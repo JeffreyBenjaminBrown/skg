@@ -499,6 +499,109 @@ function M.install_settlements (settlements)
   submit_later(M.settle_next)
 end
 
+function M.install_preselection_retirements (retirements)
+  local incident = assert(state.maintenance_client_incident,
+    'Invalid-disk retirements arrived without client state')
+  if not sexpr.is_list(retirements) then
+    error('Invalid-disk retirements are malformed') end
+  local registered = {}
+  for _, buffer_id in ipairs(incident.registered_buffer_ids or {}) do
+    registered[buffer_id] = true end
+  local seen, pending, acknowledged = {}, {}, {}
+  for _, retirement in ipairs(retirements) do
+    local buffer_id = payload.field_text(retirement, 'buffer-id')
+    if not buffer_id or not registered[buffer_id] or seen[buffer_id]
+       or not true_field(retirement, 'dirty')
+       or not true_field(retirement, 'impacted')
+       or payload.field_text(retirement, 'planned-disposition')
+          ~= 'interrupted'
+       or payload.field_text(retirement, 'required-ack')
+          ~= 'retirement-ack' then
+      error('Invalid-disk retirement inventory is inconsistent') end
+    seen[buffer_id] = true
+    if true_field(retirement, 'acknowledged') then
+      local resolution = payload.field_text(
+        retirement, 'settlement-resolution') or 'client-acknowledged'
+      local absent = registry.find_by_id(buffer_id) == nil
+      if not locally_applied(incident, buffer_id)
+         and not (resolution == 'census-absent' and absent)
+         and not incident.adopted then
+        error('Server acknowledged an unapplied dirty retirement') end
+      table.insert(acknowledged, retirement)
+    else
+      table.insert(pending, retirement)
+    end
+  end
+  M.require_stable_settlements(
+    incident.preselection_retirements, retirements)
+  incident.preselection_retirements = retirements
+  incident.pending_preselection_retirements = pending
+  incident.acknowledged_preselection_retirements = acknowledged
+  incident.in_flight_preselection_retirement = nil
+  incident.phase = 'settling-preselection-retirements'
+  submit_later(M.settle_next_preselection_retirement)
+end
+
+function M.settle_next_preselection_retirement ()
+  local incident = state.maintenance_client_incident
+  if not incident
+     or incident.phase ~= 'settling-preselection-retirements' then return end
+  local retirement = incident.pending_preselection_retirements[1]
+  if not retirement then
+    incident.phase = 'server-blocked'
+    vim.notify(
+      'Skg retired every dirty view; repair disk and retry maintenance')
+    return
+  end
+  local buffer_id = payload.field_text(retirement, 'buffer-id')
+  local ok, error_text = pcall(function ()
+    if not locally_applied(incident, buffer_id) then
+      M.apply_settlement(retirement)
+      mark_locally_applied(incident, buffer_id)
+    end
+    incident.in_flight_preselection_retirement = retirement
+    M.send_preselection_retirement_ack(retirement)
+  end)
+  if not ok then
+    incident.phase = 'preselection-retirement-blocked'
+    vim.notify('Maintenance could not retire dirty buffer '
+      .. tostring(buffer_id) .. ': ' .. tostring(error_text),
+      vim.log.levels.ERROR)
+  end
+end
+
+function M.send_preselection_retirement_ack (retirement)
+  local incident = assert(state.maintenance_client_incident,
+    'Dirty-buffer retirement ACK has no client state')
+  state.register_response_handler('maintenance-status',
+    M.handle_preselection_retirement_ack, true)
+  state.set_request_failure_handler(fail_request(
+    'preselection-retirement-ack-pending',
+    'Dirty-buffer retirement ACK was not delivered'))
+  client.submit_request(request('maintenance view settled',
+    vim.list_extend({ { 'maintenance-epoch', incident.epoch } },
+      M.ack_fields(retirement))), nil, incident.incident_id)
+end
+
+function M.handle_preselection_retirement_ack (_payload_text, response)
+  local incident = assert(state.maintenance_client_incident,
+    'Dirty-buffer retirement ACK arrived without client state')
+  local retirement = incident.in_flight_preselection_retirement
+  local first = incident.pending_preselection_retirements[1]
+  local buffer_id = retirement
+    and payload.field_text(retirement, 'buffer-id') or nil
+  if not retirement or not first
+     or buffer_id ~= payload.field_text(response, 'buffer-id')
+     or buffer_id ~= payload.field_text(first, 'buffer-id')
+     or payload.field_text(response, 'required-ack') ~= 'retirement-ack' then
+    error('Dirty-buffer retirement ACK changed identity') end
+  table.insert(incident.acknowledged_preselection_retirements, retirement)
+  table.remove(incident.pending_preselection_retirements, 1)
+  incident.in_flight_preselection_retirement = nil
+  incident.phase = 'settling-preselection-retirements'
+  submit_later(M.settle_next_preselection_retirement)
+end
+
 local function application_from (settlement)
   local application = payload.field(settlement, 'application')
   if not sexpr.is_list(application) then
@@ -967,6 +1070,9 @@ function M.resume_active (response)
       'Maintenance %s remains locked in server phase %s: %s. Repair the '
         .. 'reported problem, then run :SkgRetryMaintenance.',
       incident_id, phase, incident.blocking_reason), vim.log.levels.ERROR)
+    local retirements = payload.field(response, 'preselection-retirements')
+    if retirements ~= nil then
+      M.install_preselection_retirements(retirements) end
   else
     incident.phase = 'waiting-for-server'
     vim.notify('Skg maintenance ' .. incident_id
@@ -1284,6 +1390,9 @@ function M.server_status_handler (payload_text, response)
         .. 'reported problem, then run :SkgRetryMaintenance.',
       incident.server_phase or '?', incident.blocking_reason),
       vim.log.levels.ERROR)
+    local retirements = payload.field(response, 'preselection-retirements')
+    if retirements ~= nil then
+      M.install_preselection_retirements(retirements) end
   elseif status == 'active' or status == 'terminal' or status == 'idle' then
     M.handle_status(payload_text, response)
   else
