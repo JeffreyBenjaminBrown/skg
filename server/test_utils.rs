@@ -1098,6 +1098,90 @@ pub fn read_all_lp_messages (
     messages . push (msg); }
   messages }
 
+/// Drive the retained collateral scheduler until its next exact text offer,
+/// acknowledge that offer as applied, and return the offered content.  Direct
+/// handler tests use this instead of the real editor request loop.
+pub fn apply_next_scheduled_view (
+  scheduler : &mut crate::serve::handlers::collateral_scheduler::CollateralScheduler,
+  views     : &mut ViewsState,
+  server    : &mut std::net::TcpStream,
+  reader    : &mut std::io::BufReader<std::net::TcpStream>,
+) -> Result<String, Box<dyn std::error::Error>> {
+  use std::time::{Duration, Instant};
+  reader . get_mut () . set_read_timeout (Some (Duration::from_millis (20)))?;
+  let deadline = Instant::now () + Duration::from_secs (10);
+  loop {
+    scheduler . pump (server, views);
+    match read_lp_message (reader) {
+      Ok (message) if message . contains ("(response-type collateral-view)") => {
+        let field = |key : &str| -> Result<String, Box<dyn std::error::Error>> {
+          response_atom_field (&message, key)
+            . ok_or_else (|| format! ("offer has no {}: {}", key, message) . into ())
+        };
+        if response_atom_field (&message, "needs-authorization")
+           . as_deref () == Some ("true")
+        {
+          return Err ("test rerender unexpectedly needs scalar authorization"
+            . into ()); }
+        if let Some (error) = response_atom_field (&message, "render-error") {
+          return Err (format! ("scheduled view failed: {}", error) . into ()); }
+        let quoted = |value : String| format! ("{:?}", value);
+        let mut acknowledgement = format! (concat! (
+          "((request . \"apply collateral\") ",
+          "(operation-id . {}) (view-uri . {}) (applied . \"true\") ",
+          "(authorized . \"nil\") (graph-generation . {}) ",
+          "(presentation-generation . {}) ",
+          "(viewforest-base-revision . {}) ",
+          "(resulting-server-revision . {}) ",
+          "(view-base-graph-generation . {}) ",
+          "(view-base-presentation-generation . {}) ",
+          "(expected-client-application-token . {}) ",
+          "(resulting-client-application-token . {}) ",
+          "(client-token . {}) (view-base-source-set . {}) ",
+          "(resulting-source-set . {})"),
+          quoted (field ("operation-id")?), quoted (field ("view-uri")?),
+          quoted (field ("graph-generation")?),
+          quoted (field ("presentation-generation")?),
+          quoted (field ("viewforest-base-revision")?),
+          quoted (field ("resulting-server-revision")?),
+          quoted (field ("view-base-graph-generation")?),
+          quoted (field ("view-base-presentation-generation")?),
+          quoted (field ("expected-client-application-token")?),
+          quoted (field ("resulting-client-application-token")?),
+          quoted (field ("resulting-client-application-token")?),
+          quoted (field ("view-base-source-set")?),
+          quoted (field ("resulting-source-set")?));
+        if let Some (buffer_id) = response_atom_field (
+            &message, "client-buffer-id")
+        {
+          acknowledgement . push_str (&format! (
+            " (client-buffer-id . {:?})", buffer_id)); }
+        acknowledgement . push (')');
+        scheduler . handle_apply_ack (server, &acknowledgement, views);
+        return field ("content");
+      }
+      Ok (_) => {}
+      Err (_) if Instant::now () < deadline => {
+        std::thread::sleep (Duration::from_millis (5)); }
+      Err (error) => return Err (error),
+    }
+    if Instant::now () >= deadline {
+      return Err ("timed out waiting for scheduled view offer" . into ()); }
+  }
+}
+
+fn response_atom_field (response : &str, key : &str) -> Option<String> {
+  let sexp::Sexp::List (fields) = sexp::parse (response) . ok ()? else {
+    return None; };
+  fields . iter () . find_map (|field| {
+    let sexp::Sexp::List (parts) = field else { return None; };
+    if parts . len () != 2
+       || crate::types::sexp::atom_to_string (&parts [0]) . ok ()? != key
+    { return None; }
+    crate::types::sexp::atom_to_string (&parts [1]) . ok ()
+  })
+}
+
 /// Extract a string field from a tagged sexp like
 /// ((response-type X) (view-uri "URI") (content "...")).
 /// Returns None if the key is not found.

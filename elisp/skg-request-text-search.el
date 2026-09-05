@@ -251,6 +251,10 @@ Exits readonly after replacing content."
          (result-token
           (skg--nat-from-response
            response 'resulting-client-application-token))
+         (base-source-set
+          (skg--as-string (cadr (assoc 'view-base-source-set response))))
+         (result-source-set
+          (skg--as-string (cadr (assoc 'resulting-source-set response))))
          (applied nil)
          (client-token expected-token))
     (when (and terms content)
@@ -270,11 +274,13 @@ Exits readonly after replacing content."
                       :base-graph-generation base-graph-generation
                       :base-presentation-generation
                       base-presentation-generation
+                      :base-source-set base-source-set
                       :expected-application-token expected-token
                       :graph-generation graph-generation
                       :presentation-generation presentation-generation
                       :server-revision result-revision
                       :application-token result-token
+                      :source-set result-source-set
                       :require-clean t))
                     (setq applied t
                           client-token skg--application-token)
@@ -293,14 +299,26 @@ Exits readonly after replacing content."
        tcp-proc
        (concat
         (prin1-to-string
-         `((request . "apply collateral")
-           (operation-id . ,operation-id)
-           (view-uri . ,uri)
-           (applied . ,(if applied "true" "false"))
-           (graph-generation . ,graph-generation)
-           (presentation-generation . ,presentation-generation)
-           (viewforest-base-revision . ,base-revision)
-           (client-token . ,client-token)))
+         (append
+          `((request . "apply collateral")
+            (operation-id . ,operation-id)
+            (view-uri . ,uri)
+            (applied . ,(if applied "true" "nil"))
+            (authorized . "nil")
+            (graph-generation . ,graph-generation)
+            (presentation-generation . ,presentation-generation)
+            (viewforest-base-revision . ,base-revision)
+            (resulting-server-revision . ,result-revision)
+            (view-base-graph-generation . ,base-graph-generation)
+            (view-base-presentation-generation
+             . ,base-presentation-generation)
+            (expected-client-application-token . ,expected-token)
+            (resulting-client-application-token . ,result-token)
+            (client-token . ,client-token)
+            (view-base-source-set . ,base-source-set)
+            (resulting-source-set . ,result-source-set))
+          (when client-buffer-id
+            `((client-buffer-id . ,client-buffer-id)))))
         "\n")))
     (when warnings
       (skg-big-nonfatal-message

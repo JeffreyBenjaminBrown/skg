@@ -315,8 +315,8 @@ Unlocks non-collateral buffers."
 
 (defun skg--apply-streamed-view-update (payload log-category handler-name)
   "Apply one streamed view update from PAYLOAD: unlock and replace the buffer for
-its view URI.  Shared by the save (collateral-view) and rerender (rerender-view)
-streams; LOG-CATEGORY and HANDLER-NAME label any error."
+its view URI.  Retained only for the legacy in-request save stream;
+LOG-CATEGORY and HANDLER-NAME label any error."
   (condition-case err
       (let* ((response (read payload))
              (uri (cadr (assoc 'view-uri response)))
@@ -831,6 +831,11 @@ every component of the registered application record must still match."
                      (skg--buffer-record-presentation-generation
                       skg--buffer-record)))
         (error "Skg presentation generation changed before application"))
+      (when (and (plist-member authority :base-source-set)
+                 (not (equal (plist-get authority :base-source-set)
+                             (skg--buffer-record-source-set
+                              skg--buffer-record))))
+        (error "Skg source-set changed before application"))
       (when (and (plist-get authority :require-clean)
                  (skg-buffer-dirty-p))
         (error "Skg refuses to replace a dirty buffer"))
@@ -884,7 +889,10 @@ every component of the registered application record must still match."
              (skg--buffer-record-presentation-generation skg--buffer-record))
          (skg--buffer-record-server-revision skg--buffer-record)
          (or (plist-get authority :server-revision)
-             (skg--buffer-record-server-revision skg--buffer-record)))
+             (skg--buffer-record-server-revision skg--buffer-record))
+         (skg--buffer-record-source-set skg--buffer-record)
+         (or (plist-get authority :source-set)
+             (skg--buffer-record-source-set skg--buffer-record)))
         (when (plist-member authority :root-ids)
           (setf (skg--buffer-record-root-ids skg--buffer-record)
                 (plist-get authority :root-ids)))))
@@ -1014,18 +1022,34 @@ COLUMN is a character offset from the line's start; nil means column 0."
          (result-revision
           (cadr (assoc 'resulting-server-revision response)))
          (client-buffer-id (cadr (assoc 'client-buffer-id response)))
+         (base-source-set
+          (cadr (assoc 'view-base-source-set response)))
+         (result-source-set
+          (cadr (assoc 'resulting-source-set response)))
          (content (cadr (assoc 'content response)))
          (needs-authorization
           (cadr (assoc 'needs-authorization response)))
+         (render-error (cadr (assoc 'render-error response)))
          (buf (or (skg-find-buffer-by-id client-buffer-id)
                   (and uri (skg-find-buffer-by-uri uri))))
          (applied nil)
+         (authorized nil)
          (client-token expected-token))
+    (dolist (warning (or (cadr (assoc 'warnings response)) nil))
+      (message "SKG background refresh warning: %s" warning))
     (cond
      ((equal needs-authorization "true")
       (ding)
-      (message "SKG background refresh needs authorization: %s"
-               (or (cadr (assoc 'prompt response)) "protected text")))
+      (let ((prompt (or (cadr (assoc 'prompt response))
+                        "Include protected text in this background refresh?")))
+        (if (buffer-live-p buf)
+            (setq authorized (y-or-n-p (concat prompt " ")))
+          (message "SKG discarded authorization for a closed view: %s"
+                   prompt))))
+     (render-error
+      (ding)
+      (message "SKG background refresh failed for %s: %s"
+               (or uri "closed view") render-error))
      ((not (buffer-live-p buf)) nil)
      ((with-current-buffer buf (skg-buffer-dirty-p))
       (with-current-buffer buf
@@ -1046,11 +1070,13 @@ COLUMN is a character offset from the line's start; nil means column 0."
                      :base-graph-generation base-graph-generation
                      :base-presentation-generation
                      base-presentation-generation
+                     :base-source-set base-source-set
                      :expected-application-token expected-token
                      :graph-generation graph-generation
                      :presentation-generation presentation-generation
                      :server-revision result-revision
                      :application-token result-token
+                     :source-set result-source-set
                      :require-clean t))
               (setq applied t
                     client-token skg--application-token))
@@ -1067,14 +1093,26 @@ COLUMN is a character offset from the line's start; nil means column 0."
      tcp-proc
      (concat
       (prin1-to-string
-       `((request . "apply collateral")
-         (operation-id . ,operation-id)
-         (view-uri . ,uri)
-         (applied . ,(if applied "true" "false"))
-         (graph-generation . ,graph-generation)
-         (presentation-generation . ,presentation-generation)
-         (viewforest-base-revision . ,base-revision)
-         (client-token . ,client-token)))
+       (append
+        `((request . "apply collateral")
+          (operation-id . ,operation-id)
+          (view-uri . ,uri)
+          (applied . ,(if applied "true" "nil"))
+          (authorized . ,(if authorized "true" "nil"))
+          (graph-generation . ,graph-generation)
+          (presentation-generation . ,presentation-generation)
+          (viewforest-base-revision . ,base-revision)
+          (resulting-server-revision . ,result-revision)
+          (view-base-graph-generation . ,base-graph-generation)
+          (view-base-presentation-generation
+           . ,base-presentation-generation)
+          (expected-client-application-token . ,expected-token)
+          (resulting-client-application-token . ,result-token)
+          (client-token . ,client-token)
+          (view-base-source-set . ,base-source-set)
+          (resulting-source-set . ,result-source-set))
+        (when client-buffer-id
+          `((client-buffer-id . ,client-buffer-id)))))
       "\n"))))
 
 (skg-register-server-push-handler

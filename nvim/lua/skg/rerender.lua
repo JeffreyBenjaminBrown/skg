@@ -1,6 +1,7 @@
--- PURPOSE: The rerender stream (rerender-lock -> rerender-view* ->
--- rerender-done), shared by the diff-mode toggle, the source-set
--- switch, and the explicit rerender-all request. The Lua port of
+-- PURPOSE: The queued-rerender response (rerender-lock -> rerender-done),
+-- shared by the diff-mode toggle, source-set switch, and explicit
+-- rerender-all request. Exact view text arrives later through retained
+-- collateral operations. The Lua port of
 -- elisp/skg-request-rerender-all-views.el.
 
 local client = require('skg.client')
@@ -8,7 +9,6 @@ local lock = require('skg.lock')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
-local save = require('skg.save')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -57,7 +57,7 @@ function M.register_ugly_confirmation (retry, unfired_response_type)
     end, false)
 end
 
----Register the three handlers for streamed rerender responses.
+---Register the two handlers for a queued rerender response.
 ---Shared by every rerender-carrying request.
 function M.register_rerender_stream_handlers ()
   state.register_response_handler('rerender-lock',
@@ -75,14 +75,8 @@ function M.register_rerender_stream_handlers ()
                 'rerender-lock handler error: %s', tostring(err))
       end
     end, true)
-  state.register_response_handler('rerender-view',
-    function (payload_text, response)
-      save.apply_streamed_view_update(payload_text, response,
-                                      'rerender', 'rerender-view')
-    end, false) -- non-one-shot: fires for each streamed view
   state.register_response_handler('rerender-done',
     function (_payload_text, response)
-      state.remove_response_handler('rerender-view')
       lock.end_stream()
       lock.unlock_all_save_locked() -- safety net
       local ok, err = pcall(function ()

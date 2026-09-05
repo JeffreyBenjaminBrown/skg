@@ -140,6 +140,7 @@ pub(crate) async fn render_background_view (
   env                   : &SkgEnv,
   diff_mode_enabled     : bool,
   active_source_set     : Option<&ActiveSourceSet>,
+  create_partnerCols    : bool,
   cancellation          : RenderCancellationTicket,
 ) -> Result<(ViewForest, String, Vec<String>), String> {
   let mut context = RerenderAfterSaveContext::for_save (
@@ -149,7 +150,7 @@ pub(crate) async fn render_background_view (
     &mut viewforest, &context . graph_snap)
     . map_err (|error| error . to_string ())?;
   let text = rerender_view (
-    &mut viewforest, &mut context, None, false)
+    &mut viewforest, &mut context, None, create_partnerCols)
     . await . map_err (|error| error . to_string ())?;
   Ok ((viewforest, text, context . warnings))
 }

@@ -196,6 +196,10 @@ function M.display_search_enrichment (response)
     payload.field_text(response, 'expected-client-application-token'))
   local result_token = tonumber(
     payload.field_text(response, 'resulting-client-application-token'))
+  local base_source_set =
+    payload.field_text(response, 'view-base-source-set')
+  local result_source_set =
+    payload.field_text(response, 'resulting-source-set')
   local buf = registry.find_by_id(client_buffer_id)
     or (uri and buffer.find_buffer_by_uri(uri) or nil)
   local applied = false
@@ -215,11 +219,13 @@ function M.display_search_enrichment (response)
         base_server_revision = base_revision,
         base_graph_generation = base_graph_generation,
         base_presentation_generation = base_presentation_generation,
+        base_source_set = base_source_set,
         expected_application_token = expected_token,
         graph_generation = graph_generation,
         presentation_generation = presentation_generation,
         server_revision = result_revision,
         application_token = result_token,
+        source_set = result_source_set,
         require_clean = true,
       })
     vim.bo[buf].modifiable = true
@@ -242,19 +248,37 @@ function M.display_search_enrichment (response)
   end
   if operation_id then
     state.register_response_handler('collateral-applied', function () end, true)
-    client.submit_request(sexpr.to_string({
+    local acknowledgement = {
       sexpr.pair(sexpr.symbol('request'), 'apply collateral'),
       sexpr.pair(sexpr.symbol('operation-id'), operation_id),
       sexpr.pair(sexpr.symbol('view-uri'), uri),
-      sexpr.pair(sexpr.symbol('applied'), applied and 'true' or 'false'),
+      sexpr.pair(sexpr.symbol('applied'), applied and 'true' or 'nil'),
+      sexpr.pair(sexpr.symbol('authorized'), 'nil'),
       sexpr.pair(sexpr.symbol('graph-generation'),
                  tostring(graph_generation)),
       sexpr.pair(sexpr.symbol('presentation-generation'),
                  tostring(presentation_generation)),
       sexpr.pair(sexpr.symbol('viewforest-base-revision'),
                  tostring(base_revision)),
+      sexpr.pair(sexpr.symbol('resulting-server-revision'),
+                 tostring(result_revision)),
+      sexpr.pair(sexpr.symbol('view-base-graph-generation'),
+                 tostring(base_graph_generation)),
+      sexpr.pair(sexpr.symbol('view-base-presentation-generation'),
+                 tostring(base_presentation_generation)),
+      sexpr.pair(sexpr.symbol('expected-client-application-token'),
+                 tostring(expected_token)),
+      sexpr.pair(sexpr.symbol('resulting-client-application-token'),
+                 tostring(result_token)),
       sexpr.pair(sexpr.symbol('client-token'), tostring(client_token)),
-    }) .. '\n')
+      sexpr.pair(sexpr.symbol('view-base-source-set'), base_source_set),
+      sexpr.pair(sexpr.symbol('resulting-source-set'), result_source_set),
+    }
+    if client_buffer_id then
+      table.insert(acknowledgement,
+        sexpr.pair(sexpr.symbol('client-buffer-id'), client_buffer_id))
+    end
+    client.submit_request(sexpr.to_string(acknowledgement) .. '\n')
   end
   M.display_warnings(
     response, 'Search enrichment completed with warnings')

@@ -57,7 +57,7 @@
   "Set the active source-set for this TCP connection to NAME.
 Open SKG buffers are kept and re-rendered in place: the server
 replies with the active-source-set confirmation followed by the
-rerender stream (rerender-lock, rerender-view*, rerender-done)."
+queued-rerender completion; exact retained-session offers follow."
   (interactive (list (skg--prompt-for-source-set)))
   (when (or approved-pids
             (yes-or-no-p "Switch source-set and re-render all SKG buffers? "))

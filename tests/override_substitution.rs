@@ -23,15 +23,18 @@
 
 use indoc::indoc;
 use std::error::Error;
+use std::io::BufReader;
 use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
+use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::test_utils::{
+  apply_next_scheduled_view,
   run_with_shared_test_db,
   graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -407,25 +410,20 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
       let toggle = |views_state : &mut ViewsState| -> String {
         let (mut server, client) =
           connected_tcp_stream_pair ();
+        let active = ActiveSourceSet::named (
+          config, SourceSetName ("all" . to_string ()))
+          . expect ("set all resolves");
+        let mut scheduler = CollateralScheduler::new ();
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
               &mut server,
               "((request . \"git diff mode toggle\"))",
-              &env, views_state,
-              & ActiveSourceSet::named (
-                  config, SourceSetName ("all" . to_string ()))
-                . expect ("set all resolves") ); } ); } );
-        drop (server);
-        let mut reader : std::io::BufReader<TcpStream> =
-          std::io::BufReader::new (client);
-        let mut rerendered : Option<String> = None;
-        while let Ok (m) =
-          skg::test_utils::read_lp_message (&mut reader) {
-          if m . contains ("rerender-view")
-             && m . contains ("toggle-subst-uuid") {
-            rerendered = Some (m); }}
-        rerendered . expect ("the registered view rerenders") };
+              &env, views_state, &active, &mut scheduler ); } ); } );
+        let mut reader = BufReader::new (client);
+        apply_next_scheduled_view (
+          &mut scheduler, views_state, &mut server, &mut reader)
+          . expect ("the registered view rerenders") };
       let shape = | buf : &str | -> Vec<(usize, String)> {
         // (depth, id) per headline carrying an id; decoration-blind.
         buf . lines ()
@@ -439,15 +437,6 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
                       . take_while ( |c| *c != ')' )
                       . collect () )) } )
           . collect () };
-      let content_of = | msg : &str | -> String {
-        let start : usize =
-          msg . find ("(content \"")
-          . expect ("rerender-view carries content")
-          + "(content \"" . len ();
-        let end : usize =
-          msg . rfind ("\"))")
-          . expect ("rerender-view content terminates");
-        msg [start .. end] . to_string () };
       let before_shape : Vec<(usize, String)> = shape (&before);
       let assert_stable = | view : &str, when : &str | {
         assert_eq! ( shape (view), before_shape,
@@ -462,10 +451,10 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
            marked R collects N:\n{}", when, view ); };
       { let on : String = toggle (&mut views_state);
         assert! ( views_state . diff_mode_enabled );
-        assert_stable ( & content_of (&on), "diff on" ); }
+        assert_stable ( &on, "diff on" ); }
       { let off : String = toggle (&mut views_state);
         assert! ( ! views_state . diff_mode_enabled );
-        assert_stable ( & content_of (&off), "diff off" ); }
+        assert_stable ( &off, "diff off" ); }
       Ok (( )) }
 
 async fn ownership_and_visibility_gate_substitution (

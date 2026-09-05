@@ -19,6 +19,7 @@ use std::sync::{Arc, Mutex};
 
 use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
 use skg::serve::ViewsState;
+use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender;
 use skg::serve::handlers::source_sets::handle_source_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
@@ -96,6 +97,7 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
           open_views        : OpenViews::new (), };
       let toggle = |views_state : &mut ViewsState,
                     active : &ActiveSourceSet| -> Vec<String> {
+        let mut collateral_scheduler = CollateralScheduler::new ();
         let (mut server, client) =
           connected_tcp_stream_pair () . unwrap ();
         std::thread::scope ( |scope| {
@@ -103,7 +105,8 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
             handle_git_diff_toggle_and_rerender (
               &mut server,
               "((request . \"git diff mode toggle\"))",
-              &env, views_state, active ); } ); } );
+              &env, views_state, active,
+              &mut collateral_scheduler ); } ); } );
         drop (server);
         let mut reader : BufReader<TcpStream> =
           BufReader::new (client);
@@ -171,13 +174,15 @@ async fn switch_refusals_take_the_unwinding_shape (
                     enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
                     search_cancelled : &Arc<AtomicBool>,
                     request : &str| -> Vec<String> {
+        let mut collateral_scheduler = CollateralScheduler::new ();
         let (mut server, client) =
           connected_tcp_stream_pair () . unwrap ();
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             handle_source_set_request (
               &mut server, request, &env, views_state,
-              active, enrichment_slot, search_cancelled ); } ); } );
+              active, &mut collateral_scheduler,
+              enrichment_slot, search_cancelled ); } ); } );
         drop (server);
         let mut reader : BufReader<TcpStream> =
           BufReader::new (client);
@@ -302,12 +307,14 @@ async fn refusal_first_messages_parse_and_read_as_documented (
           config, SourceSetName::from ("public"))?;
       let (mut server, client) =
         connected_tcp_stream_pair ()?;
+      let mut collateral_scheduler = CollateralScheduler::new ();
       std::thread::scope ( |scope| {
         scope . spawn ( || {
           handle_git_diff_toggle_and_rerender (
             &mut server,
             "((request . \"git diff mode toggle\"))",
-            &env, &mut views_state, &restricted ); } ); } );
+            &env, &mut views_state, &restricted,
+            &mut collateral_scheduler ); } ); } );
       drop (server);
       let mut reader : BufReader<TcpStream> =
         BufReader::new (client);

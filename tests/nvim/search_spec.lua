@@ -117,7 +117,9 @@ describe('skg.search', function ()
           .. ' (view-base-graph-generation 1)'
           .. ' (view-base-presentation-generation 0)'
           .. ' (expected-client-application-token 1)'
-          .. ' (resulting-client-application-token 2))')
+          .. ' (resulting-client-application-token 2)'
+          .. ' (view-base-source-set "all")'
+          .. ' (resulting-source-set "all"))')
         respond(enrichment_frame)
       elseif line:find('apply collateral', 1, true) then
         respond(helpers.framed(

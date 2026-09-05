@@ -20,10 +20,13 @@ use std::sync::Arc;
 
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::serve::ViewsState;
+use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::serve::handlers::single_root_view::handle_single_root_view_request;
 use skg::source_sets::{
   ActiveSourceSet, SourceSetName};
-use skg::test_utils::{graph_handle_from_config, read_lp_message,
+use skg::test_utils::{apply_next_scheduled_view,
+                      extract_string_field_from_sexp,
+                      graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
 use skg::test_utils::run_with_shared_test_db;
 use skg::to_org::render::override_menu::override_menu_view;
@@ -304,34 +307,27 @@ async fn open_menu_survives_diff_mode_toggle (
               &env, &mut views_state, &active ); } ); } );
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
-        read_lp_message ( &mut reader ) ? };
-      let toggle = |views_state : &mut ViewsState| -> Vec<String> {
+        let response = read_lp_message ( &mut reader ) ?;
+        extract_string_field_from_sexp (&response, "content")
+          .ok_or ("override menu response has no content")? };
+      let toggle = |views_state : &mut ViewsState| -> String {
         let (mut server, client) =
           connected_tcp_stream_pair () . unwrap ();
+        let mut scheduler = CollateralScheduler::new ();
         std::thread::scope ( |scope| {
           scope . spawn ( || {
             skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
               &mut server,
               "((request . \"git diff mode toggle\"))",
-              &env, views_state, &active ); } ); } );
-        drop (server);
+              &env, views_state, &active, &mut scheduler ); } ); } );
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
-        let mut messages : Vec<String> = Vec::new ();
-        while let Ok (m) = skg::test_utils::read_lp_message (&mut reader) {
-          messages . push (m); }
-        messages };
-      let menu_view_of = |messages : &[String]| -> String {
-        messages . iter ()
-          . find ( |m| m . contains ("rerender-view")
-                       && m . contains ("override-menu:Z") )
-          . cloned ()
-          . unwrap_or_else ( || panic! (
-              "the open menu rerenders on toggle: {:?}", messages )) };
+        apply_next_scheduled_view (
+          &mut scheduler, views_state, &mut server, &mut reader)
+          . expect ("the open menu rerenders on toggle") };
       { // Toggle ON: the menu rerenders, shape unchanged.
-        let messages : Vec<String> = toggle (&mut views_state);
+        let rerendered = toggle (&mut views_state);
         assert! ( views_state . diff_mode_enabled );
-        let rerendered : String = menu_view_of (&messages);
         for (depth, id) in shape_signature (&menu_before) {
           if id . is_empty () { continue; }
           assert! (
@@ -344,9 +340,8 @@ async fn open_menu_survives_diff_mode_toggle (
           menu_before . matches ("(id Z)") . count (),
           "no duplicate or phantom Z:\n{}", rerendered ); }
       { // Toggle OFF: still intact.
-        let messages : Vec<String> = toggle (&mut views_state);
+        let rerendered = toggle (&mut views_state);
         assert! ( ! views_state . diff_mode_enabled );
-        let rerendered : String = menu_view_of (&messages);
         for (depth, id) in shape_signature (&menu_before) {
           if id . is_empty () { continue; }
           assert! (

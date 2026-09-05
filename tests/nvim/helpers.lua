@@ -23,7 +23,6 @@ local nonterminal_frame_kinds = {
   ['search-results'] = true,
   ['request-snapshot'] = true,
   ['rerender-lock'] = true,
-  ['rerender-view'] = true,
   ['git-diff-mode'] = true,
   ['active-source-set'] = true,
 }
@@ -76,10 +75,12 @@ local function envelope_framed_for_request (message, request_id)
   return result
 end
 
----A minimal TCP server on 127.0.0.1. ON_REQUEST(line, respond) runs
----for each newline-terminated request line; respond(text) writes raw
----bytes back. Returns {port, close}.
----@param on_request fun(line: string, respond: fun(text: string))
+---A minimal TCP server on 127.0.0.1. ON_REQUEST(line, respond,
+---push) runs for each newline-terminated request line.  RESPOND accepts
+---an LP-framed message and adds the triggering request's envelope;
+---PUSH accepts an unframed payload and emits it without one.  Returns
+---{port, close}.
+---@param on_request fun(line: string, respond: fun(text: string), push: fun(payload: string))
 ---@return table
 function M.fake_server (on_request)
   local server = vim.uv.new_tcp()
@@ -111,6 +112,12 @@ function M.fake_server (on_request)
         local respond = function (text)
           connection:write(envelope_framed_for_request(text, request_id))
         end
+        local push = function (payload)
+          local previous = M.current_request_id
+          M.current_request_id = nil
+          connection:write(M.framed(payload))
+          M.current_request_id = previous
+        end
         if line:find('(role . "interactive")', 1, true) then
           respond(M.framed(
             '((response-type verify-connection) (content "connected")'
@@ -129,7 +136,7 @@ function M.fake_server (on_request)
             .. ' (write-enabled true) (text-required-buffer-ids ())'
             .. ' (stale-buffer-ids ()) (restored-buffer-ids ()))'))
         else
-          on_request(line, respond)
+          on_request(line, respond, push)
         end
         M.current_request_id = nil
       end

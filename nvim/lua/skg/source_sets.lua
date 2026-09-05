@@ -44,7 +44,7 @@ end
 
 ---Set the active source-set for this connection to NAME (prompted
 ---when absent), after confirmation; the server replies with the
----confirmation followed by the rerender stream.
+---confirmation and queues exact retained-session rerender offers.
 ---@param name string|nil
 function M.set_active_source_set (name, approved_pids)
   name = name or picker.prompt_for_source_set()

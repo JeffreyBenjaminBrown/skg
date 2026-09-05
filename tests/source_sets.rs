@@ -13,6 +13,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::ancestry::AncestryTree;
 use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
 use skg::serve::ViewsState;
+use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::serve::handlers::source_sets::handle_source_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::source_sets::{
@@ -24,7 +25,10 @@ use skg::source_sets::{
   run_with_source_set_test_db};
 use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::test_utils::set_source_retagging_member_sources;
+use skg::test_utils::{
+  apply_next_scheduled_view,
+  set_source_retagging_member_sources,
+};
 use skg::test_utils::run_with_shared_test_db;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -49,6 +53,7 @@ use skg::types::views_state::{OpenViews, ViewState, ViewUri};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::fs;
+use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -183,22 +188,25 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
         Arc::new (Mutex::new (None));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
-      let (mut server_stream, _client_stream) =
+      let (mut server_stream, client_stream) =
         connected_tcp_stream_pair ()?;
+      let mut collateral_scheduler = CollateralScheduler::new ();
       std::thread::scope ( |scope| {
         scope . spawn ( || {
           handle_source_set_request (
             &mut server_stream,
             "((request . \"set active source set\") (name . \"public\"))",
             &env, &mut views_state, &mut active,
+            &mut collateral_scheduler,
             &enrichment_slot, &search_cancelled); } ); } );
 
       // 3. The re-rendered view: N drawn directly, R anonymized.
-      let view_public : String = {
-        let forest = views_state . open_views
-          . viewuri_to_view (&uri)
-          . expect ("the switched view should still be registered");
-        viewforest_to_string (forest, config) ? };
+      let mut reader = BufReader::new (client_stream);
+      let view_public = apply_next_scheduled_view (
+        &mut collateral_scheduler, &mut views_state,
+        &mut server_stream, &mut reader)?;
+      assert_eq! (views_state . open_views . views . get (&uri)
+        . map (|view| view . source_set . as_str ()), Some ("public"));
       assert! ( view_public . contains ("inactiveNode"),
         "the overrider should become an anonymous placeholder:\n{}",
         view_public );
@@ -384,6 +392,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         Arc::new (AtomicBool::new (false));
       let (mut server_stream, _client_stream) =
         connected_tcp_stream_pair ()?;
+      let mut collateral_scheduler = CollateralScheduler::new ();
       std::thread::scope ( |scope| {
         // The handler is sync and calls block_on internally (as the
         // real connection thread does); it cannot run inside this
@@ -395,6 +404,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
             &env,
             &mut views_state,
             &mut active,
+            &mut collateral_scheduler,
             &enrichment_slot,
             &search_cancelled); } ); } );
       assert_eq! (

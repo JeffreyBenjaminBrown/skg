@@ -11,8 +11,8 @@
 When enabled, subsequent content views and saves show
 what changed between HEAD and the worktree.
 Sends a single combined request; the server responds with
-git-diff-mode, then streams rerender-lock, rerender-view*,
-rerender-done."
+git-diff-mode and a queued-rerender completion.  Exact retained-session
+offers then update clean views individually."
   (interactive)
   (let ((unsaved-buffers
          (cl-remove-if-not

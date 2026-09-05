@@ -112,8 +112,8 @@ end
 
 ---Clean up when the TCP connection closes: run the reset hooks (which
 ---unlock all save-locked buffers and end any stream) and clear the
----handler map, so stale non-one-shot handlers (like collateral-view
----or rerender-view) cannot linger after a server crash.
+---handler map, so stale non-one-shot handlers cannot linger after a
+---server crash.
 ---@param event string
 function M.sentinel (event)
   log.log('info', 'tcp', 'connection closed: %s', event)

@@ -138,9 +138,6 @@
                     (warnings ("audit warning"))))))
       (should ended)
       (should unlocked)
-      (should-not
-       (assoc 'rerender-view
-              (skg--request-record-handlers skg--request-draft)))
       (should (equal (car shown) "*skg rerender messages*"))
       (should (string-match-p "^\\* errors\n\\*\\* view failed"
                               (nth 2 shown)))

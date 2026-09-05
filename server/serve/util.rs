@@ -223,7 +223,7 @@ fn inferred_terminal_status (response_type : &str) -> Option<&'static str> {
   match response_type {
     "save-lock" | "save-relax-lock" | "collateral-view"
     | "search-results" | "request-snapshot"
-    | "rerender-lock" | "rerender-view"
+    | "rerender-lock"
     | "git-diff-mode" | "active-source-set" => None,
     "fork-confirmation" | "telescope-hoist-confirmation"
     | "ugly-telescope-confirmation" => Some ("needs-authorization"),
@@ -404,8 +404,7 @@ pub(crate) fn format_fork_confirmation_response_sexp (
 
 /// Format a single view update as an s-expression.
 /// Format: ((view-uri "URI") (content "CONTENT"))
-/// Used for any streamed per-view message (collateral-view,
-/// rerender-view, etc.). The caller tags it with the appropriate
+/// Used for any streamed per-view message. The caller tags it with the appropriate
 /// TcpToClient variant.
 pub(crate) fn format_single_view_sexp (
   uri     : &ViewUri,

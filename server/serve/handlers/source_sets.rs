@@ -1,9 +1,8 @@
 use crate::serve::ViewsState;
+use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::handlers::rerender_all_views::{
-  authorize_prepared_rerenders,
-  prepare_rerender_views,
   stream_empty_rerender,
-  stream_prepared_rerenders};
+  stream_queued_rerender};
 use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::handlers::text_search::SearchEnrichmentPayload;
 use crate::serve::protocol::{RequestType, TcpToClient};
@@ -15,8 +14,6 @@ use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::SourceSetName;
 use crate::types::misc::SkgConfig;
-use crate::types::tree::forest::ViewForest;
-use crate::update_buffer::source_switch::convert_and_prune_for_source_switch;
 
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +25,7 @@ pub fn handle_source_set_request (
   env              : &SkgEnv,
   views_state      : &mut ViewsState,
   active_source_set : &mut ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
 ) {
@@ -39,7 +37,8 @@ pub fn handle_source_set_request (
     Ok (RequestType::SetActiveSourceSet) =>
       set_active_source_set (
         stream, request, env, views_state,
-        active_source_set, enrichment_slot, search_cancelled ),
+        active_source_set, collateral_scheduler,
+        enrichment_slot, search_cancelled ),
     Ok (_) =>
       // Reachable only from malformed requests no current client
       // sends, but Emacs may have locked buffers and set its stream
@@ -65,6 +64,7 @@ fn set_active_source_set (
   env              : &SkgEnv,
   views_state      : &mut ViewsState,
   active_source_set : &mut ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
 ) {
@@ -93,26 +93,16 @@ fn set_active_source_set (
       tracing::info! ( msg = %msg, "Source-set switch refused" );
       refuse_unwinding (stream, active_source_set, &msg);
       return; }}
-  let mut prepared =
-  { let target : ActiveSourceSet = active . clone ();
-    let prepass = |viewforest : &mut ViewForest|
-      -> Result<(), Box<dyn std::error::Error>> {
-      convert_and_prune_for_source_switch (
-        viewforest . as_internal_tree_mut (), &target ) };
-    prepare_rerender_views (
-      env, views_state, views_state . diff_mode_enabled,
-      Some (&target), Some (&prepass), true ) };
-  if ! authorize_prepared_rerenders (
-    stream, env, &mut prepared, Some (&active),
-    "source-set-switch-rerender",
-    &approved_pids_from_request (request) ) {
-    return; }
   search_cancelled . store (true, Ordering::SeqCst);
   if let Ok (mut slot) = enrichment_slot . lock () {
     *slot = None; }
   *active_source_set = active;
+  let uris = collateral_scheduler . replace_for_explicit_rerender (
+    views_state, env, active_source_set,
+    &approved_pids_from_request (request),
+    "source-set-switch-rerender", true);
   send_active_source_set_response (stream, active_source_set, false);
-  stream_prepared_rerenders (stream, views_state, prepared); }
+  stream_queued_rerender (stream, &uris); }
 
 fn send_source_sets_response (
   stream      : &mut TcpStream,

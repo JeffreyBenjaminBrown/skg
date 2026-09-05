@@ -42,27 +42,50 @@ describe('skg stream consumers', function ()
     wipe_named('skg://stage-moves')
   end)
 
-  it('drives the rerender stream: lock, per-view update, done with'
-     .. ' warnings', function ()
-    server = helpers.connect_to_fake_server(function (line, respond)
+  it('queues rerenders and applies each through an exact server offer',
+     function ()
+    require('skg.state').register_server_push_handler(
+      'collateral-view',
+      require('skg.save').background_collateral_offer_handler)
+    server = helpers.connect_to_fake_server(function (line, respond, push)
       if line:find('rerender all views', 1, true) then
         respond(helpers.framed(
           '((response-type rerender-lock)'
-          .. ' (lock-views (uri-a)))'))
-        respond(helpers.framed(
-          '((response-type rerender-view) (view-uri uri-a)'
-          .. ' (content "* (skg (node (id a))) a rerendered"))'))
+          .. ' (lock-views ()))'))
         respond(helpers.framed(
           '((response-type rerender-done) (errors ())'
-          .. ' (warnings ("stale herald")))'))
+          .. ' (warnings ()) (queued-view-uris (uri-a uri-b)))'))
+        push(
+          '((response-type collateral-view) (frame-kind collateral-view)'
+          .. ' (server-push true) (operation-id rerender-1)'
+          .. ' (view-uri uri-a) (graph-generation 1)'
+          .. ' (presentation-generation 0)'
+          .. ' (viewforest-base-revision 0)'
+          .. ' (resulting-server-revision 1)'
+          .. ' (view-base-graph-generation 1)'
+          .. ' (view-base-presentation-generation 0)'
+          .. ' (expected-client-application-token 1)'
+          .. ' (resulting-client-application-token 2)'
+          .. ' (view-base-source-set "all")'
+          .. ' (resulting-source-set "all") (warnings ())'
+          .. ' (content "* (skg (node (id a))) a rerendered")))')
+      elseif line:find('apply collateral', 1, true) then
+        assert.is_truthy(line:find('(authorized . "nil")', 1, true))
+        assert.is_truthy(line:find(
+          '(view%-base%-source%-set . "all")'))
+        respond(helpers.framed(
+          '((response-type collateral-applied) (content "applied"))'))
       end
     end)
+    require('skg.state').active_source_set_name = 'all'
     local a = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'uri-a')
+      '* (skg (node (id a))) a', 'skg://a', 'uri-a',
+      { graph_generation = 1 })
     local b = buffer.open_org_buffer_from_text(
-      '* (skg (node (id b))) b', 'skg://b', 'uri-b')
+      '* (skg (node (id b))) b', 'skg://b', 'uri-b',
+      { graph_generation = 1 })
     rerender.request_rerender_all_views()
-    -- Locked immediately; b unlocks on rerender-lock (not listed).
+    -- Locked immediately; the queued completion releases both buffers.
     assert.is_false(vim.bo[a].modifiable)
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
@@ -70,16 +93,6 @@ describe('skg stream consumers', function ()
     assert.is_true(vim.bo[b].modifiable)
     assert.are.equal('* (skg (node (id a))) a rerendered',
       vim.api.nvim_buf_get_lines(a, 0, 1, false)[1])
-    -- The warning channel fired (mirrors test-skg-warning-channel).
-    local found = nil
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_get_name(buf)
-         == 'skg://messages/rerender' then found = buf end
-    end
-    assert.is_truthy(found)
-    assert.is_truthy(table.concat(
-      vim.api.nvim_buf_get_lines(found, 0, -1, false), '\n')
-      :find('stale herald', 1, true))
   end)
 
   it('diff-mode toggle refuses on unsaved buffers, else acks and'

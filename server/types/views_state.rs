@@ -245,6 +245,23 @@ impl OpenViews {
     Ok (( ))
   }
 
+  pub fn set_client_application_authority_and_source_set (
+    &mut self,
+    uri                     : &ViewUri,
+    graph_generation        : u64,
+    presentation_generation : u64,
+    client_application_token : u64,
+    source_set              : String,
+  ) -> Result<(), String> {
+    self . set_client_application_authority (
+      uri, graph_generation, presentation_generation,
+      client_application_token)?;
+    self . views . get_mut (uri)
+      . expect ("application authority view remains registered")
+      . source_set = source_set;
+    Ok (( ))
+  }
+
   /// Advance a preserved forest's graph association without claiming it was
   /// rerendered.  This is the maintenance-only orthogonal-view transition.
   pub fn preserve_across_maintenance (

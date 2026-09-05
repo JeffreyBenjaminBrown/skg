@@ -4,8 +4,8 @@
 ;;; Used by skg-view-diff-mode to refresh all open views
 ;;; after toggling diff mode.
 ;;;
-;;; Protocol: rerender-lock → rerender-view* → rerender-done.
-;;; Each view is unlocked and updated as its rerender-view arrives.
+;;; Protocol: rerender-lock → rerender-done queues retained-session
+;;; collateral offers.  Each view is updated only through its exact ACK.
 
 (require 'skg-length-prefix)
 (require 'skg-request-save) ; for skg-replace-buffer-with-new-content, skg-big-nonfatal-message
@@ -15,7 +15,7 @@
 (defun skg-request-rerender-all-views (&optional approved-pids)
   "Ask the server to re-render every open view.
 Locks all skg buffers, then registers handlers for the
-streaming protocol: rerender-lock, rerender-view*, rerender-done."
+queueing protocol: rerender-lock, rerender-done, then exact offers."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream "rerender")
     (skg--register-stream-request-cleanup "rerender")
@@ -54,7 +54,7 @@ request replaced; remove it and balance its pending count."
    nil))
 
 (defun skg--register-rerender-stream-handlers ()
-  "Register the three handlers for streamed rerender responses.
+  "Register the two handlers for a queued rerender response.
 Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
   (skg-register-response-handler
    ;; 1. Lock message: unlock buffers not in the URI list.
@@ -72,16 +72,9 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
         (skg-log 'error 'rerender "rerender-lock handler error: %S" err))))
    t)
   (skg-register-response-handler
-   ;; 2. Per-view update: unlock and update each buffer.
-   'rerender-view
-   (lambda (_tcp-proc payload)
-     (skg--apply-streamed-view-update payload 'rerender "rerender-view"))
-   nil) ;; non-one-shot: fires for each streamed view
-  (skg-register-response-handler
-   ;; 3. Done message: clean up and show errors/warnings.
+   ;; 2. Done message: clean up; exact offers arrive as server operations.
    'rerender-done
    (lambda (_tcp-proc payload)
-     (skg-remove-response-handler 'rerender-view)
      (skg--end-stream)
      (skg--unlock-all-save-locked) ;; safety net
      (condition-case err

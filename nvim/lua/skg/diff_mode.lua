@@ -11,8 +11,8 @@ local state = require('skg.state')
 
 local M = {}
 
----Toggle diff mode; the server answers with a git-diff-mode ack, then
----streams the rerender protocol. Refuses while any skg buffer has
+---Toggle diff mode; the server answers with a git-diff-mode ACK, then
+---queues exact retained-session rerender offers. Refuses while any skg buffer has
 ---unsaved edits.
 function M.toggle (approved_pids)
   local unsaved = save.other_unsaved_skg_buffers(-1)

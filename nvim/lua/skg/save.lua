@@ -261,8 +261,7 @@ function M.save_lock_handler (saved_uri, response)
 end
 
 ---Apply one streamed view update: unlock and replace the buffer for
----its view uri. Shared by the save (collateral-view) and rerender
----(rerender-view) streams.
+---its view URI. Retained only for the legacy in-request save stream.
 ---@param _payload_text string
 ---@param response any
 ---@param log_category string
@@ -390,6 +389,9 @@ function M.replace_buffer_with_new_content (buf, new_content,
        and authority.base_presentation_generation
            ~= record.presentation_generation then
       error('Skg presentation generation changed before application') end
+    if authority.base_source_set
+       and authority.base_source_set ~= record.source_set then
+      error('Skg source-set changed before application') end
     if authority.require_clean and registry.dirty(buf) then
       error('Skg refuses to replace a dirty buffer') end
     if authority.application_token and not expected_token
@@ -435,6 +437,8 @@ function M.replace_buffer_with_new_content (buf, new_content,
       or vim.b[buf].skg_presentation_generation
     vim.b[buf].skg_server_revision =
       authority.server_revision or vim.b[buf].skg_server_revision
+    vim.b[buf].skg_record_source_set =
+      authority.source_set or vim.b[buf].skg_record_source_set
     if authority.root_ids then vim.b[buf].skg_root_ids = authority.root_ids end
   end
   vim.b[buf].skg_background_refresh_stale = nil
@@ -851,17 +855,38 @@ function M.background_collateral_offer_handler (_payload_text, response)
   local result_revision = tonumber(
     payload.field_text(response, 'resulting-server-revision'))
   local client_buffer_id = payload.field_text(response, 'client-buffer-id')
+  local base_source_set =
+    payload.field_text(response, 'view-base-source-set')
+  local result_source_set =
+    payload.field_text(response, 'resulting-source-set')
   local needs_authorization =
     payload.field_text(response, 'needs-authorization')
+  local render_error = payload.field_text(response, 'render-error')
   local content = payload.field(response, 'content')
   local buf = registry.find_by_id(client_buffer_id)
     or (uri and buffer.find_buffer_by_uri(uri) or nil)
   local applied = false
+  local authorized = false
   local client_token = expected_token or 0
+  for _, warning in ipairs(payload.string_list(
+      payload.field(response, 'warnings'))) do
+    vim.notify('SKG background refresh warning: ' .. warning,
+               vim.log.levels.WARN)
+  end
   if needs_authorization == 'true' then
-    vim.notify('SKG background refresh needs authorization: '
-      .. (payload.field_text(response, 'prompt') or 'protected text'),
-      vim.log.levels.WARN)
+    local prompt = payload.field_text(response, 'prompt')
+      or 'Include protected text in this background refresh?'
+    if buf and vim.api.nvim_buf_is_valid(buf)
+       and #vim.api.nvim_list_uis() > 0 then
+      authorized = vim.fn.confirm(prompt, '&Include\n&Keep stale', 2) == 1
+    else
+      vim.notify('SKG background refresh needs authorization: ' .. prompt,
+                 vim.log.levels.WARN)
+    end
+  elseif render_error then
+    vim.notify('SKG background refresh failed for '
+      .. (uri or 'closed view') .. ': ' .. render_error,
+      vim.log.levels.ERROR)
   elseif buf and vim.api.nvim_buf_is_valid(buf) and registry.dirty(buf) then
     vim.b[buf].skg_background_refresh_stale = true
     vim.notify('SKG left modified buffer '
@@ -875,11 +900,13 @@ function M.background_collateral_offer_handler (_payload_text, response)
         base_server_revision = tonumber(base_revision),
         base_graph_generation = base_graph_generation,
         base_presentation_generation = base_presentation_generation,
+        base_source_set = base_source_set,
         expected_application_token = expected_token,
         graph_generation = tonumber(graph_generation),
         presentation_generation = tonumber(presentation_generation),
         server_revision = result_revision,
         application_token = result_token,
+        source_set = result_source_set,
         require_clean = true,
       })
     if ok then
@@ -892,17 +919,36 @@ function M.background_collateral_offer_handler (_payload_text, response)
     end
   end
   state.register_response_handler('collateral-applied', function () end, true)
-  require('skg.client').submit_request(sexpr.to_string({
+  local acknowledgement = {
     sexpr.pair(sexpr.symbol('request'), 'apply collateral'),
     sexpr.pair(sexpr.symbol('operation-id'), operation_id),
     sexpr.pair(sexpr.symbol('view-uri'), uri),
-    sexpr.pair(sexpr.symbol('applied'), applied and 'true' or 'false'),
+    sexpr.pair(sexpr.symbol('applied'), applied and 'true' or 'nil'),
+    sexpr.pair(sexpr.symbol('authorized'), authorized and 'true' or 'nil'),
     sexpr.pair(sexpr.symbol('graph-generation'), graph_generation),
     sexpr.pair(sexpr.symbol('presentation-generation'),
               presentation_generation),
     sexpr.pair(sexpr.symbol('viewforest-base-revision'), base_revision),
+    sexpr.pair(sexpr.symbol('resulting-server-revision'),
+              tostring(result_revision)),
+    sexpr.pair(sexpr.symbol('view-base-graph-generation'),
+              tostring(base_graph_generation)),
+    sexpr.pair(sexpr.symbol('view-base-presentation-generation'),
+              tostring(base_presentation_generation)),
+    sexpr.pair(sexpr.symbol('expected-client-application-token'),
+              tostring(expected_token)),
+    sexpr.pair(sexpr.symbol('resulting-client-application-token'),
+              tostring(result_token)),
     sexpr.pair(sexpr.symbol('client-token'), tostring(client_token)),
-  }) .. '\n')
+    sexpr.pair(sexpr.symbol('view-base-source-set'), base_source_set),
+    sexpr.pair(sexpr.symbol('resulting-source-set'), result_source_set),
+  }
+  if client_buffer_id then
+    table.insert(acknowledgement,
+      sexpr.pair(sexpr.symbol('client-buffer-id'), client_buffer_id))
+  end
+  require('skg.client').submit_request(
+    sexpr.to_string(acknowledgement) .. '\n')
 end
 
 return M

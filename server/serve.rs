@@ -407,11 +407,12 @@ fn handle_connection (
                 &mut stream, &tag_server_push_sexp_response (
                   response_type, &event . operation_id, &event . payload));
             }
-            let mut interactive = runtime . interactive . lock () . unwrap ();
-            let InteractiveSession {
-              views, collateral_scheduler, ..
-            } = &mut *interactive;
-            collateral_scheduler . pump (&mut stream, views); }}
+            if ! snapshot_requested {
+              let mut interactive = runtime . interactive . lock () . unwrap ();
+              let InteractiveSession {
+                views, collateral_scheduler, ..
+              } = &mut *interactive;
+              collateral_scheduler . pump (&mut stream, views); }}}
         if let Some (error) = take_send_failure () {
           tracing::warn! (%error,
             "server-push transport failed; retaining session work");
@@ -569,17 +570,23 @@ fn dispatch_request (
     | RequestType::ActiveSourceSet
     | RequestType::SetActiveSourceSet => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
-        let InteractiveSession { views, active_source_set, .. } = interactive;
+        let InteractiveSession {
+          views, active_source_set, collateral_scheduler, ..
+        } = interactive;
         handle_source_set_request (
           stream, request, env, views, active_source_set,
+          collateral_scheduler,
           enrichment_slot, search_cancelled); })
       { send_runtime_error (stream, &error); }}
     RequestType::HeraldRules => handle_herald_rules_request (stream),
     RequestType::GitDiffModeToggle => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
-        let InteractiveSession { views, active_source_set, .. } = interactive;
+        let InteractiveSession {
+          views, active_source_set, collateral_scheduler, ..
+        } = interactive;
         handle_git_diff_toggle_and_rerender (
-          stream, request, env, views, active_source_set); })
+          stream, request, env, views, active_source_set,
+          collateral_scheduler); })
       { send_runtime_error (stream, &error); }}
     RequestType::ExportToOrg => {
       let snapshot = runtime . selected_snapshot ();
@@ -594,9 +601,12 @@ fn dispatch_request (
       { send_runtime_error (stream, &error); }}
     RequestType::RerenderAllViews => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
-        let InteractiveSession { views, active_source_set, .. } = interactive;
+        let InteractiveSession {
+          views, active_source_set, collateral_scheduler, ..
+        } = interactive;
         handle_rerender_all_views_request (
-          stream, request, env, views, active_source_set); })
+          stream, request, env, views, active_source_set,
+          collateral_scheduler); })
       { send_runtime_error (stream, &error); }}
     RequestType::ReloadPaths => {
       handle_observation_hint_request (stream, request, runtime); }

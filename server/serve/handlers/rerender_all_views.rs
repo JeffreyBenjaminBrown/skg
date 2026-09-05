@@ -1,36 +1,15 @@
 use crate::git_ops::read_repo::open_repo;
 use crate::serve::ViewsState;
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
-  approved_pids_from_request,
-  challenge_response,
-  decide as decide_scalar_release};
+use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
+use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
+use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::SkgConfig;
-use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
-use crate::types::views_state::pids_from_viewforest;
-use crate::update_buffer::{rerender_view, RerenderAfterSaveContext};
 
-use futures::executor::block_on;
 use std::net::TcpStream;
-use std::collections::HashSet;
-
-struct PreparedView {
-  uri        : ViewUri,
-  text       : String,
-  viewforest : ViewForest,
-}
-
-pub(crate) struct PreparedRerenders {
-  uris     : Vec<ViewUri>,
-  views    : Vec<PreparedView>,
-  errors   : Vec<String>,
-  warnings : Vec<String>,
-}
 
 pub fn handle_rerender_all_views_request (
   stream     : &mut TcpStream,
@@ -38,153 +17,43 @@ pub fn handle_rerender_all_views_request (
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
 ) {
-  stream_rerender_views (
-    stream, env, views_state, Some (active_source_set),
-    None, false,
-    "rerender-all-views",
-    &approved_pids_from_request (request)); }
+  let uris = collateral_scheduler . replace_for_explicit_rerender (
+    views_state, env, active_source_set,
+    &approved_pids_from_request (request),
+    "rerender-all-views", false);
+  stream_queued_rerender (stream, &uris); }
 
-/// Stream re-rendered views to Emacs.
-/// Sends: rerender-lock → rerender-view* → rerender-done.
-/// Shared by 'handle_rerender_all_views_request',
-/// 'handle_git_diff_toggle_and_rerender', and the source-set switch
-/// ('set_active_source_set'), which passes a per-view prepass (the
-/// convert-and-prune step) and asks for PartnerCol re-creation
-/// (TODO/full-schema/9-2_source-set-safety.org).
-pub fn stream_rerender_views (
-  stream     : &mut TcpStream,
-  env        : &SkgEnv,
-  views_state : &mut ViewsState,
-  active_source_set : Option<&ActiveSourceSet>,
-  prepass    : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerCols : bool,
-  operation          : &str,
-  approved_pids      : &HashSet<crate::types::misc::ID>,
+pub(crate) fn stream_queued_rerender (
+  stream : &mut TcpStream,
+  uris   : &[ViewUri],
 ) {
-  let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, views_state . diff_mode_enabled,
-    active_source_set, prepass, create_partnerCols );
-  if ! authorize_prepared_rerenders (
-    stream, env, &mut prepared, active_source_set,
-    operation, approved_pids ) {
-    return; }
-  stream_prepared_rerenders (stream, views_state, prepared);
-}
-
-/// Complete every rerender in memory. Nothing is sent and no registered
-/// view is changed, so the scalar-release decision can precede the lock and
-/// the first externally visible mutation.
-pub(crate) fn prepare_rerender_views (
-  env                 : &SkgEnv,
-  views_state         : &ViewsState,
-  diff_mode_enabled   : bool,
-  active_source_set   : Option<&ActiveSourceSet>,
-  prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerCols  : bool,
-) -> PreparedRerenders {
-  let uris : Vec<ViewUri> =
-    views_state . open_views . views . keys () . cloned () . collect ();
-  let mut context : RerenderAfterSaveContext =
-    RerenderAfterSaveContext::without_save (
-      env, diff_mode_enabled, active_source_set );
-  let mut rendered_views : Vec<PreparedView> = Vec::new ();
-  for uri in &uris {
-    let mut viewforest : ViewForest = match
-      views_state . open_views . viewuri_to_view (uri) {
-        Some (f) => f . clone (),
-        None => {
-          context . errors . push ( format! (
-            "View {}: no viewforest found",
-            uri . repr_in_client () ));
-          continue; } };
-    if let Some (prepass) = prepass {
-      if let Err (e) = prepass (&mut viewforest) {
-        context . errors . push ( format! (
-          "View {}: {}",
-          uri . repr_in_client (), e ));
-        continue; }}
-    match block_on ( async {
-      let _span : tracing::span::EnteredSpan =
-        tracing::info_span! (
-          "rerender_view (rerender-all)"
-        ) . entered ();
-      rerender_view (
-        &mut viewforest,
-        &mut context,
-        None, // streamed rerenders repair silently.
-        create_partnerCols
-      ) . await } )
-    { Ok (text) => {
-        rendered_views . push ( PreparedView {
-          uri : uri . clone (), text, viewforest } ); },
-      Err (e) => {
-        context . errors . push ( format! (
-          "View {}: {}",
-          uri . repr_in_client (), e )); }} }
-  PreparedRerenders {
-    uris,
-    views    : rendered_views,
-    errors   : context . errors,
-    warnings : context . warnings,
-  }
-}
-
-pub(crate) fn authorize_prepared_rerenders (
-  stream            : &mut TcpStream,
-  env               : &SkgEnv,
-  prepared          : &mut PreparedRerenders,
-  active_source_set : Option<&ActiveSourceSet>,
-  operation         : &str,
-  approved_pids     : &HashSet<crate::types::misc::ID>,
-) -> bool {
-  let Some (active) = active_source_set else { return true; };
-  let candidates : Vec<crate::types::misc::ID> =
-    prepared . views . iter ()
-    . flat_map ( |view|
-      pids_from_viewforest (&view . viewforest) . into_iter () )
-    . collect ();
-  let release = decide_scalar_release (
-    operation, active, &candidates,
-    &env . in_rust_graph_snapshot (), approved_pids );
-  match release {
-    ScalarReleaseDecision::Challenge { .. } => {
-      let _ = send_response_with_length_prefix (
-        stream, &challenge_response (&release) . unwrap () );
-      false },
-    ScalarReleaseDecision::AllowWithWarning { warning } => {
-      prepared . warnings . push (warning);
-      true },
-    ScalarReleaseDecision::Allow => true,
-  }
-}
-
-pub(crate) fn stream_prepared_rerenders (
-  stream      : &mut TcpStream,
-  views_state : &mut ViewsState,
-  prepared    : PreparedRerenders,
-) {
+  // The command's broad transient lock is no longer application authority.
+  // Release it immediately; each retained-session offer independently checks
+  // cleanliness and exact buffer/revision/token/generation authority.
   let _ = send_response_with_length_prefix (
     stream,
-    & tag_sexp_response (
-      TcpToClient::RerenderLock,
-      & format_lock_views_sexp (&prepared . uris) ));
-  for view in prepared . views {
-    views_state . open_views . update_view (
-      &view . uri, view . viewforest);
-    let _ = send_response_with_length_prefix (
-      stream,
-      & tag_sexp_response (
-        TcpToClient::RerenderView,
-        & format_single_view_sexp (&view . uri, &view . text) )); }
-
+    &tag_sexp_response (
+      TcpToClient::RerenderLock, &format_lock_views_sexp (&[])));
+  let response = add_queued_uris (
+    &format_errors_warnings_sexp (&[], &[]), uris);
   let _ = send_response_with_length_prefix (
     stream,
-    & tag_sexp_response (
-      TcpToClient::RerenderDone,
-      & format_errors_warnings_sexp (
-        &prepared . errors,
-        &prepared . warnings) )); }
+    &tag_sexp_response (TcpToClient::RerenderDone, &response));
+}
+
+fn add_queued_uris (response : &str, uris : &[ViewUri]) -> String {
+  use sexp::{Atom, Sexp};
+  let Ok (Sexp::List (mut fields)) = sexp::parse (response) else {
+    return response . into (); };
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("queued-view-uris" . into ())),
+    Sexp::List (uris . iter () . map (|uri|
+      Sexp::Atom (Atom::S (uri . repr_in_client ()))) . collect ()),
+  ]));
+  Sexp::List (fields) . to_string ()
+}
 
 /// Send an EMPTY rerender stream: a "rerender-lock" naming no views,
 /// then "rerender-done" with no errors or warnings.  Used after a
@@ -195,16 +64,7 @@ pub(crate) fn stream_prepared_rerenders (
 pub fn stream_empty_rerender (
   stream : &mut TcpStream,
 ) {
-  let _ = send_response_with_length_prefix (
-    stream,
-    & tag_sexp_response (
-      TcpToClient::RerenderLock,
-      & format_lock_views_sexp ( &[] ) ));
-  let _ = send_response_with_length_prefix (
-    stream,
-    & tag_sexp_response (
-      TcpToClient::RerenderDone,
-      & format_errors_warnings_sexp ( &[], &[] ) )); }
+  stream_queued_rerender (stream, &[]); }
 
 /// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,
@@ -215,6 +75,7 @@ pub fn handle_git_diff_toggle_and_rerender (
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  collateral_scheduler : &mut CollateralScheduler,
 ) {
   if ! views_state . diff_mode_enabled
      && ! active_source_set . is_all () {
@@ -236,21 +97,18 @@ pub fn handle_git_diff_toggle_and_rerender (
       stream_empty_rerender (stream);
       return; }}
   let next_diff_mode : bool = ! views_state . diff_mode_enabled;
-  let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, next_diff_mode, Some (active_source_set),
-    None, false );
-  if ! authorize_prepared_rerenders (
-    stream, env, &mut prepared, Some (active_source_set),
-    "diff-mode-rerender", &approved_pids_from_request (request) ) {
-    return; }
   views_state . diff_mode_enabled = next_diff_mode;
+  let uris = collateral_scheduler . replace_for_explicit_rerender (
+    views_state, env, active_source_set,
+    &approved_pids_from_request (request),
+    "diff-mode-rerender", false);
   let msg : String =
     git_diff_mode_message (views_state . diff_mode_enabled, &env . config);
   tracing::info! ( msg = %msg, "Git diff mode toggled" );
   let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
-  stream_prepared_rerenders (stream, views_state, prepared); }
+  stream_queued_rerender (stream, &uris); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.
@@ -291,3 +149,20 @@ fn sources_not_tracked_in_git (
           warnings . push ( format! (
             "{}: git repo has no commits yet", source_name )); } } } }
   warnings }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn queued_completion_names_every_view_without_streaming_text () {
+    let response = add_queued_uris (
+      &format_errors_warnings_sexp (&[], &[]),
+      &[
+        ViewUri::ContentView ("view-a" . into ()),
+        ViewUri::SearchView ("dog" . into ()),
+      ]);
+    assert! (response . contains ("(queued-view-uris (view-a search:dog))"));
+    assert! (!response . contains ("content"));
+  }
+}
