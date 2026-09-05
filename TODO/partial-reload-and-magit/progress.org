@@ -1066,3 +1066,28 @@ what's imperfect about what's done; choices determining the future.
 - The Git presentation-signature regression passes, both maintained
   first-search/title-visit integrations pass under Emacs and Neovim, and
   =cargo check --all-targets= plus =git diff --check= are clean.
+
+* duplicate telescope warnings now say where the duplicates are
+
+** diagnosis
+- The warning for =33d5cd4e-8a0c-48f0-85c2-467db86e1862= did not mean that
+  the node had two section files.  Its sole section file, in =jeff-public=,
+  contains the alias =shows-because (relationship)= twice.
+- Alias, ordered-relation and unordered-relation folding all reused a
+  =DuplicateMember= warning whose text unconditionally claimed that the two
+  occurrences came from different sources.  The deduplication itself was
+  correct: it retained the first alias and warned about the second.  Only the
+  explanation was false.
+
+** repair and validation
+- =DuplicateMember= now records both the source of the retained occurrence and
+  the source of the rejected occurrence.  A repetition within one source says
+  that the first occurrence won; a real cross-source collision names both
+  sources and says which more-public occurrence won.
+- A focused regression covers both messages and their source identities.  All
+  12 telescope tests pass, as does =cargo check --all-targets=.
+- The live real-corpus server regenerated =data/telescope-warnings.org= with
+  the accurate message: =member 'shows-because (relationship)' appeared more
+  than once in source 'jeff-public'; the first occurrence won=.  The source
+  data was deliberately left untouched, so the useful warning remains until
+  its repeated alias is repaired.
