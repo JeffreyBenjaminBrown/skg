@@ -1,4 +1,5 @@
 local maintenance = require('skg.maintenance')
+local config = require('skg.config')
 local payload = require('skg.payload')
 local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
@@ -63,6 +64,7 @@ local function reset ()
   state.maintenance_state = nil
   state.connection_handshake_state = nil
   state.request_draft = nil
+  config.source_inventory = nil
   for _, buf in ipairs(registry.buffers()) do
     if vim.api.nvim_buf_is_valid(buf) then
       vim.bo[buf].modifiable = true
@@ -283,6 +285,8 @@ describe('skg Neovim maintenance handshake', function ()
   end)
 
   it('dispatches an exact asynchronous candidate selection', function ()
+    state.active_source_set_name = 'main'
+    vim.g.skg_active_source_set_name = 'main'
     state.maintenance_client_incident = {
       incident_id = incident_id, epoch = 9,
       registered_buffer_ids = {}, locally_applied = {},
@@ -293,11 +297,21 @@ describe('skg Neovim maintenance handshake', function ()
       f('maintenance-epoch', 9), f('g1-graph-generation', 2),
       f('g1-manifest-revision', 6), f('tantivy-generation', 4),
       f('server-evidence-sha256', string.rep('d', 64)),
+      f('source-set', 'all'),
+      f('source-inventory', {{
+        f('name', 'replacement'), f('abbreviation', 'rep'),
+        f('owned', 'true'), f('position', 0),
+        f('configured-path', 'replacement-notes'),
+        f('directory', '/data/replacement-notes'),
+        f('directory-identity', '/data/replacement-notes'),
+      }}),
       f('view-settlements', {}),
     })
     assert.are.equal('settling-views',
       state.maintenance_client_incident.phase)
     assert.are.equal(2, state.maintenance_client_incident.g1_graph_generation)
+    assert.are.equal('all', state.active_source_set_name)
+    assert.are.equal('replacement', config.source_inventory[1].name)
     assert.has_error(function ()
       maintenance.server_status_handler('', {
         f('status', 'candidate-selected'), f('incident-id', 'wrong'),

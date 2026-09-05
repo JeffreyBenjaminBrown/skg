@@ -240,6 +240,8 @@ old implementation."
 
 (defun skg--maintenance-record-selection (response)
   (let* ((state skg--maintenance-client-incident)
+         (source-set (skg--maintenance-text response 'source-set))
+         (source-inventory (assoc 'source-inventory response))
          (values
           (list
            :g1-graph-generation
@@ -250,7 +252,8 @@ old implementation."
            (skg--maintenance-field response 'tantivy-generation)
            :server-evidence-sha256
            (skg--maintenance-text response 'server-evidence-sha256))))
-    (unless (and (natnump (plist-get values :g1-graph-generation))
+    (unless (and source-set source-inventory
+                 (natnump (plist-get values :g1-graph-generation))
                  (natnump (plist-get values :g1-manifest-revision))
                  (natnump (plist-get values :tantivy-generation))
                  (string-match-p
@@ -264,6 +267,15 @@ old implementation."
         (when (and prior (not (equal prior value)))
           (error "Maintenance selection changed its durable authority"))
         (setf (plist-get state key) value)))
+    (let ((prior (plist-get state :selected-source-set)))
+      (when (and prior (not (equal prior source-set)))
+        (error "Maintenance selection changed its source-set authority"))
+      (setf (plist-get state :selected-source-set) source-set))
+    (skg-install-source-inventory response)
+    (unless (equal skg--active-source-set-name source-set)
+      (message "Skg full rebuild changed source-set from %s to %s"
+               skg--active-source-set-name source-set))
+    (setq skg--active-source-set-name source-set)
     (setf (plist-get state :phase) 'presenting)
     (setq skg--maintenance-client-incident state)
     state))

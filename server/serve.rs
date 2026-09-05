@@ -1028,28 +1028,6 @@ fn verify_connection_response (
     Sexp::Atom (Atom::S (value . to_string ())) };
   let field = |key : &str, value : Sexp| -> Sexp {
     Sexp::List (vec! [atom (key), value]) };
-  let source_entries : Vec<Sexp> = config . ordered_sources ()
-    . into_iter ()
-    . enumerate ()
-    . map ( |(position, name)| {
-      let source = config . sources . get (&name)
-        . expect ("ordered source exists");
-      Sexp::List (vec! [
-        field ("name", atom (&name)),
-        field ("abbreviation", source . abbreviation . as_deref ()
-          . map (&atom) . unwrap_or_else ( || atom ("nil") )),
-        field ("owned", atom (
-          if source . user_owns_it { "true" } else { "nil" })),
-        field ("position", Sexp::Atom (Atom::I (position as i64))),
-        field ("configured-path", atom (
-          &config . sources . configured_path (&name)
-            . unwrap_or (&source . path) . to_string_lossy ())),
-        field ("directory", atom (&source . path . to_string_lossy ())),
-        field ("directory-identity", atom (
-          &config . sources . directory_identity (&name)
-            . unwrap_or (&source . path) . to_string_lossy ())),
-      ]) })
-    . collect ();
   let warning_entries : Vec<Sexp> = warnings . iter ()
     . map ( |(pid, warning)| {
       let (kind, winning_paths, ignored_paths) = match warning {
@@ -1090,7 +1068,7 @@ fn verify_connection_response (
       TcpToClient::VerifyConnection . repr_in_client ())),
     field ("content", atom (
       "This is the skg server verifying the connection.")),
-    field ("source-inventory", Sexp::List (source_entries)),
+    source_inventory_field (config),
     field ("telescope-warnings", Sexp::List (warning_entries)),
     field ("pending-recovery-incidents", Sexp::List (recovery_entries)),
     field ("active-source-set", atom (active_source_set_name)),
@@ -1110,6 +1088,34 @@ fn verify_connection_response (
     field ("typedb-health", health (&selected . typedb_health)),
     field ("tantivy-health", health (&selected . tantivy_health)),
   ]) . to_string ()
+}
+
+pub(crate) fn source_inventory_field (config : &SkgConfig) -> Sexp {
+  let atom = |value : &str| -> Sexp {
+    Sexp::Atom (Atom::S (value . to_string ())) };
+  let field = |key : &str, value : Sexp| -> Sexp {
+    Sexp::List (vec![atom (key), value]) };
+  let entries = config . ordered_sources () . into_iter () . enumerate ()
+    . map (|(position, name)| {
+      let source = config . sources . get (&name)
+        . expect ("ordered source exists");
+      Sexp::List (vec![
+        field ("name", atom (&name)),
+        field ("abbreviation", source . abbreviation . as_deref ()
+          . map (&atom) . unwrap_or_else (|| atom ("nil"))),
+        field ("owned", atom (
+          if source . user_owns_it { "true" } else { "nil" })),
+        field ("position", Sexp::Atom (Atom::I (position as i64))),
+        field ("configured-path", atom (
+          &config . sources . configured_path (&name)
+            . unwrap_or (&source . path) . to_string_lossy ())),
+        field ("directory", atom (&source . path . to_string_lossy ())),
+        field ("directory-identity", atom (
+          &config . sources . directory_identity (&name)
+            . unwrap_or (&source . path) . to_string_lossy ())),
+      ])
+    }) . collect ();
+  field ("source-inventory", Sexp::List (entries))
 }
 
 fn handle_shutdown_request (

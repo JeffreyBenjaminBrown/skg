@@ -40,6 +40,7 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::
   org_to_uninterpreted_viewforest;
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
+use crate::serve::source_inventory_field;
 use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision,
   approved_pids_from_request,
@@ -597,6 +598,8 @@ pub(crate) fn select_and_stage_candidate (
     . expect ("selected incident has candidate") . id . clone ();
   let candidate = runtime . candidate (&candidate_id)
     . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
+  let selected_snapshot = runtime . selected_snapshot ();
+  let selected_config = &selected_snapshot . env . config;
   let settlements = {
     let interactive = runtime . interactive . lock ()
       . map_err (|_| "interactive session poisoned" . to_string ())?;
@@ -610,13 +613,15 @@ pub(crate) fn select_and_stage_candidate (
       runtime . transition_maintenance (|coordinator|
         coordinator . record_view_settlements (
           incident, epoch, settlements . clone ()))?;
-      candidate_selected_payload (&active, verified, &settlements)
+      candidate_selected_payload (
+        &active, selected_config, verified, &settlements)
     }
     ApplicationStaging::Challenge (challenge) => {
       runtime . transition_maintenance (|coordinator|
         coordinator . record_scalar_challenge (
           incident, epoch, challenge . clone ()))?;
-      scalar_challenge_payload (&active, verified, &challenge)
+      scalar_challenge_payload (
+        &active, selected_config, verified, &challenge)
     }
   }
 }
@@ -878,6 +883,7 @@ fn append_selected_fields (
 
 fn candidate_selected_payload (
   active      : &crate::maintenance::ActiveMaintenance,
+  config      : &crate::types::misc::SkgConfig,
   verified    : &VerifiedInitialArchive,
   settlements : &[ViewSettlementRecord],
 ) -> Result<String, String> {
@@ -885,6 +891,8 @@ fn candidate_selected_payload (
   fields . splice (0..0, maintenance_selection_identity_fields (
     active, "candidate-selected"));
   append_selected_fields (&mut fields, active)?;
+  fields . push (atom_field ("source-set", &active . source_set));
+  fields . push (source_inventory_field (config));
   fields . push (requested_id_outcomes_sexp (
     &active . requested_id_outcomes, false));
   fields . push (Sexp::List (vec![
@@ -896,6 +904,7 @@ fn candidate_selected_payload (
 
 fn scalar_challenge_payload (
   active    : &crate::maintenance::ActiveMaintenance,
+  config    : &crate::types::misc::SkgConfig,
   verified  : &VerifiedInitialArchive,
   challenge : &ScalarReleaseRecord,
 ) -> Result<String, String> {
@@ -903,6 +912,8 @@ fn scalar_challenge_payload (
   fields . splice (0..0, maintenance_selection_identity_fields (
     active, "needs-scalar-authorization"));
   append_selected_fields (&mut fields, active)?;
+  fields . push (atom_field ("source-set", &active . source_set));
+  fields . push (source_inventory_field (config));
   fields . push (requested_id_outcomes_sexp (
     &active . requested_id_outcomes, false));
   fields . push (atom_field ("operation", &challenge . operation));
@@ -1074,10 +1085,13 @@ fn approve_maintenance_scalar_release (
   let verified = runtime . verified_archive (&incident)
     . ok_or_else (|| "verified initial archive was not retained"
       . to_string ())?;
+  let selected_snapshot = runtime . selected_snapshot ();
+  let selected_config = &selected_snapshot . env . config;
   if !active . view_settlements . is_empty () {
     let settlements : Vec<ViewSettlementRecord> = active . view_settlements
       . values () . cloned () . collect ();
-    return candidate_selected_payload (&active, &verified, &settlements);
+    return candidate_selected_payload (
+      &active, selected_config, &verified, &settlements);
   }
   let candidate_id = active . candidate . as_ref ()
     . ok_or_else (|| "scalar authorization incident has no candidate"
@@ -1101,7 +1115,8 @@ fn approve_maintenance_scalar_release (
   runtime . transition_maintenance (|coordinator|
     coordinator . record_view_settlements (
       &incident, epoch, settlements . clone ()))?;
-  candidate_selected_payload (&active, &verified, &settlements)
+  candidate_selected_payload (
+    &active, selected_config, &verified, &settlements)
 }
 
 pub fn handle_cancel_maintenance_request (
@@ -1130,8 +1145,11 @@ pub fn handle_maintenance_status_request (
   runtime : &ServerRuntime,
 ) {
   let coordinator = runtime . maintenance . lock () . unwrap () . clone ();
+  let selected_snapshot = runtime . selected_snapshot ();
+  let selected_config = &selected_snapshot . env . config;
   let payload = match coordinator . state {
-    CoordinatorState::Active (active) => active_status_sexp (&active),
+    CoordinatorState::Active (active) =>
+      active_status_sexp_with_config (&active, Some (selected_config)),
     CoordinatorState::Pending (pending) => Sexp::List (vec![
       atom_field ("status", "pending"),
       atom_field ("pending-reason", pending . reason . label ()),
@@ -1150,6 +1168,13 @@ pub fn handle_maintenance_status_request (
 
 fn active_status_sexp (
   active : &crate::maintenance::ActiveMaintenance,
+) -> Sexp {
+  active_status_sexp_with_config (active, None)
+}
+
+fn active_status_sexp_with_config (
+  active : &crate::maintenance::ActiveMaintenance,
+  config : Option<&crate::types::misc::SkgConfig>,
 ) -> Sexp {
   let mut fields = vec![
     atom_field ("status", "active"),
@@ -1176,6 +1201,9 @@ fn active_status_sexp (
   ];
   if active . selected_store . is_some () {
     let _ = append_selected_fields (&mut fields, active);
+    if let Some (config) = config {
+      fields . push (source_inventory_field (config));
+    }
   }
   if let Some (scalar) = &active . scalar_release {
     fields . push (atom_field ("operation", &scalar . operation));
@@ -2193,8 +2221,10 @@ mod tests {
       prompt: "Approve the exact PID?" . into (),
       approved: false,
     };
+    let config = crate::dbs::filesystem::not_nodes::load_config (
+      "tests/source_sets/fixtures/skgconfig.toml") . unwrap ();
     let payload = scalar_challenge_payload (
-      &active, &verified, &challenge) . unwrap ();
+      &active, &config, &verified, &challenge) . unwrap ();
     assert! (payload . contains ("needs-scalar-authorization"));
     assert! (payload . contains (&format! (
       "(incident-id {})", active . incident_id)));
@@ -2202,6 +2232,8 @@ mod tests {
       "(maintenance-epoch {})", active . epoch . get ())));
     assert! (payload . contains (&format! (
       "(candidate-id {})", active . candidate . as_ref () . unwrap () . id)));
+    assert! (payload . contains ("(source-set all)"));
+    assert! (payload . contains ("(source-inventory ("));
     assert! (payload . contains ("ugly-pid"));
     assert! (!payload . contains ("view-settlements"));
     assert! (!payload . contains ("SECRET-STAGED-TEXT"));

@@ -161,6 +161,32 @@
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'origin-operation-required))))
 
+(ert-deftest test-skg-maintenance-selection-installs-replacement-sources ()
+  (let ((skg--maintenance-client-incident '(:epoch 9))
+        (skg--active-source-set-name "main")
+        (skg--server-source-inventory nil))
+    (skg--maintenance-record-selection
+     `((g1-graph-generation 2)
+       (g1-manifest-revision 6)
+       (tantivy-generation 4)
+       (server-evidence-sha256 ,(make-string 64 ?d))
+       (source-set all)
+       (source-inventory
+        (((name replacement)
+          (abbreviation rep)
+          (owned true)
+          (position 0)
+          (configured-path replacement-notes)
+          (directory /data/replacement-notes)
+          (directory-identity /data/replacement-notes))))))
+    (should (equal skg--active-source-set-name "all"))
+    (should (equal (plist-get (car skg--server-source-inventory) :name)
+                   "replacement"))
+    (should (equal
+             (plist-get skg--maintenance-client-incident
+                        :selected-source-set)
+             "all"))))
+
 (ert-deftest test-skg-rebuild-begins-maintenance-instead-of-raw-request ()
   (let ((skg--maintenance-client-incident nil)
         arguments)

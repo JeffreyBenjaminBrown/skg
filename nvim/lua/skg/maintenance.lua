@@ -211,6 +211,8 @@ end
 function M.record_selection (response)
   local incident = assert(state.maintenance_client_incident,
     'Maintenance selection arrived without client state')
+  local selected_source_set = payload.field_text(response, 'source-set')
+  local source_inventory = payload.field(response, 'source-inventory')
   local values = {
     g1_graph_generation = nat(response, 'g1-graph-generation'),
     g1_manifest_revision = nat(response, 'g1-manifest-revision'),
@@ -218,13 +220,26 @@ function M.record_selection (response)
     server_evidence_sha256 = payload.field_text(
       response, 'server-evidence-sha256'),
   }
-  if not sha256_valid(values.server_evidence_sha256) then
+  if not selected_source_set or source_inventory == nil
+     or not sha256_valid(values.server_evidence_sha256) then
     error('Maintenance selection authority is incomplete') end
   for key, value in pairs(values) do
     if incident[key] ~= nil and incident[key] ~= value then
       error('Maintenance selection changed its durable authority') end
     incident[key] = value
   end
+  if incident.selected_source_set ~= nil
+     and incident.selected_source_set ~= selected_source_set then
+    error('Maintenance selection changed its source-set authority') end
+  incident.selected_source_set = selected_source_set
+  require('skg.config').install_source_inventory(source_inventory)
+  if state.active_source_set_name ~= selected_source_set then
+    vim.notify('Skg full rebuild changed source-set from '
+      .. tostring(state.active_source_set_name) .. ' to '
+      .. selected_source_set)
+  end
+  state.active_source_set_name = selected_source_set
+  vim.g.skg_active_source_set_name = selected_source_set
   incident.phase = 'presenting'
   return incident
 end
