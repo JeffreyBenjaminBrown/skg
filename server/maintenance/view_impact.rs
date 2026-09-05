@@ -83,7 +83,8 @@ pub fn plan_incident_view_settlements (
       },
     };
     let (planned_disposition, requirement) = planned_settlement (
-      &frozen . kind, frozen . dirty, &assessment, state . is_some ());
+      &frozen . kind, frozen . dirty, frozen . disposable,
+      frozen . continuation_id . is_some (), &assessment, state . is_some ());
     settlements . push (ViewSettlementRecord {
       buffer_id: buffer_id . clone (),
       buffer_key: archived_buffer . map (|snapshot| snapshot . buffer_key . clone ()),
@@ -184,6 +185,8 @@ fn is_graph_view_kind (kind : &BufferKind) -> bool {
 fn planned_settlement (
   kind      : &BufferKind,
   dirty     : bool,
+  disposable : bool,
+  has_continuation : bool,
   impact    : &ViewImpactAssessment,
   has_forest : bool,
 ) -> (ViewDisposition, ViewSettlementRequirement) {
@@ -202,16 +205,21 @@ fn planned_settlement (
     ContentView | NewEmptyContentView | SearchView =>
       (RetainedClean, ReleaseAck),
     OverrideChoiceMenu if dirty => (Interrupted, RetirementAck),
-    OverrideChoiceMenu => (ClosedDisposable, CloseAck),
-    MetadataEditor | ForkConfirmation | RelationshipKindMenu if dirty =>
-      // Until the descriptor names its parent workflow, conservative
-      // retirement is the only safe disposition.
-      (Interrupted, RetirementAck),
-    MetadataEditor | ForkConfirmation | RelationshipKindMenu =>
+    OverrideChoiceMenu if disposable && !has_continuation =>
       (ClosedDisposable, CloseAck),
-    ReloadSelector | DiskConflict | IdStack | DerivedReport if dirty =>
+    OverrideChoiceMenu => (DetachedDerived, ReleaseAck),
+    MetadataEditor | ForkConfirmation | RelationshipKindMenu if dirty =>
+      (Interrupted, RetirementAck),
+    RelationshipKindMenu =>
+      // Its typed close path explicitly cancels the recorded continuation.
+      (ClosedDisposable, CloseAck),
+    MetadataEditor | ForkConfirmation | DiskConflict =>
+      (Interrupted, RetirementAck),
+    ReloadSelector => (DetachedDerived, ReleaseAck),
+    IdStack | DerivedReport
+      if dirty || !disposable || has_continuation =>
       (DetachedDerived, ReleaseAck),
-    ReloadSelector | DiskConflict | IdStack | DerivedReport =>
+    IdStack | DerivedReport =>
       (ClosedDisposable, CloseAck),
     DurableReport | RawSkgFile => (RetainedClean, ReleaseAck),
   }
@@ -378,17 +386,29 @@ mod tests {
       impacted: true, ..orthogonal . clone ()
     };
     assert_eq! (planned_settlement (
-      &BufferKind::ContentView, true, &impacted, true),
+      &BufferKind::ContentView, true, false, false, &impacted, true),
       (ViewDisposition::Interrupted,
        ViewSettlementRequirement::RetirementAck));
     assert_eq! (planned_settlement (
-      &BufferKind::SearchView, true, &orthogonal, true),
+      &BufferKind::SearchView, true, false, false, &orthogonal, true),
       (ViewDisposition::ReleasedUnimpacted,
        ViewSettlementRequirement::ReleaseAck));
     assert_eq! (planned_settlement (
-      &BufferKind::ContentView, false, &impacted, true),
+      &BufferKind::ContentView, false, false, false, &impacted, true),
       (ViewDisposition::Refreshed,
        ViewSettlementRequirement::ApplicationAck));
+    assert_eq! (planned_settlement (
+      &BufferKind::DerivedReport, false, false, false, &orthogonal, false),
+      (ViewDisposition::DetachedDerived,
+       ViewSettlementRequirement::ReleaseAck));
+    assert_eq! (planned_settlement (
+      &BufferKind::DerivedReport, false, true, false, &orthogonal, false),
+      (ViewDisposition::ClosedDisposable,
+       ViewSettlementRequirement::CloseAck));
+    assert_eq! (planned_settlement (
+      &BufferKind::ReloadSelector, false, true, true, &orthogonal, false),
+      (ViewDisposition::DetachedDerived,
+       ViewSettlementRequirement::ReleaseAck));
   }
 
   #[test]
