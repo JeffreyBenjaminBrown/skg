@@ -718,6 +718,29 @@ what's imperfect about what's done; choices determining the future.
   tests pass, all 400 Emacs tests pass with three optional undo-sidecar tests
   skipped, and the complete Neovim suite passes.  The slice was committed as
   separate server, Emacs and Neovim changes.
+- Completed the ordinary-save fence envisioned by the plan.  The Rust save
+  path prepares the complete create/replace/move/tombstone path union, binds
+  every target to selected BLAKE3 bytes or absence, validates the complete
+  union under graph-writer serialization immediately before mutation, and
+  queues exact observation on a typed mismatch.  Tests now additionally prove
+  refusal of semantically equal byte changes, atomic path replacement and one
+  drifted member of a multi-path batch without changing any other member.
+- Added independent raw-file save authority to both clients.  A configured
+  direct =.skg= buffer remembers exact SHA-256 bytes or absence from its actual
+  read, including a read which predates verified source inventory; every save
+  refuses a changed, deleted, created, symlinked or otherwise unsafe path and
+  queues process-owned observation.  Successful saves alone advance the
+  baseline, while an explicit revert establishes a new one.
+- Raw files now remain unconditionally unsaveable during a maintenance epoch.
+  Unlock compares each clean raw buffer with its pre-maintenance read fact,
+  retains an externally-stale warning until revert/save reconciliation, and
+  never replaces editor text.  The common maintenance entry function in each
+  client refuses and names every modified raw buffer before connecting or
+  allocating an incident, so partial reload and pending reconciliation have
+  the same preflight as pull and full rebuild.
+- Validation after the ordinary/raw save slice: all five focused Rust fence
+  tests pass; all 403 of 406 runnable Emacs tests pass with the three expected
+  optional undo-sidecar skips; and the complete Neovim suite passes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
