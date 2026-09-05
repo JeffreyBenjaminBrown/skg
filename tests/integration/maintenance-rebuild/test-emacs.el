@@ -11,13 +11,13 @@
   (unless condition (rebuild-test-fail "%s" message))
   (message "ok: %s" message))
 
-(defun rebuild-test-buffer ()
+(defun rebuild-test-buffer (id)
   (cl-find-if
    (lambda (buffer)
      (with-current-buffer buffer
        (and (derived-mode-p 'skg-content-view-mode)
             (string-match-p
-             "(id x)"
+             (format "(id %s)" id)
              (buffer-substring-no-properties (point-min) (point-max))))))
    (buffer-list)))
 
@@ -36,37 +36,41 @@
         (replace-match (cadr replacement) t t))
       (write-region (point-min) (point-max) config nil 'silent))))
 
+(defun rebuild-test-break-config ()
+  (with-temp-file (getenv "SKG_TEST_CONFIG")
+    (insert "this is not valid TOML = [\n")))
+
 (defun rebuild-test-main ()
   (setq skg-port (string-to-number (getenv "SKG_TEST_PORT")))
   (setq skg-config-dir
         (file-name-directory (getenv "SKG_TEST_CONFIG")))
 
   (skg-request-single-root-content-view-from-id "x")
-  (let ((view
-         (skg-test-wait-for
-          (lambda ()
-            (let ((buffer (rebuild-test-buffer)))
-              (and buffer
-                   (with-current-buffer buffer
-                     (string-match-p
-                      "title before rebuild"
-                      (buffer-substring-no-properties
-                       (point-min) (point-max))))
-                   buffer))))))
+  (let* ((view
+          (skg-test-wait-for
+           (lambda ()
+             (let ((buffer (rebuild-test-buffer "x")))
+               (and buffer
+                    (with-current-buffer buffer
+                      (string-match-p
+                       "title before rebuild"
+                       (buffer-substring-no-properties
+                        (point-min) (point-max))))
+                    buffer)))))
+         (ordinary-handler
+          (alist-get "full-rebuild"
+                     skg--maintenance-origin-operation-handlers
+                     nil nil #'equal)))
     (rebuild-test-check view "the pre-rebuild view loaded")
     (rebuild-test-check
      (equal skg--active-source-set-name "main")
      "the initial restricted source-set is active")
-    (let ((ordinary-handler
-           (alist-get "full-rebuild"
-                      skg--maintenance-origin-operation-handlers
-                      nil nil #'equal)))
-      (skg-register-maintenance-origin-handler
-       "full-rebuild"
-       (lambda (phase response)
-         (when (equal phase "archive-ready")
-           (rebuild-test-replace-config))
-         (funcall ordinary-handler phase response))))
+    (skg-register-maintenance-origin-handler
+     "full-rebuild"
+     (lambda (phase response)
+       (when (equal phase "archive-ready")
+         (rebuild-test-replace-config))
+       (funcall ordinary-handler phase response)))
     (skg-rebuild-dbs)
     (rebuild-test-check
      (skg-test-wait-for
@@ -87,13 +91,53 @@
      "the absent old source-set fell back exactly to all")
     (rebuild-test-check
      (equal (skg--source-names) '("replacement"))
-     "the client installed the replacement source inventory"))
+     "the client installed the replacement source inventory")
+
+    (skg-register-maintenance-origin-handler
+     "full-rebuild"
+     (lambda (phase response)
+       (when (equal phase "archive-ready")
+         (rebuild-test-break-config))
+       (funcall ordinary-handler phase response)))
+    (skg-rebuild-dbs)
+    (rebuild-test-check
+     (skg-test-wait-for
+      (lambda ()
+        (with-temp-buffer
+          (insert-file-contents (getenv "SKG_TEST_CONFIG"))
+          (string-prefix-p "this is not valid TOML" (buffer-string))))
+      15)
+     "the invalid replacement config reached the archive boundary")
+    (accept-process-output nil 1)
+    ;; Let the already-started server worker finish while this client is
+    ;; deliberately not relying on its best-effort unsolicited failure frame.
+    (sleep-for 1)
+    (skg-maintenance-status t)
+    (rebuild-test-check
+     (skg-test-wait-for
+      (lambda ()
+        (eq (plist-get skg--maintenance-client-incident :phase)
+            'server-blocked))
+      30)
+     "an invalid replacement config blocked before store mutation")
+    (skg-request-single-root-content-view-from-id "y")
+    (rebuild-test-check
+     (skg-test-wait-for
+      (lambda ()
+        (let ((buffer (rebuild-test-buffer "y")))
+          (and buffer
+               (with-current-buffer buffer
+                 (string-match-p
+                  "queryable after invalid preflight"
+                  (buffer-substring-no-properties (point-min) (point-max)))))))
+      15)
+     "the selected graph remained queryable after invalid preflight"))
   (rebuild-test-check
    (directory-files-recursively
     (expand-file-name "maintenance-archives" skg-config-dir)
     "FINALIZED\\'")
    "a finalized recovery archive remains on disk")
-  (message "PASS: full rebuild completed through Emacs maintenance")
+  (message "PASS: full rebuild and invalid preflight completed through Emacs maintenance")
   (kill-emacs 0))
 
 (run-at-time 75 nil (lambda () (rebuild-test-fail "full rebuild timed out")))

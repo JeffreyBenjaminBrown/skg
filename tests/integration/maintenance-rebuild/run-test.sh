@@ -36,6 +36,10 @@ cat > "$REPLACEMENT_SOURCE_ROOT/x.skg" << 'EOF'
 title: "title after rebuild"
 pid: "x"
 EOF
+cat > "$REPLACEMENT_SOURCE_ROOT/y.skg" << 'EOF'
+title: "queryable after invalid preflight"
+pid: "y"
+EOF
 
 AVAILABLE_PORT=$(find_available_port)
 DB_NAME=$(generate_db_name)
