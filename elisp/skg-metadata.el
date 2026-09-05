@@ -4,6 +4,7 @@
 
 (require 'org)
 (require 'org-fold-core)
+(require 'skg-buffer-registry)
 (require 'skg-config)
 (require 'skg-sexpr-search)
 
@@ -586,7 +587,9 @@ NOT save. Call `skg-request-save-buffer' afterward."
 RET on a settable role headline buries the menu and calls
 CONTINUATION with the role's kind symbol; RET on a read-only role
 explains the refusal; q aborts."
-  (let ((menu-buffer (get-buffer-create "*skg-relationship-kinds*")))
+  (let ((origin-buffer (current-buffer))
+        (origin-point (point))
+        (menu-buffer (get-buffer-create "*skg-relationship-kinds*")))
     (with-current-buffer menu-buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -614,11 +617,26 @@ explains the refusal; q aborts."
          (set-keymap-parent map org-mode-map)
          (define-key map (kbd "RET")
                      #'skg--relationship-kind-menu-choose)
-         (define-key map (kbd "q") #'quit-window)
+         (define-key map (kbd "q") #'skg--relationship-kind-menu-cancel)
          map))
       (setq skg--relationship-kind-menu-continuation continuation)
-      (goto-char (point-min)))
+      (goto-char (point-min))
+      (skg-register-buffer
+       menu-buffer 'relationship-kind-menu
+       :lifecycle 'attached-workflow
+       :disposable t
+       :continuation-id (org-id-uuid)
+       :origin-buffer origin-buffer
+       :origin-location (format "((point %d))" origin-point)
+       :recipe '((kind . "relationship-kind-menu"))
+       :last-fetched (skg-buffer-raw-text menu-buffer)))
     (pop-to-buffer menu-buffer)))
+
+(defun skg--relationship-kind-menu-cancel ()
+  "Explicitly cancel and close the relationship-kind continuation."
+  (interactive)
+  (kill-buffer (current-buffer))
+  (message "Relationship-kind selection cancelled"))
 
 (defun skg--relationship-kind-menu-choose ()
   "Choose the role headline at point in the relationship-kind menu."

@@ -99,7 +99,17 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
-    (setq-local skg-sexp-edit--is-activeNode is-activeNode)))
+    (setq-local skg-sexp-edit--is-activeNode is-activeNode)
+    (set-buffer-modified-p nil)
+    (skg-register-buffer
+     edit-buffer 'metadata-editor
+     :lifecycle 'attached-workflow
+     :continuation-id (org-id-uuid)
+     :origin-buffer source-buffer
+     :origin-location
+     (format "((start %d) (end %d))" sexp-start sexp-end)
+     :recipe '((kind . "metadata-editor"))
+     :last-fetched (skg-buffer-raw-text edit-buffer))))
 
 (defun skg-sexp-edit--decorate-with-heralds ()
   "Append, per headline, the herald its metadata path produces:

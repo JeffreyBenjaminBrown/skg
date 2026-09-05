@@ -174,6 +174,10 @@ content-view buffer (so the user can rotate each clone's source), records
 the origin, leaves skg-view-uri nil, and binds approve/decline plus an
 ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
+    (with-current-buffer origin
+      (skg-register-buffer
+       origin 'content-view :view-uri "view:fork-origin"
+       :recipe '((kind . "single-root") (root-id . "origin"))))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
                     "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (parentIs independent) indef (rels \"aO\"))) N-original\n"
@@ -183,6 +187,13 @@ ordinary-save refusal on C-x C-s."
                 (should-not buffer-read-only)
                 (should (null skg-view-uri))
                 (should (eq skg--fork-origin-buffer origin))
+                (should (eq (skg--buffer-record-kind skg--buffer-record)
+                            'fork-confirmation))
+                (should
+                 (equal (skg--buffer-record-origin-buffer-id
+                         skg--buffer-record)
+                        (skg--buffer-record-id
+                         (buffer-local-value 'skg--buffer-record origin))))
                 (should (derived-mode-p 'skg-content-view-mode))
                 (should (string-match-p "(id N)" (buffer-string)))
                 ;; approve / decline / save-refusal are reachable
@@ -197,6 +208,10 @@ ordinary-save refusal on C-x C-s."
   "The buffer-local key overrides must not leak into the shared
 skg-content-view-mode-map (which would break C-x C-s in real views)."
   (let ((origin (generate-new-buffer "*fork-origin-3*")))
+    (with-current-buffer origin
+      (skg-register-buffer
+       origin 'content-view :view-uri "view:fork-origin-3"
+       :recipe '((kind . "single-root") (root-id . "origin-3"))))
     (let ((buf (skg--show-fork-confirmation
                 "* (skg (node (source owned))) N-edited\n"
                 origin)))
@@ -248,6 +263,10 @@ saved metadata, so the server omitted the placeholder) prompts nothing."
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."
   (let ((origin (generate-new-buffer "*fork-origin-2*")))
+    (with-current-buffer origin
+      (skg-register-buffer
+       origin 'content-view :view-uri "view:fork-origin-2"
+       :recipe '((kind . "single-root") (root-id . "origin-2"))))
     (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (source foreign) indef)) N\n"
                                             origin)))
       (kill-buffer origin) ;; origin dies before approval

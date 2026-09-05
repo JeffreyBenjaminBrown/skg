@@ -542,8 +542,8 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
         (skg-content-view-mode)
         (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
         (goto-char (point-min)))
-      ;; nil view-uri: not a registered view, and the ordinary-save guard
-      ;; rejects M-x skg-request-save-buffer on it.
+      ;; nil view-uri: this is a registered attached workflow, not a live
+      ;; graph view, and the ordinary-save guard rejects saving it directly.
       (setq skg-view-uri nil)
       (setq skg--fork-origin-buffer save-buffer)
       (setq skg--fork-suppress-strip-on-kill nil)
@@ -560,7 +560,15 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
       (local-set-key (kbd "C-c C-c") #'skg-approve-fork)
       (local-set-key (kbd "C-c C-k") #'skg-decline-fork)
       (local-set-key (kbd "C-x C-s") #'skg--fork-confirmation-refuse-save)
-      (set-buffer-modified-p nil))
+      (set-buffer-modified-p nil)
+      (skg-register-buffer
+       buf 'fork-confirmation
+       :lifecycle 'attached-workflow
+       :continuation-id (org-id-uuid)
+       :origin-buffer save-buffer
+       :origin-location "((scope save))"
+       :recipe '((kind . "fork-confirmation"))
+       :last-fetched (skg-buffer-raw-text buf)))
     (display-buffer buf)
     buf))
 
@@ -644,6 +652,12 @@ carries no fork atom."
   (when (buffer-live-p skg--fork-origin-buffer)
     (with-current-buffer skg--fork-origin-buffer
       (skg-strip-fork-requests-in-buffer)))
+  (skg-register-buffer
+   (current-buffer) 'derived-report
+   :lifecycle 'client-local
+   :disposable nil
+   :recipe '((kind . "fork-declined-report"))
+   :last-fetched (skg-buffer-raw-text))
   (message
    "Fork declined; nothing was saved. This buffer is left open for reference."))
 

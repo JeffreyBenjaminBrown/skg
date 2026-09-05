@@ -20,6 +20,7 @@ local bijection = require('skg.sexpr.org_bijection')
 local config = require('skg.config')
 local defaults = require('skg.sexpr.activenode_defaults')
 local metadata = require('skg.metadata')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
@@ -120,6 +121,17 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   vim.b[buf].skg_edit_start = metadata_start
   vim.b[buf].skg_edit_length = metadata_length
   vim.b[buf].skg_edit_is_activeNode = is_activeNode
+  vim.bo[buf].modified = false
+  registry.register(buf, 'metadata-editor', {
+    lifecycle = 'attached-workflow',
+    continuation_id = registry.new_local_id(),
+    origin_buffer = source_buf,
+    origin_location = string.format(
+      '((line %d) (metadata-start %d) (metadata-length %d))',
+      line_number, metadata_start, metadata_length),
+    recipe = { kind = 'metadata-editor' },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.api.nvim_create_autocmd('BufWriteCmd', {
     buffer = buf,
     callback = function () M.commit(buf) end })

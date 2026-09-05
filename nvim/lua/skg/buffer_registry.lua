@@ -17,6 +17,10 @@ local function uuid ()
     value:sub(17, 20), value:sub(21, 32))
 end
 
+function M.new_local_id ()
+  return uuid()
+end
+
 function M.raw_text (buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local text = table.concat(lines, '\n')
@@ -104,16 +108,51 @@ local function conservative_ids (text)
   return result
 end
 
+local function attached_workflow_kind (kind)
+  return kind == 'metadata-editor'
+      or kind == 'fork-confirmation'
+      or kind == 'disk-conflict'
+end
+
+local function refresh_attached_workflow_count (origin_id, excluded_buf)
+  if not origin_id then return end
+  local origin = M.find_by_id and M.find_by_id(origin_id) or nil
+  if not origin then return end
+  local count = 0
+  for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
+    if candidate ~= excluded_buf and vim.api.nvim_buf_is_valid(candidate)
+       and vim.b[candidate].skg_origin_buffer_id == origin_id
+       and attached_workflow_kind(vim.b[candidate].skg_buffer_kind) then
+      count = count + 1
+    end
+  end
+  vim.b[origin].skg_attached_workflow_count = count
+end
+
 function M.register (buf, kind, options)
   options = options or {}
   local state = require('skg.state')
   local current = M.raw_text(buf)
   local last_fetched = options.last_fetched or current
+  local old_origin_id = vim.b[buf].skg_origin_buffer_id
+  local origin_record = nil
+  if options.origin_buffer then
+    origin_record = M.record(options.origin_buffer)
+    if not origin_record then
+      error('Skg workflow origin is not registered') end
+  end
   vim.b[buf].skg_buffer_id = vim.b[buf].skg_buffer_id or uuid()
   vim.b[buf].skg_buffer_kind = assert(kind, 'explicit Skg buffer kind required')
   vim.b[buf].skg_lifecycle = options.lifecycle or 'live-view'
   vim.b[buf].skg_disposable = options.disposable == true
   vim.b[buf].skg_continuation_id = options.continuation_id
+  if options.view_uri ~= nil then
+    vim.b[buf].skg_view_uri = options.view_uri end
+  vim.b[buf].skg_origin_buffer_id = origin_record and origin_record.id or nil
+  vim.b[buf].skg_origin_view_uri = origin_record and origin_record.view_uri or nil
+  vim.b[buf].skg_origin_application_token =
+    origin_record and origin_record.application_token or nil
+  vim.b[buf].skg_origin_location = options.origin_location
   vim.b[buf].skg_recipe = options.recipe or {}
   vim.b[buf].skg_root_ids = options.root_ids or conservative_ids(last_fetched)
   vim.b[buf].skg_record_source_set = state.active_source_set_name
@@ -127,7 +166,9 @@ function M.register (buf, kind, options)
     ((vim.b[buf].skg_application_token or 0) + 1)
   vim.b[buf].skg_last_fetched = last_fetched
   vim.b[buf].skg_last_fetched_sha256 = digest(last_fetched)
-  vim.b[buf].skg_logical_dirty = false
+  vim.b[buf].skg_logical_dirty = attached_workflow_kind(kind)
+  vim.b[buf].skg_attached_workflow_count =
+    vim.b[buf].skg_attached_workflow_count or 0
   vim.b[buf].skg_presentation_stale = false
   vim.b[buf].skg_search_stale = false
   vim.b[buf].skg_herald_bearing = last_fetched:find('(heralds', 1, true) ~= nil
@@ -138,6 +179,19 @@ function M.register (buf, kind, options)
       error('Active maintenance has no valid epoch') end
     M.lock_for_maintenance(buf, epoch)
   end
+  if not vim.b[buf].skg_registry_cleanup_installed then
+    vim.b[buf].skg_registry_cleanup_installed = true
+    vim.api.nvim_create_autocmd('BufWipeout', {
+      buffer = buf,
+      callback = function (event)
+        refresh_attached_workflow_count(
+          vim.b[event.buf].skg_origin_buffer_id, event.buf)
+      end,
+    })
+  end
+  refresh_attached_workflow_count(old_origin_id)
+  refresh_attached_workflow_count(
+    origin_record and origin_record.id or nil)
   return M.record(buf)
 end
 
@@ -150,6 +204,10 @@ function M.record (buf)
     lifecycle = vim.b[buf].skg_lifecycle,
     disposable = vim.b[buf].skg_disposable == true,
     continuation_id = vim.b[buf].skg_continuation_id,
+    origin_buffer_id = vim.b[buf].skg_origin_buffer_id,
+    origin_view_uri = vim.b[buf].skg_origin_view_uri,
+    origin_application_token = vim.b[buf].skg_origin_application_token,
+    origin_location = vim.b[buf].skg_origin_location,
     view_uri = vim.b[buf].skg_view_uri,
     recipe = vim.b[buf].skg_recipe,
     root_ids = vim.b[buf].skg_root_ids,
@@ -160,7 +218,8 @@ function M.record (buf)
     application_token = vim.b[buf].skg_application_token,
     last_fetched = vim.b[buf].skg_last_fetched,
     last_fetched_sha256 = vim.b[buf].skg_last_fetched_sha256,
-    logical_dirty = vim.b[buf].skg_logical_dirty == true,
+    logical_dirty = vim.b[buf].skg_logical_dirty == true
+      or (vim.b[buf].skg_attached_workflow_count or 0) > 0,
     maintenance_epoch = vim.b[buf].skg_maintenance_epoch,
     presentation_stale = vim.b[buf].skg_presentation_stale == true,
     search_stale = vim.b[buf].skg_search_stale == true,
@@ -175,7 +234,8 @@ function M.buffers ()
 end
 
 function M.dirty (buf)
-  return vim.bo[buf].modified or vim.b[buf].skg_logical_dirty == true
+  local record = M.record(buf)
+  return vim.bo[buf].modified or (record and record.logical_dirty == true)
 end
 
 function M.apply_server_text (buf, text, expected)
@@ -268,6 +328,16 @@ end
 
 function M.release_across_maintenance (buf, settlement, epoch, graph_generation)
   local record = M.validate_maintenance_buffer_base(buf, settlement, epoch)
+  if record.origin_buffer_id then
+    local origin = M.find_by_id(record.origin_buffer_id)
+    local origin_record = origin and M.record(origin) or nil
+    if not origin_record
+       or origin_record.view_uri ~= record.origin_view_uri
+       or origin_record.application_token ~= record.origin_application_token
+       or type(record.origin_location) ~= 'string' then
+      error('Attached workflow origin authority changed')
+    end
+  end
   vim.b[buf].skg_graph_generation = graph_generation
   vim.b[buf].skg_presentation_stale = true
   if record.kind == 'search-view' then vim.b[buf].skg_search_stale = true end
@@ -310,6 +380,11 @@ function M.close_for_maintenance (buf, settlement, epoch)
   local record = M.validate_maintenance_buffer_base(buf, settlement, epoch)
   if not record.disposable or M.dirty(buf) then
     error('Maintenance refuses to close a non-disposable or dirty buffer') end
+  if record.continuation_id then
+    if record.kind ~= 'relationship-kind-menu' then
+      error('Maintenance refuses to close a live continuation') end
+    vim.b[buf].skg_continuation_id = nil
+  end
   local uri = vim.b[buf].skg_view_uri
   vim.b[buf].skg_view_uri = nil
   local ok, error_text = pcall(vim.api.nvim_buf_delete, buf, { force = false })
@@ -373,6 +448,16 @@ function M.unlock_after_maintenance (buf, epoch)
   if not M.record(buf) or vim.b[buf].skg_maintenance_epoch ~= epoch then
     return end
   vim.b[buf].skg_maintenance_epoch = nil
+  if vim.b[buf].skg_lifecycle == 'detached-recovery'
+     and vim.b[buf].skg_origin_buffer_id then
+    local origin_id = vim.b[buf].skg_origin_buffer_id
+    vim.b[buf].skg_continuation_id = nil
+    vim.b[buf].skg_origin_buffer_id = nil
+    vim.b[buf].skg_origin_view_uri = nil
+    vim.b[buf].skg_origin_application_token = nil
+    vim.b[buf].skg_origin_location = nil
+    refresh_attached_workflow_count(origin_id)
+  end
   if not vim.b[buf].skg_save_locked then vim.bo[buf].modifiable = true end
 end
 
@@ -388,6 +473,10 @@ function M.census ()
       lifecycle = record.lifecycle,
       disposable = record.disposable,
       continuation_id = record.continuation_id,
+      origin_buffer_id = record.origin_buffer_id,
+      origin_view_uri = record.origin_view_uri,
+      origin_application_token = record.origin_application_token,
+      origin_location = record.origin_location,
       view_uri = record.view_uri or 'nil',
       recipe = M.recipe_text(record.recipe),
       root_ids = normalized_strings(record.root_ids),
@@ -427,6 +516,14 @@ function M.census_payload ()
                 descriptor.disposable and 'true' or 'nil'),
       atom_pair(sexpr, 'continuation-id',
                 descriptor.continuation_id or 'nil'),
+      atom_pair(sexpr, 'origin-buffer-id',
+                descriptor.origin_buffer_id or 'nil'),
+      atom_pair(sexpr, 'origin-view-uri',
+                descriptor.origin_view_uri or 'nil'),
+      atom_pair(sexpr, 'origin-application-token',
+                descriptor.origin_application_token or 'nil'),
+      atom_pair(sexpr, 'origin-location',
+                descriptor.origin_location or 'nil'),
       atom_pair(sexpr, 'view-uri', descriptor.view_uri),
       atom_pair(sexpr, 'recipe', descriptor.recipe),
       { sexpr.symbol('root-ids'), descriptor.root_ids },

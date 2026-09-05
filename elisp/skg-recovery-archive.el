@@ -377,6 +377,18 @@
      (skg-recovery--field
       'continuation-id
       (or (skg--buffer-record-continuation-id record) "none"))
+     (skg-recovery--field
+      'origin-buffer-id
+      (or (skg--buffer-record-origin-buffer-id record) "none"))
+     (skg-recovery--field
+      'origin-view-uri
+      (or (skg--buffer-record-origin-view-uri record) "none"))
+     (skg-recovery--field
+      'origin-application-token
+      (or (skg--buffer-record-origin-application-token record) "none"))
+     (skg-recovery--field
+      'origin-location
+      (or (skg--buffer-record-origin-location record) "none"))
      (skg-recovery--field 'name (buffer-name buffer))
      (skg-recovery--field
       'view-uri (or (skg--buffer-record-view-uri record) "none"))
@@ -402,7 +414,7 @@
       'dirty (if (skg-buffer-dirty-p buffer) "true" "nil"))
      (skg-recovery--field
       'logical-dirty
-      (if (skg--buffer-record-logical-dirty record) "true" "nil"))
+      (if (skg-buffer-logical-dirty-p buffer) "true" "nil"))
      (skg-recovery--field
       'maintenance-epoch (skg--buffer-record-maintenance-epoch record))
      (skg-recovery--field
@@ -525,6 +537,18 @@
      (skg-recovery--field
       'continuation-id
       (or (skg--buffer-record-continuation-id record) "none"))
+     (skg-recovery--field
+      'origin-buffer-id
+      (or (skg--buffer-record-origin-buffer-id record) "none"))
+     (skg-recovery--field
+      'origin-view-uri
+      (or (skg--buffer-record-origin-view-uri record) "none"))
+     (skg-recovery--field
+      'origin-application-token
+      (or (skg--buffer-record-origin-application-token record) "none"))
+     (skg-recovery--field
+      'origin-location
+      (or (skg--buffer-record-origin-location record) "none"))
      (skg-recovery--field 'name (buffer-name buffer))
      (skg-recovery--field
       'view-uri (or (skg--buffer-record-view-uri record) "none"))
@@ -549,7 +573,7 @@
                           (if (skg-buffer-dirty-p buffer) "true" "nil"))
      (skg-recovery--field
       'logical-dirty
-      (if (skg--buffer-record-logical-dirty record) "true" "nil"))
+      (if (skg-buffer-logical-dirty-p buffer) "true" "nil"))
      (skg-recovery--field
       'maintenance-epoch (skg--buffer-record-maintenance-epoch record))
      (skg-recovery--field

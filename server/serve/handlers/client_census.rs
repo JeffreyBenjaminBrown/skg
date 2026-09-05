@@ -192,6 +192,11 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
       lifecycle: field (&record, "lifecycle")?,
       disposable: bool_field (&record, "disposable")?,
       continuation_id: optional_text_field (&record, "continuation-id")?,
+      origin_buffer_id: optional_text_field (&record, "origin-buffer-id")?,
+      origin_view_uri: optional_text_field (&record, "origin-view-uri")?,
+      origin_application_token: optional_unsigned_field (
+        &record, "origin-application-token")?,
+      origin_location: optional_text_field (&record, "origin-location")?,
       view_uri: if uri == "nil" { None }
                 else { Some (ViewUri::from_client_string (uri)) },
       recipe: normalized_recipe_field (&record)?,
@@ -451,6 +456,8 @@ mod tests {
       "(((buffer-id . \"buffer-1\") (kind . \"search-view\") ",
       "(lifecycle . \"live-view\") (disposable . \"nil\") ",
       "(continuation-id . \"continuation-1\") ",
+      "(origin-buffer-id . \"nil\") (origin-view-uri . \"nil\") ",
+      "(origin-application-token . \"nil\") (origin-location . \"nil\") ",
       "(view-uri . \"search:dog\") ",
       "(recipe . \"((body \\\"nil\\\") (kind \\\"search\\\") ",
       "(operators \\\"true\\\") (regex \\\"true\\\") ",

@@ -5,6 +5,7 @@
 -- view cases and test-skg-metadata-editing.el's spirit).
 
 local defaults = require('skg.sexpr.activenode_defaults')
+local registry = require('skg.buffer_registry')
 local metadata = require('skg.metadata')
 local metadata_edit = require('skg.metadata_edit')
 local modify_graph = require('skg.modify_graph')
@@ -245,10 +246,20 @@ describe('skg.metadata_edit', function ()
   it('opens the expanded view and commits an edit back', function ()
     local source_buf = buffer_with(
       '* (skg (node (id abc) (source public))) my title')
+    registry.register(source_buf, 'content-view', {
+      view_uri = 'view:test-metadata',
+      recipe = { kind = 'single-root', root_id = 'abc' },
+      root_ids = { 'abc' },
+    })
     metadata_edit.edit_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     assert.is_truthy(vim.api.nvim_buf_get_name(edit_buf)
                      :find('metadata%-edit'))
+    local edit_record = registry.record(edit_buf)
+    assert.are.equal('metadata-editor', edit_record.kind)
+    assert.are.equal(
+      registry.record(source_buf).id, edit_record.origin_buffer_id)
+    assert.is_true(registry.record(source_buf).logical_dirty)
     -- Flip indef's value to true, then commit.
     for line = 1, vim.api.nvim_buf_line_count(edit_buf) do
       if metadata.line_text(line):match('^%*+ indef$') then
@@ -269,6 +280,11 @@ describe('skg.metadata_edit', function ()
     -- Mirrors the empty-node skeleton cases of
     -- test-skg-insert-heading-source-prompt.el.
     local source_buf = buffer_with('* just a plain headline')
+    registry.register(source_buf, 'content-view', {
+      view_uri = 'view:test-empty-metadata',
+      recipe = { kind = 'single-root', root_id = 'draft' },
+      root_ids = { 'draft' },
+    })
     metadata_edit.edit_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     local text = table.concat(

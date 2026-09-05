@@ -10,7 +10,8 @@
   id kind lifecycle disposable continuation-id buffer view-uri recipe root-ids
   source-set graph-generation presentation-generation server-revision
   application-token last-fetched last-fetched-sha256 logical-dirty
-  origin-buffer-id origin-token transient-lock-reasons maintenance-epoch
+  origin-buffer-id origin-view-uri origin-application-token origin-location
+  attached-workflow-count transient-lock-reasons maintenance-epoch
   presentation-stale search-stale herald-bearing)
 
 (defvar skg--buffer-registry (make-hash-table :test #'equal)
@@ -84,11 +85,22 @@
 
 (cl-defun skg-register-buffer
     (buffer kind &key view-uri recipe root-ids lifecycle disposable
-            continuation-id last-fetched server-revision graph-generation
-            presentation-generation application-token)
+            continuation-id origin-buffer origin-location last-fetched
+            server-revision graph-generation presentation-generation
+            application-token)
   "Register BUFFER under an explicit KIND and return its durable record."
   (with-current-buffer buffer
     (let* ((existing skg--buffer-record)
+           (old-origin-id
+            (and existing (skg--buffer-record-origin-buffer-id existing)))
+           (origin-record
+            (when origin-buffer
+              (unless (buffer-live-p origin-buffer)
+                (error "Skg workflow origin is no longer live"))
+              (buffer-local-value 'skg--buffer-record origin-buffer)))
+           (_
+            (when (and origin-buffer (null origin-record))
+              (error "Skg workflow origin is not registered")))
            (id (or (and existing (skg--buffer-record-id existing))
                    (org-id-uuid)))
            (text (or last-fetched (skg-buffer-raw-text buffer)))
@@ -118,7 +130,23 @@
                           1))
                     :last-fetched text
                     :last-fetched-sha256 (skg--sha256-text text)
-                    :logical-dirty nil
+                    :logical-dirty
+                    (memq kind '(metadata-editor fork-confirmation
+                                  disk-conflict))
+                    :origin-buffer-id
+                    (and origin-record (skg--buffer-record-id origin-record))
+                    :origin-view-uri
+                    (and origin-record
+                         (skg--buffer-record-view-uri origin-record))
+                    :origin-application-token
+                    (and origin-record
+                         (skg--buffer-record-application-token origin-record))
+                    :origin-location origin-location
+                    :attached-workflow-count
+                    (or (and existing
+                             (skg--buffer-record-attached-workflow-count
+                              existing))
+                        0)
                     :transient-lock-reasons nil
                     :maintenance-epoch nil
                     :presentation-stale nil
@@ -141,12 +169,21 @@
           (unless (natnump epoch)
             (error "Active maintenance has no valid epoch"))
           (skg-lock-buffer-for-maintenance buffer epoch)))
+      (when old-origin-id
+        (skg--refresh-attached-workflow-count old-origin-id))
+      (when origin-record
+        (skg--refresh-attached-workflow-count
+         (skg--buffer-record-id origin-record)))
       record)))
 
 (defun skg-unregister-current-buffer ()
   (when skg--buffer-record
-    (remhash (skg--buffer-record-id skg--buffer-record)
-             skg--buffer-registry)))
+    (let ((origin-id (skg--buffer-record-origin-buffer-id
+                      skg--buffer-record)))
+      (remhash (skg--buffer-record-id skg--buffer-record)
+               skg--buffer-registry)
+      (when origin-id
+        (skg--refresh-attached-workflow-count origin-id)))))
 
 (defun skg-registered-buffers ()
   "Return live registered buffers, pruning dead entries."
@@ -166,11 +203,41 @@
                               skg--buffer-registry))))
     (when (buffer-live-p buffer) buffer)))
 
+(defun skg--attached-workflow-record-p (record origin-id)
+  (and record
+       (equal (skg--buffer-record-origin-buffer-id record) origin-id)
+       (memq (skg--buffer-record-kind record)
+             '(metadata-editor fork-confirmation disk-conflict))))
+
+(defun skg--refresh-attached-workflow-count (origin-id)
+  "Recompute the unfinished workflow count attached to ORIGIN-ID."
+  (when-let ((origin (skg-find-buffer-by-id origin-id)))
+    (let ((count 0))
+      (dolist (buffer (skg-registered-buffers))
+        (when (and (not (eq buffer origin))
+                   (skg--attached-workflow-record-p
+                    (buffer-local-value 'skg--buffer-record buffer)
+                    origin-id))
+          (setq count (1+ count))))
+      (with-current-buffer origin
+        (setf (skg--buffer-record-attached-workflow-count
+               skg--buffer-record)
+              count)))))
+
+(defun skg-buffer-logical-dirty-p (&optional buffer)
+  "Whether BUFFER has local logical state not represented by modified-p."
+  (with-current-buffer (or buffer (current-buffer))
+    (and skg--buffer-record
+         (or (skg--buffer-record-logical-dirty skg--buffer-record)
+             (> (or (skg--buffer-record-attached-workflow-count
+                     skg--buffer-record)
+                    0)
+                0)))))
+
 (defun skg-buffer-dirty-p (&optional buffer)
   (with-current-buffer (or buffer (current-buffer))
     (or (buffer-modified-p)
-        (and skg--buffer-record
-             (skg--buffer-record-logical-dirty skg--buffer-record)))))
+        (skg-buffer-logical-dirty-p))))
 
 (defun skg--maintenance-settlement-value (settlement key)
   (cadr (assoc key settlement)))
@@ -234,7 +301,10 @@
     (buffer settlement epoch graph-generation)
   "Preserve BUFFER exactly while associating it with selected graph G1."
   (with-current-buffer buffer
-    (skg-validate-maintenance-buffer-base buffer settlement epoch)
+    (let ((record (skg-validate-maintenance-buffer-base
+                   buffer settlement epoch)))
+      (when (skg--buffer-record-origin-buffer-id record)
+        (skg--validate-attached-workflow-origin record)))
     (setf (skg--buffer-record-graph-generation skg--buffer-record)
           graph-generation
           (skg--buffer-record-presentation-stale skg--buffer-record) t
@@ -243,6 +313,21 @@
               (eq (skg--buffer-record-kind skg--buffer-record)
                   'search-view)))
     skg--buffer-record))
+
+(defun skg--validate-attached-workflow-origin (record)
+  "Require RECORD's exact originating buffer authority to remain live."
+  (let* ((origin-id (skg--buffer-record-origin-buffer-id record))
+         (origin (skg-find-buffer-by-id origin-id)))
+    (unless (buffer-live-p origin)
+      (error "Attached workflow origin %s is no longer live" origin-id))
+    (let ((origin-record (buffer-local-value 'skg--buffer-record origin)))
+      (unless (and origin-record
+                   (equal (skg--buffer-record-view-uri origin-record)
+                          (skg--buffer-record-origin-view-uri record))
+                   (equal (skg--buffer-record-application-token origin-record)
+                          (skg--buffer-record-origin-application-token record))
+                   (stringp (skg--buffer-record-origin-location record)))
+        (error "Attached workflow origin authority changed")))))
 
 (defun skg-retire-buffer-for-maintenance
     (buffer settlement epoch incident-id)
@@ -276,6 +361,16 @@
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (skg-validate-maintenance-buffer-base buffer settlement epoch)
+      (unless (and (skg--buffer-record-disposable skg--buffer-record)
+                   (not (skg-buffer-dirty-p buffer)))
+        (error "Maintenance refuses to close a non-disposable or dirty buffer"))
+      (when (skg--buffer-record-continuation-id skg--buffer-record)
+        (unless (eq (skg--buffer-record-kind skg--buffer-record)
+                    'relationship-kind-menu)
+          (error "Maintenance refuses to close a live continuation"))
+        (when (boundp 'skg--relationship-kind-menu-continuation)
+          (setq skg--relationship-kind-menu-continuation nil))
+        (setf (skg--buffer-record-continuation-id skg--buffer-record) nil))
       (remove-hook 'kill-buffer-hook #'skg-send-close-view t)
       (unless (kill-buffer buffer)
         (error "Maintenance close was refused for buffer %s"
@@ -344,7 +439,20 @@
       (when skg--maintenance-lock-overlay
         (delete-overlay skg--maintenance-lock-overlay)
         (setq skg--maintenance-lock-overlay nil))
-      (setf (skg--buffer-record-maintenance-epoch skg--buffer-record) nil))))
+      (let ((origin-id
+             (and (eq (skg--buffer-record-lifecycle skg--buffer-record)
+                      'detached-recovery)
+                  (skg--buffer-record-origin-buffer-id skg--buffer-record))))
+        (setf (skg--buffer-record-maintenance-epoch skg--buffer-record) nil)
+        (when origin-id
+          (setf (skg--buffer-record-continuation-id skg--buffer-record) nil
+                (skg--buffer-record-origin-buffer-id skg--buffer-record) nil
+                (skg--buffer-record-origin-view-uri skg--buffer-record) nil
+                (skg--buffer-record-origin-application-token
+                 skg--buffer-record)
+                nil
+                (skg--buffer-record-origin-location skg--buffer-record) nil)
+          (skg--refresh-attached-workflow-count origin-id))))))
 
 (defun skg-buffer-status-indicator ()
   (when skg--buffer-record
@@ -398,6 +506,14 @@
             . ,(if (skg--buffer-record-disposable record) "true" "nil"))
            (continuation-id
             . ,(or (skg--buffer-record-continuation-id record) "nil"))
+           (origin-buffer-id
+            . ,(or (skg--buffer-record-origin-buffer-id record) "nil"))
+           (origin-view-uri
+            . ,(or (skg--buffer-record-origin-view-uri record) "nil"))
+           (origin-application-token
+            . ,(or (skg--buffer-record-origin-application-token record) "nil"))
+           (origin-location
+            . ,(or (skg--buffer-record-origin-location record) "nil"))
            (view-uri . ,(or (skg--buffer-record-view-uri record) "nil"))
            (recipe . ,(skg-buffer-recipe-text
                        (skg--buffer-record-recipe record)))
@@ -418,7 +534,7 @@
                             (consp pending-undo-list)))
                    "true" "nil"))
            (logical-dirty
-            . ,(if (skg--buffer-record-logical-dirty record) "true" "nil"))
+            . ,(if (skg-buffer-logical-dirty-p buffer) "true" "nil"))
            (maintenance-epoch
             . ,(or (skg--buffer-record-maintenance-epoch record) "nil"))
            (modification-tick . ,(buffer-chars-modified-tick))

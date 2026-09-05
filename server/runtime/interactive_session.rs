@@ -53,6 +53,10 @@ pub struct CensusDescriptor {
   pub lifecycle            : String,
   pub disposable           : bool,
   pub continuation_id      : Option<String>,
+  pub origin_buffer_id     : Option<String>,
+  pub origin_view_uri      : Option<String>,
+  pub origin_application_token : Option<u64>,
+  pub origin_location      : Option<String>,
   pub view_uri             : Option<ViewUri>,
   pub recipe               : String,
   pub root_ids             : Vec<String>,
@@ -81,12 +85,33 @@ impl CensusDescriptor {
       return Err ("census buffer source-set is empty" . into ()); }
     if self . logical_dirty && !self . dirty {
       return Err ("logically dirty census buffer is not marked dirty" . into ()); }
+    match &self . origin_buffer_id {
+      Some (origin_id) => {
+        if origin_id == &self . buffer_id {
+          return Err ("census workflow names itself as its origin" . into ()); }
+        if self . origin_application_token . is_none () {
+          return Err ("census workflow has no origin application token" . into ()); }
+        if self . origin_location . as_deref () . unwrap_or ("") . is_empty () {
+          return Err ("census workflow has no origin location" . into ()); }
+      }
+      None if self . origin_view_uri . is_some ()
+           || self . origin_application_token . is_some ()
+           || self . origin_location . is_some () =>
+      {
+        return Err ("census buffer has partial origin authority" . into ());
+      }
+      None => {}
+    }
     Ok (crate::maintenance::FrozenBufferRecord {
       buffer_id: self . buffer_id . clone (),
       kind: crate::maintenance::BufferKind::parse (&self . kind)?,
       lifecycle: self . lifecycle . clone (),
       disposable: self . disposable,
       continuation_id: self . continuation_id . clone (),
+      origin_buffer_id: self . origin_buffer_id . clone (),
+      origin_view_uri: self . origin_view_uri . clone (),
+      origin_application_token: self . origin_application_token,
+      origin_location: self . origin_location . clone (),
       view_uri: self . view_uri . as_ref ()
         . map (ViewUri::repr_in_client),
       recipe: self . recipe . clone (),

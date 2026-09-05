@@ -51,6 +51,12 @@ skg-config-dir is set and `skg--source-names' works."
         (with-temp-buffer
           (insert org-text)
           (skg-content-view-mode)
+          (skg-register-buffer
+           (current-buffer) 'content-view
+           :view-uri "view:test-relationship"
+           :recipe '((kind . "single-root") (root-id . "owner"))
+           :root-ids '("owner")
+           :last-fetched org-text)
           (goto-char (point-min))
           (funcall body-fn))
       (delete-file config-file)
@@ -561,23 +567,32 @@ on a read-only role refuses; RET on a relation (level-1) headline
 does neither."
   (unwind-protect
       (progn
-        (let (chosen)
-          (cl-letf (((symbol-function 'pop-to-buffer)
-                     (lambda (buffer &rest _) (set-buffer buffer))))
-            (skg--select-relationship-kind
-             (lambda (kind) (setq chosen kind))))
-          (with-current-buffer "*skg-relationship-kinds*"
-            (goto-char (point-min))
-            (search-forward "* subscribes")
-            (beginning-of-line)
-            (skg--relationship-kind-menu-choose) ;; level-1: a no-op
-            (should-not chosen)
-            (should-error (test--choose-menu-role "** subscriber")
-                          :type 'user-error))
-          (test--choose-menu-role "** contained")
-          (should (eq chosen 'contained))
-          ;; Choosing killed the menu buffer.
-          (should-not (get-buffer "*skg-relationship-kinds*"))))
+        (with-temp-buffer
+          (skg-register-buffer
+           (current-buffer) 'content-view
+           :view-uri "view:test-relationship-menu"
+           :recipe '((kind . "single-root") (root-id . "origin")))
+          (let (chosen)
+            (cl-letf (((symbol-function 'pop-to-buffer)
+                       (lambda (buffer &rest _) (set-buffer buffer))))
+              (skg--select-relationship-kind
+               (lambda (kind) (setq chosen kind))))
+            (with-current-buffer "*skg-relationship-kinds*"
+              (should (eq (skg--buffer-record-kind skg--buffer-record)
+                          'relationship-kind-menu))
+              (should (skg--buffer-record-continuation-id
+                       skg--buffer-record))
+              (goto-char (point-min))
+              (search-forward "* subscribes")
+              (beginning-of-line)
+              (skg--relationship-kind-menu-choose) ;; level-1: a no-op
+              (should-not chosen)
+              (should-error (test--choose-menu-role "** subscriber")
+                            :type 'user-error))
+            (test--choose-menu-role "** contained")
+            (should (eq chosen 'contained))
+            ;; Choosing killed the menu buffer.
+            (should-not (get-buffer "*skg-relationship-kinds*")))))
     (when (get-buffer "*skg-relationship-kinds*")
       (kill-buffer "*skg-relationship-kinds*"))))
 

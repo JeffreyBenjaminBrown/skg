@@ -167,6 +167,59 @@
             (should (natnump (cdr (assq 'modification-tick descriptor))))))
       (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
+(ert-deftest test-skg-attached-workflow-carries-origin-and-dirties-parent ()
+  (let ((origin (generate-new-buffer " *skg-workflow-origin*"))
+        (child (generate-new-buffer " *skg-workflow-child*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--server-store-state '((graph-generation . 7))))
+    (unwind-protect
+        (progn
+          (with-current-buffer origin
+            (insert "* Origin\n")
+            (skg-register-buffer
+             origin 'content-view :view-uri "view:origin"
+             :recipe '((kind . "single-root") (root-id . "origin"))
+             :application-token 5)
+            (set-buffer-modified-p nil))
+          (with-current-buffer child
+            (insert "* Draft metadata\n")
+            (set-buffer-modified-p nil)
+            (skg-register-buffer
+             child 'metadata-editor :lifecycle 'attached-workflow
+             :continuation-id "continuation-1" :origin-buffer origin
+             :origin-location "((start 1) (end 9))"
+             :recipe '((kind . "metadata-editor"))))
+          (should (skg-buffer-logical-dirty-p origin))
+          (should (skg-buffer-dirty-p child))
+          (let* ((child-id (buffer-local-value
+                            'skg--buffer-record child))
+                 (descriptor
+                  (seq-find
+                   (lambda (entry)
+                     (equal (cdr (assq 'buffer-id entry))
+                            (skg--buffer-record-id child-id)))
+                   (skg-buffer-census))))
+            (should
+             (equal (cdr (assq 'origin-buffer-id descriptor))
+                    (skg--buffer-record-id
+                     (buffer-local-value 'skg--buffer-record origin))))
+            (should (equal (cdr (assq 'origin-view-uri descriptor))
+                           "view:origin"))
+            (should (equal (cdr (assq 'origin-application-token descriptor))
+                           5))
+            (should (equal (cdr (assq 'origin-location descriptor))
+                           "((start 1) (end 9))")))
+          (with-current-buffer origin
+            (skg-register-buffer
+             origin 'content-view :view-uri "view:origin"
+             :recipe '((kind . "single-root") (root-id . "origin"))
+             :application-token 5))
+          (should (skg-buffer-logical-dirty-p origin))
+          (kill-buffer child)
+          (should-not (skg-buffer-logical-dirty-p origin)))
+      (when (buffer-live-p child) (kill-buffer child))
+      (when (buffer-live-p origin) (kill-buffer origin)))))
+
 (ert-deftest test-skg-maintenance-census-is-incident-qualified ()
   (let (submitted)
     (cl-letf (((symbol-function 'skg-buffer-census) (lambda () nil))

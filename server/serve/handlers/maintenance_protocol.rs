@@ -190,6 +190,7 @@ fn freeze_maintenance_census (
       . collect::<Vec<_>> ();
     (client, census)
   };
+  validate_census_parentage (&census)?;
   validate_client_archive_capability (&client, &census)?;
   if census . iter () . any (|descriptor|
        descriptor . maintenance_epoch != Some (epoch . get ()))
@@ -215,6 +216,58 @@ fn freeze_maintenance_census (
     "locked-census-accepted-publish-initial-archive", &active,
     &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
     &snapshot . env . config . maintenance_archive_identity . to_string_lossy ()))
+}
+
+fn validate_census_parentage (census : &[CensusDescriptor])
+  -> Result<(), String>
+{
+  let by_id : std::collections::HashMap<_, _> = census . iter ()
+    . map (|descriptor| (descriptor . buffer_id . as_str (), descriptor))
+    . collect ();
+  for descriptor in census {
+    let attached = matches! (descriptor . kind . as_str (),
+      "metadata-editor" | "fork-confirmation" | "relationship-kind-menu"
+      | "disk-conflict");
+    let Some (origin_id) = descriptor . origin_buffer_id . as_deref () else {
+      if attached {
+        return Err (format! (
+          "attached workflow '{}' has no origin buffer",
+          descriptor . buffer_id)); }
+      continue;
+    };
+    if !attached {
+      return Err (format! (
+        "non-workflow buffer '{}' carries origin authority",
+        descriptor . buffer_id)); }
+    let origin = by_id . get (origin_id) . ok_or_else (|| format! (
+      "workflow '{}' names absent origin '{}'",
+      descriptor . buffer_id, origin_id))?;
+    let origin_uri = origin . view_uri . as_ref ()
+      . map (ViewUri::repr_in_client);
+    if descriptor . origin_view_uri != origin_uri
+    || descriptor . origin_application_token != Some (origin . application_token)
+    {
+      return Err (format! (
+        "workflow '{}' origin authority changed before census",
+        descriptor . buffer_id)); }
+    if matches! (descriptor . kind . as_str (),
+         "metadata-editor" | "fork-confirmation" | "disk-conflict")
+       && (!descriptor . dirty || !descriptor . logical_dirty
+           || !origin . dirty || !origin . logical_dirty)
+    {
+      return Err (format! (
+        "unfinished workflow '{}' did not make itself and its origin logically dirty",
+        descriptor . buffer_id));
+    }
+    if descriptor . kind == "relationship-kind-menu"
+       && (!descriptor . disposable || descriptor . continuation_id . is_none ())
+    {
+      return Err (format! (
+        "relationship menu '{}' lacks cancellable disposable authority",
+        descriptor . buffer_id));
+    }
+  }
+  Ok (( ))
 }
 
 pub fn handle_maintenance_archive_ready_request (
@@ -980,6 +1033,15 @@ fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp 
     atom_field ("buffer-key", record . buffer_key . as_deref () . unwrap_or ("none")),
     atom_field ("kind", record . kind . label ()),
     atom_field ("view-uri", record . view_uri . as_deref () . unwrap_or ("none")),
+    atom_field ("origin-buffer-id",
+      record . origin_buffer_id . as_deref () . unwrap_or ("none")),
+    atom_field ("origin-view-uri",
+      record . origin_view_uri . as_deref () . unwrap_or ("none")),
+    atom_field ("origin-application-token",
+      &record . origin_application_token . map (|value| value . to_string ())
+        . unwrap_or_else (|| "none" . into ())),
+    atom_field ("origin-location",
+      record . origin_location . as_deref () . unwrap_or ("none")),
     atom_field ("dirty", if record . dirty { "true" } else { "nil" }),
     atom_field ("impacted", if record . impacted { "true" } else { "nil" }),
     atom_field ("parse-uncertain",
@@ -1908,6 +1970,50 @@ mod tests {
   use crate::types::tree::forest::ViewForest;
   use crate::types::store_state::{GraphGeneration, ManifestRevision};
 
+  fn census_descriptor (id : &str, kind : &str) -> CensusDescriptor {
+    CensusDescriptor {
+      buffer_id: id . into (), kind: kind . into (),
+      lifecycle: if kind == "content-view" {
+        "live-view" . into ()
+      } else { "attached-workflow" . into () },
+      disposable: false, continuation_id: None,
+      origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
+      view_uri: (kind == "content-view")
+        . then_some (ViewUri::from_client_string ("view:origin" . into ())),
+      recipe: "()" . into (), root_ids: Vec::new (),
+      source_set: "all" . into (), graph_generation: 1,
+      presentation_generation: 2, server_revision: 3,
+      application_token: 5, dirty: true, logical_dirty: true,
+      undo_required: false, maintenance_epoch: Some (9),
+      modification_tick: 1, presentation_stale: false,
+      search_stale: false, herald_bearing: false,
+      last_fetched_sha256: "a" . repeat (64),
+      current_sha256: "b" . repeat (64),
+    }
+  }
+
+  #[test]
+  fn locked_census_requires_exact_attached_workflow_parentage () {
+    let parent = census_descriptor ("origin", "content-view");
+    let mut child = census_descriptor ("workflow", "metadata-editor");
+    child . continuation_id = Some ("continuation" . into ());
+    child . origin_buffer_id = Some ("origin" . into ());
+    child . origin_view_uri = Some ("view:origin" . into ());
+    child . origin_application_token = Some (5);
+    child . origin_location = Some ("((start 1) (end 9))" . into ());
+    assert! (validate_census_parentage (&[parent . clone (), child . clone ()])
+      . is_ok ());
+    child . origin_application_token = Some (6);
+    assert! (validate_census_parentage (&[parent . clone (), child . clone ()])
+      . unwrap_err () . contains ("origin authority changed"));
+    child . origin_application_token = Some (5);
+    let mut clean_parent = parent;
+    clean_parent . logical_dirty = false;
+    assert! (validate_census_parentage (&[clean_parent, child])
+      . unwrap_err () . contains ("logically dirty"));
+  }
+
   #[test]
   fn pull_repository_request_parser_normalizes_nested_source_groups () {
     let sources = vec!["one" . to_string (), "two" . to_string ()];
@@ -2073,6 +2179,8 @@ mod tests {
         buffer_id: "buffer" . into (), kind: BufferKind::SearchView,
         lifecycle: "live-view" . into (), disposable: false,
         continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+        origin_buffer_id: None, origin_view_uri: None,
+        origin_application_token: None, origin_location: None,
         source_set: "all" . into (),
         view_uri: Some ("search:terms" . into ()), graph_generation: 1,
         presentation_generation: 3, server_revision: 4,
@@ -2093,6 +2201,8 @@ mod tests {
     let record = ViewSettlementRecord {
       buffer_id: "buffer" . into (), buffer_key: None,
       kind: BufferKind::SearchView, view_uri: Some ("search:terms" . into ()),
+      origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
       dirty: false, impacted: false, parse_uncertain: false,
       uncertainty_reason: None, observed_ids: Vec::new (),
       resolved_primary_ids: Vec::new (), base_graph_generation: 1,
@@ -2171,6 +2281,8 @@ mod tests {
     let mut record = ViewSettlementRecord {
       buffer_id: "buffer" . into (), buffer_key: None,
       kind: BufferKind::ContentView, view_uri: Some ("view" . into ()),
+      origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
       dirty: false, impacted: true, parse_uncertain: false,
       uncertainty_reason: None, observed_ids: vec!["node" . into ()],
       resolved_primary_ids: vec!["node" . into ()],

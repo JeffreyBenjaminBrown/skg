@@ -9,6 +9,7 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
+local registry = require('skg.buffer_registry')
 local folds = require('skg.folds')
 local lock = require('skg.lock')
 local metadata = require('skg.metadata')
@@ -316,6 +317,10 @@ describe('skg.save fork confirmation', function ()
     assert.is_true(vim.bo[confirm].modifiable)
     assert.is_true(vim.bo[origin].modifiable) -- everything unlocked
     assert.is_nil(vim.b[confirm].skg_view_uri)
+    local record = registry.record(confirm)
+    assert.are.equal('fork-confirmation', record.kind)
+    assert.are.equal(registry.record(origin).id, record.origin_buffer_id)
+    assert.is_true(registry.record(origin).logical_dirty)
     assert.are.equal(0, state.lp_pending_count) -- balanced
   end)
 

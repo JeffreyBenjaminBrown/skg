@@ -722,7 +722,7 @@ function M.show_fork_confirmation (content, save_buf)
   vim.bo[buf].buftype = 'acwrite'
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = 'org'
-  vim.b[buf].skg_view_uri = nil -- not a registered view
+  vim.b[buf].skg_view_uri = nil -- registered workflow, not a live graph view
   vim.b[buf].skg_fork_origin = save_buf
   vim.b[buf].skg_fork_suppress_strip = false
   require('skg.heralds').enable(buf)
@@ -753,6 +753,14 @@ function M.show_fork_confirmation (content, save_buf)
       end })
   end
   vim.bo[buf].modified = false
+  registry.register(buf, 'fork-confirmation', {
+    lifecycle = 'attached-workflow',
+    continuation_id = registry.new_local_id(),
+    origin_buffer = save_buf,
+    origin_location = '((scope save))',
+    recipe = { kind = 'fork-confirmation' },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.api.nvim_set_current_buf(buf)
   return buf
 end
@@ -821,6 +829,12 @@ function M.decline_fork ()
     vim.api.nvim_buf_call(origin, function ()
       metadata.strip_fork_requests_in_buffer() end)
   end
+  registry.register(buf, 'derived-report', {
+    lifecycle = 'client-local',
+    disposable = false,
+    recipe = { kind = 'fork-declined-report' },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.notify('Fork declined; nothing was saved. This buffer is left'
              .. ' open for reference.')
 end

@@ -89,6 +89,10 @@ pub fn plan_incident_view_settlements (
       buffer_key: archived_buffer . map (|snapshot| snapshot . buffer_key . clone ()),
       kind: frozen . kind . clone (),
       view_uri: frozen . view_uri . clone (),
+      origin_buffer_id: frozen . origin_buffer_id . clone (),
+      origin_view_uri: frozen . origin_view_uri . clone (),
+      origin_application_token: frozen . origin_application_token,
+      origin_location: frozen . origin_location . clone (),
       dirty: frozen . dirty,
       impacted: assessment . impacted,
       parse_uncertain: assessment . parse_uncertain,
@@ -107,7 +111,48 @@ pub fn plan_incident_view_settlements (
       acknowledged: false,
     });
   }
+  settle_attached_workflows (&mut settlements)?;
   Ok (settlements)
+}
+
+fn settle_attached_workflows (
+  settlements : &mut [ViewSettlementRecord],
+) -> Result<(), String> {
+  let parent_results : std::collections::BTreeMap<_, _> = settlements . iter ()
+    . map (|record| (record . buffer_id . clone (), (
+      record . planned_disposition . clone (), record . requirement . clone (),
+      record . impacted, record . parse_uncertain,
+      record . uncertainty_reason . clone ())))
+    . collect ();
+  for record in settlements . iter_mut () {
+    if !matches! (record . kind,
+      BufferKind::MetadataEditor | BufferKind::ForkConfirmation
+      | BufferKind::DiskConflict)
+    { continue; }
+    let origin_id = record . origin_buffer_id . as_ref () . ok_or_else (||
+      format! ("attached workflow '{}' has no frozen origin", record . buffer_id))?;
+    let (disposition, requirement, impacted, uncertain, reason) =
+      parent_results . get (origin_id) . ok_or_else (|| format! (
+        "attached workflow '{}' has absent settlement origin '{}'",
+        record . buffer_id, origin_id))?;
+    record . impacted = *impacted;
+    record . parse_uncertain = *uncertain;
+    record . uncertainty_reason = reason . clone ();
+    match requirement {
+      ViewSettlementRequirement::RetirementAck => {
+        record . planned_disposition = ViewDisposition::Interrupted;
+        record . requirement = ViewSettlementRequirement::RetirementAck;
+      }
+      ViewSettlementRequirement::ReleaseAck => {
+        record . planned_disposition = ViewDisposition::ReleasedUnimpacted;
+        record . requirement = ViewSettlementRequirement::ReleaseAck;
+      }
+      other => return Err (format! (
+        "attached workflow '{}' cannot follow origin disposition {:?}/{:?}",
+        record . buffer_id, disposition, other)),
+    }
+  }
+  Ok (( ))
 }
 
 fn changed_ids (candidate : &ObservedDiskCandidate) -> BTreeSet<ID> {
@@ -344,5 +389,45 @@ mod tests {
       &BufferKind::ContentView, false, &impacted, true),
       (ViewDisposition::Refreshed,
        ViewSettlementRequirement::ApplicationAck));
+  }
+
+  #[test]
+  fn attached_workflow_follows_its_dirty_origins_settlement () {
+    let record = |id : &str, kind : BufferKind, origin : Option<&str>,
+                  disposition : ViewDisposition,
+                  requirement : ViewSettlementRequirement|
+      ViewSettlementRecord {
+        buffer_id: id . into (), buffer_key: None, kind, view_uri: None,
+        origin_buffer_id: origin . map (str::to_string),
+        origin_view_uri: None, origin_application_token: origin . map (|_| 5),
+        origin_location: origin . map (|_| "((scope save))" . into ()),
+        dirty: true, impacted: false, parse_uncertain: false,
+        uncertainty_reason: None, observed_ids: Vec::new (),
+        resolved_primary_ids: Vec::new (), base_graph_generation: 1,
+        base_presentation_generation: 2, base_server_revision: 3,
+        base_application_token: 5, planned_disposition: disposition,
+        requirement, application: None, acknowledged: false,
+      };
+    let mut settlements = vec![
+      record ("origin", BufferKind::ContentView, None,
+        ViewDisposition::ReleasedUnimpacted,
+        ViewSettlementRequirement::ReleaseAck),
+      record ("workflow", BufferKind::MetadataEditor, Some ("origin"),
+        ViewDisposition::Interrupted,
+        ViewSettlementRequirement::RetirementAck),
+    ];
+    settle_attached_workflows (&mut settlements) . unwrap ();
+    assert_eq! (settlements[1] . planned_disposition,
+      ViewDisposition::ReleasedUnimpacted);
+    assert_eq! (settlements[1] . requirement,
+      ViewSettlementRequirement::ReleaseAck);
+
+    settlements[0] . planned_disposition = ViewDisposition::Interrupted;
+    settlements[0] . requirement = ViewSettlementRequirement::RetirementAck;
+    settle_attached_workflows (&mut settlements) . unwrap ();
+    assert_eq! (settlements[1] . planned_disposition,
+      ViewDisposition::Interrupted);
+    assert_eq! (settlements[1] . requirement,
+      ViewSettlementRequirement::RetirementAck);
   }
 }

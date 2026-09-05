@@ -56,6 +56,10 @@ pub struct VerifiedBufferSnapshot {
   pub lifecycle              : String,
   pub disposable             : bool,
   pub continuation_id        : Option<String>,
+  pub origin_buffer_id       : Option<String>,
+  pub origin_view_uri        : Option<String>,
+  pub origin_application_token : Option<u64>,
+  pub origin_location        : Option<String>,
   pub name                   : String,
   pub view_uri               : Option<ViewUri>,
   pub root_ids               : Vec<ID>,
@@ -230,8 +234,9 @@ pub fn verify_initial_archive (
     let buffer_fields = alist (buffer, &context)?;
     require_exact_keys (&buffer_fields, &[
       "buffer-key", "buffer-id", "kind", "lifecycle", "disposable",
-      "continuation-id", "name", "view-uri", "root-ids", "recipe",
-      "source-set", "graph-generation", "presentation-generation",
+      "continuation-id", "origin-buffer-id", "origin-view-uri",
+      "origin-application-token", "origin-location", "name", "view-uri",
+      "root-ids", "recipe", "source-set", "graph-generation", "presentation-generation",
       "server-revision", "application-token", "dirty", "logical-dirty",
       "maintenance-epoch", "presentation-stale", "search-stale",
       "herald-bearing", "undo", "artifacts", "initial-disposition",
@@ -254,6 +259,14 @@ pub fn verify_initial_archive (
       &buffer_fields, "continuation-id", &context)?;
     let continuation_id = (continuation_text != "none")
       . then_some (continuation_text);
+    let origin_buffer_id = optional_archive_text (
+      &buffer_fields, "origin-buffer-id", &context)?;
+    let origin_view_uri = optional_archive_text (
+      &buffer_fields, "origin-view-uri", &context)?;
+    let origin_application_token = optional_archive_u64 (
+      &buffer_fields, "origin-application-token", &context)?;
+    let origin_location = optional_archive_text (
+      &buffer_fields, "origin-location", &context)?;
     let name = require_text (&buffer_fields, "name", &context)?;
     let view_uri_text = require_text (&buffer_fields, "view-uri", &context)?;
     let view_uri = if view_uri_text == "none" { None }
@@ -388,6 +401,10 @@ pub fn verify_initial_archive (
     || frozen . lifecycle != lifecycle
     || frozen . disposable != disposable
     || frozen . continuation_id != continuation_id
+    || frozen . origin_buffer_id != origin_buffer_id
+    || frozen . origin_view_uri != origin_view_uri
+    || frozen . origin_application_token != origin_application_token
+    || frozen . origin_location != origin_location
     || frozen . view_uri != view_uri . as_ref () . map (ViewUri::repr_in_client)
     || frozen_root_ids != root_id_texts
     || frozen . recipe != recipe
@@ -421,6 +438,10 @@ pub fn verify_initial_archive (
       lifecycle,
       disposable,
       continuation_id,
+      origin_buffer_id,
+      origin_view_uri,
+      origin_application_token,
+      origin_location,
       name,
       view_uri,
       root_ids,
@@ -639,6 +660,29 @@ fn require_nonempty_text (
   if value . is_empty () {
     return Err (format! ("{} field '{}' may not be empty", context, key)); }
   Ok (value)
+}
+
+fn optional_archive_text (
+  fields  : &BTreeMap<String, &Sexp>,
+  key     : &str,
+  context : &str,
+) -> Result<Option<String>, String> {
+  let value = require_nonempty_text (fields, key, context)?;
+  Ok ((value != "none") . then_some (value))
+}
+
+fn optional_archive_u64 (
+  fields  : &BTreeMap<String, &Sexp>,
+  key     : &str,
+  context : &str,
+) -> Result<Option<u64>, String> {
+  match fields . get (key) {
+    Some (Sexp::Atom (Atom::S (value))) if value == "none" => Ok (None),
+    Some (Sexp::Atom (Atom::I (value))) if *value >= 0 => Ok (Some (*value as u64)),
+    Some (_) => Err (format! (
+      "{} field '{}' must be a nonnegative integer or 'none'", context, key)),
+    None => Err (format! ("{} has no '{}' field", context, key)),
+  }
 }
 
 fn require_equal_text (
@@ -1106,6 +1150,10 @@ mod tests {
         lifecycle: "live-view" . into (),
         disposable: false,
         continuation_id: None,
+        origin_buffer_id: None,
+        origin_view_uri: None,
+        origin_application_token: None,
+        origin_location: None,
         view_uri: Some ("view-uri" . into ()),
         recipe: "((kind single-root) (root-id old))" . into (),
         root_ids: vec!["old" . into ()],
@@ -1163,6 +1211,8 @@ mod tests {
       "(buffer-id \"buffer-1\") (kind \"content-view\") ",
       "(lifecycle \"live-view\") (disposable \"nil\") ",
       "(continuation-id \"none\") ",
+      "(origin-buffer-id \"none\") (origin-view-uri \"none\") ",
+      "(origin-application-token \"none\") (origin-location \"none\") ",
       "(name \"View\") (view-uri \"view-uri\") (root-ids (\"old\")) ",
       "(recipe \"((kind \\\"single-root\\\") (root-id \\\"old\\\"))\") ",
       "(source-set \"all\") (graph-generation 1) ",

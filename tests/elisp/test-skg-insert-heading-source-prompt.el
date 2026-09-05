@@ -65,6 +65,12 @@ skg-config-dir is set and skg--owned-sources works."
         (with-temp-buffer
           (insert org-text)
           (skg-content-view-mode)
+          (skg-register-buffer
+           (current-buffer) 'content-view
+           :view-uri "view:test-metadata"
+           :recipe '((kind . "single-root") (root-id . "x"))
+           :root-ids '("x")
+           :last-fetched org-text)
           (goto-char (point-min))
           (funcall body-fn))
       (delete-file config-file)
@@ -208,6 +214,13 @@ open the sexp-edit buffer (not prompt in minibuffer)."
              (buffer-list))))
        (should edit-buf)
        (with-current-buffer edit-buf
+         (should (eq (skg--buffer-record-kind skg--buffer-record)
+                     'metadata-editor))
+         (should
+          (equal (skg--buffer-record-origin-buffer-id skg--buffer-record)
+                 (skg--buffer-record-id
+                  (buffer-local-value 'skg--buffer-record
+                                      skg-sexp-edit--source-buffer))))
          (goto-char (point-min))
          (outline-next-heading)
          (should (looking-at "^\\* title$"))

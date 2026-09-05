@@ -100,6 +100,47 @@ describe('skg maintenance buffer transitions', function ()
     assert.are.equal(descriptor.recipe, payload.field_text(wire, 'recipe'))
   end)
 
+  it('binds an attached workflow to its origin and dirties the parent',
+     function ()
+    local origin = make_buffer('content-view')
+    local child = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(child, 0, -1, false, { '* Draft metadata' })
+    vim.bo[child].modified = false
+    registry.register(child, 'metadata-editor', {
+      lifecycle = 'attached-workflow',
+      continuation_id = 'continuation-1',
+      origin_buffer = origin,
+      origin_location = '((line 1) (metadata-start 2) (metadata-length 8))',
+      recipe = { kind = 'metadata-editor' },
+    })
+    local origin_record = registry.record(origin)
+    local child_record = registry.record(child)
+    assert.is_true(origin_record.logical_dirty)
+    assert.is_true(registry.dirty(origin))
+    assert.is_true(child_record.logical_dirty)
+    assert.are.equal(origin_record.id, child_record.origin_buffer_id)
+    assert.are.equal(origin_record.view_uri, child_record.origin_view_uri)
+    assert.are.equal(
+      origin_record.application_token, child_record.origin_application_token)
+    local descriptors = registry.census()
+    local child_descriptor
+    for _, descriptor in ipairs(descriptors) do
+      if descriptor.buffer_id == child_record.id then
+        child_descriptor = descriptor break end
+    end
+    assert.are.equal(child_record.origin_location,
+      child_descriptor.origin_location)
+    registry.register(origin, 'content-view', {
+      view_uri = origin_record.view_uri,
+      recipe = { kind = 'single-root', root_id = 'origin' },
+      application_token = origin_record.application_token,
+      last_fetched = registry.raw_text(origin),
+    })
+    assert.is_true(registry.record(origin).logical_dirty)
+    vim.api.nvim_buf_delete(child, { force = true })
+    assert.is_false(registry.record(origin).logical_dirty)
+  end)
+
   it('releases exact dirty search text against G1 without unlocking it',
      function ()
     local buf = make_buffer('search-view')

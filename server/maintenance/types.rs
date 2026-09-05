@@ -360,6 +360,14 @@ pub struct ViewSettlementRecord {
   pub buffer_key             : Option<String>,
   pub kind                   : BufferKind,
   pub view_uri               : Option<String>,
+  #[serde(default)]
+  pub origin_buffer_id       : Option<String>,
+  #[serde(default)]
+  pub origin_view_uri        : Option<String>,
+  #[serde(default)]
+  pub origin_application_token : Option<u64>,
+  #[serde(default)]
+  pub origin_location        : Option<String>,
   pub dirty                  : bool,
   pub impacted               : bool,
   pub parse_uncertain        : bool,
@@ -502,6 +510,14 @@ pub struct FrozenBufferRecord {
   pub disposable              : bool,
   #[serde(default)]
   pub continuation_id         : Option<String>,
+  #[serde(default)]
+  pub origin_buffer_id        : Option<String>,
+  #[serde(default)]
+  pub origin_view_uri         : Option<String>,
+  #[serde(default)]
+  pub origin_application_token : Option<u64>,
+  #[serde(default)]
+  pub origin_location         : Option<String>,
   pub view_uri                : Option<String>,
   #[serde(default)]
   pub recipe                  : String,
