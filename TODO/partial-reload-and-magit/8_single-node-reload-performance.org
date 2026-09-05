@@ -23,10 +23,10 @@ process did not discard the recovery evidence.
 
 The two real attempts have nearly identical server-side gaps:
 
-| incident | =run maintenance origin= received | first store-transition work | unexplained pre-store gap |
-|----------+-----------------------------------+-----------------------------+---------------------------|
-| =cc56c10b-f749-40f5-8a1a-82e5983074f8= | 23:10:12.815 | 23:10:53.786 | 40.971 s |
-| =00dd1e20-3eec-42f9-8ba6-46a1ce58ab48= | 23:11:39.074 | 23:12:18.819 | 39.745 s |
+| incident                               | =run maintenance origin= received | first store-transition work | unexplained pre-store gap |
+|----------------------------------------+-----------------------------------+-----------------------------+---------------------------|
+| =cc56c10b-f749-40f5-8a1a-82e5983074f8= |                      23:10:12.815 |                23:10:53.786 | 40.971 s                  |
+| =00dd1e20-3eec-42f9-8ba6-46a1ce58ab48= |                      23:11:39.074 |                23:12:18.819 | 39.745 s                  |
 
 Once that gap ends, the second attempt spends about 13 ms updating TypeDB,
 about 148 ms creating/committing/reloading the Tantivy generation, and about
@@ -36,13 +36,13 @@ request was also quick: begin-maintenance to =ARCHIVE-READY= took about 200 ms.
 An ignored diagnostic benchmark against the same real config, removed again
 after measurement, separated the candidate and evidence stages:
 
-| operation | measured wall time |
-|-----------+--------------------|
-| read and fold the complete 29,973-file corpus | 1.286 s |
-| construct the exact one-ID candidate | 0.662 s |
-| perform a byte-equality complete observation | 1.230 s |
-| publish one-ID server recovery evidence | 39.476 s |
-| load that published evidence once | 13.417 s |
+| operation                                     | measured wall time |
+|-----------------------------------------------+--------------------|
+| read and fold the complete 29,973-file corpus | 1.286 s            |
+| construct the exact one-ID candidate          | 0.662 s            |
+| perform a byte-equality complete observation  | 1.230 s            |
+| publish one-ID server recovery evidence       | 39.476 s           |
+| load that published evidence once             | 13.417 s           |
 
 The benchmark evidence occupied 55,134,806 bytes.  The corresponding live
 =bundle.yaml= files are about 53 MiB each.  The real maintenance evidence
@@ -96,8 +96,9 @@ The incident would contain before/after records for the changed telescopes and
 would rely on the worktree, Git, or still-healthy stores for all unchanged
 nodes.  A one-title incident would be tiny and very fast, but the archive would
 no longer be a self-contained source for complete store reconstruction.  I do
-not recommend trading away the hardest failure guarantee to fix a format
-problem.
+not recommend accepting that loss merely to obtain acceptable latency: the
+recommended representation should eliminate the 40-second delay while keeping
+the stronger recovery guarantee.
 
 ** Choice 2: representation if the strong guarantee stays
 
@@ -177,4 +178,3 @@ If the recommendations above are accepted, the implementation should:
 6. add focused corruption, crash-boundary, replay and size-scaling tests; and
 7. repeat the real one-title workflow and record stage timings and retained
    bytes here before calling the repair complete.
-
