@@ -92,6 +92,10 @@ This inspects the public package header without enabling any package mode."
             (tantivy-health
              . ,(cadr (assoc 'tantivy-health response)))
             ))
+    (when (fboundp 'skg-adopt-unbound-new-empty-authority)
+      (skg-adopt-unbound-new-empty-authority
+       (cdr (assq 'graph-generation skg--server-store-state))
+       skg--active-source-set-name))
     (when (fboundp 'skg-maintenance-adopt-handshake-epoch)
       (skg-maintenance-adopt-handshake-epoch))
     (setq skg--connection-handshake-state 'census)

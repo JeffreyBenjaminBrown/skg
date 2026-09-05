@@ -79,6 +79,41 @@ describe('skg maintenance buffer transitions', function ()
     assert.are.equal('derived-report', registry.record(buf).kind)
   end)
 
+  it('initializes only unbound new-empty authority from the first handshake',
+     function ()
+    local config = require('skg.config')
+    local state = require('skg.state')
+    local old_store_state = config.store_state
+    local old_source_set = state.active_source_set_name
+    config.store_state = nil
+    state.active_source_set_name = 'server-default'
+    local unbound = vim.api.nvim_create_buf(false, true)
+    registry.register(unbound, 'new-empty-content-view', {
+      lifecycle = 'live-view', disposable = false, view_uri = 'new',
+      recipe = { kind = 'new-empty' }, last_fetched = '',
+    })
+    local old = vim.api.nvim_create_buf(false, true)
+    registry.register(old, 'new-empty-content-view', {
+      lifecycle = 'live-view', disposable = false, view_uri = 'old',
+      recipe = { kind = 'new-empty' }, last_fetched = '',
+      graph_generation = 3,
+    })
+    local content = vim.api.nvim_create_buf(false, true)
+    registry.register(content, 'content-view', {
+      lifecycle = 'live-view', disposable = false, view_uri = 'content',
+      recipe = { kind = 'single-root', root_id = 'root' },
+      root_ids = { 'root' }, last_fetched = '',
+    })
+    registry.adopt_unbound_new_empty_authority(7, 'all')
+    assert.are.equal(7, registry.record(unbound).graph_generation)
+    assert.are.equal('all', registry.record(unbound).source_set)
+    assert.are.equal(3, registry.record(old).graph_generation)
+    assert.are.equal('server-default', registry.record(old).source_set)
+    assert.are.equal(0, registry.record(content).graph_generation)
+    config.store_state = old_store_state
+    state.active_source_set_name = old_source_set
+  end)
+
   it('reuses a conventional name only under explicit disposable policy',
      function ()
     local name = 'skg://durable-namesake'

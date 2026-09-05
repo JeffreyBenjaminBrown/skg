@@ -207,8 +207,11 @@ function M.register (buf, kind, options)
   vim.b[buf].skg_root_ids = options.root_ids or conservative_ids(last_fetched)
   vim.b[buf].skg_record_source_set = state.active_source_set_name
   local store_state = require('skg.config').store_state or {}
-  vim.b[buf].skg_graph_generation =
-    options.graph_generation or store_state.graph_generation or 0
+  local initial_graph_generation =
+    options.graph_generation or store_state.graph_generation
+  vim.b[buf].skg_graph_generation = initial_graph_generation or 0
+  vim.b[buf].skg_graph_generation_unbound =
+    initial_graph_generation == nil
   vim.b[buf].skg_presentation_generation =
     options.presentation_generation or 0
   vim.b[buf].skg_server_revision = options.server_revision or 0
@@ -633,6 +636,20 @@ function M.find_by_id (buffer_id)
   for _, buf in ipairs(M.buffers()) do
     if vim.b[buf].skg_buffer_id == buffer_id then return buf end end
   return nil
+end
+
+function M.adopt_unbound_new_empty_authority (graph_generation, source_set)
+  for _, buf in ipairs(M.buffers()) do
+    local record = M.record(buf)
+    if record.kind == 'new-empty-content-view'
+       and vim.b[buf].skg_graph_generation_unbound == true
+       and record.server_revision == 0
+       and record.application_token == 1 then
+      vim.b[buf].skg_graph_generation = graph_generation
+      vim.b[buf].skg_record_source_set = source_set
+      vim.b[buf].skg_graph_generation_unbound = false
+    end
+  end
 end
 
 function M.census_texts_payload (buffer_ids)

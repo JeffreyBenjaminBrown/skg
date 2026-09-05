@@ -103,6 +103,16 @@ pub fn handle_client_census_request (
           presentation_stale . push (uri . repr_in_client ());
         }
         Some (_) => stale . push (descriptor . buffer_id . clone ()),
+        None if unmaterialized_new_empty_authority (
+            &descriptor, &descriptor_kind, current_generation) =>
+        {
+          // A new-empty view is client-created authority until its first save.
+          // There is deliberately no server forest to reconstruct from its
+          // initial (possibly id-less) text.  Preserve the descriptor for
+          // maintenance enrollment; the save endpoint remains the only place
+          // which may materialize that text as a server view.
+          enrollment_records . push (descriptor . frozen_record ()?);
+        }
         None if descriptor . graph_generation == current_generation => {
           text_required . push (descriptor . buffer_id . clone ());
           interactive . pending_census_texts . insert (
@@ -692,6 +702,20 @@ fn server_requires_presentation_stale (
   state_matches_descriptor (state, &stale_descriptor, kind)
 }
 
+/// The one live-view authority which legitimately precedes a server forest.
+/// Its current text may differ from its initial text: that is the unsaved node
+/// the user is constructing, not text from which census may invent a forest.
+fn unmaterialized_new_empty_authority (
+  descriptor        : &CensusDescriptor,
+  kind              : &BufferKind,
+  current_generation : u64,
+) -> bool {
+  kind == &BufferKind::NewEmptyContentView
+  && descriptor . graph_generation == current_generation
+  && descriptor . server_revision == 0
+  && descriptor . application_token == 1
+}
+
 fn sha256 (text : &str) -> String {
   format! ("{:x}", Sha256::digest (text . as_bytes ()))
 }
@@ -837,6 +861,32 @@ mod tests {
     assert_eq! (
       validate_live_descriptor (&descriptor) . unwrap (),
       BufferKind::ContentView);
+  }
+
+  #[test]
+  fn never_saved_new_empty_authority_does_not_require_a_server_forest () {
+    let mut descriptor = parse_descriptors (&complete_descriptor (""))
+      . unwrap () . remove (0);
+    descriptor . kind = "new-empty-content-view" . into ();
+    descriptor . view_uri = Some (ViewUri::ContentView ("new-view" . into ()));
+    descriptor . recipe = "((kind new-empty))" . into ();
+    descriptor . graph_generation = 7;
+    descriptor . server_revision = 0;
+    descriptor . application_token = 1;
+    // Unsaved edits are expected and remain solely client-side until save.
+    descriptor . dirty = true;
+    descriptor . current_sha256 = "c" . repeat (64);
+    let kind = validate_live_descriptor (&descriptor) . unwrap ();
+    assert! (unmaterialized_new_empty_authority (
+      &descriptor, &kind, 7));
+
+    let mut advanced = descriptor . clone ();
+    advanced . application_token = 2;
+    assert! (!unmaterialized_new_empty_authority (&advanced, &kind, 7));
+    let mut materialized = descriptor . clone ();
+    materialized . server_revision = 1;
+    assert! (!unmaterialized_new_empty_authority (&materialized, &kind, 7));
+    assert! (!unmaterialized_new_empty_authority (&descriptor, &kind, 8));
   }
 
   #[test]

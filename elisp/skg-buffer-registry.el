@@ -211,6 +211,26 @@
                               skg--buffer-registry))))
     (when (buffer-live-p buffer) buffer)))
 
+(defun skg-adopt-unbound-new-empty-authority (graph-generation source-set)
+  "Initialize never-connected new-empty records from their first handshake.
+Records which already name a graph generation retain it: reconnect must not
+silently rebase genuinely stale client work."
+  (dolist (buffer (skg-registered-buffers))
+    (with-current-buffer buffer
+      (when (and skg--buffer-record
+                 (eq (skg--buffer-record-kind skg--buffer-record)
+                     'new-empty-content-view)
+                 (null (skg--buffer-record-graph-generation
+                        skg--buffer-record))
+                 (= (skg--buffer-record-server-revision
+                     skg--buffer-record) 0)
+                 (= (skg--buffer-record-application-token
+                     skg--buffer-record) 1))
+        (setf (skg--buffer-record-graph-generation skg--buffer-record)
+              graph-generation
+              (skg--buffer-record-source-set skg--buffer-record)
+              source-set)))))
+
 (defun skg-acquire-generated-buffer (name)
   "Return an explicitly reusable buffer NAME, preserving every other namesake."
   (let ((existing (get-buffer name)))

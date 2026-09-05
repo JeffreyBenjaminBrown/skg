@@ -184,10 +184,10 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
   M.disarm_first_change_warning(buf) -- this rewrite is not a user edit
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
-  M.configure_view_buffer(buf, uri)
   registry.register(buf, options.kind or 'content-view', {
     lifecycle = options.lifecycle or 'live-view',
     disposable = options.disposable == true,
+    view_uri = uri,
     continuation_id = options.continuation_id,
     recipe = options.recipe,
     root_ids = options.root_ids,
@@ -197,6 +197,9 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
     presentation_generation = options.presentation_generation,
     application_token = options.application_token,
   })
+  -- Herald setup may submit requests while the connection handshake is still
+  -- settling.  Publish the complete typed record before any such nested work.
+  M.configure_view_buffer(buf, uri)
   vim.bo[buf].modified = false
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })

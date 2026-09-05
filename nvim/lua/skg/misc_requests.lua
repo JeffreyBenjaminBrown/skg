@@ -57,6 +57,8 @@ function M.install_connection_verification (_payload_text, response, tcp)
     typedb_health = payload.field(response, 'typedb-health'),
     tantivy_health = payload.field(response, 'tantivy-health'),
   }
+  require('skg.buffer_registry').adopt_unbound_new_empty_authority(
+    config.store_state.graph_generation, state.active_source_set_name)
   state.connection_handshake_state = 'census'
   require('skg.maintenance').adopt_handshake_epoch()
   M.show_handshake_telescope_warnings(response)

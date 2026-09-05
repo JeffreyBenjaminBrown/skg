@@ -69,6 +69,27 @@ describe('skg.buffer lifecycle and registry', function ()
     assert.are.equal(buf, vim.api.nvim_get_current_buf())
   end)
 
+  it('publishes the typed record before enabling heralds', function ()
+    local heralds = require('skg.heralds')
+    local registry = require('skg.buffer_registry')
+    local original_enable = heralds.enable
+    local observed
+    heralds.enable = function (buf)
+      observed = registry.record(buf)
+      return true
+    end
+    local buf = buffer.open_org_buffer_from_text(
+      '', 'skg://record-before-heralds', 'new-uri', {
+        kind = 'new-empty-content-view',
+        recipe = { kind = 'new-empty' },
+      })
+    heralds.enable = original_enable
+    assert.is_truthy(observed)
+    assert.are.equal('new-empty-content-view', observed.kind)
+    assert.are.equal('new-uri', observed.view_uri)
+    assert.are.equal(buf, registry.find_by_id(observed.id))
+  end)
+
   it('reuses the buffer bearing the same name', function ()
     local first = buffer.open_org_buffer_from_text(
       '* t\nold', 'skg://t', 'uri-1')
