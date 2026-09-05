@@ -109,6 +109,7 @@ pub fn plan_incident_view_settlements (
       planned_disposition,
       requirement,
       application: None,
+      resolution: Default::default (),
       acknowledged: false,
     });
   }
@@ -426,7 +427,8 @@ mod tests {
         resolved_primary_ids: Vec::new (), base_graph_generation: 1,
         base_presentation_generation: 2, base_server_revision: 3,
         base_application_token: 5, planned_disposition: disposition,
-        requirement, application: None, acknowledged: false,
+        requirement, application: None, resolution: Default::default (),
+        acknowledged: false,
       };
     let mut settlements = vec![
       record ("origin", BufferKind::ContentView, None,

@@ -405,7 +405,12 @@ function M.validate_settlements (settlements, expected_ids)
   for _, settlement in ipairs(settlements) do
     local buffer_id = payload.field_text(settlement, 'buffer-id')
     local required = payload.field_text(settlement, 'required-ack')
-    if not buffer_id or not allowed[required] or seen[buffer_id] then
+    local resolution = payload.field_text(
+      settlement, 'settlement-resolution') or 'pending'
+    if not buffer_id or not allowed[required] or seen[buffer_id]
+       or (resolution ~= 'pending'
+         and resolution ~= 'client-acknowledged'
+         and resolution ~= 'census-absent') then
       error('Maintenance contains a duplicate or invalid settlement') end
     seen[buffer_id] = true
     table.insert(ids, buffer_id)
@@ -426,7 +431,8 @@ local function without_ack (settlement)
        and not sexpr.is_list(entry[1]) then
       key = sexpr.atom_text(entry[1])
     end
-    if key ~= 'acknowledged' then table.insert(result, entry) end
+    if key ~= 'acknowledged' and key ~= 'settlement-resolution' then
+      table.insert(result, entry) end
   end
   return result
 end
@@ -471,7 +477,13 @@ function M.install_settlements (settlements)
   for _, settlement in ipairs(settlements) do
     local buffer_id = payload.field_text(settlement, 'buffer-id')
     if true_field(settlement, 'acknowledged') then
-      if not locally_applied(incident, buffer_id) then
+      local resolution = payload.field_text(
+        settlement, 'settlement-resolution') or 'client-acknowledged'
+      local absent = registry.find_by_id(buffer_id) == nil
+      if resolution == 'census-absent' and not absent then
+        error('Server closed a settlement for a buffer still in the census')
+      elseif resolution ~= 'census-absent'
+         and not locally_applied(incident, buffer_id) then
         error('Server acknowledged a settlement not applied locally') end
       table.insert(acknowledged, settlement)
     else

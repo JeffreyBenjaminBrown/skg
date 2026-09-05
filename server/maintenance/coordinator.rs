@@ -915,11 +915,44 @@ impl MaintenanceCoordinator {
       return Err (
         "finalizing archive contains an unacknowledged view settlement"
           . into ()); }
+    record . resolution = ViewSettlementResolution::ClientAcknowledged;
     record . acknowledged = true;
     let complete = active . view_settlements . values ()
       . all (|record| record . acknowledged);
     if complete { active . phase = MaintenancePhase::FinalizingArchive; }
     Ok (complete)
+  }
+
+  /// Resolve presentation work for frozen buffers which no longer exist in
+  /// the replacement editor's complete census.  The original disposition and
+  /// staged application remain journaled as evidence; only the obligation to
+  /// receive an impossible client ACK is closed.
+  pub fn reconcile_absent_view_settlements (
+    &mut self,
+    live_buffer_ids : &BTreeSet<String>,
+  ) -> Result<Vec<String>, String> {
+    let CoordinatorState::Active (active) = &mut self . state else {
+      return Ok (Vec::new ()); };
+    if active . view_settlements . is_empty () {
+      return Ok (Vec::new ()); }
+    if !matches! (active . phase,
+      MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
+    {
+      return Err (format! (
+        "view census reconciliation is invalid during {:?}", active . phase)); }
+    let mut resolved = Vec::new ();
+    for (buffer_id, record) in &mut active . view_settlements {
+      if record . acknowledged || live_buffer_ids . contains (buffer_id) {
+        continue; }
+      record . resolution = ViewSettlementResolution::CensusAbsent;
+      record . acknowledged = true;
+      resolved . push (buffer_id . clone ());
+    }
+    if active . view_settlements . values ()
+      . all (|record| record . acknowledged)
+    {
+      active . phase = MaintenancePhase::FinalizingArchive; }
+    Ok (resolved)
   }
 
   pub fn block_store_health (
@@ -1683,6 +1716,7 @@ mod tests {
       planned_disposition: ViewDisposition::Interrupted,
       requirement: ViewSettlementRequirement::RetirementAck,
       application: None,
+      resolution: ViewSettlementResolution::Pending,
       acknowledged: false,
     }
   }
@@ -1866,5 +1900,62 @@ mod tests {
       ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,
       4, 9,
       Some (&exact)) . unwrap ());
+  }
+
+  #[test]
+  fn complete_census_explicitly_resolves_absent_application_debt () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, vec![FrozenBufferRecord {
+        buffer_id: "view" . into (), kind: BufferKind::ContentView,
+        lifecycle: "live-view" . into (), disposable: false,
+        continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+        origin_buffer_id: None, origin_view_uri: None,
+        origin_application_token: None, origin_location: None,
+        source_set: "all" . into (), view_uri: Some ("uri-view" . into ()),
+        graph_generation: 1, presentation_generation: 0, server_revision: 4,
+        application_token: 9, dirty: false, logical_dirty: false,
+        undo_required: false, maintenance_epoch: None,
+        presentation_stale: false, search_stale: false, herald_bearing: false,
+        last_fetched_sha256: "a" . repeat (64),
+        current_sha256: "a" . repeat (64),
+      }], MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default ()
+      }) . unwrap ();
+    let CoordinatorState::Active (state) = &mut coordinator . state else {
+      unreachable! () };
+    state . phase = MaintenancePhase::Presenting;
+    let mut record = settlement ("view");
+    record . dirty = false;
+    record . planned_disposition = ViewDisposition::Refreshed;
+    record . requirement = ViewSettlementRequirement::ApplicationAck;
+    record . application = Some (ViewApplicationRecord {
+      content: "* rendered\n" . into (),
+      content_sha256: "b" . repeat (64),
+      resulting_graph_generation: 2,
+      resulting_presentation_generation: 3,
+      resulting_server_revision: 5,
+      resulting_application_token: 10,
+      warnings: Vec::new (),
+    });
+    coordinator . record_view_settlements (
+      &active . incident_id, active . epoch, vec![record]) . unwrap ();
+    assert_eq! (coordinator . reconcile_absent_view_settlements (
+      &["view" . into ()] . into_iter () . collect ()) . unwrap (),
+      Vec::<String>::new ());
+    assert_eq! (coordinator . reconcile_absent_view_settlements (
+      &BTreeSet::new ()) . unwrap (), vec!["view"]);
+    let CoordinatorState::Active (state) = &coordinator . state else {
+      unreachable! () };
+    let resolved = &state . view_settlements["view"];
+    assert_eq! (resolved . resolution,
+      ViewSettlementResolution::CensusAbsent);
+    assert! (resolved . acknowledged && resolved . application . is_some ());
+    assert_eq! (state . phase, MaintenancePhase::FinalizingArchive);
+    assert_eq! (coordinator . reconcile_absent_view_settlements (
+      &BTreeSet::new ()) . unwrap (), Vec::<String>::new ());
   }
 }

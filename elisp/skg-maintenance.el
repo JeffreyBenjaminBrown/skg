@@ -441,10 +441,16 @@ old implementation."
   (let ((seen (make-hash-table :test #'equal)) ids)
     (dolist (settlement settlements)
       (let ((buffer-id (skg--maintenance-text settlement 'buffer-id))
-            (required (skg--maintenance-text settlement 'required-ack)))
+            (required (skg--maintenance-text settlement 'required-ack))
+            (resolution
+             (or (skg--maintenance-text
+                  settlement 'settlement-resolution)
+                 "pending")))
         (unless (and buffer-id
                      (member required '("retirement-ack" "release-ack"
                                         "application-ack" "close-ack"))
+                     (member resolution '("pending" "client-acknowledged"
+                                          "census-absent"))
                      (not (gethash buffer-id seen)))
           (error "Maintenance contains a duplicate or invalid settlement"))
         (puthash buffer-id t seen)
@@ -458,7 +464,9 @@ old implementation."
   (skg--maintenance-true-p settlement 'acknowledged))
 
 (defun skg--maintenance-settlement-without-ack (settlement)
-  (cl-remove-if (lambda (field) (eq (car-safe field) 'acknowledged))
+  (cl-remove-if (lambda (field)
+                  (memq (car-safe field)
+                        '(acknowledged settlement-resolution)))
                 settlement))
 
 (defun skg--maintenance-require-stable-settlements (old new)
@@ -487,10 +495,20 @@ old implementation."
      (plist-get state :settlements) settlements)
     (dolist (settlement settlements)
       (if (skg--maintenance-settlement-acknowledged-p settlement)
-          (progn
-            (unless (member (skg--maintenance-text settlement 'buffer-id)
-                            (plist-get state :locally-applied))
-              (error "Server acknowledged a settlement not applied locally"))
+          (let* ((buffer-id
+                  (skg--maintenance-text settlement 'buffer-id))
+                 (resolution
+                  (or (skg--maintenance-text
+                       settlement 'settlement-resolution)
+                      "client-acknowledged"))
+                 (absent (not (buffer-live-p
+                               (skg-find-buffer-by-id buffer-id)))))
+            (cond
+             ((equal resolution "census-absent")
+              (unless absent
+                (error "Server closed a settlement for a buffer still in the census")))
+             ((not (member buffer-id (plist-get state :locally-applied)))
+              (error "Server acknowledged a settlement not applied locally")))
             (push settlement acknowledged))
         (push settlement pending)))
     (setf (plist-get state :settlements) settlements

@@ -1057,6 +1057,7 @@ fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp 
     integer_field ("base-application-token", record . base_application_token),
     atom_field ("planned-disposition", record . planned_disposition . label ()),
     atom_field ("required-ack", record . requirement . label ()),
+    atom_field ("settlement-resolution", record . resolution . label ()),
     atom_field ("acknowledged",
       if record . acknowledged { "true" } else { "nil" }),
   ];
@@ -2211,6 +2212,7 @@ mod tests {
       planned_disposition: ViewDisposition::RetainedClean,
       requirement: ViewSettlementRequirement::ReleaseAck,
       application: None,
+      resolution: Default::default (),
       acknowledged: false,
     };
     let state = ViewState {
@@ -2299,6 +2301,7 @@ mod tests {
         resulting_application_token: 8,
         warnings: vec!["warning" . into ()],
       }),
+      resolution: Default::default (),
       acknowledged: false,
     };
     let payload = settlement_sexp (&record) . to_string ();

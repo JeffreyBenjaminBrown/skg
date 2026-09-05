@@ -414,6 +414,27 @@ describe('skg Neovim maintenance handshake', function ()
       maintenance.install_settlements({ one, two }) end)
   end)
 
+  it('accepts an absent-census resolution without inventing a local action',
+     function ()
+    local record = settlement('gone', 'application-ack', true)
+    table.insert(record, f('settlement-resolution', 'census-absent'))
+    local old = settlement('gone', 'application-ack', false)
+    state.maintenance_client_incident = {
+      registered_buffer_ids = { 'gone' }, settlements = { old },
+      locally_applied = {},
+    }
+    local scheduled
+    local real_settle = maintenance.settle_next
+    maintenance.settle_next = function () end
+    maintenance.defer = function (callback) scheduled = callback end
+    maintenance.install_settlements({ record })
+    scheduled()
+    maintenance.settle_next = real_settle
+    assert.are.equal('gone', payload.field_text(
+      state.maintenance_client_incident.acknowledged_settlements[1],
+      'buffer-id'))
+  end)
+
   it('retries an ACK without reapplying the local transition', function ()
     local record = settlement('one', 'release-ack', false)
     state.maintenance_client_incident = {

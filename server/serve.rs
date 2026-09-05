@@ -526,14 +526,16 @@ fn dispatch_request (
         . state . policy () . skg_saves_allowed;
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_client_census_request (
-        reader, stream, &snapshot . env, &mut interactive, writes_allowed); }
+        reader, stream, &snapshot . env, &mut interactive, writes_allowed,
+        runtime); }
     RequestType::ClientCensusTexts => {
       let snapshot = runtime . selected_snapshot ();
       let writes_allowed = runtime . maintenance . lock () . unwrap ()
         . state . policy () . skg_saves_allowed;
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_client_census_texts_request (
-        reader, stream, &snapshot . env, &mut interactive, writes_allowed); }
+        reader, stream, &snapshot . env, &mut interactive, writes_allowed,
+        runtime); }
     RequestType::Shutdown => {
       let snapshot = runtime . selected_snapshot ();
       handle_shutdown_request (stream, &snapshot . env); }

@@ -2,6 +2,7 @@
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use crate::maintenance::BufferKind;
+use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{CensusDescriptor, InteractiveSession};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -26,11 +27,14 @@ pub fn handle_client_census_request (
   env          : &SkgEnv,
   interactive  : &mut InteractiveSession,
   writes_allowed : bool,
+  runtime      : &ServerRuntime,
 ) {
   let result = (|| -> Result<String, String> {
     let payload = read_length_prefixed_content (reader)
       . map_err (|error| format! ("could not read client census: {}", error))?;
     let descriptors = parse_descriptors (&payload)?;
+    let live_buffer_ids = descriptors . iter ()
+      . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
     let current_generation = env . in_rust_graph . load_full ()
       . graph_generation . get ();
     let mut live_uris : HashSet<ViewUri> = HashSet::new ();
@@ -69,6 +73,10 @@ pub fn handle_client_census_request (
     for uri in absent_server_views {
       interactive . views . open_views . unregister_view (&uri); }
 
+    runtime . transition_maintenance (|coordinator|
+      coordinator . reconcile_absent_view_settlements (&live_buffer_ids)
+        . map (|_| ( )))?;
+
     let complete = text_required . is_empty ();
     if let Some (client) = &mut interactive . attached_client {
       client . census_complete = complete; }
@@ -84,6 +92,7 @@ pub fn handle_client_census_texts_request (
   env          : &SkgEnv,
   interactive  : &mut InteractiveSession,
   writes_allowed : bool,
+  _runtime     : &ServerRuntime,
 ) {
   let result = (|| -> Result<String, String> {
     let payload = read_length_prefixed_content (reader)

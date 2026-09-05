@@ -303,6 +303,29 @@ pub enum ViewSettlementRequirement {
   CloseAck,
 }
 
+/// How one frozen buffer's presentation obligation was discharged.  A
+/// replacement editor which does not contain the buffer closes that
+/// obligation through its complete census; it does not counterfeit the ACK
+/// for an application which was never installed in that editor.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ViewSettlementResolution {
+  #[default]
+  Pending,
+  ClientAcknowledged,
+  CensusAbsent,
+}
+
+impl ViewSettlementResolution {
+  pub fn label (&self) -> &'static str {
+    match self {
+      Self::Pending => "pending",
+      Self::ClientAcknowledged => "client-acknowledged",
+      Self::CensusAbsent => "census-absent",
+    }
+  }
+}
+
 impl ViewSettlementRequirement {
   pub fn label (&self) -> &'static str {
     match self {
@@ -352,8 +375,10 @@ pub struct ViewApplicationAcknowledgement {
 }
 
 /// One durable promise for one buffer frozen in the maintenance census.
-/// `acknowledged` is false until the editor proves the exact requested action;
-/// an empty render queue is never a substitute for this inventory.
+/// `acknowledged` is false until the editor proves the exact requested action
+/// or a later complete census proves that the buffer is absent.  `resolution`
+/// distinguishes those outcomes; an empty render queue is never a substitute
+/// for this inventory.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ViewSettlementRecord {
   pub buffer_id              : String,
@@ -384,6 +409,8 @@ pub struct ViewSettlementRecord {
   pub requirement            : ViewSettlementRequirement,
   #[serde(default)]
   pub application            : Option<ViewApplicationRecord>,
+  #[serde(default)]
+  pub resolution             : ViewSettlementResolution,
   pub acknowledged           : bool,
 }
 

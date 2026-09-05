@@ -601,6 +601,33 @@
     (should-error
      (skg--maintenance-install-settlements (list one two)))))
 
+(ert-deftest test-skg-maintenance-accepts-absent-census-resolution ()
+  (let* ((old (skg-test-maintenance--settlement
+               "gone" "content-view" "view" "nil"
+               "application-ack" "refreshed"))
+         (resolved (copy-tree old))
+         scheduled
+         (skg--buffer-registry (make-hash-table :test #'equal))
+         (skg--maintenance-client-incident
+          (list :registered-buffer-ids '("gone")
+                :settlements (list old)
+                :locally-applied nil)))
+    (setq resolved (cons '(acknowledged "true")
+                         (assq-delete-all 'acknowledged resolved))
+          resolved (cons '(settlement-resolution "census-absent")
+                         resolved))
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest _args)
+                 (setq scheduled function))))
+      (skg--maintenance-install-settlements (list resolved)))
+    (should (eq scheduled #'skg--maintenance-settle-next))
+    (should (equal
+             '("gone")
+             (mapcar (lambda (record)
+                       (skg--maintenance-text record 'buffer-id))
+                     (plist-get skg--maintenance-client-incident
+                                :acknowledged-settlements))))))
+
 (ert-deftest test-skg-maintenance-retry-does-not-reapply-local-action ()
   (let* ((settlement (skg-test-maintenance--settlement
                       "one" "content-view" "view-one" "nil"
