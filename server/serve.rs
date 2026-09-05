@@ -573,11 +573,7 @@ fn dispatch_request (
       handle_export_to_org_request (
         stream, &snapshot . env . config, request); }
     RequestType::RebuildDbs => {
-      if let Err (error) = runtime . with_store_transition (
-          true, |env, interactive| {
-            handle_rebuild_dbs_request (stream, env, &mut interactive . views);
-          })
-      { send_runtime_error (stream, &error); }}
+      handle_rebuild_dbs_request (stream, runtime); }
     RequestType::StripBodyWhitespace => {
       if let Err (error) = runtime . with_store_transition (
           false, |env, _| {

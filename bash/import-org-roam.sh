@@ -30,10 +30,6 @@ if [ -z "$CONTAINER" ]; then
   exit 1
 fi
 
-SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
-SKG_PORT="$(grep -m1 '^[[:space:]]*port' "$SKG_CONFIG" \
-  | sed 's/.*=[[:space:]]*//' | sed 's/[[:space:]]*#.*//')"
-
 #
 # Step 1: Clean stale data
 #
@@ -76,13 +72,12 @@ fi
 rm -f "$TEMPLATE"
 
 #
-# Step 4: Rebuild DBs
+# Step 4: Reconcile and rebuild through an interactive recovery archive
 #
 
 read -rp "Rebuild databases now? [y/N] " yn
 if [[ "$yn" =~ ^[Yy]$ ]]; then
-  echo "Sending rebuild-dbs request to port $SKG_PORT ..."
-  echo '((request . "rebuild dbs"))' | nc -w1 localhost "$SKG_PORT"
-  echo "Rebuild request sent."
-  echo "Run M-x skg-close-all-skg-buffers to close stale views."
+  echo "A raw rebuild request is no longer safe or supported."
+  echo "Run M-x skg-rebuild-dbs in Emacs or :SkgRebuildDbs in Neovim."
+  echo "The client will archive dirty work, lock the exact buffer census, and reconcile retained views."
 fi

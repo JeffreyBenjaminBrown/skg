@@ -1,119 +1,30 @@
-use crate::context::{
-  compute_and_store_context_types,
-  content_maps_from_nodes,
-  had_id_set_from_nodes,
-  link_dests_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::{
-  LoadedCorpus,
-  error_unless_each_id_names_one_node,
-  read_all_skg_files_with_manifest,
-};
-use crate::dbs::filesystem::not_nodes::load_config;
-use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::telescope::invariants::{TelescopeViolation, report_all_telescope_violations};
-use crate::dbs::in_rust_graph::{
-  InRustGraph,
-  override_invariants::error_unless_override_invariants_hold,
-};
-use crate::types::env::SkgEnv;
-use crate::serve::ViewsState;
+use crate::maintenance::QueuedObservationReason;
+use crate::runtime::ServerRuntime;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
-use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::nodes::complete::NodeComplete;
 
-use futures::executor::block_on;
 use std::net::TcpStream;
-use std::sync::Arc;
 
+/// Retain the old wire spelling as a safe migration aid, but never let an
+/// unqualified control connection cross the archive/session boundary.  The
+/// observation makes newly imported bytes visible as pending work while the
+/// interactive command supplies the required census and recovery archive.
 pub fn handle_rebuild_dbs_request (
-  stream     : &mut TcpStream,
-  env        : &mut SkgEnv,
-  views_state : &mut ViewsState,
+  stream  : &mut TcpStream,
+  runtime : &ServerRuntime,
 ) {
-  let result : Result<(), String> =
-    rebuild_dbs_in_place (env, views_state);
-  let msg : String = match result {
-    Ok (()) => "Databases rebuilt successfully." . to_string (),
-    Err (e) => {
-      tracing::error!("Rebuild failed: {}", e);
-      format! ("Rebuild failed: {}", e) } };
+  let observation = runtime . schedule_full_observation (
+    QueuedObservationReason::ClientHint);
+  let message = match observation {
+    Ok (( )) if runtime . interactive_slot . attached () =>
+      "Direct rebuild requests cannot bypass interactive recovery. Disk observation was queued; run M-x skg-rebuild-dbs or :SkgRebuildDbs in the attached client.",
+    Ok (( )) =>
+      "Direct rebuild requests cannot bypass recovery maintenance. Disk observation was queued; attach a client and run M-x skg-rebuild-dbs or :SkgRebuildDbs.",
+    Err (_) if runtime . interactive_slot . attached () =>
+      "Direct rebuild requests cannot bypass interactive recovery. Run M-x skg-rebuild-dbs or :SkgRebuildDbs in the attached client.",
+    Err (_) =>
+      "Direct rebuild requests cannot bypass recovery maintenance. Attach a client and run M-x skg-rebuild-dbs or :SkgRebuildDbs.",
+  };
   let _ = send_response_with_length_prefix (
-    stream,
-    & tag_text_response (
-      TcpToClient::RebuildDbs, &msg )); }
-
-/// The rebuild itself, streamless, so other handlers (the
-/// telescope migration) can rebuild after rewriting files.
-pub fn rebuild_dbs_in_place (
-  env         : &mut SkgEnv,
-  views_state : &mut ViewsState,
-) -> Result<(), String> {
-  tracing::info!("Rebuilding databases from disk...");
-  // Serialize this wholesale rebuild against any concurrent save / reload
-  // so no RCU update is lost (last-store-wins on the ArcSwap).
-  let _write_guard = block_on (
-    crate::write_lock::acquire_graph_write_lock () );
-  // Let any in-flight background save-index writes finish before we wipe
-  // and rebuild the index out from under them.
-  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
-  let result : Result<(), String> = (|| {
-    let config_path : String =
-      env . config . config_path . display () . to_string ();
-    let fresh_config : SkgConfig =
-      load_config (&config_path)
-      . map_err ( |e| format! (
-        "Reloading config from {}: {}", config_path, e) ) ?;
-    let loaded : LoadedCorpus =
-      read_all_skg_files_with_manifest (&fresh_config)
-      . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-    let nodes : Vec<NodeComplete> = loaded . nodes;
-    let load_violations : Vec<(ID, TelescopeViolation)> =
-      loaded . violations;
-    error_unless_each_id_names_one_node (
-      &nodes, &fresh_config . data_root)
-      . map_err ( |e| format! ("Id-conflict check failed: {}", e) ) ?;
-    let fresh_graph : InRustGraph =
-      InRustGraph::from_nodecompletes (&nodes);
-    error_unless_override_invariants_hold (
-        &fresh_config, &fresh_graph )
-      . map_err ( |e| format! (
-        "Override invariant validation failed: {}", e) ) ?;
-    report_all_telescope_violations (
-      &fresh_config, &fresh_graph, load_violations . clone () );
-    block_on ( wipe_then_init_typedb_db (
-      &fresh_config, &env . driver, &nodes) )
-      . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
-    tracing::info!("TypeDB rebuilt.");
-    let new_tantivy : TantivyIndex =
-      rebuild_tantivy_from_nodes (&fresh_config, &nodes)
-      . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
-    env . config = fresh_config;
-    env . tantivy_index = new_tantivy;
-    env . startup_warnings = Arc::new (load_violations);
-    tracing::info!("Tantivy rebuilt.");
-    let had_id_set = had_id_set_from_nodes (&nodes);
-    let all_node_ids = nodes . iter ()
-      . map ( |n| n . pid . clone () )
-      . collect ();
-    let link_dests = link_dests_from_nodes (&nodes);
-    let (map_to_content, map_to_containers) =
-      content_maps_from_nodes (&nodes);
-    let context_computation = compute_and_store_context_types (
-      &env . tantivy_index, &had_id_set, &all_node_ids,
-      &link_dests, &map_to_content, &map_to_containers )
-      . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
-    tracing::info!("Context rankings recomputed.");
-    { // Rebuild the in-Rust graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
-      let old = env . in_rust_graph . load_full ();
-      env . in_rust_graph . store (
-        Arc::new (
-          old . with_acknowledged_rebuild (
-            fresh_graph, loaded . manifest)
-          . with_cyclic_roots (context_computation . cyclic_roots)) );
-      tracing::info!("In-Rust graph rebuilt."); }
-    Ok (())
-  })();
-  if result . is_ok () {
-    views_state . open_views . clear (); }
-  result }
+    stream, &tag_text_response (TcpToClient::RebuildDbs, message));
+}
