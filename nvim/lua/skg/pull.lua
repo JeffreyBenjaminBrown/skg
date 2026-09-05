@@ -272,7 +272,11 @@ local function request (name, atom_fields, list_fields)
   for _, entry in ipairs(atom_fields or {}) do
     table.insert(form, sexpr.pair(sexpr.symbol(entry[1]), entry[2])) end
   for _, entry in ipairs(list_fields or {}) do
-    table.insert(form, { sexpr.symbol(entry[1]), entry[2] }) end
+    local field = { sexpr.symbol(entry[1]) }
+    for _, value in ipairs(entry[2] or {}) do
+      table.insert(field, value) end
+    table.insert(form, field)
+  end
   return sexpr.to_string(form) .. '\n'
 end
 

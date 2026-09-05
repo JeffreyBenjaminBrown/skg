@@ -377,8 +377,15 @@ describe('skg Neovim client-owned pull', function ()
     assert.are.equal('finish maintenance origin',
       payload.field_text(parsed, 'request'))
     assert.are.equal('failed', payload.field_text(parsed, 'external-outcome'))
-    assert.are.same({ 'one failed', 'disk may differ' }, payload.string_list(
-      payload.field(parsed, 'external-details')))
+    local details
+    for _, field in ipairs(parsed) do
+      if sexpr.is_list(field) and sexpr.atom_text(field[1])
+          == 'external-details' then
+        details = { sexpr.atom_text(field[2]), sexpr.atom_text(field[3]) }
+      end
+    end
+    assert.are.same({ 'one failed', 'disk may differ' }, details)
+    assert.matches('%(external%-details "one failed" "disk may differ"%)', wire)
     assert.are.equal(incident_id, request_incident)
     assert.are.equal('origin-completion-pending',
       state.maintenance_client_incident.phase)
