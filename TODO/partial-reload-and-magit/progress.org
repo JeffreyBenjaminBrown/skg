@@ -1246,3 +1246,26 @@ what's imperfect about what's done; choices determining the future.
   save-leveling tests can interfere through shared process state in a parallel
   full-suite run; each passes alone and the entire suite passes with one test
   thread.  =cargo check --all-targets= and =git diff --check= are clean.
+
+* the reported remote-peer failure coincided with the development restart
+
+** diagnosis
+- The implementation commit above changed watched server files.  Cargo-watch
+  consequently stopped the old server at =20:03:49= and did not report the
+  rebuilt server ready until =20:04:02=.  The reported Emacs error is the
+  sentinel event for a TCP connection severed by that shutdown; the server log
+  contains no rejected handshake or census from the attempt.
+- Once the replacement process was stable, the exact documented clean-Emacs
+  initialization completed in 0.4 seconds with 24 herald rules and no error.
+  This was a deployment-window failure while the server was going down, not
+  another retained-incident or startup-protocol defect.
+
+** restart proof
+- A stronger live test kept one Emacs process and client-session ID alive.  It
+  connected successfully, forced cargo-watch to perform a real server restart,
+  waited for the new =Server ready= event, then evaluated the same
+  =skg-reload= / =skg-client-init= path again.
+- The second connection used the same client-session ID and issued exactly one
+  verification, one census and one herald request.  It completed with
+  =skg ready on port 1731 -- 24 herald rules loaded= and no warning or protocol
+  error.  The maintenance journal remained idle.  No code change was needed.
