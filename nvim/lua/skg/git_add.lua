@@ -15,6 +15,7 @@ local config = require('skg.config')
 local focus = require('skg.focus')
 local id_search = require('skg.id_search')
 local metadata = require('skg.metadata')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
@@ -44,20 +45,17 @@ end
 function M.git_add_if_new_recursive_preview ()
   local plan = M.git_add_new_files_recursive_plan()
   local name = 'skg://git-add-new-files'
-  local buf = nil
-  for _, existing in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_get_name(existing) == name then
-      buf = existing break end
-  end
-  if not buf then
-    buf = vim.api.nvim_create_buf(true, true)
-    vim.api.nvim_buf_set_name(buf, name)
-  end
+  local buf = registry.acquire_generated_buffer(name, true, true)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(plan.script, '\n'))
   vim.bo[buf].filetype = 'sh'
   vim.bo[buf].modified = false
+  registry.register(buf, 'derived-report', {
+    lifecycle = 'client-local', disposable = true,
+    recipe = { kind = 'git-add-preview' },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.api.nvim_set_current_buf(buf)
   require('skg.readable_ids').enable(buf)
   vim.notify(string.format(

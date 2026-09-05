@@ -50,6 +50,7 @@ local function new_buffer ()
   vim.bo[buf].modified = false
   vim.b[buf].skg_view_uri = 'view'
   registry.register(buf, 'content-view', {
+    lifecycle = 'live-view', disposable = false,
     last_fetched = '* Original\n', graph_generation = 1,
     presentation_generation = 3, server_revision = 4,
     application_token = 7,
@@ -254,7 +255,10 @@ describe('skg Neovim maintenance handshake', function ()
     state.maintenance_state = { epoch = 9, state = 'active' }
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '* New view' })
-    registry.register(buf, 'content-view', { last_fetched = '* New view\n' })
+    registry.register(buf, 'content-view', {
+      lifecycle = 'live-view', disposable = false,
+      last_fetched = '* New view\n',
+    })
     assert.are.equal(9, registry.record(buf).maintenance_epoch)
     assert.is_false(vim.bo[buf].modifiable)
   end)

@@ -1,6 +1,7 @@
 -- Mirrors the linkstack half of tests/elisp/test-skg-id-search.el.
 
 local linkstack = require('skg.linkstack')
+local registry = require('skg.buffer_registry')
 local state = require('skg.state')
 
 local function buffer_with (text)
@@ -216,5 +217,19 @@ describe('skg.linkstack stack buffer', function ()
     assert.are.same({ { 'new-id', 'new label' },
                       { 'another-id', 'another' } }, state.id_stack)
     assert.is_false(vim.bo[buf].modified)
+  end)
+
+  it('preserves and registers existing unsaved stack edits', function ()
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_name(buf, 'skg://id-stack')
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false,
+      { '* Authored', 'authored-id' })
+    vim.bo[buf].modified = true
+    state.id_stack = { { 'replacement', 'Replacement' } }
+    linkstack.view_id_stack()
+    assert.are.equal(buf, vim.api.nvim_get_current_buf())
+    assert.are.equal('* Authored\nauthored-id', buffer_text())
+    assert.is_true(vim.bo[buf].modified)
+    assert.are.equal('id-stack', registry.record(buf).kind)
   end)
 end)

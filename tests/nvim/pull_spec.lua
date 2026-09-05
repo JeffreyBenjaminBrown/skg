@@ -169,7 +169,9 @@ describe('skg Neovim client-owned pull', function ()
   it('refuses a dirty raw file before maintenance', function ()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(buf, '/client/raw.skg')
-    registry.register(buf, 'raw-skg-file')
+    registry.register(buf, 'raw-skg-file', {
+      lifecycle = 'ordinary-file', disposable = false,
+    })
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, { 'dirty' })
     vim.bo[buf].modified = true
     pull.local_repositories = function () return {
@@ -185,7 +187,9 @@ describe('skg Neovim client-owned pull', function ()
   it('lists dirty views and explains partial-failure recovery', function ()
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(buf, 'skg://dirty-view')
-    registry.register(buf, 'content-view')
+    registry.register(buf, 'content-view', {
+      lifecycle = 'live-view', disposable = false,
+    })
     vim.b[buf].skg_logical_dirty = true
     pull.local_repositories = function () return {
       { key = string.rep('a', 64), root = '/repo', sources = { 'one' } },

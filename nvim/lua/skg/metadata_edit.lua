@@ -124,6 +124,7 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   vim.bo[buf].modified = false
   registry.register(buf, 'metadata-editor', {
     lifecycle = 'attached-workflow',
+    disposable = false,
     continuation_id = registry.new_local_id(),
     origin_buffer = source_buf,
     origin_location = string.format(

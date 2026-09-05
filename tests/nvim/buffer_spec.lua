@@ -80,6 +80,19 @@ describe('skg.buffer lifecycle and registry', function ()
       vim.api.nvim_buf_get_lines(second, 1, 2, false)[1])
   end)
 
+  it('never reuses a dirty buffer bearing the same name', function ()
+    local first = buffer.open_org_buffer_from_text(
+      '* t\nlocal', 'skg://dirty-name', 'uri-1')
+    vim.api.nvim_buf_set_lines(first, 2, 2, false, { 'authored' })
+    assert.is_true(vim.bo[first].modified)
+    local second = buffer.open_org_buffer_from_text(
+      '* t\nincoming', 'skg://dirty-name', 'uri-2')
+    assert.are_not.equal(first, second)
+    assert.are.equal('local\nauthored', table.concat(
+      vim.api.nvim_buf_get_lines(first, 1, -1, false), '\n'))
+    assert.is_true(vim.bo[first].modified)
+  end)
+
   it('finds buffers by uri', function ()
     local buf = buffer.open_org_buffer_from_text(
       '* t', 'skg://t', 'uri-findme')

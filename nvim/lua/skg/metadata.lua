@@ -16,6 +16,7 @@
 local compare = require('skg.sexpr.compare')
 local edit_dsl = require('skg.sexpr.edit_dsl')
 local picker = require('skg.picker')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 
 local M = {}
@@ -392,11 +393,17 @@ function M.view_without_metadata ()
     vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false),
     '\n')
   local stripped = M.strip_metadata_from_org_text(text)
-  local buf = vim.api.nvim_create_buf(true, true)
+  local buf = registry.acquire_generated_buffer(
+    'skg://without-metadata', true, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(stripped, '\n'))
   vim.bo[buf].filetype = 'org'
   vim.bo[buf].modified = false
+  registry.register(buf, 'derived-report', {
+    lifecycle = 'client-local', disposable = true,
+    recipe = { kind = 'without-metadata' },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.api.nvim_set_current_buf(buf)
 end
 

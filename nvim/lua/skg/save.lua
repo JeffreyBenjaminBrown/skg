@@ -706,16 +706,7 @@ end
 ---@return integer bufnr
 function M.show_fork_confirmation (content, save_buf)
   local name = 'skg://fork-confirmation'
-  local buf = nil
-  for _, existing in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(existing)
-       and vim.api.nvim_buf_get_name(existing) == name then
-      buf = existing break end
-  end
-  if not buf then
-    buf = vim.api.nvim_create_buf(true, false)
-    vim.api.nvim_buf_set_name(buf, name)
-  end
+  local buf = registry.acquire_generated_buffer(name, true, false)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(content, '\n'))
@@ -755,6 +746,7 @@ function M.show_fork_confirmation (content, save_buf)
   vim.bo[buf].modified = false
   registry.register(buf, 'fork-confirmation', {
     lifecycle = 'attached-workflow',
+    disposable = false,
     continuation_id = registry.new_local_id(),
     origin_buffer = save_buf,
     origin_location = '((scope save))',

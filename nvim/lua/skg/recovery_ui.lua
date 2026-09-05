@@ -1,9 +1,11 @@
 -- Detached maintenance-recovery UI.  Recovery buffers are independent
--- scratch copies: they carry no view URI, registry record, save authority, or
+-- scratch copies: they carry no view URI or save authority, and their explicit
+-- durable-report registry record never reattaches them to the live graph or
 -- close-view callback, and no operation in this module writes into an archive.
 
 local archive = require('skg.recovery_archive')
 local payload = require('skg.payload')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -377,6 +379,14 @@ function M.open_interrupted_view (incident, buffer_key)
         buf, summary, record, verified, text)
       vim.b[buf].skg_recovery_native_undo_status = context.native_undo_status
       vim.bo[buf].modified = false
+      registry.register(buf, 'durable-report', {
+        lifecycle = 'detached-recovery', disposable = false,
+        recipe = {
+          kind = 'archived-recovery', incident_id = summary.incident_id,
+          buffer_key = verified.key,
+        },
+        last_fetched = registry.raw_text(buf),
+      })
       vim.api.nvim_set_current_buf(buf)
       restore_layout(buf, metadata)
       return buf
@@ -408,11 +418,7 @@ end
 function M.list_maintenance_incidents ()
   local summaries = archive.list()
   local name = 'skg://maintenance-incidents'
-  local buf = vim.fn.bufnr(name)
-  if buf < 0 then
-    buf = vim.api.nvim_create_buf(true, true)
-    vim.api.nvim_buf_set_name(buf, name)
-  end
+  local buf = registry.acquire_generated_buffer(name, true, true)
   vim.bo[buf].modifiable = true
   vim.bo[buf].buftype = 'nofile'
   vim.bo[buf].bufhidden = 'hide'
@@ -431,6 +437,11 @@ function M.list_maintenance_incidents ()
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].modified = false
+  registry.register(buf, 'durable-report', {
+    lifecycle = 'client-local', disposable = false,
+    recipe = { kind = 'maintenance-incident-list' },
+    last_fetched = registry.raw_text(buf),
+  })
   list_rows[buf] = rows
   if not vim.b[buf].skg_recovery_list_keys then
     vim.b[buf].skg_recovery_list_keys = true

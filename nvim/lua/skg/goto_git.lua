@@ -14,6 +14,7 @@ local config = require('skg.config')
 local id_search = require('skg.id_search')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -172,20 +173,17 @@ function M.open_plain_diff_at (resolved_path, search_id)
       'git: %s has no unstaged or staged changes.', file))
     return end
   local name = 'skg://git-diff/' .. file
-  local buf = nil
-  for _, existing in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_get_name(existing) == name then
-      buf = existing break end
-  end
-  if not buf then
-    buf = vim.api.nvim_create_buf(true, true)
-    vim.api.nvim_buf_set_name(buf, name)
-  end
+  local buf = registry.acquire_generated_buffer(name, true, true)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(diff, '\n'))
   vim.bo[buf].filetype = 'diff'
   vim.bo[buf].modifiable = false
   vim.bo[buf].modified = false
+  registry.register(buf, 'derived-report', {
+    lifecycle = 'client-local', disposable = true,
+    recipe = { kind = 'git-diff', path = resolved_path },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.api.nvim_set_current_buf(buf)
   require('skg.readable_ids').enable(buf)
   if search_id then

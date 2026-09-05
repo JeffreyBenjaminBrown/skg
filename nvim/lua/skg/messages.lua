@@ -3,6 +3,8 @@
 -- elisp/skg-request-save.el (skg-big-nonfatal-message and friends),
 -- which content views, saves, and the stream consumers all share.
 
+local registry = require('skg.buffer_registry')
+
 local M = {}
 
 ---@param message_list string[]|nil
@@ -51,7 +53,10 @@ end
 ---@param message_text string
 ---@param content string
 function M.big_nonfatal_message (buffer_name, message_text, content)
-  local buf = M.scratch_org_buffer(buffer_name, content)
+  local buf = M.scratch_org_buffer(buffer_name, content, {
+    kind = 'durable-report', lifecycle = 'client-local', disposable = false,
+    recipe = { kind = 'message-report', requested_name = buffer_name },
+  })
   local already_visible = false
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     if vim.api.nvim_win_get_buf(win) == buf then
@@ -69,22 +74,22 @@ end
 ---Find-or-create a scratch org buffer named NAME holding CONTENT.
 ---@param name string
 ---@param content string
+---@param options table|nil
 ---@return integer bufnr
-function M.scratch_org_buffer (name, content)
-  local buf = nil
-  for _, existing in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_get_name(existing) == name then
-      buf = existing break end
-  end
-  if not buf or not vim.api.nvim_buf_is_valid(buf) then
-    buf = vim.api.nvim_create_buf(true, true)
-    vim.api.nvim_buf_set_name(buf, name)
-  end
+function M.scratch_org_buffer (name, content, options)
+  options = options or {}
+  local buf = registry.acquire_generated_buffer(name, true, true)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(content, '\n'))
   vim.bo[buf].filetype = 'org'
   vim.bo[buf].modified = false
+  registry.register(buf, options.kind or 'derived-report', {
+    lifecycle = options.lifecycle or 'client-local',
+    disposable = options.disposable ~= false,
+    recipe = options.recipe or { kind = 'scratch-org' },
+    last_fetched = registry.raw_text(buf),
+  })
   return buf
 end
 

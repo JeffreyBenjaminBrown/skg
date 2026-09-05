@@ -5,6 +5,7 @@
 
 local focus = require('skg.focus')
 local metadata = require('skg.metadata')
+local registry = require('skg.buffer_registry')
 
 local M = {}
 
@@ -22,11 +23,16 @@ function M.view_org_ancestry ()
   end
   local title = metadata.split_as_stars_metadata_title(
     metadata.line_text(line)).title
-  local buf = vim.api.nvim_create_buf(true, true)
-  vim.api.nvim_buf_set_name(buf, 'skg://ancestry/' .. title)
+  local buf = registry.acquire_generated_buffer(
+    'skg://ancestry/' .. title, true, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, ancestry)
   vim.bo[buf].filetype = 'org'
   vim.bo[buf].modified = false
+  registry.register(buf, 'derived-report', {
+    lifecycle = 'client-local', disposable = true,
+    recipe = { kind = 'org-ancestry' },
+    last_fetched = registry.raw_text(buf),
+  })
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
 end

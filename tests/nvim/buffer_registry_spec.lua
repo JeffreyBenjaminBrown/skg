@@ -15,8 +15,8 @@ local function make_buffer (kind, options)
   vim.bo[buf].modified = false
   vim.b[buf].skg_view_uri = options.view_uri or 'view:test'
   registry.register(buf, kind, {
-    disposable = options.disposable,
-    lifecycle = options.lifecycle,
+    disposable = options.disposable == true,
+    lifecycle = options.lifecycle or 'live-view',
     continuation_id = options.continuation_id,
     recipe = options.recipe,
     root_ids = options.root_ids,
@@ -64,6 +64,93 @@ describe('skg maintenance buffer transitions', function ()
   before_each(wipe_registered_buffers)
   after_each(wipe_registered_buffers)
 
+  it('requires every constructor to state lifecycle and disposability',
+     function ()
+    local buf = vim.api.nvim_create_buf(false, true)
+    assert.has_error(function ()
+      registry.register(buf, 'derived-report', { disposable = true }) end,
+      'Skg buffer constructor omitted its lifecycle')
+    assert.has_error(function ()
+      registry.register(buf, 'derived-report', { lifecycle = 'client-local' })
+    end, 'Skg buffer constructor omitted its disposable policy')
+    registry.register(buf, 'derived-report', {
+      lifecycle = 'client-local', disposable = true,
+    })
+    assert.are.equal('derived-report', registry.record(buf).kind)
+  end)
+
+  it('reuses a conventional name only under explicit disposable policy',
+     function ()
+    local name = 'skg://durable-namesake'
+    local durable = vim.api.nvim_create_buf(true, true)
+    vim.api.nvim_buf_set_name(durable, name)
+    vim.api.nvim_buf_set_lines(durable, 0, -1, false,
+      { 'keep this report' })
+    vim.bo[durable].modified = false
+    registry.register(durable, 'durable-report', {
+      lifecycle = 'client-local', disposable = false,
+      last_fetched = registry.raw_text(durable),
+    })
+    local fresh = registry.acquire_generated_buffer(name, true, true)
+    assert.are_not.equal(durable, fresh)
+    assert.are.equal('keep this report',
+      vim.api.nvim_buf_get_lines(durable, 0, 1, false)[1])
+
+    local disposable_name = 'skg://disposable-namesake'
+    local disposable = vim.api.nvim_create_buf(true, true)
+    vim.api.nvim_buf_set_name(disposable, disposable_name)
+    vim.bo[disposable].modified = false
+    registry.register(disposable, 'derived-report', {
+      lifecycle = 'client-local', disposable = true,
+    })
+    assert.are.equal(disposable, registry.acquire_generated_buffer(
+      disposable_name, true, true))
+  end)
+
+  it('enumerates every direct product buffer constructor', function ()
+    local owners = {}
+    local files = vim.fn.globpath(
+      _G.skg_test_repo_root() .. '/nvim/lua/skg', '**/*.lua', false, true)
+    for _, file in ipairs(files) do
+      local owner = '<top-level>'
+      for _, line in ipairs(vim.fn.readfile(file)) do
+        local exported = line:match('^function M%.([%w_]+)%s*%(')
+        local private = line:match('^local function ([%w_]+)%s*%(')
+        if exported then owner = 'M.' .. exported
+        elseif private then owner = private end
+        if line:find('vim.api.nvim_create_buf(', 1, true) then
+          owners[owner] = true end
+      end
+    end
+    local actual = {}
+    for owner in pairs(owners) do table.insert(actual, owner) end
+    table.sort(actual)
+    local expected = {
+      'M.acquire_generated_buffer', 'M.open_edit_buffer',
+      'M.open_interrupted_view', 'M.open_org_buffer_from_text',
+      'M.start_terminal', 'M.view_id_stack', 'verify_sidecar',
+    }
+    table.sort(expected)
+    assert.are.same(expected, actual)
+  end)
+
+  it('registers only a direct configured raw skg file', function ()
+    local config = require('skg.config')
+    local old_inventory = config.source_inventory
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_name(buf, '/client/source/node.skg')
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { 'pid: node' })
+    vim.bo[buf].modified = false
+    config.source_inventory = {
+      { name = 'main', path = '/client/source' },
+    }
+    local record = registry.register_raw_file_if_configured(buf)
+    config.source_inventory = old_inventory
+    assert.are.equal('raw-skg-file', record.kind)
+    assert.are.equal('ordinary-file', record.lifecycle)
+    assert.is_false(record.disposable)
+  end)
+
   it('emits the complete normalized reconnect descriptor', function ()
     local buf = make_buffer('search-view', {
       lifecycle = 'live-view',
@@ -108,6 +195,7 @@ describe('skg maintenance buffer transitions', function ()
     vim.bo[child].modified = false
     registry.register(child, 'metadata-editor', {
       lifecycle = 'attached-workflow',
+      disposable = false,
       continuation_id = 'continuation-1',
       origin_buffer = origin,
       origin_location = '((line 1) (metadata-start 2) (metadata-length 8))',
@@ -131,6 +219,8 @@ describe('skg maintenance buffer transitions', function ()
     assert.are.equal(child_record.origin_location,
       child_descriptor.origin_location)
     registry.register(origin, 'content-view', {
+      lifecycle = 'live-view',
+      disposable = false,
       view_uri = origin_record.view_uri,
       recipe = { kind = 'single-root', root_id = 'origin' },
       application_token = origin_record.application_token,

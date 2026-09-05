@@ -61,6 +61,7 @@ vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile' }, {
   callback = function (event)
     require('skg.keymaps').attach_file_buffer(event.buf)
     require('skg.readable_ids').enable(event.buf)
+    require('skg.buffer_registry').register_raw_file_if_configured(event.buf)
   end,
 })
 

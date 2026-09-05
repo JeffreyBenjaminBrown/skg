@@ -9,6 +9,7 @@
 
 local id_search = require('skg.id_search')
 local metadata = require('skg.metadata')
+local registry = require('skg.buffer_registry')
 local state = require('skg.state')
 
 local M = {}
@@ -242,6 +243,18 @@ function M.view_id_stack ()
     buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(buf, name)
   end
+  if vim.bo[buf].modified then
+    if not registry.record(buf) then
+      registry.register(buf, 'id-stack', {
+        lifecycle = 'client-local', disposable = true,
+        recipe = { kind = 'id-stack' },
+        last_fetched = registry.raw_text(buf),
+      })
+    end
+    vim.api.nvim_set_current_buf(buf)
+    vim.notify('ID stack buffer has edits; leaving them untouched.')
+    return
+  end
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
     vim.split(M.format_id_stack_as_org(), '\n'))
@@ -249,6 +262,11 @@ function M.view_id_stack ()
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = 'org'
   vim.bo[buf].modified = false
+  registry.register(buf, 'id-stack', {
+    lifecycle = 'client-local', disposable = true,
+    recipe = { kind = 'id-stack' },
+    last_fetched = registry.raw_text(buf),
+  })
   if not vim.b[buf].skg_id_stack_autocmd then
     vim.b[buf].skg_id_stack_autocmd = true
     vim.api.nvim_create_autocmd('BufWriteCmd', {

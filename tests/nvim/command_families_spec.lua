@@ -247,6 +247,7 @@ describe('skg.metadata_edit', function ()
     local source_buf = buffer_with(
       '* (skg (node (id abc) (source public))) my title')
     registry.register(source_buf, 'content-view', {
+      lifecycle = 'live-view', disposable = false,
       view_uri = 'view:test-metadata',
       recipe = { kind = 'single-root', root_id = 'abc' },
       root_ids = { 'abc' },
@@ -281,6 +282,7 @@ describe('skg.metadata_edit', function ()
     -- test-skg-insert-heading-source-prompt.el.
     local source_buf = buffer_with('* just a plain headline')
     registry.register(source_buf, 'content-view', {
+      lifecycle = 'live-view', disposable = false,
       view_uri = 'view:test-empty-metadata',
       recipe = { kind = 'single-root', root_id = 'draft' },
       root_ids = { 'draft' },

@@ -21,6 +21,52 @@ function M.new_local_id ()
   return uuid()
 end
 
+function M.acquire_generated_buffer (name, listed, scratch)
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    local record = M.record(buf)
+    if vim.api.nvim_buf_is_valid(buf)
+       and vim.api.nvim_buf_get_name(buf) == name
+       and record and record.disposable == true
+       and not record.continuation_id
+       and not record.maintenance_epoch
+       and not M.dirty(buf) then
+      return buf
+    end
+  end
+  local buf = vim.api.nvim_create_buf(listed == true, scratch == true)
+  local actual_name = name
+  if vim.fn.bufnr(name) >= 0 then
+    actual_name = name .. '/' .. uuid() end
+  vim.api.nvim_buf_set_name(buf, actual_name)
+  return buf
+end
+
+function M.register_raw_file_if_configured (buf)
+  if not vim.api.nvim_buf_is_valid(buf) then return nil end
+  local path = vim.api.nvim_buf_get_name(buf)
+  if not path:match('%.skg$') then return nil end
+  local directory = vim.fs.normalize(vim.fs.dirname(path))
+  local configured = false
+  for _, source in ipairs(require('skg.config').source_paths() or {}) do
+    if type(source.path) == 'string'
+       and directory == vim.fs.normalize(source.path) then
+      configured = true break end
+  end
+  if not configured then return nil end
+  local record = M.record(buf)
+  if record and record.kind == 'raw-skg-file' then return record end
+  return M.register(buf, 'raw-skg-file', {
+    lifecycle = 'ordinary-file', disposable = false,
+    recipe = { kind = 'raw-skg-file', name = vim.fs.basename(path) },
+    last_fetched = M.raw_text(buf),
+  })
+end
+
+function M.register_open_raw_files ()
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    M.register_raw_file_if_configured(buf) end
+end
+
 function M.raw_text (buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local text = table.concat(lines, '\n')
@@ -131,6 +177,10 @@ end
 
 function M.register (buf, kind, options)
   options = options or {}
+  if type(options.lifecycle) ~= 'string' then
+    error('Skg buffer constructor omitted its lifecycle') end
+  if type(options.disposable) ~= 'boolean' then
+    error('Skg buffer constructor omitted its disposable policy') end
   local state = require('skg.state')
   local current = M.raw_text(buf)
   local last_fetched = options.last_fetched or current
@@ -143,8 +193,8 @@ function M.register (buf, kind, options)
   end
   vim.b[buf].skg_buffer_id = vim.b[buf].skg_buffer_id or uuid()
   vim.b[buf].skg_buffer_kind = assert(kind, 'explicit Skg buffer kind required')
-  vim.b[buf].skg_lifecycle = options.lifecycle or 'live-view'
-  vim.b[buf].skg_disposable = options.disposable == true
+  vim.b[buf].skg_lifecycle = options.lifecycle
+  vim.b[buf].skg_disposable = options.disposable
   vim.b[buf].skg_continuation_id = options.continuation_id
   if options.view_uri ~= nil then
     vim.b[buf].skg_view_uri = options.view_uri end
@@ -439,9 +489,19 @@ function M.apply_maintenance_rendered_view (
 end
 
 function M.lock_for_maintenance (buf, epoch)
-  if not M.record(buf) then return end
+  local record = M.record(buf)
+  if not record then return end
   vim.b[buf].skg_maintenance_epoch = epoch
-  vim.bo[buf].modifiable = false
+  if record.lifecycle == 'live-view'
+     or record.lifecycle == 'attached-workflow'
+     or record.lifecycle == 'maintenance-control'
+     or record.lifecycle == 'ordinary-file' then
+    if not vim.b[buf].skg_maintenance_changed_modifiable then
+      vim.b[buf].skg_pre_maintenance_modifiable = vim.bo[buf].modifiable
+      vim.b[buf].skg_maintenance_changed_modifiable = true
+    end
+    vim.bo[buf].modifiable = false
+  end
 end
 
 function M.unlock_after_maintenance (buf, epoch)
@@ -458,7 +518,13 @@ function M.unlock_after_maintenance (buf, epoch)
     vim.b[buf].skg_origin_location = nil
     refresh_attached_workflow_count(origin_id)
   end
-  if not vim.b[buf].skg_save_locked then vim.bo[buf].modifiable = true end
+  if vim.b[buf].skg_maintenance_changed_modifiable then
+    local prior = vim.b[buf].skg_pre_maintenance_modifiable == true
+    vim.b[buf].skg_maintenance_changed_modifiable = nil
+    vim.b[buf].skg_pre_maintenance_modifiable = nil
+    if not vim.b[buf].skg_save_locked then
+      vim.bo[buf].modifiable = prior end
+  end
 end
 
 function M.census ()

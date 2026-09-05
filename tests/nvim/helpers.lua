@@ -168,10 +168,18 @@ function M.reset_client_state ()
   require('skg.client').port = nil
 end
 
----Delete every skg view buffer without ceremony.
+---Delete every registered Skg-owned or legacy URI-bearing buffer.
 function M.wipe_skg_buffers ()
   local buffer = require('skg.buffer')
+  local registry = require('skg.buffer_registry')
+  local seen = {}
+  local owned = registry.buffers()
+  for _, buf in ipairs(owned) do seen[buf] = true end
   for _, buf in ipairs(buffer.all_skg_buffers()) do
+    if not seen[buf] then table.insert(owned, buf) end
+    seen[buf] = true
+  end
+  for _, buf in ipairs(owned) do
     vim.bo[buf].modified = false
     pcall(vim.api.nvim_buf_delete, buf, { force = true })
   end

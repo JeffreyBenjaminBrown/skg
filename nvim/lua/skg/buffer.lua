@@ -168,15 +168,17 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
   if not options.force_new then
     for _, existing in ipairs(vim.api.nvim_list_bufs()) do
       if vim.api.nvim_buf_is_valid(existing)
-         and vim.api.nvim_buf_get_name(existing) == buffer_name then
+         and vim.api.nvim_buf_get_name(existing) == buffer_name
+         and registry.record(existing)
+         and not registry.dirty(existing) then
         buf = existing break end
     end
   end
   if not buf then
     buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(
-      buf, options.force_new and unused_buffer_name(buffer_name)
-        or buffer_name)
+      buf, (options.force_new or vim.fn.bufnr(buffer_name) >= 0)
+        and unused_buffer_name(buffer_name) or buffer_name)
   end
   vim.bo[buf].modifiable = true
   M.disarm_first_change_warning(buf) -- this rewrite is not a user edit
@@ -184,8 +186,8 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
                              vim.split(org_text, '\n'))
   M.configure_view_buffer(buf, uri)
   registry.register(buf, options.kind or 'content-view', {
-    lifecycle = options.lifecycle,
-    disposable = options.disposable,
+    lifecycle = options.lifecycle or 'live-view',
+    disposable = options.disposable == true,
     continuation_id = options.continuation_id,
     recipe = options.recipe,
     root_ids = options.root_ids,

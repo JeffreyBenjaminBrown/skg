@@ -113,6 +113,8 @@ local function fixture ()
   local base = '* Root λ\nbase\n'
   install_text_without_undo(buf, base)
   registry.register(buf, 'content-view', {
+    lifecycle = 'live-view',
+    disposable = false,
     last_fetched = base,
     root_ids = { 'root-a', 'root-b' },
     recipe = { kind = 'single-root', requested = { 'root-a', 'root-b' } },
@@ -532,7 +534,8 @@ describe('skg recovery archive', function ()
         assert.are.equal('acwrite', vim.bo[buf].buftype)
         assert.is_true(vim.b[buf].skg_recovery)
         assert.is_nil(vim.b[buf].skg_view_uri)
-        assert.is_nil(registry.record(buf))
+        assert.are.equal('durable-report', registry.record(buf).kind)
+        assert.are.equal('detached-recovery', registry.record(buf).lifecycle)
         assert.are.equal('native-restored',
           vim.b[buf].skg_recovery_native_undo_status)
         local written = pcall(vim.api.nvim_buf_call, buf, function ()
@@ -563,7 +566,9 @@ describe('skg recovery archive', function ()
       assert.are.equal('text-only-other-client',
         vim.b[recovery].skg_recovery_native_undo_status)
       assert.is_nil(vim.b[recovery].skg_view_uri)
-      assert.is_nil(registry.record(recovery))
+      assert.are.equal('durable-report', registry.record(recovery).kind)
+      assert.are.equal('detached-recovery',
+        registry.record(recovery).lifecycle)
     end, debug.traceback)
     delete_buffer(recovery)
     cleanup(value)

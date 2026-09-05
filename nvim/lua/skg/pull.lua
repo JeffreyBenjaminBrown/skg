@@ -379,6 +379,14 @@ function M.start_terminal (repository, context, on_exit)
   table.insert(context.diagnostic_buffers, {
     buffer = buf, name = name, key = repository.key, root = repository.root,
   })
+  registry.register(buf, 'durable-report', {
+    lifecycle = 'client-local', disposable = false,
+    recipe = {
+      kind = 'pull-diagnostic', incident_id = incident.incident_id,
+      repository_key = repository.key,
+    },
+    last_fetched = registry.raw_text(buf),
+  })
 
   local win = context.diagnostic_window
   if win and vim.api.nvim_win_is_valid(win) then
