@@ -846,6 +846,24 @@ what's imperfect about what's done; choices determining the future.
 - The focused Rust maintenance suite passes 69/69 after blocked recovery and
   preselection retirement.  The complete Neovim suite passes; the relevant
   Emacs retry/retirement tests and the broader maintenance selection pass.
+- Closed the execution-discovered late-view gap with two durable identities.
+  Every successful maintenance-time query now journals its server-owned
+  =ViewUri= before the response, and an incident-qualified priority census
+  binds it to the editor-owned stable buffer ID.  The immutable initial archive
+  census stays separate from the monotonically growing presentation census;
+  settlement, final evidence and terminal unlock use the latter.
+- Selection now checks that enrollment barrier only after all pinned G0 query
+  leases have drained.  If a G0 response or a newly selected G1 response still
+  awaits census binding, the coordinator durably defers selection or view
+  classification and status resumes it after census.  Exact scalar approval is
+  reused across that deferral.  Emacs and Neovim both pass the expanded rebuild
+  integration: a view born during an invalid-config block remains epoch-locked,
+  joins the repaired incident's settlement, and unlocks only in its terminal
+  inventory.
+- Validation after late enrollment: 58/58 focused Rust maintenance tests, all
+  411 of 414 runnable Emacs tests with the three expected optional undo-sidecar
+  skips, the complete Neovim suite, and both real-client full-rebuild/retry
+  integrations pass.  =cargo check --lib= and =git diff --check= are clean.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -862,6 +880,11 @@ what's imperfect about what's done; choices determining the future.
   immediately after full census/archive parentage, before the later ordinary
   save fence.  That made the census closed over the actual live buffer set and
   exposed conventional-name overwrite risks while the policy was still local.
+- The retained failing full-rebuild retry was extended before the final broad
+  validation.  It exposed that the original one-time census could not name a
+  view born in a blocked incident, so the approved URI-to-buffer enrollment
+  barrier was implemented and tested before returning to the verification
+  matrix.
 
 ** what's imperfect about what's done
 - Both clients can finish an already-selected disk candidate, explicit reload,
@@ -875,3 +898,5 @@ what's imperfect about what's done; choices determining the future.
 - No new architectural choice arose from the locked-census or end-to-end pull
   slice.  The Undo Tree discovery remains resolved by the agreed fail-closed
   active-mode check; merely having the package installed has no effect.
+- No choice remains from late-view enrollment; its two-stage identity and
+  monotonic presentation-census rule are the user-approved design.
