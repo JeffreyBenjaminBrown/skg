@@ -628,11 +628,14 @@ old implementation."
   (let* ((response (read payload))
          (state skg--maintenance-client-incident)
          (retirement (plist-get state :in-flight-preselection-retirement))
+         (status (skg--maintenance-text response 'status))
          (buffer-id (and retirement
                          (skg--maintenance-text retirement 'buffer-id)))
          (first (car (plist-get state
                                 :pending-preselection-retirements))))
     (unless (and retirement first
+                 (member status '("invalid-dirty-buffer-retired"
+                                  "all-invalid-dirty-buffers-retired"))
                  (equal buffer-id
                         (skg--maintenance-text response 'buffer-id))
                  (equal buffer-id

@@ -526,6 +526,10 @@
       (should (equal '("dirty")
                      (plist-get skg--maintenance-client-incident
                                 :locally-applied)))
+      (should-error
+       (skg--maintenance-handle-preselection-retirement-ack
+        nil
+        "((status view-settlement-recorded) (buffer-id dirty) (required-ack retirement-ack))"))
       (skg--maintenance-handle-preselection-retirement-ack
        nil
        "((status all-invalid-dirty-buffers-retired) (buffer-id dirty) (required-ack retirement-ack))")

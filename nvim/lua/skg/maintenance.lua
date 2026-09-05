@@ -590,7 +590,10 @@ function M.handle_preselection_retirement_ack (_payload_text, response)
   local first = incident.pending_preselection_retirements[1]
   local buffer_id = retirement
     and payload.field_text(retirement, 'buffer-id') or nil
+  local status = payload.field_text(response, 'status')
   if not retirement or not first
+     or (status ~= 'invalid-dirty-buffer-retired'
+         and status ~= 'all-invalid-dirty-buffers-retired')
      or buffer_id ~= payload.field_text(response, 'buffer-id')
      or buffer_id ~= payload.field_text(first, 'buffer-id')
      or payload.field_text(response, 'required-ack') ~= 'retirement-ack' then

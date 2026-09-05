@@ -461,6 +461,12 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal(retirement, applied)
     assert.are.equal(retirement, sent)
     assert.is_true(state.maintenance_client_incident.locally_applied.dirty)
+    assert.has_error(function ()
+      maintenance.handle_preselection_retirement_ack(nil, {
+        f('status', 'view-settlement-recorded'),
+        f('buffer-id', 'dirty'), f('required-ack', 'retirement-ack'),
+      })
+    end)
     maintenance.handle_preselection_retirement_ack(nil, {
       f('status', 'all-invalid-dirty-buffers-retired'),
       f('buffer-id', 'dirty'), f('required-ack', 'retirement-ack'),
