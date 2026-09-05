@@ -624,6 +624,28 @@ what's imperfect about what's done; choices determining the future.
   render-limit settings remain replaceable.  The focused maintenance suite is
   55/55; focused Emacs maintenance/archive tests, the complete Neovim suite and
   both real-editor rebuild integrations pass.
+- Made ordinary disk observation wholly server-owned.  The legacy =reload
+  paths= wire spelling is now a nonmutating observer hint: paths queue exact
+  observation, full-sweep queues a complete comparison, and direct IDs are
+  refused with a maintained-command instruction.  Closing the final external
+  reload-batch token, including control-socket EOF, directly queues a server
+  sweep; the client push is progress only.  The observer refuses ordinary
+  publication while a batch is open, so the exact close sweep is authoritative.
+- Removed Emacs's file-notify watches, coalescing timers, client observation
+  incidents and raw-save notification hook.  =skg-reload-changed= and Magit
+  refresh now only request process-owned observation, while public path/ID
+  reload enters =explicit-partial-reload= maintenance.  Neovim's batch-close
+  notice likewise reports the sweep already queued by Rust.  The focused Rust
+  maintenance/parser tests, all 376 Emacs tests (two optional undo sidecars
+  skipped), and the complete Neovim suite pass.
+- Rewrote the protocol documentation around the sole retained session,
+  process-owned observation, G0/Gdisk/G1, maintained pull/partial/rebuild
+  transitions, exact census and ACK boundaries, opaque artifact framing,
+  archive publication, staleness and detached recovery.  The glossary now
+  fixes that vocabulary; both command references describe their actual common
+  maintained surface and failure actions; setup documents the archive root,
+  POSIX privacy, incomplete staging and =undo-fu-session= 0.8; and the
+  architecture page draws the server/client ownership boundary.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -649,6 +671,11 @@ what's imperfect about what's done; choices determining the future.
   clean ones close) rather than being settled with their parent.  The durable
   settlement inventory and ACK gate are in place, but workflow-parent-aware
   settlement is not yet implemented.
+- The mutating reload route is no longer dispatchable, but its private Emacs
+  implementation/conflict UI and the server handler's presentation plumbing
+  are still present as dead migration code.  Lower-level reload construction
+  helpers remain live in integration tests.  The obsolete orchestration must
+  be removed without deleting those tested transaction helpers.
 
 ** choices determining the future
 - No new architectural choice arose from the locked-census or end-to-end pull
