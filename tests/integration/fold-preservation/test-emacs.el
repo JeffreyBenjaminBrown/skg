@@ -55,6 +55,7 @@
                       "*** d1\n"
                       "*** d2\n"
                       "** e\n"))
+      (skg-test-register-new-empty-view buffer)
       (message "✓ Created buffer with content")
 
       ;; Position on line 4 (** d)

@@ -116,6 +116,7 @@ which takes priority over subee.skg on disk."
       (insert "* (skg (node (id 11) (source main) indef)) 11\n")
       (insert "* (skg (node (id subee) (source main))) subee\n")
       (insert "** (skg (node (id subee-1) (source main))) subee-1")
+      (skg-test-register-new-empty-view buf)
       (skg-request-save-buffer))
     (skg-test-wait-for-response)
     (message "Buffer 2 after save:\n%s"

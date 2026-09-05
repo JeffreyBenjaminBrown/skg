@@ -72,6 +72,7 @@ metadata stripped from headlines so headlines read like `* title'."
         "child body line\n"))
       (skg-content-view-mode)
       (setq skg-view-uri (org-id-uuid))
+      (skg-test-register-new-empty-view buf)
       (goto-char (point-min)))
     buf))
 

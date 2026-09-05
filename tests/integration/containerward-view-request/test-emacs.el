@@ -50,6 +50,7 @@
       (insert "*** (skg (node (id 12))) 12\n")
       (insert "**** (skg (node (id 121))) 121\n")
       (insert "*** (skg (node (id 13))) 13\n")
+      (skg-test-register-new-empty-view buffer)
       (message "✓ Created initial buffer with full structure")
 
       ;; Save to establish relationships

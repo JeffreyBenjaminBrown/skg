@@ -60,6 +60,7 @@
       (insert "*** (skg (node (id 4))) 4\n")
       (insert "*** (skg (node (id 5))) 5\n")
       (insert "** (skg (node (id 6))) 6\n")
+      (skg-test-register-new-empty-view test-buffer)
 
       (message "✓ Created buffer with 6 headlines")
 

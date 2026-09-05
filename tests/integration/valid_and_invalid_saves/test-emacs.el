@@ -23,6 +23,7 @@
     (insert "* (skg (node (id 1) (source main))) 1\n** (skg (node (id 1))) 1")
     (org-mode)
     (setq skg-view-uri (org-id-uuid))
+    (skg-test-register-new-empty-view (current-buffer))
     (goto-char (point-min))
     (message "✓ Created *skg-content-view* buffer with invalid content"))
 

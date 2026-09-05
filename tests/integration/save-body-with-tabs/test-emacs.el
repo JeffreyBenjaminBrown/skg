@@ -47,6 +47,7 @@
       (insert org-text)
       (skg-content-view-mode)
       (setq skg-view-uri (org-id-uuid))
+      (skg-test-register-new-empty-view buffer)
       (goto-char (point-min))
 
       (message "=== PHASE 2: save buffer ===")

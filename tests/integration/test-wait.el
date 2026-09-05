@@ -32,4 +32,26 @@ is idle. Returns t on success, nil on timeout."
                    (= 0 (length skg-lp--buf))))
    timeout-secs))
 
+(defun skg-test-register-new-empty-view (buffer)
+  "Give a hand-built integration BUFFER honest new-view save authority.
+Older integration fixtures predate explicit client application records.  They
+still construct their text directly so they can test folding and malformed
+input, but production saves now require the same typed record as every public
+constructor.  Reusing an already registered BUFFER preserves its server-issued
+revision and token across successive fixture edits."
+  (with-current-buffer buffer
+    (if skg--buffer-record
+        (setq skg-view-uri
+              (skg--buffer-record-view-uri skg--buffer-record))
+      (setq skg-view-uri (or skg-view-uri (org-id-uuid)))
+      (skg-register-buffer
+       buffer 'new-empty-content-view
+       :lifecycle 'live-view :disposable nil
+       :view-uri skg-view-uri :recipe '((kind . "new-empty"))
+       :last-fetched ""
+       :graph-generation
+       (or (cdr (assq 'graph-generation skg--server-store-state)) 1)
+       :presentation-generation 0
+       :server-revision 0 :application-token 1))))
+
 (provide 'test-wait)
