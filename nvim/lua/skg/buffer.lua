@@ -66,6 +66,15 @@ function M.search_buffer_name (search_terms)
   return 'skg://?' .. M.sanitize_buffer_name(search_terms)
 end
 
+local function unused_buffer_name (desired)
+  local candidate, suffix = desired, 2
+  while vim.fn.bufnr(candidate) >= 0 do
+    candidate = desired .. ' #' .. tostring(suffix)
+    suffix = suffix + 1
+  end
+  return candidate
+end
+
 ---NAME with org id links shortened for display: every
 ---[[id:ID][LABEL]] becomes [[LABEL]].
 ---@param name string
@@ -154,22 +163,26 @@ end
 ---@return integer bufnr
 function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
   local uri = view_uri or M.generate_uuid()
+  options = options or {}
   local buf = nil
-  for _, existing in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(existing)
-       and vim.api.nvim_buf_get_name(existing) == buffer_name then
-      buf = existing break end
+  if not options.force_new then
+    for _, existing in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_is_valid(existing)
+         and vim.api.nvim_buf_get_name(existing) == buffer_name then
+        buf = existing break end
+    end
   end
   if not buf then
     buf = vim.api.nvim_create_buf(true, false)
-    vim.api.nvim_buf_set_name(buf, buffer_name)
+    vim.api.nvim_buf_set_name(
+      buf, options.force_new and unused_buffer_name(buffer_name)
+        or buffer_name)
   end
   vim.bo[buf].modifiable = true
   M.disarm_first_change_warning(buf) -- this rewrite is not a user edit
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
   M.configure_view_buffer(buf, uri)
-  options = options or {}
   registry.register(buf, options.kind or 'content-view', {
     lifecycle = options.lifecycle,
     disposable = options.disposable,

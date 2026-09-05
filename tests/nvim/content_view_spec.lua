@@ -36,6 +36,13 @@ describe('skg.content_view request strings', function ()
       content_view.request_string(
         'abc', 'uri-1', nil, { 'pid-a', 'pid-b' }))
   end)
+
+  it('marks a request which must open beside an existing view', function ()
+    assert.are.equal(
+      '((request . "single root content view") (id . "abc")'
+      .. ' (view-uri . "uri-fresh") (fresh-view . "true"))\n',
+      content_view.request_string('abc', 'uri-fresh', nil, nil, true))
+  end)
 end)
 
 describe('skg.content_view responses', function ()
@@ -116,6 +123,24 @@ describe('skg.content_view responses', function ()
       return vim.api.nvim_get_current_buf() == existing
     end, 10)
     assert.are.equal(existing, vim.api.nvim_get_current_buf())
+  end)
+
+  it('opens a fresh response in an independent same-title buffer',
+     function ()
+    local existing = buffer.open_org_buffer_from_text(
+      '* same title', 'skg://same title', 'uri-existing')
+    serve_content(
+      '((response-type content-view) (content "* same title")'
+      .. ' (errors ()) (warnings ()))')
+    content_view.request_single_root_content_view_from_id(
+      'abc', nil, nil, nil, true)
+    vim.wait(2000, function ()
+      return vim.api.nvim_get_current_buf() ~= existing
+        and vim.b[vim.api.nvim_get_current_buf()].skg_view_uri ~= nil
+    end, 10)
+    assert.are_not.equal(existing, vim.api.nvim_get_current_buf())
+    assert.are_not.equal(vim.api.nvim_buf_get_name(existing),
+      vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf()))
   end)
 
   it('shows errors and warnings in a messages buffer', function ()

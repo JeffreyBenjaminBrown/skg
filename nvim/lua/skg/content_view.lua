@@ -22,7 +22,7 @@ local M = {}
 ---@param approved_pids string[]|nil
 ---@return string
 function M.request_string (node_id, view_uri, bypass_override,
-                           approved_pids)
+                           approved_pids, fresh_view)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
     sexpr.pair(sexpr.symbol('id'), node_id),
@@ -35,6 +35,9 @@ function M.request_string (node_id, view_uri, bypass_override,
     for _, pid in ipairs(approved_pids) do
       table.insert(approval, pid) end
     table.insert(request, approval) end
+  if fresh_view then
+    table.insert(request,
+      sexpr.pair(sexpr.symbol('fresh-view'), 'true')) end
   return sexpr.to_string(request) .. '\n'
 end
 
@@ -47,12 +50,13 @@ end
 function M.request_single_root_content_view_from_id (node_id,
                                                      bypass_override,
                                                      approved_pids,
-                                                     existing_view_uri)
+                                                     existing_view_uri,
+                                                     fresh_view)
   local view_uri = existing_view_uri or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
       state.remove_response_handler('ugly-telescope-confirmation')
-      M.handle_content_view(payload_text, response, view_uri)
+      M.handle_content_view(payload_text, response, view_uri, fresh_view)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
@@ -66,11 +70,11 @@ function M.request_single_root_content_view_from_id (node_id,
         payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
         M.request_single_root_content_view_from_id(
-          node_id, bypass_override, pids, view_uri) end
+          node_id, bypass_override, pids, view_uri, fresh_view) end
     end, false)
   client.submit_request(
     M.request_string(
-      node_id, view_uri, bypass_override, approved_pids))
+      node_id, view_uri, bypass_override, approved_pids, fresh_view))
 end
 
 ---Handle a content-view response: either a (switch-to-view URI)
@@ -80,7 +84,7 @@ end
 ---@param payload_text string
 ---@param response any
 ---@param view_uri string
-function M.handle_content_view (payload_text, response, view_uri)
+function M.handle_content_view (payload_text, response, view_uri, fresh_view)
   local ok, err = pcall(function ()
     local switch_uri = payload.field_text(response, 'switch-to-view')
     if switch_uri then
@@ -115,6 +119,7 @@ function M.handle_content_view (payload_text, response, view_uri)
                  and 'override-choice-menu' or 'content-view',
           disposable = server_uri and server_uri:find('^override%-menu:')
                        ~= nil,
+          force_new = fresh_view == true,
           recipe = { kind = 'single-root' },
           graph_generation = tonumber(
             payload.field_text(response, 'graph-generation')),

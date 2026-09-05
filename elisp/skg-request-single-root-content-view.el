@@ -7,8 +7,8 @@
 (require 'skg-buffer)
 (require 'skg-request-save) ; For message formatting/display helpers
 
-(defun skg--single-root-view-request-string (clean-id view-uri bypass-override
-                                                      &optional approved-pids)
+(defun skg--single-root-view-request-string
+    (clean-id view-uri bypass-override &optional approved-pids fresh-view-p)
   "The request sexp string for a single root content view of CLEAN-ID.
 When BYPASS-OVERRIDE is non-nil, the request carries
 \(override-choice . \"bypass\")."
@@ -20,12 +20,13 @@ When BYPASS-OVERRIDE is non-nil, the request carries
             (when bypass-override
               '((override-choice . "bypass")))
             (when approved-pids
-              `((allow-ugly-telescopes ,@approved-pids)))))
+              `((allow-ugly-telescopes ,@approved-pids)))
+            (when fresh-view-p '((fresh-view . "true")))))
           "\n"))
 
 (defun skg-request-single-root-content-view-from-id
     (node-id &optional tcp-proc bypass-override approved-pids view-uri
-             stale-uri-retry-p)
+             stale-uri-retry-p fresh-view-p)
   "Ask Rust for an single root content view view of NODE-ID.
 Registers a response handler in the dispatch map.
 Optional TCP-PROC allows reusing an existing connection.
@@ -34,7 +35,8 @@ When BYPASS-OVERRIDE is non-nil, the request carries
 server opens the node itself instead of the override-choice menu.
 \(Recursive content beneath the root still substitutes.)
 APPROVED-PIDS and VIEW-URI preserve an ugly-telescope approval retry.
-STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
+STALE-URI-RETRY-P is an internal guard that prevents repeated recovery.
+FRESH-VIEW-P asks the server not to redirect to an already-open root."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
          (view-uri (or view-uri (org-id-uuid)))
@@ -43,7 +45,7 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
                      node-id))
          (request-s-exp
           (skg--single-root-view-request-string
-           clean-id view-uri bypass-override approved-pids)))
+           clean-id view-uri bypass-override approved-pids fresh-view-p)))
     ;; Register handler in dispatch map (one-shot)
     (skg-register-response-handler
      'content-view
@@ -51,7 +53,7 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
        (skg-remove-response-handler 'ugly-telescope-confirmation)
        (skg-handle-content-view-sexp
         tcp-proc payload view-uri clean-id bypass-override approved-pids
-        stale-uri-retry-p))
+        stale-uri-retry-p fresh-view-p))
      t)
     ;; Alternative to content-view. Keep it non-one-shot so only the
     ;; content-view branch contributes to the pending-response count.
@@ -65,15 +67,19 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
               (pids (mapcar (lambda (pid) (format "%s" pid))
                             (cadr (assoc 'pids response)))))
          (when (y-or-n-p (concat prompt " "))
-           (skg-request-single-root-content-view-from-id
-            clean-id tcp-proc bypass-override pids view-uri
-            stale-uri-retry-p))))
+           (if fresh-view-p
+               (skg-request-single-root-content-view-from-id
+                clean-id tcp-proc bypass-override pids view-uri
+                stale-uri-retry-p t)
+             (skg-request-single-root-content-view-from-id
+              clean-id tcp-proc bypass-override pids view-uri
+              stale-uri-retry-p)))))
      nil)
     (skg-submit-request tcp-proc request-s-exp)) )
 
 (defun skg--finish-switchToContentView
     (tcp-proc switch-uri node-id bypass-override approved-pids
-              stale-uri-retry-p)
+              stale-uri-retry-p fresh-view-p)
   "Display SWITCH-URI, or repair stale server bookkeeping once."
   (let ((buf (skg-find-buffer-by-uri switch-uri)))
     (cond
@@ -86,25 +92,28 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
            "skg: could not visit %s: server twice returned a missing view (%s)"
            node-id switch-uri)
         (skg-send-close-view-uri tcp-proc switch-uri)
-        (skg-request-single-root-content-view-from-id
-         node-id tcp-proc bypass-override approved-pids nil t)))
+        (if fresh-view-p
+            (skg-request-single-root-content-view-from-id
+             node-id tcp-proc bypass-override approved-pids nil t t)
+          (skg-request-single-root-content-view-from-id
+           node-id tcp-proc bypass-override approved-pids nil t))))
      ((eq buf (current-buffer))
       (message "Already viewing this node (it is a root of this view)"))
      (t (pop-to-buffer buf)))))
 
 (defun skg--defer-switch-to-content-view
     (tcp-proc switch-uri node-id bypass-override approved-pids
-              stale-uri-retry-p)
+              stale-uri-retry-p fresh-view-p)
   "Handle a switch response outside the network process filter."
   (run-at-time
    0 nil #'skg--finish-switchToContentView
    tcp-proc switch-uri node-id bypass-override approved-pids
-   stale-uri-retry-p))
+   stale-uri-retry-p fresh-view-p))
 
 (defun skg-handle-content-view-sexp
     (tcp-proc sexp-string view-uri
               &optional node-id bypass-override approved-pids
-              stale-uri-retry-p)
+              stale-uri-retry-p fresh-view-p)
   "Parse and handle content view response s-exp.
 Expected shape: ((content ...) (errors ...) (warnings ...)).
 If the server returns ((switch-to-view URI)) instead, switch to the
@@ -120,7 +129,7 @@ retry."
             ;; The requested ID is already a root of an open view.
             (skg--defer-switch-to-content-view
              tcp-proc (format "%s" switch-uri) node-id bypass-override
-             approved-pids stale-uri-retry-p)
+             approved-pids stale-uri-retry-p fresh-view-p)
           ;; Normal content view response.
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))

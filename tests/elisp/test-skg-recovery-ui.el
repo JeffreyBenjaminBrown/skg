@@ -151,14 +151,14 @@
       (skg-test-recovery--cleanup fixture))))
 
 (ert-deftest test-skg-recovery-ui-opens-recorded-root-as-fresh-live-view ()
-  (let ((fixture (skg-test-recovery--fixture)) selected-root requested-root)
+  (let ((fixture (skg-test-recovery--fixture)) selected-root request)
     (unwind-protect
         (progn
           (skg-test-recovery-ui--finalize fixture)
           (cl-letf (((symbol-function
                       'skg-request-single-root-content-view-from-id)
-                     (lambda (root &rest _)
-                       (setq requested-root root)))
+                     (lambda (&rest arguments)
+                       (setq request arguments)))
                     (skg-recovery-ui-root-picker
                      (lambda (roots _prompt)
                        (setq selected-root roots)
@@ -167,7 +167,8 @@
              (plist-get fixture :summary)
              (plist-get fixture :buffer-key)))
           (should (equal selected-root '("root-a" "root-b")))
-          (should (equal requested-root "root-b")))
+          (should (equal (car request) "root-b"))
+          (should (eq (nth 6 request) t)))
       (skg-test-recovery--cleanup fixture))))
 
 (ert-deftest test-skg-recovery-ui-reruns-search-only-after-confirmation ()

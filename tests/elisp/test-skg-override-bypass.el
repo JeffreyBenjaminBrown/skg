@@ -32,6 +32,11 @@ field: the server defaults to offering the override-choice menu."
              '("pid-a" "pid-b")
              (cdr (assoc 'allow-ugly-telescopes (read approved)))))))
 
+(ert-deftest test-single-root-fresh-request-refuses-an-existing-view-redirect ()
+  (let ((request (read (skg--single-root-view-request-string
+                        "some-id" "fresh-uri" nil nil t))))
+    (should (equal (cdr (assoc 'fresh-view request)) "true"))))
+
 (ert-deftest test-bypass-detection-in-magit-buffers ()
   "A goto from a magit buffer bypasses the menu; from other
 buffers it does not. Detection is by major-mode name, so magit

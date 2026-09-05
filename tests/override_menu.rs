@@ -443,6 +443,19 @@ async fn handler_precedence_and_menu_dedup (
               "test-uuid-PLAIN" . to_string ()))
           . expect ("normal views register under the client URI")
           . pids; }
+      { // Detached recovery explicitly asks for another current view,
+        // so an already-open root must not redirect this request.
+        let fresh_request : String =
+          "((request . \"single root content view\") \
+            (id . \"PLAIN\") (view-uri . \"fresh-plain-uuid\") \
+            (fresh-view . \"true\"))" . to_string ();
+        let response : String =
+          respond (&mut views_state, &fresh_request);
+        assert! ( ! response . contains ("switch-to-view"),
+                  "{}", response );
+        assert! ( views_state . open_views . views . contains_key (
+          &ViewUri::ContentView ("fresh-plain-uuid" . to_string ())),
+          "fresh recovery view registers under its new URI" ); }
       { // Bypass: the overridden node itself opens, no menu.
         views_state . open_views . unregister_view (
           &ViewUri::ContentView ("raw-z-uuid" . to_string ()));

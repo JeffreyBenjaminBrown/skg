@@ -588,20 +588,21 @@ describe('skg recovery archive', function ()
     local value = fixture()
     local old_picker = ui.root_picker
     local old_request = content_view.request_single_root_content_view_from_id
-    local roots, requested_root
+    local roots, request
     local ok, error_text = xpcall(function ()
       local finalized = finalized_fixture(value)
       ui.root_picker = function (choices, _prompt, callback)
         roots = choices
         return callback(choices[2])
       end
-      content_view.request_single_root_content_view_from_id = function (root)
-        requested_root = root
+      content_view.request_single_root_content_view_from_id = function (...)
+        request = { ... }
       end
       ui.open_fresh_view_for_interrupted(
         finalized.summary, finalized.buffer_key)
       assert.same({ 'root-a', 'root-b' }, roots)
-      assert.are.equal('root-b', requested_root)
+      assert.are.equal('root-b', request[1])
+      assert.is_true(request[5])
     end, debug.traceback)
     ui.root_picker = old_picker
     content_view.request_single_root_content_view_from_id = old_request

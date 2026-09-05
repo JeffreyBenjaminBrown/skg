@@ -517,7 +517,8 @@ function M.open_fresh_view_for_interrupted (incident, buffer_key)
       local function open (root)
         if root then
           require('skg.content_view')
-            .request_single_root_content_view_from_id(root) end
+            .request_single_root_content_view_from_id(
+              root, nil, nil, nil, true) end
       end
       if #roots == 1 then return open(roots[1]) end
       return M.root_picker(roots, 'Fresh live root', open)

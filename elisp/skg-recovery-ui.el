@@ -544,7 +544,8 @@
                     ((null (cdr roots)) (car roots))
                     (t (funcall skg-recovery-ui-root-picker
                                 roots "Fresh live root: ")))))
-        (skg-request-single-root-content-view-from-id root)))
+        (skg-request-single-root-content-view-from-id
+         root nil nil nil nil nil t)))
      ((equal kind "search-view")
       (let ((terms (skg-recovery-ui--recipe-value recipe 'terms)))
         (unless (and terms

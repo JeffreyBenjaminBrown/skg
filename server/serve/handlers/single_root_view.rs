@@ -44,6 +44,11 @@ pub fn handle_single_root_view_request (
 ) {
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
+  let fresh_view : bool = sexp::parse (request) . ok ()
+    . and_then (|request| extract_v_from_kv_pair_in_sexp (
+      &request, "fresh-view") . ok ())
+    . map (|value| value == "true")
+    . unwrap_or (false);
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
       match active_source_set . id_source_is_active (
@@ -75,6 +80,7 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &response_sexp ));
           return; }}
+      if !fresh_view {
       if let Some (existing_uri)
         = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
@@ -92,7 +98,7 @@ pub fn handle_single_root_view_request (
             stream,
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
-          return; }
+          return; }}
       let bypass_menu : bool =
         // The optional (override-choice . "menu" | "bypass") field,
         // defaulting to menu. Bypass surfaces (magit jumps,

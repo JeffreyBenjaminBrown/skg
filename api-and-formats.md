@@ -183,9 +183,14 @@ So far there are these endpoints:
   - Request: `((request . "single root content view")
     (id . "NODE_ID") (view-uri . "URI")
     (override-choice . "CHOICE")
+    (fresh-view . "true")
     (allow-ugly-telescopes "PID" ...))`
     - `override-choice` is optional; values are "menu" (the default)
       and "bypass". See "the override-choice menu" below.
+    - `fresh-view` is optional and defaults false.  Detached recovery
+      uses true so an already-open content root cannot turn the request into
+      `switch-to-view`; the successful view is registered under the new
+      client-generated URI and opened in an independent client buffer.
   - Response: LP `((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))`. The document
     structure is detailed below, under `Single root content tree view`.
