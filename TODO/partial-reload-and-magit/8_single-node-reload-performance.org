@@ -1,0 +1,180 @@
+* Single-node reload performance investigation
+
+** Result
+
+The roughly 40-second pause is not the one-node reload, TypeDB, Tantivy, view
+classification, or the ordinary filesystem observer.  It is the server's
+pre-mutation recovery-evidence publication.  Every maintenance incident
+currently serializes the complete 29,973-node graph twice, as =g0_nodes= and
+=g1_nodes= inside a human-readable YAML envelope, even when one title changed.
+The publisher then parses and serializes that 53 MiB envelope repeatedly to
+prove its checksums.
+
+There is no small, semantics-neutral deletion which makes this properly fast.
+The useful fix requires choosing a durable recovery representation.  I have
+therefore made no production-code change yet.
+
+I stopped the live development server while benchmarking.  Its active incident
+=00dd1e20-3eec-42f9-8ba6-46a1ce58ab48= had already published =ARCHIVE-READY=;
+the private client archive and process journal remain on disk, so stopping the
+process did not discard the recovery evidence.
+
+** Evidence
+
+The two real attempts have nearly identical server-side gaps:
+
+| incident | =run maintenance origin= received | first store-transition work | unexplained pre-store gap |
+|----------+-----------------------------------+-----------------------------+---------------------------|
+| =cc56c10b-f749-40f5-8a1a-82e5983074f8= | 23:10:12.815 | 23:10:53.786 | 40.971 s |
+| =00dd1e20-3eec-42f9-8ba6-46a1ce58ab48= | 23:11:39.074 | 23:12:18.819 | 39.745 s |
+
+Once that gap ends, the second attempt spends about 13 ms updating TypeDB,
+about 148 ms creating/committing/reloading the Tantivy generation, and about
+4 ms rendering both affected views.  The client archive preceding the origin
+request was also quick: begin-maintenance to =ARCHIVE-READY= took about 200 ms.
+
+An ignored diagnostic benchmark against the same real config, removed again
+after measurement, separated the candidate and evidence stages:
+
+| operation | measured wall time |
+|-----------+--------------------|
+| read and fold the complete 29,973-file corpus | 1.286 s |
+| construct the exact one-ID candidate | 0.662 s |
+| perform a byte-equality complete observation | 1.230 s |
+| publish one-ID server recovery evidence | 39.476 s |
+| load that published evidence once | 13.417 s |
+
+The benchmark evidence occupied 55,134,806 bytes.  The corresponding live
+=bundle.yaml= files are about 53 MiB each.  The real maintenance evidence
+directory already occupies about 158 MiB for two attempts and one deliberately
+retained incomplete/superseded publication.
+
+The 13-second pause between the previous incident's last view settlement and
+=maintenance archive finalized= is explained by the same issue.  The evidence
+endpoint loads and validates the entire 53 MiB server bundle merely to extract
+the small changed-node artifacts which it sends to the editor.
+
+** Why the bundle is so large and slow
+
+=MaintenanceEvidenceBundle= currently contains all of these at once:
+
+- the complete =G0= path manifest;
+- the complete =G1= path manifest;
+- every semantic node in =G0=;
+- every semantic node in =G1=;
+- the transition delta;
+- before/after semantic evidence for every changed node; and
+- separately written human-facing changed-node artifacts.
+
+For a title-only partial reload, nearly all of the first four collections are
+duplicate unchanged data.  YAML magnifies their size.  The normal publisher
+serializes the payload to hash it, serializes the containing envelope, writes
+and fsyncs it, parses and reserializes the temporary publication to validate
+it, renames it, then parses and reserializes the final publication again.  The
+later client-evidence request repeats the last full load.  These operations
+explain both the 40-second pre-selection delay and the 13-second finalization
+delay.
+
+The full snapshots were added to meet the plan's stronger rule: before the
+first store mutation, durable evidence should be sufficient to reconstruct a
+complete =G0= or =G1= after a crash.  Although the current restart path does
+not yet consume =g0_nodes= or =g1_nodes= for reconstruction, simply removing
+them would weaken that intended guarantee rather than merely optimize code.
+
+** Choice 1: keep self-contained G0/G1 recovery? (recommended: yes)
+
+*** Option A -- Keep the strong recovery guarantee (recommended)
+
+Make each incident independently sufficient to reconstruct either complete
+generation even if the worktree changes again and the derived stores are found
+partly updated after a crash.  This preserves the plan's intended failure
+semantics.
+
+*** Option B -- Retain only changed-node/path evidence
+
+The incident would contain before/after records for the changed telescopes and
+would rely on the worktree, Git, or still-healthy stores for all unchanged
+nodes.  A one-title incident would be tiny and very fast, but the archive would
+no longer be a self-contained source for complete store reconstruction.  I do
+not recommend trading away the hardest failure guarantee to fix a format
+problem.
+
+** Choice 2: representation if the strong guarantee stays
+
+*** Option A -- Version 3: one compact baseline plus reversible delta (recommended)
+
+Replace the monolithic =bundle.yaml= with:
+
+- a small, inspectable header containing identities, generations, checksums,
+  change classifications and artifact inventory;
+- one versioned, compressed binary recovery payload containing a complete
+  canonical =G0= baseline; and
+- a reversible before/after node and path delta from which =G1= is derived.
+
+This preserves both complete generations without storing every unchanged node
+twice.  Human-readable per-changed-node README, semantic YAML, diff, source
+outcome and raw-byte artifacts remain unchanged.  Only the large machine
+recovery payload stops pretending to be a document for people to read.
+
+Publication should serialize the recovery DTO once, hash the exact stored
+bytes, write/fsync them once, reread their bytes once to verify the checksum,
+and rename the completed directory.  The normal in-process path should retain
+the already-validated small header and client artifact inventory, so serving
+the final client archive does not parse the recovery payload.  A restarted
+server parses it only when recovery actually needs it.
+
+The reader should continue to accept existing version-2 YAML evidence, because
+the current unfinished incident and retained diagnostics already refer to it.
+New incidents would use version 3.  A format/size regression should assert that
+a one-node transition does not write two corpus-sized node collections, and a
+recovery round-trip should derive byte-identical semantic =G0= and =G1= maps.
+
+This is my recommendation.  It attacks the scaling error, preserves the
+recovery promise, keeps the human evidence human-readable, and removes the
+13-second full parse from the ordinary client-transfer path.
+
+*** Option B -- Keep version-2 YAML, remove repeated validation passes
+
+The publisher can reuse the envelope it just built, verify exact bytes instead
+of immediately reparsing them twice, and cache the parsed client-artifact
+inventory.  That should remove most of the repeated 13-second passes and is a
+small change, but the first YAML serialization still scales with two complete
+graphs and every incident still consumes roughly 53 MiB.  It is a reasonable
+stopgap, not a satisfactory fix.
+
+*** Option C -- Share content-addressed generation snapshots across incidents
+
+Persist each complete generation snapshot once and let incidents reference a
+checksummed baseline plus their reversible delta.  Repeated one-node reloads
+would be extremely cheap after the first snapshot.  This is attractive if
+retained incidents are common, but it adds reference counting, garbage
+collection, cross-incident ownership and deletion-policy questions.  I would
+consider it a later storage optimization after the self-contained version-3
+format works.
+
+** Choice 3: should the observer queue be changed in this repair?
+
+Recommendation: no.  The plan still promises chunked cancellation and path
+coalescing which the current observer does not fully implement, and that debt
+should remain visible.  It is not the cause of this incident: on the real
+corpus a complete equality observation took 1.230 seconds and the exact
+one-target candidate took 0.662 seconds.  Combining queue surgery with the
+evidence-format migration would enlarge the proof surface without addressing
+the measured 40-second stage.
+
+** Proposed scope after the choices are settled
+
+If the recommendations above are accepted, the implementation should:
+
+1. define a portable version-3 header, compressed recovery DTO and reversible
+   node/path delta;
+2. prove reconstruction of complete =G0= and =G1= from that representation;
+3. publish and checksum each byte sequence once, with exact durable rereads;
+4. retain the small transfer inventory in memory and avoid loading the recovery
+   payload during ordinary evidence transfer;
+5. keep a read-only legacy version-2 loader for the active and retained
+   incidents already on disk;
+6. add focused corruption, crash-boundary, replay and size-scaling tests; and
+7. repeat the real one-title workflow and record stage timings and retained
+   bytes here before calling the repair complete.
+
