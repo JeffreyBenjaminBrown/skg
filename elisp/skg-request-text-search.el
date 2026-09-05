@@ -148,37 +148,44 @@ kill-buffer-hook to send close-view to the server."
                        requested-view-uri
                        (concat "search:" search-terms))))
     (when content
-      (with-current-buffer
-          (if requested-view-uri
-              (generate-new-buffer (skg-search-buffer-name search-terms))
-            (get-buffer-create (skg-search-buffer-name search-terms)))
-        (let ((inhibit-read-only t))
-          (skg--replace-search-content content)
-          (skg-content-view-mode)
-          (heralds-minor-mode)
-          (goto-char (point-min)))
-        (setq skg-view-uri view-uri)
-        (setq skg--search-request-spec
-              (list search-terms regex body operators ugly-choice))
-        (skg-register-buffer
-         (current-buffer) 'search-view
-         :view-uri view-uri
-         :recipe (append `((kind . "search")
-                           (terms . ,search-terms)
-                           (regex . ,regex)
-                           (body . ,body)
-                           (operators . ,operators))
-                         (when ugly-choice
-                           `((ugly-choice . ,ugly-choice))))
-         :last-fetched content
-         :graph-generation (plist-get authority :graph-generation)
-         :presentation-generation
-         (plist-get authority :presentation-generation)
-         :server-revision (plist-get authority :server-revision)
-         :application-token (plist-get authority :application-token))
-        (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
-        (run-hooks 'skg--search-buffer-setup-hook)
-        (switch-to-buffer (current-buffer)) ))
+      (let* ((name (skg-search-buffer-name search-terms))
+             (existing (get-buffer name)))
+        (with-current-buffer
+            (if (or requested-view-uri
+                    (not (and existing
+                              (buffer-local-value
+                               'skg--buffer-record existing)
+                              (not (skg-buffer-dirty-p existing)))))
+                (generate-new-buffer name)
+              existing)
+          (let ((inhibit-read-only t))
+            (skg--replace-search-content content)
+            (skg-content-view-mode)
+            (heralds-minor-mode)
+            (goto-char (point-min)))
+          (setq skg-view-uri view-uri)
+          (setq skg--search-request-spec
+                (list search-terms regex body operators ugly-choice))
+          (skg-register-buffer
+           (current-buffer) 'search-view
+           :lifecycle 'live-view :disposable nil
+           :view-uri view-uri
+           :recipe (append `((kind . "search")
+                             (terms . ,search-terms)
+                             (regex . ,regex)
+                             (body . ,body)
+                             (operators . ,operators))
+                           (when ugly-choice
+                             `((ugly-choice . ,ugly-choice))))
+           :last-fetched content
+           :graph-generation (plist-get authority :graph-generation)
+           :presentation-generation
+           (plist-get authority :presentation-generation)
+           :server-revision (plist-get authority :server-revision)
+           :application-token (plist-get authority :application-token))
+          (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
+          (run-hooks 'skg--search-buffer-setup-hook)
+          (switch-to-buffer (current-buffer)))))
     (when warnings
       (skg-big-nonfatal-message
        "*SKG Search Warnings*"

@@ -4,7 +4,9 @@
 (require 'cl-lib)
 (require 'heralds-minor-mode)
 (require 'skg-reload)
+(require 'skg-file-minor-mode)
 (require 'skg-request-reload-paths)
+(require 'skg-request-text-search)
 (require 'skg-worktree-guard)
 
 (ert-deftest test-skg-git-worktree-classifier-allows-index-and-ref-operations ()
@@ -74,6 +76,54 @@
       (with-current-buffer view (set-buffer-modified-p nil))
       (kill-buffer view))))
 
+(ert-deftest test-skg-configured-raw-file-gets-an-explicit-registry-record ()
+  (let ((buffer (generate-new-buffer " *skg raw registry*"))
+        (skg--buffer-registry (make-hash-table :test #'equal)))
+    (unwind-protect
+        (with-current-buffer buffer
+          (setq buffer-file-name "/client/source/node.skg")
+          (insert "pid: node\n")
+          (set-buffer-modified-p nil)
+          (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                     (lambda (_path) t)))
+            (skg-register-raw-file-buffer-if-configured buffer))
+          (should (eq 'raw-skg-file
+                      (skg--buffer-record-kind skg--buffer-record)))
+          (should (eq 'ordinary-file
+                      (skg--buffer-record-lifecycle skg--buffer-record)))
+          (should-not (skg--buffer-record-disposable skg--buffer-record)))
+      (when (buffer-live-p buffer)
+        (with-current-buffer buffer (set-buffer-modified-p nil))
+        (kill-buffer buffer)))))
+
+(ert-deftest test-skg-search-display-preserves-a-dirty-conventional-namesake ()
+  (let* ((name (skg-search-buffer-name "dog"))
+         (existing (generate-new-buffer name))
+         opened)
+    (unwind-protect
+        (progn
+          (with-current-buffer existing
+            (insert "* local\nauthored")
+            (skg-register-buffer
+             existing 'search-view :lifecycle 'live-view :disposable nil
+             :view-uri "search:old" :last-fetched "* old\n")
+            (set-buffer-modified-p t))
+          (cl-letf (((symbol-function 'heralds-minor-mode) #'ignore))
+            (skg--display-search-phase1
+             "((content \"* incoming\\n\") (view-uri \"search:new\") (warnings ()))"
+             "dog" nil nil nil nil))
+          (setq opened (current-buffer))
+          (should-not (eq existing opened))
+          (should (equal "* local\nauthored"
+                         (with-current-buffer existing (buffer-string))))
+          (should (buffer-modified-p existing)))
+      (dolist (buffer (list opened existing))
+        (when (buffer-live-p buffer)
+          (with-current-buffer buffer
+            (setq kill-buffer-hook nil)
+            (set-buffer-modified-p nil))
+          (kill-buffer buffer))))))
+
 (ert-deftest test-skg-streamed-update-never-overwrites-a-newly-dirty-buffer ()
   (let ((view (generate-new-buffer "*skg late dirty test*")))
     (unwind-protect
@@ -89,6 +139,59 @@
           (should skg--disk-client-conflict))
       (with-current-buffer view (set-buffer-modified-p nil))
       (kill-buffer view))))
+
+(ert-deftest test-skg-disk-conflict-registers-and-terminates-the-ediff-bundle ()
+  (require 'ediff)
+  (let ((origin (generate-new-buffer " *skg conflict origin*"))
+        (control (generate-new-buffer " *skg conflict control*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        variants)
+    (unwind-protect
+        (progn
+          (with-current-buffer origin
+            (insert "* local\n")
+            (skg-register-buffer
+             origin 'content-view :lifecycle 'live-view :disposable nil
+             :view-uri "view:conflict" :application-token 4)
+            (set-buffer-modified-p nil)
+            (skg-mark-disk-client-conflict
+             '((incoming . "* incoming\n") (base . "* base\n"))))
+          (cl-letf (((symbol-function 'ediff-buffers3)
+                     (lambda (_origin incoming base startup &rest _)
+                       (setq variants (list incoming base))
+                       (with-current-buffer control
+                         (mapc #'funcall startup))))
+                    ((symbol-function 'ediff-quit)
+                     (lambda (&rest _)
+                       (kill-buffer (current-buffer)))))
+            (with-current-buffer origin
+              (skg-resolve-disk-client-conflict nil)
+              (should (skg-buffer-logical-dirty-p origin))
+              (should (eq control
+                          (alist-get 'ediff-control
+                                     skg--disk-client-conflict)))
+              (dolist (variant variants)
+                (let ((record (buffer-local-value
+                               'skg--buffer-record variant)))
+                  (should (eq 'disk-conflict
+                              (skg--buffer-record-kind record)))
+                  (should (equal
+                           (skg--buffer-record-origin-buffer-id record)
+                           (skg--buffer-record-id skg--buffer-record)))))
+              (skg-clear-disk-client-conflict)
+              (should-not skg--disk-client-conflict)
+              (should-not (skg-buffer-logical-dirty-p origin))))
+          (dolist (variant variants)
+            (should-not (buffer-live-p variant)))
+          (should-not (buffer-live-p control)))
+      (dolist (buffer variants)
+        (when (buffer-live-p buffer)
+          (with-current-buffer buffer (setq buffer-read-only nil))
+          (kill-buffer buffer)))
+      (when (buffer-live-p control) (kill-buffer control))
+      (when (buffer-live-p origin)
+        (with-current-buffer origin (set-buffer-modified-p nil))
+        (kill-buffer origin)))))
 
 (ert-deftest test-skg-reload-paths-enters-maintenance ()
   (let (submitted)

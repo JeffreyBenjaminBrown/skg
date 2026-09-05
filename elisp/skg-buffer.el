@@ -158,6 +158,7 @@ otherwise generate a new UUID."
       (setq skg-contentView-initialRoot-source source)
       (skg-register-buffer
        buffer (or kind 'content-view)
+       :lifecycle 'live-view
        :view-uri uri :recipe recipe :last-fetched org-text
        :root-ids (plist-get authority :root-ids)
        :disposable (eq kind 'override-choice-menu)

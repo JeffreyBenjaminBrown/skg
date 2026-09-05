@@ -58,7 +58,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 If there is no active region, do nothing."
   (interactive)
   (when (use-region-p)
-    (let ((buffer (generate-new-buffer "*skg-without-metadata*"))
+    (let ((buffer (skg-acquire-generated-buffer "*skg-without-metadata*"))
           (text
            (skg-strip-metadata-from-org-text
             (buffer-substring-no-properties
@@ -69,7 +69,11 @@ If there is no active region, do nothing."
         (org-mode)
         (setq-local org-adapt-indentation nil)
         (set-buffer-modified-p nil)
-        (goto-char (point-min)))
+        (goto-char (point-min))
+        (skg-register-buffer
+         buffer 'derived-report :lifecycle 'client-local :disposable t
+         :recipe '((kind . "without-metadata"))
+         :last-fetched (skg-buffer-raw-text buffer)))
       (switch-to-buffer buffer))))
 
 (defun skg-strip-metadata-from-org-text (org-text)
@@ -589,7 +593,8 @@ CONTINUATION with the role's kind symbol; RET on a read-only role
 explains the refusal; q aborts."
   (let ((origin-buffer (current-buffer))
         (origin-point (point))
-        (menu-buffer (get-buffer-create "*skg-relationship-kinds*")))
+        (menu-buffer
+         (skg-acquire-generated-buffer "*skg-relationship-kinds*")))
     (with-current-buffer menu-buffer
       (let ((inhibit-read-only t))
         (erase-buffer)

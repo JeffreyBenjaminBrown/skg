@@ -4,6 +4,7 @@
 ;;; detected node "move" -- a node whose .skg file vanished from one
 ;;; source's git repo and appeared in another -- and display it.
 
+(require 'skg-buffer-registry)
 (require 'skg-length-prefix)
 
 (defun skg-stage-moves ()
@@ -29,13 +30,19 @@ then run it from the skg data root."
              (content (or (cadr (assoc 'content response))
                           "# stage moves failed\n# Empty response\n"))
              (errors-list (cadr (assoc 'errors response))))
-        (with-current-buffer (get-buffer-create "*skg stage moves*")
+        (with-current-buffer
+            (skg-acquire-generated-buffer "*skg stage moves*")
           (let ((inhibit-read-only t))
             (erase-buffer)
             (insert content)
             (sh-mode)
             (set-buffer-modified-p nil)
             (goto-char (point-min)))
+          (skg-register-buffer
+           (current-buffer) 'derived-report
+           :lifecycle 'client-local :disposable t
+           :recipe '((kind . "stage-moves"))
+           :last-fetched (skg-buffer-raw-text))
           (display-buffer (current-buffer)))
         (message "%s"
                  (if errors-list

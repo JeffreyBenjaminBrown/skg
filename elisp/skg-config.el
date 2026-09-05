@@ -4,6 +4,7 @@
 
 (require 'cl-lib)
 (require 'org)
+(require 'skg-buffer-registry)
 
 (require
  ;; PITFALL:
@@ -45,7 +46,9 @@ Nil before connection; local TOML readers are the startup fallback.")
                      :directory-identity
                      (skg--atom-string
                       (cadr (assoc 'directory-identity entry)))))
-             wire-entries)))))
+             wire-entries))
+      (when (fboundp 'skg-register-open-raw-file-buffers)
+        (skg-register-open-raw-file-buffers)))))
 
 (defun skg-config-file ()
   "Return the skgconfig.toml path for `skg-config-dir', or nil."
@@ -159,7 +162,7 @@ privacy order) plus the reserved \"all\"."
   (let ((source-paths (skg--source-paths)))
     (unless source-paths
       (user-error "No skg sources found"))
-    (let ((buffer (get-buffer-create "*skg-sources*")))
+    (let ((buffer (skg-acquire-generated-buffer "*skg-sources*")))
       (with-current-buffer buffer
         (let ((inhibit-read-only t))
           (erase-buffer)
@@ -168,7 +171,12 @@ privacy order) plus the reserved \"all\"."
                             (car source-path)
                             (cdr source-path)))))
         (org-mode)
-        (goto-char (point-min)))
+        (goto-char (point-min))
+        (set-buffer-modified-p nil)
+        (skg-register-buffer
+         buffer 'derived-report :lifecycle 'client-local :disposable t
+         :recipe '((kind . "source-list"))
+         :last-fetched (skg-buffer-raw-text buffer)))
       (display-buffer buffer))))
 
 (defun skg--owned-sources ()

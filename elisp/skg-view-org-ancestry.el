@@ -42,7 +42,7 @@ from the root down to the current position."
                  (error nil)))))
     ;; Create new buffer with ancestry
     (let* ((current-heading (cdr (car (last ancestry))))
-           (buf (generate-new-buffer
+           (buf (skg-acquire-generated-buffer
                  (format "*Ancestry: %s*" current-heading))))
       (with-current-buffer buf
         (skg--org-mode-with-options)
@@ -51,7 +51,12 @@ from the root down to the current position."
                   " "
                   (cdr item)
                   "\n"))
-        (goto-char (point-min)))
+        (goto-char (point-min))
+        (set-buffer-modified-p nil)
+        (skg-register-buffer
+         buf 'derived-report :lifecycle 'client-local :disposable t
+         :recipe '((kind . "org-ancestry"))
+         :last-fetched (skg-buffer-raw-text buf)))
       (switch-to-buffer buf))))
 
 (provide 'skg-view-org-ancestry)

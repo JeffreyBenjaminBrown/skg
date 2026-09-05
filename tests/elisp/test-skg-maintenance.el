@@ -37,7 +37,8 @@
            (insert "* Original\n")
            (setq skg-view-uri "view")
            (skg-register-buffer
-            buffer ,kind :view-uri "view" :last-fetched "* Original\n"
+            buffer ,kind :lifecycle 'live-view :disposable nil
+            :view-uri "view" :last-fetched "* Original\n"
             :graph-generation 1 :presentation-generation 3
             :server-revision 4 :application-token 7)
            (skg-lock-buffer-for-maintenance buffer 9)
@@ -120,7 +121,9 @@
         (with-current-buffer buffer
           (org-mode)
           (insert "* Born locked\n")
-          (skg-register-buffer buffer 'content-view :view-uri "new-view")
+          (skg-register-buffer
+           buffer 'content-view :lifecycle 'live-view :disposable nil
+           :view-uri "new-view")
           (should (= 12 (skg--buffer-record-maintenance-epoch
                          skg--buffer-record)))
           (should (overlayp skg--maintenance-lock-overlay)))
@@ -137,7 +140,8 @@
           (insert "* Original\n")
           (setq skg-view-uri "search:dog")
           (skg-register-buffer
-           buffer 'search-view :view-uri "search:dog"
+           buffer 'search-view :lifecycle 'live-view :disposable nil
+           :view-uri "search:dog"
            :recipe '((kind . "search") (terms . "dog")
                      (regex . t) (body . nil) (operators . t))
            :root-ids '("z-root" "a-root" "z-root")
@@ -177,7 +181,8 @@
           (with-current-buffer origin
             (insert "* Origin\n")
             (skg-register-buffer
-             origin 'content-view :view-uri "view:origin"
+             origin 'content-view :lifecycle 'live-view :disposable nil
+             :view-uri "view:origin"
              :recipe '((kind . "single-root") (root-id . "origin"))
              :application-token 5)
             (set-buffer-modified-p nil))
@@ -186,6 +191,7 @@
             (set-buffer-modified-p nil)
             (skg-register-buffer
              child 'metadata-editor :lifecycle 'attached-workflow
+             :disposable nil
              :continuation-id "continuation-1" :origin-buffer origin
              :origin-location "((start 1) (end 9))"
              :recipe '((kind . "metadata-editor"))))
@@ -211,7 +217,8 @@
                            "((start 1) (end 9))")))
           (with-current-buffer origin
             (skg-register-buffer
-             origin 'content-view :view-uri "view:origin"
+             origin 'content-view :lifecycle 'live-view :disposable nil
+             :view-uri "view:origin"
              :recipe '((kind . "single-root") (root-id . "origin"))
              :application-token 5))
           (should (skg-buffer-logical-dirty-p origin))
@@ -219,6 +226,90 @@
           (should-not (skg-buffer-logical-dirty-p origin)))
       (when (buffer-live-p child) (kill-buffer child))
       (when (buffer-live-p origin) (kill-buffer origin)))))
+
+(ert-deftest test-skg-buffer-registration-requires-explicit-constructor-policy ()
+  (let ((buffer (generate-new-buffer " *skg-policy-audit*"))
+        (skg--buffer-registry (make-hash-table :test #'equal)))
+    (unwind-protect
+        (progn
+          (should-error
+           (skg-register-buffer buffer 'derived-report :disposable t)
+           :type 'error)
+          (should-error
+           (skg-register-buffer
+            buffer 'derived-report :lifecycle 'client-local)
+           :type 'error)
+          (skg-register-buffer
+           buffer 'derived-report
+           :lifecycle 'client-local :disposable t)
+          (should (eq 'derived-report
+                      (skg--buffer-record-kind
+                       (buffer-local-value 'skg--buffer-record buffer)))))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
+(ert-deftest test-skg-generated-buffer-reuse-requires-explicit-disposability ()
+  (let ((durable (generate-new-buffer "*skg durable namesake*"))
+        (disposable (generate-new-buffer "*skg disposable namesake*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        fresh)
+    (unwind-protect
+        (progn
+          (with-current-buffer durable
+            (insert "keep this report")
+            (set-buffer-modified-p nil)
+            (skg-register-buffer
+             durable 'durable-report
+             :lifecycle 'client-local :disposable nil
+             :last-fetched (skg-buffer-raw-text durable)))
+          (setq fresh
+                (skg-acquire-generated-buffer "*skg durable namesake*"))
+          (should-not (eq durable fresh))
+          (should (equal "keep this report"
+                         (with-current-buffer durable (buffer-string))))
+          (with-current-buffer disposable
+            (set-buffer-modified-p nil)
+            (skg-register-buffer
+             disposable 'derived-report
+             :lifecycle 'client-local :disposable t
+             :last-fetched ""))
+          (should (eq disposable
+                      (skg-acquire-generated-buffer
+                       "*skg disposable namesake*"))))
+      (dolist (buffer (list fresh disposable durable))
+        (when (buffer-live-p buffer) (kill-buffer buffer))))))
+
+(ert-deftest test-skg-direct-buffer-constructor-audit-is-complete ()
+  (let ((directory (file-name-directory
+                    (locate-library "skg-buffer-registry")))
+        owners)
+    (dolist (file (directory-files directory t "\\.el\\'"))
+      (with-temp-buffer
+        (insert-file-contents file)
+        (goto-char (point-min))
+        (while (re-search-forward
+                "(\\(?:get-buffer-create\\|generate-new-buffer\\)[[:space:]\n]"
+                nil t)
+          (let ((call (point)))
+            (save-excursion
+              (goto-char call)
+              (if (re-search-backward
+                   "^(\\(?:cl-\\)?defun[[:space:]]+\\([^[:space:]()]+\\)"
+                   nil t)
+                  (push (match-string-no-properties 1) owners)
+                (push "<top-level>" owners)))))))
+    (should
+     (equal
+      (sort (delete-dups owners) #'string<)
+      (sort
+       '("skg--display-search-phase1"
+         "skg--generate-contentView-buffer"
+         "skg--pull-diagnostic-buffer"
+         "skg-acquire-generated-buffer"
+         "skg-open-interrupted-view"
+         "skg-sexp-edit--open-edit-buffer"
+         "skg-undo-sidecar-save"
+         "skg-view-id-stack")
+       #'string<)))))
 
 (ert-deftest test-skg-maintenance-census-is-incident-qualified ()
   (let (submitted)
@@ -303,7 +394,8 @@
     (unwind-protect
         (with-current-buffer buffer
           (insert "pid: node\ntitle: dirty\n")
-          (skg-register-buffer buffer 'raw-skg-file)
+          (skg-register-buffer
+           buffer 'raw-skg-file :lifecycle 'ordinary-file :disposable nil)
           (set-buffer-modified-p t)
           (should-error (skg-rebuild-dbs) :type 'user-error))
       (when (buffer-live-p buffer) (kill-buffer buffer)))))

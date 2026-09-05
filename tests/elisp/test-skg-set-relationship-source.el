@@ -53,6 +53,7 @@ skg-config-dir is set and `skg--source-names' works."
           (skg-content-view-mode)
           (skg-register-buffer
            (current-buffer) 'content-view
+           :lifecycle 'live-view :disposable nil
            :view-uri "view:test-relationship"
            :recipe '((kind . "single-root") (root-id . "owner"))
            :root-ids '("owner")
@@ -570,6 +571,7 @@ does neither."
         (with-temp-buffer
           (skg-register-buffer
            (current-buffer) 'content-view
+           :lifecycle 'live-view :disposable nil
            :view-uri "view:test-relationship-menu"
            :recipe '((kind . "single-root") (root-id . "origin")))
           (let (chosen)

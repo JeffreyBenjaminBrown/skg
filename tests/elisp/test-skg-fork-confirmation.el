@@ -176,7 +176,8 @@ ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
     (with-current-buffer origin
       (skg-register-buffer
-       origin 'content-view :view-uri "view:fork-origin"
+       origin 'content-view :lifecycle 'live-view :disposable nil
+       :view-uri "view:fork-origin"
        :recipe '((kind . "single-root") (root-id . "origin"))))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
@@ -210,7 +211,8 @@ skg-content-view-mode-map (which would break C-x C-s in real views)."
   (let ((origin (generate-new-buffer "*fork-origin-3*")))
     (with-current-buffer origin
       (skg-register-buffer
-       origin 'content-view :view-uri "view:fork-origin-3"
+       origin 'content-view :lifecycle 'live-view :disposable nil
+       :view-uri "view:fork-origin-3"
        :recipe '((kind . "single-root") (root-id . "origin-3"))))
     (let ((buf (skg--show-fork-confirmation
                 "* (skg (node (source owned))) N-edited\n"
@@ -265,7 +267,8 @@ saved metadata, so the server omitted the placeholder) prompts nothing."
   (let ((origin (generate-new-buffer "*fork-origin-2*")))
     (with-current-buffer origin
       (skg-register-buffer
-       origin 'content-view :view-uri "view:fork-origin-2"
+       origin 'content-view :lifecycle 'live-view :disposable nil
+       :view-uri "view:fork-origin-2"
        :recipe '((kind . "single-root") (root-id . "origin-2"))))
     (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (source foreign) indef)) N\n"
                                             origin)))

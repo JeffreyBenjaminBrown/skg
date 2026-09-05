@@ -592,17 +592,29 @@ Returns (error MESSAGE) if validation fails."
 The buffer displays the stack in org format
 (label headlines and ID bodies).
 Saving (C-x C-s) validates and updates `skg-id-stack'
-without writing to disk."
+  without writing to disk."
   (interactive)
-  (let (( buf (get-buffer-create "*skg-id-stack*") ))
+  (let ((buf (get-buffer-create "*skg-id-stack*")))
     (switch-to-buffer buf)
-    (erase-buffer)
-    (insert (skg--format-id-stack-as-org))
-    (goto-char (point-min))
-    (skg--org-mode-with-options)
-    (skg-id-stack-mode 1)
-    (set-buffer-modified-p nil)
-    (message "Edit ID stack. C-x C-s to save changes.") ))
+    (if (buffer-modified-p)
+        (progn
+          (unless skg--buffer-record
+            (skg-register-buffer
+             buf 'id-stack :lifecycle 'client-local :disposable t
+             :recipe '((kind . "id-stack"))
+             :last-fetched (skg-buffer-raw-text buf)))
+          (message "ID stack buffer has edits; leaving them untouched."))
+      (erase-buffer)
+      (insert (skg--format-id-stack-as-org))
+      (goto-char (point-min))
+      (skg--org-mode-with-options)
+      (skg-id-stack-mode 1)
+      (set-buffer-modified-p nil)
+      (skg-register-buffer
+       buf 'id-stack :lifecycle 'client-local :disposable t
+       :recipe '((kind . "id-stack"))
+       :last-fetched (skg-buffer-raw-text buf))
+      (message "Edit ID stack. C-x C-s to save changes."))))
 
 (defun skg--format-id-stack-as-org ()
   "Format `skg-id-stack' as org-mode text.

@@ -84,11 +84,17 @@
     (delete-dups (nreverse ids))))
 
 (cl-defun skg-register-buffer
-    (buffer kind &key view-uri recipe root-ids lifecycle disposable
+    (buffer kind &key view-uri recipe root-ids
+            (lifecycle nil lifecycle-supplied-p)
+            (disposable nil disposable-supplied-p)
             continuation-id origin-buffer origin-location last-fetched
             server-revision graph-generation presentation-generation
             application-token)
   "Register BUFFER under an explicit KIND and return its durable record."
+  (unless lifecycle-supplied-p
+    (error "Skg buffer constructor omitted its lifecycle"))
+  (unless disposable-supplied-p
+    (error "Skg buffer constructor omitted its disposable policy"))
   (with-current-buffer buffer
     (let* ((existing skg--buffer-record)
            (old-origin-id
@@ -107,7 +113,7 @@
            (record (make-skg--buffer-record
                     :id id
                     :kind kind
-                    :lifecycle (or lifecycle 'live-view)
+                    :lifecycle lifecycle
                     :disposable disposable
                     :continuation-id continuation-id
                     :buffer buffer
@@ -202,6 +208,22 @@
                      (gethash (format "%s" buffer-id)
                               skg--buffer-registry))))
     (when (buffer-live-p buffer) buffer)))
+
+(defun skg-acquire-generated-buffer (name)
+  "Return an explicitly reusable buffer NAME, preserving every other namesake."
+  (let ((existing (get-buffer name)))
+    (if (and (buffer-live-p existing)
+             (buffer-local-value 'skg--buffer-record existing)
+             (skg--buffer-record-disposable
+              (buffer-local-value 'skg--buffer-record existing))
+             (not (skg--buffer-record-continuation-id
+                   (buffer-local-value 'skg--buffer-record existing)))
+             (not (skg--buffer-record-maintenance-epoch
+                   (buffer-local-value 'skg--buffer-record existing)))
+             (not (buffer-modified-p existing))
+             (not (skg-buffer-logical-dirty-p existing)))
+        existing
+      (generate-new-buffer name))))
 
 (defun skg--attached-workflow-record-p (record origin-id)
   (and record
@@ -421,7 +443,10 @@
   (with-current-buffer buffer
     (when skg--buffer-record
       (setf (skg--buffer-record-maintenance-epoch skg--buffer-record) epoch)
-      (unless skg--maintenance-lock-overlay
+      (when (and (memq (skg--buffer-record-lifecycle skg--buffer-record)
+                       '(live-view attached-workflow maintenance-control
+                         ordinary-file))
+                 (not skg--maintenance-lock-overlay))
         (setq skg--maintenance-lock-overlay
               (make-overlay (point-min) (point-max) buffer))
         (overlay-put skg--maintenance-lock-overlay 'modification-hooks

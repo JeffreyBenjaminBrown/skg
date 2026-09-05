@@ -5,6 +5,7 @@
 (require 'org-id)
 (require 'tabulated-list)
 (require 'subr-x)
+(require 'skg-buffer-registry)
 (require 'skg-recovery-archive)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-text-search)
@@ -132,13 +133,18 @@
   "Show every retained maintenance incident without contacting the server."
   (interactive)
   (let* ((summaries (skg-recovery-archive-list))
-         (buffer (get-buffer-create "*Skg maintenance incidents*")))
+         (buffer
+          (skg-acquire-generated-buffer "*Skg maintenance incidents*")))
     (with-current-buffer buffer
       (skg-recovery-list-mode)
       (setq skg-recovery-list-summaries summaries)
       (setq tabulated-list-entries
             (mapcar #'skg-recovery-ui--summary-row summaries))
-      (tabulated-list-print t))
+      (tabulated-list-print t)
+      (skg-register-buffer
+       buffer 'durable-report :lifecycle 'client-local :disposable nil
+       :recipe '((kind . "maintenance-incident-list"))
+       :last-fetched (skg-buffer-raw-text buffer)))
     (pop-to-buffer buffer)
     buffer))
 
@@ -469,7 +475,16 @@
             (setq skg-recovery-native-undo-status
                   (skg-recovery-ui--restore-native-undo
                    buffer summary record verified))
-            (set-buffer-modified-p nil))
+            (set-buffer-modified-p nil)
+            (skg-register-buffer
+             buffer 'durable-report
+             :lifecycle 'detached-recovery :disposable nil
+             :recipe
+             `((kind . "archived-recovery")
+               (incident-id . ,(plist-get summary :incident-id))
+               (buffer-key . ,(skg-recovery--required-text
+                               record 'buffer-key "initial buffer")))
+             :last-fetched (skg-buffer-raw-text buffer)))
           (pop-to-buffer buffer)
           (skg-recovery-ui--restore-layout buffer metadata)
           buffer)

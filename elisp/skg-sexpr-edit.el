@@ -104,6 +104,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (skg-register-buffer
      edit-buffer 'metadata-editor
      :lifecycle 'attached-workflow
+     :disposable nil
      :continuation-id (org-id-uuid)
      :origin-buffer source-buffer
      :origin-location

@@ -67,6 +67,7 @@ skg-config-dir is set and skg--owned-sources works."
           (skg-content-view-mode)
           (skg-register-buffer
            (current-buffer) 'content-view
+           :lifecycle 'live-view :disposable nil
            :view-uri "view:test-metadata"
            :recipe '((kind . "single-root") (root-id . "x"))
            :root-ids '("x")

@@ -188,7 +188,12 @@
         (with-current-buffer buffer
           (comint-mode)
           (let ((inhibit-read-only t))
-            (insert (format "Skg pull maintenance incident %s\n\n" incident))))
+            (insert (format "Skg pull maintenance incident %s\n\n" incident)))
+          (set-buffer-modified-p nil)
+          (skg-register-buffer
+           buffer 'durable-report :lifecycle 'client-local :disposable nil
+           :recipe `((kind . "pull-diagnostic") (incident-id . ,incident))
+           :last-fetched (skg-buffer-raw-text buffer)))
         (setf (plist-get context :diagnostic-buffer) buffer)
         buffer)))
 

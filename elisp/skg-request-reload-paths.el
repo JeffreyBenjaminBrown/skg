@@ -197,16 +197,24 @@ This does not repair or modify any source file or Git repository."
        skg--pending-recovery-incidents "\n")
       "\n** what to do\nRun M-x skg-recover-reload-incident to inspect and explicitly confirm recovery. Skg will not recover automatically. If you accept losing automatic recovery, M-x skg-dismiss-reload-recovery-incident deletes its private journal without changing sources or Git.\n"))))
 
-(defun skg--conflict-review-buffer (name text)
-  "Create a read-only Org buffer NAME containing TEXT."
-  (let ((buffer (get-buffer-create name)))
+(defun skg--conflict-review-buffer
+    (name text origin role continuation-id)
+  "Create one registered read-only ROLE buffer for ORIGIN's conflict."
+  (let ((buffer (skg-acquire-generated-buffer name)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert (or text ""))
         (skg--org-mode-with-options)
         (set-buffer-modified-p nil)
-        (setq buffer-read-only t)))
+        (setq buffer-read-only t))
+      (skg-register-buffer
+       buffer 'disk-conflict
+       :lifecycle 'attached-workflow :disposable nil
+       :continuation-id continuation-id :origin-buffer origin
+       :origin-location (format "((role %s))" role)
+       :recipe `((kind . "disk-conflict") (role . ,role))
+       :last-fetched (skg-buffer-raw-text buffer)))
     buffer))
 
 (defun skg-resolve-disk-client-conflict (&optional accept-current-text)
@@ -231,18 +239,43 @@ pipeline.  The conflict marker clears only after that save succeeds."
     (let* ((origin (current-buffer))
            (suffix (buffer-name origin))
            (incoming (alist-get 'incoming skg--disk-client-conflict))
-           (base (alist-get 'base skg--disk-client-conflict)))
+           (base (alist-get 'base skg--disk-client-conflict))
+           (continuation-id (org-id-uuid)))
       (unless incoming
         (user-error "The incoming rendering was withheld or failed; retry the reload first"))
-      (require 'ediff)
-      (ediff-buffers3
-       origin
-       (skg--conflict-review-buffer
-        (format "*SKG incoming: %s*" suffix) incoming)
-       (skg--conflict-review-buffer
-        (format "*SKG base: %s*" suffix) base))
-      (message
-       "Edit the original local view; when satisfied use C-u M-x skg-resolve-disk-client-conflict"))))
+      (let ((incoming-buffer
+             (skg--conflict-review-buffer
+              (format "*SKG incoming: %s*" suffix) incoming origin
+              "incoming" continuation-id))
+            (base-buffer
+             (skg--conflict-review-buffer
+              (format "*SKG base: %s*" suffix) base origin
+              "base" continuation-id)))
+        (require 'ediff)
+        (setf (alist-get 'review-buffers skg--disk-client-conflict)
+              (list incoming-buffer base-buffer))
+        (ediff-buffers3
+         origin
+         incoming-buffer
+         base-buffer
+         (list
+          (lambda ()
+            (let ((control (current-buffer)))
+              (with-current-buffer origin
+                (setf (alist-get 'ediff-control skg--disk-client-conflict)
+                      control)))
+            (add-hook
+             'ediff-after-quit-hook-internal
+             (lambda ()
+               (dolist (buffer (list incoming-buffer base-buffer))
+                 (when (buffer-live-p buffer)
+                   (with-current-buffer buffer
+                     (setq buffer-read-only nil)
+                     (set-buffer-modified-p nil))
+                   (kill-buffer buffer))))
+             nil t))))
+        (message
+         "Edit the original local view; when satisfied use C-u M-x skg-resolve-disk-client-conflict")))))
 
 ;;; ---- explicit ID-stack selection ---------------------------------
 
@@ -277,7 +310,8 @@ pipeline.  The conflict marker clears only after that save succeeds."
 Use Org's standard S-left/S-right TODO cycling to mark `TO-RELOAD',
 then C-c C-c to submit.  This never edits `skg-id-stack'."
   (interactive)
-  (let ((buffer (get-buffer-create skg--reload-selection-buffer-name)))
+  (let ((buffer
+         (skg-acquire-generated-buffer skg--reload-selection-buffer-name)))
     (switch-to-buffer buffer)
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -302,7 +336,13 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
             (nreverse skg--reload-selection-entries))
       (setq-local skg--reload-selection-reason-overlays nil)
       (skg-reload-selection-mode 1)
-      (set-buffer-modified-p nil))
+      (set-buffer-modified-p nil)
+      (skg-register-buffer
+       buffer 'reload-selector
+       :lifecycle 'maintenance-control :disposable nil
+       :continuation-id (org-id-uuid)
+       :recipe '((kind . "reload-selector"))
+       :last-fetched (skg-buffer-raw-text buffer)))
     (message "Mark nodes TO-RELOAD with S-left/S-right; C-c C-c submits.")))
 
 (defun skg--reload-selection-refuse-save ()

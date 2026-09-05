@@ -9,6 +9,7 @@
 ;;; `define-minor-mode' below consults the variable at load time.
 
 (require 'skg-keymaps-and-aliases)
+(require 'skg-buffer-registry)
 (require 'skg-id-search)
 (require 'skg-worktree-guard)
 
@@ -20,8 +21,35 @@ and .skg filenames.  The server-owned watcher observes a plain save."
   :lighter " skg"
   :keymap skg-file-minor-mode-map
   (if skg-file-minor-mode
-      (add-hook 'before-save-hook #'skg--guard-raw-skg-save nil t)
-    (remove-hook 'before-save-hook #'skg--guard-raw-skg-save t)))
+      (progn
+        (add-hook 'before-save-hook #'skg--guard-raw-skg-save nil t)
+        (skg-register-raw-file-buffer-if-configured (current-buffer)))
+    (remove-hook 'before-save-hook #'skg--guard-raw-skg-save t)
+    (when (and skg--buffer-record
+               (eq (skg--buffer-record-kind skg--buffer-record)
+                   'raw-skg-file))
+      (skg-unregister-current-buffer))))
+
+(defun skg-register-raw-file-buffer-if-configured (&optional buffer)
+  "Register BUFFER when it visits a direct child of a configured source."
+  (with-current-buffer (or buffer (current-buffer))
+    (when (and buffer-file-name
+               (skg--configured-skg-file-p buffer-file-name)
+               (not (and skg--buffer-record
+                         (eq (skg--buffer-record-kind skg--buffer-record)
+                             'raw-skg-file))))
+      (skg-register-buffer
+       (current-buffer) 'raw-skg-file
+       :lifecycle 'ordinary-file :disposable nil
+       :recipe `((kind . "raw-skg-file")
+                 (name . ,(file-name-nondirectory buffer-file-name)))
+       :last-fetched (skg-buffer-raw-text)))))
+
+(defun skg-register-open-raw-file-buffers ()
+  "Register configured raw files which predate verified source inventory."
+  (dolist (buffer (buffer-list))
+    (when (buffer-live-p buffer)
+      (skg-register-raw-file-buffer-if-configured buffer))))
 
 (defun skg-file-minor-mode--maybe-enable ()
   "Enable `skg-file-minor-mode' if the current buffer visits a .skg file."

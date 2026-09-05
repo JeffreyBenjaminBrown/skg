@@ -61,8 +61,12 @@
               (should (equal text (buffer-string)))
               (should-not buffer-file-name)
               (should-not (local-variable-p 'skg-view-uri))
-              (should-not skg--buffer-record)
-              (should-not (memq buffer (skg-registered-buffers)))
+              (should (eq (skg--buffer-record-kind skg--buffer-record)
+                          'durable-report))
+              (should (eq (skg--buffer-record-lifecycle skg--buffer-record)
+                          'detached-recovery))
+              (should-not (skg--buffer-record-view-uri skg--buffer-record))
+              (should (memq buffer (skg-registered-buffers)))
               (should (eq skg-recovery-native-undo-status
                           'text-only-no-native-history))
               (should-error (skg-recovery-refuse-write)
@@ -103,7 +107,10 @@
             (should (eq skg-recovery-native-undo-status
                         'text-only-other-client))
             (should-not (local-variable-p 'skg-view-uri))
-            (should-not skg--buffer-record)))
+            (should (eq (skg--buffer-record-kind skg--buffer-record)
+                        'durable-report))
+            (should (eq (skg--buffer-record-lifecycle skg--buffer-record)
+                        'detached-recovery))))
       (skg-test-recovery-ui--kill recovery)
       (skg-test-recovery--cleanup fixture))))
 
@@ -238,7 +245,8 @@
             (skg-content-view-mode)
             (setq skg-view-uri (concat "search:" terms))
             (skg-register-buffer
-             old 'search-view :view-uri skg-view-uri
+             old 'search-view :lifecycle 'live-view :disposable nil
+             :view-uri skg-view-uri
              :recipe `((kind . "search") (terms . ,terms))))
           (let ((skg--search-buffer-setup-hook nil))
             (skg--display-search-phase1

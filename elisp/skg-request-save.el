@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 
+(require 'cl-lib)
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
@@ -16,6 +17,33 @@
 
 (defvar-local skg--disk-conflict-resolution-in-progress nil
   "Non-nil while an explicitly reconciled conflict is being saved.")
+
+(defun skg-mark-disk-client-conflict (conflict)
+  "Install CONFLICT and make this view logically dirty until resolution."
+  (setq skg--disk-client-conflict conflict)
+  (when skg--buffer-record
+    (setf (skg--buffer-record-logical-dirty skg--buffer-record) t)))
+
+(defun skg-clear-disk-client-conflict ()
+  "Terminate this view's Ediff bundle and clear its conflict state."
+  (let ((reviews (alist-get 'review-buffers skg--disk-client-conflict))
+        (control (alist-get 'ediff-control skg--disk-client-conflict)))
+    (when (buffer-live-p control)
+      (with-current-buffer control
+        (when (fboundp 'ediff-quit)
+          (let ((ediff-keep-variants t))
+            (cl-letf (((symbol-function 'y-or-n-p)
+                       (lambda (&rest _) t)))
+              (ediff-quit nil))))))
+    (dolist (buffer reviews)
+      (when (buffer-live-p buffer)
+        (with-current-buffer buffer
+          (setq buffer-read-only nil)
+          (set-buffer-modified-p nil))
+        (kill-buffer buffer))))
+  (setq skg--disk-client-conflict nil)
+  (when skg--buffer-record
+    (setf (skg--buffer-record-logical-dirty skg--buffer-record) nil)))
 
 (defvar-local skg--application-token 0
   "Monotonic identity of the server text most recently applied here.")
@@ -299,9 +327,9 @@ streams; LOG-CATEGORY and HANDLER-NAME label any error."
             (skg--unlock-after-save)
             (if (buffer-modified-p)
                 (progn
-                  (setq skg--disk-client-conflict
-                        `((reason . "stream arrived after local modification")
-                          (incoming . ,content)))
+                  (skg-mark-disk-client-conflict
+                   `((reason . "stream arrived after local modification")
+                     (incoming . ,content)))
                   (ding)
                   (skg-log 'error log-category
                            "%s refused to overwrite newly dirty buffer %s"
@@ -534,7 +562,7 @@ save target: skg-view-uri is left nil (tripping the nil-view-uri save
 guard) and C-x C-s is rebound to refuse, because a stray normal save of
 its id-less clone-to-be parents would create bare nodes. Only C-c C-c
 \(approve) and C-c C-k (decline) act on it."
-  (let ((buf (get-buffer-create "*SKG Fork Confirmation*")))
+  (let ((buf (skg-acquire-generated-buffer "*SKG Fork Confirmation*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -564,6 +592,7 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
       (skg-register-buffer
        buf 'fork-confirmation
        :lifecycle 'attached-workflow
+       :disposable nil
        :continuation-id (org-id-uuid)
        :origin-buffer save-buffer
        :origin-location "((scope save))"
@@ -710,7 +739,7 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
           (setq skg--disk-conflict-resolution-in-progress nil)
           (when (and content-value
                      (not (skg--message-list-nonempty-p errors-list)))
-            (setq skg--disk-client-conflict nil)))
+            (skg-clear-disk-client-conflict)))
         (when (or (skg--message-list-nonempty-p errors-list)
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings
@@ -924,14 +953,19 @@ COLUMN is a character offset from the line's start; nil means column 0."
 
 (defun skg-big-nonfatal-message (buffer-name message-text content)
   "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer."
-  (with-current-buffer (get-buffer-create buffer-name)
+  (with-current-buffer (skg-acquire-generated-buffer buffer-name)
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert content)
       (skg--org-mode-with-options)
       (set-buffer-modified-p nil)
       (goto-char (point-min)))
-    (display-buffer buffer-name)
+    (skg-register-buffer
+     (current-buffer) 'durable-report
+     :lifecycle 'client-local :disposable nil
+     :recipe `((kind . "message-report") (requested-name . ,buffer-name))
+     :last-fetched (skg-buffer-raw-text))
+    (display-buffer (current-buffer))
     (message "%s" message-text)))
 
 (defun skg-show-save-errors-and-warnings

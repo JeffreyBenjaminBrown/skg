@@ -272,6 +272,27 @@ not the headline's metadata ID and title."
     (should skg-id-stack-mode)
     (kill-buffer "*skg-id-stack*") ))
 
+(ert-deftest test-skg-view-id-stack-preserves-and-registers-existing-edits ()
+  (when-let ((old (get-buffer "*skg-id-stack*")))
+    (with-current-buffer old (set-buffer-modified-p nil))
+    (kill-buffer old))
+  (let ((buffer (get-buffer-create "*skg-id-stack*"))
+        (skg-id-stack '(("replacement" "Replacement"))))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (insert "* Authored\nauthored-id")
+            (set-buffer-modified-p t))
+          (skg-view-id-stack)
+          (should (eq buffer (current-buffer)))
+          (should (equal "* Authored\nauthored-id" (buffer-string)))
+          (should (buffer-modified-p))
+          (should (eq 'id-stack
+                      (skg--buffer-record-kind skg--buffer-record))))
+      (when (buffer-live-p buffer)
+        (with-current-buffer buffer (set-buffer-modified-p nil))
+        (kill-buffer buffer)))))
+
 (ert-deftest test-skg--save-id-stack-buffer-is-a-command ()
   "skg--save-id-stack-buffer is bound to C-x C-s in skg-id-stack-mode.
 For that binding to work, the function must satisfy `commandp'

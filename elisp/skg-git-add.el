@@ -23,6 +23,7 @@
 ;;; recursive version does not need a server round-trip per node.
 
 (require 'cl-lib)
+(require 'skg-buffer-registry)
 (require 'skg-config)
 (require 'skg-id-search)      ;; skg--metadata-sexp-contains-id-p, etc.
 (require 'skg-readable-ids)
@@ -68,7 +69,8 @@ stage later modifications to files that are already known to git."
          (paths (plist-get plan :paths)))
     (if (skg--explain-if-blind-to-new-files (length paths))
         nil
-      (let ((buffer (get-buffer-create "*skg git add new files*")))
+      (let ((buffer
+             (skg-acquire-generated-buffer "*skg git add new files*")))
         (with-current-buffer buffer
           (let ((inhibit-read-only t))
             (erase-buffer)
@@ -81,7 +83,12 @@ stage later modifications to files that are already known to git."
                   (print-level nil))
               (insert (pp-to-string (plist-get plan :form))))
             (goto-char (point-min))
-            (skg-readable-ids-mode 1)))
+            (skg-readable-ids-mode 1)
+            (set-buffer-modified-p nil)
+            (skg-register-buffer
+             buffer 'derived-report :lifecycle 'client-local :disposable t
+             :recipe '((kind . "git-add-preview"))
+             :last-fetched (skg-buffer-raw-text buffer))))
         (pop-to-buffer buffer)
         (message "skg-git-add-if-new-recursive-preview: %d new file(s)"
                  (length paths))))))

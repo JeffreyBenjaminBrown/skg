@@ -82,6 +82,7 @@
       (setq buffer-undo-list nil pending-undo-list nil)
       (skg-register-buffer
        buffer 'content-view
+       :lifecycle 'live-view :disposable nil
        :view-uri "view:archive-fixture"
        :last-fetched base
        :root-ids '("root-a" "root-b")
