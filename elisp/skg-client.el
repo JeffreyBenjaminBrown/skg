@@ -14,6 +14,7 @@
 (require 'skg-request-file-path)
 (require 'skg-request-herald-rules)
 (require 'skg-maintenance)
+(require 'skg-pull)
 (require 'skg-request-diff-analysis)
 (require 'skg-request-edge-source-info)
 (require 'skg-request-export-org)

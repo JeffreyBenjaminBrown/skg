@@ -6,7 +6,7 @@
 (defun skg-reload ()
   "Unload *almost* all skg features and reload from disk.
 
-Seven stateful files are deliberately absent from the unload list:
+Eight stateful files are deliberately absent from the unload list:
 
 - `skg-buffer' defines `skg-content-view-mode' and the
   permanent-local `skg-view-uri'. `unload-feature' would
@@ -35,13 +35,14 @@ Seven stateful files are deliberately absent from the unload list:
   Those watches likewise must survive, while re-evaluation safely
   refreshes their symbol callbacks, hook, and server-push handler.
 
-- `skg-maintenance' owns the live incident/archive/application retry state.
-  Its `defvar' state must likewise survive while its functions are refreshed.
+- `skg-maintenance' and `skg-pull' own the live incident/archive/application
+  and client Git-child retry state.  Their `defvar' state must likewise survive
+  while their functions are refreshed.
 
 - `skg-worktree-guard' installs process-boundary advice.  Plain
   re-evaluation refreshes its functions without duplicating advice.
 
-All seven stateful files are idempotent on re-evaluation, so we pick up
+All eight stateful files are idempotent on re-evaluation, so we pick up
 edits to them via plain `load-file' instead.
 
 The herald rule table (`heralds--transform-rules', fetched from
@@ -88,7 +89,8 @@ The destructive half of `skg-reload', kept separate so the
 herald-table preservation in `skg-reload' can be exercised without
 actually unloading the world.  See `skg-reload' for why
 `skg-buffer', `skg-keymaps-and-aliases', `skg-state', `skg-buffer-registry',
-`skg-request-reload-paths', `skg-maintenance', and `skg-worktree-guard' are
+`skg-request-reload-paths', `skg-maintenance', `skg-pull', and
+`skg-worktree-guard' are
 reloaded by hand rather than via `unload-feature'.  The stateless recovery
 archive writer is also re-evaluated before the incident coordinator which
 calls it."
@@ -138,6 +140,7 @@ calls it."
     (load-file (expand-file-name "skg-init.el"                elisp-dir))
     (load-file (expand-file-name "skg-recovery-archive.el"    elisp-dir))
     (load-file (expand-file-name "skg-maintenance.el"         elisp-dir))
+    (load-file (expand-file-name "skg-pull.el"                elisp-dir))
     (load-file (expand-file-name "skg-worktree-guard.el"      elisp-dir))
     (load-file (expand-file-name "skg-request-reload-paths.el" elisp-dir))
     (load-file (expand-file-name "skg-buffer.el"              elisp-dir))))

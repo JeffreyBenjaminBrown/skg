@@ -12,6 +12,26 @@
   "Client facts for the active server-owned maintenance incident.")
 (defvar skg--pending-maintenance-offer nil
   "Latest unsolicited valid disk candidate offered by the server.")
+(defvar skg--maintenance-origin-operation-handlers nil
+  "Origin labels mapped to their post-archive client adapters.")
+
+(defun skg-register-maintenance-origin-handler (origin handler)
+  "Register HANDLER for maintenance ORIGIN.
+HANDLER receives the durable server phase and parsed response, and returns
+non-nil when it handled that phase.  Re-registering an origin replaces its
+old implementation."
+  (setf (alist-get origin skg--maintenance-origin-operation-handlers
+                   nil nil #'equal)
+        handler))
+
+(defun skg--maintenance-dispatch-origin (phase response)
+  "Run the active incident's origin adapter for durable PHASE and RESPONSE."
+  (let* ((state skg--maintenance-client-incident)
+         (handler (alist-get
+                   (plist-get state :origin)
+                   skg--maintenance-origin-operation-handlers
+                   nil nil #'equal)))
+    (and handler (funcall handler phase response))))
 
 (defun skg--maintenance-field (response key)
   (cadr (assoc key response)))
@@ -248,8 +268,7 @@
         (or (skg--maintenance-field response 'view-settlements) nil)))
       ("archive-ready"
        (setf (plist-get state :phase) 'origin-operation-required)
-       (if (equal (plist-get state :origin) "explicit-partial-reload")
-           (run-at-time 0 nil #'skg--maintenance-run-explicit-origin)
+       (unless (skg--maintenance-dispatch-origin "archive-ready" response)
          (message
           "Skg maintenance archive is durable; its origin operation is next")))
       (_ (error "Unexpected maintenance selection status: %S" status)))))
@@ -295,6 +314,15 @@
     (setf (plist-get skg--maintenance-client-incident :phase)
           'waiting-for-origin-observation)
     (message "Skg is observing the exact partial-reload targets")))
+
+(defun skg--maintenance-explicit-origin-handler (phase _response)
+  "Resume the explicit target observer in an appropriate durable PHASE."
+  (when (member phase '("archive-ready" "final-observation"))
+    (run-at-time 0 nil #'skg--maintenance-run-explicit-origin)
+    t))
+
+(skg-register-maintenance-origin-handler
+ "explicit-partial-reload" #'skg--maintenance-explicit-origin-handler)
 
 (defun skg--maintenance-prompt-scalar (challenge)
   (let ((prompt (plist-get challenge :prompt)))
@@ -925,16 +953,15 @@
            (plist-get state :lock-census-sha256)
            (plist-get archive :manifest-sha256))
         (run-at-time 0 nil #'skg--maintenance-publish-initial)))
-     ((and (equal origin "explicit-partial-reload")
-           (equal phase "archive-ready"))
-      (setf (plist-get state :phase) 'origin-operation-required)
-      (run-at-time 0 nil #'skg--maintenance-run-explicit-origin))
-     ((and (equal origin "explicit-partial-reload")
-           (equal phase "final-observation"))
-      (setf (plist-get state :phase) 'waiting-for-origin-observation)
-      ;; Reissuing this idempotent request restores a process-local worker job
-      ;; after reconnect or server restart.
-      (run-at-time 0 nil #'skg--maintenance-run-explicit-origin))
+     ((member phase '("archive-ready" "running-external-mutation"
+                      "final-observation"))
+      (setf (plist-get state :phase)
+            (if (equal phase "archive-ready")
+                'origin-operation-required
+              'waiting-for-origin-observation))
+      (unless (skg--maintenance-dispatch-origin phase response)
+        (message "Skg maintenance %s awaits its %s origin adapter"
+                 incident-id origin)))
      ((member phase '("blocked-invalid-after-mutation"
                       "blocked-store-health"))
       (setf (plist-get state :phase) 'server-blocked)
@@ -1022,7 +1049,7 @@
      nil incident-id)))
 
 (defun skg--maintenance-handle-bootstrap
-    (_tcp-proc payload &optional terminal-callback)
+    (_tcp-proc payload &optional terminal-callback origin-context)
   (let* ((response (read payload))
          (incident-id (skg--maintenance-text response
                                              'allocated-incident-id))
@@ -1057,6 +1084,7 @@
                 :evidence nil
                 :final-archive nil
                 :terminal nil
+                :origin-context origin-context
                 :terminal-callback terminal-callback
                 :terminal-callback-fired nil))
     (condition-case error-data
@@ -1070,16 +1098,18 @@
        (run-at-time 0 nil #'skg-cancel-maintenance incident-id epoch)))))
 
 (defun skg-begin-maintenance
-    (origin &optional candidate-id paths ids terminal-callback)
+    (origin &optional candidate-id paths ids terminal-callback origin-context)
   "Begin server-owned maintenance for ORIGIN.
 CANDIDATE-ID accepts a pending observation.  PATHS and IDS are the exact
 targets of an explicit partial reload.  TERMINAL-CALLBACK receives the parsed
-terminal response only after the server completes the incident."
+terminal response only after the server completes the incident.
+ORIGIN-CONTEXT is opaque client state retained across the origin adapter."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg-register-response-handler
      'maintenance-offer
      (lambda (tcp payload)
-       (skg--maintenance-handle-bootstrap tcp payload terminal-callback))
+       (skg--maintenance-handle-bootstrap
+        tcp payload terminal-callback origin-context))
      t)
     (skg-submit-request
      tcp-proc
