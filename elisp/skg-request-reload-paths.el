@@ -301,6 +301,11 @@ pipeline.  The conflict marker clears only after that save succeeds."
 
 (put 'skg-reload-selection-mode 'completion-predicate #'ignore)
 
+(defun skg--reload-selection-keep-transient-clean (&rest _)
+  "Keep the reload selector out of dirty-work recovery.
+Its marks are transient command input, never saveable authored state."
+  (set-buffer-modified-p nil))
+
 (defun skg--reload-selection-todo-sequence (_sequence)
   "Replace Org's ordinary TODO sequence inside a reload selector."
   '(sequence "TO-RELOAD" "|"))
@@ -337,6 +342,8 @@ then C-c C-c to submit.  This never edits `skg-id-stack'."
       (setq-local skg--reload-selection-reason-overlays nil)
       (skg-reload-selection-mode 1)
       (set-buffer-modified-p nil)
+      (add-hook 'after-change-functions
+                #'skg--reload-selection-keep-transient-clean nil t)
       (skg-register-buffer
        buffer 'reload-selector
        :lifecycle 'maintenance-control :disposable nil

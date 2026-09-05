@@ -279,9 +279,14 @@ silently rebase genuinely stale client work."
                 0)))))
 
 (defun skg-buffer-dirty-p (&optional buffer)
+  "Whether BUFFER contains state maintenance must preserve as dirty work.
+Reload selectors hold only transient command input, never authored state."
   (with-current-buffer (or buffer (current-buffer))
-    (or (buffer-modified-p)
-        (skg-buffer-logical-dirty-p))))
+    (and (not (and skg--buffer-record
+                   (eq (skg--buffer-record-kind skg--buffer-record)
+                       'reload-selector)))
+         (or (buffer-modified-p)
+             (skg-buffer-logical-dirty-p)))))
 
 (defun skg--maintenance-settlement-value (settlement key)
   (cadr (assoc key settlement)))

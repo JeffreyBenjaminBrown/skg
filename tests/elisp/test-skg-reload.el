@@ -433,12 +433,53 @@ error AND leave the captured table installed."
           (goto-char (point-min))
           (org-shiftright)
           (should (equal (org-get-todo-state) "TO-RELOAD"))
+          (should-not (buffer-modified-p))
+          (let* ((buffer-id
+                  (skg--buffer-record-id skg--buffer-record))
+                 (census-record
+                  (cl-find-if
+                   (lambda (record)
+                     (equal (cdr (assoc 'buffer-id record)) buffer-id))
+                   (skg-buffer-census))))
+            (should census-record)
+            (should (equal (cdr (assoc 'dirty census-record)) "nil"))
+            (should (equal (cdr (assoc 'undo-required census-record)) "nil")))
           (org-shiftleft)
-          (should-not (org-get-todo-state)))
+          (should-not (org-get-todo-state))
+          (should-not (buffer-modified-p)))
       (dolist (name '("*skg-id-stack*" "*skg-reload-from-id-stack*"))
         (when-let ((buffer (get-buffer name)))
           (with-current-buffer buffer (set-buffer-modified-p nil))
           (kill-buffer buffer))))))
+
+(ert-deftest test-existing-modified-reload-selector-is-not-recovery-work ()
+  "Hot-reloaded code must also fix selectors which predate the clean hook."
+  (let ((buffer (generate-new-buffer " *skg old reload selector*")))
+    (unwind-protect
+        (with-current-buffer buffer
+          (insert "* TO-RELOAD Old selection\nold-id")
+          (skg-register-buffer
+           buffer 'reload-selector
+           :lifecycle 'maintenance-control :disposable nil
+           :continuation-id "old-selection"
+           :recipe '((kind . "reload-selector"))
+           :last-fetched "* Old selection\nold-id")
+          (set-buffer-modified-p t)
+          (should (buffer-modified-p))
+          (should-not (skg-buffer-dirty-p buffer))
+          (let* ((buffer-id
+                  (skg--buffer-record-id skg--buffer-record))
+                 (record
+                  (cl-find-if
+                   (lambda (entry)
+                     (equal (cdr (assoc 'buffer-id entry)) buffer-id))
+                   (skg-buffer-census))))
+            (should record)
+            (should (equal (cdr (assoc 'dirty record)) "nil"))
+            (should (equal (cdr (assoc 'undo-required record)) "nil"))))
+      (when (buffer-live-p buffer)
+        (with-current-buffer buffer (set-buffer-modified-p nil))
+        (kill-buffer buffer)))))
 
 (ert-deftest test-skg-reload-selection-submits-deduplicated-marked-ids ()
   (let ((skg-id-stack '(("same" "First") ("same" "Second")
