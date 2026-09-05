@@ -864,6 +864,35 @@ what's imperfect about what's done; choices determining the future.
   411 of 414 runnable Emacs tests with the three expected optional undo-sidecar
   skips, the complete Neovim suite, and both real-client full-rebuild/retry
   integrations pass.  =cargo check --lib= and =git diff --check= are clean.
+- Completed the post-enrollment compatibility audit.  Successful saves now
+  advance each client's process-local graph baseline monotonically, so a view
+  constructed after a save inherits the selected generation rather than the
+  handshake generation.  Emacs normalizes every atom-shaped identity in both
+  ordinary collateral and search-enrichment offers before registry lookup and
+  exact ACK construction, and a fresh =skg-connection-verify= correctly defers
+  to the mandatory handshake instead of attempting a non-local
+  =cl-return-from=.
+- Preserved client-created new-empty authority through its first connection.
+  Both clients publish the complete typed record before herald setup can cause
+  nested network work, initialize only a genuinely unbound revision-0/token-1
+  new-empty record from its first handshake, and retain an already bound older
+  generation as stale.  Census recognizes the matching never-saved authority
+  without inventing a server forest; the ordinary save endpoint remains the
+  sole place which materializes its text.  The formerly failing empty-buffer
+  save passes in both clients.
+- Converted the remaining hand-built integration views to explicit
+  =new-empty-content-view= records and made multi-phase fixtures preserve the
+  post-save revision/token rather than re-registering a buffer.  Fork tests
+  now await the approval re-save before closing their origin, and locate
+  durable declined confirmation buffers by registered kind and contents
+  instead of a conventional name.  Diff/Magit tests await the actual queued
+  application predicate, including both serialized views, rather than
+  confusing the command ACK with presentation completion.
+- Final repository-wide validation passed without retries in 220 seconds:
+  all 417 runnable Emacs unit tests passed with the three expected optional
+  undo-sidecar skips; the complete Neovim unit suite passed; all 702 Rust
+  nextest cases and all doctests passed; and all 72 Emacs/Neovim integration
+  runs passed.  =git diff --check= is clean.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -885,14 +914,21 @@ what's imperfect about what's done; choices determining the future.
   view born in a blocked incident, so the approved URI-to-buffer enrollment
   barrier was implemented and tested before returning to the verification
   matrix.
+- The final broad run was intentionally used as a compatibility audit after
+  late enrollment rather than merely as a pass/fail gate.  It exposed old
+  fixtures which relied on pre-authority constructors or synchronous rerender
+  completion; those tests were migrated to the explicit record and queued
+  presentation contracts before the harness was rerun.
 
 ** what's imperfect about what's done
 - Both clients can finish an already-selected disk candidate, explicit reload,
   client-owned pull and full rebuild through the common post-archive path, and
   can resume either durable blocked phase without repeating external work.
 - No known recovery action remains absent from the public Emacs or Neovim
-  command surfaces.  The final broad validation and end-to-end audit remain to
-  be completed.
+  command surfaces.  The automated final broad validation and end-to-end audit
+  are complete.  The plan's final real-corpus dogfood/performance exercise
+  remains an operational check requiring Jeff's actual large corpus and editor
+  session rather than a repository test fixture.
 
 ** choices determining the future
 - No new architectural choice arose from the locked-census or end-to-end pull
