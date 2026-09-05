@@ -3,6 +3,7 @@
 use crate::maintenance::candidate::{
   DiskObservation,
   observe_complete_disk,
+  observe_complete_maintenance_disk,
   observe_targeted_disk,
 };
 use crate::maintenance::{
@@ -32,6 +33,7 @@ enum ObservationSignal {
   Paths (Vec<PathBuf>, QueuedObservationReason),
   FullSweep (QueuedObservationReason),
   MaintenanceTargets (IncidentId, MaintenanceEpoch),
+  MaintenanceFinalDisk (IncidentId, MaintenanceEpoch),
   WatcherFailure (String),
 }
 
@@ -94,6 +96,16 @@ impl ObservationService {
       incident, epoch))
       . map_err (|_| "observation worker stopped" . to_string ())
   }
+
+  pub fn observe_maintenance_final_disk (
+    &self,
+    incident : IncidentId,
+    epoch    : MaintenanceEpoch,
+  ) -> Result<(), String> {
+    self . sender . send (ObservationSignal::MaintenanceFinalDisk (
+      incident, epoch))
+      . map_err (|_| "observation worker stopped" . to_string ())
+  }
 }
 
 fn observation_worker (
@@ -104,18 +116,23 @@ fn observation_worker (
     let mut paths = Vec::new ();
     let mut reasons = Vec::new ();
     let mut maintenance_jobs = Vec::new ();
+    let mut maintenance_final_jobs = Vec::new ();
     absorb_signal (
-      first, &mut paths, &mut reasons, &mut maintenance_jobs);
+      first, &mut paths, &mut reasons, &mut maintenance_jobs,
+      &mut maintenance_final_jobs);
     while let Ok (signal) = receiver . recv_timeout (
         Duration::from_millis (175))
     {
       absorb_signal (
-        signal, &mut paths, &mut reasons, &mut maintenance_jobs); }
+        signal, &mut paths, &mut reasons, &mut maintenance_jobs,
+        &mut maintenance_final_jobs); }
     let Some (runtime) = runtime . upgrade () else { return; };
     if !reasons . is_empty () || !paths . is_empty () {
       run_observation (&runtime, paths, reasons); }
     for (incident, epoch) in maintenance_jobs {
       run_target_observation (&runtime, incident, epoch); }
+    for (incident, epoch) in maintenance_final_jobs {
+      run_final_observation (&runtime, incident, epoch); }
     thread::yield_now ();
   }
 }
@@ -125,6 +142,7 @@ fn absorb_signal (
   paths   : &mut Vec<PathBuf>,
   reasons : &mut Vec<String>,
   maintenance_jobs : &mut Vec<(IncidentId, MaintenanceEpoch)>,
+  maintenance_final_jobs : &mut Vec<(IncidentId, MaintenanceEpoch)>,
 ) {
   match signal {
     ObservationSignal::Paths (new_paths, reason) => {
@@ -134,9 +152,79 @@ fn absorb_signal (
       reasons . push (reason . label () . into ()),
     ObservationSignal::MaintenanceTargets (incident, epoch) =>
       maintenance_jobs . push ((incident, epoch)),
+    ObservationSignal::MaintenanceFinalDisk (incident, epoch) =>
+      maintenance_final_jobs . push ((incident, epoch)),
     ObservationSignal::WatcherFailure (error) => {
       reasons . push (format! ("watcher failure: {}", error)); }
   }
+}
+
+enum OriginObservationFailure {
+  InvalidDisk (String),
+  Operational (String),
+}
+
+impl From<String> for OriginObservationFailure {
+  fn from (error : String) -> Self { Self::Operational (error) }
+}
+
+impl From<&str> for OriginObservationFailure {
+  fn from (error : &str) -> Self { Self::Operational (error . into ()) }
+}
+
+fn run_final_observation (
+  runtime  : &ServerRuntime,
+  incident : IncidentId,
+  epoch    : MaintenanceEpoch,
+) {
+  let result = (|| -> Result<Option<String>, OriginObservationFailure> {
+    let active = {
+      let coordinator = runtime . maintenance . lock ()
+        . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+      let CoordinatorState::Active (active) = &coordinator . state else {
+        return Ok (None); };
+      if active . incident_id != incident || active . epoch != epoch
+      || active . origin != MaintenanceOrigin::Pull
+      || active . phase != MaintenancePhase::FinalObservation
+      {
+        return Ok (None); }
+      active . clone ()
+    };
+    let sequence = runtime . transition_maintenance (|coordinator|
+      Ok (coordinator . next_observation_sequence ()))?;
+    let snapshot = runtime . selected_snapshot ();
+    if snapshot . selected . graph_generation != active . g0_graph_generation
+    || snapshot . selected . manifest_revision != active . g0_manifest_revision
+    {
+      return Err ("final observation G0 was superseded" . into ()); }
+    let candidate = match observe_complete_maintenance_disk (
+        &snapshot . env . config, &snapshot . selected, sequence)
+    {
+      DiskObservation::Valid (candidate) => candidate,
+      DiskObservation::Invalid { details } => return Err (
+        OriginObservationFailure::InvalidDisk (format! (
+          "final disk is invalid: {}", details . join ("; ")))),
+      DiskObservation::Unstable { details } => return Err (
+        OriginObservationFailure::InvalidDisk (format! (
+          "final disk was unstable: {}", details . join ("; ")))),
+      DiskObservation::ByteEquivalent
+      | DiskObservation::SemanticallyEqual { .. } => return Err (
+        OriginObservationFailure::Operational (
+          "maintenance observation returned no candidate" . into ())),
+    };
+    runtime . retain_candidate (candidate . clone ());
+    runtime . transition_maintenance (|coordinator|
+      coordinator . record_observed_candidate (
+        &incident, epoch, candidate . summary . clone ()))?;
+    let verified = runtime . verified_archive (&incident)
+      . ok_or_else (|| "verified initial archive was not retained"
+        . to_string ())?;
+    crate::serve::handlers::maintenance_protocol::select_and_stage_candidate (
+      runtime, &incident, epoch, &verified)
+      . map (Some) . map_err (OriginObservationFailure::Operational)
+  })();
+
+  queue_origin_result (runtime, incident, epoch, result);
 }
 
 fn run_target_observation (
@@ -144,18 +232,7 @@ fn run_target_observation (
   incident : IncidentId,
   epoch    : MaintenanceEpoch,
 ) {
-  enum Failure {
-    InvalidDisk (String),
-    Operational (String),
-  }
-  impl From<String> for Failure {
-    fn from (error : String) -> Self { Self::Operational (error) }
-  }
-  impl From<&str> for Failure {
-    fn from (error : &str) -> Self { Self::Operational (error . into ()) }
-  }
-
-  let result = (|| -> Result<Option<String>, Failure> {
+  let result = (|| -> Result<Option<String>, OriginObservationFailure> {
     let active = {
       let coordinator = runtime . maintenance . lock ()
         . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
@@ -186,14 +263,14 @@ fn run_target_observation (
     {
       DiskObservation::Valid (candidate) => candidate,
       DiskObservation::Invalid { details } => return Err (
-        Failure::InvalidDisk (format! (
+        OriginObservationFailure::InvalidDisk (format! (
           "targeted disk is invalid: {}", details . join ("; ")))),
       DiskObservation::Unstable { details } => return Err (
-        Failure::InvalidDisk (format! (
+        OriginObservationFailure::InvalidDisk (format! (
           "targeted disk was unstable: {}", details . join ("; ")))),
       DiskObservation::ByteEquivalent
       | DiskObservation::SemanticallyEqual { .. } => return Err (
-        Failure::Operational (
+        OriginObservationFailure::Operational (
           "targeted observation returned a non-candidate result" . into ())),
     };
     runtime . retain_candidate (candidate . clone ());
@@ -205,21 +282,30 @@ fn run_target_observation (
         . to_string ())?;
     crate::serve::handlers::maintenance_protocol::select_and_stage_candidate (
       runtime, &incident, epoch, &verified)
-      . map (Some) . map_err (Failure::Operational)
+      . map (Some) . map_err (OriginObservationFailure::Operational)
   })();
 
+  queue_origin_result (runtime, incident, epoch, result);
+}
+
+fn queue_origin_result (
+  runtime  : &ServerRuntime,
+  incident : IncidentId,
+  epoch    : MaintenanceEpoch,
+  result   : Result<Option<String>, OriginObservationFailure>,
+) {
   let payload = match result {
     Ok (Some (payload)) => payload,
     Ok (None) => return,
     Err (failure) => {
       let error = match failure {
-        Failure::InvalidDisk (error) => {
+        OriginObservationFailure::InvalidDisk (error) => {
           let _ = runtime . transition_maintenance (|coordinator|
             coordinator . block_invalid_disk (
               &incident, epoch, error . clone ()));
           error
         }
-        Failure::Operational (error) => error,
+        OriginObservationFailure::Operational (error) => error,
       };
       let phase = match &runtime . maintenance . lock () . unwrap () . state {
         CoordinatorState::Active (active) => active . phase . label (),

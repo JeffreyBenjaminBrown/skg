@@ -38,6 +38,7 @@ pub enum RequestType {
   ObservePresentation,
   BeginMaintenance,
   RunMaintenanceOrigin,
+  FinishMaintenanceOrigin,
   MaintenanceArchiveReady,
   MaintenanceArchiveFinalized,
   MaintenanceArchiveFailed,
@@ -89,6 +90,7 @@ impl RequestType {
       "observe presentation"     => Ok (RequestType::ObservePresentation),
       "begin maintenance"        => Ok (RequestType::BeginMaintenance),
       "run maintenance origin"   => Ok (RequestType::RunMaintenanceOrigin),
+      "finish maintenance origin" => Ok (RequestType::FinishMaintenanceOrigin),
       "maintenance archive ready" => Ok (RequestType::MaintenanceArchiveReady),
       "maintenance archive finalized" =>
         Ok (RequestType::MaintenanceArchiveFinalized),
@@ -104,6 +106,18 @@ impl RequestType {
       "acknowledge terminal maintenance" =>
         Ok (RequestType::AcknowledgeTerminalMaintenance),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn pull_origin_completion_has_its_own_request_type () {
+    assert_eq! (RequestType::from_client_string (
+      "finish maintenance origin") . unwrap (),
+      RequestType::FinishMaintenanceOrigin);
+  }
+}
 
 /// IN DETAIL: See api-and-formats.md
 ///

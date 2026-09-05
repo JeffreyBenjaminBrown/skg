@@ -17,6 +17,8 @@ use crate::maintenance::{
   BufferKind,
   ClientEvidenceTransferRecord,
   CoordinatorState,
+  ExternalMutationOutcome,
+  ExternalMutationRecord,
   IncidentId,
   MaintenanceEpoch,
   MaintenanceOrigin,
@@ -181,28 +183,99 @@ fn run_maintenance_origin (
     &value_from_request_sexp ("incident-id", request)?)?;
   let epoch = MaintenanceEpoch::parse (
     &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let active = require_archive_owner (runtime, &incident, epoch)?;
+  match active . origin {
+    MaintenanceOrigin::ExplicitPartialReload => {
+      let started = runtime . transition_maintenance (|coordinator|
+        coordinator . begin_target_observation (&incident, epoch))?;
+      // Schedule replays too.  This is the durable restart edge: an incident
+      // can journal FinalObservation before its process-local worker receives
+      // the job.  Duplicate jobs drop after the first advances the incident.
+      if let Err (error) = runtime . schedule_maintenance_target_observation (
+          incident . clone (), epoch)
+      {
+        let _ = runtime . transition_maintenance (|coordinator|
+          coordinator . block_invalid_disk (
+            &incident, epoch, error . clone ()));
+        return Err (format! (
+          "could not schedule maintenance target observation: {}", error));
+      }
+      Ok (Sexp::List (vec![
+        atom_field ("status", "origin-operation-started"),
+        atom_field ("incident-id", incident . as_str ()),
+        integer_field ("maintenance-epoch", epoch . get ()),
+        atom_field ("phase", "final-observation"),
+        atom_field ("replayed", if started { "nil" } else { "true" }),
+        atom_field ("next-action", "await-maintenance-status"),
+      ]) . to_string ())
+    }
+    MaintenanceOrigin::Pull => {
+      let authorized = runtime . transition_maintenance (|coordinator|
+        coordinator . authorize_external_mutation (&incident, epoch))?;
+      Ok (Sexp::List (vec![
+        atom_field ("status", "external-mutation-authorized"),
+        atom_field ("incident-id", incident . as_str ()),
+        integer_field ("maintenance-epoch", epoch . get ()),
+        atom_field ("phase", "running-external-mutation"),
+        atom_field ("replayed", if authorized { "nil" } else { "true" }),
+        atom_field ("next-action", "run-client-pull"),
+      ]) . to_string ())
+    }
+    _ => Err (format! (
+      "maintenance origin '{}' has no runnable origin adapter",
+      active . origin . label ())),
+  }
+}
+
+pub fn handle_finish_maintenance_origin_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = finish_maintenance_origin (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn finish_maintenance_origin (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let outcome = ExternalMutationOutcome::parse (
+    &value_from_request_sexp ("external-outcome", request)?)?;
+  let parsed = sexp::parse (request)
+    . map_err (|error| format! ("invalid maintenance request: {}", error))?;
+  let record = ExternalMutationRecord {
+    outcome,
+    details: optional_string_list (&parsed, "external-details")?,
+  };
   require_archive_owner (runtime, &incident, epoch)?;
-  let started = runtime . transition_maintenance (|coordinator|
-    coordinator . begin_target_observation (&incident, epoch))?;
-  // Schedule replays too.  This is the durable restart edge: an incident can
-  // journal FinalObservation before its process-local worker receives the
-  // job.  The single observation worker silently discards duplicate jobs
-  // after the first one advances the exact incident.
-  if let Err (error) = runtime . schedule_maintenance_target_observation (
+  let recorded = runtime . transition_maintenance (|coordinator|
+    coordinator . external_mutation_finished (
+      &incident, epoch, record . clone ()))?;
+  // The journal reaches FinalObservation before the process-local queue.  A
+  // replay therefore always reschedules, while the worker accepts only the
+  // still-matching incident and phase.
+  if let Err (error) = runtime . schedule_maintenance_final_observation (
       incident . clone (), epoch)
   {
     let _ = runtime . transition_maintenance (|coordinator|
       coordinator . block_invalid_disk (
         &incident, epoch, error . clone ()));
     return Err (format! (
-      "could not schedule maintenance target observation: {}", error));
+      "could not schedule final maintenance observation: {}", error));
   }
   Ok (Sexp::List (vec![
-    atom_field ("status", "origin-operation-started"),
+    atom_field ("status", "origin-operation-finished"),
     atom_field ("incident-id", incident . as_str ()),
     integer_field ("maintenance-epoch", epoch . get ()),
     atom_field ("phase", "final-observation"),
-    atom_field ("replayed", if started { "nil" } else { "true" }),
+    atom_field ("external-outcome", record . outcome . label ()),
+    list_field ("external-details", &record . details),
+    atom_field ("replayed", if recorded { "nil" } else { "true" }),
     atom_field ("next-action", "await-maintenance-status"),
   ]) . to_string ())
 }
@@ -1014,6 +1087,11 @@ fn active_status_sexp (
     fields . push (atom_field (
       "scalar-approved", if scalar . approved { "true" } else { "nil" }));
   }
+  if let Some (external) = &active . external_mutation {
+    fields . push (atom_field (
+      "external-outcome", external . outcome . label ()));
+    fields . push (list_field ("external-details", &external . details));
+  }
   if !active . view_settlements . is_empty () {
     fields . push (Sexp::List (vec![
       Sexp::Atom (Atom::S ("view-settlements" . into ())),
@@ -1630,6 +1708,27 @@ mod tests {
         "(requested-paths (source/node.skg))"), "{}", payload);
       assert! (payload . contains ("(requested-ids (alias))"), "{}", payload);
     }
+  }
+
+  #[test]
+  fn pull_status_replays_the_exact_external_mutation_result () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (MaintenanceOrigin::Pull, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    coordinator . authorize_external_mutation (
+      &active . incident_id, active . epoch) . unwrap ();
+    coordinator . external_mutation_finished (
+      &active . incident_id, active . epoch, ExternalMutationRecord {
+        outcome: ExternalMutationOutcome::Failed,
+        details: vec!["repo-a exited 1" . into ()],
+      }) . unwrap ();
+    let CoordinatorState::Active (active) = coordinator . state else {
+      panic! ("pull incident stopped being active"); };
+    let status = active_status_sexp (&active) . to_string ();
+    assert! (status . contains ("(external-outcome failed)"), "{}", status);
+    assert! (status . contains (
+      "(external-details (\"repo-a exited 1\"))"), "{}", status);
   }
 
   #[test]
