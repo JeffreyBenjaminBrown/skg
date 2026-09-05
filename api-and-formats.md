@@ -1,6 +1,18 @@
 # API
 
-Communication between Rust and Emacs is via TCP on port 1730, configurable in any skgconfig.toml. The connection is persistent.
+Communication between Rust and an Emacs or Neovim client is via TCP on port
+1730, configurable in `skgconfig.toml`.  The interactive connection is
+persistent.  The server process retains selected stores, maintenance, views,
+observation and presentation state across sequential replacement connections.
+
+The first request on every socket declares `(role . "interactive")` or
+`(role . "control")`.  The one user-bearing role is `interactive`.  Exactly
+one interactive socket may be live; a second is refused before it can obtain
+user data or dispatch an ordinary endpoint.  After disconnect, either editor
+may replace it, but must complete the census described below before ordinary
+requests or writes are enabled.  `control` is content-blind and is allowlisted
+to `begin reload batch`, `end reload batch`, and `shutdown`; it cannot query,
+save, select disk, approve maintenance, or acknowledge presentation.
 
 After initialization, every server response is length-prefixed as
 `Content-Length: LENGTH\r\n\r\nPAYLOAD`; `LENGTH` is the number of
@@ -20,6 +32,22 @@ The server echoes it on every frame.  A request ID owns one wire exchange;
 an incident ID owns the longer disk/store/presentation episode and is reused
 by retries.  A client rejects a response whose incident identity does not
 match its request record.
+
+The related identities are deliberately not interchangeable:
+
+| Identity | Owner and lifetime |
+|---|---|
+| request ID | One socket request/continuation exchange, ending in one terminal frame. |
+| server operation ID | One unsolicited server push; durable state is recovered through status rather than by reusing a request ID. |
+| incident ID | One complete durable maintenance or fatal-recovery episode across requests and reconnects. |
+| candidate ID | One immutable, validated disk candidate based on a named selected generation. |
+| maintenance epoch | One monotonically increasing edit/query/save policy interval. |
+| graph generation | One coherent selected in-Rust graph and derived-store transition. |
+| manifest revision | One exact selected path/byte manifest; it can advance on a semantic no-op without changing the graph generation. |
+| presentation generation | One exact Git HEAD/index/worktree presentation signature. |
+| server view revision | One accepted server forest for a view URI. |
+| client application token | One exact installation of server text in an editor buffer. |
+| client session ID | One editor process identity used to bind archive ownership; it grants no authority by itself. |
 
 Every ordinary response payload carries:
 
@@ -61,8 +89,54 @@ Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not R
 So far there are these endpoints:
 
 ## Verify connection
-  - Request: ((request . "verify connection"))
-  - Response: LP `((response-type verify-connection) (content "This is the skg server verifying the connection."))`.
+
+- Interactive request:
+
+  ```text
+  ((request . "verify connection")
+   (role . "interactive")
+   (client-kind . "emacs"|"neovim")
+   (client-version . "VERSION")
+   (client-session-id . "PROCESS-ID")
+   (archive-format-version . 1)
+   (native-undo-kind . "undo-fu-session"|"nvim-wundo"|"none")
+   (native-undo-version . "VERSION")
+   (source-set . "server-default"|"RETAINED-NAME"))
+  ```
+
+  `client-session-id` is nonempty and at most 256 bytes.  A claimed source-set
+  must either request the server default or exactly match the retained sole
+  session.  Archive and native-undo capabilities are checked again against the
+  exact locked dirty-buffer census when maintenance starts.  Dirty Emacs undo
+  currently requires public `undo-fu-session` 0.8; dirty Neovim undo requires
+  `nvim-wundo` matching the advertised Neovim version.  Merely having another
+  undo package installed is irrelevant, but an active `undo-tree-mode` is
+  refused by the Emacs archive adapter.
+
+- The `verify-connection` response includes compact source inventory and
+  archive identities, telescope warnings, unresolved fatal-reload incidents,
+  active source-set, graph generation, manifest revision, maintenance epoch
+  and state, TypeDB/Tantivy health, and `(census-required true)`.  It never
+  includes the complete selected path manifest.
+
+- The client next sends `((request . "client census"))`, optionally carrying
+  the active maintenance epoch, followed by a length-prefixed S-expression
+  payload of descriptors.  The accepted descriptor authority is:
+
+  ```text
+  ((buffer-id . "ID") (kind . "KIND") (view-uri . "URI"|"nil")
+   (graph-generation . N) (presentation-generation . N)
+   (server-revision . N) (application-token . N)
+   (dirty . "true"|"nil") (undo-required . "true"|"nil")
+   (last-fetched-sha256 . "SHA256") (current-sha256 . "SHA256"))
+  ```
+
+  The server reattaches exact retained authority, reports stale buffer IDs,
+  and requests full text only for reconstructible missing views.  If requested,
+  `client census texts` carries a second length-prefixed payload with
+  `buffer-id`, exact `last-fetched`, and exact `current` text.  No ordinary
+  endpoint is admitted until the response says `(census-complete true)`.
+  Reconnect assertions never overwrite newer retained server authority.
 
 ## Text search
   - Request: `((request . "text search") (terms . "SEARCH_TERMS")
@@ -249,8 +323,8 @@ So far there are these endpoints:
   - The server deliberately returns the computed path when the file no
     longer exists, so deleted nodes can still be located in a git diff.
   - Does not require TypeDB or Tantivy -- only the config.
-  - If the requested source is inactive in the current connection's
-    active source-set, the server refuses to expose the path. Direct
+  - If the requested source is inactive in the retained session's active
+    source-set, the server refuses to expose the path. Direct
     file visits outside Skg are not intercepted.
 
 ## Git diff mode toggle
@@ -261,7 +335,7 @@ So far there are these endpoints:
        Includes warnings if any sources are not git-tracked.
     2. Rerender lock, per-view, and done messages (same as "rerender all views"):
        rerender-lock → rerender-view* → rerender-done.
-  - Behavior: Toggles per-connection diff mode and re-renders all open views.
+  - Behavior: Toggles retained-session diff mode and re-renders all open views.
     When enabled, subsequent `single root content view` and `save buffer`
     responses include diff annotations showing changes
     between git HEAD and the worktree.
@@ -388,11 +462,26 @@ So far there are these endpoints:
     single `# No moves detected.` comment.
 
 ## Rebuild databases
-  - Request: ((request . "rebuild dbs"))
-  - Response: LP response-type "rebuild-dbs" with `((content "..."))`.
-    Content is "Databases rebuilt successfully." on success,
-    or "Rebuild failed: ..." on error.
-  - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
+
+- The public editor commands `M-x skg-rebuild-dbs` and `:SkgRebuildDbs`
+  bootstrap maintenance with origin `full-rebuild`; see “Durable maintenance
+  protocol” below.  They archive editor state before any destructive store
+  step, load and fence the governing config file, validate the complete disk
+  candidate, then take an exclusive generation gate while reconstructing
+  TypeDB, Tantivy, context rankings, and the selected graph/manifest.  Queries
+  continue against G0 during preflight but are refused during the visibly
+  exclusive reconstruction window.
+- The old raw request `((request . "rebuild dbs"))` is retained only as a safe
+  migration aid.  It never rebuilds or mutates stores.  It queues exact disk
+  observation and returns a `rebuild-dbs` response instructing the user to run
+  the editor command, where census and recovery archival are available.
+- A valid changed config can replace runtime source catalogs, database/index
+  locations, archive root and render limits as part of the same publication.
+  Listener, tracing, audit-daemon, readiness-sound and shutdown-handler
+  settings are startup-only and cause preflight to stop with an instruction to
+  restart the server.  The selected G0 remains queryable after preflight
+  failure; a destructive failure attempts complete G0 store reconstruction
+  and otherwise leaves maintenance durably blocked.
 
 ## Recompute cyclic roots
   - Request: `((request . "recompute cyclic roots"))`.
@@ -543,11 +632,12 @@ So far there are these endpoints:
        with active view-children is retained, read-only), and
        PartnerCols regenerate per the new set, so widening the set
        reveals members and cols.
-  - Behavior: The active source-set is per Emacs TCP connection. It
-    defaults from `skgconfig.toml`, resets on reconnect, and is not
-    written back to the config. Changing it requires confirmation in
-    Emacs, re-renders (not closes) all active Skg buffers for that
-    connection, and cancels any in-flight search enrichment.
+  - Behavior: The active source-set belongs to the sole retained interactive
+    session. It defaults from `skgconfig.toml` when that session is first
+    created, survives replacement connections, and is not written back to the
+    config. Changing it requires confirmation in the editor, re-renders (not
+    closes) all active Skg buffers, and cancels any in-flight search
+    enrichment.
   - Refusal: switching to a set other than `all` while git diff mode
     is on is refused, before any side effect (no enrichment
     cancellation, no set change, no rerendering). The refusal — and
@@ -558,7 +648,7 @@ So far there are these endpoints:
     rerender-lock naming no views, then rerender-done), so the
     client's preemptive buffer locks and stream guard unwind.
     Switching TO `all` is always allowed. The resulting
-    per-connection invariant: diff mode on implies active source-set
+    retained-session invariant: diff mode on implies active source-set
     `all`.
   - Rerender authorization precedes both the set change and release of
     view text. If the proposed set would render an ugly telescope, the
@@ -587,66 +677,25 @@ So far there are these endpoints:
     carries those PIDs in `allow-ugly-telescopes`; `all` returns the
     ordinary map with the shared warning.
 
-## Reload paths or selected IDs
+## Disk observation hint (retired `reload paths` spelling)
 
-  - Request: `((request . "reload paths") (paths "PATH" ...)
-    (ids "ID" ...) (dirty-view-uris "URI" ...)
-    (allow-ugly-telescopes "PID" ...) (incident-id . "UUID"))`.
-    At least one path or ID is
-    required.  An ID may be primary or extra; the server resolves it against
-    the selected graph and reloads that primary PID's complete cross-source
-    telescope.  Repeated paths, IDs and aliases of one PID are deduplicated.
-  - A successful terminal `reload-paths` response carries `content`,
-    `requested-id-outcomes`, `conflicted-views`, `updated-views`,
-    `files-affected`, `rerender-errors`, `warnings`, and
-    `recovery-available`. Each requested-ID
-    outcome names the requested ID, resolved
-    primary PID, every configured section path considered, and status
-    `acknowledged` or `rejected` with a reason.  Mixed success terminates as
-    `complete-with-rejected-files`; a batch-wide stability, invariant or store
-    failure terminates as `failed`. Each view outcome names its URI, changed
-    PIDs and paths. A conflicted view also carries its scalar-authorized
-    incoming rendering, which the client retains for explicit three-way
-    review but never installs automatically. Reload never writes a `.skg`
-    file.
-  - The exact queued Tantivy generation must finish before acknowledgement.
-    If its incremental write fails, the same single writer reconstructs the
-    complete index in place from that generation's immutable selected graph,
-    then continues later queued deltas in order.  The response reports this
-    recovery.  If reconstruction also fails, Tantivy is marked poisoned and
-    search refuses with an instruction to run `skg-rebuild-dbs`.
-  - The client locks all views before sending and reports which were dirty.
-    Rust stages the complete affected batch, runs scalar release before and
-    after completion, updates only clean buffers, and leaves a dirty affected
-    view on its previous server forest. A scalar challenge is the terminal
-    `ugly-telescope-confirmation`; its committed store result is retained by
-    incident ID, so an approved retry performs presentation only and does not
-    apply the graph transition twice.
-  - An out-of-band change which intersects a dirty view opens
-    `*SKG Disk-Client Conflicts*`, marks that view save-blocked, and plays the
-    harsh warning sound. `skg-resolve-disk-client-conflict` compares its last
-    rendered base, editable local text, and incoming rendering in Ediff. A
-    prefix invocation explicitly submits the manually reconciled local text
-    through the normal save path; the marker clears only after save success.
-    Raw `.skg` saves and Magit operations capable of writing a configured
-    source's worktree are refused earlier whenever any Skg view is dirty.
-    Read-only and index/ref-only Git operations remain available.
-  - `M-x skg-reload-from-id-stack` opens a transient copy of the Emacs ID
-    stack.  Org's ordinary S-left/S-right TODO cycling marks `TO-RELOAD`;
-    C-c C-c submits the marked IDs.  This mode neither changes the canonical
-    stack nor permits C-x C-s.  Acknowledged marks clear; rejected marks remain
-    with transient reason annotations.
-  - Emacs installs one nonrecursive file-notify watch per normalized source
-    directory.  Watch callbacks and raw-file save hooks enqueue path names
-    only; they never stat, read or hash content.  A short quiet timer submits
-    the newest path observation per path under one incident.  Magit refresh,
-    watcher startup/overflow and `skg-reload-changed` request `full-sweep`,
-    which compares BLAKE3 manifests on the server and therefore detects
-    same-size rewrites even when mtimes are restored.
-  - Requests arriving while a reload-batch bracket is open return
-    `(deferred true)` as data inside a terminal response.  The client retains
-    the candidates and incident ID and retries after the bracket closes;
-    `deferred` never means acknowledged.
+- Request: `((request . "reload paths") (paths "PATH" ...))`, or the
+  full-corpus form with `(full-sweep . "true")`.
+- This compatibility endpoint is observation-only.  It queues work on the
+  process-owned low-priority observer and returns terminal response type
+  `reload-paths` with `(observation-queued true)`.  It does not allocate an
+  incident, lock a view, select disk, or mutate a store.  Direct IDs are
+  refused with an instruction to use the maintained editor command.
+- The public path/ID commands instead bootstrap `explicit-partial-reload`
+  maintenance.  Each resolved primary PID observes every possible
+  cross-source telescope section; an extra-ID change takes the conservative
+  complete-corpus fallback.  Unknown IDs are retained as rejected outcomes,
+  while acknowledged IDs clear from the Emacs selection buffer only after the
+  incident's terminal ACK.
+- The Rust watcher, not either editor, owns normal source-directory
+  observation.  `skg-reload-changed` and a Magit refresh can still request an
+  exact BLAKE3 full sweep as a hint.  A raw `.skg` save needs no client hook:
+  the server watcher observes it independently of the editor connection.
 
 ## Fatal reload recovery
 
@@ -695,24 +744,264 @@ So far there are these endpoints:
     reachable, pulling still proceeds.  While any token remains active, Skg
     starts no observed reload.
   - When the last token ends or its connection is lost, the server sends the
-    verified interactive client a server-owned `reconciliation-ready` frame
-    with a monotonic `sweep-generation`. Emacs then takes its current
-    dirty-buffer census and submits one full manifest sweep. A client which
-    connects later performs the same sweep during handshake, so the shell
-    process never needs access to editor-local buffer state.
+    process-owned observer one exact full-sweep request and may also send the
+    verified interactive client a `reconciliation-ready` progress frame with
+    a monotonic `sweep-generation`.  Correctness does not depend on a connected
+    editor reacting to that frame, and the shell process never needs access to
+    editor-local buffer state.
+
+## Process-owned observation and pending disk work
+
+The server installs one nonrecursive watcher for every normalized source
+directory and also schedules exact full sweeps at startup, after watcher gaps,
+after an external batch, after source-catalog replacement, and after a save
+fence discovers drift.  The low-priority observer reads disk without changing
+the selected generation:
+
+- **G0** is the coherent selected graph, TypeDB projection, committed Tantivy
+  generation, exact path manifest, and store-health tuple used by queries.
+- An **observation** compares exact BLAKE3 path/byte manifests against a named
+  G0.  A byte-equivalent result does nothing.  A semantically equal rewrite
+  advances only the selected manifest revision.
+- **Gdisk** is an immutable exact-byte candidate that folded and validated
+  successfully and differs semantically from its base G0.  It has a
+  server-allocated candidate ID but is not selected.
+- **G1** is that candidate only after maintenance has coherently committed and
+  published all selected stores and the exact manifest.
+
+A valid Gdisk changes coordinator state to `pending` with reason
+`valid-disk-difference` and queues a server-push `maintenance-offer`.  The push
+has a server operation ID plus candidate ID, base graph generation, base
+manifest revision, changed primary IDs, observation reasons and paths.  The
+user may decline the prompt: G0 remains editable and queryable, but every Skg
+view save is refused until the pending disk work is reconciled.  A later disk
+change can supersede the candidate.
+
+Invalid or unstable exact bytes produce persistent pending reasons
+`invalid-disk` or `unstable-disk` and a server-push `maintenance-status` rather
+than a candidate.  Observation failures use `observation-failure`.  None of
+these states silently changes selected stores.  `maintenance status` reports
+`idle`, `observing`, `pending`, `active`, `terminal`, or
+`blocked-store-health`, with explicit kebab-case phase/reason labels rather
+than implementation debug text.
+
+## Durable maintenance protocol
+
+Maintenance is the only live route for selecting disk not produced by the
+current Skg save.  It covers accepted out-of-band candidates, explicit path/ID
+reload, client-owned pull, and full rebuild/config replacement.  One durable
+coordinator and a monotonically increasing epoch fence editor writes.  Every
+request after bootstrap repeats the exact incident ID and epoch; the server
+also requires the same archive-owner client session.
+
+### Entry, locked census, and initial archive
+
+1. The client sends:
+
+   ```text
+   ((request . "begin maintenance")
+    (origin . "pending-reconciliation"|"explicit-partial-reload"|
+              "pull"|"full-rebuild")
+    (candidate-id . "UUID"|"none")
+    (paths "PATH" ...) (ids "ID" ...)
+    (pull-repositories (((repository-key . "KEY")
+                         (sources ("SOURCE" ...))) ...)))
+   ```
+
+   Only fields appropriate to the origin are present.  Pull requires active
+   source-set `all`, and its logical repository/source mapping must match the
+   server's configured Git topology.  Every origin refuses entry if a visited
+   configured raw `.skg` buffer is modified.
+
+2. The terminal `maintenance-offer` allocates incident ID, maintenance epoch,
+   UTC start, strict archive directory name, archive folder/identity, G0,
+   retained source-set, targets and candidate.  Both clients immediately put
+   the epoch lock on every registered buffer, including buffers created while
+   the incident is active, and submit an incident-qualified descriptor census.
+   `maintenance locked census` freezes exactly that acknowledged inventory.
+   Its checksum is the SHA-256 of sorted buffer IDs separated by NUL bytes.
+
+3. The client writes the complete initial archive under same-filesystem
+   `.staging`, verifies closed lengths/checksums, atomically renames it to its
+   strict final name, and creates `ARCHIVE-READY` last.  It then sends:
+
+   ```text
+   ((request . "maintenance archive ready")
+    (maintenance-epoch . N)
+    (manifest-sha256 . "SHA256")
+    (lock-census-sha256 . "SHA256"))
+   ```
+
+   The server independently validates the archive root, private modes,
+   complete declared inventory, marker, manifest checksum, incident/epoch,
+   client ownership, census checksum and unchanged G0.  Only its exact ACK
+   crosses the point at which pull or destructive rebuild work may begin.
+
+If a required native undo sidecar cannot be written, `maintenance archive
+failed` records the exact buffer key and reason and returns
+`undo-waiver-required`.  `approve undo waiver` must repeat that exact tuple;
+it authorizes a text-only retry for that buffer, not a general weakening.
+`cancel maintenance` is valid only before `ARCHIVE-READY` and returns the exact
+epoch whose locks can be removed.
+
+### Origin work and store selection
+
+`run maintenance origin` advances an archived explicit reload or full rebuild
+to server-owned final observation.  For pull it returns
+`external-mutation-authorized`: the client then executes configured
+repositories serially with argument-vector Git processes and finally sends
+`finish maintenance origin` with `external-outcome` `completed`, `failed`, or
+`indeterminate`, plus incident-qualified diagnostic details.  A nonzero Git
+exit does not prove that disk is unchanged, so final observation still runs.
+
+Partial selection and pull remain queryable through a pinned coherent G0.
+Full rebuild takes an exclusive query gate only after complete config/corpus
+preflight; requests during its destructive reconstruction receive an explicit
+outage error.  Candidate bytes and governing config bytes are revalidated at
+the selection boundary.  The server journals candidate identity, store
+transition and semantic evidence before publishing G1.  Tantivy acknowledgement
+names the exact generation; an incremental failure reconstructs from the
+immutable selected graph, while an unrecoverable derived-store failure leaves
+store health and maintenance explicitly blocked.
+
+If final disk after an external mutation is invalid or unstable, the incident
+stays locked in `blocked-invalid-after-mutation`; it is not rolled back into a
+false success.  Preflight failure before destructive work leaves G0 queryable.
+After a destructive full-rebuild failure, the server attempts complete G0
+reconstruction before reporting the durable failure state.
+
+### Scalar release and view settlement
+
+Once G1 is selected, status carries the exact source inventory/source-set,
+G1 graph and manifest generations, Tantivy outcome, server-evidence checksum,
+and one settlement per frozen buffer.  A restricted source-set which would
+release protected scalar text first returns `needs-scalar-authorization` with
+only operation, exact PID list and prompt.  `approve maintenance scalar
+release` must repeat the exact list; no staged view text precedes approval.
+
+Each settlement freezes buffer ID/kind/URI, dirty and impact classification,
+base graph/presentation generation, server revision and application token,
+planned disposition, and required ACK.  The policies are:
+
+- dirty impacted or parse-uncertain views are **retired** in place as detached
+  recovery buffers; their text and native undo remain, but live URI and Skg
+  save authority are removed;
+- dirty orthogonal views are released byte-for-byte against G1 and marked
+  presentation-stale; search views are separately marked search-stale;
+- clean impacted views receive an exact staged rendering with content SHA-256
+  and one-step resulting generations/revision/token;
+- clean orthogonal views remain untouched; explicitly disposable clean menus
+  may close.
+
+`maintenance view settled` repeats all frozen authority.  An application ACK
+also repeats content SHA-256 and every resulting authority counter.  The server
+journals each ACK before installing its retained forest and refuses stale,
+changed, duplicate-inconsistent, or missing-buffer authority.  Exact replay is
+idempotent.
+
+Maintenance never automatically reruns a search.  A refreshed search buffer
+keeps its old membership and ranking and is marked search-stale; graph-derived
+display such as heralds may separately be presentation-stale.  The warnings
+remain visible until an explicit fresh query or applicable rerender clears the
+corresponding condition.
+
+### Evidence, final archive, terminal delivery, and reconnect
+
+After every settlement ACK, `maintenance evidence` requests the exact
+`server-evidence-sha256`.  The reply is the artifact bundle described below.
+The client verifies its descriptor and opaque bytes, installs evidence
+categories replay-safely, writes `manifest.final.sexp`, rewrites the human
+`incident.org` and interrupted-buffer index, and creates `FINALIZED` last.
+It then sends `maintenance archive finalized` with the final-manifest,
+transfer-manifest, and complete opaque-byte SHA-256 values.  Changed checksums
+are refused even on retry.
+
+`complete maintenance` repeats the final-manifest checksum and yields a
+durable `terminal` response containing incident, epoch, disposition, exact
+unlock census, selected generations, and per-ID outcomes.  The client unlocks
+only that census, then sends `acknowledge terminal maintenance`.  Only this
+last exact ACK returns the coordinator to idle and compacts its transaction
+journal.  Lost replies at the view, evidence, finalization, completion, or
+terminal boundary can be replayed without applying the local action twice.
+
+`maintenance status` is the reconnect/resume endpoint.  An active response
+includes origin, phase, targets, frozen census, candidate/G0/G1 evidence and
+settlements, including which ACKs are already durable.  A terminal response
+replays the exact unlock instruction.  Connection loss never converts an
+active incident into idle and never unlocks views merely because a socket
+ended.
+
+## Artifact-bundle frames and recovery archives
+
+An artifact bundle uses this header:
+
+```text
+Content-Length: TOTAL_BYTES\r\n
+Content-Type: application/x-skg-artifact-bundle\r\n
+Descriptor-Length: UTF8_DESCRIPTOR_BYTES\r\n
+\r\n
+DESCRIPTOR || OPAQUE_ARTIFACT_BYTES
+```
+
+`Content-Length` covers both portions.  The descriptor is one ordinary
+enveloped UTF-8 S-expression; `Descriptor-Length` is its exact byte boundary.
+Its ordered artifact records contain safe relative path, purpose, byte offset,
+byte length and lowercase SHA-256.  Offsets are contiguous and cover the
+opaque tail exactly.  Clients must not decode, normalize newlines, base64, or
+count characters in the artifact bytes; non-UTF-8 `.skg` evidence is valid.
+
+The archive root defaults beside `skgconfig.toml` and must be structurally
+disjoint from every source.  Directories are mode 0700 and regular files mode
+0600 from first creation on POSIX.  Archive operations reject `..`, unsafe
+components, symlinks, traversal, undeclared files, changed rereads and
+non-private modes.  The portable top-level shape is:
+
+```text
+.staging/INCIDENT.CLIENT-NONCE.partial/
+TIMESTAMP_UUID/
+  ARCHIVE-READY
+  FINALIZED
+  manifest.initial.sexp
+  manifest.final.sexp
+  incident.org
+  buffer-snapshots/...
+  interrupted-buffers/README.org
+  new-nodes/... | deleted-nodes/... | modified-nodes/... | invalid-paths/...
+```
+
+`ARCHIVE-READY` binds archive format, incident and initial-manifest checksum.
+`FINALIZED` binds incident, final-manifest checksum and transfer-manifest
+checksum.  Marker filenames alone are not authority.  `incident.org` and
+buffer README/diff files are human aids; the versioned manifests and checksums
+are machine authority.  Incomplete `.staging` or missing-marker publications
+are retained for inspection and never auto-promoted or auto-deleted.
+
+The server's config-keyed private YAML maintenance journal has a different
+job: it is temporary transaction authority for phases, store selection,
+settlement and transfer ACKs, and may be compacted only after the terminal
+ACK.  The client incident directory is permanent recovery evidence.  Skg
+reports exact and IEC size for the new archive and all retained archives; it
+never deletes one automatically.  A retired buffer is already detached
+recovery: open a fresh live view for current G1 rather than granting that old
+text a new live URI implicitly.  Archive deletion, when exposed by a client,
+must be an explicit confirmed operation confined to one validated incident;
+manual deletion has the same irreversible loss of native undo and evidence.
 
 ## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
   - Response: LP `((response-type shutdown) (content "Server shutting down..."))`.
   - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
-  - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
+  - The sole interactive connection or an explicitly authenticated control
+    connection may request shutdown.  There is no multi-user or secondary
+    interactive role.  The server exits after sending the response, so the
+    caller should not use shutdown while another operation is in flight.
 
 ## Busy-initializing signal
-  - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
+  - Triggered when an editor connects while the server is still initializing TypeDB/Tantivy.
   - Response: the unprefixed, newline-terminated
     `((busy-initializing . "human-readable status message"))`.
-  - Emacs should display the message and retry the request (or let the user retry manually).
+  - The editor should display the message and retry the request (or let the user retry manually).
   - No request triggers this specifically; any request sent during initialization may receive it.
 
 Once initialization is complete, endpoint errors use that endpoint's
@@ -927,7 +1216,13 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 | `timing_log`         | no       | false   | When true, writes a JSON log to `<data_root>/logs/server.jsonl`. |
 | `auto_audit_daily`   | no       | false   | When true, audits the in-Rust memory against TypeDB at most once per day, backgrounded at lowest priority. Mismatches are appended to `<data_root>/audits.org` and flagged to the client on the next outbound buffer. |
 | `beep_when_server_becomes_available` | no | true | When true, plays a local sound after server initialization finishes. |
-| `default_source_set` | no | `all` | Source-set active when a client connects. Runtime changes are per connection and are not written back. |
+| `default_source_set` | no | `all` | Source-set used for a new retained interactive session. Runtime changes belong to that sole session across reconnects and are not written back. |
+| `maintenance_archive_folder` | no | `unsaved-work-interrupted-by-rebuild` | Private client recovery-archive root. Relative values resolve beside this config file. The normalized root must be disjoint from every source. |
+
+The handshake returns both the configured archive spelling and the server's
+normalized identity.  Each client resolves the configured value beside its
+own copy of this same config path, validates that its normalized result agrees,
+and refuses unsafe overlap or symlink traversal before maintenance begins.
 
 ## Sources
 
