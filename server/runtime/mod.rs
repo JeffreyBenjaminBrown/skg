@@ -5,6 +5,7 @@ use crate::maintenance::journal::MaintenanceJournalStore;
 use crate::maintenance::evidence::MaintenanceEvidenceStore;
 use crate::maintenance::{
   CandidateId,
+  CoordinatorState,
   MaintenanceCoordinator,
   QueuedObservationReason,
 };
@@ -223,9 +224,13 @@ impl ServerRuntime {
   }
 
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
+    let protected = {
+      let coordinator = self . maintenance . lock () . unwrap ();
+      journal_candidate_id (&coordinator . state) . cloned ()
+    };
     let mut candidates = self . candidates . lock () . unwrap ();
-    candidates . clear ();
-    candidates . insert (candidate . summary . id . clone (), candidate);
+    retain_candidate_entry (&mut candidates, protected . as_ref (),
+      candidate . summary . id . clone (), candidate);
   }
 
   pub fn candidate (&self, id : &CandidateId)
@@ -314,6 +319,30 @@ impl ServerRuntime {
   }
 }
 
+/// A background observation is allowed to discover successor work while an
+/// incident is active.  Its process-local candidate must never evict the exact
+/// candidate named by the durable coordinator before that incident has used
+/// it.  Unreferenced older observations remain bounded to the newest entry.
+fn retain_candidate_entry<T> (
+  candidates : &mut BTreeMap<CandidateId, T>,
+  protected  : Option<&CandidateId>,
+  incoming_id : CandidateId,
+  incoming   : T,
+) {
+  candidates . retain (|id, _| Some (id) == protected);
+  candidates . insert (incoming_id, incoming);
+}
+
+fn journal_candidate_id (state : &CoordinatorState) -> Option<&CandidateId> {
+  match state {
+    CoordinatorState::Pending (pending) =>
+      pending . candidate . as_ref () . map (|candidate| &candidate . id),
+    CoordinatorState::Active (active) =>
+      active . candidate . as_ref () . map (|candidate| &candidate . id),
+    _ => None,
+  }
+}
+
 impl InteractiveConnectionSlot {
   fn new () -> Self {
     Self { state: Arc::new (Mutex::new (InteractiveConnectionState {
@@ -350,6 +379,23 @@ impl Drop for InteractiveConnectionGuard {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn successor_candidate_does_not_evict_journaled_candidate () {
+    let protected = CandidateId::new ();
+    let stale = CandidateId::new ();
+    let incoming = CandidateId::new ();
+    let mut candidates = BTreeMap::from ([
+      (protected . clone (), "active"),
+      (stale . clone (), "stale"),
+    ]);
+    retain_candidate_entry (
+      &mut candidates, Some (&protected), incoming . clone (), "successor");
+    assert_eq! (candidates . len (), 2);
+    assert_eq! (candidates . get (&protected), Some (&"active"));
+    assert_eq! (candidates . get (&incoming), Some (&"successor"));
+    assert! (!candidates . contains_key (&stale));
+  }
 
   #[test]
   fn second_interactive_attachment_is_refused_until_drop () {
