@@ -102,7 +102,7 @@ So far there are these endpoints:
    (client-session-id . "PROCESS-ID")
    (archive-format-version . 1)
    (native-undo-kind . "undo-fu-session"|"nvim-wundo"|"none")
-   (native-undo-version . "VERSION")
+   (native-undo-version . "VERSION"|"not-installed")
    (source-set . "server-default"|"RETAINED-NAME"))
   ```
 
@@ -113,7 +113,9 @@ So far there are these endpoints:
   currently requires public `undo-fu-session` 0.8; dirty Neovim undo requires
   `nvim-wundo` matching the advertised Neovim version.  Merely having another
   undo package installed is irrelevant, but an active `undo-tree-mode` is
-  refused by the Emacs archive adapter.
+  refused by the Emacs archive adapter.  Emacs advertises `none` and
+  `not-installed` when it cannot find `undo-fu-session`; after installing or
+  changing the package, reconnect the Skg client so it sends a new handshake.
 
 - The `verify-connection` response includes compact source inventory and
   archive identities, telescope warnings, unresolved fatal-reload incidents,

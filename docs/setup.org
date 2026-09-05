@@ -53,6 +53,8 @@ Please ask an AI for help setting it up.
     in a dirty Skg buffer is incompatible with this adapter; disable it before
     maintenance.  If required native undo cannot be archived, Skg aborts by
     default and offers a second explicit text-and-diff-only waiver.
+    If you install or change =undo-fu-session= after initializing Skg,
+    reconnect the client so the capability handshake is refreshed.
 
     Neovim 0.11 or newer needs no extra undo package; Skg uses its built-in
     =:wundo= format and records the exact Neovim version in the sidecar.

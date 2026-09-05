@@ -7,6 +7,22 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-verify-connection)
 
+(ert-deftest test-emacs-handshake-names-missing-native-undo-clearly ()
+  (cl-letf (((symbol-function 'skg--installed-undo-fu-session-version)
+             (lambda () nil)))
+    (let ((request (read (skg--connection-handshake-request))))
+      (should (equal (cdr (assoc 'native-undo-kind request)) "none"))
+      (should (equal (cdr (assoc 'native-undo-version request))
+                     "not-installed")))))
+
+(ert-deftest test-emacs-handshake-advertises-an-unsupported-found-version ()
+  (cl-letf (((symbol-function 'skg--installed-undo-fu-session-version)
+             (lambda () "0.9")))
+    (let ((request (read (skg--connection-handshake-request))))
+      (should (equal (cdr (assoc 'native-undo-kind request))
+                     "undo-fu-session"))
+      (should (equal (cdr (assoc 'native-undo-version request)) "0.9")))))
+
 (ert-deftest test-connection-warning-opens-persistent-telescope-buffer ()
   (let (shown)
     (cl-letf (((symbol-function 'skg-big-nonfatal-message)

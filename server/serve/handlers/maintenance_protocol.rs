@@ -2166,10 +2166,42 @@ fn validate_client_archive_capability (
       && client . capabilities . native_undo_version == "0.8" => Ok (( )),
     "neovim" if client . capabilities . native_undo_kind == "nvim-wundo"
       && client . capabilities . native_undo_version == client . version => Ok (( )),
-    _ => Err (format! (
-      "dirty buffers have undo history, but client advertised {} {}",
-      client . capabilities . native_undo_kind,
-      client . capabilities . native_undo_version)),
+    _ => Err (native_undo_capability_refusal (client)),
+  }
+}
+
+fn native_undo_capability_refusal (client : &AttachedClient) -> String {
+  let capability = &client . capabilities;
+  match client . kind . label () {
+    "emacs" if matches! (
+      ( capability . native_undo_kind . as_str (),
+        capability . native_undo_version . as_str () ),
+      ("none", "not-installed") | ("unavailable", "unavailable")) =>
+    {
+      "dirty buffers have undo history, but this Emacs connection cannot archive it: undo-fu-session 0.8 was not available when the connection was established. Install exactly undo-fu-session 0.8, then reconnect the Skg client and retry"
+        . into ()
+    }
+    "emacs" if capability . native_undo_kind == "undo-fu-session"
+      || ( capability . native_undo_kind == "unavailable"
+           && capability . native_undo_version != "unavailable" ) =>
+    {
+      format! (
+        "dirty buffers have undo history, but this Emacs connection found undo-fu-session version '{}'; Skg requires exactly version 0.8. Install the supported version, then reconnect the Skg client and retry",
+        capability . native_undo_version)
+    }
+    "emacs" => format! (
+      "dirty buffers have undo history, but this Emacs connection advertised native undo adapter '{}' at version '{}'; Skg requires undo-fu-session 0.8. Reconnect with the supported adapter and retry",
+      capability . native_undo_kind, capability . native_undo_version),
+    "neovim" if capability . native_undo_kind == "nvim-wundo" => format! (
+      "dirty buffers have undo history, but this Neovim connection advertised nvim-wundo version '{}' while its Neovim version is '{}'; Skg requires those versions to match. Reconnect with a compatible client and retry",
+      capability . native_undo_version, client . version),
+    "neovim" => format! (
+      "dirty buffers have undo history, but this Neovim connection advertised native undo adapter '{}' at version '{}'; Skg requires nvim-wundo matching Neovim version '{}'. Reconnect with a compatible client and retry",
+      capability . native_undo_kind, capability . native_undo_version,
+      client . version),
+    other => format! (
+      "dirty buffers have undo history, but client '{}' advertised unsupported native undo adapter '{}' at version '{}'",
+      other, capability . native_undo_kind, capability . native_undo_version),
   }
 }
 
@@ -2388,6 +2420,10 @@ mod tests {
     ServerEvidenceRecord,
     ViewDisposition,
   };
+  use crate::runtime::interactive_session::{
+    ClientCapabilities,
+    ClientKind,
+  };
   use crate::types::tree::forest::ViewForest;
   use crate::types::store_state::{GraphGeneration, ManifestRevision};
 
@@ -2412,6 +2448,55 @@ mod tests {
       last_fetched_sha256: "a" . repeat (64),
       current_sha256: "b" . repeat (64),
     }
+  }
+
+  fn attached_emacs_with_undo (
+    kind    : &str,
+    version : &str,
+  ) -> AttachedClient {
+    AttachedClient {
+      kind: ClientKind::Emacs,
+      version: "30.2" . into (),
+      session_id: "session" . into (),
+      capabilities: ClientCapabilities {
+        archive_format_version: ARCHIVE_FORMAT_VERSION,
+        native_undo_kind: kind . into (),
+        native_undo_version: version . into (),
+      },
+      census_complete: true,
+    }
+  }
+
+  #[test]
+  fn missing_emacs_undo_capability_explains_the_fix () {
+    let mut census = census_descriptor ("dirty", "content-view");
+    census . undo_required = true;
+    for (kind, version) in [
+      ("none", "not-installed"),
+      ("unavailable", "unavailable"), // pre-fix clients
+    ] {
+      let error = validate_client_archive_capability (
+        &attached_emacs_with_undo (kind, version), &[census . clone ()])
+        . unwrap_err ();
+      assert! (error . contains ("undo-fu-session 0.8 was not available"),
+               "{}", error);
+      assert! (error . contains ("Install exactly undo-fu-session 0.8"),
+               "{}", error);
+      assert! (error . contains ("reconnect the Skg client"), "{}", error);
+      assert! (!error . contains ("unavailable unavailable"), "{}", error);
+    }
+  }
+
+  #[test]
+  fn wrong_emacs_undo_version_names_found_and_required_versions () {
+    let mut census = census_descriptor ("dirty", "content-view");
+    census . undo_required = true;
+    let error = validate_client_archive_capability (
+      &attached_emacs_with_undo ("undo-fu-session", "0.9"), &[census])
+      . unwrap_err ();
+    assert! (error . contains ("found undo-fu-session version '0.9'"),
+             "{}", error);
+    assert! (error . contains ("requires exactly version 0.8"), "{}", error);
   }
 
   #[test]

@@ -18,8 +18,7 @@ This inspects the public package header without enabling any package mode."
 
 (defun skg--connection-handshake-request ()
   "Return the role-bearing handshake for this Emacs process."
-  (let* ((undo-version (skg--installed-undo-fu-session-version))
-         (supported (equal undo-version "0.8")))
+  (let ((undo-version (skg--installed-undo-fu-session-version)))
     (concat
      (prin1-to-string
       `((request . "verify connection")
@@ -28,10 +27,10 @@ This inspects the public package header without enabling any package mode."
         (client-version . ,emacs-version)
         (client-session-id . ,skg--client-session-id)
         (archive-format-version . ,skg--maintenance-archive-format-version)
-        (native-undo-kind . ,(if supported
+        (native-undo-kind . ,(if undo-version
                                  "undo-fu-session"
-                               "unavailable"))
-        (native-undo-version . ,(or undo-version "unavailable"))
+                               "none"))
+        (native-undo-version . ,(or undo-version "not-installed"))
         (source-set . ,skg--active-source-set-name)))
      "\n")))
 
