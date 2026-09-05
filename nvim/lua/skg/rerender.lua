@@ -9,6 +9,7 @@ local lock = require('skg.lock')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -71,6 +72,11 @@ function M.register_rerender_stream_handlers ()
                    .. tostring(err))
       end
     end, true)
+end
+
+function M.refresh_queued_handler (_payload_text, response)
+  registry.mark_view_uris_presentation_stale(payload.string_list(
+    payload.field(response, 'queued-view-uris')))
 end
 
 return M

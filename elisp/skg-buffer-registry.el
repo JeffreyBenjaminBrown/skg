@@ -615,4 +615,17 @@
              (length buffer-ids))
      :warning)))
 
+(defun skg-mark-view-uris-presentation-stale (view-uris)
+  "Mark registered live VIEW-URIS stale without changing their save authority."
+  (let ((wanted (mapcar (lambda (uri) (format "%s" uri)) view-uris))
+        changed)
+    (dolist (buffer (skg-registered-buffers))
+      (with-current-buffer buffer
+        (when (and skg--buffer-record
+                   (member (skg--buffer-record-view-uri skg--buffer-record)
+                           wanted))
+          (setf (skg--buffer-record-presentation-stale skg--buffer-record) t
+                changed t))))
+    (when changed (force-mode-line-update t))))
+
 (provide 'skg-buffer-registry)

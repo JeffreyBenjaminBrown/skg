@@ -662,6 +662,17 @@ function M.mark_census_buffers_stale (buffer_ids)
   end
 end
 
+function M.mark_view_uris_presentation_stale (view_uris)
+  local wanted, changed = {}, false
+  for _, uri in ipairs(view_uris or {}) do wanted[tostring(uri)] = true end
+  for _, buf in ipairs(M.buffers()) do
+    if wanted[vim.b[buf].skg_view_uri] then
+      vim.b[buf].skg_presentation_stale = true
+      changed = true end
+  end
+  if changed then vim.cmd('redrawstatus') end
+end
+
 ---Warnings which remain relevant whenever BUF is entered.
 ---@param buf integer
 ---@return string[]

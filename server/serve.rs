@@ -390,24 +390,31 @@ fn handle_connection (
           if role . as_ref () . map (ConnectionRole::interactive)
              . unwrap_or (false)
           {
-            let events : Vec<_> = {
-              let mut interactive = runtime . interactive . lock () . unwrap ();
-              interactive . queued_server_events . drain (..) . collect ()
-            };
-            for event in events {
+            let mut server_event_send_failed = false;
+            loop {
+              let event = runtime . interactive . lock () . unwrap ()
+                . queued_server_events . pop_front ();
+              let Some (event) = event else { break; };
               let response_type = match event . frame_kind . as_str () {
                 "maintenance-offer" => TcpToClient::MaintenanceOffer,
                 "maintenance-status" => TcpToClient::MaintenanceStatus,
+                "refresh-queued" => TcpToClient::RefreshQueued,
                 other => {
                   tracing::error! (frame_kind = other,
                     "discarding unknown queued server event kind");
                   continue; }
               };
-              let _ = send_response_with_length_prefix (
+              if send_response_with_length_prefix (
                 &mut stream, &tag_server_push_sexp_response (
-                  response_type, &event . operation_id, &event . payload));
+                  response_type, &event . operation_id, &event . payload))
+                . is_err ()
+              {
+                runtime . interactive . lock () . unwrap ()
+                  . queued_server_events . push_front (event);
+                server_event_send_failed = true;
+                break; }
             }
-            if ! snapshot_requested {
+            if ! snapshot_requested && !server_event_send_failed {
               let mut interactive = runtime . interactive . lock () . unwrap ();
               let InteractiveSession {
                 views, collateral_scheduler, ..

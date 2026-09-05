@@ -99,6 +99,8 @@ function M.handle_buffer_census_response (
   local registry = require('skg.buffer_registry')
   local required = payload.string_list(
     payload.field(response, 'text-required-buffer-ids'))
+  registry.mark_view_uris_presentation_stale(payload.string_list(
+    payload.field(response, 'presentation-stale-view-uris')))
   require('skg.maintenance').handle_census_stale(payload.string_list(
     payload.field(response, 'stale-buffer-ids')))
   if #required == 0 then
@@ -115,6 +117,8 @@ function M.handle_buffer_census_response (
     tcp, request_text, {
       ['client-census'] = {
         handler = function (_payload_text, final_response)
+          registry.mark_view_uris_presentation_stale(payload.string_list(
+            payload.field(final_response, 'presentation-stale-view-uris')))
           require('skg.maintenance').handle_census_stale(
             payload.string_list(payload.field(
               final_response, 'stale-buffer-ids')))

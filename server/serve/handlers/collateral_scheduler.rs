@@ -108,6 +108,42 @@ pub struct ViewApplicationOffer {
   pub resulting_source_set : String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QueuedRefresh {
+  pub operation   : String,
+  pub generation  : RenderGeneration,
+  pub view_uris   : Vec<ViewUri>,
+}
+
+impl QueuedRefresh {
+  pub fn operation_id (&self) -> String {
+    format! ("refresh-{}-{}-{}",
+      self . generation . graph . get (),
+      self . generation . presentation,
+      self . operation)
+  }
+
+  pub fn payload (&self) -> String {
+    Sexp::List (vec![
+      pair ("reason", atom (&self . operation)),
+      pair ("graph-generation", Sexp::Atom (Atom::I (
+        self . generation . graph . get () as i64))),
+      pair ("presentation-generation", Sexp::Atom (Atom::I (
+        self . generation . presentation as i64))),
+      pair ("queued-view-uris", Sexp::List (self . view_uris . iter ()
+        . map (|uri| atom (&uri . repr_in_client ())) . collect ())),
+    ]) . to_string ()
+  }
+
+  pub fn send (&self, stream : &mut TcpStream) -> std::io::Result<()> {
+    if self . view_uris . is_empty () { return Ok (( )); }
+    send_response_with_length_prefix (stream,
+      &tag_server_push_sexp_response (
+        TcpToClient::RefreshQueued, &self . operation_id (),
+        &self . payload ()))
+  }
+}
+
 pub struct CollateralScheduler {
   epoch          : Arc<AtomicU64>,
   batch          : Option<BatchContext>,
@@ -144,15 +180,15 @@ impl CollateralScheduler {
   pub fn replace_after_transition (
     &mut self,
     saved_uri           : Option<&ViewUri>,
-    views_state         : &ViewsState,
+    views_state         : &mut ViewsState,
     env                 : &SkgEnv,
     define_nodes        : &[DefineNode],
     active_source_set   : &ActiveSourceSet,
     scalar_approved     : &HashSet<ID>,
-  ) {
+  ) -> QueuedRefresh {
     self . replace_queue (
       saved_uri, views_state, env, define_nodes, active_source_set,
-      scalar_approved, "background-rerender", false, false);
+      scalar_approved, "background-rerender", false, false)
   }
 
   /// Replace obsolete queued rerenders with one explicit retained-session
@@ -160,23 +196,22 @@ impl CollateralScheduler {
   /// waits for its ACK and then clones whichever forest that ACK made current.
   pub fn replace_for_explicit_rerender (
     &mut self,
-    views_state       : &ViewsState,
+    views_state       : &mut ViewsState,
     env               : &SkgEnv,
     active_source_set : &ActiveSourceSet,
     scalar_approved   : &HashSet<ID>,
     operation         : &str,
     source_switch     : bool,
-  ) -> Vec<ViewUri> {
+  ) -> QueuedRefresh {
     self . replace_queue (
       None, views_state, env, &[], active_source_set, scalar_approved,
-      operation, source_switch, source_switch);
-    self . queued_uris ()
+      operation, source_switch, source_switch)
   }
 
   fn replace_queue (
     &mut self,
     saved_uri           : Option<&ViewUri>,
-    views_state         : &ViewsState,
+    views_state         : &mut ViewsState,
     env                 : &SkgEnv,
     define_nodes        : &[DefineNode],
     active_source_set   : &ActiveSourceSet,
@@ -184,18 +219,22 @@ impl CollateralScheduler {
     operation           : &str,
     source_switch       : bool,
     create_partnerCols  : bool,
-  ) {
+  ) -> QueuedRefresh {
     let epoch = self . epoch . fetch_add (1, Ordering::AcqRel) + 1;
     self . queue = views_state . open_views . views . keys ()
       . filter (|uri| saved_uri != Some (*uri))
       . cloned ()
       . collect ();
     self . sort_queue ();
+    for uri in &self . queue {
+      if let Some (state) = views_state . open_views . views . get_mut (uri) {
+        state . presentation_stale = true; }}
+    let generation = RenderGeneration {
+      graph: env . in_rust_graph . load_full () . graph_generation,
+      presentation: self . presentation_generation,
+    };
     self . batch = Some (BatchContext {
-      generation: RenderGeneration {
-        graph: env . in_rust_graph . load_full () . graph_generation,
-        presentation: self . presentation_generation,
-      },
+      generation,
       epoch,
       env: env . clone (),
       define_nodes: define_nodes . to_vec (),
@@ -206,12 +245,13 @@ impl CollateralScheduler {
       source_switch,
       create_partnerCols,
     });
-  }
-
-  fn queued_uris (&self) -> Vec<ViewUri> {
     let mut uris = self . queue . clone ();
     uris . sort_by_key (ViewUri::repr_in_client);
-    uris
+    QueuedRefresh {
+      operation: operation . into (),
+      generation,
+      view_uris: uris,
+    }
   }
 
   pub fn seed_presentation (&mut self, env : &SkgEnv) -> Result<(), String> {
@@ -227,21 +267,22 @@ impl CollateralScheduler {
   /// signature rerenders every view only while diff mode is enabled.
   pub fn observe_presentation (
     &mut self,
-    views_state       : &ViewsState,
+    views_state       : &mut ViewsState,
     env               : &SkgEnv,
     active_source_set : &ActiveSourceSet,
-  ) -> Result<bool, String> {
+  ) -> Result<(bool, Option<QueuedRefresh>), String> {
     let signature = presentation_signature (&env . config)?;
     let previous = self . presentation_signature . replace (signature);
-    if previous == Some (signature) { return Ok (false); }
-    if previous . is_none () { return Ok (false); }
+    if previous == Some (signature) { return Ok ((false, None)); }
+    if previous . is_none () { return Ok ((false, None)); }
     self . presentation_generation = self . presentation_generation
       . checked_add (1) . ok_or ("presentation generation exhausted")?;
-    if views_state . diff_mode_enabled {
-      self . replace_queue (
+    let queued = if views_state . diff_mode_enabled {
+      Some (self . replace_queue (
         None, views_state, env, &[], active_source_set, &HashSet::new (),
-        "git-presentation-rerender", false, false); }
-    Ok (true)
+        "git-presentation-rerender", false, false))
+    } else { None };
+    Ok ((true, queued))
   }
 
   /// A foreground operation gets first use of TypeDB.  The current worker is
@@ -688,6 +729,13 @@ impl CollateralScheduler {
         pending . generation . presentation,
         resulting_client_token,
         pending . resulting_source_set)?;
+      // A newer replacement batch may have queued this URI while the exact
+      // older offer was awaiting its ACK.  Applying that offer repairs its
+      // own generation, but must not erase the newer retained refresh debt.
+      if self . queue . contains (&pending . uri) {
+        views_state . open_views . views . get_mut (&pending . uri)
+          . expect ("acknowledged queued view remains registered")
+          . presentation_stale = true; }
       self . pending_offer = None;
       Ok ("collateral view application acknowledged")
     })();
@@ -955,6 +1003,25 @@ mod tests {
     assert_eq! (field ("client-buffer-id") . as_deref (), Some ("client-buffer"));
     assert_eq! (field ("view-base-source-set") . as_deref (), Some ("private"));
     assert_eq! (field ("resulting-source-set") . as_deref (), Some ("all"));
+  }
+
+  #[test]
+  fn queued_refresh_names_generation_reason_and_every_view () {
+    let refresh = QueuedRefresh {
+      operation: "git-presentation-rerender" . into (),
+      generation: RenderGeneration {
+        graph: GraphGeneration::INITIAL . successor (), presentation: 8,
+      },
+      view_uris: vec![
+        ViewUri::ContentView ("view" . into ()),
+        ViewUri::SearchView ("terms" . into ()),
+      ],
+    };
+    let payload = refresh . payload ();
+    assert! (payload . contains ("(reason git-presentation-rerender)"));
+    assert! (payload . contains ("(graph-generation 2)"));
+    assert! (payload . contains ("(presentation-generation 8)"));
+    assert! (payload . contains ("(queued-view-uris (view search:terms))"));
   }
 
   #[test]

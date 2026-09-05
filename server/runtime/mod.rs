@@ -253,9 +253,18 @@ impl ServerRuntime {
     let InteractiveSession {
       views, active_source_set, collateral_scheduler, ..
     } = &mut *interactive;
-    collateral_scheduler . observe_presentation (
-      views, &snapshot . env, active_source_set)
-      . map (|changed| (changed, diff_mode_enabled))
+    let (changed, queued) = collateral_scheduler . observe_presentation (
+      views, &snapshot . env, active_source_set)?;
+    let event = queued . map (|refresh|
+      crate::runtime::interactive_session::QueuedServerEvent {
+        frame_kind: crate::serve::protocol::TcpToClient::RefreshQueued
+          . repr_in_client () . into (),
+        operation_id: refresh . operation_id (),
+        payload: refresh . payload (),
+      });
+    drop (interactive);
+    if let Some (event) = event { self . queue_server_event (event); }
+    Ok ((changed, diff_mode_enabled))
   }
 
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {

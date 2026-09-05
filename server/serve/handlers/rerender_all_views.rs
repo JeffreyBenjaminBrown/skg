@@ -18,14 +18,14 @@ pub fn handle_rerender_all_views_request (
   active_source_set : &ActiveSourceSet,
   collateral_scheduler : &mut CollateralScheduler,
 ) {
-  let uris = collateral_scheduler . replace_for_explicit_rerender (
+  let refresh = collateral_scheduler . replace_for_explicit_rerender (
     views_state, env, active_source_set, &Default::default (),
     "rerender-all-views", false);
-  stream_queued_rerender (stream, &uris); }
+  stream_queued_rerender (stream, &refresh); }
 
 pub(crate) fn stream_queued_rerender (
   stream : &mut TcpStream,
-  uris   : &[ViewUri],
+  refresh : &crate::serve::handlers::collateral_scheduler::QueuedRefresh,
 ) {
   // The command's broad transient lock is no longer application authority.
   // Release it immediately; each retained-session offer independently checks
@@ -34,8 +34,9 @@ pub(crate) fn stream_queued_rerender (
     stream,
     &tag_sexp_response (
       TcpToClient::RerenderLock, &format_lock_views_sexp (&[])));
+  let _ = refresh . send (stream);
   let response = add_queued_uris (
-    &format_errors_warnings_sexp (&[], &[]), uris);
+    &format_errors_warnings_sexp (&[], &[]), &refresh . view_uris);
   let _ = send_response_with_length_prefix (
     stream,
     &tag_sexp_response (TcpToClient::RerenderDone, &response));
@@ -62,7 +63,15 @@ fn add_queued_uris (response : &str, uris : &[ViewUri]) -> String {
 pub fn stream_empty_rerender (
   stream : &mut TcpStream,
 ) {
-  stream_queued_rerender (stream, &[]); }
+  let _ = send_response_with_length_prefix (
+    stream,
+    &tag_sexp_response (
+      TcpToClient::RerenderLock, &format_lock_views_sexp (&[])));
+  let response = add_queued_uris (
+    &format_errors_warnings_sexp (&[], &[]), &[]);
+  let _ = send_response_with_length_prefix (
+    stream,
+    &tag_sexp_response (TcpToClient::RerenderDone, &response)); }
 
 /// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,
@@ -96,7 +105,7 @@ pub fn handle_git_diff_toggle_and_rerender (
       return; }}
   let next_diff_mode : bool = ! views_state . diff_mode_enabled;
   views_state . diff_mode_enabled = next_diff_mode;
-  let uris = collateral_scheduler . replace_for_explicit_rerender (
+  let refresh = collateral_scheduler . replace_for_explicit_rerender (
     views_state, env, active_source_set, &Default::default (),
     "diff-mode-rerender", false);
   let msg : String =
@@ -105,7 +114,7 @@ pub fn handle_git_diff_toggle_and_rerender (
   let _ = send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
-  stream_queued_rerender (stream, &uris); }
+  stream_queued_rerender (stream, &refresh); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.

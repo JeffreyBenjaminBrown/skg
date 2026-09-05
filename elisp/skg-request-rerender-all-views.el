@@ -71,4 +71,13 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
         (message "skg: rerender-done handler error: %S" err))))
    t))
 
+(defun skg--refresh-queued-handler (_tcp-proc payload)
+  "Expose process-owned refresh debt named by an unsolicited PAYLOAD."
+  (let* ((response (read payload))
+         (uris (or (cadr (assoc 'queued-view-uris response)) nil)))
+    (skg-mark-view-uris-presentation-stale uris)))
+
+(skg-register-server-push-handler
+ 'refresh-queued #'skg--refresh-queued-handler)
+
 (provide 'skg-request-rerender-all-views)

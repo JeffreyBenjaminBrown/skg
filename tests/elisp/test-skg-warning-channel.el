@@ -144,4 +144,27 @@
       (should (string-match-p "^\\* warnings\n\\*\\* audit warning"
                               (nth 2 shown))))))
 
+(ert-deftest test-refresh-queued-marks-only-named-live-view-stale ()
+  (let ((skg--buffer-registry (make-hash-table :test #'equal))
+        (named (generate-new-buffer " *skg-refresh-named*"))
+        (other (generate-new-buffer " *skg-refresh-other*")))
+    (unwind-protect
+        (progn
+          (skg-register-buffer
+           named 'content-view :lifecycle 'live-view :disposable nil
+           :view-uri "view-a")
+          (skg-register-buffer
+           other 'content-view :lifecycle 'live-view :disposable nil
+           :view-uri "view-b")
+          (skg--refresh-queued-handler
+           nil "((queued-view-uris (view-a)))")
+          (should (with-current-buffer named
+                    (skg--buffer-record-presentation-stale
+                     skg--buffer-record)))
+          (should-not (with-current-buffer other
+                        (skg--buffer-record-presentation-stale
+                         skg--buffer-record))))
+      (when (buffer-live-p named) (kill-buffer named))
+      (when (buffer-live-p other) (kill-buffer other)))))
+
 (provide 'test-skg-warning-channel)

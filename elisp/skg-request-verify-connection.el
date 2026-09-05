@@ -133,6 +133,8 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
                                            response))
                                nil)))
          (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
+    (skg-mark-view-uris-presentation-stale
+     (or (cadr (assoc 'presentation-stale-view-uris response)) nil))
     (if (fboundp 'skg-maintenance-handle-census-stale)
         (skg-maintenance-handle-census-stale stale)
       (skg-mark-census-buffers-stale stale))
@@ -162,6 +164,8 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
   "Install the terminal disposition of requested census texts."
   (let* ((response (read payload))
          (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
+    (skg-mark-view-uris-presentation-stale
+     (or (cadr (assoc 'presentation-stale-view-uris response)) nil))
     (if (fboundp 'skg-maintenance-handle-census-stale)
         (skg-maintenance-handle-census-stale stale)
       (skg-mark-census-buffers-stale stale))

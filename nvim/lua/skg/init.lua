@@ -35,6 +35,9 @@ function M.install_session_surface ()
     'collateral-view',
     require('skg.save').background_collateral_offer_handler)
   state.register_server_push_handler(
+    'refresh-queued',
+    require('skg.rerender').refresh_queued_handler)
+  state.register_server_push_handler(
     'reconciliation-ready',
     require('skg.misc_requests').reconciliation_ready_handler)
   state.register_server_push_handler(

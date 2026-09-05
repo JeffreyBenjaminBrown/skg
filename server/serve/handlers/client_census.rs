@@ -63,6 +63,7 @@ pub fn handle_client_census_request (
     let mut live_uris : HashSet<ViewUri> = HashSet::new ();
     let mut text_required : Vec<String> = Vec::new ();
     let mut stale : Vec<String> = Vec::new ();
+    let mut presentation_stale : Vec<String> = Vec::new ();
     let mut census_applications = Vec::new ();
     interactive . pending_census_texts . clear ();
     interactive . live_census = descriptors . iter () . map (|descriptor|
@@ -86,6 +87,12 @@ pub fn handle_client_census_request (
         Some (_) if census_application . is_some () => {
           census_applications . push ((
             descriptor . clone (), census_application . unwrap ()));
+        }
+        Some (state) if server_requires_presentation_stale (
+            state, &descriptor, &descriptor_kind) =>
+        {
+          state . client_buffer_id = Some (descriptor . buffer_id . clone ());
+          presentation_stale . push (uri . repr_in_client ());
         }
         Some (_) => stale . push (descriptor . buffer_id . clone ()),
         None if descriptor . graph_generation == current_generation => {
@@ -111,7 +118,8 @@ pub fn handle_client_census_request (
     if let Some (client) = &mut interactive . attached_client {
       client . census_complete = complete; }
     Ok (census_response (
-      complete, writes_allowed && complete, &text_required, &stale))
+      complete, writes_allowed && complete, &text_required, &stale,
+      &presentation_stale))
   })();
   send_result (stream, result);
 }
@@ -386,7 +394,7 @@ pub fn handle_client_census_texts_request (
     if let Some (client) = &mut interactive . attached_client {
       client . census_complete = true; }
     let mut response = census_response (
-      true, writes_allowed, &[], &stale);
+      true, writes_allowed, &[], &stale, &[]);
     let Ok (Sexp::List (mut fields)) = sexp::parse (&response) else {
       unreachable! (); };
     fields . push (list_field ("restored-buffer-ids", &restored));
@@ -638,6 +646,21 @@ fn state_matches_descriptor (
   && roots == descriptor . root_ids . iter () . cloned () . collect ()
 }
 
+/// A queued server refresh is conservative state, not loss of view authority.
+/// Reconnect propagates that one-way stale bit instead of retiring an
+/// otherwise exact client buffer merely because its status frame was missed.
+fn server_requires_presentation_stale (
+  state      : &ViewState,
+  descriptor : &CensusDescriptor,
+  kind       : &BufferKind,
+) -> bool {
+  if !state . presentation_stale || descriptor . presentation_stale {
+    return false; }
+  let mut stale_descriptor = descriptor . clone ();
+  stale_descriptor . presentation_stale = true;
+  state_matches_descriptor (state, &stale_descriptor, kind)
+}
+
 fn sha256 (text : &str) -> String {
   format! ("{:x}", Sha256::digest (text . as_bytes ()))
 }
@@ -647,12 +670,14 @@ fn census_response (
   write_enabled : bool,
   text_required : &[String],
   stale         : &[String],
+  presentation_stale : &[String],
 ) -> String {
   Sexp::List (vec![
     atom_field ("census-complete", if complete { "true" } else { "nil" }),
     atom_field ("write-enabled", if write_enabled { "true" } else { "nil" }),
     list_field ("text-required-buffer-ids", text_required),
     list_field ("stale-buffer-ids", stale),
+    list_field ("presentation-stale-view-uris", presentation_stale),
   ]) . to_string ()
 }
 
@@ -757,9 +782,15 @@ mod tests {
       search_stale: true,
     };
     assert! (state_matches_descriptor (&state, &descriptor, &kind));
+    let mut missed_status = descriptor . clone ();
+    missed_status . presentation_stale = false;
+    assert! (server_requires_presentation_stale (
+      &state, &missed_status, &kind));
     let mut changed = state;
     changed . source_set = "all" . into ();
     assert! (!state_matches_descriptor (&changed, &descriptor, &kind));
+    assert! (!server_requires_presentation_stale (
+      &changed, &missed_status, &kind));
   }
 
   #[test]

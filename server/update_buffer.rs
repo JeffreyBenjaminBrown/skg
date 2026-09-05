@@ -337,9 +337,10 @@ pub async fn update_views_after_save (
       viewuri_from_request_result,
       active_source_set)
   {
-    scheduler . replace_after_transition (
+    let refresh = scheduler . replace_after_transition (
       Some (saved_uri), views_state, env, &define_nodes, active,
       scalar_approved_pids);
+    let _ = refresh . send (stream);
   }
   if let Some (w) = take_pending_audit_warning () {
     context . warnings . insert (0, w); }

@@ -187,6 +187,15 @@ describe('skg maintenance buffer transitions', function ()
     assert.are.equal(descriptor.recipe, payload.field_text(wire, 'recipe'))
   end)
 
+  it('marks only named queued view uris presentation-stale', function ()
+    local named = make_buffer('content-view', { view_uri = 'view:named' })
+    local other = make_buffer('content-view', { view_uri = 'view:other' })
+    require('skg.rerender').refresh_queued_handler(nil, sexpr.read(
+      '((queued-view-uris ("view:named")))'))
+    assert.is_true(registry.record(named).presentation_stale)
+    assert.is_false(registry.record(other).presentation_stale)
+  end)
+
   it('binds an attached workflow to its origin and dirties the parent',
      function ()
     local origin = make_buffer('content-view')

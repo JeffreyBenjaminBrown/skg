@@ -96,11 +96,11 @@ fn set_active_source_set (
   if let Ok (mut slot) = enrichment_slot . lock () {
     *slot = None; }
   *active_source_set = active;
-  let uris = collateral_scheduler . replace_for_explicit_rerender (
+  let refresh = collateral_scheduler . replace_for_explicit_rerender (
     views_state, env, active_source_set, &Default::default (),
     "source-set-switch-rerender", true);
   send_active_source_set_response (stream, active_source_set, false);
-  stream_queued_rerender (stream, &uris); }
+  stream_queued_rerender (stream, &refresh); }
 
 fn send_source_sets_response (
   stream      : &mut TcpStream,
