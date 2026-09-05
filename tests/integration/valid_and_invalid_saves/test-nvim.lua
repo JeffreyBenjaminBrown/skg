@@ -25,7 +25,7 @@ local function test_invalid_save ()
        .. ' indefinitive) ===')
 
   local view_uri = buffer.generate_uuid()
-  local content_buf = buffer.open_org_buffer_from_text(
+  local content_buf = T.open_new_empty_view(
     original_content, content_buffer_name, view_uri)
   print('created ' .. content_buffer_name .. ' buffer with invalid'
        .. ' content')

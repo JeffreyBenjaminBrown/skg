@@ -30,7 +30,7 @@ local content = table.concat({
   '*** (skg (node (id 5))) 5',
   '** (skg (node (id 6))) 6',
 }, '\n')
-local buf = buffer.open_org_buffer_from_text(
+local buf = T.open_new_empty_view(
   content, 'skg://focus-and-folded-markers-test')
 print('Created buffer with 6 headlines')
 

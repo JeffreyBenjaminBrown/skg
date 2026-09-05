@@ -91,6 +91,23 @@ function M.buffer_text (buf)
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
 end
 
+---Open client-authored live authority which has no server forest until save.
+---Integration fixtures use this instead of pretending their hand-built text
+---was returned by a content-view query.
+---@param text string
+---@param name string
+---@param uri string|nil
+---@param options table|nil
+---@return integer bufnr
+function M.open_new_empty_view (text, name, uri, options)
+  options = vim.tbl_extend('force', options or {}, {
+    kind = 'new-empty-content-view',
+    recipe = { kind = 'new-empty' },
+  })
+  return require('skg.buffer').open_org_buffer_from_text(
+    text, name, uri, options)
+end
+
 ---Write TEXT to PATH (the tests log intermediate buffer states).
 ---@param path string
 ---@param text string

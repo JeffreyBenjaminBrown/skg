@@ -50,7 +50,7 @@ local initial_content = table.concat({
   '**** (skg (node (id 121))) 121',
   '*** (skg (node (id 13))) 13',
 }, '\n')
-local buf = buffer.open_org_buffer_from_text(
+local buf = T.open_new_empty_view(
   initial_content, buffer_name, view_uri)
 print('Created initial buffer with full structure')
 
@@ -68,7 +68,9 @@ local new_content = table.concat({
   '*** (skg (node (id 121))) 121',
   '** (skg (node (id 13))) 13',
 }, '\n')
-buf = buffer.open_org_buffer_from_text(new_content, buffer_name, view_uri)
+vim.api.nvim_buf_set_lines(
+  buf, 0, -1, false, vim.split(new_content, '\n', { plain = true }))
+vim.api.nvim_set_current_buf(buf)
 print('Created new buffer without node 0')
 
 -- Position on line 3 ('** (skg (node (id 12))) 12').

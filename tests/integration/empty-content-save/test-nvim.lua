@@ -18,7 +18,7 @@ print('Starting integration test...')
 -- underlying buffer constructor directly -- the exact port target.
 print('open-empty-buffer')
 local buffer = require('skg.buffer')
-local content_buffer = buffer.open_org_buffer_from_text('', 'skg://skg-empty')
+local content_buffer = T.open_new_empty_view('', 'skg://skg-empty')
 if not content_buffer or not vim.api.nvim_buf_is_valid(content_buffer) then
   T.fail('skg content buffer was not created')
 end

@@ -88,7 +88,7 @@ local function bfp_build_buffer (name)
   }, '\n') .. '\n'
   -- The trailing newline matches the server's rendering convention,
   -- so the redraw does not change the line count under the snapshot.
-  return buffer.open_org_buffer_from_text(content, 'skg://bfp-' .. name)
+  return T.open_new_empty_view(content, 'skg://bfp-' .. name)
 end
 
 ---Run one save-round-trip scenario. APPLY_FOLDS closes the folds that

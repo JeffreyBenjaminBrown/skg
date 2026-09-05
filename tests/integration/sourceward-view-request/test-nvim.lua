@@ -44,8 +44,9 @@ end
 ---@return string
 local function request_on_line (line_number)
   local uri = buffer.generate_uuid()
-  local buf = buffer.open_org_buffer_from_text(
-    base_buffer_text, 'skg://sourceward-test-view', uri)
+  local buf = T.open_new_empty_view(
+    base_buffer_text, 'skg://sourceward-test-view', uri,
+    { force_new = true })
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-sourceward-view-line-%d', line_number))

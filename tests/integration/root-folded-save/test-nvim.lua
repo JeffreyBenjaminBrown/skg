@@ -40,7 +40,7 @@ local metadata = require('skg.metadata')
 local folds = require('skg.folds')
 
 local view_uri = buffer.generate_uuid()
-local view = buffer.open_org_buffer_from_text(
+local view = T.open_new_empty_view(
   org_text, 'skg://skg-root-folded-save', view_uri)
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 

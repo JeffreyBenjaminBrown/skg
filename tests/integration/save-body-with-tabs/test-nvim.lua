@@ -21,7 +21,7 @@ local org_text = table.concat({
 
 local buffer = require('skg.buffer')
 local view_uri = buffer.generate_uuid()
-buffer.open_org_buffer_from_text(
+T.open_new_empty_view(
   org_text, 'skg://skg-body-with-tabs', view_uri)
 vim.api.nvim_win_set_cursor(0, { 1, 0 })
 

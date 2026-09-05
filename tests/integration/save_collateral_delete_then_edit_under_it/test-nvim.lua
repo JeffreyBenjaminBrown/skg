@@ -198,14 +198,11 @@ print('=== PHASE 3: Create and save buffer 2 ===')
 -- subee-1 must be supplied explicitly: the save pipeline's in-memory
 -- node map (built from save_instructions) gives subee empty contains,
 -- which takes priority over subee.skg on disk.
-local buf2 = vim.api.nvim_create_buf(true, false)
-vim.api.nvim_buf_set_name(buf2, 'skg://skg-test-buf2')
-vim.bo[buf2].filetype = 'org'
-vim.b[buf2].skg_view_uri = require('skg.buffer').generate_uuid()
-vim.api.nvim_buf_set_lines(buf2, 0, -1, false, {
+local buf2 = T.open_new_empty_view(table.concat({
   '* (skg (node (id 11) (source main) indef)) 11',
   '* (skg (node (id subee) (source main))) subee',
-  '** (skg (node (id subee-1) (source main))) subee-1' })
+  '** (skg (node (id subee-1) (source main))) subee-1',
+}, '\n'), 'skg://skg-test-buf2')
 vim.api.nvim_set_current_buf(buf2)
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 3: save response arrived')
