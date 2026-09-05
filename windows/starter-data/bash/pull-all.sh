@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-set -e
+set -eu
 
-for i in $(cat list-of-repositories.txt); do
-  echo "STAY for a second -- this will prompt for password."
-  echo ""
-  echo "$i"
-  cd "$i"
-  git pull
-  cd -
-done
+echo "pull-all.sh no longer runs Git outside Skg maintenance." >&2
+echo "Use M-x skg-pull-all in Emacs or :SkgPullAll in Neovim." >&2
+echo "Those commands archive dirty editor work before starting Git." >&2
+exit 2
