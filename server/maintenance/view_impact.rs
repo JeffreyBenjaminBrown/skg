@@ -114,7 +114,61 @@ pub fn plan_incident_view_settlements (
     });
   }
   settle_attached_workflows (&mut settlements)?;
+  for record in &mut settlements {
+    if let Some (retirement) = active . preselection_retirements
+      . get (&record . buffer_id)
+    {
+      *record = retirement . clone (); }
+  }
   Ok (settlements)
+}
+
+/// Invalid final disk after a client-owned external mutation cannot support
+/// any semantic orthogonality proof.  Every frozen dirty buffer is therefore
+/// retired against its exact G0 authority and verified archive key before a
+/// later repair is allowed to select anything.
+pub fn plan_invalid_preselection_retirements (
+  active  : &ActiveMaintenance,
+  archive : &VerifiedInitialArchive,
+) -> Result<Vec<ViewSettlementRecord>, String> {
+  let archived : std::collections::BTreeMap<_, _> = archive . buffers . iter ()
+    . map (|snapshot| (snapshot . buffer_id . as_str (), snapshot))
+    . collect ();
+  let mut retirements = Vec::new ();
+  for (buffer_id, frozen) in &active . buffer_census {
+    if !frozen . dirty { continue; }
+    let snapshot = archived . get (buffer_id . as_str ())
+      . ok_or_else (|| format! (
+        "dirty buffer '{}' is absent from the verified archive", buffer_id))?;
+    retirements . push (ViewSettlementRecord {
+      buffer_id: buffer_id . clone (),
+      buffer_key: Some (snapshot . buffer_key . clone ()),
+      kind: frozen . kind . clone (),
+      view_uri: frozen . view_uri . clone (),
+      origin_buffer_id: frozen . origin_buffer_id . clone (),
+      origin_view_uri: frozen . origin_view_uri . clone (),
+      origin_application_token: frozen . origin_application_token,
+      origin_location: frozen . origin_location . clone (),
+      dirty: true,
+      impacted: true,
+      parse_uncertain: true,
+      uncertainty_reason: Some (
+        "final disk is invalid after external mutation; orthogonality cannot be proven"
+          . into ()),
+      observed_ids: Vec::new (),
+      resolved_primary_ids: Vec::new (),
+      base_graph_generation: frozen . graph_generation,
+      base_presentation_generation: frozen . presentation_generation,
+      base_server_revision: frozen . server_revision,
+      base_application_token: frozen . application_token,
+      planned_disposition: ViewDisposition::Interrupted,
+      requirement: ViewSettlementRequirement::RetirementAck,
+      application: None,
+      resolution: Default::default (),
+      acknowledged: false,
+    });
+  }
+  Ok (retirements)
 }
 
 fn settle_attached_workflows (

@@ -20,6 +20,7 @@ use crate::maintenance::{
   PendingReason,
   QueuedObservationReason,
 };
+use crate::maintenance::view_impact::plan_invalid_preselection_retirements;
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::QueuedServerEvent;
 use crate::serve::protocol::TcpToClient;
@@ -479,10 +480,37 @@ fn queue_origin_result (
     Err (failure) => {
       let error = match failure {
         OriginObservationFailure::InvalidDisk (error) => {
-          let _ = runtime . transition_maintenance (|coordinator|
+          let staged = runtime . transition_maintenance (|coordinator|
             coordinator . block_invalid_disk (
-              &incident, epoch, error . clone ()));
-          error
+              &incident, epoch, error . clone ())) . and_then (|_| {
+            let active = match &runtime . maintenance . lock ()
+              . map_err (|_|
+                "maintenance coordinator poisoned" . to_string ())?
+              . state
+            {
+              CoordinatorState::Active (active)
+                if active . incident_id == incident
+                && active . epoch == epoch => active . clone (),
+              _ => return Err (
+                "invalid-disk incident authority changed" . into ()),
+            };
+            if active . external_mutation . is_none () {
+              return Ok (( )); }
+            let verified = runtime . verified_archive (&incident)
+              . ok_or_else (||
+                "verified initial archive was not retained" . to_string ())?;
+            let retirements = plan_invalid_preselection_retirements (
+              &active, &verified)?;
+            runtime . transition_maintenance (|coordinator|
+              coordinator . record_preselection_retirements (
+                &incident, epoch, retirements))
+          });
+          match staged {
+            Ok (( )) => error,
+            Err (retirement_error) => format! (
+              "{}; dirty-view retirement could not be staged: {}",
+              error, retirement_error),
+          }
         }
         OriginObservationFailure::Operational (error) => error,
       };
@@ -490,13 +518,22 @@ fn queue_origin_result (
         CoordinatorState::Active (active) => active . phase . label (),
         state => state . label (),
       };
-      Sexp::List (vec![
+      let mut fields = vec![
         field ("status", "origin-operation-failed"),
         field ("incident-id", incident . as_str ()),
         field ("maintenance-epoch", &epoch . get () . to_string ()),
         field ("phase", phase),
         field ("error", &error),
-      ]) . to_string ()
+      ];
+      if let CoordinatorState::Active (active) =
+        &runtime . maintenance . lock () . unwrap () . state
+      {
+        if !active . preselection_retirements . is_empty () {
+          fields . push (
+            crate::serve::handlers::maintenance_protocol::
+              preselection_retirements_field (active)); }
+      }
+      Sexp::List (fields) . to_string ()
     }
   };
   runtime . queue_server_event (QueuedServerEvent {

@@ -2,7 +2,7 @@ use super::types::*;
 use crate::types::store_state::{GraphGeneration, ManifestRevision};
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -317,6 +317,7 @@ impl MaintenanceCoordinator {
       successor_observation_required: false,
       force_full_rebuild_recovery: false,
       scalar_release: None,
+      preselection_retirements: Default::default (),
       view_settlements: Default::default (),
       blocking_reason: None,
       suspended_phase: None,
@@ -1001,6 +1002,105 @@ impl MaintenanceCoordinator {
     Ok (complete)
   }
 
+  /// Before an external mutation yields invalid disk there is no G1 against
+  /// which dirty views can prove orthogonality.  Record their conservative
+  /// retirements separately from the eventual complete G1 settlement set.
+  pub fn record_preselection_retirements (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    retirements : Vec<ViewSettlementRecord>,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::BlockedInvalidAfterMutation
+    || active . external_mutation . is_none ()
+    {
+      return Err (format! (
+        "preselection retirement is invalid during {:?}", active . phase)); }
+    let mut records = BTreeMap::new ();
+    for record in retirements {
+      if !record . dirty || !record . impacted
+      || record . planned_disposition != ViewDisposition::Interrupted
+      || record . requirement != ViewSettlementRequirement::RetirementAck
+      || record . application . is_some ()
+      {
+        return Err (format! (
+          "buffer '{}' is not a conservative dirty retirement",
+          record . buffer_id)); }
+      let id = record . buffer_id . clone ();
+      if records . insert (id . clone (), record) . is_some () {
+        return Err (format! (
+          "preselection retirement repeats buffer '{}'", id)); }
+    }
+    let expected : BTreeSet<_> = active . dirty_buffer_ids
+      . iter () . cloned () . collect ();
+    let actual : BTreeSet<_> = records . keys () . cloned () . collect ();
+    if actual != expected {
+      return Err (format! (
+        "preselection retirement inventory is {:?}, expected {:?}",
+        actual, expected)); }
+    if active . preselection_retirements . is_empty () {
+      active . preselection_retirements = records;
+    } else if active . preselection_retirements != records {
+      return Err (
+        "incident already records different preselection retirements" . into ()); }
+    Ok (( ))
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn acknowledge_preselection_retirement (
+    &mut self,
+    incident_id      : &IncidentId,
+    epoch            : MaintenanceEpoch,
+    buffer_id        : &str,
+    requirement      : ViewSettlementRequirement,
+    view_uri         : Option<&str>,
+    base_graph_generation : u64,
+    base_presentation_generation : u64,
+    base_revision    : u64,
+    application_token : u64,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::BlockedInvalidAfterMutation {
+      return Err (format! (
+        "preselection retirement ACK is invalid during {:?}", active . phase)); }
+    let record = active . preselection_retirements . get_mut (buffer_id)
+      . ok_or_else (|| format! (
+        "buffer '{}' has no preselection retirement", buffer_id))?;
+    if requirement != ViewSettlementRequirement::RetirementAck
+    || record . requirement != requirement
+    || record . view_uri . as_deref () != view_uri
+    || record . base_graph_generation != base_graph_generation
+    || record . base_presentation_generation != base_presentation_generation
+    || record . base_server_revision != base_revision
+    || record . base_application_token != application_token
+    {
+      return Err (format! (
+        "buffer '{}' retirement ACK changed its frozen authority", buffer_id)); }
+    if !record . acknowledged {
+      record . resolution = ViewSettlementResolution::ClientAcknowledged;
+      record . acknowledged = true; }
+    Ok (active . preselection_retirements . values ()
+      . all (|record| record . acknowledged))
+  }
+
+  pub fn reconcile_absent_preselection_retirements (
+    &mut self,
+    live_buffer_ids : &BTreeSet<String>,
+  ) -> Vec<String> {
+    let CoordinatorState::Active (active) = &mut self . state else {
+      return Vec::new (); };
+    let mut resolved = Vec::new ();
+    for (buffer_id, record) in &mut active . preselection_retirements {
+      if record . acknowledged || live_buffer_ids . contains (buffer_id) {
+        continue; }
+      record . resolution = ViewSettlementResolution::CensusAbsent;
+      record . acknowledged = true;
+      resolved . push (buffer_id . clone ());
+    }
+    resolved
+  }
+
   /// Resolve presentation work for frozen buffers which no longer exist in
   /// the replacement editor's complete census.  The original disposition and
   /// staged application remain journaled as evidence; only the obligation to
@@ -1137,6 +1237,11 @@ impl MaintenanceCoordinator {
         "invalid-disk retry cannot replace selected or presented authority"
           . into ());
     }
+    if active . preselection_retirements . values ()
+      . any (|record| !record . acknowledged)
+    {
+      return Err (
+        "invalid-disk retry awaits every dirty-buffer retirement" . into ()); }
     active . candidate = None;
     active . server_evidence = None;
     active . presentation_fence = None;
@@ -1168,6 +1273,11 @@ impl MaintenanceCoordinator {
         "store-health retry cannot replace selected or presented authority"
           . into ());
     }
+    if active . preselection_retirements . values ()
+      . any (|record| !record . acknowledged)
+    {
+      return Err (
+        "store-health retry awaits every dirty-buffer retirement" . into ()); }
     active . candidate = None;
     active . server_evidence = None;
     active . presentation_fence = None;
@@ -1457,6 +1567,41 @@ mod tests {
     }
   }
 
+  fn frozen_dirty_view (buffer_id : &str) -> FrozenBufferRecord {
+    FrozenBufferRecord {
+      buffer_id: buffer_id . into (), kind: BufferKind::ContentView,
+      lifecycle: "live-view" . into (), disposable: false,
+      continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+      origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
+      source_set: "all" . into (), view_uri: Some ("view" . into ()),
+      graph_generation: 1, presentation_generation: 2, server_revision: 3,
+      application_token: 4, dirty: true, logical_dirty: false,
+      undo_required: true, maintenance_epoch: None,
+      presentation_stale: false, search_stale: false, herald_bearing: false,
+      last_fetched_sha256: "a" . repeat (64),
+      current_sha256: "b" . repeat (64),
+    }
+  }
+
+  fn dirty_retirement (buffer_id : &str) -> ViewSettlementRecord {
+    ViewSettlementRecord {
+      buffer_id: buffer_id . into (), buffer_key: Some ("view-key" . into ()),
+      kind: BufferKind::ContentView, view_uri: Some ("view" . into ()),
+      origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
+      dirty: true, impacted: true, parse_uncertain: true,
+      uncertainty_reason: Some ("invalid final disk" . into ()),
+      observed_ids: Vec::new (), resolved_primary_ids: Vec::new (),
+      base_graph_generation: 1, base_presentation_generation: 2,
+      base_server_revision: 3, base_application_token: 4,
+      planned_disposition: ViewDisposition::Interrupted,
+      requirement: ViewSettlementRequirement::RetirementAck,
+      application: None, resolution: ViewSettlementResolution::Pending,
+      acknowledged: false,
+    }
+  }
+
   #[test]
   fn pending_disk_blocks_saves_but_not_editing_or_queries () {
     let mut coordinator = MaintenanceCoordinator::new ();
@@ -1545,6 +1690,51 @@ mod tests {
       panic! ("recovered stores stopped being active"); };
     assert_eq! (rebuilt . phase, MaintenancePhase::Presenting);
     assert! (!rebuilt . force_full_rebuild_recovery);
+  }
+
+  #[test]
+  fn invalid_post_pull_disk_requires_exact_dirty_retirement_before_retry () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let sources = vec!["main" . to_string ()];
+    let active = coordinator . begin_epoch_with_archive_contract_and_targets (
+      MaintenanceOrigin::Pull, None, "session" . into (), "emacs" . into (),
+      "all" . into (), GraphGeneration::INITIAL, ManifestRevision::INITIAL,
+      MaintenanceTargets {
+        pull_repositories: BTreeMap::from ([
+          (pull_repository_key (&sources), sources)]),
+        ..MaintenanceTargets::default ()
+      }) . unwrap ();
+    coordinator . freeze_locked_census (
+      &active . incident_id, active . epoch,
+      vec![frozen_dirty_view ("dirty")]) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . authorize_external_mutation (
+      &active . incident_id, active . epoch) . unwrap ();
+    coordinator . external_mutation_finished (
+      &active . incident_id, active . epoch, ExternalMutationRecord {
+        outcome: ExternalMutationOutcome::Failed,
+        details: vec!["pull exited 1" . into ()],
+      }) . unwrap ();
+    coordinator . block_invalid_disk (
+      &active . incident_id, active . epoch, "invalid final disk" . into ())
+      . unwrap ();
+    coordinator . record_preselection_retirements (
+      &active . incident_id, active . epoch,
+      vec![dirty_retirement ("dirty")]) . unwrap ();
+    assert! (coordinator . retry_blocked_invalid_disk (
+      &active . incident_id, active . epoch) . unwrap_err ()
+      . contains ("awaits every dirty-buffer retirement"));
+    assert! (coordinator . acknowledge_preselection_retirement (
+      &active . incident_id, active . epoch, "dirty",
+      ViewSettlementRequirement::RetirementAck, Some ("view"), 1, 2, 3, 4)
+      . unwrap ());
+    coordinator . retry_blocked_invalid_disk (
+      &active . incident_id, active . epoch) . unwrap ();
+    let CoordinatorState::Active (retried) = &coordinator . state else {
+      panic! ("post-pull invalid retry stopped being active"); };
+    assert_eq! (retried . phase, MaintenancePhase::FinalObservation);
+    assert! (retried . preselection_retirements["dirty"] . acknowledged);
   }
 
   #[test]

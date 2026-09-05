@@ -1120,6 +1120,16 @@ fn requested_id_outcomes_sexp (
   ])
 }
 
+pub(crate) fn preselection_retirements_field (
+  active : &crate::maintenance::ActiveMaintenance,
+) -> Sexp {
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S ("preselection-retirements" . into ())),
+    Sexp::List (active . preselection_retirements . values ()
+      . map (settlement_sexp) . collect ()),
+  ])
+}
+
 fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp {
   let mut fields = vec![
     atom_field ("buffer-id", &record . buffer_id),
@@ -1463,7 +1473,14 @@ fn active_status_sexp (
     MaintenancePhase::BlockedInvalidAfterMutation
     | MaintenancePhase::BlockedStoreHealth)
   {
-    fields . push (atom_field ("next-action", "retry-maintenance"));
+    fields . push (atom_field ("next-action",
+      if active . preselection_retirements . values ()
+        . any (|record| !record . acknowledged)
+      {
+        "retire-invalid-dirty-buffers"
+      } else {
+        "retry-maintenance"
+      }));
   }
   if active . selected_store . is_some () {
     let _ = append_selected_fields (&mut fields, active);
@@ -1487,6 +1504,9 @@ fn active_status_sexp (
     fields . push (atom_field (
       "external-outcome", external . outcome . label ()));
     fields . push (list_field ("external-details", &external . details));
+  }
+  if !active . preselection_retirements . is_empty () {
+    fields . push (preselection_retirements_field (active));
   }
   if !active . view_settlements . is_empty () {
     fields . push (Sexp::List (vec![
@@ -1562,9 +1582,15 @@ fn acknowledge_view_settlement (
     })
   } else { None };
   let active = require_archive_owner (runtime, &incident, epoch)?;
-  let record = active . view_settlements . get (&buffer_id)
-    . ok_or_else (|| format! (
-      "buffer '{}' has no planned settlement", buffer_id))?;
+  let preselection = active . phase
+    == MaintenancePhase::BlockedInvalidAfterMutation
+    && active . preselection_retirements . contains_key (&buffer_id);
+  let record = if preselection {
+    active . preselection_retirements . get (&buffer_id)
+  } else {
+    active . view_settlements . get (&buffer_id)
+  } . ok_or_else (|| format! (
+    "buffer '{}' has no planned settlement", buffer_id))?;
   let effect = {
     let interactive = runtime . interactive . lock ()
       . map_err (|_| "interactive session poisoned" . to_string ())?;
@@ -1575,27 +1601,42 @@ fn acknowledge_view_settlement (
       &active, record, state, application_ack . as_ref ())?
   };
   let all_settled = runtime . transition_maintenance (|coordinator|
-    coordinator . acknowledge_view_settlement (
-      &incident,
-      epoch,
-      &buffer_id,
-      requirement . clone (),
-      view_uri . as_deref (),
-      base_graph_generation,
-      base_presentation_generation,
-      base_revision,
-      application_token,
-      application_ack . as_ref ()))?;
+    if preselection {
+      coordinator . acknowledge_preselection_retirement (
+        &incident, epoch, &buffer_id, requirement . clone (),
+        view_uri . as_deref (), base_graph_generation,
+        base_presentation_generation, base_revision, application_token)
+    } else {
+      coordinator . acknowledge_view_settlement (
+        &incident,
+        epoch,
+        &buffer_id,
+        requirement . clone (),
+        view_uri . as_deref (),
+        base_graph_generation,
+        base_presentation_generation,
+        base_revision,
+        application_token,
+        application_ack . as_ref ())
+    })?;
   apply_server_settlement_effect (runtime, effect);
   Ok (Sexp::List (vec![
-    atom_field ("status", if all_settled {
+    atom_field ("status", if preselection && all_settled {
+      "all-invalid-dirty-buffers-retired"
+    } else if preselection {
+      "invalid-dirty-buffer-retired"
+    } else if all_settled {
       "all-views-settled"
     } else {
       "view-settlement-recorded"
     }),
     atom_field ("buffer-id", &buffer_id),
     atom_field ("required-ack", requirement . label ()),
-    atom_field ("next-action", if all_settled {
+    atom_field ("next-action", if preselection && all_settled {
+      "repair-and-retry-maintenance"
+    } else if preselection {
+      "retire-remaining-dirty-buffers"
+    } else if all_settled {
       "finalize-archive"
     } else {
       "settle-remaining-views"

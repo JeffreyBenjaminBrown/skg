@@ -681,6 +681,8 @@ pub struct ActiveMaintenance {
   #[serde(default)]
   pub scalar_release    : Option<ScalarReleaseRecord>,
   #[serde(default)]
+  pub preselection_retirements : BTreeMap<String, ViewSettlementRecord>,
+  #[serde(default)]
   pub view_settlements  : BTreeMap<String, ViewSettlementRecord>,
   #[serde(default)]
   pub blocking_reason   : Option<String>,

@@ -161,6 +161,7 @@ fn reconcile_maintenance_census (
   };
   runtime . transition_maintenance (|coordinator| {
     coordinator . adopt_attached_session (&attached_session_id)?;
+    coordinator . reconcile_absent_preselection_retirements (live_buffer_ids);
     coordinator . reconcile_absent_view_settlements (live_buffer_ids)?;
     Ok (( ))
   })?;
