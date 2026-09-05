@@ -448,6 +448,7 @@
   (let ((skg--maintenance-client-incident
          '(:incident-id "incident" :epoch 9 :origin "pull"
            :requested-paths nil :requested-ids nil :phase waiting-for-server))
+        (skg--maintenance-state nil)
         warning)
     (cl-letf (((symbol-function 'display-warning)
                (lambda (_type message &rest _arguments)
