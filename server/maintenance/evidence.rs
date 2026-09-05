@@ -9,6 +9,7 @@ use super::candidate::{
   ObservedDiskCandidate,
   SemanticChangeEvidence,
   SemanticNodeEvidence,
+  config_file_blake3,
   config_identity,
   source_catalog_blake3,
 };
@@ -40,7 +41,7 @@ use std::os::unix::fs::{
   PermissionsExt,
 };
 
-const EVIDENCE_FORMAT_VERSION : u32 = 1;
+const EVIDENCE_FORMAT_VERSION : u32 = 2;
 pub const CLIENT_EVIDENCE_FORMAT_VERSION : u32 = 1;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -50,6 +51,7 @@ pub struct MaintenanceEvidenceBundle {
   pub maintenance_epoch    : MaintenanceEpoch,
   pub candidate             : CandidateSummary,
   pub config_identity       : PathBuf,
+  pub config_file_blake3    : String,
   pub source_catalog_blake3 : String,
   pub g0_graph_generation   : GraphGeneration,
   pub g0_manifest_revision  : ManifestRevision,
@@ -313,6 +315,8 @@ fn validate_candidate_contract (
     return Err ("candidate evidence does not share the active G0" . into ()); }
   if config_identity (config) != candidate . config_identity {
     return Err ("candidate evidence configuration identity changed" . into ()); }
+  if config_file_blake3 (config) != candidate . config_file_blake3 {
+    return Err ("candidate evidence configuration bytes changed" . into ()); }
   if source_catalog_blake3 (config) != candidate . source_catalog_blake3 {
     return Err ("candidate evidence source catalog changed" . into ()); }
   let byte_paths : BTreeSet<&PathBuf> = candidate . selected_bytes . keys () . collect ();
@@ -439,6 +443,7 @@ fn build_bundle (
     maintenance_epoch: active . epoch,
     candidate: candidate . summary . clone (),
     config_identity: config_identity (config),
+    config_file_blake3: config_file_blake3 (config),
     source_catalog_blake3: source_catalog_blake3 (config),
     g0_graph_generation: selected . graph_generation,
     g0_manifest_revision: selected . manifest_revision,
@@ -771,7 +776,10 @@ mod tests {
     let candidate = ObservedDiskCandidate {
       summary: summary . clone (),
       config_identity: config_identity (&config),
+      config_file_blake3:
+        crate::maintenance::candidate::config_file_blake3 (&config),
       source_catalog_blake3: source_catalog_blake3 (&config),
+      config: Arc::new (config . clone ()),
       manifest: Default::default (),
       base_graph: Arc::new (InRustGraph::new ()),
       graph: Arc::new (InRustGraph::new ()),
@@ -830,7 +838,10 @@ mod tests {
     let candidate = ObservedDiskCandidate {
       summary: summary . clone (),
       config_identity: config_identity (&config),
+      config_file_blake3:
+        crate::maintenance::candidate::config_file_blake3 (&config),
       source_catalog_blake3: source_catalog_blake3 (&config),
+      config: Arc::new (config . clone ()),
       manifest: BTreeMap::from ([
         (path . clone (), PathDigest::of_bytes (&after_bytes)),
       ]),

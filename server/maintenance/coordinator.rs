@@ -718,6 +718,24 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  pub fn replace_full_rebuild_source_set (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    source_set  : String,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::FullRebuild
+    || active . phase != MaintenancePhase::FullRebuildExclusive
+    {
+      return Err (format! (
+        "source-set replacement is invalid during {:?}", active . phase)); }
+    if source_set . is_empty () {
+      return Err ("replacement source-set may not be empty" . into ()); }
+    active . source_set = source_set;
+    Ok (( ))
+  }
+
   pub fn record_client_evidence_transfer (
     &mut self,
     incident_id : &IncidentId,

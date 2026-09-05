@@ -286,7 +286,7 @@ fn validate_and_create_maintenance_archive_root (
   Ok (( ))
 }
 
-fn reject_archive_source_overlap (
+pub(crate) fn reject_archive_source_overlap (
   archive : &Path,
   config  : &SkgConfig,
 ) -> io::Result<()> {

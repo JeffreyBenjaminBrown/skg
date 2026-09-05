@@ -20,6 +20,7 @@ use crate::context::{
   link_dests_from_nodes,
 };
 use crate::dbs::init::wipe_then_init_typedb_db;
+use crate::dbs::init::create_empty_tantivy_index;
 use crate::dbs::tantivy::background_writer::{
   TantivyGenerationStatus,
   latest_tantivy_generation,
@@ -30,6 +31,7 @@ use crate::dbs::tantivy::write::reconstruct_index_from_nodes;
 use crate::maintenance::candidate::{config_identity, source_catalog_blake3};
 use crate::runtime::ServerRuntime;
 use crate::save::{apply_define_nodes_to_stores, nodecompletes_from_graph};
+use crate::source_sets::ActiveSourceSet;
 use crate::types::store_state::StoreHealth;
 use crate::telescope::invariants::{
   report_telescope_violations,
@@ -65,13 +67,13 @@ pub fn select_archived_candidate (
     . ok_or_else (|| format! (
       "candidate {} is not retained in this process", summary . id))?;
   let snapshot = runtime . selected_snapshot ();
-  validate_preselection (
+  validate_rebuild_preselection (
     runtime, &active, &snapshot . env . config, &snapshot . selected,
     &candidate)?;
-  revalidate_candidate (&snapshot . env . config, &candidate)?;
+  revalidate_candidate (&candidate . config, &candidate)?;
 
   let evidence = runtime . maintenance_evidence . publish_candidate (
-    &active, &snapshot . env . config, &snapshot . selected, &candidate)?;
+    &active, &candidate . config, &snapshot . selected, &candidate)?;
   let evidence_record = ServerEvidenceRecord {
     path: evidence . path . clone (),
     bundle_sha256: evidence . bundle_sha256 . clone (),
@@ -240,20 +242,61 @@ async fn rebuild_stores (
   let context = compute_context_types (
     &had_id_set, &all_node_ids, &link_dests,
     &map_to_content, &map_to_containers);
-  let mut warnings = validate_all_telescopes (&env . config, &candidate . graph);
+  let mut warnings = validate_all_telescopes (
+    &candidate . config, &candidate . graph);
   warnings . extend (candidate . load_violations . clone ());
   warnings . sort_by (|left, right| left . 0 . cmp (&right . 0));
+  let source_catalog_changed = source_catalog_blake3 (&env . config)
+    != candidate . source_catalog_blake3;
+  let mut interactive = runtime . interactive . lock () . map_err (|_|
+    SelectionFailure::Stores {
+      reason: "interactive session poisoned" . into (),
+      queryable_g0: false,
+    })?;
+  let old_source_set = interactive . active_source_set . clone ();
+  let replacement_source_set = ActiveSourceSet::named (
+      &candidate . config, old_source_set . name . clone ())
+    . or_else (|_| ActiveSourceSet::named (
+      &candidate . config,
+      crate::types::misc::SourceSetName::from ("all")))
+    . map_err (|error| SelectionFailure::Stores {
+      reason: format! ("replacement source-set is invalid: {}", error),
+      queryable_g0: true,
+    })?;
+  let source_set_changed = old_source_set . name != replacement_source_set . name;
+  if source_set_changed {
+    tracing::warn! (
+      old = %old_source_set . name . 0,
+      new = %replacement_source_set . name . 0,
+      "replacement config removed the active source-set; using exact fallback");
+  }
 
   if let Err (error) = wipe_then_init_typedb_db (
-      &env . config, &env . driver, &nodes) . await
+      &candidate . config, &env . driver, &nodes) . await
   {
     let reason = format! ("TypeDB full reconstruction failed: {}", error);
     return fail_rebuild_and_restore (
       runtime, selection, env, _write_guard, old_selected, old_nodes, reason)
       . await;
   }
+  let replacement_tantivy = if candidate . config . tantivy_folder
+      == env . config . tantivy_folder
+  {
+    env . tantivy_index . clone ()
+  } else {
+    match create_empty_tantivy_index (&candidate . config . tantivy_folder) {
+      Ok (index) => index,
+      Err (error) => {
+        let reason = format! (
+          "replacement Tantivy index could not be created: {}", error);
+        return fail_rebuild_and_restore (
+          runtime, selection, env, _write_guard,
+          old_selected, old_nodes, reason) . await;
+      }
+    }
+  };
   if let Err (error) = reconstruct_index_from_nodes (
-      &nodes, &env . tantivy_index, &context . labels)
+      &nodes, &replacement_tantivy, &context . labels)
   {
     let reason = format! ("Tantivy full reconstruction failed: {}", error);
     return fail_rebuild_and_restore (
@@ -261,11 +304,40 @@ async fn rebuild_stores (
       . await;
   }
 
+  if source_catalog_changed {
+    let sources = candidate . config . sources . values ()
+      . map (|source| source . path . clone ()) . collect ();
+    if let Err (error) = runtime . replace_observation_sources (sources) {
+      let reason = format! ("replacement source watches failed: {}", error);
+      return fail_rebuild_and_restore (
+        runtime, selection, env, _write_guard, old_selected, old_nodes, reason)
+        . await;
+    }
+  }
+  if let Err (error) = runtime . transition_maintenance (|coordinator|
+      coordinator . replace_full_rebuild_source_set (
+        incident_id, epoch, replacement_source_set . name . 0 . clone ()))
+  {
+    if source_catalog_changed {
+      let old_sources = env . config . sources . values ()
+        . map (|source| source . path . clone ()) . collect ();
+      let _ = runtime . replace_observation_sources (old_sources);
+    }
+    return fail_rebuild_and_restore (
+      runtime, selection, env, _write_guard, old_selected, old_nodes,
+      format! ("replacement source-set could not be journaled: {}", error))
+      . await;
+  }
+
   let selected = Arc::new (old_selected . with_acknowledged_rebuild (
       (*candidate . graph) . clone (), candidate . manifest . clone ())
     . with_cyclic_roots (context . cyclic_roots));
   env . startup_warnings = Arc::new (warnings . clone ());
+  env . config = (*candidate . config) . clone ();
+  env . tantivy_index = replacement_tantivy;
   env . in_rust_graph . store (selected . clone ());
+  interactive . active_source_set = replacement_source_set . clone ();
+  drop (interactive);
   runtime . publish_selected_from_env (&env);
   if let Err (error) = report_telescope_violations (
       &warnings, &env . config . data_root)
@@ -550,6 +622,40 @@ fn validate_preselection (
   Ok (( ))
 }
 
+fn validate_rebuild_preselection (
+  runtime   : &ServerRuntime,
+  active    : &super::types::ActiveMaintenance,
+  old_config : &crate::types::misc::SkgConfig,
+  selected  : &crate::types::store_state::SelectedStoreState,
+  candidate : &ObservedDiskCandidate,
+) -> Result<(), String> {
+  if active . candidate . as_ref () != Some (&candidate . summary) {
+    return Err ("active full-rebuild candidate identity changed" . into ()); }
+  if active . g0_graph_generation != selected . graph_generation
+  || active . g0_manifest_revision != selected . manifest_revision
+  {
+    return Err ("active full-rebuild G0 was superseded" . into ()); }
+  if config_identity (old_config) != candidate . config_identity
+  || config_identity (&candidate . config) != candidate . config_identity
+  {
+    return Err (
+      "full rebuild changed the identity of its governing configuration"
+        . into ()); }
+  if source_catalog_blake3 (&candidate . config)
+      != candidate . source_catalog_blake3
+  {
+    return Err ("full-rebuild candidate source identity is inconsistent"
+      . into ()); }
+  let sequence = runtime . maintenance . lock ()
+    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+    . observation_sequence;
+  if sequence != candidate . summary . covered_sequence {
+    return Err (format! (
+      "full-rebuild candidate covered observation {}, but current observation is {}",
+      candidate . summary . covered_sequence . get (), sequence . get ())); }
+  Ok (( ))
+}
+
 fn validate_locked_preselection (
   runtime     : &ServerRuntime,
   incident_id : &IncidentId,
@@ -595,8 +701,9 @@ fn validate_locked_rebuild (
         . into ()); }
     active . clone ()
   };
-  validate_preselection (runtime, &active, config, selected, candidate)?;
-  revalidate_candidate (config, candidate)
+  validate_rebuild_preselection (
+    runtime, &active, config, selected, candidate)?;
+  revalidate_candidate (&candidate . config, candidate)
 }
 
 async fn restore_g0 (

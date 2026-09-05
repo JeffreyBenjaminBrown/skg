@@ -6,6 +6,10 @@ use crate::maintenance::candidate::{
   observe_complete_maintenance_disk,
   observe_targeted_disk,
 };
+use crate::dbs::filesystem::not_nodes::{
+  load_config,
+  reject_archive_source_overlap,
+};
 use crate::maintenance::{
   CoordinatorState,
   IncidentId,
@@ -48,26 +52,22 @@ impl ObservationService {
     sources : Vec<PathBuf>,
   ) -> Result<Self, String> {
     let (sender, receiver) = mpsc::channel ();
-    let callback_sender = sender . clone ();
-    let mut watcher = RecommendedWatcher::new (
-      move |result : notify::Result<Event>| match result {
-        Ok (event) => {
-          let _ = callback_sender . send (ObservationSignal::Paths (
-            event . paths, QueuedObservationReason::FilesystemEvent)); }
-        Err (error) => {
-          let _ = callback_sender . send (
-            ObservationSignal::WatcherFailure (error . to_string ())); }
-      },
-      Config::default ()) . map_err (|error| error . to_string ())?;
-    for source in sources {
-      watcher . watch (&source, RecursiveMode::NonRecursive)
-        . map_err (|error| format! (
-          "could not watch {}: {}", source . display (), error))?;
-    }
+    let watcher = configured_watcher (&sender, sources)?;
     thread::Builder::new () . name ("skg-observer" . into ())
       . spawn (move || observation_worker (runtime, receiver))
       . map_err (|error| error . to_string ())?;
     Ok (Self { sender, _watcher: watcher })
+  }
+
+  /// Prepare every new watch before dropping the old watcher.  Events from
+  /// the brief overlap share this worker queue and are harmlessly coalesced;
+  /// a setup failure leaves the complete old watch set installed.
+  pub fn replace_sources (&mut self, sources : Vec<PathBuf>)
+    -> Result<(), String>
+  {
+    let watcher = configured_watcher (&self . sender, sources)?;
+    self . _watcher = watcher;
+    Ok (( ))
   }
 
   pub fn observe_paths (
@@ -106,6 +106,29 @@ impl ObservationService {
       incident, epoch))
       . map_err (|_| "observation worker stopped" . to_string ())
   }
+}
+
+fn configured_watcher (
+  sender  : &mpsc::Sender<ObservationSignal>,
+  sources : Vec<PathBuf>,
+) -> Result<RecommendedWatcher, String> {
+  let callback_sender = sender . clone ();
+  let mut watcher = RecommendedWatcher::new (
+    move |result : notify::Result<Event>| match result {
+      Ok (event) => {
+        let _ = callback_sender . send (ObservationSignal::Paths (
+          event . paths, QueuedObservationReason::FilesystemEvent)); }
+      Err (error) => {
+        let _ = callback_sender . send (
+          ObservationSignal::WatcherFailure (error . to_string ())); }
+    },
+    Config::default ()) . map_err (|error| error . to_string ())?;
+  for source in sources {
+    watcher . watch (&source, RecursiveMode::NonRecursive)
+      . map_err (|error| format! (
+        "could not watch {}: {}", source . display (), error))?;
+  }
+  Ok (watcher)
 }
 
 fn observation_worker (
@@ -198,8 +221,22 @@ fn run_final_observation (
     || snapshot . selected . manifest_revision != active . g0_manifest_revision
     {
       return Err ("final observation G0 was superseded" . into ()); }
+    let proposed_config = if active . origin == MaintenanceOrigin::FullRebuild {
+      let path = snapshot . env . config . config_path . to_string_lossy ();
+      let config = load_config (&path) . map_err (|error|
+        OriginObservationFailure::InvalidDisk (format! (
+          "replacement config is invalid: {}", error)))?;
+      reject_archive_source_overlap (
+        &config . maintenance_archive_identity, &snapshot . env . config)
+        . map_err (|error| OriginObservationFailure::InvalidDisk (format! (
+          "replacement archive root is unsafe against the selected source catalog: {}",
+          error)))?;
+      config
+    } else {
+      snapshot . env . config . clone ()
+    };
     let candidate = match observe_complete_maintenance_disk (
-        &snapshot . env . config, &snapshot . selected, sequence)
+        &proposed_config, &snapshot . selected, sequence)
     {
       DiskObservation::Valid (candidate) => candidate,
       DiskObservation::Invalid { details } => return Err (

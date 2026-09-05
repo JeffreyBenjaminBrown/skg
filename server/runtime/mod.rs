@@ -235,6 +235,17 @@ impl ServerRuntime {
       . observe_maintenance_final_disk (incident, epoch)
   }
 
+  pub(crate) fn replace_observation_sources (
+    &self,
+    sources : Vec<PathBuf>,
+  ) -> Result<(), String> {
+    self . observation . lock ()
+      . map_err (|_| "observation service lock poisoned" . to_string ())?
+      . as_mut ()
+      . ok_or_else (|| "observation service is not running" . to_string ())?
+      . replace_sources (sources)
+  }
+
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
     let protected = {
       let coordinator = self . maintenance . lock () . unwrap ();

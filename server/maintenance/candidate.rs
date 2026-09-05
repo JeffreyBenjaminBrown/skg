@@ -47,11 +47,16 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ObservedDiskCandidate {
   pub summary          : CandidateSummary,
   pub config_identity  : PathBuf,
+  pub config_file_blake3 : String,
   pub source_catalog_blake3 : String,
+  /// The fully loaded configuration against which this graph was folded.
+  /// For ordinary candidates this is G0's config; a full rebuild may carry a
+  /// replacement source catalog from the same governing config path.
+  pub config           : Arc<SkgConfig>,
   pub manifest         : SelectedPathManifest,
   /// Immutable G0 needed after G1 publication for exact two-generation view
   /// impact resolution.  Durable recovery uses the evidence DTO projection;
@@ -80,7 +85,7 @@ pub enum CandidateDiskFence {
   Targeted (BTreeMap<PathBuf, Option<PathDigest>>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum DiskObservation {
   ByteEquivalent,
   SemanticallyEqual {
@@ -253,7 +258,9 @@ fn complete_candidate (
   Arc::new (ObservedDiskCandidate {
     summary,
     config_identity: config_identity (config),
+    config_file_blake3: config_file_blake3 (config),
     source_catalog_blake3: source_catalog_blake3 (config),
+    config: Arc::new (config . clone ()),
     manifest,
     base_graph: selected . graph . clone (),
     graph,
@@ -397,7 +404,9 @@ fn observe_targeted_disk_inner (
   Ok (DiskObservation::Valid (Arc::new (ObservedDiskCandidate {
     summary,
     config_identity: config_identity (config),
+    config_file_blake3: config_file_blake3 (config),
     source_catalog_blake3: source_catalog_blake3 (config),
+    config: Arc::new (config . clone ()),
     manifest,
     base_graph: selected . graph . clone (),
     graph: Arc::new (graph),
@@ -511,6 +520,8 @@ pub fn revalidate_candidate (
 ) -> Result<(), String> {
   if config_identity (config) != candidate . config_identity {
     return Err ("candidate belongs to a different configuration" . into ()); }
+  if config_file_blake3 (config) != candidate . config_file_blake3 {
+    return Err ("candidate configuration bytes no longer match" . into ()); }
   if source_catalog_blake3 (config) != candidate . source_catalog_blake3 {
     return Err ("candidate source catalog no longer matches" . into ()); }
   match &candidate . disk_fence {
@@ -539,6 +550,13 @@ pub fn revalidate_candidate (
 pub fn config_identity (config : &SkgConfig) -> PathBuf {
   config . config_path . canonicalize ()
     . unwrap_or_else (|_| config . config_path . clone ())
+}
+
+pub fn config_file_blake3 (config : &SkgConfig) -> String {
+  let bytes = fs::read (&config . config_path) . unwrap_or_else (|_|
+    serde_yaml::to_string (config)
+      . expect ("configuration serialization is infallible") . into_bytes ());
+  blake3::hash (&bytes) . to_hex () . to_string ()
 }
 
 pub fn source_catalog_blake3 (config : &SkgConfig) -> String {
@@ -856,5 +874,35 @@ mod tests {
     assert! (reformatted . definitions . is_empty ());
     assert! (reformatted . summary . changed_primary_ids . is_empty ());
     assert_ne! (reformatted . manifest, selected . manifest);
+  }
+
+  #[test]
+  fn candidate_revalidation_fences_exact_config_file_bytes () {
+    let temporary = tempdir () . unwrap ();
+    let source_path = temporary . path () . join ("owned");
+    fs::create_dir (&source_path) . unwrap ();
+    fs::write (source_path . join ("A.skg"),
+      "pid: A\ntitle: unchanged\n") . unwrap ();
+    let source_name = SourceName::from ("owned");
+    let mut entries = HashMap::new ();
+    entries . insert (source_name . clone (), SkgfileSource {
+      name: source_name, abbreviation: None,
+      path: source_path, user_owns_it: true,
+    });
+    let mut config = SkgConfig::dummyFromSources (entries);
+    config . config_path = temporary . path () . join ("skgconfig.toml");
+    fs::write (&config . config_path, "# observed config bytes\n") . unwrap ();
+    let loaded = read_all_skg_files_with_manifest (&config) . unwrap ();
+    let selected = SelectedStoreState::initial (
+      InRustGraph::from_nodecompletes (&loaded . nodes), loaded . manifest);
+    let DiskObservation::Valid (candidate) = observe_complete_maintenance_disk (
+      &config, &selected, ObservationSequence::INITIAL)
+    else { panic! ("complete observation did not produce a candidate"); };
+
+    assert! (revalidate_candidate (&config, &candidate) . is_ok ());
+    fs::write (&config . config_path, "# changed config bytes\n") . unwrap ();
+    assert_eq! (
+      revalidate_candidate (&config, &candidate) . unwrap_err (),
+      "candidate configuration bytes no longer match");
   }
 }
