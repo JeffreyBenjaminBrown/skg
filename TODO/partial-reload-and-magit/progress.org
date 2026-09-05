@@ -1158,3 +1158,33 @@ what's imperfect about what's done; choices determining the future.
   project directory preinstalled.  Regressions protect both the logging-before-
   state order and the dynamically self-contained require path.  All 26
   reload-focused Emacs tests pass and =git diff --check= is clean.
+
+* incomplete client initialization is no longer reported as a connection
+
+** diagnosis
+- A fresh Emacs connecting while the server is already down takes the existing
+  immediate-refusal path and reports that it could not connect.  The misleading
+  message could instead occur with a retained TCP process which Emacs still
+  considered live after the server stopped: the bounded herald-rule requests
+  timed out, and initialization mistook their nil result for a successful
+  connection with an empty server response.
+- Nil from =skg-herald-rules-ensure= means only that no attempt installed a
+  valid rule table.  It does not establish that the server returned an empty
+  table; the connection may have closed, the handshake may not have completed,
+  or the server may have been silent.  The old =skg connected= wording was
+  therefore both misleading and too confident about the cause.
+
+** repair and validation
+- Initialization now raises a =user-error= and says explicitly that the client
+  is not ready whenever no valid rule table is installed.  It distinguishes a
+  connection which closed during startup, a live-looking connection whose
+  handshake or replies did not arrive, and a verified handshake followed by
+  invalid or absent rules.  Each form points to both the user-facing server log
+  and the cargo-watch log.
+- Herald self-healing and request documentation now use the same accurate
+  =no valid rule table arrived= terminology rather than asserting that the
+  server sent an empty table.
+- Regressions cover all three failure states and prove that the success message
+  is reserved for initialization which actually installed rules.  All 428
+  Emacs tests pass; three native-undo tests are skipped because
+  =undo-fu-session= is not installed.  =git diff --check= is clean.
