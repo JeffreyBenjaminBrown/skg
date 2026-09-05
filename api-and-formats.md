@@ -121,7 +121,14 @@ So far there are these endpoints:
   archive identities, telescope warnings, unresolved fatal-reload incidents,
   active source-set, graph generation, manifest revision, maintenance epoch
   and state, TypeDB/Tantivy health, and `(census-required true)`.  It never
-  includes the complete selected path manifest.
+  includes the complete selected path manifest.  If a different editor
+  session replaces one which disconnected during safe pre-archive maintenance,
+  the server abandons (never adopts) that unmutated transaction before replying
+  and includes `(abandoned-prearchive-incident ID)` plus
+  `(abandoned-prearchive-origin ORIGIN)`.  The client warns that the command
+  must be repeated if it is still wanted.  Same-session reconnects resume the
+  incident; archive-ready and later incidents retain the existing archive-
+  verified adoption protocol.
 
 - The client next sends `((request . "client census"))`, optionally carrying
   the active maintenance epoch, followed by a length-prefixed S-expression
@@ -152,7 +159,11 @@ So far there are these endpoints:
   `client census texts` carries a second length-prefixed payload with
   `buffer-id`, exact `last-fetched`, and exact `current` text.  No ordinary
   endpoint is admitted until the response says `(census-complete true)`.
-  Reconnect assertions never overwrite newer retained server authority.
+  Reconnect assertions never overwrite newer retained server authority.  A
+  client initializer likewise waits for this terminal census result before it
+  sends the first ordinary request (currently the herald-rule fetch); a
+  verification or census rejection is reported once with the server's exact
+  reason.
 
 ## Text search
   - Request: `((request . "text search") (terms . "SEARCH_TERMS")

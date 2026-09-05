@@ -158,7 +158,23 @@ old implementation."
        `((request . "maintenance locked census")
          (maintenance-epoch . ,epoch)))
       "\n")
-     `((maintenance-offer ,#'skg--maintenance-handle-bootstrap . t))
+     `((maintenance-offer ,#'skg--maintenance-handle-bootstrap . t)
+       (error
+        ,(lambda (_tcp payload)
+           (let ((reason (skg--connection-handshake-error-content payload)))
+             (when skg--maintenance-client-incident
+               (setf (plist-get skg--maintenance-client-incident :phase)
+                     'cancelling-after-locked-census-refusal))
+             (display-warning
+              'skg
+              (format
+               (concat "Maintenance stopped before archive publication: %s. "
+                       "The safe pre-archive incident is being cancelled.")
+               reason)
+              :error)
+             (run-at-time
+              0 nil #'skg-cancel-maintenance incident-id epoch)))
+        . t))
      nil incident-id)))
 
 (defun skg--maintenance-registered-ids ()

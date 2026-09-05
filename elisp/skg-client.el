@@ -37,6 +37,12 @@
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
+  ;; The server grants ordinary request authority only after verification and
+  ;; the complete client census.  Herald rules are ordinary requests: waiting
+  ;; here keeps them behind the whole startup barrier, rather than merely
+  ;; behind the first verification frame.
+  (unless (skg-connection-handshake-ensure)
+    (user-error "%s" (skg--client-initialization-failure-message)))
   ;; Re-fetch the herald rule table from the (possibly rebuilt) server,
   ;; DISCARDING any cached table first and WAITING for the reply. So a
   ;; reconnect -- including one right after `skg-reload', which
@@ -70,10 +76,16 @@
   (unless ;; create a new connection only if one doesn't exist
           ;; or the existing one is dead
       (and                 skg-rust-tcp-proc
-           (process-live-p skg-rust-tcp-proc ))
+           (process-live-p skg-rust-tcp-proc)
+           skg--connection-handshake-state
+           (not (eq skg--connection-handshake-state 'failed)))
+    (when (and skg-rust-tcp-proc
+               (process-live-p skg-rust-tcp-proc))
+      (delete-process skg-rust-tcp-proc))
     (skg-clear-request-coordinator)
     (skg-lp-reset)
     (setq skg--connection-handshake-state nil
+          skg--connection-handshake-error nil
           skg--git-diff-mode-enabled
           ;; The server starts each connection with diff mode off.
           nil
@@ -114,15 +126,17 @@
   "Explain why a connection without herald rules is not ready."
   (let* ((logs (skg--server-log-files))
          (reason
-          (cond
+         (cond
+           (skg--connection-handshake-error
+            (format "the server rejected startup reconciliation: %s"
+                    skg--connection-handshake-error))
            ((not (and skg-rust-tcp-proc
                       (process-live-p skg-rust-tcp-proc)))
             "the server connection closed before initialization completed")
            ((not (eq skg--connection-handshake-state 'verified))
             (format
-             (concat "the TCP connection did not complete its handshake or "
-                     "return herald rules after %d attempts")
-             skg-herald-rules-max-attempts))
+             "the TCP connection did not complete its handshake within %.1f seconds"
+             skg-connection-handshake-timeout))
            (t
             (format
              (concat "the server handshake completed, but no valid herald "
@@ -131,8 +145,7 @@
     (format
      (concat
       "SKG client initialization failed on port %s: %s.\n"
-      "The client is not ready. The server may be stopped, starting, or "
-      "unresponsive.\n"
+      "The client is not ready.\n"
       "Look for the startup error in:\n"
       "  %s\n"
       "  %s")
@@ -162,7 +175,8 @@ the request record named by its request-id."
     (if (string-prefix-p "((busy-initializing" trimmed)
         (let ((parsed (car (read-from-string trimmed))))
           (message "%s" (cdr (assq 'busy-initializing parsed)))
-          (setq skg--connection-handshake-state nil)
+          (setq skg--connection-handshake-state nil
+                skg--connection-handshake-error nil)
           (skg-clear-request-coordinator)
           (skg-lp-reset))
       (skg-lp-handle-generic-chunk tcp-proc string) )) )
@@ -170,6 +184,11 @@ the request record named by its request-id."
 (defun skg--tcp-sentinel (_proc event)
   "Clean up when the TCP connection closes."
   (when (not (string-prefix-p "open" event))
+    (unless (or skg--connection-handshake-error
+                (eq skg--connection-handshake-state 'verified))
+      (setq skg--connection-handshake-error
+            (format "the server connection closed: %s"
+                    (string-trim event))))
     (setq skg--connection-handshake-state nil)
     (skg-clear-request-coordinator)
     (skg-lp-reset)) )

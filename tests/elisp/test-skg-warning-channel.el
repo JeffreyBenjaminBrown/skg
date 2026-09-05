@@ -39,6 +39,19 @@
       (should (string-match-p "retained owned files" (nth 2 shown)))
       (should (string-match-p "/data/foreign/X.skg" (nth 2 shown))))))
 
+(ert-deftest test-connection-warns-when-replacement-abandons-prearchive-work ()
+  (let (shown)
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (type message level &rest _args)
+                 (setq shown (list type message level)))))
+      (skg--show-abandoned-prearchive-maintenance
+       '((abandoned-prearchive-incident old-incident)
+         (abandoned-prearchive-origin explicit-partial-reload)))
+      (should (equal (car shown) 'skg))
+      (should (eq (nth 2 shown) :warning))
+      (should (string-match-p "old-incident" (cadr shown)))
+      (should (string-match-p "No disk or server-store mutation" (cadr shown))))))
+
 (ert-deftest test-content-view-success-with-warnings-opens-content-and-shows-warning ()
   (let ((opened nil)
         (shown nil))

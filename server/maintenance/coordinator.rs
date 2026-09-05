@@ -1535,6 +1535,40 @@ impl MaintenanceCoordinator {
           active . phase = phase; }}}
   }
 
+  /// Resume the owning editor, or abandon a different editor's transaction
+  /// while it is still before the archive/risky-work boundary.  This is not
+  /// incident adoption: the replacement receives ordinary idle/pending state
+  /// and must explicitly request any still-wanted maintenance again.
+  pub fn reconnected_for_session (
+    &mut self,
+    session_id : &str,
+  ) -> Option<(IncidentId, String)> {
+    self . reconnected ();
+    let CoordinatorState::Active (active) = &self . state else {
+      return None; };
+    if active . controlling_session_id () == session_id
+    || !matches! (active . phase,
+      MaintenancePhase::AwaitingLockedCensus
+      | MaintenancePhase::PreparingArchive
+      | MaintenancePhase::AwaitingArchiveWaiver)
+    {
+      return None; }
+    let abandoned = (
+      active . incident_id . clone (), active . origin . label () . to_string ());
+    let candidate = active . candidate . clone ();
+    self . state = if let Some (candidate) = candidate {
+      CoordinatorState::Pending (PendingDiskState {
+        reason: PendingReason::ValidDiskDifference,
+        candidate: Some (candidate),
+        details: vec![
+          "a replacement editor abandoned pre-archive maintenance" . into ()],
+        // The replacement never saw the old offer, so it needs a fresh one.
+        offer_sent: false,
+      })
+    } else { CoordinatorState::Idle };
+    Some (abandoned)
+  }
+
   /// Transfer an already archived incident to the sole replacement editor.
   /// The caller independently reverifies the initial archive before invoking
   /// this transition.  Session IDs identify resumptions; they are not archive
@@ -2323,6 +2357,58 @@ mod tests {
     assert_eq! (retained . phase, MaintenancePhase::SelectingPartial);
     assert_eq! (retained . suspended_phase, None);
     assert! (retained . client_connected);
+  }
+
+  #[test]
+  fn replacement_abandons_but_never_adopts_prearchive_maintenance () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_for_client (
+      MaintenanceOrigin::ExplicitPartialReload, None, "owner" . into ())
+      . unwrap ();
+    coordinator . disconnected ();
+    assert_eq! (
+      coordinator . reconnected_for_session ("replacement"),
+      Some ((active . incident_id, "explicit-partial-reload" . into ())));
+    assert! (matches! (coordinator . state, CoordinatorState::Idle));
+  }
+
+  #[test]
+  fn owner_resumes_and_archived_incidents_remain_adoptable () {
+    let mut owner = MaintenanceCoordinator::new ();
+    owner . begin_for_client (
+      MaintenanceOrigin::ExplicitPartialReload, None, "owner" . into ())
+      . unwrap ();
+    owner . disconnected ();
+    assert_eq! (owner . reconnected_for_session ("owner"), None);
+    assert! (matches! (owner . state, CoordinatorState::Active (_)));
+
+    let mut archived = MaintenanceCoordinator::new ();
+    let active = archived . begin_for_client (
+      MaintenanceOrigin::ExplicitPartialReload, None, "owner" . into ())
+      . unwrap ();
+    archived . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    archived . disconnected ();
+    assert_eq! (archived . reconnected_for_session ("replacement"), None);
+    let CoordinatorState::Active (retained) = &archived . state else {
+      panic! ("archived incident was abandoned"); };
+    assert_eq! (retained . controlling_session_id (), "owner");
+  }
+
+  #[test]
+  fn replacement_gets_a_fresh_offer_for_an_abandoned_candidate () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let candidate = candidate ();
+    coordinator . set_pending_valid (candidate . clone ()) . unwrap ();
+    coordinator . begin_for_client (
+      MaintenanceOrigin::PendingReconciliation, Some (candidate . clone ()),
+      "owner" . into ()) . unwrap ();
+    coordinator . disconnected ();
+    assert! (coordinator . reconnected_for_session ("replacement") . is_some ());
+    let CoordinatorState::Pending (pending) = &coordinator . state else {
+      panic! ("abandoned candidate was not returned to pending"); };
+    assert_eq! (pending . candidate . as_ref (), Some (&candidate));
+    assert! (!pending . offer_sent);
   }
 
   #[test]

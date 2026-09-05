@@ -17,7 +17,11 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
   "Stable identity of this Emacs process across Skg reconnects and code reloads.")
 
 (defvar skg--connection-handshake-state nil
-  "Nil, `sent', or `verified' for the current TCP connection.")
+  "Progress of the mandatory handshake for the current TCP connection.
+The value is nil, `sent', `census', `census-texts', `verified', or `failed'.")
+
+(defvar skg--connection-handshake-error nil
+  "Exact server or transport error which prevented connection verification.")
 
 (defvar skg--active-source-set-name "server-default"
   "Name claimed in a reconnect handshake; replaced by server authority.")

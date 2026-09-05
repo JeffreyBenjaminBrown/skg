@@ -7,6 +7,34 @@
 
 (defconst skg--maintenance-archive-format-version 1)
 
+(defconst skg-connection-handshake-timeout 5.0
+  "Seconds client initialization waits for verification and census.")
+
+(defun skg--connection-handshake-error-content (payload)
+  "Return the server's exact startup error from PAYLOAD."
+  (condition-case nil
+      (let* ((response (read payload))
+             (content (cadr (assoc 'content response))))
+        (if content (format "%s" content) payload))
+    (error payload)))
+
+(defun skg--record-connection-handshake-error (_tcp-proc payload)
+  "Record a terminal handshake or connection-census rejection in PAYLOAD."
+  (setq skg--connection-handshake-error
+        (skg--connection-handshake-error-content payload)
+        skg--connection-handshake-state 'failed))
+
+(defun skg-connection-handshake-ensure ()
+  "Wait for the mandatory connection handshake and return non-nil on success."
+  (let ((deadline (+ (float-time) skg-connection-handshake-timeout)))
+    (while (and (not (eq skg--connection-handshake-state 'verified))
+                (not skg--connection-handshake-error)
+                skg-rust-tcp-proc
+                (process-live-p skg-rust-tcp-proc)
+                (< (float-time) deadline))
+      (accept-process-output skg-rust-tcp-proc 0.05))
+    (eq skg--connection-handshake-state 'verified)))
+
 (defun skg--installed-undo-fu-session-version ()
   "Return the installed undo-fu-session version string, or nil.
 This inspects the public package header without enabling any package mode."
@@ -66,6 +94,21 @@ This inspects the public package header without enabling any package mode."
                  (length warnings))
          content)))))
 
+(defun skg--show-abandoned-prearchive-maintenance (response)
+  "Warn when RESPONSE safely abandoned another session's pre-archive work."
+  (when-let ((incident (cadr (assoc 'abandoned-prearchive-incident response))))
+    (let ((origin (or (cadr (assoc 'abandoned-prearchive-origin response))
+                      "maintenance")))
+      (display-warning
+       'skg
+       (format
+        (concat "Skg abandoned unfinished %s incident %s from a different "
+                "editor session before archive publication.  No disk or "
+                "server-store mutation had begun; repeat that command if "
+                "it is still wanted.")
+        origin incident)
+       :warning))))
+
 (defun skg--install-connection-verification (tcp-proc payload)
   "Install authoritative server state from handshake PAYLOAD."
   (let* ((response (read payload))
@@ -99,6 +142,7 @@ This inspects the public package header without enabling any package mode."
       (skg-maintenance-adopt-handshake-epoch))
     (setq skg--connection-handshake-state 'census)
     (skg--show-handshake-telescope-warnings response)
+    (skg--show-abandoned-prearchive-maintenance response)
     (when (fboundp 'skg-install-pending-recovery-incidents)
       (skg-install-pending-recovery-incidents response))
     (message "%s" (or (and content (format "%s" content))
@@ -123,7 +167,9 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
       ,(lambda (tcp payload)
          (skg--handle-buffer-census-response
           tcp payload maintenance-incident-id maintenance-epoch))
-      . t))
+      . t)
+     ,@(unless maintenance-incident-id
+         `((error ,#'skg--record-connection-handshake-error . t))))
    (prin1-to-string (skg-buffer-census))
    maintenance-incident-id))
 
@@ -156,7 +202,9 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
               ,(lambda (tcp payload)
                  (skg--finish-buffer-census
                   tcp payload maintenance-incident-id maintenance-epoch))
-              . t))
+              . t)
+             ,@(unless maintenance-incident-id
+                 `((error ,#'skg--record-connection-handshake-error . t))))
            (prin1-to-string (skg-buffer-census-texts required))
            maintenance-incident-id))
       (skg--complete-buffer-census
@@ -190,12 +238,14 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
 (defun skg--submit-connection-handshake (tcp-proc)
   "Put the mandatory handshake first without consuming an ordinary draft."
   (unless skg--connection-handshake-state
-    (setq skg--connection-handshake-state 'sent)
+    (setq skg--connection-handshake-state 'sent
+          skg--connection-handshake-error nil)
     (skg-submit-priority-request
      tcp-proc
      (skg--connection-handshake-request)
      `((verify-connection
-        ,#'skg--install-connection-verification . t)))))
+        ,#'skg--install-connection-verification . t)
+       (error ,#'skg--record-connection-handshake-error . t)))))
 
 (defun skg-connection-verify ()
   "Verify connection to the Rust server,

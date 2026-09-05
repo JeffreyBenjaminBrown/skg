@@ -136,6 +136,31 @@
                                   :registered-buffer-ids)
                        (list id)))))))
 
+(ert-deftest test-skg-locked-census-rejection-cancels-the-prearchive-incident ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9 :phase awaiting-locked-census))
+        handlers scheduled warning)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'tcp))
+              ((symbol-function 'skg-submit-priority-request)
+               (lambda (_tcp _request supplied-handlers &rest _args)
+                 (setq handlers supplied-handlers)))
+              ((symbol-function 'display-warning)
+               (lambda (_type message _level &rest _args)
+                 (setq warning message)))
+              ((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest arguments)
+                 (setq scheduled (cons function arguments)))))
+      (skg--maintenance-send-locked-census)
+      (let ((handler (cadr (assoc 'error handlers))))
+        (should (functionp handler))
+        (funcall
+         handler nil
+         "((content \"dirty undo cannot be archived\") (terminal-status failed))"))
+      (should (eq (plist-get skg--maintenance-client-incident :phase)
+                  'cancelling-after-locked-census-refusal))
+      (should (string-match-p "dirty undo cannot be archived" warning))
+      (should (equal scheduled '(skg-cancel-maintenance "incident" 9))))))
+
 (ert-deftest test-skg-buffer-born-during-maintenance-inherits-epoch ()
   (let ((buffer (generate-new-buffer " *skg-born-locked-test*"))
         (skg--buffer-registry (make-hash-table :test #'equal))

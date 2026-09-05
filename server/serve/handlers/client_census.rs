@@ -61,17 +61,19 @@ pub fn handle_verify_connection_request (
 ) {
   let result = (|| -> Result<String, String> {
     let lease = runtime . query_lease ()?;
-    let census_required = {
+    let (census_required, client_session_id) = {
       let mut interactive = runtime . interactive . lock () . unwrap ();
-      install_client_handshake (
-        request, &lease . snapshot . env, &mut interactive)?
+      let census_required = install_client_handshake (
+        request, &lease . snapshot . env, &mut interactive)?;
+      let session_id = interactive . attached_client . as_ref ()
+        . expect ("successful handshake installed its client")
+        . session_id . clone ();
+      (census_required, session_id)
     };
     let active_source_set_name = runtime . interactive . lock () . unwrap ()
       . active_source_set . name . 0 . clone ();
-    runtime . transition_maintenance (|coordinator| {
-      coordinator . reconnected ();
-      Ok (( ))
-    })?;
+    let abandoned = runtime . transition_maintenance (|coordinator|
+      Ok (coordinator . reconnected_for_session (&client_session_id)))?;
     let maintenance = runtime . maintenance . lock () . unwrap () . clone ();
     Ok (verify_connection_response (
       &lease . snapshot . env . config,
@@ -79,7 +81,8 @@ pub fn handle_verify_connection_request (
       &lease . snapshot . env . in_rust_graph . load_full (),
       &active_source_set_name,
       census_required,
-      &maintenance))
+      &maintenance,
+      abandoned . as_ref ()))
   }) ();
   let response = match result {
     Ok (response) => response,
@@ -143,6 +146,7 @@ fn verify_connection_response (
   active_source_set_name : &str,
   census_required : bool,
   maintenance : &MaintenanceCoordinator,
+  abandoned_prearchive : Option<&(crate::maintenance::IncidentId, String)>,
 ) -> String {
   let atom = |value : &str| -> Sexp {
     Sexp::Atom (Atom::S (value . to_string ())) };
@@ -183,7 +187,7 @@ fn verify_connection_response (
     StoreHealth::Healthy => atom ("healthy"),
     StoreHealth::Poisoned (reason) => Sexp::List (vec! [
       atom ("poisoned"), atom (reason)]), }};
-  Sexp::List (vec! [
+  let mut fields = vec! [
     field ("response-type", atom (
       TcpToClient::VerifyConnection . repr_in_client ())),
     field ("content", atom (
@@ -207,7 +211,13 @@ fn verify_connection_response (
       &config . maintenance_archive_identity . to_string_lossy ())),
     field ("typedb-health", health (&selected . typedb_health)),
     field ("tantivy-health", health (&selected . tantivy_health)),
-  ]) . to_string ()
+  ];
+  if let Some ((incident, origin)) = abandoned_prearchive {
+    fields . push (field (
+      "abandoned-prearchive-incident", atom (incident . as_str ())));
+    fields . push (field ("abandoned-prearchive-origin", atom (origin)));
+  }
+  Sexp::List (fields) . to_string ()
 }
 
 pub(crate) fn source_inventory_field (config : &SkgConfig) -> Sexp {
@@ -993,7 +1003,7 @@ mod tests {
       ]));
     let response : String = verify_connection_response (
       &config, &warnings, &selected, "all", false,
-      &MaintenanceCoordinator::new ());
+      &MaintenanceCoordinator::new (), None);
     let first : usize = response . find ("(name first)") . unwrap ();
     let second : usize = response . find ("(name second)") . unwrap ();
     assert! (first < second, "{}", response);
@@ -1020,11 +1030,28 @@ mod tests {
       reason: "SECRET-MAINTENANCE-PAYLOAD" . into (),
     };
     let response = verify_connection_response (
-      &config, &[], &selected, "all", true, &maintenance);
+      &config, &[], &selected, "all", true, &maintenance, None);
     assert! (response . contains (
       "(maintenance-state blocked-store-health)"), "{}", response);
     assert! (!response . contains ("SECRET-MAINTENANCE-PAYLOAD"),
       "{}", response);
+  }
+
+  #[test]
+  fn verification_names_safely_abandoned_prearchive_work () {
+    let config = SkgConfig::dummyFromSources (HashMap::new ());
+    let selected = SelectedStoreState::initial (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::default ());
+    let incident = crate::maintenance::IncidentId::new ();
+    let abandoned = (incident . clone (), "explicit-partial-reload" . into ());
+    let response = verify_connection_response (
+      &config, &[], &selected, "all", true,
+      &MaintenanceCoordinator::new (), Some (&abandoned));
+    assert! (response . contains (&format! (
+      "(abandoned-prearchive-incident {})", incident)), "{}", response);
+    assert! (response . contains (
+      "(abandoned-prearchive-origin explicit-partial-reload)"), "{}", response);
   }
 
   fn complete_descriptor (overrides : &str) -> String {
