@@ -21,9 +21,20 @@
              (buffer-substring-no-properties (point-min) (point-max))))))
    (buffer-list)))
 
-(defun rebuild-test-replace-disk ()
-  (with-temp-file (getenv "SKG_REBUILD_SOURCE")
-    (insert "title: \"title after rebuild\"\npid: \"x\"\n")))
+(defun rebuild-test-replace-config ()
+  (let ((config (getenv "SKG_TEST_CONFIG")))
+    (with-temp-buffer
+      (insert-file-contents config)
+      (dolist (replacement
+               '(("default_source_set = \"main\""
+                  "default_source_set = \"replacement\"")
+                 ("name = \"main\"" "name = \"replacement\"")
+                 ("path = \"notes\"" "path = \"replacement-notes\"")))
+        (goto-char (point-min))
+        (unless (search-forward (car replacement) nil t)
+          (rebuild-test-fail "config text was absent: %s" (car replacement)))
+        (replace-match (cadr replacement) t t))
+      (write-region (point-min) (point-max) config nil 'silent))))
 
 (defun rebuild-test-main ()
   (setq skg-port (string-to-number (getenv "SKG_TEST_PORT")))
@@ -43,6 +54,9 @@
                        (point-min) (point-max))))
                    buffer))))))
     (rebuild-test-check view "the pre-rebuild view loaded")
+    (rebuild-test-check
+     (equal skg--active-source-set-name "main")
+     "the initial restricted source-set is active")
     (let ((ordinary-handler
            (alist-get "full-rebuild"
                       skg--maintenance-origin-operation-handlers
@@ -51,7 +65,7 @@
        "full-rebuild"
        (lambda (phase response)
          (when (equal phase "archive-ready")
-           (rebuild-test-replace-disk))
+           (rebuild-test-replace-config))
          (funcall ordinary-handler phase response))))
     (skg-rebuild-dbs)
     (rebuild-test-check
@@ -67,7 +81,13 @@
      "full rebuild returned idle with the same live view reconciled")
     (rebuild-test-check
      (> (or (alist-get 'graph-generation skg--server-store-state) 0) 1)
-     "the selected graph generation advanced"))
+     "the selected graph generation advanced")
+    (rebuild-test-check
+     (equal skg--active-source-set-name "all")
+     "the absent old source-set fell back exactly to all")
+    (rebuild-test-check
+     (equal (skg--source-names) '("replacement"))
+     "the client installed the replacement source inventory"))
   (rebuild-test-check
    (directory-files-recursively
     (expand-file-name "maintenance-archives" skg-config-dir)

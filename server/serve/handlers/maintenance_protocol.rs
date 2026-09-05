@@ -1149,7 +1149,7 @@ pub fn handle_maintenance_status_request (
   let selected_config = &selected_snapshot . env . config;
   let payload = match coordinator . state {
     CoordinatorState::Active (active) =>
-      active_status_sexp_with_config (&active, Some (selected_config)),
+      active_status_sexp (&active, Some (selected_config)),
     CoordinatorState::Pending (pending) => Sexp::List (vec![
       atom_field ("status", "pending"),
       atom_field ("pending-reason", pending . reason . label ()),
@@ -1167,12 +1167,6 @@ pub fn handle_maintenance_status_request (
 }
 
 fn active_status_sexp (
-  active : &crate::maintenance::ActiveMaintenance,
-) -> Sexp {
-  active_status_sexp_with_config (active, None)
-}
-
-fn active_status_sexp_with_config (
   active : &crate::maintenance::ActiveMaintenance,
   config : Option<&crate::types::misc::SkgConfig>,
 ) -> Sexp {
@@ -1923,7 +1917,7 @@ mod tests {
     let offer = maintenance_offer_payload (
       "locked-census-accepted-publish-initial-archive",
       &active, "archive", "/archive");
-    let status = active_status_sexp (&active) . to_string ();
+    let status = active_status_sexp (&active, None) . to_string ();
     for payload in [offer, status] {
       assert! (payload . contains (
         "(requested-paths (source/node.skg))"), "{}", payload);
@@ -1972,7 +1966,7 @@ mod tests {
       }) . unwrap ();
     let CoordinatorState::Active (active) = coordinator . state else {
       panic! ("pull incident stopped being active"); };
-    let status = active_status_sexp (&active) . to_string ();
+    let status = active_status_sexp (&active, None) . to_string ();
     assert! (status . contains ("(external-outcome failed)"), "{}", status);
     assert! (status . contains (
       "(external-details (\"repo-a exited 1\"))"), "{}", status);

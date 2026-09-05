@@ -67,13 +67,13 @@ pub fn select_archived_candidate (
     . ok_or_else (|| format! (
       "candidate {} is not retained in this process", summary . id))?;
   let snapshot = runtime . selected_snapshot ();
-  validate_rebuild_preselection (
+  validate_preselection (
     runtime, &active, &snapshot . env . config, &snapshot . selected,
     &candidate)?;
-  revalidate_candidate (&candidate . config, &candidate)?;
+  revalidate_candidate (&snapshot . env . config, &candidate)?;
 
   let evidence = runtime . maintenance_evidence . publish_candidate (
-    &active, &candidate . config, &snapshot . selected, &candidate)?;
+    &active, &snapshot . env . config, &snapshot . selected, &candidate)?;
   let evidence_record = ServerEvidenceRecord {
     path: evidence . path . clone (),
     bundle_sha256: evidence . bundle_sha256 . clone (),
@@ -147,13 +147,13 @@ pub fn rebuild_archived_candidate (
   {
     return Err ("full rebuild requires a complete-disk candidate" . into ()); }
   let snapshot = runtime . selected_snapshot ();
-  validate_preselection (
+  validate_rebuild_preselection (
     runtime, &active, &snapshot . env . config, &snapshot . selected,
     &candidate)?;
-  revalidate_candidate (&snapshot . env . config, &candidate)?;
+  revalidate_candidate (&candidate . config, &candidate)?;
 
   let evidence = runtime . maintenance_evidence . publish_candidate (
-    &active, &snapshot . env . config, &snapshot . selected, &candidate)?;
+    &active, &candidate . config, &snapshot . selected, &candidate)?;
   let evidence_record = ServerEvidenceRecord {
     path: evidence . path . clone (),
     bundle_sha256: evidence . bundle_sha256 . clone (),

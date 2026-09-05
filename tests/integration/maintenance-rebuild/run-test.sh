@@ -26,9 +26,14 @@ check_typedb_server
 
 TEST_WORK_ROOT=$(mktemp -d "$TEST_DIR/work-XXXXXX")
 SOURCE_ROOT="$TEST_WORK_ROOT/notes"
-mkdir -p "$SOURCE_ROOT"
+REPLACEMENT_SOURCE_ROOT="$TEST_WORK_ROOT/replacement-notes"
+mkdir -p "$SOURCE_ROOT" "$REPLACEMENT_SOURCE_ROOT"
 cat > "$SOURCE_ROOT/x.skg" << 'EOF'
 title: "title before rebuild"
+pid: "x"
+EOF
+cat > "$REPLACEMENT_SOURCE_ROOT/x.skg" << 'EOF'
+title: "title after rebuild"
 pid: "x"
 EOF
 
@@ -42,6 +47,7 @@ maintenance_archive_folder = "maintenance-archives"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 delete_on_quit = true
+default_source_set = "main"
 
 [[sources]]
 name = "main"
@@ -49,7 +55,6 @@ path = "notes"
 EOF
 
 export SKG_TEST_CONFIG="$TEMP_CONFIG"
-export SKG_REBUILD_SOURCE="$SOURCE_ROOT/x.skg"
 
 start_skg_server
 run_client_test
