@@ -406,6 +406,10 @@ error AND leave the captured table installed."
       (should (equal heralds--transform-rules '(skg test-sentinel))))))
 
 (ert-deftest test-skg-reload-refreshes-detached-recovery-commands ()
+  (should (< (cl-position "skg-log.el"
+                          skg--reload-by-evaluation-files :test #'equal)
+             (cl-position "skg-state.el"
+                          skg--reload-by-evaluation-files :test #'equal)))
   (should (member "skg-recovery-ui.el"
                   skg--reload-by-evaluation-files))
   (should (< (cl-position "skg-recovery-archive.el"
@@ -416,6 +420,22 @@ error AND leave the captured table installed."
                           skg--reload-by-evaluation-files :test #'equal)
              (cl-position "skg-maintenance.el"
                           skg--reload-by-evaluation-files :test #'equal))))
+
+(ert-deftest test-skg-reload-resolves-requires-from-its-own-directory ()
+  "A load-file bootstrap must not depend on a preconfigured `load-path'."
+  (let ((elisp-dir "/tmp/skg-self-contained-elisp/")
+        (load-path '("/some/unrelated/elisp/"))
+        observed-load-paths)
+    (cl-letf (((symbol-function 'unload-feature)
+               (lambda (&rest _)))
+              ((symbol-function 'load-file)
+               (lambda (_file)
+                 (push (copy-sequence load-path) observed-load-paths))))
+      (skg--reload-modules elisp-dir))
+    (should observed-load-paths)
+    (dolist (observed observed-load-paths)
+      (should (equal (car observed) elisp-dir)))
+    (should (equal load-path '("/some/unrelated/elisp/")))))
 
 (ert-deftest test-skg-reload-selection-is-a-distinct-id-stack-entry-path ()
   "Only the explicit reload command installs TO-RELOAD selection state."

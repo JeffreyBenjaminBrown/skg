@@ -6,7 +6,11 @@
 (defun skg-reload ()
   "Unload *almost* all skg features and reload from disk.
 
-Nine stateful files are deliberately absent from the unload list:
+Ten stateful files are deliberately absent from the unload list:
+
+- `skg-log' owns the live logging destination, category filter and level.
+  Re-evaluation refreshes its functions while its `defvar' configuration
+  survives.
 
 - `skg-buffer' defines `skg-content-view-mode' and the
   permanent-local `skg-view-uri'. `unload-feature' would
@@ -46,7 +50,7 @@ Nine stateful files are deliberately absent from the unload list:
 - `skg-worktree-guard' installs process-boundary advice.  Plain
   re-evaluation refreshes its functions without duplicating advice.
 
-All nine stateful files are idempotent on re-evaluation, so we pick up
+All ten stateful files are idempotent on re-evaluation, so we pick up
 edits to them via plain `load-file' instead.
 
 The herald rule table (`heralds--transform-rules', fetched from
@@ -88,7 +92,8 @@ error still propagates so the user can fix it."
   (message "skg: all modules reloaded"))
 
 (defconst skg--reload-by-evaluation-files
-  '("skg-state.el"
+  '("skg-log.el"
+    "skg-state.el"
     "skg-buffer-registry.el"
     "skg-keymaps-and-aliases.el"
     "skg-init.el"
@@ -106,13 +111,15 @@ error still propagates so the user can fix it."
 The destructive half of `skg-reload', kept separate so the
 herald-table preservation in `skg-reload' can be exercised without
 actually unloading the world.  See `skg-reload' for why
-`skg-buffer', `skg-keymaps-and-aliases', `skg-state', `skg-buffer-registry',
+`skg-log', `skg-buffer', `skg-keymaps-and-aliases', `skg-state',
+`skg-buffer-registry',
 `skg-request-reload-paths', `skg-maintenance', `skg-pull', and
 `skg-recovery-ui' and `skg-worktree-guard' are
 reloaded by hand rather than via `unload-feature'.  The stateless recovery
 archive writer is also re-evaluated before the incident coordinator which
 calls it."
-  (let ((skg-features
+  (let ((load-path (cons elisp-dir load-path))
+        (skg-features
          '( skg-client
             skg-compare-sexpr
             skg-config
