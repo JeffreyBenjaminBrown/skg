@@ -1866,3 +1866,84 @@ the plan needs.
 
 No product or architectural choice remains for Jeff before execution.  This
 revision still does not authorize execution of the implementation plan.
+
+* DONE Execution discovered one important choice: enrolling views born during maintenance
+
+The retry integration now exercises the previously untested sequence directly:
+an invalid replacement config blocks maintenance, a new =G0= view is queried and
+born with the active epoch lock, the config is repaired, and the same incident is
+retried to completion.  The retry and terminal ACK succeed, but the new view stays
+locked.  The reason is exact: its client-local buffer ID was not in the one-time
+locked census, so the server neither settled it nor named it in the terminal unlock
+inventory.
+
+This is not safely fixed by unlocking every local buffer which happens to carry the
+epoch.  That would make the client, rather than the durable server journal, decide
+that a view has no outstanding presentation work.  Nor should the server start
+allocating "client-local" buffer IDs in query responses.  Besides changing identity
+ownership, that would not cover new-empty views and other legitimate client-created
+records.
+
+** DONE Use =ViewUri= for provisional server enrollment and bind it to the client buffer ID
+
+Jeff approved a two-stage identity rule.  A =ViewUri= identifies a retained server
+view; a client-local buffer ID identifies the concrete editor buffer which must
+eventually be settled and unlocked.  Neither replaces the other.
+
+When a query admitted during an active incident is going to return a retained view,
+the server already knows the resulting =ViewUri=.  Before returning the successful
+query response, it must durably add that URI to the incident's pending presentation
+enrollment, together with the graph and presentation generations against which the
+view was produced.  This is atomic with admitting the response, so selection or
+finalization cannot overtake a =G0= view merely because the client has not constructed
+its buffer yet.  A failed query does not enroll a URI.
+
+After constructing and registering the buffer under the active epoch, the client
+submits an incident-qualified priority census.  That census binds the pending URI to
+the client's stable buffer ID and full descriptor.  From then on the buffer ID is the
+authority used by settlement ACKs and the exact terminal unlock inventory.  The
+server never invents a client-local ID.  New-empty buffers and other client-created
+records which have no server-known URI use the same priority census to enroll
+directly by buffer ID.
+
+The server should preserve two related but distinct inventories:
+
+- the immutable initial locked census and checksum which authorized the initial
+  archive and point of no return; and
+- a monotonically growing incident presentation census, plus its temporarily
+  unbound pending =ViewUri=s, used for view settlement, final-archive evidence, and
+  the exact terminal unlock list.
+
+Only a clean, correctly epoch-locked record may join after initial archive
+publication.  A newly dirty/logically-dirty record is a protocol violation because
+its bytes and undo are absent from the initial archive.  Before =G1= selection, an
+enrolled record joins ordinary impact planning.  If a pinned =G0= query finishes
+while selection races ahead, its exact record still receives the same impact,
+rendering, and scalar-release treatment as an older =G0= view.  A record genuinely
+born from =G1= is journaled as already graph-current, is not spuriously marked
+presentation/search stale, and remains locked only until its exact terminal entry.
+Any newly required scalar challenge must supersede an unanswered challenge or form a
+new exact challenge after earlier approvals; it cannot inherit unrelated approval.
+
+Final evidence/finalization must wait until every pending URI has either been bound by
+the priority census or resolved absent by an authoritative reconnect census, and
+until the resulting settlement ACKs finish.  Once finalization is the active
+serialized client request, later user queries are queued behind it and therefore
+construct after the terminal state instead of slipping into the archive.  Server-side
+validation must still reject finalization whenever pending enrollment is nonempty or
+its current presentation census and settlements differ.
+
+The clients' existing request coordinators serialize one request at a time and put
+maintenance barriers ahead of queued ordinary work.  The constructor therefore
+registers and locks the buffer, sends the priority census before later maintenance
+work, and then requests durable status.  Reconnect already performs the complete
+census which resolves any response lost between server enrollment and client buffer
+construction.
+
+The alternatives were to use only the monotonically repeated client census, to give
+the server ownership of buffer IDs for query-created views, or to prohibit/defer new
+views for part of maintenance.  =ViewUri= closes the server-side admission race
+without changing client-buffer identity ownership, while the census binding supplies
+one lifecycle for query-created and client-created records.  No important choice
+remains open; execution is authorized to resume from the retained failing end-to-end
+case.
