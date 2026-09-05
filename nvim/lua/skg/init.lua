@@ -39,6 +39,9 @@ function M.install_session_surface ()
   state.register_server_push_handler(
     'maintenance-offer',
     require('skg.maintenance').server_offer_handler)
+  state.register_server_push_handler(
+    'maintenance-status',
+    require('skg.maintenance').server_status_handler)
   vim.api.nvim_create_user_command('SkgReconcilePendingChanges',
     function () require('skg.maintenance').reconcile_pending() end,
     { force = true })
@@ -48,6 +51,14 @@ function M.install_session_surface ()
   vim.api.nvim_create_user_command('SkgCancelMaintenance',
     function () require('skg.maintenance').cancel() end,
     { force = true })
+  vim.api.nvim_create_user_command('SkgReloadIds',
+    function (options)
+      require('skg.maintenance').reload_ids(options.fargs) end,
+    { nargs = '+', force = true })
+  vim.api.nvim_create_user_command('SkgReloadPaths',
+    function (options)
+      require('skg.maintenance').reload_paths(options.fargs) end,
+    { nargs = '+', complete = 'file', force = true })
 end
 
 ---Initialize the client against a server config: remember the

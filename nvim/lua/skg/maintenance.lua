@@ -25,6 +25,35 @@ local function equal_lists (left, right)
   return true
 end
 
+local function normalized_strings (values, label)
+  local result, seen = {}, {}
+  for _, value in ipairs(values or {}) do
+    if type(value) ~= 'string' or value == '' then
+      error('Explicit reload ' .. label .. ' must be nonempty strings') end
+    if not seen[value] then
+      seen[value] = true
+      table.insert(result, value) end
+  end
+  table.sort(result)
+  return result
+end
+
+local function config_relative_reload_path (value)
+  local config = require('skg.config')
+  local normalized = vim.fs.normalize(value)
+  local absolute = normalized:sub(1, 1) == '/'
+    or normalized:match('^%a:[/\\]') ~= nil
+  if not absolute then return normalized end
+  if not config.config_file_path then
+    error('Cannot translate an absolute reload path before Skg init') end
+  local root = vim.fs.dirname(vim.fs.normalize(config.config_file_path))
+  local relative = vim.fs.relpath(root, normalized)
+  if not relative or relative == '..' or relative:match('^%.%.[/\\]') then
+    error('Explicit reload path is outside the skgconfig data root: ' .. value)
+  end
+  return relative
+end
+
 local function registered_ids ()
   local result = {}
   for _, buf in ipairs(registry.buffers()) do
@@ -196,6 +225,12 @@ function M.handle_selection_response (_payload_text, response)
   local status = payload.field_text(response, 'status')
   local incident = assert(state.maintenance_client_incident,
     'Maintenance selection arrived without client state')
+  if field_present(response, 'incident-id')
+     or field_present(response, 'maintenance-epoch') then
+    require_client_incident(
+      payload.field_text(response, 'incident-id'),
+      nat(response, 'maintenance-epoch'))
+  end
   if status ~= 'archive-ready' then M.record_selection(response) end
   if status == 'needs-scalar-authorization' then
     local challenge = status_challenge(response)
@@ -217,6 +252,35 @@ function M.handle_selection_response (_payload_text, response)
     error('Unexpected maintenance selection status: ' .. tostring(status))
   end
 end
+
+function M.handle_origin_started (_payload_text, response)
+  local incident = require_client_incident(
+    payload.field_text(response, 'incident-id'),
+    nat(response, 'maintenance-epoch'))
+  if payload.field_text(response, 'status') ~= 'origin-operation-started' then
+    error('Server did not start the explicit maintenance origin') end
+  incident.phase = 'waiting-for-origin-observation'
+  vim.notify('Skg is observing the exact partial-reload targets')
+end
+
+function M.run_explicit_origin (incident)
+  incident = incident or assert(state.maintenance_client_incident,
+    'No explicit partial-reload incident is ready to run')
+  if not incident.offer or incident.offer.origin ~= 'explicit-partial-reload'
+     or not incident.incident_id or incident.epoch == nil then
+    error('No explicit partial-reload incident is ready to run') end
+  incident.phase = 'origin-operation-start-pending'
+  state.register_response_handler(
+    'maintenance-status', M.handle_origin_started, true)
+  state.set_request_failure_handler(fail_request(
+    'origin-operation-start-pending',
+    'Explicit reload worker was not started'))
+  client.submit_request(request('run maintenance origin', {
+    { 'maintenance-epoch', incident.epoch },
+  }), nil, incident.incident_id)
+end
+
+M.origin_operation_handlers['explicit-partial-reload'] = M.run_explicit_origin
 
 function M.send_archive_ready ()
   local incident = assert(state.maintenance_client_incident,
@@ -596,6 +660,10 @@ function M.handle_terminal (_payload_text, response)
     response, 'selected-graph-generation')
   config.store_state.manifest_revision = nat(
     response, 'selected-manifest-revision')
+  if incident.terminal_callback and not incident.terminal_callback_fired then
+    incident.terminal_callback(response)
+    incident.terminal_callback_fired = true
+  end
   submit_later(M.send_terminal_ack)
 end
 
@@ -635,6 +703,22 @@ function M.resume_active (response)
   local epoch = nat(response, 'maintenance-epoch')
   local phase = payload.field_text(response, 'phase')
   local incident = require_client_incident(incident_id, epoch)
+  local origin = payload.field_text(response, 'origin')
+  local paths = payload.string_list(payload.field(response, 'requested-paths'))
+  local ids = payload.string_list(payload.field(response, 'requested-ids'))
+  if incident.offer and incident.offer.origin
+     and incident.offer.origin ~= origin then
+    error('Maintenance status changed its origin') end
+  if incident.requested_paths
+     and not equal_lists(incident.requested_paths, paths) then
+    error('Maintenance status changed its requested paths') end
+  if incident.requested_ids
+     and not equal_lists(incident.requested_ids, ids) then
+    error('Maintenance status changed its requested IDs') end
+  incident.requested_paths = paths
+  incident.requested_ids = ids
+  incident.offer = incident.offer or {}
+  incident.offer.origin = origin
   M.set_handshake_summary('active', epoch)
   if field_present(response, 'g1-graph-generation') then
     M.record_selection(response) end
@@ -659,6 +743,14 @@ function M.resume_active (response)
     incident.phase = 'preparing-archive'
     if incident.archive then submit_later(M.send_archive_ready)
     else submit_later(M.publish_initial) end
+  elseif origin == 'explicit-partial-reload' and phase == 'archive-ready' then
+    incident.phase = 'origin-operation-required'
+    submit_later(function () M.run_explicit_origin(incident) end)
+  elseif origin == 'explicit-partial-reload' and phase == 'final-observation' then
+    incident.phase = 'waiting-for-origin-observation'
+    -- Reissue the idempotent trigger so a process-local worker job is restored
+    -- after a reconnect or server restart.
+    submit_later(function () M.run_explicit_origin(incident) end)
   elseif phase == 'blocked-invalid-after-mutation'
       or phase == 'blocked-store-health' then
     incident.phase = 'server-blocked'
@@ -746,7 +838,7 @@ function M.publish_initial ()
   end
 end
 
-local function handle_bootstrap (_payload_text, response)
+local function handle_bootstrap (_payload_text, response, terminal_callback)
   local offered_ids = sorted_copy(payload.string_list(
     payload.field(response, 'registered-buffer-ids')))
   local actual_ids = registered_ids()
@@ -756,6 +848,12 @@ local function handle_bootstrap (_payload_text, response)
     epoch = assert(payload.field(response, 'maintenance-epoch'),
       'offer has no maintenance epoch'),
     phase = 'preparing-archive',
+    requested_paths = payload.string_list(
+      payload.field(response, 'requested-paths')),
+    requested_ids = payload.string_list(
+      payload.field(response, 'requested-ids')),
+    terminal_callback = terminal_callback,
+    terminal_callback_fired = false,
     registered_buffer_ids = offered_ids,
     undo_waivers = {},
     locally_applied = {},
@@ -791,12 +889,73 @@ local function handle_bootstrap (_payload_text, response)
   M.publish_initial()
 end
 
-function M.begin (origin, candidate_id)
-  state.register_response_handler('maintenance-offer', handle_bootstrap, true)
-  client.submit_request(request('begin maintenance', {
+function M.begin (origin, candidate_id, paths, ids, terminal_callback)
+  state.register_response_handler('maintenance-offer',
+    function (payload_text, response)
+      handle_bootstrap(payload_text, response, terminal_callback) end,
+    true)
+  local fields = {
     { 'origin', origin },
     { 'candidate-id', candidate_id or 'none' },
-  }))
+  }
+  if paths and #paths > 0 then table.insert(fields, { 'paths', paths }) end
+  if ids and #ids > 0 then table.insert(fields, { 'ids', ids }) end
+  client.submit_request(request('begin maintenance', fields))
+end
+
+local function report_explicit_outcomes (response)
+  local outcomes = payload.field(response, 'requested-id-outcomes') or {}
+  local rejected = {}
+  for _, outcome in ipairs(outcomes) do
+    if payload.field_text(outcome, 'status') == 'rejected' then
+      table.insert(rejected, string.format('%s (%s)',
+        payload.field_text(outcome, 'requested-id') or '?',
+        payload.field_text(outcome, 'reason') or 'not acknowledged'))
+    end
+  end
+  if #rejected == 0 then
+    vim.notify('Skg explicit partial reload completed.')
+  else
+    vim.notify('Skg partial reload completed; unresolved IDs: '
+      .. table.concat(rejected, ', '), vim.log.levels.WARN)
+  end
+end
+
+---Begin a durable explicit partial reload by config-relative paths or G0 IDs.
+---Absolute local paths beneath the local skgconfig directory are translated
+---to config-relative spelling before crossing a host/container boundary.
+---@param options table { paths?: string[], ids?: string[], on_terminal?: fun(any) }
+---@return boolean started
+function M.reload_targets (options)
+  options = options or {}
+  local ids = normalized_strings(options.ids, 'IDs')
+  local paths = {}
+  for _, value in ipairs(normalized_strings(options.paths, 'paths')) do
+    table.insert(paths, config_relative_reload_path(value)) end
+  paths = normalized_strings(paths, 'paths')
+  if #paths == 0 and #ids == 0 then
+    error('Explicit partial reload requires at least one path or ID') end
+  local dirty = 0
+  for _, buf in ipairs(registry.buffers()) do
+    if registry.dirty(buf) then dirty = dirty + 1 end end
+  if dirty > 0 then
+    local answer = vim.fn.confirm(string.format(
+      'Archive %d dirty Skg view(s) before the partial reload? Impacted '
+        .. 'views will become detached recovery buffers.', dirty),
+      '&Continue\n&Cancel', 2)
+    if answer ~= 1 then return false end
+  end
+  M.begin('explicit-partial-reload', nil, paths, ids,
+    options.on_terminal or report_explicit_outcomes)
+  return true
+end
+
+function M.reload_ids (ids, on_terminal)
+  return M.reload_targets({ ids = ids, on_terminal = on_terminal })
+end
+
+function M.reload_paths (paths, on_terminal)
+  return M.reload_targets({ paths = paths, on_terminal = on_terminal })
 end
 
 function M.reconcile_pending ()
@@ -826,6 +985,33 @@ function M.server_offer_handler (_payload_text, response)
     if answer == 1 then
       M.begin('pending-reconciliation', offer.candidate_id) end
   end)
+end
+
+function M.server_status_handler (payload_text, response)
+  local status = payload.field_text(response, 'status')
+  if status == 'candidate-selected'
+     or status == 'needs-scalar-authorization' then
+    if not field_present(response, 'incident-id')
+       or not field_present(response, 'maintenance-epoch') then
+      error('Asynchronous maintenance selection has no exact envelope') end
+    M.handle_selection_response(payload_text, response)
+  elseif status == 'origin-operation-failed' then
+    local incident = require_client_incident(
+      payload.field_text(response, 'incident-id'),
+      nat(response, 'maintenance-epoch'))
+    incident.phase = 'server-blocked'
+    vim.notify(string.format(
+      'Explicit reload remains locked in server phase %s: %s',
+      payload.field_text(response, 'phase') or '?',
+      payload.field_text(response, 'error') or 'unknown error'),
+      vim.log.levels.ERROR)
+  elseif status == 'active' or status == 'terminal' or status == 'idle' then
+    M.handle_status(payload_text, response)
+  else
+    local reason = payload.field_text(response, 'pending-reason')
+    if reason then warn('Skg disk observation is pending: ' .. reason)
+    else vim.notify('Skg maintenance: ' .. payload_text) end
+  end
 end
 
 function M.cancel ()

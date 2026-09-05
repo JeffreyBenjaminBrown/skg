@@ -59,18 +59,21 @@ describe('skg Neovim maintenance handshake', function ()
   local original_defer
   local original_archive_finalize
   local original_client_submit
+  local original_begin
 
   before_each(function ()
     reset()
     original_defer = maintenance.defer
     original_archive_finalize = require('skg.recovery_archive').finalize
     original_client_submit = require('skg.client').submit_request
+    original_begin = maintenance.begin
   end)
 
   after_each(function ()
     maintenance.defer = original_defer
     require('skg.recovery_archive').finalize = original_archive_finalize
     require('skg.client').submit_request = original_client_submit
+    maintenance.begin = original_begin
     reset()
   end)
 
@@ -83,6 +86,76 @@ describe('skg Neovim maintenance handshake', function ()
       maintenance.validate_settlements({ one, one }, { 'one', 'two' }) end)
     assert.has_error(function ()
       maintenance.validate_settlements({ one }, { 'one', 'two' }) end)
+  end)
+
+  it('sends exact explicit targets and starts the server-owned origin worker',
+     function ()
+    local client_module = require('skg.client')
+    local requests = {}
+    client_module.submit_request = function (wire, _content, request_incident)
+      table.insert(requests, { wire = wire, incident = request_incident })
+    end
+    maintenance.begin('explicit-partial-reload', nil,
+      { 'source/A.skg' }, { 'alias', 'B' }, function () end)
+    assert.matches('begin maintenance', requests[1].wire, 1, true)
+    assert.matches('paths', requests[1].wire, 1, true)
+    assert.matches('source/A.skg', requests[1].wire, 1, true)
+    assert.matches('ids', requests[1].wire, 1, true)
+    assert.matches('alias', requests[1].wire, 1, true)
+
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9,
+      offer = { origin = 'explicit-partial-reload' },
+    }
+    maintenance.run_explicit_origin(state.maintenance_client_incident)
+    assert.matches('run maintenance origin', requests[2].wire, 1, true)
+    assert.are.equal(incident_id, requests[2].incident)
+    maintenance.handle_origin_started(nil, {
+      f('status', 'origin-operation-started'),
+      f('incident-id', incident_id), f('maintenance-epoch', 9),
+    })
+    assert.are.equal('waiting-for-origin-observation',
+      state.maintenance_client_incident.phase)
+  end)
+
+  it('dispatches an exact asynchronous candidate selection', function ()
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9,
+      registered_buffer_ids = {}, locally_applied = {},
+    }
+    maintenance.defer = function () end
+    maintenance.server_status_handler('', {
+      f('status', 'candidate-selected'), f('incident-id', incident_id),
+      f('maintenance-epoch', 9), f('g1-graph-generation', 2),
+      f('g1-manifest-revision', 6), f('tantivy-generation', 4),
+      f('server-evidence-sha256', string.rep('d', 64)),
+      f('view-settlements', {}),
+    })
+    assert.are.equal('settling-views',
+      state.maintenance_client_incident.phase)
+    assert.are.equal(2, state.maintenance_client_incident.g1_graph_generation)
+    assert.has_error(function ()
+      maintenance.server_status_handler('', {
+        f('status', 'candidate-selected'), f('incident-id', 'wrong'),
+        f('maintenance-epoch', 9),
+      })
+    end)
+  end)
+
+  it('offers a deduplicated explicit ID API without prompting when clean',
+     function ()
+    local captured
+    maintenance.begin = function (...)
+      captured = { ... }
+    end
+    assert.is_true(maintenance.reload_targets({
+      ids = { 'alias', 'B', 'alias' },
+    }))
+    assert.are.equal('explicit-partial-reload', captured[1])
+    assert.is_nil(captured[2])
+    assert.are.same({}, captured[3])
+    assert.are.same({ 'B', 'alias' }, captured[4])
+    assert.is_function(captured[5])
   end)
 
   it('echoes every base and rendered-result authority in an application ACK',
@@ -163,12 +236,16 @@ describe('skg Neovim maintenance handshake', function ()
     local buf = new_buffer()
     local buffer_id = registry.record(buf).id
     local manifest = string.rep('a', 64)
+    local terminal_callback_runs = 0
     state.maintenance_state = { epoch = 9, state = 'active' }
     state.maintenance_client_incident = {
       incident_id = incident_id, epoch = 9, phase = 'completing',
       registered_buffer_ids = { buffer_id },
       g1_graph_generation = 2, g1_manifest_revision = 6,
       final_archive = { manifest_sha256 = manifest, path = '/archive' },
+      terminal_callback = function ()
+        terminal_callback_runs = terminal_callback_runs + 1 end,
+      terminal_callback_fired = false,
     }
     local scheduled
     local terminal_ack_runs = 0
@@ -191,6 +268,8 @@ describe('skg Neovim maintenance handshake', function ()
       state.maintenance_client_incident.phase)
     assert.are.equal('terminal', state.maintenance_state.state)
     assert.are.equal(1, terminal_ack_runs)
+    assert.are.equal(1, terminal_callback_runs)
+    assert.is_true(state.maintenance_client_incident.terminal_callback_fired)
   end)
 
   it('finishes the exact evidence and terminal acknowledgement chain',
