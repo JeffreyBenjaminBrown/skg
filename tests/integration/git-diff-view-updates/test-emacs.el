@@ -101,7 +101,16 @@
   ;; We need to be in a content-view buffer for the save to work.
   (switch-to-buffer "*b*")
   (skg-view-diff-mode)
-  (skg-test-wait-for-response 20))
+  (skg-test-wait-for-response 20)
+  (unless (skg-test-wait-for
+           (lambda ()
+             (and (with-current-buffer "*a*"
+                    (string-match-p "removed" (buffer-string)))
+                  (with-current-buffer "*b*"
+                    (string-match-p "removed" (buffer-string)))))
+           20)
+    (message "✗ FAIL [phase 5]: queued diff presentations did not arrive")
+    (kill-emacs 1)))
 
 ;; ─── Phase 6: Verify diff markers in view-b ────────────────
 
@@ -160,7 +169,14 @@
   ;; Re-save to trigger diff recomputation
   (with-current-buffer "*b*"
     (skg-request-save-buffer))
-  (skg-test-wait-for-response 20))
+  (skg-test-wait-for-response 20)
+  (unless (skg-test-wait-for
+           (lambda ()
+             (with-current-buffer "*b*"
+               (not (string-match-p "textChanged" (buffer-string)))))
+           20)
+    (message "✗ FAIL [phase 8]: queued presentation did not settle")
+    (kill-emacs 1)))
 
 ;; ─── Phase 9: Verify textChanged gone ───────────────────────
 
@@ -184,7 +200,16 @@
   (setq integration-test-phase "phase-10")
   (switch-to-buffer "*b*")
   (skg-view-diff-mode)
-  (skg-test-wait-for-response 20))
+  (skg-test-wait-for-response 20)
+  (unless (skg-test-wait-for
+           (lambda ()
+             (and (with-current-buffer "*a*"
+                    (not (string-match-p "removed" (buffer-string))))
+                  (with-current-buffer "*b*"
+                    (not (string-match-p "removed" (buffer-string))))))
+           20)
+    (message "✗ FAIL [phase 10]: clean presentations did not arrive")
+    (kill-emacs 1)))
 
 ;; ─── Phase 11: Verify clean views ───────────────────────────
 

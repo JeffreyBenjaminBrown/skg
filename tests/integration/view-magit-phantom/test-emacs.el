@@ -60,6 +60,12 @@
     (switch-to-buffer buf)
     (skg-view-diff-mode)
     (skg-test-wait-for-response 20)
+    (unless (skg-test-wait-for
+             (lambda ()
+               (with-current-buffer buf
+                 (string-match-p "(unstaged removedM)" (buffer-string))))
+             20)
+      (test-fail "Queued diff presentation did not arrive"))
     (let ((content (buffer-substring-no-properties
                     (point-min) (point-max))))
       (unless (string-match-p "(unstaged removedM)" content)

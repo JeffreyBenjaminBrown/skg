@@ -66,6 +66,13 @@
   (switch-to-buffer "*a*")
   (skg-view-diff-mode)
   (skg-test-wait-for-response 20)
+  (unless (skg-test-wait-for
+           (lambda ()
+             (with-current-buffer "*a*"
+               (string-match-p "(unstaged removedM)" (buffer-string))))
+           20)
+    (message "✗ FAIL [phase 3]: queued diff presentation did not arrive")
+    (kill-emacs 1))
   ;; Verify that a removed-here phantom c appears under b
   (let* ((content (with-current-buffer "*a*"
                     (buffer-substring-no-properties

@@ -62,6 +62,13 @@
     (switch-to-buffer buf)
     (skg-view-diff-mode)
     (skg-test-wait-for-response 20)
+    (unless (skg-test-wait-for
+             (lambda ()
+               (with-current-buffer buf
+                 (and (string-match-p "(id b)" (buffer-string))
+                      (string-match-p "removedX" (buffer-string)))))
+             20)
+      (test-fail "Queued deleted-file presentation did not arrive"))
     (let ((content (buffer-substring-no-properties
                     (point-min) (point-max))))
       ;; Phantom b shows up as a child of a with 'removedM on the

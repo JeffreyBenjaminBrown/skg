@@ -84,6 +84,11 @@ print('=== PHASE 2: Toggle diff mode, verify phantom b ===')
 vim.api.nvim_set_current_buf(content_view)
 require('skg.diff_mode').toggle()
 T.check(T.wait_for_response(20), 'diff-mode-on response arrived')
+T.check(T.wait_for(function ()
+  local content = T.buffer_text(content_view)
+  return content:find('(id b)', 1, true)
+         and content:find('removedX', 1, true)
+end, 20), 'queued deleted-file presentation arrived')
 do
   local content = T.buffer_text(content_view)
   T.check(content:find('(id b)', 1, true) ~= nil,

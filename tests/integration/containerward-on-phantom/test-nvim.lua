@@ -195,6 +195,9 @@ print('=== PHASE 3: Toggle diff mode ON ===')
 vim.api.nvim_set_current_buf(buf_a)
 diff_mode.toggle()
 T.wait_for_response(20)
+T.check(T.wait_for(function ()
+  return T.buffer_text(buf_a):find('(unstaged removedM)', 1, true)
+end, 20), 'queued diff presentation arrived')
 -- Verify that a removed-here phantom c appears under b.
 local content_after_diff = T.buffer_text(buf_a)
 T.check(content_after_diff:find('(unstaged removedM)', 1, true) ~= nil,

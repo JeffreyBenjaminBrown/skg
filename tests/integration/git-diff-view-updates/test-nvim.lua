@@ -188,6 +188,10 @@ print('=== PHASE 5: Toggle git diff mode ON ===')
 vim.api.nvim_set_current_buf(buf_b)
 require('skg.diff_mode').toggle()
 T.check(T.wait_for_response(20), 'phase 5: diff-mode-on response arrived')
+T.check(T.wait_for(function ()
+  return T.buffer_text(buf_a):find('removed', 1, true)
+         and T.buffer_text(buf_b):find('removed', 1, true)
+end, 20), 'phase 5: queued diff presentations arrived')
 
 -- PHASE 6: verify diff markers in view-b. Check for the presence of
 -- diff-related strings rather than an exact line-by-line match,
@@ -227,6 +231,9 @@ end
 vim.api.nvim_set_current_buf(buf_b)
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(20), 'phase 8: re-save response arrived')
+T.check(T.wait_for(function ()
+  return not T.buffer_text(buf_b):find('textChanged', 1, true)
+end, 20), 'phase 8: queued presentation settled')
 
 -- PHASE 9: verify textChanged gone (the title change is now in HEAD).
 print('=== PHASE 9: Verify textChanged gone after commit ===')
@@ -242,6 +249,10 @@ print('=== PHASE 10: Toggle git diff mode OFF ===')
 vim.api.nvim_set_current_buf(buf_b)
 require('skg.diff_mode').toggle()
 T.check(T.wait_for_response(20), 'phase 10: diff-mode-off response arrived')
+T.check(T.wait_for(function ()
+  return not T.buffer_text(buf_a):find('removed', 1, true)
+         and not T.buffer_text(buf_b):find('removed', 1, true)
+end, 20), 'phase 10: clean presentations arrived')
 
 -- PHASE 11: verify both views are clean (no diff/phantom markers).
 print('=== PHASE 11: Verify views are clean (no diff markers) ===')
