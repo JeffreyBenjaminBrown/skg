@@ -315,6 +315,7 @@ impl MaintenanceCoordinator {
       selected_store: None,
       presentation_fence: None,
       successor_observation_required: false,
+      force_full_rebuild_recovery: false,
       scalar_release: None,
       view_settlements: Default::default (),
       blocking_reason: None,
@@ -730,7 +731,11 @@ impl MaintenanceCoordinator {
   ) -> Result<(), String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if active . origin != MaintenanceOrigin::FullRebuild
-    || active . phase != MaintenancePhase::FullRebuildExclusive
+    && !active . force_full_rebuild_recovery
+    {
+      return Err (
+        "full rebuild completion has no exclusive rebuild authority" . into ()); }
+    if active . phase != MaintenancePhase::FullRebuildExclusive
     {
       return Err (format! (
         "full rebuild completion is invalid during {:?}", active . phase)); }
@@ -738,6 +743,7 @@ impl MaintenanceCoordinator {
       return Err ("full rebuild has no durable server evidence" . into ()); }
     active . selected_store = Some (selected);
     active . blocking_reason = None;
+    active . force_full_rebuild_recovery = false;
     active . phase = MaintenancePhase::Presenting;
     Ok (( ))
   }
@@ -794,7 +800,11 @@ impl MaintenanceCoordinator {
   ) -> Result<(), String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if active . origin != MaintenanceOrigin::FullRebuild
-    || active . phase != MaintenancePhase::FullRebuildExclusive
+    && !active . force_full_rebuild_recovery
+    {
+      return Err (
+        "source-set replacement has no exclusive rebuild authority" . into ()); }
+    if active . phase != MaintenancePhase::FullRebuildExclusive
     {
       return Err (format! (
         "source-set replacement is invalid during {:?}", active . phase)); }
@@ -1108,6 +1118,67 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  /// Retry an invalid final observation without repeating the external origin
+  /// operation or weakening its archive/epoch boundary.
+  pub fn retry_blocked_invalid_disk (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::BlockedInvalidAfterMutation {
+      return Err (format! (
+        "invalid-disk retry is invalid during {:?}", active . phase)); }
+    if active . selected_store . is_some ()
+    || active . client_evidence_transfer . is_some ()
+    || !active . view_settlements . is_empty ()
+    {
+      return Err (
+        "invalid-disk retry cannot replace selected or presented authority"
+          . into ());
+    }
+    active . candidate = None;
+    active . server_evidence = None;
+    active . presentation_fence = None;
+    active . scalar_release = None;
+    active . blocking_reason = None;
+    active . successor_observation_required = false;
+    active . phase = MaintenancePhase::FinalObservation;
+    Ok (( ))
+  }
+
+  /// A failed store transition is retried only from a fresh observation.  A
+  /// poisoned/unqueryable selected triple escalates to a complete candidate
+  /// and full reconstruction even when the original incident was targeted.
+  pub fn retry_blocked_store_health (
+    &mut self,
+    incident_id       : &IncidentId,
+    epoch             : MaintenanceEpoch,
+    force_full_rebuild : bool,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . phase != MaintenancePhase::BlockedStoreHealth {
+      return Err (format! (
+        "store-health retry is invalid during {:?}", active . phase)); }
+    if active . selected_store . is_some ()
+    || active . client_evidence_transfer . is_some ()
+    || !active . view_settlements . is_empty ()
+    {
+      return Err (
+        "store-health retry cannot replace selected or presented authority"
+          . into ());
+    }
+    active . candidate = None;
+    active . server_evidence = None;
+    active . presentation_fence = None;
+    active . scalar_release = None;
+    active . blocking_reason = None;
+    active . successor_observation_required = false;
+    active . force_full_rebuild_recovery = force_full_rebuild;
+    active . phase = MaintenancePhase::FinalObservation;
+    Ok (( ))
+  }
+
   pub fn selection_superseded (
     &mut self,
     incident_id : &IncidentId,
@@ -1412,6 +1483,68 @@ mod tests {
     assert! (policy . queries_allowed);
     assert! (!policy . skg_saves_allowed);
     assert! (policy . maintenance_locked);
+  }
+
+  #[test]
+  fn blocked_invalid_disk_retries_without_repeating_origin_authority () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . block_invalid_disk (
+      &active . incident_id, active . epoch, "invalid candidate" . into ())
+      . unwrap ();
+    coordinator . retry_blocked_invalid_disk (
+      &active . incident_id, active . epoch) . unwrap ();
+    let CoordinatorState::Active (retried) = &coordinator . state else {
+      panic! ("invalid-disk retry stopped being active"); };
+    assert_eq! (retried . phase, MaintenancePhase::FinalObservation);
+    assert_eq! (retried . origin, MaintenanceOrigin::ExplicitPartialReload);
+    assert! (retried . blocking_reason . is_none ());
+    assert! (!retried . force_full_rebuild_recovery);
+  }
+
+  #[test]
+  fn poisoned_store_retry_records_exclusive_rebuild_authority () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::ExplicitPartialReload, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . block_store_health (
+      &active . incident_id, active . epoch, "stores poisoned" . into ())
+      . unwrap ();
+    coordinator . retry_blocked_store_health (
+      &active . incident_id, active . epoch, true) . unwrap ();
+    let CoordinatorState::Active (retried) = &coordinator . state else {
+      panic! ("store-health retry stopped being active"); };
+    assert_eq! (retried . phase, MaintenancePhase::FinalObservation);
+    assert_eq! (retried . origin, MaintenanceOrigin::ExplicitPartialReload);
+    assert! (retried . force_full_rebuild_recovery);
+    coordinator . record_observed_candidate (
+      &active . incident_id, active . epoch, candidate ()) . unwrap ();
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "server" . into (),
+        artifact_count: 1, total_file_bytes: 2,
+      }) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::FullRebuildExclusive) . unwrap ();
+    coordinator . replace_full_rebuild_source_set (
+      &active . incident_id, active . epoch, "all" . into ()) . unwrap ();
+    coordinator . store_rebuilt (
+      &active . incident_id, active . epoch, SelectedStoreRecord {
+        graph_generation: GraphGeneration::INITIAL . successor (),
+        manifest_revision: ManifestRevision::INITIAL . successor (),
+        tantivy_generation: 0,
+        tantivy_outcome: "synchronous-full-rebuild" . into (),
+      }) . unwrap ();
+    let CoordinatorState::Active (rebuilt) = &coordinator . state else {
+      panic! ("recovered stores stopped being active"); };
+    assert_eq! (rebuilt . phase, MaintenancePhase::Presenting);
+    assert! (!rebuilt . force_full_rebuild_recovery);
   }
 
   #[test]

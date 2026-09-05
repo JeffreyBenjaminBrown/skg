@@ -135,8 +135,10 @@ pub fn rebuild_archived_candidate (
   epoch       : MaintenanceEpoch,
 ) -> Result<CandidateSelectionOutcome, String> {
   let active = matching_archive_ready (runtime, incident_id, epoch)?;
-  if active . origin != super::types::MaintenanceOrigin::FullRebuild {
-    return Err ("exclusive rebuild selection requires a full-rebuild origin"
+  if active . origin != super::types::MaintenanceOrigin::FullRebuild
+  && !active . force_full_rebuild_recovery
+  {
+    return Err ("exclusive rebuild selection requires recovery authority"
       . into ()); }
   let summary = active . candidate . as_ref ()
     . ok_or_else (|| "full rebuild has no complete candidate" . to_string ())?;
@@ -220,6 +222,9 @@ fn reschedule_superseded_candidate (
   runtime . transition_maintenance (|coordinator|
     coordinator . selection_superseded (
       &active . incident_id, active . epoch, reason . clone ()))?;
+  if active . force_full_rebuild_recovery {
+    return runtime . schedule_maintenance_final_observation (
+      active . incident_id . clone (), active . epoch); }
   match active . origin {
     super::types::MaintenanceOrigin::ExplicitPartialReload =>
       runtime . schedule_maintenance_target_observation (
@@ -723,7 +728,8 @@ fn validate_locked_rebuild (
     let CoordinatorState::Active (active) = &coordinator . state else {
       return Err ("maintenance ended before full rebuild selection" . into ()); };
     if &active . incident_id != incident_id || active . epoch != epoch
-    || active . origin != super::types::MaintenanceOrigin::FullRebuild
+    || (active . origin != super::types::MaintenanceOrigin::FullRebuild
+        && !active . force_full_rebuild_recovery)
     || active . phase != MaintenancePhase::FullRebuildExclusive
     {
       return Err ("maintenance authority changed before full rebuild selection"

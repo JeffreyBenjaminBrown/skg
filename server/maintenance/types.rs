@@ -677,6 +677,8 @@ pub struct ActiveMaintenance {
   #[serde(default)]
   pub successor_observation_required : bool,
   #[serde(default)]
+  pub force_full_rebuild_recovery : bool,
+  #[serde(default)]
   pub scalar_release    : Option<ScalarReleaseRecord>,
   #[serde(default)]
   pub view_settlements  : BTreeMap<String, ViewSettlementRecord>,

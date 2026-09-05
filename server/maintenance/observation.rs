@@ -342,10 +342,11 @@ fn run_final_observation (
       let CoordinatorState::Active (active) = &coordinator . state else {
         return Ok (None); };
       if active . incident_id != incident || active . epoch != epoch
-      || !matches! (active . origin,
-        MaintenanceOrigin::PendingReconciliation
-        | MaintenanceOrigin::Pull
-        | MaintenanceOrigin::FullRebuild)
+      || (!active . force_full_rebuild_recovery
+          && !matches! (active . origin,
+            MaintenanceOrigin::PendingReconciliation
+            | MaintenanceOrigin::Pull
+            | MaintenanceOrigin::FullRebuild))
       || active . phase != MaintenancePhase::FinalObservation
       {
         return Ok (None); }

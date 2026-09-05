@@ -47,6 +47,7 @@ pub enum RequestType {
   ApproveMaintenanceScalarRelease,
   CancelMaintenance,
   MaintenanceStatus,
+  RetryMaintenance,
   MaintenanceEvidence,
   MaintenanceViewSettled,
   CompleteMaintenance,
@@ -103,6 +104,7 @@ impl RequestType {
         Ok (RequestType::ApproveMaintenanceScalarRelease),
       "cancel maintenance"       => Ok (RequestType::CancelMaintenance),
       "maintenance status"       => Ok (RequestType::MaintenanceStatus),
+      "retry maintenance"        => Ok (RequestType::RetryMaintenance),
       "maintenance evidence"     => Ok (RequestType::MaintenanceEvidence),
       "maintenance view settled" => Ok (RequestType::MaintenanceViewSettled),
       "complete maintenance"     => Ok (RequestType::CompleteMaintenance),
@@ -126,6 +128,13 @@ mod tests {
     assert_eq! (RequestType::from_client_string (
       "maintenance locked census") . unwrap (),
       RequestType::MaintenanceLockedCensus);
+  }
+
+  #[test]
+  fn blocked_maintenance_retry_has_its_own_request_type () {
+    assert_eq! (RequestType::from_client_string (
+      "retry maintenance") . unwrap (),
+      RequestType::RetryMaintenance);
   }
 }
 

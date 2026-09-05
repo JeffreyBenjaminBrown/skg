@@ -65,6 +65,7 @@ use std::path::Path;
 
 use crate::types::misc::ID;
 use crate::types::sexp::{atom_to_string, extract_string_list_from_sexp};
+use crate::types::store_state::StoreHealth;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{
@@ -678,11 +679,13 @@ pub(crate) fn select_and_stage_candidate (
   epoch    : MaintenanceEpoch,
   verified : &VerifiedInitialArchive,
 ) -> Result<String, String> {
-  let origin = matching_active (runtime, incident, epoch)? . origin;
-  match origin {
-    MaintenanceOrigin::FullRebuild => {
-      rebuild_archived_candidate (runtime, incident, epoch)?; }
-    _ => { select_archived_candidate (runtime, incident, epoch)?; }
+  let active = matching_active (runtime, incident, epoch)?;
+  if active . origin == MaintenanceOrigin::FullRebuild
+  || active . force_full_rebuild_recovery
+  {
+    rebuild_archived_candidate (runtime, incident, epoch)?;
+  } else {
+    select_archived_candidate (runtime, incident, epoch)?;
   }
   let (presentation_generation, signature_blake3) =
     runtime . exact_git_presentation_identity ()?;
@@ -1333,6 +1336,83 @@ pub fn handle_maintenance_status_request (
   send_result (stream, TcpToClient::MaintenanceStatus, "complete", Ok (payload));
 }
 
+pub fn handle_retry_maintenance_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = retry_maintenance (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn retry_maintenance (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let active = require_archive_owner (runtime, &incident, epoch)?;
+  let old_reason = active . blocking_reason . clone ()
+    . unwrap_or_else (|| "unspecified" . into ());
+  let (retry_kind, force_complete) = match active . phase {
+    MaintenancePhase::BlockedInvalidAfterMutation => {
+      runtime . transition_maintenance (|coordinator|
+        coordinator . retry_blocked_invalid_disk (&incident, epoch))?;
+      ("invalid-disk", active . force_full_rebuild_recovery)
+    }
+    MaintenancePhase::BlockedStoreHealth => {
+      let snapshot = runtime . selected_snapshot ();
+      let coherent_g0 =
+        snapshot . selected . graph_generation == active . g0_graph_generation
+        && snapshot . selected . manifest_revision
+          == active . g0_manifest_revision
+        && matches! (&snapshot . selected . typedb_health,
+          StoreHealth::Healthy)
+        && matches! (&snapshot . selected . tantivy_health,
+          StoreHealth::Healthy);
+      runtime . transition_maintenance (|coordinator|
+        coordinator . retry_blocked_store_health (
+          &incident, epoch, !coherent_g0))?;
+      ("store-health", !coherent_g0)
+    }
+    ref phase => return Err (format! (
+      "maintenance retry is invalid during {:?}", phase)),
+  };
+  let (recovery_mode, schedule_result) = if force_complete {
+    ("full-rebuild", runtime . schedule_maintenance_final_observation (
+      incident . clone (), epoch))
+  } else if active . origin == MaintenanceOrigin::ExplicitPartialReload {
+    ("targeted", runtime . schedule_maintenance_target_observation (
+      incident . clone (), epoch))
+  } else {
+    ("complete", runtime . schedule_maintenance_final_observation (
+      incident . clone (), epoch))
+  };
+  if let Err (error) = schedule_result {
+    runtime . transition_maintenance (|coordinator| match retry_kind {
+      "invalid-disk" => coordinator . block_invalid_disk (
+        &incident, epoch, old_reason . clone ()),
+      _ => coordinator . block_store_health (
+        &incident, epoch, old_reason . clone ()),
+    })?;
+    return Err (format! (
+      "maintenance remained blocked because recovery observation could not be queued: {}",
+      error));
+  }
+  Ok (Sexp::List (vec![
+    atom_field ("status", "maintenance-retry-queued"),
+    atom_field ("incident-id", incident . as_str ()),
+    integer_field ("maintenance-epoch", epoch . get ()),
+    atom_field ("phase", MaintenancePhase::FinalObservation . label ()),
+    atom_field ("retry-kind", retry_kind),
+    atom_field ("recovery-mode", recovery_mode),
+    atom_field ("previous-blocking-reason", &old_reason),
+    atom_field ("next-action", "await-maintenance-status"),
+  ]) . to_string ())
+}
+
 fn active_status_sexp (
   active : &crate::maintenance::ActiveMaintenance,
   config : Option<&crate::types::misc::SkgConfig>,
@@ -1376,6 +1456,15 @@ fn active_status_sexp (
     atom_field ("lock-census-sha256",
       &lock_census_sha256 (&active . registered_buffer_ids)),
   ];
+  if let Some (reason) = &active . blocking_reason {
+    fields . push (atom_field ("blocking-reason", reason));
+  }
+  if matches! (active . phase,
+    MaintenancePhase::BlockedInvalidAfterMutation
+    | MaintenancePhase::BlockedStoreHealth)
+  {
+    fields . push (atom_field ("next-action", "retry-maintenance"));
+  }
   if active . selected_store . is_some () {
     let _ = append_selected_fields (&mut fields, active);
     if let Some (config) = config {
@@ -2220,6 +2309,25 @@ mod tests {
     assert! (status . contains (&format! (
       "(pull-repositories (((repository-key {}) (sources (test-source)))))",
       key)), "{}", status);
+  }
+
+  #[test]
+  fn blocked_status_names_exact_reason_and_retry_action () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::Pull, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    coordinator . block_invalid_disk (
+      &active . incident_id, active . epoch,
+      "source file no longer parses" . into ()) . unwrap ();
+    let CoordinatorState::Active (active) = coordinator . state else {
+      panic! ("blocked incident stopped being active"); };
+    let status = active_status_sexp (&active, None) . to_string ();
+    assert! (status . contains (
+      "(blocking-reason \"source file no longer parses\")"), "{}", status);
+    assert! (status . contains ("(next-action retry-maintenance)"),
+      "{}", status);
   }
 
   #[test]

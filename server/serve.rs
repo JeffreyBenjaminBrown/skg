@@ -43,6 +43,7 @@ use crate::serve::handlers::maintenance_protocol::{
   handle_maintenance_evidence_request,
   handle_maintenance_locked_census_request,
   handle_maintenance_status_request,
+  handle_retry_maintenance_request,
   handle_maintenance_view_settled_request,
   handle_finish_maintenance_origin_request,
   handle_run_maintenance_origin_request,
@@ -703,6 +704,8 @@ fn dispatch_request (
       handle_cancel_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceStatus =>
       handle_maintenance_status_request (stream, runtime),
+    RequestType::RetryMaintenance =>
+      handle_retry_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceEvidence =>
       handle_maintenance_evidence_request (stream, request, runtime),
     RequestType::MaintenanceViewSettled =>
