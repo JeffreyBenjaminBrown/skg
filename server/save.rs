@@ -907,6 +907,84 @@ mod save_fence_tests {
       delete_prepared . validate_selected_fence (),
       Err (SaveError::DiskSelectionChanged { .. })));
   }
+
+  #[test]
+  fn semantically_equal_external_bytes_still_fail_closed () {
+    let temp = tempfile::tempdir () . unwrap ();
+    let path = temp . path () . join ("semantic-no-op.skg");
+    let selected_bytes = b"pid: node\ntitle: before\n";
+    std::fs::write (&path, selected_bytes) . unwrap ();
+    let selected = SelectedPathManifest::from ([
+      (path . clone (), PathDigest::of_bytes (selected_bytes)),
+    ]);
+    let prepared = prepared_for (
+      path . clone (), Some (b"pid: node\ntitle: saved\n" . to_vec ()),
+      &selected);
+
+    // This YAML parses to the same scalar values.  The save fence is about
+    // selected bytes, so semantic equality cannot authorize overwriting it.
+    let external = b"pid: node\ntitle: before  \n";
+    std::fs::write (&path, external) . unwrap ();
+    assert! (matches! (
+      prepared . validate_selected_fence (),
+      Err (SaveError::DiskSelectionChanged { .. })));
+    assert_eq! (std::fs::read (&path) . unwrap (), external);
+  }
+
+  #[test]
+  fn atomic_replacement_is_detected_by_exact_bytes () {
+    let temp = tempfile::tempdir () . unwrap ();
+    let path = temp . path () . join ("renamed.skg");
+    let replacement = temp . path () . join ("replacement.tmp");
+    std::fs::write (&path, b"selected") . unwrap ();
+    let selected = SelectedPathManifest::from ([
+      (path . clone (), PathDigest::of_bytes (b"selected")),
+    ]);
+    let prepared = prepared_for (
+      path . clone (), Some (b"ours" . to_vec ()), &selected);
+
+    std::fs::write (&replacement, b"atomic external replacement") . unwrap ();
+    std::fs::rename (&replacement, &path) . unwrap ();
+    let SaveError::DiskSelectionChanged { paths, .. } =
+      prepared . validate_selected_fence () . unwrap_err ()
+    else { panic! ("wrong save-fence error"); };
+    assert_eq! (paths, vec![path]);
+  }
+
+  #[test]
+  fn one_drifted_target_refuses_the_complete_prepared_batch () {
+    let temp = tempfile::tempdir () . unwrap ();
+    let first = temp . path () . join ("first.skg");
+    let second = temp . path () . join ("second.skg");
+    std::fs::write (&first, b"selected first") . unwrap ();
+    std::fs::write (&second, b"selected second") . unwrap ();
+    let selected = SelectedPathManifest::from ([
+      (first . clone (), PathDigest::of_bytes (b"selected first")),
+      (second . clone (), PathDigest::of_bytes (b"selected second")),
+    ]);
+    let prepared = PreparedFilesystemUpdate {
+      writes: Vec::new (),
+      deleted_pids: HashSet::new (),
+      path_manifest: BTreeMap::from ([
+        (first . clone (), PreparedPathMutation {
+          expected_before: None,
+          proposed_after: Some (b"ours first" . to_vec ()),
+        }),
+        (second . clone (), PreparedPathMutation {
+          expected_before: None,
+          proposed_after: Some (b"ours second" . to_vec ()),
+        }),
+      ]),
+    } . with_selected_fence (&selected);
+
+    std::fs::write (&second, b"external second") . unwrap ();
+    let SaveError::DiskSelectionChanged { paths, .. } =
+      prepared . validate_selected_fence () . unwrap_err ()
+    else { panic! ("wrong save-fence error"); };
+    assert_eq! (paths, vec![second . clone ()]);
+    assert_eq! (std::fs::read (&first) . unwrap (), b"selected first");
+    assert_eq! (std::fs::read (&second) . unwrap (), b"external second");
+  }
 }
 
 
