@@ -482,7 +482,7 @@ function M.install_settlements (settlements)
       local absent = registry.find_by_id(buffer_id) == nil
       if resolution == 'census-absent' and not absent then
         error('Server closed a settlement for a buffer still in the census')
-      elseif resolution ~= 'census-absent'
+      elseif resolution ~= 'census-absent' and not incident.adopted
          and not locally_applied(incident, buffer_id) then
         error('Server acknowledged a settlement not applied locally') end
       table.insert(acknowledged, settlement)
@@ -789,10 +789,106 @@ function M.finish_idle ()
   vim.notify('Skg maintenance complete; recovery archive: ' .. path)
 end
 
+function M.inspect_retained_incident (response, require_final)
+  local incident_id = payload.field_text(response, 'active-incident-id')
+    or payload.field_text(response, 'incident-id')
+  local name = payload.field_text(response, 'archive-directory-name')
+  if not name or not state.maintenance_archive_folder then
+    error('Retained maintenance archive identity is incomplete') end
+  local path = vim.fs.joinpath(state.maintenance_archive_folder, name)
+  local summary = archive.inspect(path)
+  if summary.incident_id ~= incident_id or summary.name ~= name then
+    error('Retained maintenance archive identity does not match the server') end
+  local initial_sha = payload.field_text(
+    response, 'initial-manifest-sha256')
+  if initial_sha and initial_sha ~= 'none'
+     and initial_sha ~= summary.initial_manifest_sha256 then
+    error('Retained maintenance initial checksum changed') end
+  if require_final
+     and (summary.status ~= 'finalized'
+       or payload.field_text(response, 'manifest-sha256')
+          ~= summary.final_manifest_sha256) then
+    error('Retained maintenance final checksum changed') end
+  return summary
+end
+
+function M.adopt_active (response)
+  if state.maintenance_client_incident then return end
+  local archive_status = payload.field_text(response, 'archive-status')
+  if archive_status ~= 'archive-ready' and archive_status ~= 'finalized' then
+    error('A replacement editor cannot adopt maintenance before archive-ready')
+  end
+  local summary = M.inspect_retained_incident(response, false)
+  local incident_id = payload.field_text(response, 'active-incident-id')
+  local epoch = nat(response, 'maintenance-epoch')
+  local finalized = summary.status == 'finalized'
+  if archive_status == 'finalized'
+     and payload.field_text(response, 'archive-manifest-sha256')
+       ~= summary.final_manifest_sha256 then
+    error('Retained maintenance final checksum changed') end
+  state.maintenance_client_incident = {
+    incident_id = incident_id, epoch = epoch,
+    phase = 'adopting-retained-incident',
+    requested_paths = payload.string_list(
+      payload.field(response, 'requested-paths')),
+    requested_ids = payload.string_list(
+      payload.field(response, 'requested-ids')),
+    registered_buffer_ids = payload.string_list(
+      payload.field(response, 'registered-buffer-ids')),
+    undo_waivers = {}, locally_applied = {}, settlements = nil,
+    pending_settlements = {}, acknowledged_settlements = {},
+    offer = {
+      incident_id = incident_id, epoch = epoch,
+      origin = payload.field_text(response, 'origin'),
+      started_at_utc = payload.field_text(response, 'started-at-utc'),
+      archive_name = summary.name,
+      archive_folder = state.maintenance_archive_folder,
+      archive_identity = state.maintenance_archive_identity,
+      source_set = payload.field_text(response, 'source-set'),
+      graph_generation = nat(response, 'g0-graph-generation'),
+      manifest_revision = nat(response, 'g0-manifest-revision'),
+    },
+    archive = {
+      path = summary.path,
+      manifest_sha256 = summary.initial_manifest_sha256,
+    },
+    final_archive = finalized and {
+      path = summary.path,
+      manifest_sha256 = summary.final_manifest_sha256,
+      transfer_manifest_sha256 = summary.transfer_manifest_sha256,
+      artifact_bytes_sha256 = summary.artifact_bytes_sha256,
+    } or nil,
+    adopted = true, terminal_callback = nil,
+    terminal_callback_fired = false,
+  }
+end
+
+function M.adopt_terminal (response)
+  if state.maintenance_client_incident then return end
+  local summary = M.inspect_retained_incident(response, true)
+  state.maintenance_client_incident = {
+    incident_id = payload.field_text(response, 'incident-id'),
+    epoch = nat(response, 'maintenance-epoch'), phase = 'adopting-terminal',
+    registered_buffer_ids = payload.string_list(
+      payload.field(response, 'unlock-buffer-ids')),
+    g1_graph_generation = nat(response, 'selected-graph-generation'),
+    g1_manifest_revision = nat(response, 'selected-manifest-revision'),
+    final_archive = {
+      path = summary.path,
+      manifest_sha256 = summary.final_manifest_sha256,
+      transfer_manifest_sha256 = summary.transfer_manifest_sha256,
+      artifact_bytes_sha256 = summary.artifact_bytes_sha256,
+    },
+    adopted = true, terminal_callback = nil,
+    terminal_callback_fired = false,
+  }
+end
+
 function M.resume_active (response)
   local incident_id = payload.field_text(response, 'active-incident-id')
   local epoch = nat(response, 'maintenance-epoch')
   local phase = payload.field_text(response, 'phase')
+  M.adopt_active(response)
   local incident = require_client_incident(incident_id, epoch)
   local origin = payload.field_text(response, 'origin')
   local paths = payload.string_list(payload.field(response, 'requested-paths'))
@@ -877,6 +973,7 @@ function M.handle_status (payload_text, response)
   if status == 'active' then
     M.resume_active(response)
   elseif status == 'terminal' then
+    M.adopt_terminal(response)
     M.handle_terminal(payload_text, response)
   elseif status == 'idle' then
     if state.maintenance_client_incident then M.finish_idle()

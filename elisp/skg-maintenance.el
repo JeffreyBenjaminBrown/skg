@@ -507,7 +507,8 @@ old implementation."
              ((equal resolution "census-absent")
               (unless absent
                 (error "Server closed a settlement for a buffer still in the census")))
-             ((not (member buffer-id (plist-get state :locally-applied)))
+             ((and (not (plist-get state :adopted))
+                   (not (member buffer-id (plist-get state :locally-applied))))
               (error "Server acknowledged a settlement not applied locally")))
             (push settlement acknowledged))
         (push settlement pending)))
@@ -979,6 +980,123 @@ old implementation."
           skg--pending-maintenance-offer nil)
     (message "Skg maintenance complete; recovery archive: %s" path)))
 
+(defun skg--maintenance-inspect-retained-incident (response require-final)
+  "Return the exact retained archive facts named by RESPONSE.
+When REQUIRE-FINAL is non-nil, reject an archive which has not published its
+checksummed final marker."
+  (let* ((incident-id
+          (or (skg--maintenance-text response 'active-incident-id)
+              (skg--maintenance-text response 'incident-id)))
+         (name (skg--maintenance-text response 'archive-directory-name))
+         (path (and name skg--maintenance-archive-folder
+                    (expand-file-name name skg--maintenance-archive-folder)))
+         (summary (and path (skg-recovery-archive-inspect path)))
+         (initial-sha
+          (skg--maintenance-text response 'initial-manifest-sha256))
+         (final-sha (skg--maintenance-text response 'manifest-sha256)))
+    (unless (and summary
+                 (equal incident-id (plist-get summary :incident-id))
+                 (equal name (plist-get summary :name)))
+      (error "Retained maintenance archive identity does not match the server"))
+    (when (and initial-sha (not (equal initial-sha "none"))
+               (not (equal initial-sha
+                           (plist-get summary :initial-manifest-sha256))))
+      (error "Retained maintenance initial checksum changed"))
+    (when require-final
+      (unless (and (eq (plist-get summary :status) 'finalized)
+                   (equal final-sha
+                          (plist-get summary :final-manifest-sha256)))
+        (error "Retained maintenance final checksum changed")))
+    summary))
+
+(defun skg--maintenance-adopt-active (response)
+  "Reconstruct client state for an archive-backed active RESPONSE."
+  (unless skg--maintenance-client-incident
+    (let* ((archive-status
+            (skg--maintenance-text response 'archive-status))
+           (_archive-ready
+            (unless (member archive-status '("archive-ready" "finalized"))
+              (error "A replacement editor cannot adopt maintenance before archive-ready")))
+           (summary (skg--maintenance-inspect-retained-incident response nil))
+           (incident-id
+            (skg--maintenance-text response 'active-incident-id))
+           (epoch (skg--maintenance-field response 'maintenance-epoch))
+           (initial-sha (plist-get summary :initial-manifest-sha256))
+           (finalized (eq (plist-get summary :status) 'finalized)))
+      (when (and (equal archive-status "finalized")
+                 (not (equal
+                       (skg--maintenance-text
+                        response 'archive-manifest-sha256)
+                       (plist-get summary :final-manifest-sha256))))
+        (error "Retained maintenance final checksum changed"))
+      (setq skg--maintenance-client-incident
+            (list
+             :incident-id incident-id :epoch epoch
+             :origin (skg--maintenance-text response 'origin)
+             :requested-paths
+             (skg--maintenance-string-list response 'requested-paths)
+             :requested-ids
+             (skg--maintenance-string-list response 'requested-ids)
+             :phase 'adopting-retained-incident
+             :offer
+             (list :incident-id incident-id :epoch epoch
+                   :origin (skg--maintenance-text response 'origin)
+                   :started-at-utc
+                   (skg--maintenance-text response 'started-at-utc)
+                   :archive-name (plist-get summary :name)
+                   :archive-folder skg--maintenance-archive-folder
+                   :archive-identity skg--maintenance-archive-identity
+                   :source-set (skg--maintenance-text response 'source-set)
+                   :graph-generation
+                   (skg--maintenance-field response 'g0-graph-generation)
+                   :manifest-revision
+                   (skg--maintenance-field response 'g0-manifest-revision))
+             :registered-buffer-ids
+             (skg--maintenance-string-list response 'registered-buffer-ids)
+             :undo-waivers nil :locally-applied nil :settlements nil
+             :pending-settlements nil :acknowledged-settlements nil
+             :in-flight-settlement nil
+             :archive (list :path (plist-get summary :path)
+                            :manifest-sha256 initial-sha)
+             :final-archive
+             (and finalized
+                  (list
+                   :path (plist-get summary :path)
+                   :manifest-sha256
+                   (plist-get summary :final-manifest-sha256)
+                   :transfer-manifest-sha256
+                   (plist-get summary :transfer-manifest-sha256)
+                   :artifact-bytes-sha256
+                   (plist-get summary :artifact-bytes-sha256)))
+             :adopted t :terminal-callback nil
+             :terminal-callback-fired nil)))))
+
+(defun skg--maintenance-adopt-terminal (response)
+  "Reconstruct enough state to receive and ACK terminal RESPONSE."
+  (unless skg--maintenance-client-incident
+    (let ((summary (skg--maintenance-inspect-retained-incident response t)))
+      (setq skg--maintenance-client-incident
+            (list
+             :incident-id (skg--maintenance-text response 'incident-id)
+             :epoch (skg--maintenance-field response 'maintenance-epoch)
+             :phase 'adopting-terminal
+             :registered-buffer-ids
+             (skg--maintenance-string-list response 'unlock-buffer-ids)
+             :g1-graph-generation
+             (skg--maintenance-field response 'selected-graph-generation)
+             :g1-manifest-revision
+             (skg--maintenance-field response 'selected-manifest-revision)
+             :final-archive
+             (list :path (plist-get summary :path)
+                   :manifest-sha256
+                   (plist-get summary :final-manifest-sha256)
+                   :transfer-manifest-sha256
+                   (plist-get summary :transfer-manifest-sha256)
+                   :artifact-bytes-sha256
+                   (plist-get summary :artifact-bytes-sha256))
+             :adopted t :terminal-callback nil
+             :terminal-callback-fired nil)))))
+
 (defun skg--maintenance-status-challenge (response)
   (let ((challenge
          (list :operation (skg--maintenance-text response 'operation)
@@ -994,6 +1112,7 @@ old implementation."
   (let* ((incident-id (skg--maintenance-text response 'active-incident-id))
          (epoch (skg--maintenance-field response 'maintenance-epoch))
          (phase (skg--maintenance-text response 'phase))
+         (_adopted (skg--maintenance-adopt-active response))
          (state (skg--maintenance-require-client-incident
                  incident-id epoch))
          (origin (skg--maintenance-text response 'origin))
@@ -1081,8 +1200,7 @@ old implementation."
     (pcase status
       ("active" (skg--maintenance-resume-active response))
       ("terminal"
-       (unless skg--maintenance-client-incident
-         (error "Server has terminal maintenance unknown to this client"))
+       (skg--maintenance-adopt-terminal response)
        (skg--maintenance-handle-terminal nil payload))
       ("idle"
        (if skg--maintenance-client-incident

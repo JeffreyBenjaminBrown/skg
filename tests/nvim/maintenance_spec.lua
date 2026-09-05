@@ -78,6 +78,7 @@ end
 describe('skg Neovim maintenance handshake', function ()
   local original_defer
   local original_archive_finalize
+  local original_archive_inspect
   local original_client_submit
   local original_client_priority_submit
   local original_client_connect
@@ -87,6 +88,7 @@ describe('skg Neovim maintenance handshake', function ()
     reset()
     original_defer = maintenance.defer
     original_archive_finalize = require('skg.recovery_archive').finalize
+    original_archive_inspect = require('skg.recovery_archive').inspect
     original_client_submit = require('skg.client').submit_request
     original_client_priority_submit =
       require('skg.client').submit_priority_request
@@ -97,6 +99,7 @@ describe('skg Neovim maintenance handshake', function ()
   after_each(function ()
     maintenance.defer = original_defer
     require('skg.recovery_archive').finalize = original_archive_finalize
+    require('skg.recovery_archive').inspect = original_archive_inspect
     require('skg.client').submit_request = original_client_submit
     require('skg.client').submit_priority_request =
       original_client_priority_submit
@@ -303,6 +306,34 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal('running-external-mutation', seen.phase)
     assert.are.equal(response, seen.response)
     maintenance.origin_operation_handlers['test-origin'] = nil
+  end)
+
+  it('adopts an archive-backed incident in a replacement editor', function ()
+    state.maintenance_archive_folder = '/archives'
+    state.maintenance_archive_identity = '/server/archives'
+    local initial_sha = string.rep('a', 64)
+    require('skg.recovery_archive').inspect = function (path)
+      assert.are.equal('/archives/archive', path)
+      return {
+        incident_id = incident_id, name = 'archive', path = path,
+        status = 'archive-ready', initial_manifest_sha256 = initial_sha,
+      }
+    end
+    maintenance.adopt_active({
+      f('active-incident-id', incident_id), f('maintenance-epoch', 9),
+      f('archive-status', 'archive-ready'),
+      f('archive-directory-name', 'archive'),
+      f('initial-manifest-sha256', initial_sha),
+      f('origin', 'explicit-partial-reload'), f('started-at-utc', 'now'),
+      f('source-set', 'all'), f('g0-graph-generation', 1),
+      f('g0-manifest-revision', 2), f('requested-paths', { 'one.skg' }),
+      f('requested-ids', { 'node' }), f('registered-buffer-ids', { 'gone' }),
+    })
+    local incident = state.maintenance_client_incident
+    assert.is_true(incident.adopted)
+    assert.are.equal(initial_sha, incident.archive.manifest_sha256)
+    assert.are.same({ 'gone' }, incident.registered_buffer_ids)
+    assert.are.equal('explicit-partial-reload', incident.offer.origin)
   end)
 
   it('dispatches an exact asynchronous candidate selection', function ()

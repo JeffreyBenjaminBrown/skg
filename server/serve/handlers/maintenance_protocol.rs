@@ -18,6 +18,7 @@ use crate::maintenance::pull::validate_repository_mapping;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
   CandidateId,
+  ArchiveStatus,
   BufferKind,
   ClientEvidenceTransferRecord,
   CoordinatorState,
@@ -471,9 +472,9 @@ fn acknowledge_terminal_maintenance (
     let coordinator = runtime . maintenance . lock ()
       . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
     if let CoordinatorState::Terminal (terminal) = &coordinator . state {
-      if terminal . archive_owner_session_id != attached . session_id {
+      if terminal . controlling_session_id () != attached . session_id {
         return Err (
-          "terminal acknowledgement came from a different client session"
+          "terminal acknowledgement came from a different controller session"
             . into ()); }
     }
   }
@@ -507,8 +508,8 @@ fn require_completion_owner (
     CoordinatorState::Active (active) => {
       if &active . incident_id != incident || active . epoch != epoch {
         return Err ("completion names another active incident" . into ()); }
-      if active . archive_owner_session_id != attached . session_id {
-        return Err ("completion came from a different client session"
+      if active . controlling_session_id () != attached . session_id {
+        return Err ("completion came from a different controller session"
           . into ()); }
       match &active . archive_status {
         crate::maintenance::ArchiveStatus::Finalized {
@@ -523,8 +524,8 @@ fn require_completion_owner (
     CoordinatorState::Terminal (terminal) => {
       if &terminal . incident_id != incident || terminal . epoch != epoch {
         return Err ("completion names another terminal incident" . into ()); }
-      if terminal . archive_owner_session_id != attached . session_id {
-        return Err ("completion came from a different client session"
+      if terminal . controlling_session_id () != attached . session_id {
+        return Err ("completion came from a different controller session"
           . into ()); }
       if terminal . archive_manifest_sha256 . as_deref ()
          != Some (manifest_sha256)
@@ -542,6 +543,7 @@ fn terminal_payload (terminal : &TerminalMaintenance) -> String {
     atom_field ("incident-id", terminal . incident_id . as_str ()),
     integer_field ("maintenance-epoch", terminal . epoch . get ()),
     atom_field ("disposition", terminal . disposition . label ()),
+    atom_field ("archive-directory-name", &terminal . archive_directory_name),
     atom_field ("manifest-sha256", terminal . archive_manifest_sha256
       . as_deref () . unwrap_or ("none")),
     list_field ("unlock-buffer-ids", &terminal . registered_buffer_ids),
@@ -601,8 +603,8 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
   let lock_sha256 = value_from_request_sexp ("lock-census-sha256", request)?;
   let active = matching_active (runtime, &incident, epoch)?;
   let attached = attached_client (runtime)?;
-  if attached . session_id != active . archive_owner_session_id {
-    return Err ("archive ACK came from a different client session" . into ()); }
+  if attached . session_id != active . controlling_session_id () {
+    return Err ("archive ACK came from a different controller session" . into ()); }
   if lock_sha256 != lock_census_sha256 (&active . registered_buffer_ids) {
     return Err ("maintenance epoch lock census checksum does not match" . into ()); }
   let snapshot = runtime . selected_snapshot ();
@@ -1256,6 +1258,22 @@ fn active_status_sexp (
     atom_field ("candidate-id", active . candidate . as_ref ()
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     atom_field ("archive-directory-name", &active . archive_directory_name),
+    atom_field ("archive-status", match &active . archive_status {
+      ArchiveStatus::NotRequired => "not-required",
+      ArchiveStatus::Preparing => "preparing",
+      ArchiveStatus::UndoFailed { .. } => "undo-failed",
+      ArchiveStatus::UndoWaiverApproved { .. } => "undo-waiver-approved",
+      ArchiveStatus::Ready { .. } => "archive-ready",
+      ArchiveStatus::Finalized { .. } => "finalized",
+      ArchiveStatus::Incomplete { .. } => "incomplete",
+    }),
+    atom_field ("initial-manifest-sha256", active
+      . initial_archive_manifest_sha256 . as_deref () . unwrap_or ("none")),
+    atom_field ("archive-manifest-sha256", match &active . archive_status {
+      ArchiveStatus::Ready { manifest_sha256 }
+      | ArchiveStatus::Finalized { manifest_sha256 } => manifest_sha256,
+      _ => "none",
+    }),
     atom_field ("started-at-utc", &active . started_at_utc),
     atom_field ("source-set", &active . source_set),
     integer_field ("g0-graph-generation", active . g0_graph_generation . get ()),
@@ -1724,8 +1742,9 @@ fn require_archive_owner (
   epoch    : MaintenanceEpoch,
 ) -> Result<crate::maintenance::ActiveMaintenance, String> {
   let active = matching_active (runtime, incident, epoch)?;
-  if attached_client (runtime)? . session_id != active . archive_owner_session_id {
-    return Err ("maintenance message came from a different client session" . into ()); }
+  if attached_client (runtime)? . session_id != active . controlling_session_id () {
+    return Err (
+      "maintenance message came from a different controller session" . into ()); }
   Ok (active)
 }
 

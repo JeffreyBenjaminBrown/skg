@@ -601,6 +601,40 @@
     (should-error
      (skg--maintenance-install-settlements (list one two)))))
 
+(ert-deftest test-skg-maintenance-adopts-archive-backed-active-incident ()
+  (let ((skg--maintenance-client-incident nil)
+        (skg--maintenance-archive-folder "/archives")
+        (skg--maintenance-archive-identity "/server/archives")
+        (initial-sha (make-string 64 ?a)))
+    (cl-letf (((symbol-function 'skg-recovery-archive-inspect)
+               (lambda (path)
+                 (should (equal path "/archives/archive"))
+                 (list :incident-id
+                       "12345678-1234-4234-8234-123456789abc"
+                       :name "archive" :path path :status 'archive-ready
+                       :initial-manifest-sha256 initial-sha))))
+      (skg--maintenance-adopt-active
+       `((active-incident-id "12345678-1234-4234-8234-123456789abc")
+         (maintenance-epoch 9) (archive-status "archive-ready")
+         (archive-directory-name "archive")
+         (initial-manifest-sha256 ,initial-sha)
+         (origin "explicit-partial-reload") (started-at-utc "now")
+         (source-set "all") (g0-graph-generation 1)
+         (g0-manifest-revision 2) (requested-paths ("one.skg"))
+         (requested-ids ("node")) (registered-buffer-ids ("gone")))))
+    (should (plist-get skg--maintenance-client-incident :adopted))
+    (should (equal initial-sha
+                   (plist-get
+                    (plist-get skg--maintenance-client-incident :archive)
+                    :manifest-sha256)))
+    (should (equal '("gone")
+                   (plist-get skg--maintenance-client-incident
+                              :registered-buffer-ids)))
+    (should (equal
+             "explicit-partial-reload"
+             (plist-get (plist-get skg--maintenance-client-incident :offer)
+                        :origin)))))
+
 (ert-deftest test-skg-maintenance-accepts-absent-census-resolution ()
   (let* ((old (skg-test-maintenance--settlement
                "gone" "content-view" "view" "nil"

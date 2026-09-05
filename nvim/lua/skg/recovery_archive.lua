@@ -1427,11 +1427,11 @@ function M.inspect (incident_root)
   if has_final_marker ~= has_final_manifest then
     fail('incident has an incomplete final marker pair') end
 
-  local final, status
+  local final, final_sha, status
   if has_final_marker then
     local verified = verify_archive_marker(
       incident_root, 'FINALIZED', 'manifest.final.sexp', 'final')
-    final, status = verified.value, 'finalized'
+    final, final_sha, status = verified.value, verified.sha256, 'finalized'
     if required_text(final, 'incident-id', 'final manifest') ~= incident_id
        or required_text(final, 'initial-manifest-sha256', 'final manifest')
          ~= ready.sha256 then
@@ -1463,6 +1463,12 @@ function M.inspect (incident_root)
     dirty_buffers = #required_list(initial, 'buffers', 'initial manifest'),
     interrupted_buffers = interrupted, released_buffers = released,
     native_undo_compatible = native_undo_compatible(initial),
+    initial_manifest_sha256 = ready.sha256,
+    final_manifest_sha256 = final_sha,
+    transfer_manifest_sha256 = final and required_text(
+      final, 'transfer-manifest-sha256', 'final manifest') or nil,
+    artifact_bytes_sha256 = final and required_text(
+      final, 'artifact-bytes-sha256', 'final manifest') or nil,
     bytes = bytes, iec = iec_size(bytes), initial = initial, final = final,
   }
 end

@@ -1652,7 +1652,8 @@ This is read-only and does not require a running server."
                                (file-symlink-p final-marker-path)))
          (has-final-manifest (or (file-exists-p final-manifest-path)
                                  (file-symlink-p final-manifest-path)))
-         final status dispositions interrupted released changed g1 bytes)
+         final final-sha status dispositions interrupted released changed g1
+         bytes)
     (unless (and (equal name
                         (skg-recovery--required-text
                          initial 'archive-directory-name "initial manifest"))
@@ -1665,6 +1666,7 @@ This is read-only and does not require a running server."
                          incident-root "FINALIZED" "manifest.final.sexp"
                          "final")))
           (setq final (plist-get verified :value)
+                final-sha (plist-get verified :sha256)
                 status 'finalized)
           (unless (and
                    (equal incident-id
@@ -1712,6 +1714,14 @@ This is read-only and does not require a running server."
           :interrupted-buffers interrupted :released-buffers released
           :native-undo-compatible
           (skg-recovery--native-undo-compatible-p initial)
+          :initial-manifest-sha256 (plist-get ready :sha256)
+          :final-manifest-sha256 final-sha
+          :transfer-manifest-sha256
+          (and final (skg-recovery--required-text
+                      final 'transfer-manifest-sha256 "final manifest"))
+          :artifact-bytes-sha256
+          (and final (skg-recovery--required-text
+                      final 'artifact-bytes-sha256 "final manifest"))
           :bytes bytes :iec (skg-recovery--iec-size bytes)
           :initial initial :final final)))
 

@@ -278,6 +278,8 @@ impl MaintenanceCoordinator {
       started_at_utc,
       archive_owner_session_id: client_session_id,
       archive_owner_client_kind: client_kind,
+      initial_archive_manifest_sha256: None,
+      controller_session_id: String::new (),
       source_set,
       g0_graph_generation,
       g0_manifest_revision,
@@ -382,6 +384,7 @@ impl MaintenanceCoordinator {
     {
       return Err (format! (
         "archive-ready is invalid during {:?}", active . phase)); }
+    active . initial_archive_manifest_sha256 = Some (manifest_sha256 . clone ());
     active . archive_status = ArchiveStatus::Ready { manifest_sha256 };
     active . phase = MaintenancePhase::ArchiveReady;
     Ok (( ))
@@ -1059,6 +1062,44 @@ impl MaintenanceCoordinator {
           active . phase = phase; }}}
   }
 
+  /// Transfer an already archived incident to the sole replacement editor.
+  /// The caller independently reverifies the initial archive before invoking
+  /// this transition.  Session IDs identify resumptions; they are not archive
+  /// provenance and therefore never rewrite `archive_owner_session_id`.
+  pub fn adopt_attached_session (
+    &mut self,
+    session_id : &str,
+  ) -> Result<bool, String> {
+    if session_id . is_empty () {
+      return Err ("replacement session ID may not be empty" . into ()); }
+    match &mut self . state {
+      CoordinatorState::Active (active) => {
+        if active . controlling_session_id () == session_id {
+          return Ok (false); }
+        if active . initial_archive_manifest_sha256 . is_none ()
+        || !matches! (active . archive_status,
+          ArchiveStatus::Ready { .. } | ArchiveStatus::Finalized { .. })
+        {
+          return Err (
+            "a replacement editor cannot adopt maintenance before archive-ready"
+              . into ()); }
+        active . controller_session_id = session_id . to_string ();
+        Ok (true)
+      }
+      CoordinatorState::Terminal (terminal) => {
+        if terminal . controlling_session_id () == session_id {
+          return Ok (false); }
+        if terminal . archive_manifest_sha256 . is_none () {
+          return Err (
+            "a replacement editor cannot adopt terminal maintenance without a final archive"
+              . into ()); }
+        terminal . controller_session_id = session_id . to_string ();
+        Ok (true)
+      }
+      _ => Ok (false),
+    }
+  }
+
   pub fn finish (
     &mut self,
     incident_id : &IncidentId,
@@ -1089,6 +1130,8 @@ impl MaintenanceCoordinator {
       epoch: active . epoch,
       disposition,
       archive_owner_session_id: active . archive_owner_session_id . clone (),
+      controller_session_id: active . controlling_session_id () . to_string (),
+      archive_directory_name: active . archive_directory_name . clone (),
       archive_manifest_sha256: manifest_sha256,
       registered_buffer_ids: active . registered_buffer_ids . clone (),
       selected_store: active . selected_store . clone (),
@@ -1957,5 +2000,24 @@ mod tests {
     assert_eq! (state . phase, MaintenancePhase::FinalizingArchive);
     assert_eq! (coordinator . reconcile_absent_view_settlements (
       &BTreeSet::new ()) . unwrap (), Vec::<String>::new ());
+  }
+
+  #[test]
+  fn replacement_controller_never_rewrites_archive_provenance () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_for_client (
+      MaintenanceOrigin::ExplicitPartialReload, None, "archive-writer" . into ())
+      . unwrap ();
+    assert! (coordinator . adopt_attached_session ("replacement") . is_err ());
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial-sha" . into ()) . unwrap ();
+    assert! (coordinator . adopt_attached_session ("replacement") . unwrap ());
+    assert! (!coordinator . adopt_attached_session ("replacement") . unwrap ());
+    let CoordinatorState::Active (active) = &coordinator . state else {
+      unreachable! () };
+    assert_eq! (active . archive_owner_session_id, "archive-writer");
+    assert_eq! (active . controlling_session_id (), "replacement");
+    assert_eq! (active . initial_archive_manifest_sha256 . as_deref (),
+      Some ("initial-sha"));
   }
 }

@@ -1,7 +1,11 @@
 //! Two-step client census and retained-view reattachment.
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
-use crate::maintenance::BufferKind;
+use crate::maintenance::archive::{
+  InitialArchiveExpectation,
+  verify_initial_archive,
+};
+use crate::maintenance::{ArchiveStatus, BufferKind, CoordinatorState};
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{CensusDescriptor, InteractiveSession};
 use crate::serve::protocol::TcpToClient;
@@ -17,7 +21,7 @@ use crate::types::views_state::{ViewState, ViewUri, pids_from_viewforest};
 
 use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::BufReader;
 use std::net::TcpStream;
 
@@ -33,7 +37,7 @@ pub fn handle_client_census_request (
     let payload = read_length_prefixed_content (reader)
       . map_err (|error| format! ("could not read client census: {}", error))?;
     let descriptors = parse_descriptors (&payload)?;
-    let live_buffer_ids = descriptors . iter ()
+    let live_buffer_ids : BTreeSet<String> = descriptors . iter ()
       . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
     let current_generation = env . in_rust_graph . load_full ()
       . graph_generation . get ();
@@ -73,9 +77,7 @@ pub fn handle_client_census_request (
     for uri in absent_server_views {
       interactive . views . open_views . unregister_view (&uri); }
 
-    runtime . transition_maintenance (|coordinator|
-      coordinator . reconcile_absent_view_settlements (&live_buffer_ids)
-        . map (|_| ( )))?;
+    reconcile_maintenance_census (runtime, interactive, &live_buffer_ids)?;
 
     let complete = text_required . is_empty ();
     if let Some (client) = &mut interactive . attached_client {
@@ -84,6 +86,51 @@ pub fn handle_client_census_request (
       complete, writes_allowed && complete, &text_required, &stale))
   })();
   send_result (stream, result);
+}
+
+/// Bind the complete census to durable maintenance before granting the
+/// replacement editor normal protocol authority.  Before store selection, a
+/// restarted runtime also reconstructs its verified-archive cache from the
+/// immutable initial checksum; after selection, the journaled selected store
+/// and evidence records are the point-of-no-return authority.
+fn reconcile_maintenance_census (
+  runtime         : &ServerRuntime,
+  interactive     : &InteractiveSession,
+  live_buffer_ids : &BTreeSet<String>,
+) -> Result<(), String> {
+  let attached_session_id = interactive . attached_client . as_ref ()
+    . ok_or_else (|| "client census has no attached session" . to_string ())?
+    . session_id . clone ();
+  let coordinator = runtime . maintenance . lock ()
+    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+    . clone ();
+  let verified = match &coordinator . state {
+    CoordinatorState::Active (active)
+      if active . selected_store . is_none ()
+      && matches! (active . archive_status, ArchiveStatus::Ready { .. })
+      && runtime . verified_archive (&active . incident_id) . is_none () =>
+    {
+      let manifest_sha256 = active . initial_archive_manifest_sha256
+        . as_deref () . ok_or_else (||
+          "active archive-ready incident has no initial checksum" . to_string ())?;
+      let selected = runtime . selected_snapshot ();
+      Some ((active . incident_id . clone (), verify_initial_archive (
+        InitialArchiveExpectation {
+          archive_root: &selected . env . config . maintenance_archive_identity,
+          active,
+          manifest_sha256,
+        })?))
+    }
+    _ => None,
+  };
+  runtime . transition_maintenance (|coordinator| {
+    coordinator . adopt_attached_session (&attached_session_id)?;
+    coordinator . reconcile_absent_view_settlements (live_buffer_ids)?;
+    Ok (( ))
+  })?;
+  if let Some ((incident, verified)) = verified {
+    runtime . retain_verified_archive (incident, verified); }
+  Ok (( ))
 }
 
 pub fn handle_client_census_texts_request (

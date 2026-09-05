@@ -617,6 +617,17 @@ pub struct ActiveMaintenance {
   pub archive_owner_session_id : String,
   #[serde(default)]
   pub archive_owner_client_kind : String,
+  /// Immutable checksum of the initial archive.  `archive_status` later
+  /// changes to the final-manifest checksum, so restart recovery must retain
+  /// this separately in order to reverify the original archive.
+  #[serde(default)]
+  pub initial_archive_manifest_sha256 : Option<String>,
+  /// The session currently authorized to drive the incident.  This starts as
+  /// the archive producer and may move to a replacement editor only after the
+  /// initial archive is durable.  Empty old journals fall back to the archive
+  /// producer.
+  #[serde(default)]
+  pub controller_session_id : String,
   #[serde(default)]
   pub source_set        : String,
   #[serde(default = "initial_graph_generation")]
@@ -668,11 +679,31 @@ pub struct TerminalMaintenance {
   pub epoch             : MaintenanceEpoch,
   pub disposition       : TerminalDisposition,
   pub archive_owner_session_id : String,
+  #[serde(default)]
+  pub controller_session_id : String,
+  #[serde(default)]
+  pub archive_directory_name : String,
   pub archive_manifest_sha256 : Option<String>,
   pub registered_buffer_ids : Vec<String>,
   pub selected_store    : Option<SelectedStoreRecord>,
   #[serde(default)]
   pub requested_id_outcomes : Vec<MaintenanceIdOutcome>,
+}
+
+impl ActiveMaintenance {
+  pub fn controlling_session_id (&self) -> &str {
+    if self . controller_session_id . is_empty () {
+      &self . archive_owner_session_id
+    } else { &self . controller_session_id }
+  }
+}
+
+impl TerminalMaintenance {
+  pub fn controlling_session_id (&self) -> &str {
+    if self . controller_session_id . is_empty () {
+      &self . archive_owner_session_id
+    } else { &self . controller_session_id }
+  }
 }
 
 fn initial_graph_generation () -> GraphGeneration {
