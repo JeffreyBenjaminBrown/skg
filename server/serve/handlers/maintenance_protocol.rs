@@ -1426,7 +1426,7 @@ fn acknowledge_view_settlement (
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum ServerSettlementEffect {
+pub(crate) enum ServerSettlementEffect {
   None,
   Unregister (ViewUri),
   Preserve {
@@ -1445,7 +1445,7 @@ enum ServerSettlementEffect {
   },
 }
 
-fn prepare_server_settlement_effect (
+pub(crate) fn prepare_server_settlement_effect (
   active          : &crate::maintenance::ActiveMaintenance,
   record          : &ViewSettlementRecord,
   state           : Option<&ViewState>,

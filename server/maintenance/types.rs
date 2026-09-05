@@ -313,6 +313,7 @@ pub enum ViewSettlementResolution {
   #[default]
   Pending,
   ClientAcknowledged,
+  CensusApplied,
   CensusAbsent,
 }
 
@@ -321,6 +322,7 @@ impl ViewSettlementResolution {
     match self {
       Self::Pending => "pending",
       Self::ClientAcknowledged => "client-acknowledged",
+      Self::CensusApplied => "census-applied",
       Self::CensusAbsent => "census-absent",
     }
   }

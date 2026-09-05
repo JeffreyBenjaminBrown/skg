@@ -391,7 +391,7 @@ pub fn impact_ids_from_viewforest (
 /// Extra_ids are pulled from the in-Rust graph. If in-Rust graph isn't
 /// initialized (tests that bypass 'init_global_handle_for_first_time_or_panic'), only
 /// primary ids are collected — extras aren't available.
-fn root_ids_from_viewforest (
+pub(crate) fn root_ids_from_viewforest (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();

@@ -958,6 +958,52 @@ impl MaintenanceCoordinator {
     Ok (resolved)
   }
 
+  /// Record that a complete census proved the client already installed the
+  /// exact staged application whose ordinary ACK was lost.
+  pub fn acknowledge_view_application_from_census (
+    &mut self,
+    buffer_id       : &str,
+    application_ack : &ViewApplicationAcknowledgement,
+  ) -> Result<bool, String> {
+    let (incident_id, epoch, requirement, view_uri, base_graph,
+         base_presentation, base_revision, base_token) = {
+      let CoordinatorState::Active (active) = &self . state else {
+        return Err ("census application has no active maintenance" . into ()); };
+      let record = active . view_settlements . get (buffer_id)
+        . ok_or_else (|| format! (
+          "buffer '{}' has no planned settlement", buffer_id))?;
+      if record . acknowledged {
+        return if record . resolution == ViewSettlementResolution::CensusApplied {
+          Ok (active . view_settlements . values ()
+            . all (|record| record . acknowledged))
+        } else {
+          Err (format! (
+            "buffer '{}' settlement was resolved by another authority",
+            buffer_id))
+        }; }
+      (
+        active . incident_id . clone (), active . epoch,
+        record . requirement . clone (), record . view_uri . clone (),
+        record . base_graph_generation,
+        record . base_presentation_generation,
+        record . base_server_revision,
+        record . base_application_token,
+      )
+    };
+    if requirement != ViewSettlementRequirement::ApplicationAck {
+      return Err (format! (
+        "buffer '{}' has no staged application to confirm", buffer_id)); }
+    let complete = self . acknowledge_view_settlement (
+      &incident_id, epoch, buffer_id, requirement, view_uri . as_deref (),
+      base_graph, base_presentation, base_revision, base_token,
+      Some (application_ack))?;
+    let active = self . matching_active_mut (&incident_id, epoch)?;
+    active . view_settlements . get_mut (buffer_id)
+      . expect ("acknowledged census application remains journaled")
+      . resolution = ViewSettlementResolution::CensusApplied;
+    Ok (complete)
+  }
+
   pub fn block_store_health (
     &mut self,
     incident_id : &IncidentId,
@@ -1933,11 +1979,20 @@ mod tests {
       ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,
       4, 9,
       Some (&changed)) . is_err ());
+    let mut census_coordinator = coordinator . clone ();
+    assert! (census_coordinator . acknowledge_view_application_from_census (
+      "view", &exact) . unwrap ());
+    let CoordinatorState::Active (census_active) = &census_coordinator . state
+      else { unreachable! () };
+    assert_eq! (census_active . view_settlements["view"] . resolution,
+      ViewSettlementResolution::CensusApplied);
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "view",
       ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,
       4, 9,
       Some (&exact)) . unwrap ());
+    assert! (coordinator . acknowledge_view_application_from_census (
+      "view", &exact) . is_err ());
     assert! (coordinator . acknowledge_view_settlement (
       &active . incident_id, active . epoch, "view",
       ViewSettlementRequirement::ApplicationAck, Some ("uri-view"), 1, 0,

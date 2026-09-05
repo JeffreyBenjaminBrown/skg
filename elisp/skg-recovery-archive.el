@@ -1122,6 +1122,11 @@ path, manifest checksum, and size report."
                            record 'planned-disposition context))
              (required-ack (skg-recovery--required-text
                             record 'required-ack context))
+             (resolution
+              (if (assoc 'settlement-resolution record)
+                  (skg-recovery--required-text
+                   record 'settlement-resolution context)
+                "client-acknowledged"))
              (application
               (skg-recovery--normalize-settlement-application
                record required-ack)))
@@ -1137,6 +1142,11 @@ path, manifest checksum, and size report."
                           "application-ack" "close-ack"))
           (skg-recovery--fail "unknown settlement acknowledgement: %s"
                               required-ack))
+        (unless (member resolution
+                        '("client-acknowledged" "census-applied"
+                          "census-absent"))
+          (skg-recovery--fail "unknown settlement resolution: %s"
+                              resolution))
         (puthash buffer-id buffer-key seen)
         (push
          (delq
@@ -1183,6 +1193,7 @@ path, manifest checksum, and size report."
              record 'base-application-token context))
            (skg-recovery--field 'disposition disposition)
            (skg-recovery--field 'required-ack required-ack)
+           (skg-recovery--field 'settlement-resolution resolution)
            (skg-recovery--field 'acknowledged "true")
            application))
          normalized)))

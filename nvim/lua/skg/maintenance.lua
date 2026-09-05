@@ -410,6 +410,7 @@ function M.validate_settlements (settlements, expected_ids)
     if not buffer_id or not allowed[required] or seen[buffer_id]
        or (resolution ~= 'pending'
          and resolution ~= 'client-acknowledged'
+         and resolution ~= 'census-applied'
          and resolution ~= 'census-absent') then
       error('Maintenance contains a duplicate or invalid settlement') end
     seen[buffer_id] = true

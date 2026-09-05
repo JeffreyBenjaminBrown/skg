@@ -5,7 +5,13 @@ use crate::maintenance::archive::{
   InitialArchiveExpectation,
   verify_initial_archive,
 };
-use crate::maintenance::{ArchiveStatus, BufferKind, CoordinatorState};
+use crate::maintenance::{
+  ArchiveStatus,
+  BufferKind,
+  CoordinatorState,
+  ViewApplicationAcknowledgement,
+  ViewSettlementRequirement,
+};
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{CensusDescriptor, InteractiveSession};
 use crate::serve::protocol::TcpToClient;
@@ -17,7 +23,17 @@ use crate::serve::util::{
 use crate::types::env::SkgEnv;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::sexp::{atom_to_string, extract_v_from_kv_pair_in_sexp};
-use crate::types::views_state::{ViewState, ViewUri, pids_from_viewforest};
+use crate::types::views_state::{
+  ViewState,
+  ViewUri,
+  pids_from_viewforest,
+  root_ids_from_viewforest,
+};
+
+use super::maintenance_protocol::{
+  ServerSettlementEffect,
+  prepare_server_settlement_effect,
+};
 
 use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
@@ -41,9 +57,13 @@ pub fn handle_client_census_request (
       . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
     let current_generation = env . in_rust_graph . load_full ()
       . graph_generation . get ();
+    let maintenance = runtime . maintenance . lock ()
+      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+      . clone ();
     let mut live_uris : HashSet<ViewUri> = HashSet::new ();
     let mut text_required : Vec<String> = Vec::new ();
     let mut stale : Vec<String> = Vec::new ();
+    let mut census_applications = Vec::new ();
     interactive . pending_census_texts . clear ();
     interactive . live_census = descriptors . iter () . map (|descriptor|
       (descriptor . buffer_id . clone (), descriptor . clone ())) . collect ();
@@ -51,6 +71,8 @@ pub fn handle_client_census_request (
     for descriptor in descriptors {
       let Some (uri) = descriptor . view_uri . clone () else { continue; };
       let descriptor_kind = validate_live_descriptor (&descriptor)?;
+      let census_application = census_application_ack (
+        &maintenance . state, &descriptor)?;
       if !live_uris . insert (uri . clone ()) {
         return Err (format! (
           "client census names view '{}' more than once",
@@ -60,6 +82,10 @@ pub fn handle_client_census_request (
           state, &descriptor, &descriptor_kind) =>
         {
           state . client_buffer_id = Some (descriptor . buffer_id . clone ());
+        }
+        Some (_) if census_application . is_some () => {
+          census_applications . push ((
+            descriptor . clone (), census_application . unwrap ()));
         }
         Some (_) => stale . push (descriptor . buffer_id . clone ()),
         None if descriptor . graph_generation == current_generation => {
@@ -78,6 +104,8 @@ pub fn handle_client_census_request (
       interactive . views . open_views . unregister_view (&uri); }
 
     reconcile_maintenance_census (runtime, interactive, &live_buffer_ids)?;
+    reconcile_census_applications (
+      runtime, interactive, &census_applications)?;
 
     let complete = text_required . is_empty ();
     if let Some (client) = &mut interactive . attached_client {
@@ -133,13 +161,148 @@ fn reconcile_maintenance_census (
   Ok (( ))
 }
 
+fn census_application_ack (
+  state      : &CoordinatorState,
+  descriptor : &CensusDescriptor,
+) -> Result<Option<ViewApplicationAcknowledgement>, String> {
+  let CoordinatorState::Active (active) = state else { return Ok (None); };
+  let Some (record) = active . view_settlements . get (&descriptor . buffer_id)
+    else { return Ok (None); };
+  if record . acknowledged
+  || record . requirement != ViewSettlementRequirement::ApplicationAck
+  {
+    return Ok (None); }
+  let Some (application) = &record . application else {
+    return Err (format! (
+      "buffer '{}' has application debt without a staged offer",
+      descriptor . buffer_id)); };
+  let Some (frozen) = active . buffer_census . get (&descriptor . buffer_id)
+    else {
+      return Err (format! (
+        "buffer '{}' application debt is absent from the frozen census",
+        descriptor . buffer_id)); };
+  let offered_sha = sha256 (&application . content);
+  if offered_sha != application . content_sha256 {
+    return Err (format! (
+      "buffer '{}' staged application checksum is inconsistent",
+      descriptor . buffer_id)); }
+  let (maybe_placed, parse_errors, _) = org_to_uninterpreted_viewforest (
+    &application . content) . map_err (|error| format! (
+      "could not reconstruct staged census application '{}': {}",
+      descriptor . buffer_id, error))?;
+  if !parse_errors . is_empty () {
+    return Err (format! (
+      "staged census application '{}' reparsed with errors",
+      descriptor . buffer_id)); }
+  let offered_forest = maybePlaced_to_placed_viewforest (maybe_placed)
+    . map_err (|error| format! (
+      "could not place staged census application '{}': {}",
+      descriptor . buffer_id, error))?;
+  let offered_roots : HashSet<String> = root_ids_from_viewforest (
+    &offered_forest) . into_iter () . map (|id| id . 0) . collect ();
+  let described_roots : HashSet<String> = descriptor . root_ids . iter ()
+    . cloned () . collect ();
+  let described_uri = descriptor . view_uri . as_ref ()
+    . map (ViewUri::repr_in_client);
+  let expected_search_stale = frozen . search_stale
+    || record . kind == BufferKind::SearchView;
+  if descriptor . dirty
+  || descriptor . logical_dirty
+  || descriptor . lifecycle != "live-view"
+  || descriptor . kind != record . kind . label ()
+  || described_uri . as_deref () != record . view_uri . as_deref ()
+  || descriptor . recipe != frozen . recipe
+  || descriptor . source_set != frozen . source_set
+  || descriptor . graph_generation != application . resulting_graph_generation
+  || descriptor . presentation_generation
+       != application . resulting_presentation_generation
+  || descriptor . server_revision != application . resulting_server_revision
+  || descriptor . application_token
+       != application . resulting_application_token
+  || descriptor . maintenance_epoch != Some (active . epoch . get ())
+  || descriptor . presentation_stale
+  || descriptor . search_stale != expected_search_stale
+  || descriptor . last_fetched_sha256 != offered_sha
+  || descriptor . current_sha256 != offered_sha
+  || described_roots != offered_roots
+  {
+    return Ok (None); }
+  Ok (Some (ViewApplicationAcknowledgement {
+    content_sha256: offered_sha,
+    resulting_graph_generation: descriptor . graph_generation,
+    resulting_presentation_generation: descriptor . presentation_generation,
+    resulting_server_revision: descriptor . server_revision,
+    resulting_application_token: descriptor . application_token,
+  }))
+}
+
+fn reconcile_census_applications (
+  runtime      : &ServerRuntime,
+  interactive  : &mut InteractiveSession,
+  applications : &[(CensusDescriptor, ViewApplicationAcknowledgement)],
+) -> Result<(), String> {
+  if applications . is_empty () { return Ok (( )); }
+  let coordinator = runtime . maintenance . lock ()
+    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+    . clone ();
+  let CoordinatorState::Active (active) = &coordinator . state else {
+    return Err ("census application lost its active incident" . into ()); };
+  let mut effects = Vec::new ();
+  for (descriptor, acknowledgement) in applications {
+    let record = active . view_settlements . get (&descriptor . buffer_id)
+      . ok_or_else (|| format! (
+        "buffer '{}' lost its application settlement",
+        descriptor . buffer_id))?;
+    let uri = descriptor . view_uri . as_ref ()
+      . ok_or_else (|| "census application has no view URI" . to_string ())?;
+    let state = interactive . views . open_views . views . get (uri)
+      . ok_or_else (|| format! (
+        "buffer '{}' census application has no retained forest",
+        descriptor . buffer_id))?;
+    if state_matches_descriptor (state, descriptor, &record . kind) {
+      effects . push (ServerSettlementEffect::None);
+    } else {
+      effects . push (prepare_server_settlement_effect (
+        active, record, Some (state), Some (acknowledgement))?); }
+  }
+  runtime . transition_maintenance (|coordinator| {
+    for (descriptor, acknowledgement) in applications {
+      coordinator . acknowledge_view_application_from_census (
+        &descriptor . buffer_id, acknowledgement)?; }
+    Ok (( ))
+  })?;
+  for effect in effects {
+    match effect {
+      ServerSettlementEffect::None => {}
+      ServerSettlementEffect::Apply {
+        uri, base_revision, viewforest, graph_generation,
+        presentation_generation, application_token, search_stale,
+      } => {
+        if !interactive . views . open_views . update_view_if_revision (
+            &uri, base_revision, viewforest)
+        {
+          return Err ("census application base advanced after validation"
+            . into ()); }
+        interactive . views . open_views . set_client_application_authority (
+          &uri, graph_generation, presentation_generation, application_token)?;
+        interactive . views . open_views . views . get_mut (&uri)
+          . expect ("census-applied view remains registered")
+          . search_stale |= search_stale;
+      }
+      _ => return Err (
+        "application census prepared a non-application server effect" . into ()),
+    }
+  }
+  Ok (( ))
+}
+
 pub fn handle_client_census_texts_request (
   reader       : &mut BufReader<TcpStream>,
   stream       : &mut TcpStream,
   env          : &SkgEnv,
   interactive  : &mut InteractiveSession,
   writes_allowed : bool,
-  _runtime     : &ServerRuntime,
+  runtime      : &ServerRuntime,
 ) {
   let result = (|| -> Result<String, String> {
     let payload = read_length_prefixed_content (reader)
@@ -147,6 +310,7 @@ pub fn handle_client_census_texts_request (
     let records = parse_text_records (&payload)?;
     let mut restored : Vec<String> = Vec::new ();
     let mut stale : Vec<String> = Vec::new ();
+    let mut restored_descriptors = Vec::new ();
     for (buffer_id, last_fetched, current) in records {
       let Some (descriptor) = interactive . pending_census_texts
         . remove (&buffer_id)
@@ -201,11 +365,24 @@ pub fn handle_client_census_texts_request (
         interactive . views . open_views . unregister_view (&uri);
         stale . push (descriptor . buffer_id);
         continue; }
-      restored . push (descriptor . buffer_id);
+      restored . push (descriptor . buffer_id . clone ());
+      restored_descriptors . push (descriptor);
     }
     stale . extend (
       interactive . pending_census_texts . keys () . cloned ());
     interactive . pending_census_texts . clear ();
+    let maintenance = runtime . maintenance . lock ()
+      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+      . clone ();
+    let mut census_applications = Vec::new ();
+    for descriptor in &restored_descriptors {
+      if let Some (ack) = census_application_ack (
+          &maintenance . state, descriptor)?
+      {
+        census_applications . push ((descriptor . clone (), ack)); }
+    }
+    reconcile_census_applications (
+      runtime, interactive, &census_applications)?;
     if let Some (client) = &mut interactive . attached_client {
       client . census_complete = true; }
     let mut response = census_response (
@@ -598,5 +775,92 @@ mod tests {
     assert_eq! (
       validate_live_descriptor (&descriptor) . unwrap (),
       BufferKind::ContentView);
+  }
+
+  #[test]
+  fn exact_staged_application_is_a_census_ack_but_changed_text_is_not () {
+    use crate::maintenance::{
+      FrozenBufferRecord,
+      MaintenanceCoordinator,
+      MaintenanceOrigin,
+      MaintenancePhase,
+      MaintenanceTargets,
+      ViewApplicationRecord,
+      ViewDisposition,
+      ViewSettlementRecord,
+      ViewSettlementResolution,
+    };
+    use crate::types::store_state::{GraphGeneration, ManifestRevision};
+
+    let content = String::new ();
+    let content_sha = sha256 (&content);
+    let frozen = FrozenBufferRecord {
+      buffer_id: "buffer" . into (), kind: BufferKind::ContentView,
+      lifecycle: "live-view" . into (), disposable: false,
+      continuation_id: None, origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
+      view_uri: Some ("view" . into ()), recipe: "()" . into (),
+      root_ids: Vec::new (), source_set: "all" . into (),
+      graph_generation: 1, presentation_generation: 3, server_revision: 4,
+      application_token: 7, dirty: false, logical_dirty: false,
+      undo_required: false, maintenance_epoch: Some (9),
+      presentation_stale: false, search_stale: false, herald_bearing: false,
+      last_fetched_sha256: "a" . repeat (64),
+      current_sha256: "a" . repeat (64),
+    };
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, vec![frozen], MaintenanceTargets {
+        ids: vec!["node" . into ()], ..MaintenanceTargets::default ()
+      }) . unwrap ();
+    let CoordinatorState::Active (state) = &mut coordinator . state else {
+      unreachable! () };
+    state . phase = MaintenancePhase::Presenting;
+    state . view_settlements . insert ("buffer" . into (),
+      ViewSettlementRecord {
+        buffer_id: "buffer" . into (), buffer_key: None,
+        kind: BufferKind::ContentView, view_uri: Some ("view" . into ()),
+        origin_buffer_id: None, origin_view_uri: None,
+        origin_application_token: None, origin_location: None,
+        dirty: false, impacted: true, parse_uncertain: false,
+        uncertainty_reason: None, observed_ids: Vec::new (),
+        resolved_primary_ids: Vec::new (), base_graph_generation: 1,
+        base_presentation_generation: 3, base_server_revision: 4,
+        base_application_token: 7,
+        planned_disposition: ViewDisposition::Refreshed,
+        requirement: ViewSettlementRequirement::ApplicationAck,
+        application: Some (ViewApplicationRecord {
+          content, content_sha256: content_sha . clone (),
+          resulting_graph_generation: 2,
+          resulting_presentation_generation: 8,
+          resulting_server_revision: 5,
+          resulting_application_token: 8,
+          warnings: Vec::new (),
+        }),
+        resolution: ViewSettlementResolution::Pending,
+        acknowledged: false,
+      });
+    let descriptor = CensusDescriptor {
+      buffer_id: "buffer" . into (), kind: "content-view" . into (),
+      lifecycle: "live-view" . into (), disposable: false,
+      continuation_id: None, origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
+      view_uri: Some (ViewUri::ContentView ("view" . into ())),
+      recipe: "()" . into (), root_ids: Vec::new (), source_set: "all" . into (),
+      graph_generation: 2, presentation_generation: 8, server_revision: 5,
+      application_token: 8, dirty: false, logical_dirty: false,
+      undo_required: false, maintenance_epoch: Some (active . epoch . get ()),
+      modification_tick: 1, presentation_stale: false, search_stale: false,
+      herald_bearing: false, last_fetched_sha256: content_sha . clone (),
+      current_sha256: content_sha,
+    };
+    assert! (census_application_ack (
+      &coordinator . state, &descriptor) . unwrap () . is_some ());
+    let mut changed = descriptor;
+    changed . current_sha256 = "f" . repeat (64);
+    assert! (census_application_ack (
+      &coordinator . state, &changed) . unwrap () . is_none ());
   }
 }

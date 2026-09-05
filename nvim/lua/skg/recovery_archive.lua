@@ -995,6 +995,10 @@ local function normalize_settlements (settlements, initial_buffers)
     ['retirement-ack'] = true, ['release-ack'] = true,
     ['application-ack'] = true, ['close-ack'] = true,
   }
+  local valid_resolutions = {
+    ['client-acknowledged'] = true, ['census-applied'] = true,
+    ['census-absent'] = true,
+  }
   local seen, normalized = {}, {}
   for _, record in ipairs(settlements) do
     local context = 'view settlement'
@@ -1002,12 +1006,17 @@ local function normalize_settlements (settlements, initial_buffers)
     local buffer_key = required_text(record, 'buffer-key', context)
     local disposition = required_text(record, 'planned-disposition', context)
     local required_ack = required_text(record, 'required-ack', context)
+    local resolution_value = payload.field(record, 'settlement-resolution')
+    local resolution = resolution_value == nil and 'client-acknowledged'
+      or required_text(record, 'settlement-resolution', context)
     if seen[buffer_id] then
       fail('duplicate settlement for buffer ' .. buffer_id) end
     if not valid_dispositions[disposition] then
       fail('unknown buffer disposition: ' .. disposition) end
     if not valid_acks[required_ack] then
       fail('unknown settlement acknowledgement: ' .. required_ack) end
+    if not valid_resolutions[resolution] then
+      fail('unknown settlement resolution: ' .. resolution) end
     seen[buffer_id] = buffer_key
     local normalized_record = {
       field('buffer-id', buffer_id),
@@ -1031,6 +1040,7 @@ local function normalize_settlements (settlements, initial_buffers)
         record, 'base-application-token', context)),
       field('disposition', disposition),
       field('required-ack', required_ack),
+      field('settlement-resolution', resolution),
       field('acknowledged', 'true'),
     }
     local application = normalize_settlement_application(record, required_ack)

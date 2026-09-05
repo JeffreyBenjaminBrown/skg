@@ -450,7 +450,7 @@ old implementation."
                      (member required '("retirement-ack" "release-ack"
                                         "application-ack" "close-ack"))
                      (member resolution '("pending" "client-acknowledged"
-                                          "census-absent"))
+                                          "census-applied" "census-absent"))
                      (not (gethash buffer-id seen)))
           (error "Maintenance contains a duplicate or invalid settlement"))
         (puthash buffer-id t seen)
