@@ -1,26 +1,40 @@
 ;;; -*- lexical-binding: t; -*-
 
-(require 'skg-length-prefix)
+(require 'cl-lib)
+(require 'skg-buffer-registry)
+(require 'skg-maintenance)
+
+(defun skg--rebuild-dirty-buffers ()
+  (cl-remove-if-not #'skg-buffer-dirty-p (skg-registered-buffers)))
+
+(defun skg--rebuild-raw-buffer-p (buffer)
+  (with-current-buffer buffer
+    (and skg--buffer-record
+         (eq (skg--buffer-record-kind skg--buffer-record) 'raw-skg-file))))
+
+(defun skg--rebuild-terminal (_response)
+  (ding)
+  (message "Skg databases rebuilt and registered views reconciled"))
 
 (defun skg-rebuild-dbs ()
-  "Wipe and rebuild TypeDB and Tantivy from .skg files on disk.
-Does not touch the filesystem — only the derived databases.
-Useful after importing new data or if the databases are stale."
+  "Archive editor state and rebuild all selected stores from exact disk bytes."
   (interactive)
-  (message "Rebuilding databases (this may take a while) ...")
-  (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (request-sexp "((request . \"rebuild dbs\"))\n"))
-    (skg-register-response-handler
-     'rebuild-dbs
-     (lambda (_tcp-proc payload)
-       (let* ((response (read payload))
-              (content (cadr (assoc 'content response)))
-              (full-msg (concat (or content "Rebuild complete.")
-                                "\nExisting skg views are now invalid."
-                                " Run M-x skg-close-all-skg-buffers to close them.")))
-         (ding) ;; Audible signal: rebuilds take long enough to walk away from.
-         (message "%s" full-msg)))
-     t)
-    (skg-submit-request tcp-proc request-sexp)))
+  (when skg--maintenance-client-incident
+    (user-error "Maintenance is already active"))
+  (let* ((dirty (skg--rebuild-dirty-buffers))
+         (dirty-raw (cl-remove-if-not #'skg--rebuild-raw-buffer-p dirty)))
+    (when dirty-raw
+      (user-error "Full rebuild refuses modified raw .skg buffers: %s"
+                  (mapconcat #'buffer-name dirty-raw ", ")))
+    (when (or (null dirty)
+              (yes-or-no-p
+               (format
+                (concat "Full rebuild will archive %d dirty Skg view(s). "
+                        "Impacted views may become detached recovery buffers. "
+                        "Continue? ")
+                (length dirty))))
+      (message "Preparing recovery archive for full rebuild ...")
+      (skg-begin-maintenance
+       "full-rebuild" nil nil nil #'skg--rebuild-terminal))))
 
 (provide 'skg-request-rebuild-dbs)

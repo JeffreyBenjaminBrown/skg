@@ -299,14 +299,14 @@ old implementation."
       (_ (error "Unexpected maintenance selection status: %S" status)))))
 
 (defun skg--maintenance-run-explicit-origin ()
-  "Ask the server worker to observe and select the frozen explicit targets."
+  "Ask the server worker to run an archive-ready server-owned origin."
   (let* ((state skg--maintenance-client-incident)
          (incident-id (plist-get state :incident-id))
-         (epoch (plist-get state :epoch)))
+         (epoch (plist-get state :epoch))
+         (origin (plist-get state :origin)))
     (unless (and state incident-id epoch
-                 (equal (plist-get state :origin)
-                        "explicit-partial-reload"))
-      (error "No explicit partial-reload incident is ready to run"))
+                 (member origin '("explicit-partial-reload" "full-rebuild")))
+      (error "No server-owned maintenance origin is ready to run"))
     (setf (plist-get state :phase) 'origin-operation-start-pending)
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
       (skg-register-response-handler
@@ -317,7 +317,7 @@ old implementation."
            (setf (plist-get skg--maintenance-client-incident :phase)
                  'origin-operation-start-pending))
          (display-warning
-          'skg (format "Explicit reload worker was not started: %s" reason)
+          'skg (format "%s worker was not started: %s" origin reason)
           :warning)))
       (skg-submit-request
        tcp-proc
@@ -335,10 +335,14 @@ old implementation."
          (epoch (skg--maintenance-field response 'maintenance-epoch)))
     (skg--maintenance-require-client-incident incident-id epoch)
     (unless (equal status "origin-operation-started")
-      (error "Server did not start the explicit maintenance origin"))
+      (error "Server did not start the server-owned maintenance origin"))
     (setf (plist-get skg--maintenance-client-incident :phase)
           'waiting-for-origin-observation)
-    (message "Skg is observing the exact partial-reload targets")))
+    (message
+     (if (equal (plist-get skg--maintenance-client-incident :origin)
+                "full-rebuild")
+         "Skg is validating the complete disk before exclusive rebuild"
+       "Skg is observing the exact partial-reload targets"))))
 
 (defun skg--maintenance-explicit-origin-handler (phase _response)
   "Resume the explicit target observer in an appropriate durable PHASE."
@@ -348,6 +352,8 @@ old implementation."
 
 (skg-register-maintenance-origin-handler
  "explicit-partial-reload" #'skg--maintenance-explicit-origin-handler)
+(skg-register-maintenance-origin-handler
+ "full-rebuild" #'skg--maintenance-explicit-origin-handler)
 
 (defun skg--maintenance-prompt-scalar (challenge)
   (let ((prompt (plist-get challenge :prompt)))

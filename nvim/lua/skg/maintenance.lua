@@ -285,23 +285,27 @@ function M.handle_origin_started (_payload_text, response)
     payload.field_text(response, 'incident-id'),
     nat(response, 'maintenance-epoch'))
   if payload.field_text(response, 'status') ~= 'origin-operation-started' then
-    error('Server did not start the explicit maintenance origin') end
+    error('Server did not start the server-owned maintenance origin') end
   incident.phase = 'waiting-for-origin-observation'
-  vim.notify('Skg is observing the exact partial-reload targets')
+  if incident.offer.origin == 'full-rebuild' then
+    vim.notify('Skg is validating the complete disk before exclusive rebuild')
+  else vim.notify('Skg is observing the exact partial-reload targets') end
 end
 
 function M.run_explicit_origin (incident)
   incident = incident or assert(state.maintenance_client_incident,
     'No explicit partial-reload incident is ready to run')
-  if not incident.offer or incident.offer.origin ~= 'explicit-partial-reload'
+  if not incident.offer
+     or (incident.offer.origin ~= 'explicit-partial-reload'
+         and incident.offer.origin ~= 'full-rebuild')
      or not incident.incident_id or incident.epoch == nil then
-    error('No explicit partial-reload incident is ready to run') end
+    error('No server-owned maintenance origin is ready to run') end
   incident.phase = 'origin-operation-start-pending'
   state.register_response_handler(
     'maintenance-status', M.handle_origin_started, true)
   state.set_request_failure_handler(fail_request(
     'origin-operation-start-pending',
-    'Explicit reload worker was not started'))
+    incident.offer.origin .. ' worker was not started'))
   client.submit_request(request('run maintenance origin', {
     { 'maintenance-epoch', incident.epoch },
   }), nil, incident.incident_id)
@@ -316,6 +320,8 @@ end
 
 M.register_origin_operation_handler(
   'explicit-partial-reload', M.explicit_origin_operation_handler)
+M.register_origin_operation_handler(
+  'full-rebuild', M.explicit_origin_operation_handler)
 
 function M.send_archive_ready ()
   local incident = assert(state.maintenance_client_incident,

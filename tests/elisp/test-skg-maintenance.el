@@ -4,6 +4,7 @@
                              (file-name-directory load-file-name)))
 (require 'ert)
 (require 'skg-maintenance)
+(require 'skg-request-rebuild-dbs)
 
 (defun skg-test-maintenance--settlement
     (buffer-id kind uri dirty requirement disposition)
@@ -146,6 +147,42 @@
     (should (eq (car scheduled) #'skg--maintenance-run-explicit-origin))
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'origin-operation-required))))
+
+(ert-deftest test-skg-archive-ready-schedules-full-rebuild-worker ()
+  (let ((skg--maintenance-client-incident
+         '(:origin "full-rebuild" :phase preparing-archive))
+        scheduled)
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest arguments)
+                 (setq scheduled (cons function arguments)))))
+      (skg--maintenance-handle-selection-response
+       nil "((status archive-ready))"))
+    (should (eq (car scheduled) #'skg--maintenance-run-explicit-origin))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'origin-operation-required))))
+
+(ert-deftest test-skg-rebuild-begins-maintenance-instead-of-raw-request ()
+  (let ((skg--maintenance-client-incident nil)
+        arguments)
+    (cl-letf (((symbol-function 'skg-registered-buffers) (lambda () nil))
+              ((symbol-function 'skg-begin-maintenance)
+               (lambda (&rest values) (setq arguments values))))
+      (skg-rebuild-dbs))
+    (should (equal (car arguments) "full-rebuild"))
+    (should (functionp (nth 4 arguments)))))
+
+(ert-deftest test-skg-rebuild-refuses-a-dirty-raw-file-buffer ()
+  (let ((buffer (generate-new-buffer " *skg-raw-rebuild-test*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--maintenance-client-incident nil)
+        (skg--server-store-state '((graph-generation . 1))))
+    (unwind-protect
+        (with-current-buffer buffer
+          (insert "pid: node\ntitle: dirty\n")
+          (skg-register-buffer buffer 'raw-skg-file)
+          (set-buffer-modified-p t)
+          (should-error (skg-rebuild-dbs) :type 'user-error))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
 (ert-deftest test-skg-origin-failure-push-keeps-the-exact-incident-locked ()
   (let ((skg--maintenance-client-incident

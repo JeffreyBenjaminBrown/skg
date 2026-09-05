@@ -231,15 +231,35 @@ end
 ---Wipe and rebuild TypeDB and Tantivy from the .skg files on disk.
 ---Does not touch the filesystem -- only the derived databases.
 function M.rebuild_dbs ()
-  vim.notify('Rebuilding databases (this may take a while) ...')
-  state.register_response_handler('rebuild-dbs',
-    function (_payload, response)
-      local content = payload.field_text(response, 'content')
-      vim.notify((content or 'Rebuild complete.')
-                 .. '\nExisting skg views are now invalid.'
-                 .. ' Run :SkgCloseAllSkgBuffers to close them.')
-    end, true)
-  client.submit_request('((request . "rebuild dbs"))\n')
+  if state.maintenance_client_incident then
+    error('Maintenance is already active') end
+  local registry = require('skg.buffer_registry')
+  local dirty = {}
+  local dirty_raw = {}
+  for _, buf in ipairs(registry.buffers()) do
+    if registry.dirty(buf) then
+      table.insert(dirty, buf)
+      local record = registry.record(buf)
+      if record and record.kind == 'raw-skg-file' then
+        table.insert(dirty_raw, vim.api.nvim_buf_get_name(buf)) end
+    end
+  end
+  if #dirty_raw > 0 then
+    error('Full rebuild refuses modified raw .skg buffers: '
+      .. table.concat(dirty_raw, ', ')) end
+  if #dirty > 0 then
+    local answer = vim.fn.confirm(string.format(
+      'Full rebuild will archive %d dirty Skg view(s). Impacted views may '
+        .. 'become detached recovery buffers. Continue?', #dirty),
+      '&Continue\n&Cancel', 2)
+    if answer ~= 1 then return false end
+  end
+  vim.notify('Preparing recovery archive for full rebuild ...')
+  require('skg.maintenance').begin(
+    'full-rebuild', nil, nil, nil, function ()
+      vim.notify('Skg databases rebuilt and registered views reconciled')
+    end)
+  return true
 end
 
 ---Recompute the rank-only cyclic-root cache from the complete current graph.

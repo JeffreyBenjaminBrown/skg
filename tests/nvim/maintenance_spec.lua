@@ -141,6 +141,26 @@ describe('skg Neovim maintenance handshake', function ()
     })
     assert.are.equal('waiting-for-origin-observation',
       state.maintenance_client_incident.phase)
+
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 10,
+      offer = { origin = 'full-rebuild' },
+    }
+    maintenance.run_explicit_origin(state.maintenance_client_incident)
+    assert.matches('run maintenance origin', requests[3].wire, 1, true)
+    assert.are.equal(incident_id, requests[3].incident)
+  end)
+
+  it('begins full rebuild through maintenance instead of a raw request',
+     function ()
+    local misc = require('skg.misc_requests')
+    local arguments
+    maintenance.begin = function (...)
+      arguments = { ... }
+    end
+    assert.is_true(misc.rebuild_dbs())
+    assert.are.equal('full-rebuild', arguments[1])
+    assert.is_function(arguments[5])
   end)
 
   it('carries opaque origin context and structured bootstrap fields',
