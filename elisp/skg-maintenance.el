@@ -359,7 +359,8 @@ old implementation."
       (skg--maintenance-require-client-incident
        (skg--maintenance-text response 'incident-id)
        (skg--maintenance-field response 'maintenance-epoch)))
-    (unless (equal status "archive-ready")
+    (when (member status '("candidate-selected"
+                           "needs-scalar-authorization"))
       (skg--maintenance-record-selection response))
     (pcase status
       ("needs-scalar-authorization"
@@ -376,6 +377,9 @@ old implementation."
        (unless (skg--maintenance-dispatch-origin "archive-ready" response)
          (message
           "Skg maintenance archive is durable; its origin operation is next")))
+      ("view-enrollment-pending"
+       (setf (plist-get state :phase) 'waiting-for-view-enrollment)
+       (message "Skg maintenance is enrolling a newly opened view"))
       (_ (error "Unexpected maintenance selection status: %S" status)))))
 
 (defun skg--maintenance-run-explicit-origin ()
@@ -1621,7 +1625,8 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
   (let* ((response (read payload))
          (status (skg--maintenance-text response 'status)))
     (pcase status
-      ((or "candidate-selected" "needs-scalar-authorization")
+      ((or "candidate-selected" "needs-scalar-authorization"
+           "view-enrollment-pending")
        (unless (and (assoc 'incident-id response)
                     (assoc 'maintenance-epoch response))
          (error "Asynchronous maintenance selection has no exact envelope"))

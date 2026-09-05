@@ -50,6 +50,11 @@ pub struct CandidateSelectionOutcome {
   pub evidence           : PublishedMaintenanceEvidence,
 }
 
+pub enum CandidateSelectionResult {
+  Selected (CandidateSelectionOutcome),
+  DeferredForViewEnrollment,
+}
+
 /// Close every durable precondition and synchronously select a pending
 /// candidate.  Keeping this one operation synchronous to its archive ACK means
 /// a terminal client response can never outrun the exact Tantivy generation.
@@ -57,7 +62,7 @@ pub fn select_archived_candidate (
   runtime     : &ServerRuntime,
   incident_id : &IncidentId,
   epoch       : MaintenanceEpoch,
-) -> Result<CandidateSelectionOutcome, String> {
+) -> Result<CandidateSelectionResult, String> {
   let active = matching_archive_ready (runtime, incident_id, epoch)?;
   let summary = active . candidate . as_ref ()
     . ok_or_else (|| "this maintenance origin has no candidate to select"
@@ -98,14 +103,16 @@ pub fn select_archived_candidate (
     Ok (record) => {
       runtime . transition_maintenance (|coordinator|
         coordinator . store_selected (incident_id, epoch, record . clone ()))?;
-      Ok (CandidateSelectionOutcome {
+      Ok (CandidateSelectionResult::Selected (CandidateSelectionOutcome {
         graph_generation: record . graph_generation . get (),
         manifest_revision: record . manifest_revision . get (),
         tantivy_generation: record . tantivy_generation,
         tantivy_outcome: record . tantivy_outcome,
         evidence,
-      })
+      }))
     }
+    Err (SelectionFailure::EnrollmentPending) =>
+      Ok (CandidateSelectionResult::DeferredForViewEnrollment),
     Err (SelectionFailure::Superseded (reason)) => {
       reschedule_superseded_candidate (runtime, &active, reason . clone ())?;
       Err (format! (
@@ -133,7 +140,7 @@ pub fn rebuild_archived_candidate (
   runtime     : &ServerRuntime,
   incident_id : &IncidentId,
   epoch       : MaintenanceEpoch,
-) -> Result<CandidateSelectionOutcome, String> {
+) -> Result<CandidateSelectionResult, String> {
   let active = matching_archive_ready (runtime, incident_id, epoch)?;
   if active . origin != super::types::MaintenanceOrigin::FullRebuild
   && !active . force_full_rebuild_recovery
@@ -182,14 +189,16 @@ pub fn rebuild_archived_candidate (
     Ok (record) => {
       runtime . transition_maintenance (|coordinator|
         coordinator . store_rebuilt (incident_id, epoch, record . clone ()))?;
-      Ok (CandidateSelectionOutcome {
+      Ok (CandidateSelectionResult::Selected (CandidateSelectionOutcome {
         graph_generation: record . graph_generation . get (),
         manifest_revision: record . manifest_revision . get (),
         tantivy_generation: record . tantivy_generation,
         tantivy_outcome: record . tantivy_outcome,
         evidence,
-      })
+      }))
     }
+    Err (SelectionFailure::EnrollmentPending) =>
+      Ok (CandidateSelectionResult::DeferredForViewEnrollment),
     Err (SelectionFailure::Superseded (reason)) => {
       reschedule_superseded_candidate (runtime, &active, reason . clone ())?;
       Err (format! (
@@ -210,6 +219,7 @@ pub fn rebuild_archived_candidate (
 }
 
 enum SelectionFailure {
+  EnrollmentPending,
   Superseded (String),
   Stores { reason : String, queryable_g0 : bool },
 }
@@ -249,6 +259,15 @@ async fn rebuild_stores (
   let expected_generation = candidate . summary . base_graph_generation;
   let selection = runtime . generation_gate . begin_selection (
     expected_generation, true) . map_err (SelectionFailure::Superseded)?;
+  if runtime . transition_maintenance (|coordinator|
+      coordinator . defer_selection_for_view_enrollment (
+        incident_id, epoch))
+      . map_err (|reason| SelectionFailure::Stores {
+        reason, queryable_g0: true,
+      })?
+  {
+    selection . retain_generation ();
+    return Err (SelectionFailure::EnrollmentPending); }
   let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
   wait_for_tantivy_writes_idle ();
   let mut env = runtime . lock_writer_env () . map_err (|reason|
@@ -450,6 +469,15 @@ async fn select_stores (
   let expected_generation = candidate . summary . base_graph_generation;
   let selection = runtime . generation_gate . begin_selection (
     expected_generation, false) . map_err (SelectionFailure::Superseded)?;
+  if runtime . transition_maintenance (|coordinator|
+      coordinator . defer_selection_for_view_enrollment (
+        incident_id, epoch))
+      . map_err (|reason| SelectionFailure::Stores {
+        reason, queryable_g0: true,
+      })?
+  {
+    selection . retain_generation ();
+    return Err (SelectionFailure::EnrollmentPending); }
   let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
   let env = runtime . lock_writer_env () . map_err (|reason|
     SelectionFailure::Stores { reason, queryable_g0: false })?;
@@ -575,6 +603,15 @@ async fn select_manifest_only (
   let expected_generation = candidate . summary . base_graph_generation;
   let selection = runtime . generation_gate . begin_selection (
     expected_generation, false) . map_err (SelectionFailure::Superseded)?;
+  if runtime . transition_maintenance (|coordinator|
+      coordinator . defer_selection_for_view_enrollment (
+        incident_id, epoch))
+      . map_err (|reason| SelectionFailure::Stores {
+        reason, queryable_g0: true,
+      })?
+  {
+    selection . retain_generation ();
+    return Err (SelectionFailure::EnrollmentPending); }
   let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
   let env = runtime . lock_writer_env () . map_err (|reason|
     SelectionFailure::Stores { reason, queryable_g0: false })?;

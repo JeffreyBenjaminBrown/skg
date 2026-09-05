@@ -370,6 +370,17 @@
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'origin-operation-required))))
 
+(ert-deftest test-skg-selection-defers-for-new-view-enrollment ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9 :phase waiting-for-server)))
+    (skg--maintenance-server-status
+     nil
+     (concat "((status view-enrollment-pending)"
+             " (incident-id incident) (maintenance-epoch 9)"
+             " (phase archive-ready) (pending-view-uris (view)))"))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'waiting-for-view-enrollment))))
+
 (ert-deftest test-skg-maintenance-selection-installs-replacement-sources ()
   (let ((skg--maintenance-client-incident '(:epoch 9))
         (skg--active-source-set-name "main")

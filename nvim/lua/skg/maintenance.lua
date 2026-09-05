@@ -331,7 +331,9 @@ function M.handle_selection_response (_payload_text, response)
       payload.field_text(response, 'incident-id'),
       nat(response, 'maintenance-epoch'))
   end
-  if status ~= 'archive-ready' then M.record_selection(response) end
+  if status == 'candidate-selected'
+     or status == 'needs-scalar-authorization' then
+    M.record_selection(response) end
   if status == 'needs-scalar-authorization' then
     local challenge = status_challenge(response)
     incident.phase = 'awaiting-scalar-authorization'
@@ -346,6 +348,9 @@ function M.handle_selection_response (_payload_text, response)
       vim.notify('Skg maintenance archive is durable; its origin operation '
         .. 'is next')
     end
+  elseif status == 'view-enrollment-pending' then
+    incident.phase = 'waiting-for-view-enrollment'
+    vim.notify('Skg maintenance is enrolling a newly opened view')
   else
     error('Unexpected maintenance selection status: ' .. tostring(status))
   end
@@ -1434,7 +1439,8 @@ end
 function M.server_status_handler (payload_text, response)
   local status = payload.field_text(response, 'status')
   if status == 'candidate-selected'
-     or status == 'needs-scalar-authorization' then
+     or status == 'needs-scalar-authorization'
+     or status == 'view-enrollment-pending' then
     if not field_present(response, 'incident-id')
        or not field_present(response, 'maintenance-epoch') then
       error('Asynchronous maintenance selection has no exact envelope') end

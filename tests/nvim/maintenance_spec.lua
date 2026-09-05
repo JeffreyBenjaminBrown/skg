@@ -386,6 +386,20 @@ describe('skg Neovim maintenance handshake', function ()
     end)
   end)
 
+  it('defers selection while a new view awaits census enrollment', function ()
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9, phase = 'waiting-for-server',
+      registered_buffer_ids = {},
+    }
+    maintenance.server_status_handler('', {
+      f('status', 'view-enrollment-pending'), f('incident-id', incident_id),
+      f('maintenance-epoch', 9), f('phase', 'archive-ready'),
+      f('pending-view-uris', { 'view' }),
+    })
+    assert.are.equal('waiting-for-view-enrollment',
+      state.maintenance_client_incident.phase)
+  end)
+
   it('retains the exact blocked reason and recovery command', function ()
     state.maintenance_client_incident = {
       incident_id = incident_id, epoch = 9, phase = 'waiting-for-server',

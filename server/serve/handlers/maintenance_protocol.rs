@@ -11,9 +11,11 @@ use crate::maintenance::evidence::{
   ClientEvidenceBundle,
 };
 use crate::maintenance::selection::{
+  CandidateSelectionResult,
   rebuild_archived_candidate,
   select_archived_candidate,
 };
+use crate::maintenance::coordinator::VIEW_ENROLLMENT_PENDING;
 use crate::maintenance::pull::validate_repository_mapping;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
@@ -679,21 +681,42 @@ pub(crate) fn select_and_stage_candidate (
   epoch    : MaintenanceEpoch,
   verified : &VerifiedInitialArchive,
 ) -> Result<String, String> {
-  let active = matching_active (runtime, incident, epoch)?;
-  if active . origin == MaintenanceOrigin::FullRebuild
-  || active . force_full_rebuild_recovery
-  {
-    rebuild_archived_candidate (runtime, incident, epoch)?;
-  } else {
-    select_archived_candidate (runtime, incident, epoch)?;
+  let mut active = matching_active (runtime, incident, epoch)?;
+  if !active . pending_view_enrollments . is_empty () {
+    return Ok (view_enrollment_pending_payload (&active)); }
+  if active . selected_store . is_none () {
+    let selection = if active . origin == MaintenanceOrigin::FullRebuild
+      || active . force_full_rebuild_recovery
+    {
+      rebuild_archived_candidate (runtime, incident, epoch)?
+    } else {
+      select_archived_candidate (runtime, incident, epoch)?
+    };
+    if matches! (
+      selection, CandidateSelectionResult::DeferredForViewEnrollment)
+    {
+      active = matching_active (runtime, incident, epoch)?;
+      return Ok (view_enrollment_pending_payload (&active)); }
+    active = matching_active (runtime, incident, epoch)?;
+  } else if active . phase != MaintenancePhase::Presenting {
+    return Err (format! (
+      "selected maintenance candidate cannot stage views during {:?}",
+      active . phase));
   }
-  let (presentation_generation, signature_blake3) =
-    runtime . exact_git_presentation_identity ()?;
-  runtime . transition_maintenance (|coordinator|
-    coordinator . record_presentation_fence (
-      incident, epoch, signature_blake3 . clone (),
-      presentation_generation))?;
-  let active = matching_active (runtime, incident, epoch)?;
+  if !active . pending_view_enrollments . is_empty () {
+    return Ok (view_enrollment_pending_payload (&active));
+  }
+  if active . presentation_fence . is_none () {
+    let (presentation_generation, signature_blake3) =
+      runtime . exact_git_presentation_identity ()?;
+    runtime . transition_maintenance (|coordinator|
+      coordinator . record_presentation_fence (
+        incident, epoch, signature_blake3 . clone (),
+        presentation_generation))?;
+    active = matching_active (runtime, incident, epoch)?;
+  }
+  if !active . pending_view_enrollments . is_empty () {
+    return Ok (view_enrollment_pending_payload (&active)); }
   let candidate_id = active . candidate . as_ref ()
     . expect ("selected incident has candidate") . id . clone ();
   let candidate = runtime . candidate (&candidate_id)
@@ -706,24 +729,55 @@ pub(crate) fn select_and_stage_candidate (
     plan_incident_view_settlements (
       &active, verified, &interactive, &candidate)?
   };
+  let approved_pids : HashSet<ID> = active . scalar_release . as_ref ()
+    .filter (|release| release . approved)
+    .into_iter ()
+    .flat_map (|release| release . pids . iter ())
+    .map (|pid| ID::from (pid . as_str ()))
+    .collect ();
   match stage_application_settlements (
-      runtime, &active, settlements, &HashSet::new ())?
+      runtime, &active, settlements, &approved_pids)?
   {
     ApplicationStaging::Ready (settlements) => {
-      runtime . transition_maintenance (|coordinator|
+      let recorded = runtime . transition_maintenance (|coordinator|
         coordinator . record_view_settlements (
-          incident, epoch, settlements . clone ()))?;
+          incident, epoch, settlements . clone ()));
+      if let Err (error) = recorded {
+        if error == VIEW_ENROLLMENT_PENDING {
+          return matching_active (runtime, incident, epoch)
+            . map (|active| view_enrollment_pending_payload (&active)); }
+        return Err (error); }
       candidate_selected_payload (
         &active, selected_config, verified, &settlements)
     }
     ApplicationStaging::Challenge (challenge) => {
-      runtime . transition_maintenance (|coordinator|
+      let recorded = runtime . transition_maintenance (|coordinator|
         coordinator . record_scalar_challenge (
-          incident, epoch, challenge . clone ()))?;
+          incident, epoch, challenge . clone ()));
+      if let Err (error) = recorded {
+        if error == VIEW_ENROLLMENT_PENDING {
+          return matching_active (runtime, incident, epoch)
+            . map (|active| view_enrollment_pending_payload (&active)); }
+        return Err (error); }
       scalar_challenge_payload (
         &active, selected_config, verified, &challenge)
     }
   }
+}
+
+fn view_enrollment_pending_payload (
+  active : &crate::maintenance::ActiveMaintenance,
+) -> String {
+  Sexp::List (vec![
+    atom_field ("status", "view-enrollment-pending"),
+    atom_field ("incident-id", active . incident_id . as_str ()),
+    integer_field ("maintenance-epoch", active . epoch . get ()),
+    atom_field ("phase", active . phase . label ()),
+    list_field ("pending-view-uris",
+      &active . pending_view_enrollments . keys () . cloned ()
+        . collect::<Vec<_>> ()),
+    atom_field ("next-action", "submit-maintenance-census"),
+  ]) . to_string ()
 }
 
 enum ApplicationStaging {
@@ -1269,6 +1323,8 @@ fn approve_maintenance_scalar_release (
       . to_string ())?;
   let selected_snapshot = runtime . selected_snapshot ();
   let selected_config = &selected_snapshot . env . config;
+  if !active . pending_view_enrollments . is_empty () {
+    return Ok (view_enrollment_pending_payload (&active)); }
   if !active . view_settlements . is_empty () {
     let settlements : Vec<ViewSettlementRecord> = active . view_settlements
       . values () . cloned () . collect ();
@@ -1294,9 +1350,14 @@ fn approve_maintenance_scalar_release (
       "maintenance scalar challenge changed after exact authorization"
         . into ());
   };
-  runtime . transition_maintenance (|coordinator|
+  let recorded = runtime . transition_maintenance (|coordinator|
     coordinator . record_view_settlements (
-      &incident, epoch, settlements . clone ()))?;
+      &incident, epoch, settlements . clone ()));
+  if let Err (error) = recorded {
+    if error == VIEW_ENROLLMENT_PENDING {
+      return matching_active (runtime, &incident, epoch)
+        . map (|active| view_enrollment_pending_payload (&active)); }
+    return Err (error); }
   candidate_selected_payload (
     &active, selected_config, &verified, &settlements)
 }
@@ -1326,26 +1387,61 @@ pub fn handle_maintenance_status_request (
   stream  : &mut TcpStream,
   runtime : &ServerRuntime,
 ) {
-  let coordinator = runtime . maintenance . lock () . unwrap () . clone ();
-  let selected_snapshot = runtime . selected_snapshot ();
-  let selected_config = &selected_snapshot . env . config;
-  let payload = match coordinator . state {
-    CoordinatorState::Active (active) =>
-      active_status_sexp (&active, Some (selected_config)),
-    CoordinatorState::Pending (pending) => Sexp::List (vec![
-      atom_field ("status", "pending"),
-      atom_field ("pending-reason", pending . reason . label ()),
-      atom_field ("candidate-id", pending . candidate . as_ref ()
-        . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
-    ]),
-    CoordinatorState::Terminal (terminal) =>
-      sexp::parse (&terminal_payload (&terminal))
-        . expect ("terminal payload is valid"),
-    other => Sexp::List (vec![
-      atom_field ("status", other . label ()),
-    ]),
-  } . to_string ();
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", Ok (payload));
+  let result = (|| -> Result<String, String> {
+    resume_enrollment_deferred_candidate (runtime)?;
+    let coordinator = runtime . maintenance . lock () . unwrap () . clone ();
+    let selected_snapshot = runtime . selected_snapshot ();
+    let selected_config = &selected_snapshot . env . config;
+    Ok (match coordinator . state {
+      CoordinatorState::Active (active) =>
+        active_status_sexp (&active, Some (selected_config)),
+      CoordinatorState::Pending (pending) => Sexp::List (vec![
+        atom_field ("status", "pending"),
+        atom_field ("pending-reason", pending . reason . label ()),
+        atom_field ("candidate-id", pending . candidate . as_ref ()
+          . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
+      ]),
+      CoordinatorState::Terminal (terminal) =>
+        sexp::parse (&terminal_payload (&terminal))
+          . expect ("terminal payload is valid"),
+      other => Sexp::List (vec![
+        atom_field ("status", other . label ()),
+      ]),
+    } . to_string ())
+  })();
+  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn resume_enrollment_deferred_candidate (
+  runtime : &ServerRuntime,
+) -> Result<(), String> {
+  let active = match &runtime . maintenance . lock ()
+      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+      . state
+  {
+    CoordinatorState::Active (active) => active . clone (),
+    _ => return Ok (( )),
+  };
+  if active . candidate . is_none ()
+  || !active . pending_view_enrollments . is_empty ()
+  || !matches! (active . archive_status, ArchiveStatus::Ready { .. })
+  {
+    return Ok (( )); }
+  let preselection_deferred = active . phase == MaintenancePhase::ArchiveReady
+    && active . selected_store . is_none ();
+  let presentation_deferred = active . phase == MaintenancePhase::Presenting
+    && active . selected_store . is_some ()
+    && active . view_settlements . is_empty ()
+    && active . scalar_release . as_ref ()
+      . map (|release| release . approved) . unwrap_or (true);
+  if !preselection_deferred && !presentation_deferred {
+    return Ok (( )); }
+  let verified = runtime . verified_archive (&active . incident_id)
+    . ok_or_else (|| "verified initial archive was not retained"
+      . to_string ())?;
+  select_and_stage_candidate (
+    runtime, &active . incident_id, active . epoch, &verified)?;
+  Ok (( ))
 }
 
 pub fn handle_retry_maintenance_request (

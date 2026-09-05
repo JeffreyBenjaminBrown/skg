@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub(crate) const VIEW_ENROLLMENT_PENDING : &str =
+  "view classification awaits pending URI enrollment";
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MaintenanceCoordinator {
   pub epoch                : MaintenanceEpoch,
@@ -528,6 +531,32 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  /// Give a selected-store transition back its archive-ready phase when an
+  /// old-generation query completed while the generation gate was draining.
+  /// The gate caller invokes this while new queries are still excluded, so a
+  /// false result is also proof that selection may cross the G0 boundary.
+  pub fn defer_selection_for_view_enrollment (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if !matches! (active . phase,
+      MaintenancePhase::SelectingPartial
+      | MaintenancePhase::FullRebuildExclusive)
+    {
+      return Err (format! (
+        "view-enrollment selection barrier is invalid during {:?}",
+        active . phase)); }
+    if active . pending_view_enrollments . is_empty () {
+      return Ok (false); }
+    if active . selected_store . is_some () {
+      return Err (
+        "view-enrollment selection barrier followed store selection" . into ()); }
+    active . phase = MaintenancePhase::ArchiveReady;
+    Ok (true)
+  }
+
   pub fn archive_ready (
     &mut self,
     incident_id    : &IncidentId,
@@ -1000,8 +1029,7 @@ impl MaintenanceCoordinator {
         return Err (format! ("view settlement repeats buffer '{}'", id)); }
     }
     if !active . pending_view_enrollments . is_empty () {
-      return Err (
-        "view classification awaits pending URI enrollment" . into ()); }
+      return Err (VIEW_ENROLLMENT_PENDING . into ()); }
     let expected : BTreeSet<_> = active . presentation_census ()
       . keys () . cloned () . collect ();
     let actual : BTreeSet<_> = records . keys () . cloned () . collect ();
@@ -1027,6 +1055,8 @@ impl MaintenanceCoordinator {
     if active . phase != MaintenancePhase::Presenting {
       return Err (format! (
         "scalar challenge is invalid during {:?}", active . phase)); }
+    if !active . pending_view_enrollments . is_empty () {
+      return Err (VIEW_ENROLLMENT_PENDING . into ()); }
     if !active . view_settlements . is_empty () {
       return Err ("scalar challenge cannot replace planned view settlements"
         . into ()); }
@@ -2038,6 +2068,47 @@ mod tests {
     assert! (enrolled . registered_buffer_ids . is_empty ());
     assert_eq! (enrolled . presentation_buffer_ids (), ["late-buffer"]);
     assert! (enrolled . pending_view_enrollments . is_empty ());
+  }
+
+  #[test]
+  fn selection_waits_for_a_query_to_bind_its_client_buffer () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let candidate = candidate ();
+    coordinator . set_pending_valid (candidate . clone ()) . unwrap ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation, Some (candidate)) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "server" . into (),
+        artifact_count: 1, total_file_bytes: 2,
+      }) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::SelectingPartial) . unwrap ();
+    coordinator . enroll_pending_view (PendingViewEnrollment {
+      view_uri: "late-view" . into (), graph_generation: 1,
+      presentation_generation: 2, server_revision: 3, application_token: 4,
+    }) . unwrap ();
+    assert! (coordinator . defer_selection_for_view_enrollment (
+      &active . incident_id, active . epoch) . unwrap ());
+    let CoordinatorState::Active (deferred) = &coordinator . state else {
+      panic! ("deferred selection stopped being active"); };
+    assert_eq! (deferred . phase, MaintenancePhase::ArchiveReady);
+    assert! (deferred . server_evidence . is_some ());
+
+    coordinator . enroll_presentation_census (
+      vec![late_clean_view ("late-buffer", "late-view", active . epoch)],
+      Some (active . epoch . get ())) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::SelectingPartial) . unwrap ();
+    assert! (!coordinator . defer_selection_for_view_enrollment (
+      &active . incident_id, active . epoch) . unwrap ());
+    let CoordinatorState::Active (ready) = &coordinator . state else {
+      panic! ("ready selection stopped being active"); };
+    assert_eq! (ready . phase, MaintenancePhase::SelectingPartial);
   }
 
   #[test]
