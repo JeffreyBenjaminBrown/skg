@@ -74,4 +74,51 @@
         (kill-buffer buffer))
       (delete-directory directory t))))
 
+(ert-deftest test-skg-undo-sidecar-restores-without-mutating-archive ()
+  (skip-unless (equal (skg-undo-sidecar-package-version) "0.8"))
+  (let* ((directory (make-temp-file "skg-undo-sidecar-restore-" t))
+         (pseudo-file (expand-file-name "unsaved-changes.org" directory))
+         (sidecar (expand-file-name "undo.emacs.gz" directory))
+         (source (generate-new-buffer " *skg-undo-restore-source*"))
+         (target (generate-new-buffer " *skg-undo-restore-target*")))
+    (unwind-protect
+        (let (text sidecar-before)
+          (with-current-buffer source
+            (org-mode)
+            (buffer-disable-undo)
+            (insert "* Root λ\nbase\n")
+            (buffer-enable-undo)
+            (setq buffer-undo-list nil pending-undo-list nil)
+            (goto-char (point-max))
+            (insert "unsaved café 🐙\n")
+            (undo-boundary)
+            (setq text (skg-undo-sidecar--raw-text))
+            (skg-test--write-private-utf8 pseudo-file text)
+            (should (eq (plist-get
+                         (skg-undo-sidecar-save
+                          source pseudo-file sidecar directory)
+                         :status)
+                        'archived)))
+          (setq sidecar-before (skg-undo-sidecar--read-bytes sidecar))
+          (with-current-buffer target
+            (org-mode)
+            (buffer-disable-undo)
+            (insert text)
+            (buffer-enable-undo)
+            (setq buffer-undo-list nil pending-undo-list nil)
+            (set-buffer-modified-p nil)
+            (should (memq
+                     (skg-undo-sidecar-restore
+                      target pseudo-file sidecar "0.8")
+                     '(undo-redo-probed structurally-validated-apply)))
+            (should-not buffer-file-name)
+            (should (equal text (skg-undo-sidecar--raw-text))))
+          (should (equal sidecar-before
+                         (skg-undo-sidecar--read-bytes sidecar))))
+      (dolist (buffer (list source target))
+        (when (buffer-live-p buffer)
+          (with-current-buffer buffer (set-buffer-modified-p nil))
+          (kill-buffer buffer)))
+      (delete-directory directory t))))
+
 (provide 'test-skg-undo-sidecar)

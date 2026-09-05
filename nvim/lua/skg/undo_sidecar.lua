@@ -227,6 +227,45 @@ function M.save (buf, current_text_path, sidecar_path, incident_staging)
   }
 end
 
+---Restore an already verified native sidecar into BUF without mutating either
+---archive artifact.  EXPECTED_VERSION must match this exact Neovim build.
+---@param buf integer
+---@param current_text_path string
+---@param sidecar_path string
+---@param expected_version string|nil
+---@return string validation
+function M.restore (buf, current_text_path, sidecar_path, expected_version)
+  if not vim.api.nvim_buf_is_valid(buf)
+     or not vim.api.nvim_buf_is_loaded(buf) then
+    fail('recovery buffer is not live') end
+  if expected_version and expected_version ~= version_string() then
+    fail('unsupported archived undo version ' .. expected_version) end
+  local archived_text, text_stat = read_regular_file(
+    current_text_path, 'current-text artifact')
+  local sidecar_bytes, sidecar_stat = read_regular_file(
+    sidecar_path, 'native undo sidecar')
+  if text_stat.mode % 512 ~= 384
+     or sidecar_stat.mode % 512 ~= 384
+     or (text_stat.nlink and text_stat.nlink ~= 1)
+     or (sidecar_stat.nlink and sidecar_stat.nlink ~= 1) then
+    fail('recovery artifacts are not private single-link files') end
+  if raw_text(buf) ~= archived_text then
+    fail('recovery buffer text differs from its archive artifact') end
+
+  command_in_buffer(
+    buf, 'silent rundo ' .. vim.fn.fnameescape(sidecar_path))
+  local recovered_tree = buffer_undotree(buf)
+  local validation = verify_sidecar(
+    archived_text, sidecar_path, recovered_tree)
+  if raw_text(buf) ~= archived_text
+     or read_regular_file(current_text_path, 'current-text artifact')
+       ~= archived_text
+     or read_regular_file(sidecar_path, 'native undo sidecar')
+       ~= sidecar_bytes then
+    fail('native undo restore changed archived or live text') end
+  return validation
+end
+
 -- Exposed only to let fixture tests compare a native recovery without
 -- depending on volatile undo timestamps or the synchronization flag.
 M._tree_shape = tree_shape

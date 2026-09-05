@@ -101,6 +101,42 @@ describe('skg native Neovim undo sidecar', function ()
     assert(ok, err)
   end)
 
+  it('restores a native tree without mutating archive artifacts', function ()
+    local directory = private_directory()
+    local current_path = directory .. '/unsaved-changes.org'
+    local sidecar = directory .. '/undo.nvim'
+    local source = new_buffer_with_base({ '* Root λ', 'base' })
+    local target = nil
+    local ok, err = xpcall(function ()
+      vim.api.nvim_buf_set_lines(source, 2, 2, false, { 'branch café' })
+      vim.api.nvim_buf_call(source, function () vim.cmd('silent undo') end)
+      vim.api.nvim_buf_set_lines(source, 2, 2, false, { 'branch 🐙' })
+      local text = raw_text(source)
+      write_private(current_path, text)
+      local saved = undo_sidecar.save(
+        source, current_path, sidecar, directory)
+      local sidecar_before = read_bytes(sidecar)
+      local expected_tree = vim.api.nvim_buf_call(
+        source, function () return vim.fn.undotree() end)
+      target = new_buffer_with_base(
+        vim.api.nvim_buf_get_lines(source, 0, -1, false))
+      local version = vim.version()
+      local validation = undo_sidecar.restore(
+        target, current_path, sidecar,
+        string.format('%d.%d.%d', version.major, version.minor, version.patch))
+      assert.is_truthy(validation:find('probed', 1, true))
+      assert.same(undo_sidecar._tree_shape(expected_tree),
+        undo_sidecar._tree_shape(vim.api.nvim_buf_call(
+          target, function () return vim.fn.undotree() end)))
+      assert.are.equal(text, raw_text(target))
+      assert.are.equal(sidecar_before, read_bytes(sidecar))
+      assert.are.equal(saved.sha256, vim.fn.sha256(read_bytes(sidecar)))
+    end, debug.traceback)
+    cleanup(target)
+    cleanup(source, directory)
+    assert(ok, err)
+  end)
+
   it('refuses to bind undo history to different current text', function ()
     local directory = private_directory()
     local current_path = directory .. '/unsaved-changes.org'

@@ -165,6 +165,63 @@
                   '("undo-fu-session refused the archived text"))))))
   (skg-undo-sidecar--validate-recovered-state buffer))
 
+(defun skg-undo-sidecar--require-private-regular (path description)
+  (let ((attributes (file-attributes path 'integer)))
+    (when (file-symlink-p path)
+      (signal 'skg-undo-sidecar-error
+              (list (format "%s is a symlink" description))))
+    (unless (and attributes
+                 (file-regular-p path)
+                 (= (logand (or (file-modes path) 0) #o777) #o600)
+                 (= (file-attribute-link-number attributes) 1))
+      (signal 'skg-undo-sidecar-error
+              (list (format "%s is not a private regular file"
+                            description))))))
+
+(defun skg-undo-sidecar-restore
+    (buffer pseudo-file sidecar &optional expected-version)
+  "Restore SIDECAR into BUFFER without writing below the archive.
+PSEUDO-FILE contains BUFFER's exact archived text.  EXPECTED-VERSION, when
+non-nil, must name the exact supported undo-fu-session version."
+  (with-current-buffer buffer
+    (when (and expected-version (not (equal expected-version "0.8")))
+      (signal 'skg-undo-sidecar-error
+              (list (format "unsupported archived undo version %s"
+                            expected-version))))
+    (when-let ((reason (skg-undo-sidecar-capability-error)))
+      (signal 'skg-undo-sidecar-error (list reason)))
+    (skg-undo-sidecar--require-private-regular
+     pseudo-file "current-text artifact")
+    (skg-undo-sidecar--require-private-regular
+     sidecar "native undo sidecar")
+    (let* ((pseudo-bytes (skg-undo-sidecar--read-bytes pseudo-file))
+           (sidecar-bytes (skg-undo-sidecar--read-bytes sidecar))
+           (live-bytes (skg--utf8-unix-bytes
+                        (skg-undo-sidecar--raw-text)))
+           (package-dir (make-temp-file "skg-undo-restore-" t))
+           validation)
+      (unless (equal live-bytes pseudo-bytes)
+        (signal 'skg-undo-sidecar-error
+                '("recovery buffer text differs from its archive artifact")))
+      (set-file-modes package-dir #o700)
+      (require 'undo-fu-session)
+      (unwind-protect
+          (setq validation
+                (skg-undo-sidecar--recover
+                 buffer pseudo-file sidecar package-dir))
+        (when (file-directory-p package-dir)
+          (delete-directory package-dir t)))
+      (unless (and (equal pseudo-bytes
+                          (skg-undo-sidecar--read-bytes pseudo-file))
+                   (equal sidecar-bytes
+                          (skg-undo-sidecar--read-bytes sidecar))
+                   (equal live-bytes
+                          (skg--utf8-unix-bytes
+                           (skg-undo-sidecar--raw-text))))
+        (signal 'skg-undo-sidecar-error
+                '("native undo restore changed archived or live text")))
+      validation)))
+
 (defun skg-undo-sidecar-save (buffer pseudo-file sidecar incident-staging)
   "Archive BUFFER's native history to SIDECAR and verify a round trip.
 PSEUDO-FILE is the already-written exact current-text artifact.  Return a
