@@ -31,6 +31,7 @@
 (require 'skg-org-fold)
 (require 'skg-focus)
 (require 'skg-request-save)
+(require 'skg-request-text-search)
 
 (defun skg-test--buffer-text ()
   (buffer-substring-no-properties (point-min) (point-max)))
@@ -313,6 +314,52 @@ headline and not back on the focused headline."
                         skg--buffer-record)))
           (should (equal "true" (cdr (assoc 'applied acknowledgement))))
           (should (equal "view-uri"
+                         (cdr (assoc 'view-uri acknowledgement)))))
+      (kill-buffer buf))))
+
+(ert-deftest test-search-enrichment-normalizes-unquoted-wire-atoms ()
+  "Symbol-shaped wire atoms still match string-valued search authority."
+  (let ((buf (generate-new-buffer "*test-search-wire-atoms*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--server-store-state '((graph-generation . 2)))
+        (skg--active-source-set-name "all")
+        acknowledgement)
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "search:bravo"
+                      skg--application-token 2)
+          (insert "* (skg (node (id root))) root\n")
+          (skg-register-buffer
+           buf 'search-view :lifecycle 'live-view :disposable nil
+           :view-uri skg-view-uri :last-fetched (buffer-string)
+           :graph-generation 2 :presentation-generation 0
+           :server-revision 1 :application-token 2)
+          (set-buffer-modified-p nil)
+          (cl-letf (((symbol-function 'skg-register-response-handler)
+                     (lambda (&rest _)))
+                    ((symbol-function 'skg-submit-request)
+                     (lambda (_tcp request &rest _)
+                       (setq acknowledgement (read request)))))
+            (skg--display-search-enrichment
+             nil
+             (format
+              "((operation-id search-1) (view-uri search:bravo)\
+ (client-buffer-id %s) (terms \"bravo\")\
+ (content \"* (skg (node (id root))) enriched\\n\")\
+ (warnings ()) (graph-generation 3) (presentation-generation 0)\
+ (viewforest-base-revision 1) (resulting-server-revision 2)\
+ (view-base-graph-generation 2)\
+ (view-base-presentation-generation 0)\
+ (expected-client-application-token 2)\
+ (resulting-client-application-token 3)\
+ (view-base-source-set all) (resulting-source-set all))"
+              (skg--buffer-record-id skg--buffer-record))))
+          (should (string-match-p "enriched" (buffer-string)))
+          (should (= 3 (skg--buffer-record-graph-generation
+                        skg--buffer-record)))
+          (should (equal "true" (cdr (assoc 'applied acknowledgement))))
+          (should (equal "search:bravo"
                          (cdr (assoc 'view-uri acknowledgement)))))
       (kill-buffer buf))))
 

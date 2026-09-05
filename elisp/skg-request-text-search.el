@@ -231,9 +231,11 @@ Exits readonly after replacing content."
          (terms   (skg--as-string (cadr (assoc 'terms   response))))
          (content (skg--as-string (cadr (assoc 'content response))))
          (warnings (cadr (assoc 'warnings response)))
-         (operation-id (cadr (assoc 'operation-id response)))
-         (uri (cadr (assoc 'view-uri response)))
-         (client-buffer-id (cadr (assoc 'client-buffer-id response)))
+         (operation-id
+          (skg--as-string (cadr (assoc 'operation-id response))))
+         (uri (skg--as-string (cadr (assoc 'view-uri response))))
+         (client-buffer-id
+          (skg--as-string (cadr (assoc 'client-buffer-id response))))
          (graph-generation
           (skg--nat-from-response response 'graph-generation))
          (presentation-generation
