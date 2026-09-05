@@ -274,7 +274,7 @@ impl MaintenanceEvidenceStore {
     let (header, publication, _) = load_evidence_header (
       &self . directory . join (incident . as_str ()),
       &self . config_identity,
-      Some (incident), false)?;
+      Some (incident), true)?;
     let mut bytes = Vec::new ();
     let mut records = Vec::new ();
     for (index, artifact) in header . artifacts . iter () . enumerate () {
@@ -1100,6 +1100,145 @@ mod tests {
   }
 
   #[test]
+  fn recovery_payload_round_trips_complete_g0_and_g1 () {
+    let modified = ID::from ("modified");
+    let deleted = ID::from ("deleted");
+    let added = ID::from ("added");
+    let modified_before = semantic_node (&modified, "before");
+    let modified_after = semantic_node (&modified, "after");
+    let deleted_before = semantic_node (&deleted, "deleted");
+    let added_after = semantic_node (&added, "added");
+    let changed_path = PathBuf::from ("changed.skg");
+    let deleted_path = PathBuf::from ("deleted.skg");
+    let added_path = PathBuf::from ("added.skg");
+    let before_changed_digest = PathDigest::of_bytes (b"before");
+    let after_changed_digest = PathDigest::of_bytes (b"after");
+    let deleted_digest = PathDigest::of_bytes (b"deleted");
+    let added_digest = PathDigest::of_bytes (b"added");
+    let recovery = MaintenanceRecoveryPayload {
+      format_version: EVIDENCE_FORMAT_VERSION,
+      g0_manifest: BTreeMap::from ([
+        (changed_path . clone (), before_changed_digest),
+        (deleted_path . clone (), deleted_digest),
+      ]),
+      g0_nodes: vec![modified_before . clone (), deleted_before . clone ()],
+      node_delta: vec![
+        ReversibleNodeDelta {
+          primary_id: modified . to_string (),
+          before: Some (modified_before . clone ()),
+          after: Some (modified_after . clone ()),
+        },
+        ReversibleNodeDelta {
+          primary_id: deleted . to_string (),
+          before: Some (deleted_before . clone ()),
+          after: None,
+        },
+        ReversibleNodeDelta {
+          primary_id: added . to_string (),
+          before: None,
+          after: Some (added_after . clone ()),
+        },
+      ],
+      path_delta: vec![
+        ReversiblePathDelta {
+          path: changed_path . clone (),
+          before: Some (before_changed_digest),
+          after: Some (after_changed_digest),
+        },
+        ReversiblePathDelta {
+          path: deleted_path . clone (),
+          before: Some (deleted_digest),
+          after: None,
+        },
+        ReversiblePathDelta {
+          path: added_path . clone (),
+          before: None,
+          after: Some (added_digest),
+        },
+      ],
+    };
+    let encoded = encode_recovery_payload (&recovery) . unwrap ();
+    let decoded = decode_recovery_payload (&encoded) . unwrap ();
+    assert_eq! (decoded, recovery);
+    let reconstructed = reconstruct_evidence (&decoded) . unwrap ();
+    assert_eq! (reconstructed . g0_nodes, BTreeMap::from ([
+      (modified . to_string (), modified_before),
+      (deleted . to_string (), deleted_before),
+    ]));
+    assert_eq! (reconstructed . g1_nodes, BTreeMap::from ([
+      (modified . to_string (), modified_after),
+      (added . to_string (), added_after),
+    ]));
+    assert_eq! (reconstructed . g0_manifest, BTreeMap::from ([
+      (changed_path . clone (), before_changed_digest),
+      (deleted_path, deleted_digest),
+    ]));
+    assert_eq! (reconstructed . g1_manifest, BTreeMap::from ([
+      (changed_path, after_changed_digest),
+      (added_path, added_digest),
+    ]));
+  }
+
+  #[test]
+  fn recovery_payload_rejects_a_delta_whose_before_value_is_false () {
+    let pid = ID::from ("node");
+    let recovery = MaintenanceRecoveryPayload {
+      format_version: EVIDENCE_FORMAT_VERSION,
+      g0_manifest: Default::default (),
+      g0_nodes: vec![semantic_node (&pid, "actual")],
+      node_delta: vec![ReversibleNodeDelta {
+        primary_id: pid . to_string (),
+        before: Some (semantic_node (&pid, "false")),
+        after: Some (semantic_node (&pid, "after")),
+      }],
+      path_delta: Vec::new (),
+    };
+    assert! (reconstruct_evidence (&recovery) . unwrap_err ()
+      . contains ("does not match G0"));
+  }
+
+  #[test]
+  fn one_node_delta_does_not_serialize_a_second_corpus () {
+    #[derive(Serialize)]
+    struct TwoFullGenerations<'a> {
+      g0_nodes : &'a [SemanticNodeEvidence],
+      g1_nodes : &'a [SemanticNodeEvidence],
+    }
+
+    let mut g0_nodes = Vec::new ();
+    for index in 0..512 {
+      let pid = ID::from (format! ("node-{:04}", index));
+      let mut node = semantic_node (&pid, &format! ("title-{:04}", index));
+      node . body = Some (format! ("unique-body-{:04}-{}",
+        index, "x" . repeat (256)));
+      g0_nodes . push (node);
+    }
+    let before = g0_nodes[0] . clone ();
+    let mut after = before . clone ();
+    after . title = "changed title" . into ();
+    let recovery = MaintenanceRecoveryPayload {
+      format_version: EVIDENCE_FORMAT_VERSION,
+      g0_manifest: Default::default (),
+      g0_nodes: g0_nodes . clone (),
+      node_delta: vec![ReversibleNodeDelta {
+        primary_id: before . pid . clone (),
+        before: Some (before),
+        after: Some (after),
+      }],
+      path_delta: Vec::new (),
+    };
+    let compact_bytes = encode_recovery_payload (&recovery) . unwrap ();
+    let mut duplicated_bytes = Vec::new ();
+    ciborium::ser::into_writer (&TwoFullGenerations {
+      g0_nodes: &g0_nodes,
+      g1_nodes: &g0_nodes,
+    }, &mut duplicated_bytes) . unwrap ();
+    assert! (compact_bytes . len () * 10 < duplicated_bytes . len () * 6,
+      "one-baseline payload was {} bytes; duplicated corpus was {} bytes",
+      compact_bytes . len (), duplicated_bytes . len ());
+  }
+
+  #[test]
   fn candidate_bundle_round_trips_and_rejects_an_extra_file () {
     let temporary = tempdir () . unwrap ();
     let config_path = temporary . path () . join ("skgconfig.toml");
@@ -1219,7 +1358,7 @@ mod tests {
       modified_primary_ids: BTreeSet::from ([pid . clone ()]),
       evidence: BTreeMap::from ([
         (pid . clone (), SemanticChangeEvidence {
-          before: Some (before), after: Some (after),
+          before: Some (before . clone ()), after: Some (after . clone ()),
           diff: "-before\n+after\n" . into (),
         }),
       ]),
@@ -1235,6 +1374,19 @@ mod tests {
       temporary . path () . join ("evidence"), config_identity (&config));
     let publication = store . publish_candidate (
       &active, &config, &selected, &candidate) . unwrap ();
+    let (loaded, _) = store . load (&active . incident_id) . unwrap ();
+    assert_eq! (loaded . recovery . g0_nodes . len (), 1);
+    assert_eq! (loaded . recovery . node_delta . len (), 1);
+    let reconstructed = reconstruct_evidence (&loaded . recovery) . unwrap ();
+    assert_eq! (reconstructed . g0_nodes . get (&pid . to_string ()),
+      Some (&before));
+    assert_eq! (reconstructed . g1_nodes . get (&pid . to_string ()),
+      Some (&after));
+    assert_eq! (reconstructed . g0_manifest, selected . manifest);
+    assert_eq! (reconstructed . g1_manifest, candidate . manifest);
+    assert! (!publication . path . join ("bundle.yaml") . exists ());
+    assert! (publication . path . join (HEADER_FILENAME) . exists ());
+    assert! (publication . path . join (RECOVERY_FILENAME) . exists ());
     let client = store . client_bundle (&active . incident_id) . unwrap ();
     assert_eq! (store . client_bundle (&active . incident_id) . unwrap (), client);
 
@@ -1256,6 +1408,15 @@ mod tests {
     let start = raw . byte_offset as usize;
     let end = start + raw . byte_length as usize;
     assert_eq! (&client . bytes[start..end], after_bytes);
+
+    let recovery_path = publication . path . join (RECOVERY_FILENAME);
+    let mut corrupt = fs::read (&recovery_path) . unwrap ();
+    corrupt[0] ^= 0xff;
+    fs::write (&recovery_path, corrupt) . unwrap ();
+    assert! (store . load (&active . incident_id) . unwrap_err ()
+      . contains ("recovery evidence checksum mismatch"));
+    assert! (store . client_bundle (&active . incident_id) . unwrap_err ()
+      . contains ("recovery evidence checksum mismatch"));
   }
 
   fn semantic_node (pid : &ID, title : &str) -> SemanticNodeEvidence {
