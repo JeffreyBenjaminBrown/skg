@@ -7,7 +7,6 @@
 
 use super::candidate::{
   ObservedDiskCandidate,
-  SemanticChangeEvidence,
   SemanticNodeEvidence,
   config_file_blake3,
   config_identity,
@@ -16,11 +15,11 @@ use super::candidate::{
 use super::journal::MaintenanceJournalStore;
 use super::types::{ActiveMaintenance, CandidateSummary, IncidentId, MaintenanceEpoch};
 use crate::save::nodecompletes_from_graph;
-use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::store_state::{
   GraphGeneration,
   ManifestRevision,
+  PathDigest,
   SelectedPathManifest,
   SelectedStoreState,
 };
@@ -30,7 +29,7 @@ use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg(unix)]
@@ -41,11 +40,15 @@ use std::os::unix::fs::{
   PermissionsExt,
 };
 
-const EVIDENCE_FORMAT_VERSION : u32 = 2;
+const EVIDENCE_FORMAT_VERSION : u32 = 3;
+const HEADER_FILENAME : &str = "header.yaml";
+const RECOVERY_FILENAME : &str = "recovery.cbor.zst";
+const RECOVERY_ENCODING : &str = "cbor";
+const RECOVERY_COMPRESSION : &str = "zstd-level-3";
 pub const CLIENT_EVIDENCE_FORMAT_VERSION : u32 = 1;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct MaintenanceEvidenceBundle {
+pub struct MaintenanceEvidenceHeader {
   pub format_version       : u32,
   pub incident_id          : IncidentId,
   pub maintenance_epoch    : MaintenanceEpoch,
@@ -55,24 +58,56 @@ pub struct MaintenanceEvidenceBundle {
   pub source_catalog_blake3 : String,
   pub g0_graph_generation   : GraphGeneration,
   pub g0_manifest_revision  : ManifestRevision,
-  pub g0_manifest           : SelectedPathManifest,
-  pub g1_manifest           : SelectedPathManifest,
-  pub g0_nodes              : Vec<SemanticNodeEvidence>,
-  pub g1_nodes              : Vec<SemanticNodeEvidence>,
-  pub transition_delta      : Vec<EvidenceDefinition>,
+  pub recovery              : RecoveryPayloadRecord,
   pub added_primary_ids     : BTreeSet<ID>,
   pub deleted_primary_ids   : BTreeSet<ID>,
   pub modified_primary_ids  : BTreeSet<ID>,
-  pub semantic_evidence     : BTreeMap<ID, SemanticChangeEvidence>,
   pub warnings              : Vec<String>,
   pub artifacts             : Vec<EvidenceArtifact>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "kind")]
-pub enum EvidenceDefinition {
-  Save { node : SemanticNodeEvidence },
-  Delete { id : ID, source : SourceName },
+pub struct RecoveryPayloadRecord {
+  pub relative_path     : PathBuf,
+  pub encoding          : String,
+  pub compression       : String,
+  pub uncompressed_bytes : u64,
+  pub byte_length       : u64,
+  pub sha256            : String,
+  pub blake3            : String,
+}
+
+/// The one corpus-sized recovery value.  G1 is represented reversibly instead
+/// of storing a second almost-identical corpus.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MaintenanceRecoveryPayload {
+  pub format_version : u32,
+  pub g0_manifest           : SelectedPathManifest,
+  pub g0_nodes              : Vec<SemanticNodeEvidence>,
+  pub node_delta            : Vec<ReversibleNodeDelta>,
+  pub path_delta            : Vec<ReversiblePathDelta>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ReversibleNodeDelta {
+  pub primary_id : String,
+  pub before     : Option<SemanticNodeEvidence>,
+  pub after      : Option<SemanticNodeEvidence>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ReversiblePathDelta {
+  pub path   : PathBuf,
+  pub before : Option<PathDigest>,
+  pub after  : Option<PathDigest>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReconstructedEvidence {
+  pub g0_manifest : SelectedPathManifest,
+  pub g1_manifest : SelectedPathManifest,
+  pub g0_nodes    : BTreeMap<String, SemanticNodeEvidence>,
+  pub g1_nodes    : BTreeMap<String, SemanticNodeEvidence>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -85,10 +120,10 @@ pub struct EvidenceArtifact {
   pub blake3        : String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct EvidenceEnvelope {
-  payload        : MaintenanceEvidenceBundle,
-  payload_blake3 : String,
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaintenanceEvidenceBundle {
+  pub header   : MaintenanceEvidenceHeader,
+  pub recovery : MaintenanceRecoveryPayload,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -160,7 +195,7 @@ impl MaintenanceEvidenceStore {
     let final_path = self . directory . join (active . incident_id . as_str ());
     if final_path . exists () {
       let (bundle, publication) = self . load (&active . incident_id)?;
-      if bundle . candidate == candidate . summary {
+      if bundle . header . candidate == candidate . summary {
         return Ok (publication); }
       // A candidate can become stale after its bundle is durable but before
       // the first store mutation.  Preserve that attempted evidence under a
@@ -168,7 +203,8 @@ impl MaintenanceEvidenceStore {
       // replacement candidate.  Nothing is deleted or overwritten.
       let superseded_path = self . directory . join (format! (
         "{}--superseded--{}--{}",
-        active . incident_id, bundle . candidate . id, uuid::Uuid::new_v4 ()));
+        active . incident_id, bundle . header . candidate . id,
+        uuid::Uuid::new_v4 ()));
       fs::rename (&final_path, &superseded_path)
         . map_err (|error| format! (
           "could not preserve superseded candidate evidence: {}", error))?;
@@ -179,7 +215,7 @@ impl MaintenanceEvidenceStore {
       ".{}.{}.tmp", active . incident_id, uuid::Uuid::new_v4 ()));
     create_private_directory (&temporary)?;
     let result = (|| {
-      let (mut bundle, artifacts) = build_bundle (
+      let (mut header, recovery, artifacts) = build_evidence (
         active, config, selected, candidate)?;
       for artifact in &artifacts {
         let path = temporary . join (&artifact . metadata . relative_path);
@@ -188,25 +224,30 @@ impl MaintenanceEvidenceStore {
         create_private_directory_all (parent)?;
         write_private_file (&path, &artifact . bytes)?;
       }
-      bundle . artifacts = artifacts . iter ()
+      header . artifacts = artifacts . iter ()
         . map (|artifact| artifact . metadata . clone ()) . collect ();
-      let payload_bytes = serde_yaml::to_string (&bundle)
+      let recovery_uncompressed = encode_recovery_payload (&recovery)?;
+      let recovery_bytes = zstd::stream::encode_all (
+        Cursor::new (&recovery_uncompressed), 3)
+        . map_err (|error| format! ("could not compress recovery evidence: {}",
+          error))?;
+      header . recovery = recovery_record (
+        recovery_uncompressed . len (), &recovery_bytes);
+      let header_bytes = serde_yaml::to_string (&header)
         . map_err (|error| error . to_string ())? . into_bytes ();
-      let envelope = EvidenceEnvelope {
-        payload: bundle,
-        payload_blake3: blake3_hex (&payload_bytes),
-      };
-      let envelope_bytes = serde_yaml::to_string (&envelope)
-        . map_err (|error| error . to_string ())? . into_bytes ();
-      write_private_file (&temporary . join ("bundle.yaml"), &envelope_bytes)?;
+      write_private_file (
+        &temporary . join (RECOVERY_FILENAME), &recovery_bytes)?;
+      write_private_file (&temporary . join (HEADER_FILENAME), &header_bytes)?;
       sync_tree_directories (&temporary)?;
-      validate_evidence_directory (
-        &temporary, &self . config_identity, Some (&active . incident_id))?;
+      let publication = verify_new_publication (
+        &temporary, &header, &header_bytes, &recovery_bytes, &artifacts)?;
       fs::rename (&temporary, &final_path)
         . map_err (|error| error . to_string ())?;
       sync_directory (&self . directory)?;
-      let (_, publication) = self . load (&active . incident_id)?;
-      Ok (publication)
+      Ok (PublishedMaintenanceEvidence {
+        path: final_path . clone (),
+        .. publication
+      })
     })();
     // Incomplete temporary directories are intentionally retained.  They are
     // crash evidence and, unlike the final path, never grant mutation authority.
@@ -217,7 +258,7 @@ impl MaintenanceEvidenceStore {
     &self,
     incident : &IncidentId,
   ) -> Result<(MaintenanceEvidenceBundle, PublishedMaintenanceEvidence), String> {
-    validate_evidence_directory (
+    load_evidence_directory (
       &self . directory . join (incident . as_str ()),
       &self . config_identity,
       Some (incident))
@@ -230,22 +271,20 @@ impl MaintenanceEvidenceStore {
     &self,
     incident : &IncidentId,
   ) -> Result<ClientEvidenceBundle, String> {
-    let (bundle, publication) = self . load (incident)?;
+    let (header, publication, _) = load_evidence_header (
+      &self . directory . join (incident . as_str ()),
+      &self . config_identity,
+      Some (incident), false)?;
     let mut bytes = Vec::new ();
     let mut records = Vec::new ();
-    for (index, artifact) in bundle . artifacts . iter () . enumerate () {
+    for (index, artifact) in header . artifacts . iter () . enumerate () {
       let relative_path = artifact . relative_path . to_str ()
         . ok_or_else (|| "client evidence path is not UTF-8" . to_string ())?
         . to_string ();
-      let artifact_bytes = fs::read (
-        publication . path . join (&artifact . relative_path))
-        . map_err (|error| error . to_string ())?;
-      if artifact_bytes . len () as u64 != artifact . byte_length
-      || sha256_hex (&artifact_bytes) != artifact . sha256
-      || blake3_hex (&artifact_bytes) != artifact . blake3
-      {
-        return Err (format! (
-          "evidence artifact changed before transfer: {}", relative_path)); }
+      let artifact_bytes = validate_artifact_bytes (
+        &publication . path, artifact) . map_err (|error| format! (
+          "evidence artifact changed before transfer: {}: {}",
+          relative_path, error))?;
       let byte_offset = bytes . len () as u64;
       bytes . extend_from_slice (&artifact_bytes);
       records . push (ClientEvidenceArtifact {
@@ -259,12 +298,12 @@ impl MaintenanceEvidenceStore {
     }
     let artifact_bytes_sha256 = sha256_hex (&bytes);
     let transfer_manifest_sha256 = client_transfer_manifest_sha256 (
-      &bundle . incident_id, bundle . maintenance_epoch, &bundle . candidate,
+      &header . incident_id, header . maintenance_epoch, &header . candidate,
       &publication . bundle_sha256, &artifact_bytes_sha256, &records)?;
     Ok (ClientEvidenceBundle {
-      incident_id: bundle . incident_id,
-      maintenance_epoch: bundle . maintenance_epoch,
-      candidate: bundle . candidate,
+      incident_id: header . incident_id,
+      maintenance_epoch: header . maintenance_epoch,
+      candidate: header . candidate,
       server_bundle_sha256: publication . bundle_sha256,
       transfer_manifest_sha256,
       artifact_bytes_sha256,
@@ -358,12 +397,16 @@ fn validate_candidate_contract (
   Ok (( ))
 }
 
-fn build_bundle (
+fn build_evidence (
   active    : &ActiveMaintenance,
   config    : &SkgConfig,
   selected  : &SelectedStoreState,
   candidate : &ObservedDiskCandidate,
-) -> Result<(MaintenanceEvidenceBundle, Vec<ArtifactBytes>), String> {
+) -> Result<(
+  MaintenanceEvidenceHeader,
+  MaintenanceRecoveryPayload,
+  Vec<ArtifactBytes>,
+), String> {
   let mut artifacts = Vec::new ();
   let classified : BTreeSet<&ID> = candidate . added_primary_ids . iter ()
     . chain (&candidate . deleted_primary_ids)
@@ -433,21 +476,31 @@ fn build_bundle (
   let mut g0_nodes : Vec<SemanticNodeEvidence> =
     nodecompletes_from_graph (&selected . graph) . iter ()
       . map (SemanticNodeEvidence::from) . collect ();
-  let mut g1_nodes : Vec<SemanticNodeEvidence> =
-    nodecompletes_from_graph (&candidate . graph) . iter ()
-      . map (SemanticNodeEvidence::from) . collect ();
   g0_nodes . sort_by (|left, right| left . pid . cmp (&right . pid));
-  g1_nodes . sort_by (|left, right| left . pid . cmp (&right . pid));
-  let transition_delta = candidate . definitions . iter () . map (|definition|
-    match definition {
-      DefineNode::Save (SaveNode (node)) => EvidenceDefinition::Save {
-        node: SemanticNodeEvidence::from (node),
-      },
-      DefineNode::Delete (DeleteNode { id, source }) => EvidenceDefinition::Delete {
-        id: id . clone (), source: source . clone (),
-      },
+  let node_delta = candidate . evidence . iter () . map (|(pid, evidence)|
+    ReversibleNodeDelta {
+      primary_id: pid . to_string (),
+      before: evidence . before . clone (),
+      after: evidence . after . clone (),
     }) . collect ();
-  let bundle = MaintenanceEvidenceBundle {
+  let all_paths : BTreeSet<PathBuf> = selected . manifest . keys () . cloned ()
+    . chain (candidate . manifest . keys () . cloned ()) . collect ();
+  let path_delta = all_paths . into_iter () . filter_map (|path| {
+    let before = selected . manifest . get (&path) . copied ();
+    let after = candidate . manifest . get (&path) . copied ();
+    (before != after) . then_some (ReversiblePathDelta {
+      path, before, after,
+    })
+  }) . collect ();
+  let recovery = MaintenanceRecoveryPayload {
+    format_version: EVIDENCE_FORMAT_VERSION,
+    g0_manifest: selected . manifest . clone (),
+    g0_nodes,
+    node_delta,
+    path_delta,
+  };
+  reconstruct_evidence (&recovery)?;
+  let header = MaintenanceEvidenceHeader {
     format_version: EVIDENCE_FORMAT_VERSION,
     incident_id: active . incident_id . clone (),
     maintenance_epoch: active . epoch,
@@ -457,19 +510,109 @@ fn build_bundle (
     source_catalog_blake3: source_catalog_blake3 (config),
     g0_graph_generation: selected . graph_generation,
     g0_manifest_revision: selected . manifest_revision,
-    g0_manifest: selected . manifest . clone (),
-    g1_manifest: candidate . manifest . clone (),
-    g0_nodes,
-    g1_nodes,
-    transition_delta,
+    recovery: recovery_record (0, &[]),
     added_primary_ids: candidate . added_primary_ids . clone (),
     deleted_primary_ids: candidate . deleted_primary_ids . clone (),
     modified_primary_ids: candidate . modified_primary_ids . clone (),
-    semantic_evidence: candidate . evidence . clone (),
     warnings: candidate . warnings . clone (),
     artifacts: Vec::new (),
   };
-  Ok ((bundle, artifacts))
+  Ok ((header, recovery, artifacts))
+}
+
+/// Reconstruct both complete semantic generations from the durable baseline
+/// and its reversible delta.  Every `before` value must agree with G0; this
+/// turns the delta into checked evidence rather than an unchecked edit list.
+pub fn reconstruct_evidence (
+  recovery : &MaintenanceRecoveryPayload,
+) -> Result<ReconstructedEvidence, String> {
+  if recovery . format_version != EVIDENCE_FORMAT_VERSION {
+    return Err (format! ("unsupported recovery evidence version {}",
+      recovery . format_version)); }
+  let mut g0_nodes = BTreeMap::new ();
+  for node in &recovery . g0_nodes {
+    if node . pid . is_empty () {
+      return Err ("recovery baseline contains an empty primary ID" . into ()); }
+    if g0_nodes . insert (node . pid . clone (), node . clone ()) . is_some () {
+      return Err (format! ("duplicate G0 recovery node {}", node . pid)); }
+  }
+  let mut g1_nodes = g0_nodes . clone ();
+  let mut changed_nodes = BTreeSet::new ();
+  for delta in &recovery . node_delta {
+    if !changed_nodes . insert (delta . primary_id . clone ()) {
+      return Err (format! ("duplicate recovery node delta {}",
+        delta . primary_id)); }
+    for value in [&delta . before, &delta . after] . into_iter () . flatten () {
+      if value . pid != delta . primary_id {
+        return Err (format! (
+          "recovery node delta {} contains node {}",
+          delta . primary_id, value . pid)); }
+    }
+    if g0_nodes . get (&delta . primary_id) != delta . before . as_ref () {
+      return Err (format! ("recovery node delta {} does not match G0",
+        delta . primary_id)); }
+    match &delta . after {
+      Some (node) => { g1_nodes . insert (delta . primary_id . clone (), node . clone ()); },
+      None => { g1_nodes . remove (&delta . primary_id); },
+    }
+  }
+
+  let g0_manifest = recovery . g0_manifest . clone ();
+  let mut g1_manifest = g0_manifest . clone ();
+  let mut changed_paths = BTreeSet::new ();
+  for delta in &recovery . path_delta {
+    if !changed_paths . insert (delta . path . clone ()) {
+      return Err (format! ("duplicate recovery path delta {}",
+        delta . path . display ())); }
+    if g0_manifest . get (&delta . path) . copied () != delta . before {
+      return Err (format! ("recovery path delta does not match G0 at {}",
+        delta . path . display ())); }
+    match delta . after {
+      Some (digest) => { g1_manifest . insert (delta . path . clone (), digest); },
+      None => { g1_manifest . remove (&delta . path); },
+    }
+  }
+  Ok (ReconstructedEvidence {
+    g0_manifest,
+    g1_manifest,
+    g0_nodes,
+    g1_nodes,
+  })
+}
+
+fn recovery_record (
+  uncompressed_bytes : usize,
+  bytes              : &[u8],
+) -> RecoveryPayloadRecord {
+  RecoveryPayloadRecord {
+    relative_path: PathBuf::from (RECOVERY_FILENAME),
+    encoding: RECOVERY_ENCODING . into (),
+    compression: RECOVERY_COMPRESSION . into (),
+    uncompressed_bytes: uncompressed_bytes as u64,
+    byte_length: bytes . len () as u64,
+    sha256: sha256_hex (bytes),
+    blake3: blake3_hex (bytes),
+  }
+}
+
+fn encode_recovery_payload (
+  recovery : &MaintenanceRecoveryPayload,
+) -> Result<Vec<u8>, String> {
+  let mut bytes = Vec::new ();
+  ciborium::ser::into_writer (recovery, &mut bytes)
+    . map_err (|error| format! ("could not encode recovery evidence: {}", error))?;
+  Ok (bytes)
+}
+
+fn decode_recovery_payload (
+  bytes : &[u8],
+) -> Result<MaintenanceRecoveryPayload, String> {
+  let mut cursor = Cursor::new (bytes);
+  let recovery = ciborium::de::from_reader (&mut cursor)
+    . map_err (|error| format! ("invalid recovery evidence: {}", error))?;
+  if cursor . position () != bytes . len () as u64 {
+    return Err ("recovery evidence has trailing bytes" . into ()); }
+  Ok (recovery)
 }
 
 fn artifact (
@@ -537,62 +680,247 @@ fn evidence_field (key : &str, value : &str) -> Sexp {
   ])
 }
 
-fn validate_evidence_directory (
-  directory       : &Path,
-  config_identity : &Path,
-  incident        : Option<&IncidentId>,
-) -> Result<(MaintenanceEvidenceBundle, PublishedMaintenanceEvidence), String> {
+fn verify_new_publication (
+  directory      : &Path,
+  header         : &MaintenanceEvidenceHeader,
+  header_bytes   : &[u8],
+  recovery_bytes : &[u8],
+  artifacts      : &[ArtifactBytes],
+) -> Result<PublishedMaintenanceEvidence, String> {
   require_private_directory (directory)?;
-  let bundle_path = directory . join ("bundle.yaml");
-  let bundle_bytes = fs::read (&bundle_path)
-    . map_err (|error| format! ("could not read {}: {}",
-      bundle_path . display (), error))?;
-  require_private_regular_file (&bundle_path)?;
-  let envelope : EvidenceEnvelope = serde_yaml::from_slice (&bundle_bytes)
-    . map_err (|error| format! ("invalid evidence bundle: {}", error))?;
-  if envelope . payload . format_version != EVIDENCE_FORMAT_VERSION {
-    return Err (format! ("unsupported evidence bundle version {}",
-      envelope . payload . format_version)); }
-  if let Some (expected) = incident {
-    if &envelope . payload . incident_id != expected {
-      return Err ("evidence directory has the wrong incident ID" . into ()); }}
-  if envelope . payload . config_identity != config_identity {
-    return Err ("evidence bundle belongs to a different config" . into ()); }
-  let payload_bytes = serde_yaml::to_string (&envelope . payload)
-    . map_err (|error| error . to_string ())? . into_bytes ();
-  if blake3_hex (&payload_bytes) != envelope . payload_blake3 {
-    return Err ("evidence payload checksum mismatch" . into ()); }
-
-  let mut expected_files : BTreeSet<PathBuf> =
-    BTreeSet::from ([PathBuf::from ("bundle.yaml")]);
-  let mut total_file_bytes = bundle_bytes . len () as u64;
-  for artifact in &envelope . payload . artifacts {
-    validate_relative_artifact_path (&artifact . relative_path)?;
-    if !expected_files . insert (artifact . relative_path . clone ()) {
+  validate_header (header, None, &header . config_identity)?;
+  verify_exact_file (&directory . join (HEADER_FILENAME), header_bytes)?;
+  verify_exact_file (
+    &directory . join (RECOVERY_FILENAME), recovery_bytes)?;
+  let mut expected_files = BTreeSet::from ([
+    PathBuf::from (HEADER_FILENAME),
+    PathBuf::from (RECOVERY_FILENAME),
+  ]);
+  let mut total_file_bytes = header_bytes . len () as u64
+    + recovery_bytes . len () as u64;
+  for artifact in artifacts {
+    if !expected_files . insert (artifact . metadata . relative_path . clone ()) {
       return Err (format! ("duplicate evidence artifact {}",
-        artifact . relative_path . display ())); }
-    let path = directory . join (&artifact . relative_path);
-    require_private_regular_file (&path)?;
-    let bytes = fs::read (&path) . map_err (|error| error . to_string ())?;
-    if bytes . len () as u64 != artifact . byte_length
-    || sha256_hex (&bytes) != artifact . sha256
-    || blake3_hex (&bytes) != artifact . blake3
-    {
-      return Err (format! ("evidence artifact checksum mismatch at {}",
-        artifact . relative_path . display ())); }
-    total_file_bytes += bytes . len () as u64;
+        artifact . metadata . relative_path . display ())); }
+    verify_exact_file (
+      &directory . join (&artifact . metadata . relative_path),
+      &artifact . bytes)?;
+    total_file_bytes += artifact . bytes . len () as u64;
   }
   let actual_files = regular_file_inventory (directory)?;
   if actual_files != expected_files {
     return Err (format! (
       "evidence file inventory mismatch: expected {:?}, found {:?}",
       expected_files, actual_files)); }
-  Ok ((envelope . payload, PublishedMaintenanceEvidence {
+  Ok (PublishedMaintenanceEvidence {
     path: directory . to_path_buf (),
-    bundle_sha256: sha256_hex (&bundle_bytes),
-    artifact_count: expected_files . len () - 1,
+    bundle_sha256: sha256_hex (header_bytes),
+    artifact_count: artifacts . len (),
     total_file_bytes,
-  }))
+  })
+}
+
+fn verify_exact_file (path : &Path, expected : &[u8]) -> Result<(), String> {
+  require_private_regular_file (path)?;
+  let actual = fs::read (path) . map_err (|error| format! (
+    "could not reread {}: {}", path . display (), error))?;
+  if actual != expected {
+    return Err (format! ("durable evidence reread differed at {}",
+      path . display ())); }
+  Ok (( ))
+}
+
+fn load_evidence_directory (
+  directory       : &Path,
+  config_identity : &Path,
+  incident        : Option<&IncidentId>,
+) -> Result<(MaintenanceEvidenceBundle, PublishedMaintenanceEvidence), String> {
+  let (header, publication, recovery_bytes) = load_evidence_header (
+    directory, config_identity, incident, true)?;
+  for artifact in &header . artifacts {
+    validate_artifact_bytes (directory, artifact)?;
+  }
+  let compressed = recovery_bytes . expect ("recovery bytes were requested");
+  let recovery_uncompressed = decode_compressed_recovery (
+    &header . recovery, &compressed)?;
+  let recovery = decode_recovery_payload (&recovery_uncompressed)?;
+  validate_recovery_against_header (&header, &recovery)?;
+  Ok ((MaintenanceEvidenceBundle { header, recovery }, publication))
+}
+
+fn load_evidence_header (
+  directory                : &Path,
+  config_identity          : &Path,
+  incident                 : Option<&IncidentId>,
+  verify_recovery_checksum : bool,
+) -> Result<(
+  MaintenanceEvidenceHeader,
+  PublishedMaintenanceEvidence,
+  Option<Vec<u8>>,
+), String> {
+  require_private_directory (directory)?;
+  let header_path = directory . join (HEADER_FILENAME);
+  let header_bytes = fs::read (&header_path)
+    . map_err (|error| format! ("could not read {}: {}",
+      header_path . display (), error))?;
+  require_private_regular_file (&header_path)?;
+  let header : MaintenanceEvidenceHeader = serde_yaml::from_slice (&header_bytes)
+    . map_err (|error| format! ("invalid evidence header: {}", error))?;
+  validate_header (&header, incident, config_identity)?;
+
+  let mut expected_files = BTreeSet::from ([
+    PathBuf::from (HEADER_FILENAME),
+    PathBuf::from (RECOVERY_FILENAME),
+  ]);
+  let mut total_file_bytes = header_bytes . len () as u64;
+  for artifact in &header . artifacts {
+    validate_relative_artifact_path (&artifact . relative_path)?;
+    if !expected_files . insert (artifact . relative_path . clone ()) {
+      return Err (format! ("duplicate evidence artifact {}",
+        artifact . relative_path . display ())); }
+    let path = directory . join (&artifact . relative_path);
+    require_private_regular_file (&path)?;
+    let length = fs::metadata (&path) . map_err (|error| error . to_string ())?
+      . len ();
+    if length != artifact . byte_length {
+      return Err (format! ("evidence artifact length mismatch at {}",
+        artifact . relative_path . display ())); }
+    total_file_bytes += length;
+  }
+  let recovery_path = directory . join (&header . recovery . relative_path);
+  require_private_regular_file (&recovery_path)?;
+  let recovery_length = fs::metadata (&recovery_path)
+    . map_err (|error| error . to_string ())? . len ();
+  if recovery_length != header . recovery . byte_length {
+    return Err ("recovery evidence length mismatch" . into ()); }
+  let recovery_bytes = if verify_recovery_checksum {
+    let bytes = fs::read (&recovery_path) . map_err (|error| format! (
+      "could not read {}: {}", recovery_path . display (), error))?;
+    if sha256_hex (&bytes) != header . recovery . sha256
+    || blake3_hex (&bytes) != header . recovery . blake3
+    {
+      return Err ("recovery evidence checksum mismatch" . into ()); }
+    Some (bytes)
+  } else { None };
+  total_file_bytes += recovery_length;
+  let actual_files = regular_file_inventory (directory)?;
+  if actual_files != expected_files {
+    return Err (format! (
+      "evidence file inventory mismatch: expected {:?}, found {:?}",
+      expected_files, actual_files)); }
+  let artifact_count = header . artifacts . len ();
+  Ok ((header, PublishedMaintenanceEvidence {
+    path: directory . to_path_buf (),
+    bundle_sha256: sha256_hex (&header_bytes),
+    artifact_count,
+    total_file_bytes,
+  }, recovery_bytes))
+}
+
+fn validate_header (
+  header          : &MaintenanceEvidenceHeader,
+  incident        : Option<&IncidentId>,
+  config_identity : &Path,
+) -> Result<(), String> {
+  if header . format_version != EVIDENCE_FORMAT_VERSION {
+    return Err (format! ("unsupported evidence header version {}",
+      header . format_version)); }
+  if let Some (expected) = incident {
+    if &header . incident_id != expected {
+      return Err ("evidence directory has the wrong incident ID" . into ()); }}
+  if header . config_identity != config_identity {
+    return Err ("evidence bundle belongs to a different config" . into ()); }
+  if header . candidate . base_graph_generation != header . g0_graph_generation
+  || header . candidate . base_manifest_revision != header . g0_manifest_revision
+  {
+    return Err ("evidence header names inconsistent G0 generations" . into ()); }
+  if header . recovery . relative_path != Path::new (RECOVERY_FILENAME)
+  || header . recovery . encoding != RECOVERY_ENCODING
+  || header . recovery . compression != RECOVERY_COMPRESSION
+  {
+    return Err ("unsupported recovery evidence representation" . into ()); }
+  let classifications = [
+    &header . added_primary_ids,
+    &header . deleted_primary_ids,
+    &header . modified_primary_ids,
+  ];
+  for left in 0..classifications . len () {
+    for right in left + 1..classifications . len () {
+      if !classifications[left] . is_disjoint (classifications[right]) {
+        return Err ("evidence change classifications overlap" . into ()); }
+    }
+  }
+  Ok (( ))
+}
+
+fn validate_artifact_bytes (
+  directory : &Path,
+  artifact  : &EvidenceArtifact,
+) -> Result<Vec<u8>, String> {
+  let bytes = fs::read (directory . join (&artifact . relative_path))
+    . map_err (|error| error . to_string ())?;
+  if bytes . len () as u64 != artifact . byte_length
+  || sha256_hex (&bytes) != artifact . sha256
+  || blake3_hex (&bytes) != artifact . blake3
+  {
+    return Err (format! ("evidence artifact checksum mismatch at {}",
+      artifact . relative_path . display ())); }
+  Ok (bytes)
+}
+
+fn decode_compressed_recovery (
+  record : &RecoveryPayloadRecord,
+  bytes  : &[u8],
+) -> Result<Vec<u8>, String> {
+  let mut decoder = zstd::stream::read::Decoder::new (Cursor::new (bytes))
+    . map_err (|error| format! ("invalid compressed recovery evidence: {}",
+      error))?;
+  let limit = record . uncompressed_bytes . checked_add (1)
+    . ok_or_else (|| "recovery evidence length overflows u64" . to_string ())?;
+  let mut decoded = Vec::new ();
+  decoder . by_ref () . take (limit) . read_to_end (&mut decoded)
+    . map_err (|error| format! ("could not decompress recovery evidence: {}",
+      error))?;
+  if decoded . len () as u64 != record . uncompressed_bytes {
+    return Err ("recovery evidence uncompressed length mismatch" . into ()); }
+  Ok (decoded)
+}
+
+fn validate_recovery_against_header (
+  header   : &MaintenanceEvidenceHeader,
+  recovery : &MaintenanceRecoveryPayload,
+) -> Result<(), String> {
+  reconstruct_evidence (recovery)?;
+  let added : BTreeSet<String> = header . added_primary_ids . iter ()
+    . map (ToString::to_string) . collect ();
+  let deleted : BTreeSet<String> = header . deleted_primary_ids . iter ()
+    . map (ToString::to_string) . collect ();
+  let modified : BTreeSet<String> = header . modified_primary_ids . iter ()
+    . map (ToString::to_string) . collect ();
+  let mut actual_added = BTreeSet::new ();
+  let mut actual_deleted = BTreeSet::new ();
+  let mut actual_modified = BTreeSet::new ();
+  for delta in &recovery . node_delta {
+    match (&delta . before, &delta . after) {
+      (None, Some (_)) => { actual_added . insert (delta . primary_id . clone ()); },
+      (Some (_), None) => { actual_deleted . insert (delta . primary_id . clone ()); },
+      (Some (before), Some (after)) if before != after => {
+        actual_modified . insert (delta . primary_id . clone ()); },
+      _ => return Err (format! ("recovery node delta {} is not a change",
+        delta . primary_id)),
+    }
+  }
+  if (added, deleted, modified)
+    != (actual_added . clone (), actual_deleted . clone (), actual_modified . clone ())
+  {
+    return Err ("recovery delta differs from header classifications" . into ()); }
+  let changed : BTreeSet<String> = actual_added . into_iter ()
+    . chain (actual_deleted) . chain (actual_modified) . collect ();
+  if changed != header . candidate . changed_primary_ids . iter ()
+    . cloned () . collect ()
+  {
+    return Err ("recovery delta differs from candidate summary" . into ()); }
+  Ok (( ))
 }
 
 fn regular_file_inventory (root : &Path) -> Result<BTreeSet<PathBuf>, String> {
@@ -623,8 +951,10 @@ fn validate_relative_artifact_path (path : &Path) -> Result<(), String> {
       !matches! (component, std::path::Component::Normal (_)))
   {
     return Err (format! ("unsafe evidence artifact path {}", path . display ())); }
-  if path == Path::new ("bundle.yaml") {
-    return Err ("artifact may not replace bundle.yaml" . into ()); }
+  if path == Path::new (HEADER_FILENAME)
+  || path == Path::new (RECOVERY_FILENAME)
+  {
+    return Err ("artifact may not replace evidence metadata" . into ()); }
   Ok (( ))
 }
 
@@ -741,7 +1071,9 @@ mod tests {
     MaintenanceOrigin,
     ObservationSequence,
   };
+  use crate::maintenance::candidate::SemanticChangeEvidence;
   use crate::types::misc::SkgConfig;
+  use crate::types::nodes::complete::empty_node_complete;
   use crate::types::store_state::{PathDigest, SelectedStoreState};
   use std::sync::Arc;
   use tempfile::tempdir;
@@ -811,7 +1143,7 @@ mod tests {
     let publication = store . publish_candidate (
       &active, &config, &selected, &candidate) . unwrap ();
     let (loaded, loaded_publication) = store . load (&active . incident_id) . unwrap ();
-    assert_eq! (loaded . candidate, candidate . summary);
+    assert_eq! (loaded . header . candidate, candidate . summary);
     assert_eq! (loaded_publication, publication);
     let client = store . client_bundle (&active . incident_id) . unwrap ();
     assert! (client . artifacts . is_empty ());
@@ -826,7 +1158,7 @@ mod tests {
       &replacement_active, &config, &selected, &replacement_candidate)
       . unwrap ();
     assert_eq! (store . load (&active . incident_id) . unwrap () . 0
-      . candidate, replacement_candidate . summary);
+      . header . candidate, replacement_candidate . summary);
     let preserved_prefix = format! (
       "{}--superseded--{}--", active . incident_id, candidate . summary . id);
     assert! (fs::read_dir (&store . directory) . unwrap ()
@@ -848,8 +1180,15 @@ mod tests {
     let path = temporary . path () . join ("node one.skg");
     let before_bytes = b"before telescope\n";
     let after_bytes = vec![0xff, 0xfe, b'\n'];
+    let mut before_complete = empty_node_complete ();
+    before_complete . pid = pid . clone ();
+    before_complete . title = "before" . into ();
+    before_complete . source = "source" . into ();
+    let mut after_complete = before_complete . clone ();
+    after_complete . title = "after" . into ();
     let selected = SelectedStoreState::initial (
-      InRustGraph::new (), BTreeMap::from ([
+      InRustGraph::from_nodecompletes (&[before_complete . clone ()]),
+      BTreeMap::from ([
         (path . clone (), PathDigest::of_bytes (before_bytes)),
       ]));
     let summary = CandidateSummary {
@@ -871,8 +1210,9 @@ mod tests {
       manifest: BTreeMap::from ([
         (path . clone (), PathDigest::of_bytes (&after_bytes)),
       ]),
-      base_graph: Arc::new (InRustGraph::new ()),
-      graph: Arc::new (InRustGraph::new ()),
+      base_graph: Arc::new (
+        InRustGraph::from_nodecompletes (&[before_complete])),
+      graph: Arc::new (InRustGraph::from_nodecompletes (&[after_complete])),
       definitions: Vec::new (),
       added_primary_ids: Default::default (),
       deleted_primary_ids: Default::default (),

@@ -106,6 +106,7 @@ path = "tests/git_diff_view_partner_cols.rs"
 arc-swap = "1"
 async-std = { version = "1.12", features = ["attributes"] }
 blake3 = "1"
+ciborium = "0.2"
 ctrlc = { version = "3.4", features = ["termination"] }
 ego-tree = "0.6"
 filetime = "0.2"
