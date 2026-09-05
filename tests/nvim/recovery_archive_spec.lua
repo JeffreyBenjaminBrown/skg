@@ -323,6 +323,18 @@ describe('skg recovery archive', function ()
       assert.are.equal('initial', payload.field_text(manifest, 'manifest-kind'))
       assert.are.equal(7, payload.field(manifest, 'g0-graph-generation'))
       assert.are.equal(1, #payload.field(manifest, 'buffers'))
+      local buffer_record = payload.field(manifest, 'buffers')[1]
+      assert.are.equal('live-view', payload.field_text(
+        buffer_record, 'lifecycle'))
+      assert.are.equal(
+        'server-default', payload.field_text(buffer_record, 'source-set'))
+      assert.are.equal(4, payload.field(buffer_record, 'maintenance-epoch'))
+      assert.are.equal(
+        '((kind "single-root") (requested ("root-a" "root-b")))',
+        payload.field_text(buffer_record, 'recipe'))
+      assert.are.equal('true', payload.field_text(buffer_record, 'dirty'))
+      assert.are.equal('true', payload.field_text(
+        buffer_record, 'logical-dirty'))
       local marker = sexpr.read(read_bytes(final .. '/ARCHIVE-READY'))
       assert.are.equal(incident_id, payload.field_text(marker, 'incident-id'))
       assert.are.equal(result.manifest_sha256,

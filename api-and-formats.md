@@ -990,8 +990,15 @@ TIMESTAMP_UUID/
 `FINALIZED` binds incident, final-manifest checksum and transfer-manifest
 checksum.  Marker filenames alone are not authority.  `incident.org` and
 buffer README/diff files are human aids; the versioned manifests and checksums
-are machine authority.  Incomplete `.staging` or missing-marker publications
-are retained for inspection and never auto-promoted or auto-deleted.
+are machine authority.  Each initial dirty-buffer manifest record repeats the
+frozen census's kind, lifecycle/disposability, continuation, URI, normalized
+roots and recipe, source-set, generation/revision/token tuple, physical and
+logical dirty state, incident epoch, presentation/search staleness, and herald
+status.  The server canonicalizes recipe syntax and independently requires
+every repeated fact and both text checksums to match the locked census before
+accepting `ARCHIVE-READY`.  Incomplete `.staging` or missing-marker
+publications are retained for inspection and never auto-promoted or
+auto-deleted.
 
 The server's config-keyed private YAML maintenance journal has a different
 job: it is temporary transaction authority for phases, store selection,

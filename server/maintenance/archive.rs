@@ -53,14 +53,24 @@ pub struct VerifiedBufferSnapshot {
   pub buffer_key             : String,
   pub buffer_id              : String,
   pub kind                   : BufferKind,
+  pub lifecycle              : String,
+  pub disposable             : bool,
+  pub continuation_id        : Option<String>,
   pub name                   : String,
   pub view_uri               : Option<ViewUri>,
   pub root_ids               : Vec<ID>,
   pub recipe                 : String,
+  pub source_set             : String,
   pub graph_generation       : u64,
   pub presentation_generation : u64,
   pub server_revision        : u64,
   pub application_token      : u64,
+  pub dirty                  : bool,
+  pub logical_dirty          : bool,
+  pub maintenance_epoch      : u64,
+  pub presentation_stale     : bool,
+  pub search_stale           : bool,
+  pub herald_bearing         : bool,
   pub last_fetched_text      : String,
   pub current_text           : String,
 }
@@ -219,10 +229,12 @@ pub fn verify_initial_archive (
     let context = format! ("initial manifest buffer {}", index + 1);
     let buffer_fields = alist (buffer, &context)?;
     require_exact_keys (&buffer_fields, &[
-      "buffer-key", "buffer-id", "kind", "name", "view-uri", "root-ids",
-      "recipe", "graph-generation", "presentation-generation",
-      "server-revision", "application-token", "undo", "artifacts",
-      "initial-disposition",
+      "buffer-key", "buffer-id", "kind", "lifecycle", "disposable",
+      "continuation-id", "name", "view-uri", "root-ids", "recipe",
+      "source-set", "graph-generation", "presentation-generation",
+      "server-revision", "application-token", "dirty", "logical-dirty",
+      "maintenance-epoch", "presentation-stale", "search-stale",
+      "herald-bearing", "undo", "artifacts", "initial-disposition",
     ], &context)?;
     let key = require_nonempty_text (&buffer_fields, "buffer-key", &context)?;
     validate_buffer_key (&key)?;
@@ -234,14 +246,25 @@ pub fn verify_initial_archive (
       return Err (format! ("duplicate archive buffer ID '{}'", buffer_id)); }
     let kind = BufferKind::parse (&require_nonempty_text (
       &buffer_fields, "kind", &context)?)?;
+    let lifecycle = require_nonempty_text (
+      &buffer_fields, "lifecycle", &context)?;
+    let disposable = require_strict_bool (
+      &buffer_fields, "disposable", &context)?;
+    let continuation_text = require_nonempty_text (
+      &buffer_fields, "continuation-id", &context)?;
+    let continuation_id = (continuation_text != "none")
+      . then_some (continuation_text);
     let name = require_text (&buffer_fields, "name", &context)?;
     let view_uri_text = require_text (&buffer_fields, "view-uri", &context)?;
     let view_uri = if view_uri_text == "none" { None }
       else { Some (ViewUri::from_client_string (view_uri_text)) };
-    let root_ids = require_atom_list_text (
-      &buffer_fields, "root-ids", &context)? . into_iter ()
-      . map (ID::from) . collect ();
-    let recipe = require_text (&buffer_fields, "recipe", &context)?;
+    let root_id_texts = require_unique_sorted_atom_texts (
+      &buffer_fields, "root-ids", &context)?;
+    let root_ids = root_id_texts . iter () . map (ID::from) . collect ();
+    let recipe = canonical_recipe (
+      &require_text (&buffer_fields, "recipe", &context)?, &context)?;
+    let source_set = require_nonempty_text (
+      &buffer_fields, "source-set", &context)?;
     let graph_generation = require_u64 (
       &buffer_fields, "graph-generation", &context)?;
     let presentation_generation = require_u64 (
@@ -250,6 +273,25 @@ pub fn verify_initial_archive (
       &buffer_fields, "server-revision", &context)?;
     let application_token = require_u64 (
       &buffer_fields, "application-token", &context)?;
+    let dirty = require_strict_bool (&buffer_fields, "dirty", &context)?;
+    let logical_dirty = require_strict_bool (
+      &buffer_fields, "logical-dirty", &context)?;
+    let maintenance_epoch = require_u64 (
+      &buffer_fields, "maintenance-epoch", &context)?;
+    let presentation_stale = require_strict_bool (
+      &buffer_fields, "presentation-stale", &context)?;
+    let search_stale = require_strict_bool (
+      &buffer_fields, "search-stale", &context)?;
+    let herald_bearing = require_strict_bool (
+      &buffer_fields, "herald-bearing", &context)?;
+    if logical_dirty && !dirty {
+      return Err (format! (
+        "{} is logically dirty but not physically dirty", context)); }
+    if !dirty {
+      return Err (format! ("{} is not declared dirty", context)); }
+    if maintenance_epoch != expected . active . epoch . get () {
+      return Err (format! (
+        "{} maintenance epoch does not match the incident", context)); }
     require_equal_text (&buffer_fields, "initial-disposition",
       "pending-classification", &context)?;
 
@@ -336,13 +378,30 @@ pub fn verify_initial_archive (
     let frozen = expected . active . buffer_census . get (&buffer_id)
       . ok_or_else (|| format! (
         "{} is absent from the frozen maintenance census", context))?;
+    let mut frozen_root_ids = frozen . root_ids . clone ();
+    frozen_root_ids . sort ();
+    if frozen_root_ids . windows (2) . any (|pair| pair[0] == pair[1]) {
+      return Err (format! (
+        "{} frozen census repeats a root ID", context)); }
     if !frozen . dirty
     || frozen . kind != kind
+    || frozen . lifecycle != lifecycle
+    || frozen . disposable != disposable
+    || frozen . continuation_id != continuation_id
     || frozen . view_uri != view_uri . as_ref () . map (ViewUri::repr_in_client)
+    || frozen_root_ids != root_id_texts
+    || frozen . recipe != recipe
+    || frozen . source_set != source_set
     || frozen . graph_generation != graph_generation
     || frozen . presentation_generation != presentation_generation
     || frozen . server_revision != server_revision
     || frozen . application_token != application_token
+    || frozen . dirty != dirty
+    || frozen . logical_dirty != logical_dirty
+    || frozen . maintenance_epoch != Some (maintenance_epoch)
+    || frozen . presentation_stale != presentation_stale
+    || frozen . search_stale != search_stale
+    || frozen . herald_bearing != herald_bearing
     {
       return Err (format! (
         "{} authority does not match the frozen maintenance census", context)); }
@@ -359,14 +418,24 @@ pub fn verify_initial_archive (
       buffer_key: key,
       buffer_id,
       kind,
+      lifecycle,
+      disposable,
+      continuation_id,
       name,
       view_uri,
       root_ids,
       recipe,
+      source_set,
       graph_generation,
       presentation_generation,
       server_revision,
       application_token,
+      dirty,
+      logical_dirty,
+      maintenance_epoch,
+      presentation_stale,
+      search_stale,
+      herald_bearing,
       last_fetched_text,
       current_text,
     });
@@ -536,6 +605,19 @@ fn require_atom_list_text (
   }) . collect ()
 }
 
+fn require_unique_sorted_atom_texts (
+  fields  : &BTreeMap<String, &Sexp>,
+  key     : &str,
+  context : &str,
+) -> Result<Vec<String>, String> {
+  let values = require_atom_list_text (fields, key, context)?;
+  let unique : BTreeSet<_> = values . iter () . cloned () . collect ();
+  if unique . len () != values . len () {
+    return Err (format! (
+      "{} field '{}' contains a duplicate", context, key)); }
+  Ok (unique . into_iter () . collect ())
+}
+
 fn require_text (
   fields  : &BTreeMap<String, &Sexp>,
   key     : &str,
@@ -584,6 +666,27 @@ fn require_u64 (
       "{} field '{}' must be a nonnegative integer", context, key)),
     None => Err (format! ("{} has no '{}' field", context, key)),
   }
+}
+
+fn require_strict_bool (
+  fields  : &BTreeMap<String, &Sexp>,
+  key     : &str,
+  context : &str,
+) -> Result<bool, String> {
+  match require_text (fields, key, context)? . as_str () {
+    "true" => Ok (true),
+    "nil" => Ok (false),
+    _ => Err (format! (
+      "{} field '{}' must be exactly 'true' or 'nil'", context, key)),
+  }
+}
+
+fn canonical_recipe (text : &str, context : &str) -> Result<String, String> {
+  let recipe = sexp::parse (text)
+    . map_err (|error| format! ("{} has an invalid recipe: {}", context, error))?;
+  if !matches! (recipe, Sexp::List (_)) {
+    return Err (format! ("{} recipe must be a proper list", context)); }
+  Ok (recipe . to_string ())
 }
 
 fn require_exact_keys (
@@ -1004,7 +1107,7 @@ mod tests {
         disposable: false,
         continuation_id: None,
         view_uri: Some ("view-uri" . into ()),
-        recipe: "((kind \"single-root\") (root-id \"old\"))" . into (),
+        recipe: "((kind single-root) (root-id old))" . into (),
         root_ids: vec!["old" . into ()],
         source_set: "all" . into (),
         graph_generation: 1,
@@ -1014,7 +1117,7 @@ mod tests {
         dirty: true,
         logical_dirty: false,
         undo_required: false,
-        maintenance_epoch: None,
+        maintenance_epoch: Some (1),
         presentation_stale: false,
         search_stale: false,
         herald_bearing: false,
@@ -1058,10 +1161,16 @@ mod tests {
       "(g0-manifest-revision 1) (directory-sync \"test\") ",
       "(artifacts ({})) (buffers (((buffer-key \"root_deadbeef\") ",
       "(buffer-id \"buffer-1\") (kind \"content-view\") ",
+      "(lifecycle \"live-view\") (disposable \"nil\") ",
+      "(continuation-id \"none\") ",
       "(name \"View\") (view-uri \"view-uri\") (root-ids (\"old\")) ",
-      "(recipe \"single-root:old\") (graph-generation 1) ",
+      "(recipe \"((kind \\\"single-root\\\") (root-id \\\"old\\\"))\") ",
+      "(source-set \"all\") (graph-generation 1) ",
       "(presentation-generation 2) (server-revision 3) ",
-      "(application-token 4) (undo ((status \"empty\") ",
+      "(application-token 4) (dirty \"true\") (logical-dirty \"nil\") ",
+      "(maintenance-epoch 1) (presentation-stale \"nil\") ",
+      "(search-stale \"nil\") (herald-bearing \"nil\") ",
+      "(undo ((status \"empty\") ",
       "(kind \"undo-fu-session\") (version \"0.8\"))) ",
       "(artifacts ({})) (initial-disposition \"pending-classification\")))) ",
       "(initial-status \"prepared-for-publication\"))\n"),
@@ -1103,8 +1212,34 @@ mod tests {
     assert_eq! (verified . buffers . len (), 1);
     assert_eq! (verified . buffers[0] . buffer_id, "buffer-1");
     assert_eq! (verified . buffers[0] . root_ids, vec![ID::from ("old")]);
+    assert_eq! (verified . buffers[0] . lifecycle, "live-view");
+    assert_eq! (verified . buffers[0] . recipe,
+      "((kind single-root) (root-id old))");
+    assert_eq! (verified . buffers[0] . source_set, "all");
+    assert_eq! (verified . buffers[0] . maintenance_epoch, 1);
     assert_eq! (verified . buffers[0] . current_text,
       "* (skg (node (id new) (source main))) café\n");
+  }
+
+  #[test]
+  fn rejects_a_resigned_descriptor_that_differs_from_the_frozen_census () {
+    let mut fixture = dirty_fixture ();
+    let directory = fixture . root . join (
+      &fixture . active . archive_directory_name);
+    let manifest_path = directory . join ("manifest.initial.sexp");
+    let manifest = fs::read_to_string (&manifest_path) . unwrap ()
+      . replace ("(lifecycle \"live-view\")", "(lifecycle \"archived-view\")");
+    assert! (manifest . contains ("(lifecycle \"archived-view\")"));
+    fixture . manifest_sha256 = sha256 (manifest . as_bytes ());
+    fs::write (&manifest_path, manifest) . unwrap ();
+    let marker = format! (
+      "((archive-format-version 1) (incident-id {}) (manifest-sha256 {}))\n",
+      quoted (fixture . active . incident_id . as_str ()),
+      quoted (&fixture . manifest_sha256));
+    fs::write (directory . join ("ARCHIVE-READY"), marker) . unwrap ();
+    let error = verify_initial_archive (expectation (&fixture)) . unwrap_err ();
+    assert! (error . contains (
+      "authority does not match the frozen maintenance census"), "{}", error);
   }
 
   #[test]

@@ -268,6 +268,7 @@
                  (expand-file-name "manifest.initial.sexp" final)))
                (manifest
                 (read (decode-coding-string manifest-bytes 'utf-8-unix t)))
+               (buffer-record (car (cadr (assoc 'buffers manifest))))
                (marker
                 (read
                  (decode-coding-string
@@ -295,6 +296,14 @@
           (should (equal (cadr (assoc 'manifest-kind manifest)) "initial"))
           (should (= (cadr (assoc 'g0-graph-generation manifest)) 7))
           (should (= (length (cadr (assoc 'buffers manifest))) 1))
+          (should (equal (cadr (assoc 'lifecycle buffer-record)) "live-view"))
+          (should
+           (equal (cadr (assoc 'source-set buffer-record)) "server-default"))
+          (should (= (cadr (assoc 'maintenance-epoch buffer-record)) 4))
+          (should
+           (equal (cadr (assoc 'recipe buffer-record))
+                  "((kind \"single-root\") (requested (\"root-a\" \"root-b\")))"))
+          (should (equal (cadr (assoc 'dirty buffer-record)) "true"))
           (should
            (equal (cadr (assoc 'incident-id marker))
                   skg-test-recovery-incident-id))

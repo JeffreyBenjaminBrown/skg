@@ -227,10 +227,7 @@
         root))))
 
 (defun skg-recovery--recipe-text (recipe)
-  (let ((print-circle t)
-        (print-level nil)
-        (print-length nil))
-    (prin1-to-string (or recipe nil))))
+  (skg-buffer-recipe-text recipe))
 
 (defun skg-recovery--allocate-buffer-keys (buffers)
   (let* ((descriptors
@@ -375,6 +372,11 @@
                           (symbol-name (skg--buffer-record-kind record)))
      (skg-recovery--field
       'lifecycle (symbol-name (skg--buffer-record-lifecycle record)))
+     (skg-recovery--field
+      'disposable (if (skg--buffer-record-disposable record) "true" "nil"))
+     (skg-recovery--field
+      'continuation-id
+      (or (skg--buffer-record-continuation-id record) "none"))
      (skg-recovery--field 'name (buffer-name buffer))
      (skg-recovery--field
       'view-uri (or (skg--buffer-record-view-uri record) "none"))
@@ -401,6 +403,17 @@
      (skg-recovery--field
       'logical-dirty
       (if (skg--buffer-record-logical-dirty record) "true" "nil"))
+     (skg-recovery--field
+      'maintenance-epoch (skg--buffer-record-maintenance-epoch record))
+     (skg-recovery--field
+      'presentation-stale
+      (if (skg--buffer-record-presentation-stale record) "true" "nil"))
+     (skg-recovery--field
+      'search-stale
+      (if (skg--buffer-record-search-stale record) "true" "nil"))
+     (skg-recovery--field
+      'herald-bearing
+      (if (skg--buffer-record-herald-bearing record) "true" "nil"))
      (skg-recovery--field
       'point
       (if windows (car windows)
@@ -505,6 +518,13 @@
      (skg-recovery--field 'buffer-id buffer-id)
      (skg-recovery--field 'kind
                           (symbol-name (skg--buffer-record-kind record)))
+     (skg-recovery--field
+      'lifecycle (symbol-name (skg--buffer-record-lifecycle record)))
+     (skg-recovery--field
+      'disposable (if (skg--buffer-record-disposable record) "true" "nil"))
+     (skg-recovery--field
+      'continuation-id
+      (or (skg--buffer-record-continuation-id record) "none"))
      (skg-recovery--field 'name (buffer-name buffer))
      (skg-recovery--field
       'view-uri (or (skg--buffer-record-view-uri record) "none"))
@@ -515,6 +535,8 @@
       'recipe (skg-recovery--recipe-text
                (skg--buffer-record-recipe record)))
      (skg-recovery--field
+      'source-set (or (skg--buffer-record-source-set record) "all"))
+     (skg-recovery--field
       'graph-generation (or (skg--buffer-record-graph-generation record) 0))
      (skg-recovery--field
       'presentation-generation
@@ -523,6 +545,22 @@
       'server-revision (or (skg--buffer-record-server-revision record) 0))
      (skg-recovery--field
       'application-token (or (skg--buffer-record-application-token record) 0))
+     (skg-recovery--field 'dirty
+                          (if (skg-buffer-dirty-p buffer) "true" "nil"))
+     (skg-recovery--field
+      'logical-dirty
+      (if (skg--buffer-record-logical-dirty record) "true" "nil"))
+     (skg-recovery--field
+      'maintenance-epoch (skg--buffer-record-maintenance-epoch record))
+     (skg-recovery--field
+      'presentation-stale
+      (if (skg--buffer-record-presentation-stale record) "true" "nil"))
+     (skg-recovery--field
+      'search-stale
+      (if (skg--buffer-record-search-stale record) "true" "nil"))
+     (skg-recovery--field
+      'herald-bearing
+      (if (skg--buffer-record-herald-bearing record) "true" "nil"))
      (skg-recovery--field 'undo (skg-recovery--undo-fields undo))
      (skg-recovery--field 'artifacts (nreverse artifacts))
      (skg-recovery--field 'initial-disposition "pending-classification"))))

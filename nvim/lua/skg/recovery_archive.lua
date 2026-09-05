@@ -275,47 +275,8 @@ local function safe_primary_root (roots)
   return root
 end
 
-local function portable_recipe_value (value)
-  local value_type = type(value)
-  if value == nil then return 'none' end
-  if value_type == 'string' or value_type == 'number' then return value end
-  if value_type == 'boolean' then return value and 'true' or 'false' end
-  if sexpr.is_symbol(value) then return { sexpr.symbol('symbol'), value.name } end
-  if sexpr.is_pair(value) then
-    return { sexpr.symbol('pair'), portable_recipe_value(value.car),
-             portable_recipe_value(value.cdr) } end
-  if value_type ~= 'table' then
-    fail('recipe contains unsupported ' .. value_type) end
-  local count, maximum, map = 0, 0, false
-  for key in pairs(value) do
-    if type(key) ~= 'number' or key < 1 or key ~= math.floor(key) then
-      map = true
-    else
-      count = count + 1
-      maximum = math.max(maximum, key)
-    end
-  end
-  if not map and count == maximum then
-    local result = {}
-    for _, item in ipairs(value) do
-      table.insert(result, portable_recipe_value(item)) end
-    return result
-  end
-  local keys = {}
-  for key in pairs(value) do
-    table.insert(keys, { text = tostring(key), original = key }) end
-  table.sort(keys, function (left, right) return left.text < right.text end)
-  local result = {}
-  for _, key in ipairs(keys) do
-    table.insert(result, {
-      key.text, portable_recipe_value(value[key.original]),
-    }) end
-  return result
-end
-
 local function recipe_text (recipe)
-  local ok, result = pcall(
-    M.canonical_sexpr, portable_recipe_value(recipe or {}))
+  local ok, result = pcall(registry.recipe_text, recipe)
   if not ok then fail('buffer recipe is not portable: ' .. tostring(result)) end
   return result
 end
@@ -417,6 +378,8 @@ local function buffer_metadata (descriptor, undo, windows)
     field('buffer-id', record.id),
     field('kind', record.kind),
     field('lifecycle', record.lifecycle or 'unknown'),
+    field('disposable', record.disposable and 'true' or 'nil'),
+    field('continuation-id', record.continuation_id or 'none'),
     field('name', vim.api.nvim_buf_get_name(descriptor.buf)),
     field('view-uri', record.view_uri or 'none'),
     field('root-ids', root_ids_value(record.root_ids)),
@@ -428,6 +391,11 @@ local function buffer_metadata (descriptor, undo, windows)
     field('application-token', record.application_token or 0),
     field('dirty', registry.dirty(descriptor.buf) and 'true' or 'nil'),
     field('logical-dirty', record.logical_dirty and 'true' or 'nil'),
+    field('maintenance-epoch', record.maintenance_epoch),
+    field('presentation-stale', record.presentation_stale and 'true' or 'nil'),
+    field('search-stale', record.search_stale and 'true' or 'nil'),
+    field('herald-bearing', vim.b[descriptor.buf].skg_herald_bearing == true
+      and 'true' or 'nil'),
     field('point', windows[1] or {}),
     field('windows', windows),
     field('undo', undo_fields(undo)),
@@ -514,14 +482,25 @@ local function snapshot_one_buffer (descriptor, staging, waiver_reason)
     field('buffer-key', descriptor.key),
     field('buffer-id', record.id),
     field('kind', record.kind),
+    field('lifecycle', record.lifecycle or 'unknown'),
+    field('disposable', record.disposable and 'true' or 'nil'),
+    field('continuation-id', record.continuation_id or 'none'),
     field('name', vim.api.nvim_buf_get_name(buf)),
     field('view-uri', record.view_uri or 'none'),
     field('root-ids', root_ids_value(record.root_ids)),
     field('recipe', recipe_text(record.recipe)),
+    field('source-set', record.source_set or 'all'),
     field('graph-generation', record.graph_generation or 0),
     field('presentation-generation', record.presentation_generation or 0),
     field('server-revision', record.server_revision or 0),
     field('application-token', record.application_token or 0),
+    field('dirty', registry.dirty(buf) and 'true' or 'nil'),
+    field('logical-dirty', record.logical_dirty and 'true' or 'nil'),
+    field('maintenance-epoch', record.maintenance_epoch),
+    field('presentation-stale', record.presentation_stale and 'true' or 'nil'),
+    field('search-stale', record.search_stale and 'true' or 'nil'),
+    field('herald-bearing', vim.b[buf].skg_herald_bearing == true
+      and 'true' or 'nil'),
     field('undo', undo_fields(undo)),
     field('artifacts', artifacts),
     field('initial-disposition', 'pending-classification'),
