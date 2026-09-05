@@ -21,6 +21,41 @@ Please ask an AI for help setting it up.
    You can make your thoughts entirely private, entirely public,
    or a mix, and you can share with anyone.
    See example-data/ for how.
+*** configure the maintenance recovery archive
+    =maintenance_archive_folder= is optional in =skgconfig.toml=.  Its default
+    is =unsaved-work-interrupted-by-rebuild=, resolved beside that config file:
+
+    #+begin_src toml
+    maintenance_archive_folder = "unsaved-work-interrupted-by-rebuild"
+    #+end_src
+
+    The archive root must be structurally disjoint from every configured
+    source: neither may contain the other, including after symlinks are
+    resolved.  Skg creates and requires private directories with mode 0700 and
+    files with mode 0600 on POSIX.  It refuses symlinks and path traversal, and
+    refuses to proceed if it cannot make an existing archive root private.
+
+    Maintenance archives exact dirty-buffer text, diffs, semantic evidence,
+    and native undo before selecting external disk or destructively rebuilding
+    stores.  Published incidents are permanent until you explicitly delete
+    them.  If publication fails, Skg deliberately leaves the incomplete
+    =.staging/INCIDENT.NONCE.partial= tree for inspection; it never promotes or
+    deletes that tree automatically.
+*** Emacs native undo support
+    Install exactly =undo-fu-session= 0.8 from stable NonGNU ELPA:
+
+    : M-x package-refresh-contents
+    : M-x package-install RET undo-fu-session RET
+
+    You do not need =undo-fu=, and you do not need to enable
+    =undo-fu-session-global-mode=.  Skg invokes only the package's public
+    save/recover API inside each private incident.  An active =undo-tree-mode=
+    in a dirty Skg buffer is incompatible with this adapter; disable it before
+    maintenance.  If required native undo cannot be archived, Skg aborts by
+    default and offers a second explicit text-and-diff-only waiver.
+
+    Neovim 0.11 or newer needs no extra undo package; Skg uses its built-in
+    =:wundo= format and records the exact Neovim version in the sidecar.
 ** start the client
 ```elisp
   (progn (load-file "../elisp/skg-reload.el")

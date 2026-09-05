@@ -2,6 +2,10 @@ db_name = "skg-dev"
 tantivy_folder = ".index.tantivy"
 port = 1730 # TCP port for Rust-Emacs API communication.
 default_source_set = "public"
+# Private recovery evidence for pulls, external-disk reconciliation, and
+# rebuilds. Relative paths resolve beside this config and must not overlap a
+# source. Skg creates directories mode 0700 and files mode 0600 on POSIX.
+maintenance_archive_folder = "unsaved-work-interrupted-by-rebuild"
 
 # Sources are listed in PRIVACY ORDER: most public first, most
 # private last. That order defines the available source-sets: each
