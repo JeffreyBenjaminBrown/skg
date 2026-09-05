@@ -1188,3 +1188,61 @@ what's imperfect about what's done; choices determining the future.
   is reserved for initialization which actually installed rules.  All 428
   Emacs tests pass; three native-undo tests are skipped because
   =undo-fu-session= is not installed.  =git diff --check= is clean.
+
+* replacement startup recovers safely from unfinished pre-archive maintenance
+
+** diagnosis
+- The client which requested incident
+  =40f56a96-1f6e-407d-b1f6-55255cc5512e= disconnected after beginning an
+  explicit partial reload but before supplying an acceptable locked census.
+  The durable journal therefore correctly retained the incident in
+  =awaiting-locked-census= with =archive_status: preparing=, but recorded no
+  frozen buffers, archive, selected store, or external mutation.
+- The locked-census refusal (the missing native-undo capability) took the
+  generic request-error path.  Emacs displayed the error but never cancelled
+  this still-safe incident, so the next server process restored it.
+- A new Emacs process has a different client-session ID.  The server correctly
+  refused to let it /adopt/ an incident before =archive-ready=, but offered no
+  safe way past the abandoned transaction.  Meanwhile =skg-client-init=
+  waited only for herald rules, not for the mandatory verification and census
+  barrier.  It queued an ordinary herald request after the rejected census,
+  elicited =client census must complete before ordinary requests=, lost the
+  connection, and repeated the sequence through its herald retries.
+
+** repair
+- =skg-client-init= now waits for the complete verification-and-census
+  handshake before requesting herald rules.  Verification and ordinary census
+  requests retain the server's exact terminal error, stop the initialization
+  attempt, and report it once.  A closed or genuinely stalled handshake still
+  gets the corresponding transport/timeout explanation and log paths.
+- A locked maintenance-census refusal now warns with its exact reason and
+  schedules cancellation of that exact incident and epoch.  This prevents a
+  future pre-archive capability refusal from stranding another journal entry.
+- On reconnect, the owning editor session still resumes its transaction.  A
+  /different/ editor session abandons, rather than adopts, an incident only in
+  the three phases before archive publication; if the incident carried a disk
+  candidate, that candidate returns to pending and is offered afresh.  Anything
+  at =archive-ready= or later remains protected by the existing archive-verified
+  adoption protocol.
+- The verification response names any safely abandoned incident and origin.
+  Emacs emits a persistent warning that no disk or server-store mutation had
+  begun and that the original command must be repeated if it is still wanted.
+  The wire contract and ordering guarantee are recorded in
+  =api-and-formats.md=.
+
+** live recovery and validation
+- Re-running the documented clean-Emacs setup against the real retained journal
+  safely abandoned the old pre-archive incident and changed the journal to
+  =idle=.  The original partial reload never performed its requested mutation;
+  it must be requested again if still wanted.
+- That real initialization completed in about 0.4 seconds, issued exactly one
+  verification, one census and one herald request, and reported
+  =skg ready on port 1731 -- 24 herald rules loaded=.  The warning named the
+  abandoned incident rather than flashing the two secondary protocol errors or
+  retrying connections.
+- All 433 Emacs tests have 430 expected passes and three expected skips for the
+  absent =undo-fu-session=.  All 308 Rust library tests pass serially, and each
+  touched maintenance test passes in the ordinary runner.  Three unrelated
+  save-leveling tests can interfere through shared process state in a parallel
+  full-suite run; each passes alone and the entire suite passes with one test
+  thread.  =cargo check --all-targets= and =git diff --check= are clean.
