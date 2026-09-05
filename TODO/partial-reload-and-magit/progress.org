@@ -1300,3 +1300,35 @@ what's imperfect about what's done; choices determining the future.
   proving that busy-socket retirement and same-session retry compose correctly.
   All 438 Emacs tests have 435 expected passes and three expected skips for the
   absent =undo-fu-session=; =git diff --check= is clean.
+
+* explicit targeted reload can overtake an incidental watcher candidate
+
+** diagnosis
+- Editing =056a7de8-d7e5-4fb4-9a42-7e0f088ab898.skg= caused the process-owned
+  watcher to publish valid complete-disk candidate
+  =4534b931-21fe-49aa-9164-654776d72ac0=.  The ID-stack command then correctly
+  requested a new =explicit-partial-reload= for that ID with
+  =candidate-id none=.
+- The coordinator applied its pending-candidate identity check to every origin
+  except full rebuild.  That check is essential when the user accepts
+  =pending-reconciliation=, but wrong for an explicit reload: naming the
+  watcher's complete candidate would silently expand a targeted command to any
+  unrelated changes that candidate happened to contain.  Rejecting the command
+  instead made the watcher/selector timing visible as =pending candidate ...
+  must be named explicitly=.
+
+** repair and validation
+- An explicit path/ID reload now deliberately supersedes either an incidental
+  pending watcher candidate or an ordinary observation still in progress.  It
+  enters maintenance with no candidate and constructs the exact targeted
+  candidate promised by the plan.  The mandatory complete sweep after terminal
+  acknowledgement will rediscover and offer any changes outside that target.
+- Pending reconciliation still requires the exact candidate ID, and full
+  rebuild retains its existing supersession behavior.  Regressions cover all
+  four boundaries.  All 311 Rust library tests pass serially,
+  =cargo check --all-targets= passes, and =git diff --check= is clean.
+- Recompiling this server change restarted the live server.  Its incremental
+  initializer found exactly one modified =.skg= file and loaded it, so the
+  reported title edit is already selected and the live maintenance journal is
+  idle.  A later edit followed by ID-stack reload will exercise the repaired
+  no-restart path.
