@@ -49,8 +49,11 @@ local function fresh_request_id ()
   return string.format('nvim-%d-%d', vim.fn.getpid(), M.next_request_number)
 end
 
-function M.new_internal_request (handlers)
-  local record = { id = fresh_request_id(), handlers = handlers or {} }
+function M.new_internal_request (handlers, incident_id)
+  local record = {
+    id = fresh_request_id(), handlers = handlers or {},
+    incident_id = incident_id,
+  }
   M.request_records[record.id] = record
   for _, entry in pairs(record.handlers) do
     if entry.one_shot then

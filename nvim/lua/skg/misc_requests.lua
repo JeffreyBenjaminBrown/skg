@@ -70,32 +70,49 @@ function M.install_connection_verification (_payload_text, response, tcp)
   M.submit_buffer_census(tcp or state.tcp)
 end
 
-function M.submit_buffer_census (tcp)
+function M.submit_buffer_census (tcp, maintenance_incident_id, maintenance_epoch)
   local registry = require('skg.buffer_registry')
-  client.submit_priority_request(tcp, '((request . "client census"))\n', {
+  local request_text = maintenance_epoch
+    and string.format(
+      '((request . "client census") (maintenance-epoch . %d))\n',
+      maintenance_epoch)
+    or '((request . "client census"))\n'
+  client.submit_priority_request(tcp, request_text, {
     ['client-census'] = {
       handler = function (_payload_text, response)
-        M.handle_buffer_census_response(tcp, response) end,
+        M.handle_buffer_census_response(
+          tcp, response, maintenance_incident_id, maintenance_epoch) end,
       one_shot = true,
     },
-  }, registry.census_payload())
+  }, registry.census_payload(), maintenance_incident_id)
 end
 
-function M.handle_buffer_census_response (tcp, response)
+local function complete_buffer_census (maintenance_incident_id, maintenance_epoch)
+  state.connection_handshake_state = 'verified'
+  vim.schedule(function ()
+    require('skg.maintenance').resume_after_census(
+      maintenance_incident_id, maintenance_epoch) end)
+end
+
+function M.handle_buffer_census_response (
+    tcp, response, maintenance_incident_id, maintenance_epoch)
   local registry = require('skg.buffer_registry')
   local required = payload.string_list(
     payload.field(response, 'text-required-buffer-ids'))
   require('skg.maintenance').handle_census_stale(payload.string_list(
     payload.field(response, 'stale-buffer-ids')))
   if #required == 0 then
-    state.connection_handshake_state = 'verified'
-    vim.schedule(function ()
-      require('skg.maintenance').resume_after_census() end)
+    complete_buffer_census(maintenance_incident_id, maintenance_epoch)
     return
   end
   state.connection_handshake_state = 'census-texts'
+  local request_text = maintenance_epoch
+    and string.format(
+      '((request . "client census texts") (maintenance-epoch . %d))\n',
+      maintenance_epoch)
+    or '((request . "client census texts"))\n'
   client.submit_priority_request(
-    tcp, '((request . "client census texts"))\n', {
+    tcp, request_text, {
       ['client-census'] = {
         handler = function (_payload_text, final_response)
           require('skg.maintenance').handle_census_stale(
@@ -103,13 +120,11 @@ function M.handle_buffer_census_response (tcp, response)
               final_response, 'stale-buffer-ids')))
           if payload.field_text(final_response, 'census-complete') ~= 'true' then
             error('Skg server did not complete the buffer census') end
-          state.connection_handshake_state = 'verified'
-          vim.schedule(function ()
-            require('skg.maintenance').resume_after_census() end)
+          complete_buffer_census(maintenance_incident_id, maintenance_epoch)
         end,
         one_shot = true,
       },
-    }, registry.census_texts_payload(required))
+    }, registry.census_texts_payload(required), maintenance_incident_id)
 end
 
 function M.enqueue_connection_handshake (tcp)

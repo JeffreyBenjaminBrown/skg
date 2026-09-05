@@ -160,10 +160,13 @@ local function write_request (tcp, text)
   end)
 end
 
----Queue an internal connection request without consuming an ordinary draft.
-function M.submit_priority_request (tcp, request_text, handlers, content)
-  local record = state.new_internal_request(handlers)
-  local wire = request_wire(request_text, record.id, nil, content)
+---Queue an internal connection or maintenance barrier request without
+---consuming an ordinary draft.
+function M.submit_priority_request (
+    tcp, request_text, handlers, content, incident_id)
+  local record = state.new_internal_request(handlers, incident_id)
+  local wire = request_wire(
+    request_text, record.id, record.incident_id, content)
   state.enqueue_priority_request(
     record, wire, function (text) write_request(tcp, text) end)
   return record.id

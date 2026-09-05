@@ -188,18 +188,24 @@ function M.handle_census_stale (buffer_ids)
   registry.mark_census_buffers_stale(ordinary)
 end
 
-function M.resume_after_census ()
-  local summary = state.maintenance_state
-  if summary and (summary.state == 'active' or summary.state == 'terminal') then
-    M.status(true) end
-end
-
 local function require_client_incident (incident_id, epoch)
   local incident = state.maintenance_client_incident
   if not incident or incident.incident_id ~= incident_id
      or incident.epoch ~= epoch then
     error('Maintenance response names another incident or epoch') end
   return incident
+end
+
+function M.resume_after_census (maintenance_incident_id, maintenance_epoch)
+  if maintenance_incident_id then
+    require_client_incident(maintenance_incident_id, maintenance_epoch) end
+  local summary = state.maintenance_state
+  if summary and (summary.state == 'active' or summary.state == 'terminal') then
+    local incident = state.maintenance_client_incident
+    if incident and incident.phase == 'awaiting-locked-census' then
+      M.send_locked_census()
+    else M.status(true) end
+  end
 end
 
 function M.record_selection (response)
@@ -768,7 +774,24 @@ function M.resume_active (response)
   elseif phase == 'finalizing-archive' then
     incident.phase = 'finalizing-archive'
     submit_later(M.resume_finalization)
+  elseif phase == 'awaiting-locked-census' then
+    incident.phase = 'awaiting-locked-census'
+    submit_later(M.send_locked_census)
   elseif phase == 'preparing-archive' then
+    if not incident.lock_census_sha256 then
+      local offered_ids = sorted_copy(payload.string_list(
+        payload.field(response, 'registered-buffer-ids')))
+      local actual_ids = registered_ids()
+      if not equal_lists(offered_ids, actual_ids) then
+        error('Maintenance census changed from its frozen authority') end
+      local checksum = M.lock_census_sha256(actual_ids)
+      if checksum ~= payload.field_text(response, 'lock-census-sha256') then
+        error('Maintenance census checksum does not match') end
+      incident.registered_buffer_ids = offered_ids
+      incident.lock_census_sha256 = checksum
+      for _, buf in ipairs(registry.buffers()) do
+        registry.lock_for_maintenance(buf, epoch) end
+    end
     incident.phase = 'preparing-archive'
     if incident.archive then submit_later(M.send_archive_ready)
     else submit_later(M.publish_initial) end
@@ -868,57 +891,107 @@ function M.publish_initial ()
   end
 end
 
-local function handle_bootstrap (
-    _payload_text, response, terminal_callback, origin_context)
+local function offer_for_writer (response)
+  return {
+    incident_id = payload.field_text(response, 'allocated-incident-id'),
+    epoch = payload.field(response, 'maintenance-epoch'),
+    origin = payload.field_text(response, 'origin'),
+    started_at_utc = payload.field_text(response, 'started-at-utc'),
+    archive_name = payload.field_text(response, 'archive-directory-name'),
+    source_set = payload.field_text(response, 'source-set'),
+    graph_generation = payload.field(response, 'g0-graph-generation'),
+    manifest_revision = payload.field(response, 'g0-manifest-revision'),
+  }
+end
+
+local function lock_offer (response)
   local offered_ids = sorted_copy(payload.string_list(
     payload.field(response, 'registered-buffer-ids')))
   local actual_ids = registered_ids()
-  local incident = {
-    incident_id = assert(payload.field_text(
-      response, 'allocated-incident-id'), 'offer has no incident ID'),
-    epoch = assert(payload.field(response, 'maintenance-epoch'),
-      'offer has no maintenance epoch'),
-    phase = 'preparing-archive',
-    requested_paths = payload.string_list(
-      payload.field(response, 'requested-paths')),
-    requested_ids = payload.string_list(
-      payload.field(response, 'requested-ids')),
-    origin_context = origin_context,
-    terminal_callback = terminal_callback,
-    terminal_callback_fired = false,
-    registered_buffer_ids = offered_ids,
-    undo_waivers = {},
-    locally_applied = {},
-    offer = {
-      incident_id = payload.field_text(response, 'allocated-incident-id'),
-      epoch = payload.field(response, 'maintenance-epoch'),
-      origin = payload.field_text(response, 'origin'),
-      started_at_utc = payload.field_text(response, 'started-at-utc'),
-      archive_name = payload.field_text(response, 'archive-directory-name'),
-      source_set = payload.field_text(response, 'source-set'),
-      graph_generation = payload.field(response, 'g0-graph-generation'),
-      manifest_revision = payload.field(response, 'g0-manifest-revision'),
-    },
-  }
-  state.maintenance_client_incident = incident
   if not equal_lists(offered_ids, actual_ids) then
-    vim.notify('Maintenance census changed before locking; cancelling safely.',
-               vim.log.levels.ERROR)
-    submit_later(M.cancel)
-    return
+    error('Maintenance census changed: server froze '
+      .. vim.inspect(offered_ids) .. ', client has ' .. vim.inspect(actual_ids))
   end
   local checksum = M.lock_census_sha256(actual_ids)
   if checksum ~= payload.field_text(response, 'lock-census-sha256') then
-    vim.notify('Maintenance census checksum does not match; cancelling safely.',
-               vim.log.levels.ERROR)
-    submit_later(M.cancel)
-    return
-  end
-  incident.lock_census_sha256 = checksum
-  M.set_handshake_summary('active', incident.epoch)
+    error('Maintenance census checksum does not match') end
+  local epoch = nat(response, 'maintenance-epoch')
   for _, buf in ipairs(registry.buffers()) do
-    registry.lock_for_maintenance(buf, incident.epoch) end
-  M.publish_initial()
+    registry.lock_for_maintenance(buf, epoch) end
+  return checksum
+end
+
+local function handle_bootstrap (
+    _payload_text, response, terminal_callback, origin_context)
+  local status = payload.field_text(response, 'status')
+  local incident_id = assert(payload.field_text(
+    response, 'allocated-incident-id'), 'offer has no incident ID')
+  local epoch = nat(response, 'maintenance-epoch')
+  local offer = offer_for_writer(response)
+  if status == 'install-maintenance-epoch-and-submit-locked-census' then
+    if state.maintenance_client_incident then
+      error('Another client-known maintenance incident is active') end
+    local incident = {
+      incident_id = incident_id,
+      epoch = epoch,
+      phase = 'awaiting-locked-census',
+      requested_paths = payload.string_list(
+        payload.field(response, 'requested-paths')),
+      requested_ids = payload.string_list(
+        payload.field(response, 'requested-ids')),
+      origin_context = origin_context,
+      terminal_callback = terminal_callback,
+      terminal_callback_fired = false,
+      registered_buffer_ids = {},
+      undo_waivers = {},
+      locally_applied = {},
+      offer = offer,
+    }
+    state.maintenance_client_incident = incident
+    M.set_handshake_summary('active', epoch)
+    for _, buf in ipairs(registry.buffers()) do
+      registry.lock_for_maintenance(buf, epoch) end
+    require('skg.misc_requests').submit_buffer_census(
+      client.connect(), incident_id, epoch)
+  elseif status == 'locked-census-accepted-publish-initial-archive' then
+    local incident = require_client_incident(incident_id, epoch)
+    if not vim.deep_equal(offer, incident.offer)
+       or payload.field_text(response, 'origin') ~= incident.offer.origin
+       or not equal_lists(payload.string_list(
+         payload.field(response, 'requested-paths')), incident.requested_paths)
+       or not equal_lists(payload.string_list(
+         payload.field(response, 'requested-ids')), incident.requested_ids) then
+      error('Maintenance locked-census offer changed bootstrap authority')
+    end
+    incident.registered_buffer_ids = sorted_copy(payload.string_list(
+      payload.field(response, 'registered-buffer-ids')))
+    local ok, result = pcall(lock_offer, response)
+    if not ok then
+      vim.notify(tostring(result), vim.log.levels.ERROR)
+      submit_later(M.cancel)
+      return
+    end
+    incident.lock_census_sha256 = result
+    incident.phase = 'preparing-archive'
+    M.publish_initial()
+  else
+    error('Unexpected maintenance bootstrap status ' .. tostring(status))
+  end
+end
+
+function M.send_locked_census ()
+  local incident = assert(state.maintenance_client_incident,
+    'Locked maintenance census has no client state')
+  local tcp = client.connect()
+  client.submit_priority_request(tcp, request('maintenance locked census', {
+    { 'maintenance-epoch', incident.epoch },
+  }), {
+    ['maintenance-offer'] = {
+      handler = function (payload_text, response)
+        handle_bootstrap(payload_text, response) end,
+      one_shot = true,
+    },
+  }, nil, incident.incident_id)
 end
 
 ---Begin one durable maintenance incident.

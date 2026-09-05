@@ -25,6 +25,23 @@ local function settlement (buffer_id, requirement, acknowledged)
   }
 end
 
+local function bootstrap_response (status, buffer_ids)
+  local response = {
+    f('status', status),
+    f('allocated-incident-id', incident_id), f('maintenance-epoch', 9),
+    f('requested-paths', {}), f('requested-ids', {}),
+    f('origin', 'pull'), f('started-at-utc', 'now'),
+    f('archive-directory-name', 'archive'), f('source-set', 'all'),
+    f('g0-graph-generation', 1), f('g0-manifest-revision', 2),
+  }
+  if buffer_ids then
+    table.insert(response, f('registered-buffer-ids', buffer_ids))
+    table.insert(response, f('lock-census-sha256',
+      maintenance.lock_census_sha256(buffer_ids)))
+  end
+  return response
+end
+
 local function new_buffer ()
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '* Original' })
@@ -59,6 +76,8 @@ describe('skg Neovim maintenance handshake', function ()
   local original_defer
   local original_archive_finalize
   local original_client_submit
+  local original_client_priority_submit
+  local original_client_connect
   local original_begin
 
   before_each(function ()
@@ -66,6 +85,9 @@ describe('skg Neovim maintenance handshake', function ()
     original_defer = maintenance.defer
     original_archive_finalize = require('skg.recovery_archive').finalize
     original_client_submit = require('skg.client').submit_request
+    original_client_priority_submit =
+      require('skg.client').submit_priority_request
+    original_client_connect = require('skg.client').connect
     original_begin = maintenance.begin
   end)
 
@@ -73,6 +95,9 @@ describe('skg Neovim maintenance handshake', function ()
     maintenance.defer = original_defer
     require('skg.recovery_archive').finalize = original_archive_finalize
     require('skg.client').submit_request = original_client_submit
+    require('skg.client').submit_priority_request =
+      original_client_priority_submit
+    require('skg.client').connect = original_client_connect
     maintenance.begin = original_begin
     reset()
   end)
@@ -124,8 +149,15 @@ describe('skg Neovim maintenance handshake', function ()
     local context = { local_only = '/client/repository' }
     local key = string.rep('a', 64)
     local wire
+    local census
     client_module.submit_request = function (request_wire)
       wire = request_wire
+    end
+    client_module.connect = function () return 'tcp' end
+    local misc = require('skg.misc_requests')
+    local real_census = misc.submit_buffer_census
+    misc.submit_buffer_census = function (...)
+      census = { ... }
     end
     maintenance.begin('pull', nil, nil, nil, nil, context, {
       { sexpr.symbol('pull-repositories'), {
@@ -144,20 +176,65 @@ describe('skg Neovim maintenance handshake', function ()
     assert.is_nil(wire:find('/client/repository', 1, true))
 
     local handler = state.request_draft.handlers['maintenance-offer'].handler
-    local real_publish = maintenance.publish_initial
-    maintenance.publish_initial = function () end
-    handler(nil, {
-      f('allocated-incident-id', incident_id), f('maintenance-epoch', 9),
-      f('registered-buffer-ids', {}),
-      f('lock-census-sha256', maintenance.lock_census_sha256({})),
-      f('requested-paths', {}), f('requested-ids', {}),
-      f('origin', 'pull'), f('started-at-utc', 'now'),
-      f('archive-directory-name', 'archive'), f('source-set', 'all'),
-      f('g0-graph-generation', 1), f('g0-manifest-revision', 2),
-    })
-    maintenance.publish_initial = real_publish
+    handler(nil, bootstrap_response(
+      'install-maintenance-epoch-and-submit-locked-census'))
+    misc.submit_buffer_census = real_census
     assert.are.equal(context,
       state.maintenance_client_incident.origin_context)
+    assert.are.equal('awaiting-locked-census',
+      state.maintenance_client_incident.phase)
+    assert.are.equal('tcp', census[1])
+    assert.are.equal(incident_id, census[2])
+    assert.are.equal(9, census[3])
+  end)
+
+  it('freezes an incident-bound census before publishing the archive',
+     function ()
+    local client_module = require('skg.client')
+    local misc = require('skg.misc_requests')
+    local real_census = misc.submit_buffer_census
+    local priority, published
+    client_module.connect = function () return 'tcp' end
+    client_module.submit_request = function () end
+    client_module.submit_priority_request = function (...)
+      priority = { ... }
+    end
+    misc.submit_buffer_census = function () end
+    maintenance.begin('pull')
+    local initial_handler =
+      state.request_draft.handlers['maintenance-offer'].handler
+    initial_handler(nil, bootstrap_response(
+      'install-maintenance-epoch-and-submit-locked-census'))
+    misc.submit_buffer_census = real_census
+
+    maintenance.resume_after_census(incident_id, 9)
+    assert.are.equal('tcp', priority[1])
+    assert.matches('maintenance locked census', priority[2], 1, true)
+    assert.matches('maintenance%-epoch', priority[2])
+    assert.are.equal(incident_id, priority[5])
+
+    local real_publish = maintenance.publish_initial
+    maintenance.publish_initial = function () published = true end
+    priority[3]['maintenance-offer'].handler(nil, bootstrap_response(
+      'locked-census-accepted-publish-initial-archive', {}))
+    maintenance.publish_initial = real_publish
+    assert.is_true(published)
+    assert.are.equal('preparing-archive',
+      state.maintenance_client_incident.phase)
+    assert.are.same({},
+      state.maintenance_client_incident.registered_buffer_ids)
+    assert.are.equal(maintenance.lock_census_sha256({}),
+      state.maintenance_client_incident.lock_census_sha256)
+  end)
+
+  it('registers buffers born during maintenance under the active lock',
+     function ()
+    state.maintenance_state = { epoch = 9, state = 'active' }
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '* New view' })
+    registry.register(buf, 'content-view', { last_fetched = '* New view\n' })
+    assert.are.equal(9, registry.record(buf).maintenance_epoch)
+    assert.is_false(vim.bo[buf].modifiable)
   end)
 
   it('dispatches reconnect phases through the registered origin adapter',

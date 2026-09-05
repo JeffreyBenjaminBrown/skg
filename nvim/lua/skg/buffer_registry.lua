@@ -67,6 +67,13 @@ function M.register (buf, kind, options)
   vim.b[buf].skg_presentation_stale = false
   vim.b[buf].skg_search_stale = false
   vim.b[buf].skg_herald_bearing = last_fetched:find('(heralds', 1, true) ~= nil
+  local maintenance = state.maintenance_state
+  if maintenance and maintenance.state == 'active' then
+    local epoch = maintenance.epoch
+    if type(epoch) ~= 'number' or epoch < 0 or epoch ~= math.floor(epoch) then
+      error('Active maintenance has no valid epoch') end
+    M.lock_for_maintenance(buf, epoch)
+  end
   return M.record(buf)
 end
 
