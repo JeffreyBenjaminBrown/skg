@@ -41,34 +41,41 @@
   ;; the complete client census.  Herald rules are ordinary requests: waiting
   ;; here keeps them behind the whole startup barrier, rather than merely
   ;; behind the first verification frame.
-  (unless (skg-connection-handshake-ensure)
-    (user-error "%s" (skg--client-initialization-failure-message)))
-  ;; Re-fetch the herald rule table from the (possibly rebuilt) server,
-  ;; DISCARDING any cached table first and WAITING for the reply. So a
-  ;; reconnect -- including one right after `skg-reload', which
-  ;; deliberately preserves the previous table across the unload -- ends
-  ;; up with the CURRENT server's table, ready before this returns. The
-  ;; bare async `skg-request-herald-rules' left the stale table in place
-  ;; until its reply happened to land, so a server whose rule table had
-  ;; changed (e.g. the styled-span heralds) rendered raw metadata.
-  (setq heralds--transform-rules nil)
-  (let ((rules (skg-herald-rules-ensure)))
-    ;; Report the outcome in a SHORT string, rather than returning the
-    ;; rule table: `skg-herald-rules-ensure' returns the (large) table,
-    ;; and as the last form it would otherwise become
-    ;; `skg-client-init''s value -- which an interactive eval echoes in
-    ;; full into the minibuffer. This returned a bare nil for that
-    ;; reason, but nil in the echo area reads as failure when in fact
-    ;; everything worked. `message' returns the string it prints, so
-    ;; the echoed value and the echoed message now agree, and they say
-    ;; which port was reached -- worth stating, since several skg
-    ;; instances (different configs, different ports) can be up at once.
-    ;; The rule count is the evidence that the round trip landed: the
-    ;; table is `(skg RULE ...)', hence the 1-.
-    (if rules
-        (message "skg ready on port %s -- %d herald rules loaded."
-                 skg-port (1- (length rules)))
-      (user-error "%s" (skg--client-initialization-failure-message)))))
+  (let ((handshake-result (skg-connection-handshake-ensure)))
+    (if (eq handshake-result 'busy-initializing)
+        ;; Busy is an expected, immediately retryable startup state, not a
+        ;; failed reconciliation.  The exceptional signal has already closed
+        ;; this request coordinator; the next init opens a fresh connection.
+        (message "%s" (or skg--connection-busy-message
+                          "Server is initializing, please wait."))
+      (unless handshake-result
+        (user-error "%s" (skg--client-initialization-failure-message)))
+      ;; Re-fetch the herald rule table from the (possibly rebuilt) server,
+      ;; DISCARDING any cached table first and WAITING for the reply. So a
+      ;; reconnect -- including one right after `skg-reload', which
+      ;; deliberately preserves the previous table across the unload -- ends
+      ;; up with the CURRENT server's table, ready before this returns. The
+      ;; bare async `skg-request-herald-rules' left the stale table in place
+      ;; until its reply happened to land, so a server whose rule table had
+      ;; changed (e.g. the styled-span heralds) rendered raw metadata.
+      (setq heralds--transform-rules nil)
+      (let ((rules (skg-herald-rules-ensure)))
+        ;; Report the outcome in a SHORT string, rather than returning the
+        ;; rule table: `skg-herald-rules-ensure' returns the (large) table,
+        ;; and as the last form it would otherwise become
+        ;; `skg-client-init''s value -- which an interactive eval echoes in
+        ;; full into the minibuffer. This returned a bare nil for that
+        ;; reason, but nil in the echo area reads as failure when in fact
+        ;; everything worked. `message' returns the string it prints, so
+        ;; the echoed value and the echoed message now agree, and they say
+        ;; which port was reached -- worth stating, since several skg
+        ;; instances (different configs, different ports) can be up at once.
+        ;; The rule count is the evidence that the round trip landed: the
+        ;; table is `(skg RULE ...)', hence the 1-.
+        (if rules
+            (message "skg ready on port %s -- %d herald rules loaded."
+                     skg-port (1- (length rules)))
+          (user-error "%s" (skg--client-initialization-failure-message)))))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()
@@ -78,7 +85,8 @@
       (and                 skg-rust-tcp-proc
            (process-live-p skg-rust-tcp-proc)
            skg--connection-handshake-state
-           (not (eq skg--connection-handshake-state 'failed)))
+           (not (memq skg--connection-handshake-state
+                      '(busy-initializing failed))))
     (when (and skg-rust-tcp-proc
                (process-live-p skg-rust-tcp-proc))
       (delete-process skg-rust-tcp-proc))
@@ -86,6 +94,7 @@
     (skg-lp-reset)
     (setq skg--connection-handshake-state nil
           skg--connection-handshake-error nil
+          skg--connection-busy-message nil
           skg--git-diff-mode-enabled
           ;; The server starts each connection with diff mode off.
           nil
@@ -173,23 +182,29 @@ The client's LP machine reassembles each frame and dispatches it to
 the request record named by its request-id."
   (let ((trimmed (string-trim-left string)))
     (if (string-prefix-p "((busy-initializing" trimmed)
-        (let ((parsed (car (read-from-string trimmed))))
-          (message "%s" (cdr (assq 'busy-initializing parsed)))
-          (setq skg--connection-handshake-state nil
-                skg--connection-handshake-error nil)
+        (let* ((parsed (car (read-from-string trimmed)))
+               (status (format "%s"
+                               (cdr (assq 'busy-initializing parsed)))))
+          (message "%s" status)
+          (setq skg--connection-handshake-state 'busy-initializing
+                skg--connection-handshake-error nil
+                skg--connection-busy-message status)
           (skg-clear-request-coordinator)
           (skg-lp-reset))
       (skg-lp-handle-generic-chunk tcp-proc string) )) )
 
-(defun skg--tcp-sentinel (_proc event)
+(defun skg--tcp-sentinel (proc event)
   "Clean up when the TCP connection closes."
-  (when (not (string-prefix-p "open" event))
+  (when (and (eq proc skg-rust-tcp-proc)
+             (not (string-prefix-p "open" event)))
     (unless (or skg--connection-handshake-error
-                (eq skg--connection-handshake-state 'verified))
+                (memq skg--connection-handshake-state
+                      '(busy-initializing verified)))
       (setq skg--connection-handshake-error
             (format "the server connection closed: %s"
                     (string-trim event))))
-    (setq skg--connection-handshake-state nil)
+    (unless (eq skg--connection-handshake-state 'busy-initializing)
+      (setq skg--connection-handshake-state nil))
     (skg-clear-request-coordinator)
     (skg-lp-reset)) )
 

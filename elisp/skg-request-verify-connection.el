@@ -25,15 +25,22 @@
         skg--connection-handshake-state 'failed))
 
 (defun skg-connection-handshake-ensure ()
-  "Wait for the mandatory connection handshake and return non-nil on success."
+  "Wait for the mandatory connection handshake.
+Return t on success, `busy-initializing' for that server signal, or nil for a
+terminal failure or timeout."
   (let ((deadline (+ (float-time) skg-connection-handshake-timeout)))
     (while (and (not (eq skg--connection-handshake-state 'verified))
+                (not (eq skg--connection-handshake-state 'busy-initializing))
                 (not skg--connection-handshake-error)
                 skg-rust-tcp-proc
                 (process-live-p skg-rust-tcp-proc)
                 (< (float-time) deadline))
       (accept-process-output skg-rust-tcp-proc 0.05))
-    (eq skg--connection-handshake-state 'verified)))
+    (cond
+     ((eq skg--connection-handshake-state 'verified) t)
+     ((eq skg--connection-handshake-state 'busy-initializing)
+      'busy-initializing)
+     (t nil))))
 
 (defun skg--installed-undo-fu-session-version ()
   "Return the installed undo-fu-session version string, or nil.

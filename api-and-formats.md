@@ -1161,6 +1161,9 @@ manual deletion has the same irreversible loss of native undo and evidence.
   - Response: the unprefixed, newline-terminated
     `((busy-initializing . "human-readable status message"))`.
   - The editor should display the message and retry the request (or let the user retry manually).
+    Emacs client initialization returns this status as its short, non-error
+    result, preserves it across closure of the temporary initialization
+    socket, and opens a fresh socket on the user's next attempt.
   - No request triggers this specifically; any request sent during initialization may receive it.
 
 Once initialization is complete, endpoint errors use that endpoint's

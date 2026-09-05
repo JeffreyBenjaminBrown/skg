@@ -18,10 +18,14 @@ https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html
 
 (defvar skg--connection-handshake-state nil
   "Progress of the mandatory handshake for the current TCP connection.
-The value is nil, `sent', `census', `census-texts', `verified', or `failed'.")
+The value is nil, `sent', `census', `census-texts', `verified',
+`busy-initializing', or `failed'.")
 
 (defvar skg--connection-handshake-error nil
   "Exact server or transport error which prevented connection verification.")
+
+(defvar skg--connection-busy-message nil
+  "Server status reported by the exceptional busy-initializing signal.")
 
 (defvar skg--active-source-set-name "server-default"
   "Name claimed in a reconnect handshake; replaced by server authority.")
