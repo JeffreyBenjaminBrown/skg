@@ -8,10 +8,8 @@ use skg::dbs::init::{
   overwrite_new_empty_typedb_db,
   read_and_use_schema};
 use skg::dbs::in_rust_graph::{
-  InRustGraph,
   InRustGraphHandle,
-  install_or_swap_global_handle,
-  new_handle};
+  install_or_swap_global_handle};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::dbs::typedb::sources::create_all_sources;
@@ -20,6 +18,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   cleanup_test_tantivy_and_typedb_dbs,
   extract_string_field_from_sexp,
+  graph_handle_from_config,
   read_all_lp_messages,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
 use skg::to_org::render::content_view::multi_root_view;
@@ -51,14 +50,14 @@ fn test_source_move_updates_collateral_view_metadata (
     temp_dir . path() )?;
   let tantivy_folder : PathBuf =
     temp_dir . path() . join ("tantivy");
-  let (config, driver, tantivy, initial_nodes)
-    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex, Vec<NodeComplete>) =
+  let (config, driver, tantivy)
+    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex) =
     block_on ( setup_test_dbs (
       db_name,
       temp_dir . path(),
       &tantivy_folder ) ) ?;
   let graph : InRustGraphHandle =
-    new_handle ( InRustGraph::from_nodecompletes (&initial_nodes) );
+    graph_handle_from_config (&config) ?;
   install_or_swap_global_handle (graph . clone ());
 
   let (_save_response, collateral_buffer)
@@ -146,7 +145,7 @@ async fn setup_test_dbs (
   db_name        : &str,
   fixtures_root  : &Path,
   tantivy_folder : &Path,
-) -> Result<(SkgConfig, Arc<TypeDBDriver>, TantivyIndex, Vec<NodeComplete>),
+) -> Result<(SkgConfig, Arc<TypeDBDriver>, TantivyIndex),
             Box<dyn Error>> {
   let config : SkgConfig =
     load_config_with_overrides (
@@ -178,7 +177,7 @@ async fn setup_test_dbs (
   create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
-  Ok ((config, Arc::new (driver), tantivy_index, nodes)) }
+  Ok ((config, Arc::new (driver), tantivy_index)) }
 
 fn copy_dir_all (
   src : &Path,
