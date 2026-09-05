@@ -74,53 +74,6 @@
       (with-current-buffer view (set-buffer-modified-p nil))
       (kill-buffer view))))
 
-(ert-deftest test-skg-reload-conflict-preserves-local-and-opens-structured-report ()
-  (let ((dirty (generate-new-buffer "*skg dirty conflict test*"))
-        (clean (generate-new-buffer "*skg clean conflict test*"))
-        shown)
-    (unwind-protect
-        (progn
-          (with-current-buffer dirty
-            (setq-local skg-view-uri "dirty-uri")
-            (setq-local skg--last-rendered-content "base text")
-            (insert "local text")
-            (set-buffer-modified-p t))
-          (with-current-buffer clean
-            (setq-local skg-view-uri "clean-uri")
-            (insert "updated text")
-            (set-buffer-modified-p nil))
-          (cl-letf (((symbol-function 'skg-big-nonfatal-message)
-                     (lambda (name message content)
-                       (setq shown (list name message content)))))
-            (skg--handle-reload-conflicts
-             '((incident-id incident-one)
-               (conflicted-views
-                (((view-uri dirty-uri) (pids (node-a))
-                  (paths ("/source/node-a.skg"))
-                  (incoming "incoming text"))))
-               (updated-views
-                (((view-uri clean-uri) (pids (node-a))
-                  (paths ("/source/node-a.skg"))))
-               (files-affected ("/source/node-a.skg")))))
-          (with-current-buffer dirty
-            (should (equal (buffer-string) "local text"))
-            (should (buffer-modified-p))
-            (should (equal (alist-get 'base skg--disk-client-conflict)
-                           "base text"))
-            (should (equal (alist-get 'incoming skg--disk-client-conflict)
-                           "incoming text"))
-            (should-error (skg-request-save-buffer) :type 'user-error))
-          (should (equal (car shown) "*SKG Disk-Client Conflicts*"))
-          (should (string-prefix-p
-                   "* WARNING: Disk-client conflict(s)" (caddr shown)))
-          (should (string-match-p
-                   "^\\*\\* buffers that have been updated$" (caddr shown)))
-          (should-not (string-match-p "^  \\*" (caddr shown))))
-      (dolist (buffer (list dirty clean))
-        (when (buffer-live-p buffer)
-          (with-current-buffer buffer (set-buffer-modified-p nil))
-          (kill-buffer buffer)))))))
-
 (ert-deftest test-skg-streamed-update-never-overwrites-a-newly-dirty-buffer ()
   (let ((view (generate-new-buffer "*skg late dirty test*")))
     (unwind-protect

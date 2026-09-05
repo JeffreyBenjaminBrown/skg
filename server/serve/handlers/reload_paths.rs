@@ -1,9 +1,9 @@
-//! Partial reload of specific telescopes from disk.
+//! Exact low-level reload transaction for specific telescopes.
 //!
-//! When a `.skg` worktree file changes out of band (a magit discard is
-//! the motivating case), the client sends the affected paths and the
-//! server re-reads those telescopes from disk and updates the three
-//! derived stores to match -- a *partial* reload, not a full rebuild.
+//! Product requests enter the maintenance coordinator, which builds an
+//! immutable candidate before selecting disk.  These primitives retain the
+//! focused store-transaction coverage while that higher-level path owns all
+//! request parsing, authorization, presentation, and recovery archival.
 //!
 //! Reload is READ-ONLY with respect to the filesystem: it never writes
 //! `.skg` files, so it must not go through `update_graph_minus_nodeMerges`
@@ -41,50 +41,25 @@ use crate::dbs::tantivy::background_writer::{
   TantivyGenerationStatus,
   wait_for_tantivy_generation,
 };
-use crate::serve::ViewsState;
-use crate::serve::handlers::reload_batch::reload_batch_active;
-use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::handlers::reload_recovery::{
   IncidentDiskSnapshot,
   RecoveryDraft,
   register_incident,
 };
-use crate::serve::handlers::scalar_release::approved_pids_from_request;
-use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{
-  send_response_with_length_prefix,
-  tag_terminal_sexp_response,
-  tag_terminal_text_response,
-  value_from_request_sexp,
-};
-use crate::source_sets::ActiveSourceSet;
-use crate::sound::play_harsh_sound_in_background;
-use crate::update_buffer::{
-  ReloadPresentation,
-  ReloadRerenderOutcome,
-  ReloadViewImpact,
-  rerender_views_after_reload,
-};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, SourceCatalog, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
-use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::store_state::{PathDigest, SelectedPathManifest};
-use crate::types::views_state::ViewUri;
 use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::Telescope;
 
-use futures::executor::block_on;
-use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::io;
-use std::net::TcpStream;
 use std::path::PathBuf;
-use sexp::{Atom, Sexp};
 
 /// What a single touched telescope resolves to when re-read from disk.
 pub enum TelescopeReloadOutcome {
@@ -126,251 +101,6 @@ pub struct ReloadStoreOutcome {
   pub warnings          : Vec<String>,
   pub recovery_journaled : bool,
   pub recovery          : Option<RecoveryDraft>, }
-
-#[derive(Clone)]
-struct RequestedIdOutcome {
-  requested_id : ID,
-  pid          : Option<ID>,
-  status       : &'static str,
-  reason       : Option<String>,
-  paths        : Vec<PathBuf>, }
-
-#[derive(Clone)]
-pub(crate) struct PendingReloadPresentation {
-  applied            : Vec<DefineNode>,
-  message            : String,
-  requested_outcomes : Vec<RequestedIdOutcome>,
-  affected_paths     : Vec<PathBuf>,
-  any_rejected       : bool,
-  warnings           : Vec<String>,
-  recovery_available : bool,
-}
-
-thread_local! {
-  /// Presentation authority is connection-local because each connection
-  /// thread owns one independent `ViewsState`.  Keeping it here avoids
-  /// burdening that public struct (which integration fixtures construct), and
-  /// the thread exit drops every declined or abandoned incident.
-  static PENDING_RELOAD_PRESENTATIONS :
-    RefCell<HashMap<String, PendingReloadPresentation>> =
-      RefCell::new (HashMap::new ());
-}
-
-fn take_pending_reload (incident : &str) -> Option<PendingReloadPresentation> {
-  PENDING_RELOAD_PRESENTATIONS . with (|pending|
-    pending . borrow_mut () . remove (incident))
-}
-
-fn retain_pending_reload (
-  incident : &str,
-  pending  : PendingReloadPresentation,
-) {
-  PENDING_RELOAD_PRESENTATIONS . with (|registry|
-    registry . borrow_mut () . insert (incident . to_string (), pending));
-}
-
-pub fn handle_reload_paths_request (
-  stream            : &mut TcpStream,
-  request           : &str,
-  env               : &mut SkgEnv,
-  views_state       : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
-  collateral_scheduler : &mut CollateralScheduler,
-) {
-  let parsed = match sexp::parse (request) {
-    Ok (s) => s,
-    Err (e) => {
-      send_reload_error (stream, &format! (
-        "reload paths: failed to parse request: {}", e ));
-      return; } };
-  let dirty_uris : HashSet<ViewUri> =
-    match optional_string_list (&parsed, "dirty-view-uris") {
-      Ok (values) => values . into_iter ()
-        . map (ViewUri::from_client_string) . collect (),
-      Err (error) => { send_reload_error (stream, &error); return; }};
-  let incident_id = value_from_request_sexp ("incident-id", request) . ok ();
-  let scalar_approved_pids = approved_pids_from_request (request);
-  if let Some (incident) = incident_id . as_ref () {
-    if let Some (pending) = take_pending_reload (incident) {
-      present_committed_reload (
-        stream, env, views_state, active_source_set,
-        incident, pending, &dirty_uris, &scalar_approved_pids,
-        collateral_scheduler );
-      return; }}
-  let path_strings : Vec<String> = match optional_string_list (&parsed, "paths") {
-    Ok (values) => values,
-    Err (error) => { send_reload_error (stream, &error); return; }};
-  let requested_ids : Vec<ID> = match optional_string_list (&parsed, "ids") {
-    Ok (values) => values . into_iter () . map (ID::from) . collect (),
-    Err (error) => { send_reload_error (stream, &error); return; }};
-  let full_sweep = value_from_request_sexp ("full-sweep", request)
-    . map (|value| value == "true") . unwrap_or (false);
-  if path_strings . is_empty () && requested_ids . is_empty () && !full_sweep {
-    send_reload_error (stream, "reload paths: no paths or IDs were supplied");
-    return; }
-  if reload_batch_active () {
-    let payload = Sexp::List (vec![
-      Sexp::List (vec![
-        Sexp::Atom (Atom::S ("content" . into ())),
-        Sexp::Atom (Atom::S (
-          "Reload deferred while an external reload batch is active" . into ())),
-      ]),
-      Sexp::List (vec![
-        Sexp::Atom (Atom::S ("deferred" . into ())),
-        Sexp::Atom (Atom::S ("true" . into ())),
-      ]),
-    ]) . to_string ();
-    let _ = send_response_with_length_prefix (
-      stream, &tag_terminal_sexp_response (
-        TcpToClient::ReloadPaths, "complete", &payload));
-    return; }
-  let mut paths : Vec<PathBuf> =
-    path_strings . into_iter () . map (PathBuf::from) . collect ();
-  if full_sweep {
-    match changed_paths_since_selected (env) {
-      Ok (changed) => paths . extend (changed),
-      Err (error) => {
-        send_reload_error (stream, &format! (
-          "reload full sweep failed: {}", error));
-        return; }} }
-  paths . sort ();
-  paths . dedup ();
-  let mut touched : Vec<TouchedTelescope> =
-    classify_touched_telescopes (&env . config, &paths);
-  let mut seen : HashSet<ID> = touched . iter ()
-    . map (|item| item . pid . clone ()) . collect ();
-  let graph = env . in_rust_graph_snapshot ();
-  let mut requested : Vec<(ID, Option<ID>)> = Vec::new ();
-  for requested_id in requested_ids {
-    let pid = graph . pid_of (&requested_id);
-    if let Some (pid) = &pid {
-      if seen . insert (pid . clone ()) {
-        let node = graph . nodes . get (pid)
-          . expect ("resolved primary pid exists");
-        let source = node . source . clone ();
-        let path = env . config . sources . get (&source)
-          . expect ("graph source remains configured")
-          . path . join (format! ("{}.skg", pid));
-        touched . push (TouchedTelescope {
-          pid: pid . clone (), source, path }); }}
-    requested . push ((requested_id, pid)); }
-  let mut store_outcome : ReloadStoreOutcome =
-    match block_on ( reload_touched_telescopes_for_incident (
-      env, touched, incident_id . as_deref ()) ) {
-      Ok (outcome) => outcome,
-      Err (e)   => {
-        send_reload_error (stream, &format! ("Reload failed: {}", e));
-        return; } };
-  let recovery_available = match store_outcome . recovery . take () {
-    None => store_outcome . recovery_journaled,
-    Some (draft) => {
-      let Some (incident) = incident_id . as_deref () else {
-        send_reload_error (stream,
-          "reload produced a recoverable fatal incident without an incident-id");
-        return; };
-      if let Err (error) = register_incident (&env . config, incident, draft) {
-        send_reload_error (stream, &format! (
-          "reload committed its legal changes but could not persist its recovery journal: {}",
-          error));
-        return; }
-      true
-    }};
-  let requested_outcomes = requested . into_iter () . map (
-    |(requested_id, pid)| {
-      let paths = pid . as_ref () . map (|pid| possible_paths (
-        &env . config, pid)) . unwrap_or_default ();
-      match pid {
-        None => RequestedIdOutcome {
-          requested_id, pid: None, status: "rejected",
-          reason: Some ("ID is not present in the selected graph" . into ()),
-          paths, },
-        Some (pid) => match store_outcome . rejected . iter ()
-            . find (|(rejected, _)| rejected == &pid) {
-          Some ((_, reason)) => RequestedIdOutcome {
-            requested_id, pid: Some (pid), status: "rejected",
-            reason: Some (reason . clone ()), paths, },
-          None if store_outcome . acknowledged_pids . contains (&pid) =>
-            RequestedIdOutcome {
-            requested_id, pid: Some (pid), status: "acknowledged",
-            reason: None, paths, },
-          None => RequestedIdOutcome {
-            requested_id, pid: Some (pid), status: "rejected",
-            reason: Some ("telescope was not acknowledged" . into ()),
-            paths, }, }}})
-    . collect::<Vec<_>> ();
-  let any_rejected = requested_outcomes . iter ()
-    . any (|outcome| outcome . status == "rejected")
-    || ! store_outcome . rejected . is_empty ();
-  let mut affected_paths = paths;
-  for outcome in &requested_outcomes {
-    if outcome . pid . is_some () {
-      affected_paths . extend (outcome . paths . iter () . cloned ()); }}
-  affected_paths . sort ();
-  affected_paths . dedup ();
-  let pending = PendingReloadPresentation {
-    applied: store_outcome . applied,
-    message: store_outcome . message,
-    requested_outcomes,
-    affected_paths,
-    any_rejected,
-    warnings: store_outcome . warnings,
-    recovery_available,
-  };
-  present_committed_reload (
-    stream, env, views_state, active_source_set,
-    incident_id . as_deref () . unwrap_or (""), pending,
-    &dirty_uris, &scalar_approved_pids, collateral_scheduler ); }
-
-fn present_committed_reload (
-  stream               : &mut TcpStream,
-  env                  : &SkgEnv,
-  views_state          : &mut ViewsState,
-  active_source_set    : &ActiveSourceSet,
-  incident_id          : &str,
-  pending              : PendingReloadPresentation,
-  dirty_uris           : &HashSet<ViewUri>,
-  scalar_approved_pids : &HashSet<ID>,
-  collateral_scheduler : &mut CollateralScheduler,
-) {
-  let presentation = if pending . applied . is_empty () {
-    ReloadPresentation {
-      updated: Vec::new (), conflicted: Vec::new (),
-      errors: Vec::new (), warnings: Vec::new (), }
-  } else {
-    let diff_mode = views_state . diff_mode_enabled;
-    match block_on (rerender_views_after_reload (
-      stream, &pending . applied, env, diff_mode, views_state,
-      Some (active_source_set), dirty_uris, scalar_approved_pids,
-      Some (collateral_scheduler) )) {
-      Ok (ReloadRerenderOutcome::Presented (presentation)) => presentation,
-      Ok (ReloadRerenderOutcome::Challenge (challenge)) => {
-        if incident_id . is_empty () {
-          send_reload_error (
-            stream,
-            "reload rerender needs authorization but request has no incident-id" );
-        } else {
-          retain_pending_reload (incident_id, pending);
-          let _ = send_response_with_length_prefix (stream, &challenge); }
-        return; },
-      Err (error) => {
-        if !incident_id . is_empty () {
-          retain_pending_reload (incident_id, pending); }
-        send_reload_error (stream, &format! (
-          "reload presentation failed after stores committed: {}", error));
-        return; }} };
-  if !presentation . conflicted . is_empty () {
-    play_harsh_sound_in_background (); }
-  let payload = format_reload_response (
-    &pending . message, &pending . requested_outcomes,
-    &presentation, &pending . affected_paths, &env . config . sources,
-    &pending . warnings, pending . recovery_available );
-  let _ = send_response_with_length_prefix (
-    stream,
-    &tag_terminal_sexp_response (
-      TcpToClient::ReloadPaths,
-      if pending . any_rejected { "complete-with-rejected-files" }
-      else { "complete" },
-      &payload)); }
 
 /// Apply the survivors of a classification to the three derived stores
 /// WITHOUT writing the filesystem. Fatal telescopes keep their last-good
@@ -603,40 +333,6 @@ fn persist_recovery_before_release (
   Ok (true)
 }
 
-fn optional_string_list (sexp : &Sexp, key : &str) -> Result<Vec<String>, String> {
-  let present = match sexp {
-    Sexp::List (items) => items . iter () . any (|item| match item {
-      Sexp::List (parts) => matches! (parts . first (),
-        Some (Sexp::Atom (Atom::S (candidate))) if candidate == key),
-      _ => false, }),
-    _ => false, };
-  if present { extract_string_list_from_sexp (sexp, key) }
-  else { Ok (Vec::new ()) }
-}
-
-fn changed_paths_since_selected (env : &SkgEnv) -> io::Result<Vec<PathBuf>> {
-  let selected = env . in_rust_graph . load_full ();
-  let actual = selected_path_digest_manifest (&env . config)?;
-  Ok (changed_manifest_paths (&selected . manifest, &actual))
-}
-
-fn changed_manifest_paths (
-  selected : &SelectedPathManifest,
-  actual   : &SelectedPathManifest,
-) -> Vec<PathBuf> {
-  let paths : BTreeSet<PathBuf> = selected . keys () . cloned ()
-    . chain (actual . keys () . cloned ()) . collect ();
-  paths . into_iter () . filter (|path|
-    selected . get (path) != actual . get (path)) . collect ()
-}
-
-fn possible_paths (config : &SkgConfig, pid : &ID) -> Vec<PathBuf> {
-  config . ordered_sources () . into_iter () . map (|source| {
-    config . sources . get (&source)
-      . expect ("ordered source exists")
-      . path . join (format! ("{}.skg", pid)) }) . collect ()
-}
-
 fn graph_telescope_manifest (
   graph  : &InRustGraph,
   pids   : &[ID],
@@ -664,73 +360,6 @@ fn graph_telescope_manifest (
     }
   }
   Ok (manifest)
-}
-
-fn format_reload_response (
-  message        : &str,
-  requested      : &[RequestedIdOutcome],
-  presentation   : &ReloadPresentation,
-  affected_paths : &[PathBuf],
-  sources        : &SourceCatalog,
-  reload_warnings : &[String],
-  recovery_available : bool,
-) -> String {
-  let atom = |value : &str| Sexp::Atom (Atom::S (value . into ()));
-  let field = |key : &str, value : Sexp| Sexp::List (vec![atom (key), value]);
-  let outcomes = requested . iter () . map (|outcome| Sexp::List (vec![
-    field ("requested-id", atom (&outcome . requested_id)),
-    field ("pid", outcome . pid . as_ref ()
-      . map (|pid| atom (pid)) . unwrap_or_else (|| atom ("nil"))),
-    field ("status", atom (outcome . status)),
-    field ("reason", outcome . reason . as_ref ()
-      . map (|reason| atom (reason)) . unwrap_or_else (|| atom ("nil"))),
-    field ("paths", Sexp::List (outcome . paths . iter ()
-      . map (|path| atom (&path . to_string_lossy ())) . collect ())),
-  ])) . collect ();
-  let format_impact = |impact : &ReloadViewImpact| {
-    let paths = paths_for_impact (impact, affected_paths, sources);
-    let mut fields = vec![
-      field ("view-uri", atom (&impact . uri . repr_in_client ())),
-      field ("pids", Sexp::List (impact . pids . iter ()
-        . map (|pid| atom (pid . as_str ())) . collect ())),
-      field ("paths", Sexp::List (paths . iter ()
-        . map (|path| atom (&path . to_string_lossy ())) . collect ())),
-    ];
-    if let Some (incoming) = &impact . incoming {
-      fields . push (field ("incoming", atom (incoming))); }
-    Sexp::List (fields) };
-  Sexp::List (vec![
-    field ("content", atom (message)),
-    field ("requested-id-outcomes", Sexp::List (outcomes)),
-    field ("conflicted-views", Sexp::List (
-      presentation . conflicted . iter () . map (format_impact) . collect ())),
-    field ("updated-views", Sexp::List (
-      presentation . updated . iter () . map (format_impact) . collect ())),
-    field ("files-affected", Sexp::List (affected_paths . iter ()
-      . map (|path| atom (&path . to_string_lossy ())) . collect ())),
-    field ("rerender-errors", Sexp::List (presentation . errors . iter ()
-      . map (|error| atom (error)) . collect ())),
-    field ("warnings", Sexp::List (presentation . warnings . iter ()
-      . chain (reload_warnings . iter ())
-      . map (|warning| atom (warning)) . collect ())),
-    field ("recovery-available", atom (
-      if recovery_available { "true" } else { "false" })),
-  ]) . to_string ()
-}
-
-fn paths_for_impact (
-  impact         : &ReloadViewImpact,
-  affected_paths : &[PathBuf],
-  sources        : &SourceCatalog,
-) -> Vec<PathBuf> {
-  let pids : HashSet<&ID> = impact . pids . iter () . collect ();
-  let mut paths : Vec<PathBuf> = affected_paths . iter () . filter (|path|
-    sources . source_and_pid_for_direct_path (path)
-      . map (|(_, pid)| pids . contains (&pid)) . unwrap_or (false))
-    . cloned () . collect ();
-  paths . sort ();
-  paths . dedup ();
-  paths
 }
 
 fn summarize_reload (
@@ -948,15 +577,6 @@ fn graph_delta (
   definitions
 }
 
-fn send_reload_error (
-  stream : &mut TcpStream,
-  msg    : &str,
-) {
-  tracing::error! ("{}", msg);
-  let _ = send_response_with_length_prefix (
-    stream,
-    &tag_terminal_text_response (TcpToClient::ReloadPaths, "failed", msg)); }
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -1015,72 +635,6 @@ mod tests {
       sources . source_and_pid_for_direct_path (
         Path::new ("/data/publicity/abc.skg") ),
       None ); }
-
-  #[test]
-  fn explicit_id_outcomes_name_pid_paths_and_rejection () {
-    let presentation = ReloadPresentation {
-      updated: Vec::new (), conflicted: Vec::new (),
-      errors: Vec::new (), warnings: Vec::new (), };
-    let payload = format_reload_response ("mixed", &[
-      RequestedIdOutcome {
-        requested_id: ID::from ("alias"),
-        pid: Some (ID::from ("primary")),
-        status: "acknowledged", reason: None,
-        paths: vec![PathBuf::from ("/data/public/primary.skg")], },
-      RequestedIdOutcome {
-        requested_id: ID::from ("missing"), pid: None,
-        status: "rejected", reason: Some ("not found" . into ()),
-        paths: Vec::new (), },
-    ], &presentation, &[], &sources (&[("public", "/data/public")]),
-       &[], false);
-    assert! (payload . contains ("(requested-id alias)"));
-    assert! (payload . contains ("(pid primary)"));
-    assert! (payload . contains ("/data/public/primary.skg"));
-    assert! (payload . contains ("(status rejected)"));
-    assert! (payload . contains ("(reason \"not found\")")); }
-
-  #[test]
-  fn conflict_response_carries_paths_and_authorized_incoming_without_applying () {
-    let catalog = sources (&[("public", "/data/public")]);
-    let presentation = ReloadPresentation {
-      updated: Vec::new (),
-      conflicted: vec![ReloadViewImpact {
-        uri: ViewUri::ContentView ("dirty-uri" . into ()),
-        pids: vec![ID::from ("primary")],
-        incoming: Some ("* incoming" . into ()),
-      }],
-      errors: Vec::new (), warnings: Vec::new (), };
-    let payload = format_reload_response (
-      "done", &[], &presentation,
-      &[PathBuf::from ("/data/public/primary.skg")], &catalog,
-      &["owned telescope retained" . into ()], true );
-    assert! (payload . contains ("(conflicted-views"));
-    assert! (payload . contains ("(view-uri dirty-uri)"));
-    assert! (payload . contains ("/data/public/primary.skg"));
-    assert! (payload . contains ("(incoming \"* incoming\")"));
-    assert! (payload . contains ("(recovery-available true)"));
-    assert! (payload . contains ("owned telescope retained"));
-  }
-
-  #[test]
-  fn manifest_comparison_uses_digest_and_explicit_absence () {
-    let unchanged = PathBuf::from ("/s/unchanged.skg");
-    let rewritten = PathBuf::from ("/s/rewritten.skg");
-    let deleted = PathBuf::from ("/s/deleted.skg");
-    let added = PathBuf::from ("/s/added.skg");
-    let old = SelectedPathManifest::from ([
-      (unchanged . clone (), PathDigest::of_bytes (b"same")),
-      (rewritten . clone (), PathDigest::of_bytes (b"aaaa")),
-      (deleted . clone (), PathDigest::of_bytes (b"gone")),
-    ]);
-    let new = SelectedPathManifest::from ([
-      (unchanged, PathDigest::of_bytes (b"same")),
-      // Same byte length, different digest: stamp-only scanning misses this.
-      (rewritten . clone (), PathDigest::of_bytes (b"bbbb")),
-      (added . clone (), PathDigest::of_bytes (b"new")),
-    ]);
-    assert_eq! (changed_manifest_paths (&old, &new),
-                vec![added, deleted, rewritten]); }
 
   #[test]
   fn reload_reports_ignored_foreign_collision_without_parsing_loser () {
