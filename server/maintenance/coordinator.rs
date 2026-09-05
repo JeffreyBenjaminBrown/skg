@@ -461,6 +461,33 @@ impl MaintenanceCoordinator {
     Ok (true)
   }
 
+  /// Begin the complete preflight observation for an archive-ready rebuild.
+  /// This is still before the exclusive/destructive interval: invalid disk
+  /// therefore leaves the selected G0 stores untouched and queryable.
+  pub fn begin_full_rebuild_observation (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::FullRebuild {
+      return Err ("full rebuild observation belongs only to a full rebuild"
+        . into ()); }
+    if !matches! (active . archive_status, ArchiveStatus::Ready { .. }) {
+      return Err (
+        "full rebuild observation requires an acknowledged initial archive"
+          . into ()); }
+    if active . phase == MaintenancePhase::FinalObservation {
+      return Ok (false); }
+    if active . phase != MaintenancePhase::ArchiveReady
+       || active . candidate . is_some ()
+    {
+      return Err (format! (
+        "full rebuild observation is invalid during {:?}", active . phase)); }
+    active . phase = MaintenancePhase::FinalObservation;
+    Ok (true)
+  }
+
   /// Bind one immutable observation to the already-authorized incident.  The
   /// candidate returns to ArchiveReady so the common evidence/selection path
   /// can close every precondition before touching a derived store.
@@ -658,6 +685,26 @@ impl MaintenanceCoordinator {
         "store selection completion is invalid during {:?}", active . phase)); }
     if active . server_evidence . is_none () {
       return Err ("store selection has no durable server evidence" . into ()); }
+    active . selected_store = Some (selected);
+    active . blocking_reason = None;
+    active . phase = MaintenancePhase::Presenting;
+    Ok (( ))
+  }
+
+  pub fn store_rebuilt (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch       : MaintenanceEpoch,
+    selected    : SelectedStoreRecord,
+  ) -> Result<(), String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    if active . origin != MaintenanceOrigin::FullRebuild
+    || active . phase != MaintenancePhase::FullRebuildExclusive
+    {
+      return Err (format! (
+        "full rebuild completion is invalid during {:?}", active . phase)); }
+    if active . server_evidence . is_none () {
+      return Err ("full rebuild has no durable server evidence" . into ()); }
     active . selected_store = Some (selected);
     active . blocking_reason = None;
     active . phase = MaintenancePhase::Presenting;
@@ -897,7 +944,9 @@ impl MaintenanceCoordinator {
   ) -> Result<(), String> {
     let active = self . matching_active_mut (incident_id, epoch)?;
     if !matches! (active . phase,
-      MaintenancePhase::ArchiveReady | MaintenancePhase::SelectingPartial)
+      MaintenancePhase::ArchiveReady
+      | MaintenancePhase::SelectingPartial
+      | MaintenancePhase::FullRebuildExclusive)
     {
       return Err (format! (
         "candidate supersession is invalid during {:?}", active . phase)); }
@@ -1123,6 +1172,24 @@ mod tests {
   }
 
   #[test]
+  fn invalid_preflight_keeps_the_selected_generation_queryable () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . begin_full_rebuild_observation (
+      &active . incident_id, active . epoch) . unwrap ();
+    coordinator . block_invalid_disk (
+      &active . incident_id, active . epoch, "invalid candidate" . into ())
+      . unwrap ();
+    let policy = coordinator . state . policy ();
+    assert! (policy . queries_allowed);
+    assert! (!policy . skg_saves_allowed);
+    assert! (policy . maintenance_locked);
+  }
+
+  #[test]
   fn stale_candidate_cannot_begin_maintenance () {
     let mut coordinator = MaintenanceCoordinator::new ();
     coordinator . set_pending_valid (candidate ()) . unwrap ();
@@ -1226,6 +1293,42 @@ mod tests {
     assert_eq! (coordinator . state, CoordinatorState::Idle);
     assert! (!coordinator . acknowledge_terminal (
       &active . incident_id, active . epoch) . unwrap ());
+  }
+
+  #[test]
+  fn full_rebuild_has_distinct_preflight_and_exclusive_edges () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    assert! (coordinator . begin_full_rebuild_observation (
+      &active . incident_id, active . epoch) . unwrap ());
+    assert! (!coordinator . begin_full_rebuild_observation (
+      &active . incident_id, active . epoch) . unwrap ());
+    assert! (coordinator . record_observed_candidate (
+      &active . incident_id, active . epoch, candidate ()) . unwrap ());
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "server" . into (),
+        artifact_count: 1, total_file_bytes: 2,
+      }) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::FullRebuildExclusive) . unwrap ();
+    assert! (!coordinator . state . policy () . queries_allowed);
+    coordinator . store_rebuilt (
+      &active . incident_id, active . epoch, SelectedStoreRecord {
+        graph_generation: GraphGeneration::INITIAL . successor (),
+        manifest_revision: ManifestRevision::INITIAL . successor (),
+        tantivy_generation: 0,
+        tantivy_outcome: "synchronous-full-rebuild" . into (),
+      }) . unwrap ();
+    let CoordinatorState::Active (rebuilt) = &coordinator . state else {
+      panic! ("full rebuild stopped being active"); };
+    assert_eq! (rebuilt . phase, MaintenancePhase::Presenting);
+    assert_eq! (rebuilt . selected_store . as_ref () . unwrap ()
+      . tantivy_outcome, "synchronous-full-rebuild");
   }
 
   #[test]

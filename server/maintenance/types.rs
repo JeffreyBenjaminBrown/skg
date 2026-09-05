@@ -681,8 +681,14 @@ impl CoordinatorState {
           raw_saves_allowed: false,
           maintenance_locked: true,
         },
-        MaintenancePhase::BlockedInvalidAfterMutation
-        | MaintenancePhase::BlockedStoreHealth => StatePolicy {
+        MaintenancePhase::BlockedInvalidAfterMutation => StatePolicy {
+          edits_allowed: false,
+          skg_saves_allowed: false,
+          queries_allowed: true,
+          raw_saves_allowed: false,
+          maintenance_locked: true,
+        },
+        MaintenancePhase::BlockedStoreHealth => StatePolicy {
           edits_allowed: false,
           skg_saves_allowed: false,
           queries_allowed: false,
