@@ -824,6 +824,28 @@ what's imperfect about what's done; choices determining the future.
   connection-loop and journal tests pass.  The full Rust library run passed
   286/290 and reproduced the same four shared-global save-leveling races seen
   earlier; all 15 tests in that affected module pass together serially.
+- Added an exact =retry maintenance= endpoint for the two durable blocked
+  phases.  It preserves incident, epoch and archive ownership, never repeats a
+  client pull, and always starts from fresh observation.  A still-healthy exact
+  G0 store tuple keeps the incident's targeted/complete scope; a poisoned,
+  unavailable or changed tuple forces a complete candidate and exclusive full
+  reconstruction before release.
+- Exposed that recovery as =skg-retry-maintenance= and
+  =:SkgRetryMaintenance=.  Both clients retain the exact blocking reason and
+  server phase, send the incident-qualified epoch, and await the ordinary
+  asynchronous status continuation.  The existing fatal reload-recovery and
+  dismissal commands in both clients already covered retained archive
+  incidents, so that audit required no additional product surface.
+- Closed the invalid-post-pull dirty-work gap.  Once an external operation may
+  have written disk and final bytes are invalid, the server journals a separate
+  preselection retirement for every dirty member of the frozen census.  Both
+  clients retire and exactly ACK those views before retry is permitted;
+  replacement census absence is equally durable.  A later valid selection
+  retains those acknowledged retirements instead of trying to release text
+  whose orthogonality could never be proved.
+- The focused Rust maintenance suite passes 69/69 after blocked recovery and
+  preselection retirement.  The complete Neovim suite passes; the relevant
+  Emacs retry/retirement tests and the broader maintenance selection pass.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -843,10 +865,11 @@ what's imperfect about what's done; choices determining the future.
 
 ** what's imperfect about what's done
 - Both clients can finish an already-selected disk candidate, explicit reload,
-  client-owned pull and full rebuild through the common post-archive path.
-- The recovery command layer is complete for retained client archives, but the
-  server's remaining invalid-disk/store/fatal-Git recovery actions still need a
-  complete public resume-command audit in both clients.
+  client-owned pull and full rebuild through the common post-archive path, and
+  can resume either durable blocked phase without repeating external work.
+- No known recovery action remains absent from the public Emacs or Neovim
+  command surfaces.  The final broad validation and end-to-end audit remain to
+  be completed.
 
 ** choices determining the future
 - No new architectural choice arose from the locked-census or end-to-end pull

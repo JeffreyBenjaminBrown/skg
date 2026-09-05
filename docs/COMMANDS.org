@@ -790,7 +790,8 @@ Do not close all views merely because a rebuild completed.
 A preflight failure leaves the old stores selected and queryable.  A failure
 after destruction keeps the incident durably locked while Skg attempts to
 restore them.  Read the error, preserve the archive, and use
-=skg-maintenance-status= after fixing the underlying problem or reconnecting.
+=skg-maintenance-status= after reconnecting; after fixing the reported problem,
+use =skg-retry-maintenance=.
 *** process-owned disk and Git observation
 The Rust server, not Emacs, watches the direct =.skg= children of every
 configured source.  It separately watches each repository's per-worktree and
@@ -858,10 +859,24 @@ buffer and archive when reporting or repairing a failure.
 Requests the server's durable status.  Use it after a transport interruption
 or failure to resume the exact incident; reconnect never manufactures a new
 one or unlocks views merely because the socket ended.
+*** skg-retry-maintenance
+Retries the exact active incident after you have repaired a reported
+invalid-disk or store-health problem.  The request repeats the incident ID and
+maintenance epoch and continues asynchronously through the ordinary status
+path.  It never repeats =git pull= or another client-owned external operation.
+
+If a pull may have changed disk but left invalid bytes, Skg first retires every
+dirty view from the frozen census, preserving its text and undo in the initial
+archive.  Without a valid G1, none of that dirty work can safely be classified
+as orthogonal.  Retry remains refused until every exact retirement is durably
+acknowledged; clean views stay locked.  When the old selected store tuple is
+still exactly healthy, recovery starts from fresh observation.  If that tuple
+is poisoned, unavailable or no longer G0, recovery uses a complete candidate
+and exclusive full reconstruction before unlocking.
 *** skg-cancel-maintenance
 Cancels only before =ARCHIVE-READY= has been published.  After the point of no
-return, cancellation is refused; use =skg-maintenance-status= and resolve the
-reported blocked phase.
+return, cancellation is refused; use =skg-maintenance-status=, resolve the
+reported problem, and then use =skg-retry-maintenance=.
 *** maintenance recovery archives
 Every maintenance operation publishes a private incident directory beneath
 =maintenance_archive_folder=.  Publication reports this incident's exact and

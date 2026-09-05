@@ -965,9 +965,46 @@ hide a post-fence Git change.
 
 If final disk after an external mutation is invalid or unstable, the incident
 stays locked in `blocked-invalid-after-mutation`; it is not rolled back into a
-false success.  Preflight failure before destructive work leaves G0 queryable.
-After a destructive full-rebuild failure, the server attempts complete G0
-reconstruction before reporting the durable failure state.
+false success.  Because there is no valid G1 against which dirty work can be
+proved orthogonal, the server publishes an exact `preselection-retirements`
+list for every dirty buffer in the frozen census.  The client retires those
+views in place, preserving their text and undo in the initial archive, and
+ACKs each exact `retirement-ack`.  Missing buffers can instead be reconciled by
+the replacement client's complete census.  Clean views remain locked.  Retry
+is refused until every dirty retirement is durably acknowledged.  A preflight
+failure before external or destructive work leaves G0 queryable and does not
+retire dirty views.  After a destructive full-rebuild failure, the server
+attempts complete G0 reconstruction before reporting the durable failure
+state.
+
+### Blocked recovery
+
+After repairing the reported disk or store problem, the archive-owning client
+can send:
+
+```text
+((request . "retry maintenance")
+ (incident-id . "UUID")
+ (maintenance-epoch . N))
+```
+
+The incident envelope and epoch must identify the exact blocked active
+incident.  The command is accepted only in `blocked-invalid-after-mutation` or
+`blocked-store-health`; it never repeats a client pull or other external origin
+operation.  An invalid-disk retry observes fresh bytes, targeted for an
+explicit partial reload and complete for pull or full rebuild.  A store-health
+retry first verifies that the selected graph generation, manifest revision,
+TypeDB and Tantivy still form the exact healthy G0 tuple.  If they do, it uses
+the same fresh targeted-or-complete observation.  If they do not, it requires
+a complete candidate and exclusive full reconstruction before unlocking,
+regardless of the incident's original scope.
+
+The immediate response is `maintenance-retry-queued`, with `retry-kind`,
+`recovery-mode`, `previous-blocking-reason`, and `next-action`; completion or
+another durable failure arrives through the ordinary `maintenance-status`
+push.  Active blocked status carries the exact `blocking-reason`, a
+`next-action` of `retire-invalid-dirty-buffers` or `retry-maintenance`, and any
+`preselection-retirements` with their durable ACK state.
 
 ### Scalar release and view settlement
 
@@ -1026,11 +1063,11 @@ at the view, evidence, finalization, completion, or
 terminal boundary can be replayed without applying the local action twice.
 
 `maintenance status` is the reconnect/resume endpoint.  An active response
-includes origin, phase, targets, frozen census, candidate/G0/G1 evidence and
-settlements, including which ACKs are already durable.  A terminal response
-replays the exact unlock instruction.  Connection loss never converts an
-active incident into idle and never unlocks views merely because a socket
-ended.
+includes origin, phase, targets, frozen census, candidate/G0/G1 evidence,
+blocking reason, next action, preselection retirements and final settlements,
+including which ACKs are already durable.  A terminal response replays the
+exact unlock instruction.  Connection loss never converts an active incident
+into idle and never unlocks views merely because a socket ended.
 
 ## Artifact-bundle frames and recovery archives
 
