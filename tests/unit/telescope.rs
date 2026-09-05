@@ -309,6 +309,45 @@ fn duplicate_anchors_concatenate_in_file_order (
 }
 
 #[test]
+fn duplicate_member_warning_distinguishes_one_source_from_two (
+) {
+  let public  : SourceName = SourceName::from ("public");
+  let private : SourceName = SourceName::from ("private");
+  let sections : Vec<(SourceName, SectionSlices)> = vec! [
+    ( public . clone (),
+      SectionSlices {
+        title   : Some ("t" . to_string ()),
+        aliases : Some ( vec! [
+          "same-source" . to_string (),
+          "same-source" . to_string (),
+          "cross-source" . to_string (), ] ),
+        .. SectionSlices::default () } ),
+    ( private . clone (),
+      SectionSlices {
+        aliases : Some ( vec! [ "cross-source" . to_string () ] ),
+        .. SectionSlices::default () } ) ];
+  let (_, warnings) = fold_sections ( &sections, &identity_resolve );
+
+  let repeated_here : FoldWarning = FoldWarning::DuplicateMember {
+    member       : ID::new ("same-source"),
+    selected_at  : public . clone (),
+    duplicate_at : public . clone (), };
+  assert! ( warnings . contains (&repeated_here), "{:?}", warnings );
+  assert_eq! (
+    repeated_here . to_string (),
+    "member 'same-source' appeared more than once in source 'public'; the first occurrence won" );
+
+  let repeated_below : FoldWarning = FoldWarning::DuplicateMember {
+    member       : ID::new ("cross-source"),
+    selected_at  : public,
+    duplicate_at : private, };
+  assert! ( warnings . contains (&repeated_below), "{:?}", warnings );
+  assert_eq! (
+    repeated_below . to_string (),
+    "member 'cross-source' appeared in sources 'public' and 'private'; the more public occurrence in 'public' won" );
+}
+
+#[test]
 fn anchors_resolve_through_the_resolver ( // extra-id safety
 ) {
   let resolve = |id : &ID| -> ID {

@@ -196,20 +196,24 @@ pub fn fold_sections (
       None }
     else { // aliases: union like the unordered relations,
       // but members are strings, deduped verbatim.
-      let mut seen : std::collections::HashSet<String> =
-        std::collections::HashSet::new ();
+      let mut selected_sources : HashMap<String, SourceName> =
+        HashMap::new ();
       let mut out : Vec<MemberAtSource<String>> = Vec::new ();
       for (source, s) in sections {
         if let Some (aliases) = &s . aliases {
           for a in aliases {
-            if seen . insert ( a . clone () ) {
-              out . push ( MemberAtSource::at_source (
-                source . clone (), a . clone () )); }
-            else {
+            if let Some (selected_at) = selected_sources . get (a) {
               // No per-alias id to report; reuse DuplicateMember with
               // a synthetic ID carrying the alias text.
               warnings . push ( FoldWarning::DuplicateMember {
-                member : ID ( a . clone () ) } ); }}}}
+                member       : ID ( a . clone () ),
+                selected_at  : selected_at . clone (),
+                duplicate_at : source . clone (), } ); }
+            else {
+              selected_sources . insert (
+                a . clone (), source . clone () );
+              out . push ( MemberAtSource::at_source (
+                source . clone (), a . clone () )); }}}}
       Some (out) }};
   (folded, warnings) }
 
@@ -267,17 +271,22 @@ fn fold_ordered (
                 queues . get_mut (k) . expect ("queue exists")
                 . push ( id . clone () ), }} }} }
     // Dedup against the fold so far and within this section.
-    let mut seen : std::collections::HashSet<ID> =
+    let mut selected_sources : HashMap<ID, SourceName> =
       effective . iter ()
-      . map ( |m| resolve ( &m . member ) )
+      . map ( |m| ( resolve ( &m . member ), m . source . clone () ) )
       . collect ();
     let mut keep = |id : &ID, warnings : &mut Vec<FoldWarning>|
     -> bool {
-      if seen . insert ( resolve (id) ) { true }
-      else {
+      let key : ID = resolve (id);
+      if let Some (selected_at) = selected_sources . get (&key) {
         warnings . push ( FoldWarning::DuplicateMember {
-          member : id . clone () } );
-        false }};
+          member       : id . clone (),
+          selected_at  : selected_at . clone (),
+          duplicate_at : source . clone (), } );
+        false }
+      else {
+        selected_sources . insert ( key, source . clone () );
+        true }};
     let mut next : Vec<MemberAtSource<ID>> =
       Vec::with_capacity ( effective . len ()
                            + prepend . len () );
@@ -304,16 +313,19 @@ fn fold_unordered (
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
 ) -> Vec<MemberAtSource<ID>> {
-  let mut seen : std::collections::HashSet<ID> =
-    std::collections::HashSet::new ();
+  let mut selected_sources : HashMap<ID, SourceName> = HashMap::new ();
   let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
   for (source, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
     for id in members {
-      if seen . insert ( resolve (id) ) {
-        out . push ( MemberAtSource::at_source (
-          source . clone (), id . clone () ));
-      } else {
+      let key : ID = resolve (id);
+      if let Some (selected_at) = selected_sources . get (&key) {
         warnings . push ( FoldWarning::DuplicateMember {
-          member : id . clone () } ); }}}
+          member       : id . clone (),
+          selected_at  : selected_at . clone (),
+          duplicate_at : source . clone (), } ); }
+      else {
+        selected_sources . insert ( key, source . clone () );
+        out . push ( MemberAtSource::at_source (
+          source . clone (), id . clone () )); }}}
   out }

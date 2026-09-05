@@ -307,9 +307,14 @@ pub enum FoldWarning {
   /// the relation -- there is no more-public fold to anchor into.
   /// Handled exactly like a dangling anchor.
   AnchorInBase { anchor : ID },
-  /// The same member appeared in two sources; the more public
-  /// occurrence won.
-  DuplicateMember { member : ID },
+  /// The same member appeared more than once, either within one
+  /// source or across sources.  The first occurrence in fold order
+  /// won; across sources, that is the more public occurrence.
+  DuplicateMember {
+    member       : ID,
+    selected_at  : SourceName,
+    duplicate_at : SourceName,
+  },
   /// The home -- the most public section -- carries no title, so
   /// the text sits at 'title_at', where a reader restricted to the
   /// home source cannot see it. Distinct from 'NonHomeTitle' (a
@@ -353,10 +358,17 @@ impl std::fmt::Display for FoldWarning {
         write! ( f,
           "anchor '{}' appeared in the most public section mentioning its relation, where there is no more public fold to anchor into; handled like a dangling anchor",
           anchor ),
-      FoldWarning::DuplicateMember { member } =>
-        write! ( f,
-          "member '{}' appeared in two sources; the more public occurrence won",
-          member ),
+      FoldWarning::DuplicateMember {
+        member, selected_at, duplicate_at } =>
+        if selected_at == duplicate_at {
+          write! ( f,
+            "member '{}' appeared more than once in source '{}'; the first occurrence won",
+            member, selected_at )
+        } else {
+          write! ( f,
+            "member '{}' appeared in sources '{}' and '{}'; the more public occurrence in '{}' won",
+            member, selected_at, duplicate_at, selected_at )
+        },
       FoldWarning::TitleBelowHome { home, title_at } =>
         write! ( f,
           "title below the home: the home '{}' carries no title, so this node's text sits at '{}', invisible to anyone reading at '{}'. A node's text belongs in its most public section. A save of this node is refused until the files are repaired by hand: either move the title up to '{}', or delete the '{}' section if it holds nothing else.",
