@@ -1091,3 +1091,44 @@ what's imperfect about what's done; choices determining the future.
   than once in source 'jeff-public'; the first occurrence won=.  The source
   data was deliberately left untouched, so the useful warning remains until
   its repeated alias is repaired.
+
+* reload selectors are not dirty work, and native-undo refusals explain themselves
+
+** transient selector repair
+- =*skg-reload-from-id-stack*= had the correct explicit =reload-selector= /
+  =maintenance-control= identity, but Org's =TO-RELOAD= changes still set the
+  ordinary buffer-modified bit.  The generic census therefore treated the
+  transient command input as unsaved work, demanded native-undo archival, and
+  could refuse the very reload the selector was created to request.
+- Reload selectors are now excluded by the registry's definition of dirty work
+  that maintenance must preserve.  This policy fixes already-open selectors as
+  soon as the Elisp is hot-reloaded.  Newly constructed selectors additionally
+  clear their ordinary modified bit after every change, so their visible Emacs
+  state agrees with their recovery policy.
+- The ordinary editable =*skg-id-stack*= is unchanged: unsaved edits there
+  remain dirty client-local state.  Authored content/search views and attached
+  workflows likewise retain all existing recovery protection.
+
+** native undo explanation
+- The Emacs handshake formerly encoded a missing =undo-fu-session= package as
+  two opaque placeholder strings, producing =client advertised unavailable
+  unavailable=.  It now advertises the documented adapter kind =none= and the
+  explicit state =not-installed=.  If an unsupported package version is found,
+  it advertises =undo-fu-session= plus that actual version instead.
+- Server refusals translate both the new representation and the legacy
+  =unavailable unavailable= pair.  Missing-package errors now say that exactly
+  =undo-fu-session= 0.8 must be installed and that Skg must reconnect afterward;
+  wrong-version and Neovim adapter/version mismatches name both the observed and
+  required capabilities.
+- Installing =undo-fu-session= is no longer relevant to the transient selector,
+  but remains required when genuinely dirty Emacs buffers with undo history
+  must be archived.
+
+** validation
+- Regressions prove that both a newly edited selector and an already-modified
+  pre-fix selector report =dirty=nil= and =undo-required=nil= in the census.
+  They also cover missing and wrong-version handshake/error messages, including
+  compatibility with an old client's placeholder pair.
+- All 34 tests in the reload and structured-warning Emacs suites pass, both
+  focused Rust capability tests pass, and =cargo check --all-targets= plus
+  =git diff --check= are clean.
