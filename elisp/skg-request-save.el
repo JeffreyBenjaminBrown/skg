@@ -569,7 +569,6 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
         (erase-buffer)
         (insert (or content ""))
         (skg-content-view-mode)
-        (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
         (goto-char (point-min)))
       ;; nil view-uri: this is a registered attached workflow, not a live
       ;; graph view, and the ordinary-save guard rejects saving it directly.
@@ -599,6 +598,7 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
        :origin-location "((scope save))"
        :recipe '((kind . "fork-confirmation"))
        :last-fetched (skg-buffer-raw-text buf)))
+      (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
     (display-buffer buf)
     buf))
 

@@ -137,7 +137,8 @@ and truncates to a reasonable length."
 (defun skg-open-empty-content-view ()
   "Open a new, empty skg content view buffer."
   (skg-open-org-buffer-from-text
-   nil "" "*skg-empty*"))
+   nil "" "*skg-empty*" nil
+   'new-empty-content-view '((kind . "new-empty"))))
 
 (defun skg-open-org-buffer-from-text
     (_tcp-proc org-text buffer-name &optional view-uri kind recipe authority)
@@ -151,8 +152,7 @@ otherwise generate a new UUID."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert org-text)
-        (skg-content-view-mode)
-        (heralds-minor-mode))
+        (skg-content-view-mode))
       (setq skg-view-uri uri)
       (setq-local skg--last-rendered-content org-text)
       (setq skg-contentView-initialRoot-source source)
@@ -167,6 +167,9 @@ otherwise generate a new UUID."
        (plist-get authority :presentation-generation)
        :server-revision (plist-get authority :server-revision)
        :application-token (plist-get authority :application-token))
+      ;; Herald setup can fetch rules and process nested network input.  Make
+      ;; the complete application record visible before that can happen.
+      (heralds-minor-mode)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook
                 #'skg-warn-if-other-buffer-modified nil t)

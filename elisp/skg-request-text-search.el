@@ -161,7 +161,6 @@ kill-buffer-hook to send close-view to the server."
           (let ((inhibit-read-only t))
             (skg--replace-search-content content)
             (skg-content-view-mode)
-            (heralds-minor-mode)
             (goto-char (point-min)))
           (setq skg-view-uri view-uri)
           (setq skg--search-request-spec
@@ -183,6 +182,9 @@ kill-buffer-hook to send close-view to the server."
            (plist-get authority :presentation-generation)
            :server-revision (plist-get authority :server-revision)
            :application-token (plist-get authority :application-token))
+          ;; Rule fetching can synchronously receive the search snapshot
+          ;; request, which needs this exact record to answer safely.
+          (heralds-minor-mode)
           (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
           (run-hooks 'skg--search-buffer-setup-hook)
           (switch-to-buffer (current-buffer)))))
