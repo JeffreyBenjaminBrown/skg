@@ -975,3 +975,47 @@ what's imperfect about what's done; choices determining the future.
   all Emacs and Neovim unit suites, all 702 nextest cases, doctests and all 72
   live integrations in 236 seconds.  The temporary TypeDB process was then
   stopped.
+
+* filesystem observers no longer trigger themselves by reading
+
+** live diagnosis
+- The runaway process was the real-config development server beneath
+  =bash/start-servers.sh= and =cargo-watch=, not a surviving per-test Skg
+  process.  The test run had caused that development stack to be started for
+  its shared TypeDB, so the timing was related even though the hot work was in
+  the persistent real server.
+- PID 532438 averaged 99.9% CPU and retained about 564 MB.  Per-thread CPU
+  sampling isolated all of the current load to =skg-observer=: it consumed
+  208 scheduler ticks in two seconds while every other Skg thread consumed
+  zero.  The main thread was asleep in =accept= and the notify, gRPC and
+  Tantivy threads were also asleep.
+- The observer made about 1.5 million read syscalls before shutdown, and its
+  durable real-config journal had reached cumulative observation sequence
+  22,126.  There was no corresponding source mutation or logged maintenance
+  work.  After retaining the live evidence, I terminated process group 532190,
+  which contained that Skg, its cargo watcher and the temporary TypeDB.
+
+** cause and repair
+- =notify= 8.2's Linux backend installs =IN_OPEN= as part of every default
+  watch.  Both observation callbacks treated every successful notification as
+  a mutation.  An exact corpus observation therefore opened a watched =.skg=
+  file, the open queued another complete observation, and that observation
+  opened the files again.  The Git-presentation callback had the same latent
+  feedback path when its observation opened watched Git metadata.
+- Both callbacks now discard only events which cannot describe mutation:
+  open, read, and close-after-read.  Create, remove, modify,
+  close-after-write, and conservative unknown kinds remain observable.  This
+  retains cross-platform write coverage while breaking the read feedback
+  cycle.
+- A synthetic classification regression protects that boundary, and a Linux
+  watcher regression proves that reading a watched source queues nothing while
+  writing the same source still queues its path.
+
+** validation
+- All seven =maintenance::observation= unit tests pass, including the two new
+  regressions.  =cargo check --all-targets= and =git diff --check= are clean.
+- In a fresh real-corpus run, the startup sweep advanced the durable sequence
+  exactly once, from 22,126 to 22,127.  It then remained fixed throughout a
+  one-minute sample.  =skg-observer= used about one CPU-second for that sweep
+  and slept in =futex_do_wait= afterward instead of consuming a core.  The
+  verification development stack and TypeDB were then shut down cleanly.
