@@ -67,12 +67,14 @@ response type. The final frame also carries exactly one of:
 (terminal-status needs-authorization)
 ```
 
-Streaming frames such as `save-lock`, `collateral-view`, `rerender-lock`,
-`rerender-view`, `search-results`, and `request-snapshot` have no terminal
-status. Their operation remains active until its terminal frame. Handler
-cleanup is request-local and runs once even when a handler fails. The
-length-prefix parser is connection-local and is reset only when the
-connection opens or is abandoned.
+Streaming request frames such as `save-lock`, `rerender-lock`,
+`search-results`, and `request-snapshot` have no terminal status. Their
+request remains active until its terminal frame. `collateral-view` is instead
+an unsolicited, server-owned operation with `server-push true` and its own
+operation ID; it terminates only through an exact `apply collateral` ACK.
+Handler cleanup is request-local and runs once even when a handler fails. The
+length-prefix parser is connection-local and is reset only when the connection
+opens or is abandoned.
 
 The shared ugly-telescope release warning is
 `OPERATION includes title or body text selected below its node's home
@@ -273,13 +275,17 @@ So far there are these endpoints:
        The URI list contains every other open view sharing at least one node with the saved view. Over-approximates: may include views that won't actually change. Emacs uses this to lock collateral buffers against edits.
     2. Save-relax-lock message (sent once the save plan is known):
        `Content-Length: N\r\n\r\n((response-type save-relax-lock) (lock-views ("URI1" "URI2" ...)))`
-       Sent once the save plan is known, before the collateral-view stream; carries the exact set of views that will be rerendered, narrowing the earlier over-approximate save-lock set. The client may unlock any view that was locked by save-lock but is absent from this list.
-    3. Zero or more collateral-view messages (one per affected view, streamed as each finishes):
-       `Content-Length: N\r\n\r\n((response-type collateral-view) (view-uri "URI") (content "..."))`
-       Emacs unlocks and updates each buffer as it arrives.
-    4. Final save response:
+       In the retained-session implementation this names no views: it releases
+       the foreground command's broad client lock. Affected views have instead
+       been placed in the retained collateral queue and are guarded by their
+       own exact application authority.
+    3. Final save response:
        `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))`
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of failure-explaining strings. `warnings` is a list of nonfatal messages. Both lists are present and empty if none.
+    4. After the save request terminates, zero or more unsolicited exact
+       `collateral-view` operations refresh the other queued views as described
+       under “Retained collateral application” below. They are session work,
+       not frames of the save request.
   - The first ALTERNATIVE terminal message: after validation, a save
     rereads every telescope it will write. If any currently selects a
     title or body below home and lacks exact approval, nothing is
@@ -310,20 +316,19 @@ So far there are these endpoints:
     `(fork-sources ...)`. Hoist is decided first: when a save needs
     both decisions, its approved Hoist retry then returns the fork
     confirmation, and neither attempt writes.
-  - The third ALTERNATIVE terminal message protects the saved and
-    collateral rerenders. After a valid save has updated disk and the
-    derived stores, the server renders every affected view in memory.
-    Under a restricted source-set, if the staged forests contain ugly
-    telescopes without exact scalar-release approval, it changes no
-    open-view registry entry, streams no content, and sends
+  - The third ALTERNATIVE terminal message protects the saved view's own
+    returned text. After a valid save has updated disk and the derived stores,
+    under a restricted source-set an ugly telescope without exact
+    scalar-release approval changes no open-view registry entry and sends
     `((response-type ugly-telescope-confirmation)
     (operation save-rerender) (pids ("P" ...)) (prompt "..."))`.
     The save itself has succeeded; only its updated text is withheld.
     The client may retry the SAME save with
     `(allow-ugly-telescopes "P" ...)`. Under source-set `all`, or on an
     approved retry, the ordinary save-result carries the shared ugly-
-    telescope warning. Declining leaves current client buffers and the
-    server's open-view registry unchanged.
+    telescope warning. Other affected views are independently scalar-gated by
+    their later exact collateral offers; declining one leaves that view stale
+    without rolling back the successful save or withholding unrelated views.
   - Exactly one of `save-result`, `telescope-hoist-confirmation`,
     `fork-confirmation`, and the save-rerender
     `ugly-telescope-confirmation` is sent as the terminal response to
@@ -353,9 +358,12 @@ So far there are these endpoints:
     1. Git diff mode response:
        `Content-Length: N\r\n\r\n(("response-type" "git-diff-mode") ("content" "Git diff mode enabled"))`
        Includes warnings if any sources are not git-tracked.
-    2. Rerender lock, per-view, and done messages (same as "rerender all views"):
-       rerender-lock → rerender-view* → rerender-done.
-  - Behavior: Toggles retained-session diff mode and re-renders all open views.
+    2. The queued-rerender completion (same as "rerender all views"):
+       an empty `rerender-lock`, then `rerender-done` naming
+       `queued-view-uris`. Exact view offers arrive later as unsolicited
+       retained-session operations.
+  - Behavior: Toggles retained-session diff mode and queues all open views for
+    re-rendering.
     When enabled, subsequent `single root content view` and `save buffer`
     responses include diff annotations showing changes
     between git HEAD and the worktree.
@@ -366,13 +374,10 @@ So far there are these endpoints:
     rerender-done with no errors or warnings), so the client's
     preemptive buffer locks and stream guard unwind. Nothing else
     changes. Disabling diff mode is always allowed.
-  - Before changing mode or streaming view text, a restricted request
-    that would rerender an ugly telescope instead receives LP
-    `ugly-telescope-confirmation` with
-    `(operation diff-mode-rerender)` and
-    the exact PIDs as its terminal frame. A retry
-    adds `(allow-ugly-telescopes "PID" ...)`; declining leaves the mode
-    and open-view registry unchanged.
+  - Diff mode can only be enabled under source-set `all`, so its queued offers
+    need no restricted scalar release. Each still requires exact clean-buffer
+    application and ACK; a view edited after queueing is preserved and marked
+    stale.
 
 ## Herald rules
   - Request: ((request . "herald rules"))
@@ -602,30 +607,65 @@ So far there are these endpoints:
     (and on an approved restricted run) it prints the warning.
 
 ## Rerender all views
-  - Request: `((request . "rerender all views")
-    (allow-ugly-telescopes "PID" ...))`.
+  - Request: `((request . "rerender all views"))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Lock message:
-       `Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("URI1" "URI2" ...)))`
-       Lists all view URIs that will be re-rendered. Emacs locks those buffers.
-    2. Zero or more per-view messages (one per view, streamed as each finishes):
-       `Content-Length: N\r\n\r\n((response-type rerender-view) (view-uri "URI") (content "..."))`
-       Emacs unlocks and updates each buffer as it arrives.
-    3. Done message:
-       `Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))`
-       Emacs removes the rerender-view handler and unlocks any remaining buffers.
-  - Behavior: Re-renders every open view from server memory,
+       `Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ()))`
+       Releases the command's transient broad client lock. It grants no
+       application authority.
+    2. Done message:
+       `Content-Length: N\r\n\r\n((response-type rerender-done) (errors ()) (warnings ()) (queued-view-uris ("URI1" "URI2" ...)))`
+       Terminates the foreground request after naming the retained work.
+  - Behavior: Queues every open view to re-render from its retained server
+    forest,
     applying diff annotations if diff mode is enabled.
     Does not save or modify the graph. Used after toggling
     git diff mode to refresh all views without requiring a save.
-  - All view text is prepared in memory before the release decision.
-    Under a restricted set, ugly content without exact approval returns
-    LP `ugly-telescope-confirmation` with
-    `(operation rerender-all-views)` and
-    the exact PIDs as its terminal frame. No view
-    text is sent and no open-view registry entry changes. A retry adds
-    `allow-ugly-telescopes`; `all` instead adds the shared warning to
-    `rerender-done`.
+  - Each URI is rendered and scalar-gated independently. Under a restricted
+    set, an ugly result becomes a text-free exact collateral challenge. The
+    client approves or declines that operation; it never retries the foreground
+    rerender command.
+
+## Retained collateral application
+  - The process-owned scheduler keeps at most one offered operation awaiting
+    ACK. A newer transition replaces obsolete queued/in-flight work but does
+    not discard an already offered obligation. Work resumes from the forest
+    made authoritative by that exact ACK.
+  - A rendered proposal is an unsolicited frame with no request ID:
+    `((response-type collateral-view) (frame-kind collateral-view)
+    (server-push true) (operation-id "OP") (view-uri "URI")
+    (client-buffer-id "BUFFER") (graph-generation G1)
+    (presentation-generation P1) (viewforest-base-revision R0)
+    (resulting-server-revision R1) (view-base-graph-generation G0)
+    (view-base-presentation-generation P0)
+    (expected-client-application-token T0)
+    (resulting-client-application-token T1)
+    (view-base-source-set "S0") (resulting-source-set "S1")
+    (warnings ("..." ...)) (content "..."))`.
+    `client-buffer-id` is omitted only for a legacy retained record. Exactly
+    one of `content`, text-free `(needs-authorization true) (pids (...))
+    (prompt "...")`, or `(render-error "...")` is present.
+  - The client replies with a normal request:
+    `((request . "apply collateral") (operation-id . "OP")
+    (view-uri . "URI") (client-buffer-id . "BUFFER")
+    (applied . "true"|"nil") (authorized . "true"|"nil")
+    (graph-generation . G1) (presentation-generation . P1)
+    (viewforest-base-revision . R0) (resulting-server-revision . R1)
+    (view-base-graph-generation . G0)
+    (view-base-presentation-generation . P0)
+    (expected-client-application-token . T0)
+    (resulting-client-application-token . T1) (client-token . T)
+    (view-base-source-set . "S0") (resulting-source-set . "S1"))`.
+    It must echo the complete identity. `applied` and `authorized` cannot both
+    be true. Applied content reports `T = T1`; rejection, render-error ACK, and
+    authorization decisions report `T = T0`.
+  - An applied ACK advances the server forest, server revision, client token,
+    graph/presentation generation and source-set only if the retained base is
+    still exact. A valid rejection advances none of them and marks the
+    unchanged view presentation-stale. Authorization approval adds only the
+    challenged PIDs to this batch and requeues the same URI; decline keeps the
+    old view stale. A malformed or identity-changing ACK preserves the pending
+    operation for reconciliation.
 
 ## Source sets
   - Source-sets are the prefixes of the config's privacy order (see
@@ -640,14 +680,14 @@ So far there are these endpoints:
   - Request: ((request . "active source set"))
   - Response: LP response-type "active-source-set" with
     `((active "NAME"))`.
-  - Request: `((request . "set active source set") (name . "NAME")
-    (allow-ugly-telescopes "PID" ...))`.
+  - Request: `((request . "set active source set") (name . "NAME"))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Source-set response:
        `Content-Length: N\r\n\r\n(("response-type" "active-source-set") ("active" "NAME") ("content" "Active source-set: NAME"))`
-    2. The rerender stream, as in "rerender all views":
-       rerender-lock → rerender-view* → rerender-done. Each open view
-       is re-rendered in place under the new set: nodes whose source
+    2. The queued-rerender completion, as in "rerender all views": an empty
+       `rerender-lock`, then `rerender-done` naming every queued URI. Each
+       later exact collateral offer re-renders one view under the new set:
+       nodes whose source
        became inactive are converted and pruned (an inactive node
        with active view-children is retained, read-only), and
        PartnerCols regenerate per the new set, so widening the set
@@ -670,12 +710,11 @@ So far there are these endpoints:
     Switching TO `all` is always allowed. The resulting
     retained-session invariant: diff mode on implies active source-set
     `all`.
-  - Rerender authorization precedes both the set change and release of
-    view text. If the proposed set would render an ugly telescope, the
-    first reply is LP `ugly-telescope-confirmation` with
-    `(operation source-set-switch-rerender)` and exact PIDs as its terminal
-    frame. A retry adds `allow-ugly-telescopes`; declining
-    leaves the active set and open-view registry unchanged.
+  - The active set changes when the foreground request succeeds. Scalar release
+    is then decided independently for each exact view offer. An ugly offer is
+    text-free until its operation is approved; declining preserves that view's
+    old forest/text and marks it stale, without rolling back the active set or
+    other successfully applied views.
 
 ## Titles by ids
   - Request: `((request . "titles by ids") (ids "uuid1" "uuid2" ...)

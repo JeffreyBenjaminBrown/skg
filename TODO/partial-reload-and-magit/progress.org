@@ -765,6 +765,26 @@ what's imperfect about what's done; choices determining the future.
   four preexisting save-leveling failures caused by shared process state; the
   complete affected 15-test module passes serially, while all reconnect,
   coordinator and recovery tests pass.
+- Removed the last foreground per-view rerender mutation path.  Explicit
+  rerender, diff-mode toggle and source-set switch now only commit/queue their
+  retained-session work and terminate; one server-push offer at a time owns
+  complete base/result graph, presentation, revision, client-token, buffer and
+  source-set identity, and the server forest advances only after its exact ACK.
+  Already-offered work survives a replacement batch, dirty or obsolete client
+  buffers reject without being overwritten, unchanged rejected/failed views
+  become presentation-stale, and search snapshot continuations fence scheduler
+  pumping so the application protocols cannot compete.
+- Made background scalar release part of that same exact operation.  A
+  protected view sends no candidate text; approval requeues only its named PIDs
+  and URI, decline preserves the old view as stale, and render failures remain
+  visible ACK obligations.  Removed the obsolete command-retry authorization
+  surface, whose semantics could have toggled diff mode twice.
+- Validation after the retained rerender slice: 48/48 focused Rust handler
+  tests pass; focused diff/source-set/override database suites pass; all 405 of
+  408 runnable Emacs tests pass with the same three optional undo-sidecar skips;
+  and the complete Neovim suite passes.  The protocol and both command
+  references now describe queued foreground completion and exact collateral
+  offers rather than the retired =rerender-view= stream.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -783,8 +803,6 @@ what's imperfect about what's done; choices determining the future.
   exposed conventional-name overwrite risks while the policy was still local.
 
 ** what's imperfect about what's done
-- Older foreground rerender streams still need to be routed through the same
-  exact application/ACK authority used by retained collateral offers.
 - Both clients can finish an already-selected disk candidate, explicit reload,
   client-owned pull and full rebuild through the common post-archive path.
 - The recovery command layer is complete for retained client archives, but the

@@ -34,11 +34,12 @@ the exact approved PIDs are reread and rechecked as one batch before the
 save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts
 and maintenance writers have no prompt and refuse this repair.
 
-That disk-publication choice is separate from displaying the result. If
-a successful save under a restricted source-set would rerender text from
-an ugly telescope, Skg asks for a second, request-scoped approval. Decline
-leaves the save committed but sends no new view text and changes no
-open-view registry entry.
+That disk-publication choice is separate from displaying the result. Under a
+restricted source-set, Skg still asks separately before returning ugly
+telescope text for the saved buffer. Other affected views refresh later, one
+exact clean-buffer offer at a time; an ugly offer contains no text until you
+approve it. Declining one leaves the save committed and that view visibly
+stale, without withholding unrelated views.
 ** <localleader>dd : deletion
 ***     <localleader>dd : :SkgDelete
 Marks the node at point for deletion from the graph.
@@ -484,10 +485,9 @@ enable this view to see what you've changed since your last commit,
 i.e. how your worktree differs from HEAD.
 Refuses while any skg buffer has unsaved edits.
 
-If toggling the mode would rerender ugly telescope text under a
-restricted source-set, Skg asks before changing the mode or any view.
-Declining leaves the mode and buffers unchanged; the protocol still sends
-an empty rerender stream so preemptive client locks are released.
+Enabling diff mode requires source-set =all=. Each clean open view then
+refreshes through an exact retained-session offer; a view edited after the
+toggle is preserved and marked stale instead of being overwritten.
 *** <localleader>ve : :SkgViewNewEmpty
 Asks you to pick a data source,
 and then provides a root node with that source.
@@ -511,9 +511,11 @@ and S-Left / S-Right cycling. After confirmation it tells the server
 to use that source-set and rerenders open Skg buffers in place. Choose
 =all= to remove the limit.
 
-If the proposed set would rerender ugly telescope text, Skg asks before
-changing the active set or any view. Declining leaves both unchanged and
-an empty rerender stream releases the client's preemptive locks.
+The active set changes once the request succeeds, then each clean open view
+refreshes through its own exact retained-session offer. If one result would
+release ugly telescope text, that offer contains no text until you approve it.
+Declining preserves that view's old text and marks it stale; it does not roll
+back the active set or other refreshed views.
 *** <localleader>vm : :SkgViewMetadata
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
