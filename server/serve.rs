@@ -7,6 +7,7 @@
 /// The advantage over Arc<Mutex<bool>>: no lock contention, no possibility of deadlock, and much cheaper (a few nanoseconds vs. potentially microseconds for mutex acquire/release). The tradeoff: atomics only work for simple values — you can't atomically update a String or a struct, which is why the enrichment payload itself uses Arc<Mutex<Option<SearchEnrichmentPayload>>>.
 
 pub mod handlers;
+mod maintenance_connection;
 pub mod parse_metadata_sexp;
 pub mod protocol;
 pub mod util;
@@ -19,6 +20,7 @@ use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::client_census::{
   handle_client_census_request,
   handle_client_census_texts_request,
+  handle_verify_connection_request,
 };
 use crate::serve::handlers::collateral_scheduler::{
   CollateralScheduler,
@@ -31,22 +33,8 @@ use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::maintenance_protocol::{
-  handle_acknowledge_terminal_maintenance_request,
-  handle_approve_maintenance_scalar_release_request,
-  handle_approve_undo_waiver_request,
-  handle_begin_maintenance_request,
-  handle_cancel_maintenance_request,
-  handle_complete_maintenance_request,
-  handle_maintenance_archive_failed_request,
-  handle_maintenance_archive_finalized_request,
-  handle_maintenance_archive_ready_request,
-  handle_maintenance_evidence_request,
-  handle_maintenance_locked_census_request,
-  handle_maintenance_status_request,
-  handle_retry_maintenance_request,
-  handle_maintenance_view_settled_request,
-  handle_finish_maintenance_origin_request,
-  handle_run_maintenance_origin_request,
+  handle_maintenance_protocol_request,
+  skg_save_policy_refusal,
 };
 use crate::serve::handlers::observation_hint::handle_observation_hint_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
@@ -54,13 +42,10 @@ use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_root
 use crate::serve::handlers::reload_batch::{
   handle_begin_reload_batch_request,
   handle_end_reload_batch_request,
-  reconciliation_generation,
-  release_connection_reload_batches,
 };
 use crate::serve::handlers::reload_recovery::{
   handle_reload_recovery_request,
   load_recovery_journals,
-  pending_incidents_for_config,
 };
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
@@ -78,31 +63,26 @@ use crate::serve::handlers::text_search::render_enriched_search_buffer::{
 };
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
+use crate::serve::maintenance_connection::{
+  current_reconciliation_generation,
+  finish_connection_maintenance,
+  handle_idle_maintenance_events,
+  request_allowed_before_census,
+  request_requires_collateral_preemption,
+};
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::runtime::{
   InteractiveConnectionGuard,
   ServerRuntime,
 };
-use crate::maintenance::{CoordinatorState, PendingReason};
-use crate::runtime::interactive_session::{
-  AttachedClient,
-  ClientCapabilities,
-  ClientKind,
-  InteractiveSession,
-};
-use crate::serve::util::{ begin_request_context, ensure_request_has_terminal_response, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_server_push_sexp_response, tag_sexp_response, tag_terminal_text_response, tag_text_response, take_send_failure, value_from_request_sexp};
+use crate::runtime::interactive_session::InteractiveSession;
+use crate::serve::util::{ begin_request_context, ensure_request_has_terminal_response, read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_sexp_response, tag_terminal_text_response, tag_text_response, take_send_failure, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::source_sets::ActiveSourceSet;
 use crate::source_sets::apply_source_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
-use crate::types::misc::SkgConfig;
-use crate::telescope::invariants::TelescopeViolation;
-use crate::types::store_state::{
-  SelectedStoreState,
-  StoreHealth,
-};
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -231,7 +211,8 @@ fn handle_connection (
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
   let mut role : Option<ConnectionRole> = None;
-  let mut seen_reconciliation_generation = reconciliation_generation ();
+  let mut seen_reconciliation_generation =
+    current_reconciliation_generation ();
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -286,11 +267,7 @@ fn handle_connection (
           request_header . clear ();
           continue; }
         if authenticated . interactive ()
-           && !matches! (request_type,
-             RequestType::VerifyConnection
-             | RequestType::ClientCensus
-             | RequestType::ClientCensusTexts
-             | RequestType::MaintenanceLockedCensus)
+           && !request_allowed_before_census (request_type)
            && !runtime . interactive . lock () . unwrap ()
              . attached_client . as_ref ()
              . map (|client| client . census_complete)
@@ -305,12 +282,7 @@ fn handle_connection (
           // order unambiguous on retry.
           break; }
         if authenticated . interactive ()
-        && !matches! (request_type,
-          RequestType::ApplyCollateral
-          | RequestType::ViewVisited
-          | RequestType::ObservePresentation
-          | RequestType::ClientCensus
-          | RequestType::ClientCensusTexts)
+        && request_requires_collateral_preemption (request_type)
         {
           runtime . interactive . lock () . unwrap ()
             . collateral_scheduler . preempt (); }
@@ -363,69 +335,13 @@ fn handle_connection (
                     ]),
                   ]) . to_string () ));
               snapshot_requested = true; }}}
-        if ! request_context_active () {
-          let reconciliation = reconciliation_generation ();
-          if role . as_ref () . map (ConnectionRole::interactive)
-             . unwrap_or (false)
-             && reconciliation > seen_reconciliation_generation
-          {
-            let payload = Sexp::List (vec![
-              Sexp::List (vec![
-                Sexp::Atom (Atom::S ("content" . into ())),
-                Sexp::Atom (Atom::S (
-                  "External reload batch closed; run one exact full manifest sweep"
-                    . into ())),
-              ]),
-              Sexp::List (vec![
-                Sexp::Atom (Atom::S ("sweep-generation" . into ())),
-                Sexp::Atom (Atom::I (reconciliation as i64)),
-              ]),
-            ]) . to_string ();
-            let _ = send_response_with_length_prefix (
-              &mut stream, &tag_server_push_sexp_response (
-                TcpToClient::ReconciliationReady,
-                &format! ("reconciliation-{}", reconciliation),
-                &payload));
-            seen_reconciliation_generation = reconciliation;
-          }
-          if role . as_ref () . map (ConnectionRole::interactive)
-             . unwrap_or (false)
-          {
-            let mut server_event_send_failed = false;
-            loop {
-              let event = runtime . interactive . lock () . unwrap ()
-                . queued_server_events . pop_front ();
-              let Some (event) = event else { break; };
-              let response_type = match event . frame_kind . as_str () {
-                "maintenance-offer" => TcpToClient::MaintenanceOffer,
-                "maintenance-status" => TcpToClient::MaintenanceStatus,
-                "refresh-queued" => TcpToClient::RefreshQueued,
-                other => {
-                  tracing::error! (frame_kind = other,
-                    "discarding unknown queued server event kind");
-                  continue; }
-              };
-              if send_response_with_length_prefix (
-                &mut stream, &tag_server_push_sexp_response (
-                  response_type, &event . operation_id, &event . payload))
-                . is_err ()
-              {
-                runtime . interactive . lock () . unwrap ()
-                  . queued_server_events . push_front (event);
-                server_event_send_failed = true;
-                break; }
-            }
-            let maintenance_locked = runtime . maintenance . lock () . unwrap ()
-              . state . policy () . maintenance_locked;
-            if collateral_pump_allowed (
-                snapshot_requested, server_event_send_failed,
-                maintenance_locked)
-            {
-              let mut interactive = runtime . interactive . lock () . unwrap ();
-              let InteractiveSession {
-                views, collateral_scheduler, ..
-              } = &mut *interactive;
-              collateral_scheduler . pump (&mut stream, views); }}}
+        handle_idle_maintenance_events (
+          &mut stream,
+          &runtime,
+          role . as_ref () . map (ConnectionRole::interactive)
+            . unwrap_or (false),
+          snapshot_requested,
+          &mut seen_reconciliation_generation);
         if let Some (error) = take_send_failure () {
           tracing::warn! (%error,
             "server-push transport failed; retaining session work");
@@ -433,25 +349,12 @@ fn handle_connection (
       }
       Err (_) => break, // real error
     }}
-  release_connection_reload_batches (
-    &runtime, &mut owned_reload_batch_tokens);
-  if role . as_ref () . map (ConnectionRole::interactive)
-     . unwrap_or (false)
-  {
-    runtime . maintenance . lock () . unwrap () . disconnected ();
-    runtime . persist_maintenance_state ();
-    if let Ok (mut interactive) = runtime . interactive . lock () {
-      if let Some (client) = &mut interactive . attached_client {
-        client . census_complete = false; }} }
+  finish_connection_maintenance (
+    &runtime,
+    role . as_ref () . map (ConnectionRole::interactive)
+      . unwrap_or (false),
+    &mut owned_reload_batch_tokens);
   tracing::info!(peer = %peer, "Skg socket disconnected"); }
-
-fn collateral_pump_allowed (
-  snapshot_requested  : bool,
-  server_event_failed : bool,
-  maintenance_locked  : bool,
-) -> bool {
-  !snapshot_requested && !server_event_failed && !maintenance_locked
-}
 
 #[allow(clippy::too_many_arguments)]
 fn dispatch_request (
@@ -517,31 +420,7 @@ fn dispatch_request (
         stream, request, lease, presentation_generation,
         enrichment_slot, search_cancelled, views, active_source_set, runtime); }
     RequestType::VerifyConnection => {
-      let lease = match runtime . query_lease () {
-        Ok (lease) => lease,
-        Err (error) => { send_runtime_error (stream, &error); return; }};
-      let census_required = {
-        let mut interactive = runtime . interactive . lock () . unwrap ();
-        match install_client_handshake (
-            request, &lease . snapshot . env, &mut interactive)
-        {
-          Ok (required) => required,
-          Err (error) => { send_runtime_error (stream, &error); return; }
-        }};
-      let active_source_set_name = runtime . interactive . lock () . unwrap ()
-        . active_source_set . name . 0 . clone ();
-      if let Err (error) = runtime . transition_maintenance (|coordinator| {
-          coordinator . reconnected ();
-          Ok (( ))
-        })
-      {
-        send_runtime_error (stream, &error);
-        return;
-      }
-      handle_verify_connection_request (
-        stream, &lease . snapshot . env, &active_source_set_name,
-        census_required,
-        runtime . maintenance . lock () . unwrap () . clone ()); }
+      handle_verify_connection_request (stream, request, runtime); }
     RequestType::ClientCensus => {
       let snapshot = runtime . selected_snapshot ();
       let writes_allowed = runtime . maintenance . lock () . unwrap ()
@@ -681,40 +560,24 @@ fn dispatch_request (
         Err (error) => { send_runtime_error (stream, &format! (
           "Git presentation observation failed: {}", error)); }
       }}
-    RequestType::BeginMaintenance =>
-      handle_begin_maintenance_request (stream, request, runtime),
-    RequestType::MaintenanceLockedCensus =>
-      handle_maintenance_locked_census_request (stream, request, runtime),
-    RequestType::RunMaintenanceOrigin =>
-      handle_run_maintenance_origin_request (stream, request, runtime),
-    RequestType::FinishMaintenanceOrigin =>
-      handle_finish_maintenance_origin_request (stream, request, runtime),
-    RequestType::MaintenanceArchiveReady =>
-      handle_maintenance_archive_ready_request (stream, request, runtime),
-    RequestType::MaintenanceArchiveFinalized =>
-      handle_maintenance_archive_finalized_request (stream, request, runtime),
-    RequestType::MaintenanceArchiveFailed =>
-      handle_maintenance_archive_failed_request (stream, request, runtime),
-    RequestType::ApproveUndoWaiver =>
-      handle_approve_undo_waiver_request (stream, request, runtime),
-    RequestType::ApproveMaintenanceScalarRelease =>
-      handle_approve_maintenance_scalar_release_request (
-        stream, request, runtime),
-    RequestType::CancelMaintenance =>
-      handle_cancel_maintenance_request (stream, request, runtime),
-    RequestType::MaintenanceStatus =>
-      handle_maintenance_status_request (stream, runtime),
-    RequestType::RetryMaintenance =>
-      handle_retry_maintenance_request (stream, request, runtime),
-    RequestType::MaintenanceEvidence =>
-      handle_maintenance_evidence_request (stream, request, runtime),
-    RequestType::MaintenanceViewSettled =>
-      handle_maintenance_view_settled_request (stream, request, runtime),
-    RequestType::CompleteMaintenance =>
-      handle_complete_maintenance_request (stream, request, runtime),
-    RequestType::AcknowledgeTerminalMaintenance =>
-      handle_acknowledge_terminal_maintenance_request (
-        stream, request, runtime),
+    RequestType::BeginMaintenance
+    | RequestType::MaintenanceLockedCensus
+    | RequestType::RunMaintenanceOrigin
+    | RequestType::FinishMaintenanceOrigin
+    | RequestType::MaintenanceArchiveReady
+    | RequestType::MaintenanceArchiveFinalized
+    | RequestType::MaintenanceArchiveFailed
+    | RequestType::ApproveUndoWaiver
+    | RequestType::ApproveMaintenanceScalarRelease
+    | RequestType::CancelMaintenance
+    | RequestType::MaintenanceStatus
+    | RequestType::RetryMaintenance
+    | RequestType::MaintenanceEvidence
+    | RequestType::MaintenanceViewSettled
+    | RequestType::CompleteMaintenance
+    | RequestType::AcknowledgeTerminalMaintenance =>
+      handle_maintenance_protocol_request (
+        stream, request, runtime, request_type),
   }
 }
 
@@ -732,85 +595,6 @@ fn send_runtime_error (stream : &mut TcpStream, error : &str) {
   let _ = send_response_with_length_prefix (
     stream, &tag_terminal_text_response (
       TcpToClient::Error, "failed", error));
-}
-
-fn skg_save_policy_refusal (state : &CoordinatorState) -> Option<String> {
-  if state . policy () . skg_saves_allowed { return None; }
-  let status = match state {
-    CoordinatorState::Pending (pending) => match (
-      &pending . reason, &pending . candidate)
-    {
-      (PendingReason::ValidDiskDifference, Some (candidate)) => format! (
-        "disk reconciliation is pending for candidate {} (changed primary IDs: {}); run skg-reconcile-pending-changes / :SkgReconcilePendingChanges",
-        candidate . id,
-        if candidate . changed_primary_ids . is_empty () {
-          "none" . into ()
-        } else { candidate . changed_primary_ids . join (", ") }),
-      (reason, _) => format! (
-        "disk reconciliation is pending ({:?}): {}; run skg-reconcile-pending-changes / :SkgReconcilePendingChanges",
-        reason,
-        if pending . details . is_empty () {
-          "see the maintenance status report" . into ()
-        } else { pending . details . join ("; ") }),
-    },
-    CoordinatorState::Active (active) => format! (
-      "maintenance incident {} is {:?}; Skg saves remain disabled until its terminal disposition",
-      active . incident_id, active . phase),
-    CoordinatorState::Terminal (terminal) => format! (
-      "maintenance incident {} is terminal ({}) and awaits client acknowledgement",
-      terminal . incident_id, terminal . disposition . label ()),
-    CoordinatorState::BlockedStoreHealth { reason } => format! (
-      "Skg saves are disabled because store health is blocked: {}", reason),
-    CoordinatorState::Idle | CoordinatorState::Observing =>
-      "Skg save policy is temporarily unavailable" . into (),
-  };
-  Some (format! ("* NOTHING WAS SAVED\n\n{}\n\nThe rejected save will not be retried automatically.", status))
-}
-
-fn install_client_handshake (
-  request     : &str,
-  env         : &SkgEnv,
-  interactive : &mut InteractiveSession,
-) -> Result<bool, String> {
-  let kind = match value_from_request_sexp ("client-kind", request)? . as_str () {
-    "emacs" => ClientKind::Emacs,
-    "neovim" => ClientKind::Neovim,
-    other => return Err (format! ("unsupported interactive client '{}'", other)),
-  };
-  let version = value_from_request_sexp ("client-version", request)?;
-  let session_id = value_from_request_sexp ("client-session-id", request)?;
-  if session_id . is_empty () || session_id . len () > 256 {
-    return Err ("client-session-id must contain 1 through 256 bytes" . into ()); }
-  let archive_format_version = value_from_request_sexp (
-    "archive-format-version", request)? . parse::<u32> ()
-    . map_err (|_| "archive-format-version must be an integer" . to_string ())?;
-  let native_undo_kind = value_from_request_sexp ("native-undo-kind", request)?;
-  let native_undo_version = value_from_request_sexp (
-    "native-undo-version", request)?;
-  let claimed_source_set = value_from_request_sexp ("source-set", request)?;
-  if claimed_source_set != "server-default"
-  && claimed_source_set != interactive . active_source_set . name . 0 {
-    return Err (format! (
-      "client source-set '{}' does not match retained session source-set '{}'",
-      claimed_source_set, interactive . active_source_set . name)); }
-  // Verification admits the socket but never grants ordinary request/write
-  // authority by itself.  Even an empty editor must explicitly close the
-  // census phase so reconnect and restart have the same protocol.
-  let census_required = true;
-  interactive . attached_client = Some (AttachedClient {
-    kind,
-    version,
-    session_id,
-    capabilities: ClientCapabilities {
-      archive_format_version,
-      native_undo_kind,
-      native_undo_version,
-    },
-    census_complete: false,
-  });
-  if env . config . maintenance_archive_identity . as_os_str () . is_empty () {
-    return Err ("server has no validated maintenance archive root" . into ()); }
-  Ok (census_required)
 }
 
 /// Handle the snapshot that Emacs sent back.
@@ -1040,125 +824,6 @@ fn handle_snapshot_response (
   let _ = send_response_with_length_prefix (
     stream, &enriched_sexp ); }
 
-fn handle_verify_connection_request (
-  stream : &mut std::net::TcpStream,
-  env    : &SkgEnv,
-  active_source_set_name : &str,
-  census_required : bool,
-  maintenance : crate::maintenance::MaintenanceCoordinator,
-) {
-  let _ = send_response_with_length_prefix (
-    stream,
-    & verify_connection_response (
-      &env . config,
-      &env . startup_warnings,
-      &env . in_rust_graph . load_full (),
-      active_source_set_name,
-      census_required,
-      &maintenance)); }
-
-fn verify_connection_response (
-  config   : &SkgConfig,
-  warnings : &[(crate::types::misc::ID, TelescopeViolation)],
-  selected : &SelectedStoreState,
-  active_source_set_name : &str,
-  census_required : bool,
-  maintenance : &crate::maintenance::MaintenanceCoordinator,
-) -> String {
-  let atom = |value : &str| -> Sexp {
-    Sexp::Atom (Atom::S (value . to_string ())) };
-  let field = |key : &str, value : Sexp| -> Sexp {
-    Sexp::List (vec! [atom (key), value]) };
-  let warning_entries : Vec<Sexp> = warnings . iter ()
-    . map ( |(pid, warning)| {
-      let (kind, winning_paths, ignored_paths) = match warning {
-        TelescopeViolation::IgnoredForeignPidCollision {
-          winning_paths, ignored_paths, .. } =>
-          ("ignored-foreign-pid-collision",
-           winning_paths . as_slice (), ignored_paths . as_slice ()),
-        _ => ("telescope-warning", &[][..], &[][..]), };
-      let path_list = |paths : &[std::path::PathBuf]| -> Sexp {
-        Sexp::List (paths . iter () . map ( |path|
-          atom (&path . to_string_lossy ()) ) . collect ()) };
-      Sexp::List (vec! [
-        field ("pid", atom (pid)),
-        field ("kind", atom (kind)),
-        field ("message", atom (&warning . to_string ())),
-        field ("winning-paths", path_list (winning_paths)),
-        field ("ignored-paths", path_list (ignored_paths)),
-      ]) })
-    . collect ();
-  let recovery_entries : Vec<Sexp> = pending_incidents_for_config (config)
-    . into_iter () . map (|incident| {
-      let fatal = incident . draft . fatal . iter () . map (|(pid, reason)|
-        Sexp::List (vec![
-          field ("pid", atom (pid)),
-          field ("reason", atom (reason)),
-        ])) . collect ();
-      Sexp::List (vec![
-        field ("incident-id", atom (&incident . incident_id)),
-        field ("fatal", Sexp::List (fatal)),
-      ])
-    }) . collect ();
-  let health = |health : &StoreHealth| -> Sexp { match health {
-    StoreHealth::Healthy => atom ("healthy"),
-    StoreHealth::Poisoned (reason) => Sexp::List (vec! [
-      atom ("poisoned"), atom (reason)]), }};
-  Sexp::List (vec! [
-    field ("response-type", atom (
-      TcpToClient::VerifyConnection . repr_in_client ())),
-    field ("content", atom (
-      "This is the skg server verifying the connection.")),
-    source_inventory_field (config),
-    field ("telescope-warnings", Sexp::List (warning_entries)),
-    field ("pending-recovery-incidents", Sexp::List (recovery_entries)),
-    field ("active-source-set", atom (active_source_set_name)),
-    field ("graph-generation", Sexp::Atom (Atom::I (
-      selected . graph_generation . get () as i64))),
-    field ("manifest-revision", Sexp::Atom (Atom::I (
-      selected . manifest_revision . get () as i64))),
-    field ("maintenance-epoch", Sexp::Atom (Atom::I (
-      maintenance . epoch . get () as i64))),
-    field ("maintenance-state", atom (maintenance . state . label ())),
-    field ("census-required", atom (
-      if census_required { "true" } else { "nil" })),
-    field ("maintenance-archive-folder", atom (
-      &config . maintenance_archive_folder . to_string_lossy ())),
-    field ("maintenance-archive-identity", atom (
-      &config . maintenance_archive_identity . to_string_lossy ())),
-    field ("typedb-health", health (&selected . typedb_health)),
-    field ("tantivy-health", health (&selected . tantivy_health)),
-  ]) . to_string ()
-}
-
-pub(crate) fn source_inventory_field (config : &SkgConfig) -> Sexp {
-  let atom = |value : &str| -> Sexp {
-    Sexp::Atom (Atom::S (value . to_string ())) };
-  let field = |key : &str, value : Sexp| -> Sexp {
-    Sexp::List (vec![atom (key), value]) };
-  let entries = config . ordered_sources () . into_iter () . enumerate ()
-    . map (|(position, name)| {
-      let source = config . sources . get (&name)
-        . expect ("ordered source exists");
-      Sexp::List (vec![
-        field ("name", atom (&name)),
-        field ("abbreviation", source . abbreviation . as_deref ()
-          . map (&atom) . unwrap_or_else (|| atom ("nil"))),
-        field ("owned", atom (
-          if source . user_owns_it { "true" } else { "nil" })),
-        field ("position", Sexp::Atom (Atom::I (position as i64))),
-        field ("configured-path", atom (
-          &config . sources . configured_path (&name)
-            . unwrap_or (&source . path) . to_string_lossy ())),
-        field ("directory", atom (&source . path . to_string_lossy ())),
-        field ("directory-identity", atom (
-          &config . sources . directory_identity (&name)
-            . unwrap_or (&source . path) . to_string_lossy ())),
-      ])
-    }) . collect ();
-  field ("source-inventory", Sexp::List (entries))
-}
-
 fn handle_shutdown_request (
   stream : &mut std::net::TcpStream,
   env    : &SkgEnv,
@@ -1192,82 +857,3 @@ fn cleanup_and_shutdown (env : &SkgEnv) {
         }} ); }
   tracing::info! ("Shutdown complete.");
   std::process::exit (0); }
-
-#[cfg(test)]
-mod connection_tests {
-  use super::*;
-  use crate::types::misc::{SkgfileSource, SourceName};
-  use std::collections::HashMap;
-  use std::path::PathBuf;
-
-  #[test]
-  fn collateral_pump_waits_for_snapshot_event_and_maintenance_boundaries () {
-    assert! (collateral_pump_allowed (false, false, false));
-    assert! (!collateral_pump_allowed (true, false, false));
-    assert! (!collateral_pump_allowed (false, true, false));
-    assert! (!collateral_pump_allowed (false, false, true));
-  }
-
-  #[test]
-  fn verification_carries_the_ordered_normalized_source_inventory () {
-    let mut sources = HashMap::new ();
-    for (name, path, owned) in [
-      ("second", "/tmp/second", false),
-      ("first", "/tmp/first", true),
-    ] {
-      sources . insert (SourceName::from (name), SkgfileSource {
-        name: SourceName::from (name), abbreviation: None,
-        path: PathBuf::from (path), user_owns_it: owned,
-      }); }
-    let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
-    config . sources . set_order (vec! [
-      SourceName::from ("first"), SourceName::from ("second") ]);
-    let warnings = vec! [(crate::types::misc::ID::from ("X"),
-      TelescopeViolation::IgnoredForeignPidCollision {
-        winning_sources: vec![SourceName::from ("first")],
-        winning_paths: vec![PathBuf::from ("/tmp/first/X.skg")],
-        ignored_sources: vec![SourceName::from ("second")],
-        ignored_paths: vec![PathBuf::from ("/tmp/second/X.skg")],
-      })];
-    let selected = SelectedStoreState::initial (
-      crate::dbs::in_rust_graph::InRustGraph::new (),
-      crate::types::store_state::SelectedPathManifest::from ([
-        (PathBuf::from ("/tmp/first/X.skg"),
-         crate::types::store_state::PathDigest::of_bytes (b"pid: X\n")),
-      ]));
-    let response : String = verify_connection_response (
-      &config, &warnings, &selected, "all", false,
-      &crate::maintenance::MaintenanceCoordinator::new ());
-    let first : usize = response . find ("(name first)") . unwrap ();
-    let second : usize = response . find ("(name second)") . unwrap ();
-    assert! (first < second, "{}", response);
-    assert! (response . contains ("(position 0)"), "{}", response);
-    assert! (response . contains ("(owned true)"), "{}", response);
-    assert! (response . contains ("(directory /tmp/first)"), "{}", response);
-    assert! (response . contains (
-      "(kind ignored-foreign-pid-collision)"), "{}", response);
-    assert! (response . contains ("/tmp/second/X.skg"), "{}", response);
-    assert! (response . contains ("(graph-generation 1)"), "{}", response);
-    assert! (response . contains ("(manifest-revision 1)"), "{}", response);
-    assert! (! response . contains ("path-outcomes"), "{}", response);
-    assert! (response . contains ("(tantivy-health healthy)"), "{}", response);
-  }
-
-  #[test]
-  fn verification_exposes_only_a_maintenance_state_label () {
-    let config = SkgConfig::dummyFromSources (HashMap::new ());
-    let selected = SelectedStoreState::initial (
-      crate::dbs::in_rust_graph::InRustGraph::new (),
-      crate::types::store_state::SelectedPathManifest::default ());
-    let mut maintenance = crate::maintenance::MaintenanceCoordinator::new ();
-    maintenance . state = CoordinatorState::BlockedStoreHealth {
-      reason: "SECRET-MAINTENANCE-PAYLOAD" . into (),
-    };
-    let response = verify_connection_response (
-      &config, &[], &selected, "all", true, &maintenance);
-    assert! (response . contains (
-      "(maintenance-state blocked-store-health)"), "{}", response);
-    assert! (!response . contains ("SECRET-MAINTENANCE-PAYLOAD"),
-      "{}", response);
-  }
-}

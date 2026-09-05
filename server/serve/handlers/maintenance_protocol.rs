@@ -31,6 +31,7 @@ use crate::maintenance::{
   MaintenanceOrigin,
   MaintenancePhase,
   MaintenanceTargets,
+  PendingReason,
   TerminalDisposition,
   TerminalMaintenance,
   ScalarReleaseRecord,
@@ -43,13 +44,13 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::
   org_to_uninterpreted_viewforest;
 use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
-use crate::serve::source_inventory_field;
+use crate::serve::handlers::client_census::source_inventory_field;
 use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision,
   approved_pids_from_request,
   decide as decide_scalar_release,
 };
-use crate::serve::protocol::TcpToClient;
+use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
   send_artifact_bundle_with_length_prefix,
   send_response_with_length_prefix,
@@ -78,6 +79,84 @@ use crate::types::views_state::{
 use crate::update_buffer::render_maintenance_view;
 
 const ARCHIVE_FORMAT_VERSION : u32 = 1;
+
+pub fn skg_save_policy_refusal (state : &CoordinatorState) -> Option<String> {
+  if state . policy () . skg_saves_allowed { return None; }
+  let status = match state {
+    CoordinatorState::Pending (pending) => match (
+      &pending . reason, &pending . candidate)
+    {
+      (PendingReason::ValidDiskDifference, Some (candidate)) => format! (
+        "disk reconciliation is pending for candidate {} (changed primary IDs: {}); run skg-reconcile-pending-changes / :SkgReconcilePendingChanges",
+        candidate . id,
+        if candidate . changed_primary_ids . is_empty () {
+          "none" . into ()
+        } else { candidate . changed_primary_ids . join (", ") }),
+      (reason, _) => format! (
+        "disk reconciliation is pending ({:?}): {}; run skg-reconcile-pending-changes / :SkgReconcilePendingChanges",
+        reason,
+        if pending . details . is_empty () {
+          "see the maintenance status report" . into ()
+        } else { pending . details . join ("; ") }),
+    },
+    CoordinatorState::Active (active) => format! (
+      "maintenance incident {} is {:?}; Skg saves remain disabled until its terminal disposition",
+      active . incident_id, active . phase),
+    CoordinatorState::Terminal (terminal) => format! (
+      "maintenance incident {} is terminal ({}) and awaits client acknowledgement",
+      terminal . incident_id, terminal . disposition . label ()),
+    CoordinatorState::BlockedStoreHealth { reason } => format! (
+      "Skg saves are disabled because store health is blocked: {}", reason),
+    CoordinatorState::Idle | CoordinatorState::Observing =>
+      "Skg save policy is temporarily unavailable" . into (),
+  };
+  Some (format! ("* NOTHING WAS SAVED\n\n{}\n\nThe rejected save will not be retried automatically.", status))
+}
+
+pub fn handle_maintenance_protocol_request (
+  stream       : &mut TcpStream,
+  request      : &str,
+  runtime      : &ServerRuntime,
+  request_type : RequestType,
+) {
+  match request_type {
+    RequestType::BeginMaintenance =>
+      handle_begin_maintenance_request (stream, request, runtime),
+    RequestType::MaintenanceLockedCensus =>
+      handle_maintenance_locked_census_request (stream, request, runtime),
+    RequestType::RunMaintenanceOrigin =>
+      handle_run_maintenance_origin_request (stream, request, runtime),
+    RequestType::FinishMaintenanceOrigin =>
+      handle_finish_maintenance_origin_request (stream, request, runtime),
+    RequestType::MaintenanceArchiveReady =>
+      handle_maintenance_archive_ready_request (stream, request, runtime),
+    RequestType::MaintenanceArchiveFinalized =>
+      handle_maintenance_archive_finalized_request (stream, request, runtime),
+    RequestType::MaintenanceArchiveFailed =>
+      handle_maintenance_archive_failed_request (stream, request, runtime),
+    RequestType::ApproveUndoWaiver =>
+      handle_approve_undo_waiver_request (stream, request, runtime),
+    RequestType::ApproveMaintenanceScalarRelease =>
+      handle_approve_maintenance_scalar_release_request (
+        stream, request, runtime),
+    RequestType::CancelMaintenance =>
+      handle_cancel_maintenance_request (stream, request, runtime),
+    RequestType::MaintenanceStatus =>
+      handle_maintenance_status_request (stream, runtime),
+    RequestType::RetryMaintenance =>
+      handle_retry_maintenance_request (stream, request, runtime),
+    RequestType::MaintenanceEvidence =>
+      handle_maintenance_evidence_request (stream, request, runtime),
+    RequestType::MaintenanceViewSettled =>
+      handle_maintenance_view_settled_request (stream, request, runtime),
+    RequestType::CompleteMaintenance =>
+      handle_complete_maintenance_request (stream, request, runtime),
+    RequestType::AcknowledgeTerminalMaintenance =>
+      handle_acknowledge_terminal_maintenance_request (
+        stream, request, runtime),
+    _ => unreachable! ("non-maintenance request reached maintenance handler"),
+  }
+}
 
 pub fn handle_begin_maintenance_request (
   stream  : &mut TcpStream,

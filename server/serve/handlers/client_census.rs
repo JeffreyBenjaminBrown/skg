@@ -9,26 +9,39 @@ use crate::maintenance::{
   ArchiveStatus,
   BufferKind,
   CoordinatorState,
+  MaintenanceCoordinator,
   ViewApplicationAcknowledgement,
   ViewSettlementRequirement,
 };
 use crate::runtime::ServerRuntime;
-use crate::runtime::interactive_session::{CensusDescriptor, InteractiveSession};
+use crate::runtime::interactive_session::{
+  AttachedClient,
+  CensusDescriptor,
+  ClientCapabilities,
+  ClientKind,
+  InteractiveSession,
+};
+use crate::serve::handlers::reload_recovery::pending_incidents_for_config;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
+  tag_terminal_text_response,
+  value_from_request_sexp,
 };
 use crate::types::env::SkgEnv;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
+use crate::types::misc::SkgConfig;
 use crate::types::sexp::{atom_to_string, extract_v_from_kv_pair_in_sexp};
+use crate::types::store_state::{SelectedStoreState, StoreHealth};
 use crate::types::views_state::{
   ViewState,
   ViewUri,
   pids_from_viewforest,
   root_ids_from_viewforest,
 };
+use crate::telescope::invariants::TelescopeViolation;
 
 use super::maintenance_protocol::{
   ServerSettlementEffect,
@@ -40,6 +53,190 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashSet};
 use std::io::BufReader;
 use std::net::TcpStream;
+
+pub fn handle_verify_connection_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = (|| -> Result<String, String> {
+    let lease = runtime . query_lease ()?;
+    let census_required = {
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      install_client_handshake (
+        request, &lease . snapshot . env, &mut interactive)?
+    };
+    let active_source_set_name = runtime . interactive . lock () . unwrap ()
+      . active_source_set . name . 0 . clone ();
+    runtime . transition_maintenance (|coordinator| {
+      coordinator . reconnected ();
+      Ok (( ))
+    })?;
+    let maintenance = runtime . maintenance . lock () . unwrap () . clone ();
+    Ok (verify_connection_response (
+      &lease . snapshot . env . config,
+      &lease . snapshot . env . startup_warnings,
+      &lease . snapshot . env . in_rust_graph . load_full (),
+      &active_source_set_name,
+      census_required,
+      &maintenance))
+  }) ();
+  let response = match result {
+    Ok (response) => response,
+    Err (error) => tag_terminal_text_response (
+      TcpToClient::Error, "failed", &error),
+  };
+  let _ = send_response_with_length_prefix (stream, &response);
+}
+
+fn install_client_handshake (
+  request     : &str,
+  env         : &SkgEnv,
+  interactive : &mut InteractiveSession,
+) -> Result<bool, String> {
+  let kind = match value_from_request_sexp ("client-kind", request)? . as_str () {
+    "emacs" => ClientKind::Emacs,
+    "neovim" => ClientKind::Neovim,
+    other => return Err (format! ("unsupported interactive client '{}'", other)),
+  };
+  let version = value_from_request_sexp ("client-version", request)?;
+  let session_id = value_from_request_sexp ("client-session-id", request)?;
+  if session_id . is_empty () || session_id . len () > 256 {
+    return Err ("client-session-id must contain 1 through 256 bytes" . into ()); }
+  let archive_format_version = value_from_request_sexp (
+    "archive-format-version", request)? . parse::<u32> ()
+    . map_err (|_| "archive-format-version must be an integer" . to_string ())?;
+  let native_undo_kind = value_from_request_sexp ("native-undo-kind", request)?;
+  let native_undo_version = value_from_request_sexp (
+    "native-undo-version", request)?;
+  let claimed_source_set = value_from_request_sexp ("source-set", request)?;
+  if claimed_source_set != "server-default"
+  && claimed_source_set != interactive . active_source_set . name . 0
+  {
+    return Err (format! (
+      "client source-set '{}' does not match retained session source-set '{}'",
+      claimed_source_set, interactive . active_source_set . name)); }
+  // Verification admits the socket but never grants ordinary request/write
+  // authority by itself.  Even an empty editor must explicitly close the
+  // census phase so reconnect and restart have the same protocol.
+  let census_required = true;
+  interactive . attached_client = Some (AttachedClient {
+    kind,
+    version,
+    session_id,
+    capabilities: ClientCapabilities {
+      archive_format_version,
+      native_undo_kind,
+      native_undo_version,
+    },
+    census_complete: false,
+  });
+  if env . config . maintenance_archive_identity . as_os_str () . is_empty () {
+    return Err ("server has no validated maintenance archive root" . into ()); }
+  Ok (census_required)
+}
+
+fn verify_connection_response (
+  config   : &SkgConfig,
+  warnings : &[(crate::types::misc::ID, TelescopeViolation)],
+  selected : &SelectedStoreState,
+  active_source_set_name : &str,
+  census_required : bool,
+  maintenance : &MaintenanceCoordinator,
+) -> String {
+  let atom = |value : &str| -> Sexp {
+    Sexp::Atom (Atom::S (value . to_string ())) };
+  let field = |key : &str, value : Sexp| -> Sexp {
+    Sexp::List (vec! [atom (key), value]) };
+  let warning_entries : Vec<Sexp> = warnings . iter ()
+    . map ( |(pid, warning)| {
+      let (kind, winning_paths, ignored_paths) = match warning {
+        TelescopeViolation::IgnoredForeignPidCollision {
+          winning_paths, ignored_paths, .. } =>
+          ("ignored-foreign-pid-collision",
+           winning_paths . as_slice (), ignored_paths . as_slice ()),
+        _ => ("telescope-warning", &[][..], &[][..]), };
+      let path_list = |paths : &[std::path::PathBuf]| -> Sexp {
+        Sexp::List (paths . iter () . map ( |path|
+          atom (&path . to_string_lossy ()) ) . collect ()) };
+      Sexp::List (vec! [
+        field ("pid", atom (pid)),
+        field ("kind", atom (kind)),
+        field ("message", atom (&warning . to_string ())),
+        field ("winning-paths", path_list (winning_paths)),
+        field ("ignored-paths", path_list (ignored_paths)),
+      ]) })
+    . collect ();
+  let recovery_entries : Vec<Sexp> = pending_incidents_for_config (config)
+    . into_iter () . map (|incident| {
+      let fatal = incident . draft . fatal . iter () . map (|(pid, reason)|
+        Sexp::List (vec![
+          field ("pid", atom (pid)),
+          field ("reason", atom (reason)),
+        ])) . collect ();
+      Sexp::List (vec![
+        field ("incident-id", atom (&incident . incident_id)),
+        field ("fatal", Sexp::List (fatal)),
+      ])
+    }) . collect ();
+  let health = |health : &StoreHealth| -> Sexp { match health {
+    StoreHealth::Healthy => atom ("healthy"),
+    StoreHealth::Poisoned (reason) => Sexp::List (vec! [
+      atom ("poisoned"), atom (reason)]), }};
+  Sexp::List (vec! [
+    field ("response-type", atom (
+      TcpToClient::VerifyConnection . repr_in_client ())),
+    field ("content", atom (
+      "This is the skg server verifying the connection.")),
+    source_inventory_field (config),
+    field ("telescope-warnings", Sexp::List (warning_entries)),
+    field ("pending-recovery-incidents", Sexp::List (recovery_entries)),
+    field ("active-source-set", atom (active_source_set_name)),
+    field ("graph-generation", Sexp::Atom (Atom::I (
+      selected . graph_generation . get () as i64))),
+    field ("manifest-revision", Sexp::Atom (Atom::I (
+      selected . manifest_revision . get () as i64))),
+    field ("maintenance-epoch", Sexp::Atom (Atom::I (
+      maintenance . epoch . get () as i64))),
+    field ("maintenance-state", atom (maintenance . state . label ())),
+    field ("census-required", atom (
+      if census_required { "true" } else { "nil" })),
+    field ("maintenance-archive-folder", atom (
+      &config . maintenance_archive_folder . to_string_lossy ())),
+    field ("maintenance-archive-identity", atom (
+      &config . maintenance_archive_identity . to_string_lossy ())),
+    field ("typedb-health", health (&selected . typedb_health)),
+    field ("tantivy-health", health (&selected . tantivy_health)),
+  ]) . to_string ()
+}
+
+pub(crate) fn source_inventory_field (config : &SkgConfig) -> Sexp {
+  let atom = |value : &str| -> Sexp {
+    Sexp::Atom (Atom::S (value . to_string ())) };
+  let field = |key : &str, value : Sexp| -> Sexp {
+    Sexp::List (vec![atom (key), value]) };
+  let entries = config . ordered_sources () . into_iter () . enumerate ()
+    . map (|(position, name)| {
+      let source = config . sources . get (&name)
+        . expect ("ordered source exists");
+      Sexp::List (vec![
+        field ("name", atom (&name)),
+        field ("abbreviation", source . abbreviation . as_deref ()
+          . map (&atom) . unwrap_or_else (|| atom ("nil"))),
+        field ("owned", atom (
+          if source . user_owns_it { "true" } else { "nil" })),
+        field ("position", Sexp::Atom (Atom::I (position as i64))),
+        field ("configured-path", atom (
+          &config . sources . configured_path (&name)
+            . unwrap_or (&source . path) . to_string_lossy ())),
+        field ("directory", atom (&source . path . to_string_lossy ())),
+        field ("directory-identity", atom (
+          &config . sources . directory_identity (&name)
+            . unwrap_or (&source . path) . to_string_lossy ())),
+      ])
+    }) . collect ();
+  field ("source-inventory", Sexp::List (entries))
+}
 
 pub fn handle_client_census_request (
   reader       : &mut BufReader<TcpStream>,
@@ -763,6 +960,72 @@ fn send_result (stream : &mut TcpStream, result : Result<String, String>) {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::types::misc::{SkgfileSource, SourceName};
+  use std::collections::HashMap;
+  use std::path::PathBuf;
+
+  #[test]
+  fn verification_carries_the_ordered_normalized_source_inventory () {
+    let mut sources = HashMap::new ();
+    for (name, path, owned) in [
+      ("second", "/tmp/second", false),
+      ("first", "/tmp/first", true),
+    ] {
+      sources . insert (SourceName::from (name), SkgfileSource {
+        name: SourceName::from (name), abbreviation: None,
+        path: PathBuf::from (path), user_owns_it: owned,
+      }); }
+    let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
+    config . sources . set_order (vec! [
+      SourceName::from ("first"), SourceName::from ("second") ]);
+    let warnings = vec! [(crate::types::misc::ID::from ("X"),
+      TelescopeViolation::IgnoredForeignPidCollision {
+        winning_sources: vec![SourceName::from ("first")],
+        winning_paths: vec![PathBuf::from ("/tmp/first/X.skg")],
+        ignored_sources: vec![SourceName::from ("second")],
+        ignored_paths: vec![PathBuf::from ("/tmp/second/X.skg")],
+      })];
+    let selected = SelectedStoreState::initial (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::from ([
+        (PathBuf::from ("/tmp/first/X.skg"),
+         crate::types::store_state::PathDigest::of_bytes (b"pid: X\n")),
+      ]));
+    let response : String = verify_connection_response (
+      &config, &warnings, &selected, "all", false,
+      &MaintenanceCoordinator::new ());
+    let first : usize = response . find ("(name first)") . unwrap ();
+    let second : usize = response . find ("(name second)") . unwrap ();
+    assert! (first < second, "{}", response);
+    assert! (response . contains ("(position 0)"), "{}", response);
+    assert! (response . contains ("(owned true)"), "{}", response);
+    assert! (response . contains ("(directory /tmp/first)"), "{}", response);
+    assert! (response . contains (
+      "(kind ignored-foreign-pid-collision)"), "{}", response);
+    assert! (response . contains ("/tmp/second/X.skg"), "{}", response);
+    assert! (response . contains ("(graph-generation 1)"), "{}", response);
+    assert! (response . contains ("(manifest-revision 1)"), "{}", response);
+    assert! (! response . contains ("path-outcomes"), "{}", response);
+    assert! (response . contains ("(tantivy-health healthy)"), "{}", response);
+  }
+
+  #[test]
+  fn verification_exposes_only_a_maintenance_state_label () {
+    let config = SkgConfig::dummyFromSources (HashMap::new ());
+    let selected = SelectedStoreState::initial (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::default ());
+    let mut maintenance = MaintenanceCoordinator::new ();
+    maintenance . state = CoordinatorState::BlockedStoreHealth {
+      reason: "SECRET-MAINTENANCE-PAYLOAD" . into (),
+    };
+    let response = verify_connection_response (
+      &config, &[], &selected, "all", true, &maintenance);
+    assert! (response . contains (
+      "(maintenance-state blocked-store-health)"), "{}", response);
+    assert! (!response . contains ("SECRET-MAINTENANCE-PAYLOAD"),
+      "{}", response);
+  }
 
   fn complete_descriptor (overrides : &str) -> String {
     format! (concat! (
