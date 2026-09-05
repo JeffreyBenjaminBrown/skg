@@ -808,6 +808,12 @@ pending work rather than being selected silently.  Magit refresh expedites
 both exact checks, but correctness does not depend on that hook.  Raw-file
 saves need no editor watcher hook.  Reload and reconciliation never write a
 =.skg= file themselves.
+
+If source or Git metadata changes while an incident owns the maintenance lock,
+ordinary refresh offers wait.  A preselection source change is reobserved by
+that same incident; a later source change is found by the exact sweep queued at
+terminal unlock.  Git presentation is exact-checked at G1 rendering and again
+at completion, then retained as ordinary presentation-stale work.
 *** skg-reload-changed
 Queues a low-priority exact server-side sweep of every configured source.  It
 compares content digests, not mtimes.  This command observes only; if it finds

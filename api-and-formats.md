@@ -866,6 +866,16 @@ these states silently changes selected stores.  `maintenance status` reports
 `blocked-store-health`, with explicit kebab-case phase/reason labels rather
 than implementation debug text.
 
+Watcher signals which arrive while maintenance or its terminal delivery owns
+the coordinator still advance the durable observation sequence, but do not run
+an ordinary scan whose result could not publish.  Active status reports
+`successor-observation-required`.  Before store mutation, a sequence or exact
+byte mismatch clears only the obsolete candidate/evidence pointer and queues
+the incident's own complete or targeted observer.  Any superseded durable
+server-evidence directory is preserved under a unique sibling name.  After
+the terminal unlock ACK, one exact complete sweep always runs; source changes
+after G1 therefore become ordinary successor candidates.
+
 ## Durable maintenance protocol
 
 Maintenance is the only live route for selecting disk not produced by the
@@ -945,6 +955,14 @@ names the exact generation; an incremental failure reconstructs from the
 immutable selected graph, while an unrecoverable derived-store failure leaves
 store health and maintenance explicitly blocked.
 
+The G1 presentation fence durably pairs the candidate's covered observation
+sequence with the exact normalized Git-presentation BLAKE3 and presentation
+generation.  Maintenance render attempts exact-check Git before and after;
+an advancing signature discards that attempt and retries, while the resulting
+ordinary refresh debt waits behind the maintenance lock.  `complete
+maintenance` performs a final exact check so delayed watcher delivery cannot
+hide a post-fence Git change.
+
 If final disk after an external mutation is invalid or unstable, the incident
 stays locked in `blocked-invalid-after-mutation`; it is not rolled back into a
 false success.  Preflight failure before destructive work leaves G0 queryable.
@@ -955,7 +973,8 @@ reconstruction before reporting the durable failure state.
 
 Once G1 is selected, status carries the exact source inventory/source-set,
 G1 graph and manifest generations, Tantivy outcome, server-evidence checksum,
-and one settlement per frozen buffer.  A restricted source-set which would
+the presentation-fence sequence/signature/generation, and one settlement per
+frozen buffer.  A restricted source-set which would
 release protected scalar text first returns `needs-scalar-authorization` with
 only operation, exact PID list and prompt.  `approve maintenance scalar
 release` must repeat the exact list; no staged view text precedes approval.
@@ -1002,7 +1021,8 @@ durable `terminal` response containing incident, epoch, disposition, exact
 unlock census, selected generations, and per-ID outcomes.  The client unlocks
 only that census, then sends `acknowledge terminal maintenance`.  Only this
 last exact ACK returns the coordinator to idle and compacts its transaction
-journal.  Lost replies at the view, evidence, finalization, completion, or
+journal, then queues the exact post-maintenance successor sweep.  Lost replies
+at the view, evidence, finalization, completion, or
 terminal boundary can be replayed without applying the local action twice.
 
 `maintenance status` is the reconnect/resume endpoint.  An active response

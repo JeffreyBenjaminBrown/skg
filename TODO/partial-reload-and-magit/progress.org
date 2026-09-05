@@ -806,6 +806,24 @@ what's imperfect about what's done; choices determining the future.
   complete Neovim run passes after isolating one concurrent pending-count
   flake.  =git diff --check= is clean; this environment does not have the
   =cargo fmt= subcommand installed.
+- Closed the maintenance presentation fence explicitly.  Each selected G1 now
+  journals one typed record pairing its candidate observation sequence with
+  the exact normalized Git-presentation BLAKE3 and presentation generation;
+  maintenance rendering exact-checks before and after, retries an advancing
+  signature, and terminal completion closes delayed watcher gaps once more.
+  Later Git changes remain ordinary queued presentation work.  The socket idle
+  loop no longer pumps ordinary collateral offers while maintenance is locked.
+- Retained source watcher work across the same serialized interval.  An active
+  watcher event now advances the durable sequence and records successor debt
+  without running a result the coordinator must reject.  Preselection drift
+  clears the obsolete candidate/evidence pointer and invokes the incident's
+  exact targeted or complete observer; already-published attempted evidence is
+  renamed to a unique retained sibling before replacement.  Terminal unlock
+  always queues a complete exact sweep for changes after G1.
+- Focused coordinator, evidence, observation, selection-adjacent protocol,
+  connection-loop and journal tests pass.  The full Rust library run passed
+  286/290 and reproduced the same four shared-global save-leveling races seen
+  earlier; all 15 tests in that affected module pass together serially.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity

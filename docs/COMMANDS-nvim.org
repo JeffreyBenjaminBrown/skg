@@ -724,6 +724,12 @@ Later keeps the old generation queryable and editable, but blocks every Skg
 view save until the candidate is reconciled or disk is explicitly reverted.
 Invalid or unstable disk remains visible pending work rather than being
 selected silently.  Correctness does not depend on a Neovim or Neogit hook.
+
+If source or Git metadata changes while an incident owns the maintenance lock,
+ordinary refresh offers wait.  A preselection source change is reobserved by
+that same incident; a later source change is found by the exact sweep queued at
+terminal unlock.  Git presentation is exact-checked at G1 rendering and again
+at completion, then retained as ordinary presentation-stale work.
 *** :SkgReconcilePendingChanges
 Reopens the prompt for the latest pending valid disk candidate.  Accepting
 starts archive-first maintenance.  Dirty impacted views become detached
