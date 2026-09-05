@@ -498,6 +498,42 @@
     (should-not (plist-get skg--maintenance-client-incident
                            :blocking-reason))))
 
+(ert-deftest test-skg-invalid-post-pull-retires-dirty-work-before-retry ()
+  (let* ((retirement
+          (skg-test-maintenance--settlement
+           "dirty" "content-view" "view" "true"
+           "retirement-ack" "interrupted"))
+         (retirement (append retirement
+                             '((settlement-resolution "pending"))))
+         (skg--maintenance-client-incident
+          '(:incident-id "incident" :epoch 9 :phase server-blocked
+            :registered-buffer-ids ("dirty" "clean")
+            :locally-applied nil))
+         scheduled applied sent)
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest _arguments)
+                 (setq scheduled function)))
+              ((symbol-function 'skg--maintenance-apply-settlement)
+               (lambda (record) (setq applied record)))
+              ((symbol-function
+                'skg--maintenance-send-preselection-retirement-ack)
+               (lambda (record) (setq sent record))))
+      (skg--maintenance-install-preselection-retirements (list retirement))
+      (funcall scheduled)
+      (should (eq retirement applied))
+      (should (eq retirement sent))
+      (should (equal '("dirty")
+                     (plist-get skg--maintenance-client-incident
+                                :locally-applied)))
+      (skg--maintenance-handle-preselection-retirement-ack
+       nil
+       "((status all-invalid-dirty-buffers-retired) (buffer-id dirty) (required-ack retirement-ack))")
+      (funcall scheduled))
+    (should (eq (plist-get skg--maintenance-client-incident :phase)
+                'server-blocked))
+    (should-not (plist-get skg--maintenance-client-incident
+                           :pending-preselection-retirements))))
+
 (ert-deftest test-skg-maintenance-settlement-inventory-is-exact ()
   (let ((one (skg-test-maintenance--settlement
               "one" "content-view" "view-one" "nil"

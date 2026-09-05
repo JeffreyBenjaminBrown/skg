@@ -521,6 +521,133 @@ old implementation."
     (setq skg--maintenance-client-incident state)
     (run-at-time 0 nil #'skg--maintenance-settle-next)))
 
+(defun skg--maintenance-install-preselection-retirements (retirements)
+  "Install exact dirty-buffer RETIREMENTS for invalid post-mutation disk."
+  (let* ((state skg--maintenance-client-incident)
+         (registered (plist-get state :registered-buffer-ids))
+         (seen (make-hash-table :test #'equal))
+         pending acknowledged)
+    (unless (proper-list-p retirements)
+      (error "Invalid-disk retirements are malformed"))
+    (dolist (retirement retirements)
+      (let ((buffer-id (skg--maintenance-text retirement 'buffer-id)))
+        (unless (and buffer-id (member buffer-id registered)
+                     (not (gethash buffer-id seen))
+                     (skg--maintenance-true-p retirement 'dirty)
+                     (skg--maintenance-true-p retirement 'impacted)
+                     (equal (skg--maintenance-text
+                             retirement 'planned-disposition)
+                            "interrupted")
+                     (equal (skg--maintenance-text
+                             retirement 'required-ack)
+                            "retirement-ack"))
+          (error "Invalid-disk retirement inventory is inconsistent"))
+        (puthash buffer-id t seen)
+        (if (skg--maintenance-settlement-acknowledged-p retirement)
+            (let ((resolution (or (skg--maintenance-text
+                                   retirement 'settlement-resolution)
+                                  "client-acknowledged")))
+              (unless (or (member buffer-id (plist-get state :locally-applied))
+                          (and (equal resolution "census-absent")
+                               (not (buffer-live-p
+                                     (skg-find-buffer-by-id buffer-id))))
+                          (plist-get state :adopted))
+                (error "Server acknowledged an unapplied dirty retirement"))
+              (push retirement acknowledged))
+          (push retirement pending))))
+    (skg--maintenance-require-stable-settlements
+     (plist-get state :preselection-retirements) retirements)
+    (setf (plist-get state :preselection-retirements) retirements
+          (plist-get state :pending-preselection-retirements)
+          (nreverse pending)
+          (plist-get state :acknowledged-preselection-retirements)
+          (nreverse acknowledged)
+          (plist-get state :in-flight-preselection-retirement) nil
+          (plist-get state :phase) 'settling-preselection-retirements)
+    (setq skg--maintenance-client-incident state)
+    (run-at-time 0 nil #'skg--maintenance-settle-next-preselection-retirement)))
+
+(defun skg--maintenance-settle-next-preselection-retirement ()
+  (let* ((state skg--maintenance-client-incident)
+         (pending (plist-get state :pending-preselection-retirements)))
+    (when (and state
+               (eq (plist-get state :phase)
+                   'settling-preselection-retirements))
+      (if (null pending)
+          (progn
+            (setf (plist-get state :phase) 'server-blocked)
+            (message
+             "Skg retired every dirty view; repair disk and retry maintenance"))
+        (let* ((retirement (car pending))
+               (buffer-id (skg--maintenance-text retirement 'buffer-id)))
+          (condition-case error-data
+              (progn
+                (unless (member buffer-id (plist-get state :locally-applied))
+                  (skg--maintenance-apply-settlement retirement)
+                  (push buffer-id (plist-get state :locally-applied)))
+                (setf (plist-get state :in-flight-preselection-retirement)
+                      retirement)
+                (skg--maintenance-send-preselection-retirement-ack retirement))
+            (error
+             (setf (plist-get state :phase)
+                   'preselection-retirement-blocked)
+             (display-warning
+              'skg
+              (format "Maintenance could not retire dirty buffer %s: %s"
+                      buffer-id (error-message-string error-data))
+              :error))))))))
+
+(defun skg--maintenance-send-preselection-retirement-ack (retirement)
+  (let* ((state skg--maintenance-client-incident)
+         (tcp-proc (skg-tcp-connect-to-rust)))
+    (skg-register-response-handler
+     'maintenance-status
+     #'skg--maintenance-handle-preselection-retirement-ack t)
+    (skg-set-request-failure-handler
+     (lambda (reason)
+       (when skg--maintenance-client-incident
+         (setf (plist-get skg--maintenance-client-incident :phase)
+               'preselection-retirement-ack-pending))
+       (display-warning
+        'skg (format "Dirty-buffer retirement ACK was not delivered: %s"
+                     reason)
+        :warning)))
+    (skg-submit-request
+     tcp-proc
+     (concat
+      (prin1-to-string
+       (append
+        `((request . "maintenance view settled")
+          (maintenance-epoch . ,(plist-get state :epoch)))
+        (skg--maintenance-ack-fields retirement)))
+      "\n")
+     nil (plist-get state :incident-id))))
+
+(defun skg--maintenance-handle-preselection-retirement-ack
+    (_tcp-proc payload)
+  (let* ((response (read payload))
+         (state skg--maintenance-client-incident)
+         (retirement (plist-get state :in-flight-preselection-retirement))
+         (buffer-id (and retirement
+                         (skg--maintenance-text retirement 'buffer-id)))
+         (first (car (plist-get state
+                                :pending-preselection-retirements))))
+    (unless (and retirement first
+                 (equal buffer-id
+                        (skg--maintenance-text response 'buffer-id))
+                 (equal buffer-id
+                        (skg--maintenance-text first 'buffer-id))
+                 (equal (skg--maintenance-text response 'required-ack)
+                        "retirement-ack"))
+      (error "Dirty-buffer retirement ACK changed identity"))
+    (push retirement
+          (plist-get state :acknowledged-preselection-retirements))
+    (setf (plist-get state :pending-preselection-retirements)
+          (cdr (plist-get state :pending-preselection-retirements))
+          (plist-get state :in-flight-preselection-retirement) nil
+          (plist-get state :phase) 'settling-preselection-retirements)
+    (run-at-time 0 nil #'skg--maintenance-settle-next-preselection-retirement)))
+
 (defun skg--maintenance-application (settlement)
   (let ((application (skg--maintenance-field settlement 'application)))
     (unless (proper-list-p application)
@@ -1194,8 +1321,12 @@ checksummed final marker."
           (concat "Maintenance %s remains locked in server phase %s: %s. "
                   "Repair the reported problem, then run "
                   "M-x skg-retry-maintenance.")
-          incident-id phase reason)
-         :error)))
+         incident-id phase reason)
+         :error)
+        (when-let ((retirements
+                    (skg--maintenance-field
+                     response 'preselection-retirements)))
+          (skg--maintenance-install-preselection-retirements retirements))))
      (t
       (setf (plist-get state :phase) 'waiting-for-server)
       (message "Skg maintenance %s is in server phase %s"
@@ -1437,7 +1568,11 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
                  "M-x skg-retry-maintenance.")
          (skg--maintenance-text response 'phase)
          (skg--maintenance-text response 'error))
-        :error))
+        :error)
+       (when-let ((retirements
+                   (skg--maintenance-field
+                    response 'preselection-retirements)))
+         (skg--maintenance-install-preselection-retirements retirements)))
       ((or "active" "terminal" "idle")
        (skg--maintenance-handle-status tcp-proc payload))
       (_
