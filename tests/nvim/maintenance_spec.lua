@@ -298,6 +298,8 @@ describe('skg Neovim maintenance handshake', function ()
       f('g1-manifest-revision', 6), f('tantivy-generation', 4),
       f('server-evidence-sha256', string.rep('d', 64)),
       f('source-set', 'all'),
+      f('maintenance-archive-folder', 'replacement-archives'),
+      f('maintenance-archive-identity', '/server/replacement-archives'),
       f('source-inventory', {{
         f('name', 'replacement'), f('abbreviation', 'rep'),
         f('owned', 'true'), f('position', 0),
@@ -311,6 +313,8 @@ describe('skg Neovim maintenance handshake', function ()
       state.maintenance_client_incident.phase)
     assert.are.equal(2, state.maintenance_client_incident.g1_graph_generation)
     assert.are.equal('all', state.active_source_set_name)
+    assert.are.equal('replacement-archives',
+      state.maintenance_archive_folder)
     assert.are.equal('replacement', config.source_inventory[1].name)
     assert.has_error(function ()
       maintenance.server_status_handler('', {

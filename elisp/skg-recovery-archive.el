@@ -571,7 +571,8 @@
    (skg-recovery--field 'client-archive-identity root)
    (skg-recovery--field
     'server-archive-identity
-    (or skg--maintenance-archive-identity "unavailable"))
+    (or (skg-recovery--offer-value offer 'archive-identity)
+        skg--maintenance-archive-identity "unavailable"))
    (skg-recovery--field
     'source-set
     (or (skg-recovery--offer-value offer 'source-set)

@@ -15,13 +15,16 @@ local function replace_config ()
   local replacements = {
     {'default_source_set = "main"',
      'default_source_set = "replacement"'},
+    {'maintenance_archive_folder = "maintenance-archives"',
+     'maintenance_archive_folder = "replacement-archives"'},
     {'name = "main"', 'name = "replacement"'},
     {'path = "notes"', 'path = "replacement-notes"'},
   }
   for _, replacement in ipairs(replacements) do
-    local changed
-    text, changed = text:gsub(replacement[1], replacement[2], 1)
-    T.check(changed == 1, 'the config replacement target exists')
+    local first, last = text:find(replacement[1], 1, true)
+    T.check(first ~= nil, 'the config replacement target exists')
+    text = text:sub(1, first - 1) .. replacement[2]
+      .. text:sub(last + 1)
   end
   file = assert(io.open(path, 'w'))
   file:write(text)
@@ -89,6 +92,10 @@ T.check(T.wait_for(function ()
   file:close()
   return text:find('this is not valid TOML', 1, true) == 1
 end, 15), 'the invalid replacement config reached the archive boundary')
+T.check(#vim.fn.globpath(
+  vim.fs.dirname(os.getenv('SKG_TEST_CONFIG')) .. '/replacement-archives',
+  '**/manifest.initial.sexp', false, true) > 0,
+  'the next incident used the replacement archive root')
 vim.wait(1000)
 maintenance.status(true)
 T.check(T.wait_for(function ()

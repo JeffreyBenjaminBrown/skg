@@ -171,6 +171,8 @@
        (tantivy-generation 4)
        (server-evidence-sha256 ,(make-string 64 ?d))
        (source-set all)
+       (maintenance-archive-folder replacement-archives)
+       (maintenance-archive-identity /server/replacement-archives)
        (source-inventory
         (((name replacement)
           (abbreviation rep)
@@ -180,6 +182,8 @@
           (directory /data/replacement-notes)
           (directory-identity /data/replacement-notes))))))
     (should (equal skg--active-source-set-name "all"))
+    (should (equal skg--maintenance-archive-folder
+                   "replacement-archives"))
     (should (equal (plist-get (car skg--server-source-inventory) :name)
                    "replacement"))
     (should (equal

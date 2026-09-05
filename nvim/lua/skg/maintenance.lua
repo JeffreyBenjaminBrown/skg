@@ -213,6 +213,10 @@ function M.record_selection (response)
     'Maintenance selection arrived without client state')
   local selected_source_set = payload.field_text(response, 'source-set')
   local source_inventory = payload.field(response, 'source-inventory')
+  local archive_folder = payload.field_text(
+    response, 'maintenance-archive-folder')
+  local archive_identity = payload.field_text(
+    response, 'maintenance-archive-identity')
   local values = {
     g1_graph_generation = nat(response, 'g1-graph-generation'),
     g1_manifest_revision = nat(response, 'g1-manifest-revision'),
@@ -221,6 +225,7 @@ function M.record_selection (response)
       response, 'server-evidence-sha256'),
   }
   if not selected_source_set or source_inventory == nil
+     or not archive_folder or not archive_identity
      or not sha256_valid(values.server_evidence_sha256) then
     error('Maintenance selection authority is incomplete') end
   for key, value in pairs(values) do
@@ -240,6 +245,8 @@ function M.record_selection (response)
   end
   state.active_source_set_name = selected_source_set
   vim.g.skg_active_source_set_name = selected_source_set
+  state.maintenance_archive_folder = archive_folder
+  state.maintenance_archive_identity = archive_identity
   incident.phase = 'presenting'
   return incident
 end
@@ -896,6 +903,7 @@ function M.publish_initial ()
     'no client-known maintenance incident')
   local ok, result = pcall(archive.publish_initial,
     incident.offer, registry.buffers(), {
+      archive_root = incident.offer.archive_folder,
       undo_waivers = incident.undo_waivers,
     })
   if ok then
@@ -919,6 +927,10 @@ local function offer_for_writer (response)
     origin = payload.field_text(response, 'origin'),
     started_at_utc = payload.field_text(response, 'started-at-utc'),
     archive_name = payload.field_text(response, 'archive-directory-name'),
+    archive_folder = payload.field_text(
+      response, 'maintenance-archive-folder'),
+    archive_identity = payload.field_text(
+      response, 'maintenance-archive-identity'),
     source_set = payload.field_text(response, 'source-set'),
     graph_generation = payload.field(response, 'g0-graph-generation'),
     manifest_revision = payload.field(response, 'g0-manifest-revision'),

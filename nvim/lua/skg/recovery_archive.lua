@@ -558,7 +558,8 @@ local function manifest_value (offer, root, buffer_records, root_artifacts)
     field('client-session-id', state.client_session_id),
     field('client-archive-identity', root),
     field('server-archive-identity',
-      state.maintenance_archive_identity or 'unavailable'),
+      offer.archive_identity or state.maintenance_archive_identity
+        or 'unavailable'),
     field('source-set', offer.source_set or state.active_source_set_name or 'all'),
     field('g0-graph-generation', offer.graph_generation or 0),
     field('g0-manifest-revision', offer.manifest_revision or 0),

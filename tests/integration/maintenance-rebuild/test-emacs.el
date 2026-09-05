@@ -28,6 +28,8 @@
       (dolist (replacement
                '(("default_source_set = \"main\""
                   "default_source_set = \"replacement\"")
+                 ("maintenance_archive_folder = \"maintenance-archives\""
+                  "maintenance_archive_folder = \"replacement-archives\"")
                  ("name = \"main\"" "name = \"replacement\"")
                  ("path = \"notes\"" "path = \"replacement-notes\"")))
         (goto-char (point-min))
@@ -108,6 +110,11 @@
           (string-prefix-p "this is not valid TOML" (buffer-string))))
       15)
      "the invalid replacement config reached the archive boundary")
+    (rebuild-test-check
+     (directory-files-recursively
+      (expand-file-name "replacement-archives" skg-config-dir)
+      "manifest\\.initial\\.sexp\\'")
+     "the next incident used the replacement archive root")
     (accept-process-output nil 1)
     ;; Let the already-started server worker finish while this client is
     ;; deliberately not relying on its best-effort unsolicited failure frame.

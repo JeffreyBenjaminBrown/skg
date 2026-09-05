@@ -893,6 +893,10 @@ fn candidate_selected_payload (
   append_selected_fields (&mut fields, active)?;
   fields . push (atom_field ("source-set", &active . source_set));
   fields . push (source_inventory_field (config));
+  fields . push (atom_field ("maintenance-archive-folder",
+    &config . maintenance_archive_folder . to_string_lossy ()));
+  fields . push (atom_field ("maintenance-archive-identity",
+    &config . maintenance_archive_identity . to_string_lossy ()));
   fields . push (requested_id_outcomes_sexp (
     &active . requested_id_outcomes, false));
   fields . push (Sexp::List (vec![
@@ -914,6 +918,10 @@ fn scalar_challenge_payload (
   append_selected_fields (&mut fields, active)?;
   fields . push (atom_field ("source-set", &active . source_set));
   fields . push (source_inventory_field (config));
+  fields . push (atom_field ("maintenance-archive-folder",
+    &config . maintenance_archive_folder . to_string_lossy ()));
+  fields . push (atom_field ("maintenance-archive-identity",
+    &config . maintenance_archive_identity . to_string_lossy ()));
   fields . push (requested_id_outcomes_sexp (
     &active . requested_id_outcomes, false));
   fields . push (atom_field ("operation", &challenge . operation));
@@ -1197,6 +1205,10 @@ fn active_status_sexp (
     let _ = append_selected_fields (&mut fields, active);
     if let Some (config) = config {
       fields . push (source_inventory_field (config));
+      fields . push (atom_field ("maintenance-archive-folder",
+        &config . maintenance_archive_folder . to_string_lossy ()));
+      fields . push (atom_field ("maintenance-archive-identity",
+        &config . maintenance_archive_identity . to_string_lossy ()));
     }
   }
   if let Some (scalar) = &active . scalar_release {
@@ -2228,6 +2240,7 @@ mod tests {
       "(candidate-id {})", active . candidate . as_ref () . unwrap () . id)));
     assert! (payload . contains ("(source-set all)"));
     assert! (payload . contains ("(source-inventory ("));
+    assert! (payload . contains ("(maintenance-archive-folder"));
     assert! (payload . contains ("ugly-pid"));
     assert! (!payload . contains ("view-settlements"));
     assert! (!payload . contains ("SECRET-STAGED-TEXT"));

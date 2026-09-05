@@ -147,6 +147,10 @@ old implementation."
     (started-at-utc ,(skg--maintenance-text response 'started-at-utc))
     (archive-name ,(skg--maintenance-text response
                                           'archive-directory-name))
+    (archive-folder ,(skg--maintenance-text
+                      response 'maintenance-archive-folder))
+    (archive-identity ,(skg--maintenance-text
+                        response 'maintenance-archive-identity))
     (source-set ,(skg--maintenance-text response 'source-set))
     (graph-generation ,(skg--maintenance-field response
                                                'g0-graph-generation))
@@ -179,7 +183,10 @@ old implementation."
     (condition-case error-data
         (let ((result
                (skg-recovery-archive-publish-initial
-                offer :undo-waivers (plist-get state :undo-waivers))))
+                offer
+                :archive-root
+                (skg-recovery--offer-value offer 'archive-folder)
+                :undo-waivers (plist-get state :undo-waivers))))
           (setf (plist-get skg--maintenance-client-incident :archive) result)
           (run-at-time
            0 nil #'skg--maintenance-send-archive-ready
@@ -242,6 +249,10 @@ old implementation."
   (let* ((state skg--maintenance-client-incident)
          (source-set (skg--maintenance-text response 'source-set))
          (source-inventory (assoc 'source-inventory response))
+         (archive-folder
+          (skg--maintenance-text response 'maintenance-archive-folder))
+         (archive-identity
+          (skg--maintenance-text response 'maintenance-archive-identity))
          (values
           (list
            :g1-graph-generation
@@ -252,7 +263,7 @@ old implementation."
            (skg--maintenance-field response 'tantivy-generation)
            :server-evidence-sha256
            (skg--maintenance-text response 'server-evidence-sha256))))
-    (unless (and source-set source-inventory
+    (unless (and source-set source-inventory archive-folder archive-identity
                  (natnump (plist-get values :g1-graph-generation))
                  (natnump (plist-get values :g1-manifest-revision))
                  (natnump (plist-get values :tantivy-generation))
@@ -275,7 +286,9 @@ old implementation."
     (unless (equal skg--active-source-set-name source-set)
       (message "Skg full rebuild changed source-set from %s to %s"
                skg--active-source-set-name source-set))
-    (setq skg--active-source-set-name source-set)
+    (setq skg--active-source-set-name source-set
+          skg--maintenance-archive-folder archive-folder
+          skg--maintenance-archive-identity archive-identity)
     (setf (plist-get state :phase) 'presenting)
     (setq skg--maintenance-client-incident state)
     state))
