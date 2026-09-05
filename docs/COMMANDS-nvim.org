@@ -691,21 +691,83 @@ Displays the result in the echo area.
 *** :SkgConnectionEnd
 Closes the TCP connection to the Rust server.
 *** :SkgRebuildDbs
-Rebuilds TypeDB and Tantivy databases,
-using the .skg files on disk.
-Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
-to close them.
-*** partial reload and recovery notices
-The server protocol supports exact partial reload by path or ID, but the
-Neovim client does not yet originate automatic, manual or ID-stack-selected
-reloads.  It fails closed rather than mutating silently: an external batch
-which requests reconciliation and every durable fatal-recovery incident are
-shown in persistent Skg message buffers.
+Runs a durable full-rebuild maintenance incident from the exact =.skg= bytes
+on disk.  If Skg views are dirty, the confirmation explains that they will be
+archived and impacted ones may become detached recovery buffers.  A modified
+raw =.skg= buffer is an unconditional refusal: save or revert it first.
 
-Neovim also does not confirm recovery.  Use the Emacs
-=skg-recover-reload-incident= command or repair manually.  Skg retains the
-private incident journal across reconnects and restarts until recovery
-succeeds or the incident is explicitly dismissed from a supporting client.
+Validation and archival happen before destruction.  Ordinary queries can
+continue against the old generation during that preflight, but are refused
+during the visibly exclusive TypeDB/Tantivy reconstruction window.  A clean
+impacted view is refreshed; a dirty impacted view is retired with its text and
+undo preserved in the archive; an orthogonal dirty view remains editable and
+is marked presentation-stale.  Search membership and ranking are not rerun.
+Do not close all views merely because a rebuild completed.
+
+A preflight failure leaves the old stores selected and queryable.  A failure
+after destruction keeps the incident durably locked while Skg attempts to
+restore them.  Read the error, preserve the archive, and use
+=:SkgMaintenanceStatus= after fixing the underlying problem or reconnecting.
+*** process-owned disk observation
+The Rust server, not Neovim, watches the direct =.skg= children of every
+configured source.  Observation continues while the editor is disconnected
+and does not itself change the selected graph or stores.  A stable valid
+semantic difference prompts to reconcile now or later.  Later keeps the old
+generation queryable and editable, but blocks every Skg view save until the
+candidate is reconciled or disk is explicitly reverted.  Invalid or unstable
+disk remains visible pending work rather than being selected silently.
+*** :SkgReconcilePendingChanges
+Reopens the prompt for the latest pending valid disk candidate.  Accepting
+starts archive-first maintenance.  Dirty impacted views become detached
+recovery; orthogonal dirty views stay byte-for-byte untouched and editable,
+with an honest stale-presentation marker.
+*** :SkgReloadIds ID ...
+Runs one explicit partial-reload maintenance incident for the named primary or
+extra IDs.  Each primary selects its complete cross-source telescope; an extra
+ID conservatively validates the complete corpus.  When views are dirty,
+Neovim first asks whether to archive them.  A restricted-source scalar release
+gets a separate exact authorization prompt.
+*** :SkgReloadPaths PATH ...
+The path form of the same explicit maintained reload.  Absolute paths below
+the local config directory are translated to config-relative spelling before
+crossing a host/container boundary.  The command never writes a =.skg= file.
+*** :SkgPullAll
+Pulls every distinct Git repository containing a configured source, serially
+and asynchronously, through one durable maintenance incident.  The active
+source-set must be =all=.  Modified raw =.skg= buffers are refused.  When Skg
+views are dirty, the confirmation names them and explains the archive and
+impacted/orthogonal dispositions.
+
+Skg publishes the initial recovery archive before starting the first Git
+child.  Authentication prompts and output appear in an incident-specific
+terminal buffer.  Cancellation, child loss, merge conflict, or nonzero exit
+is recorded per repository; Skg still observes and reconciles final disk.
+Preserve that buffer and the archive when repairing or reporting a failure.
+*** :SkgMaintenanceStatus
+Requests the server's durable status.  Use it after a transport interruption
+or failure to resume the exact incident; reconnect does not create a second
+incident or unlock views merely because the socket ended.
+*** :SkgCancelMaintenance
+Cancels only before =ARCHIVE-READY= publication.  After the point of no return,
+use =:SkgMaintenanceStatus= and resolve the reported blocked phase.
+*** maintenance recovery archives
+Every maintenance operation publishes a private incident directory beneath
+=maintenance_archive_folder=.  Publication reports the incident's exact and
+IEC byte size plus exact/IEC totals for all retained incidents.  The terminal
+notice names its path.  Skg never deletes archives automatically; do not
+remove one while its incident is active.
+
+If native undo cannot be archived, the default is to abort before risky work.
+A second explicit prompt can waive only that buffer's native undo and continue
+with exact text and diff recovery.  Incomplete =.staging= directories remain
+for inspection.  An impacted dirty buffer is detached recovery without live
+Skg save authority; open a fresh view for the current graph rather than
+saving its retired text as if it were current.
+
+Fatal =.skg= parse/read journals are an older separate recovery system.
+Neovim shows them persistently but does not confirm or dismiss them; use the
+Emacs recovery commands or repair manually.  The private server journal
+survives reconnects and restarts.
 *** :SkgRecomputeCyclicRoots
 Recomputes the rank-only =CyclicRoot= cache from the complete current
 graph and updates the affected Tantivy documents.  Ordinary saves and
@@ -713,9 +775,9 @@ partial reloads deliberately leave this cache stale.  Use this command
 after deliberately creating or removing containment cycles when their
 search-result ordering matters.  Matching itself is never stale.
 *** :SkgCloseAllSkgBuffers
-This may be warranted after a database rebuild.
 Kills every skg view buffer (each triggers a close-view notice to
-the server first).
+the server first).  A maintained database rebuild reconciles views, so
+rebuilding alone is not a reason to run this command.
 *** :SkgReload
 Unloads all skg Lua modules and reloads them from disk.
 Useful when you've changed Lua code

@@ -771,25 +771,47 @@ Displays the result in the minibuffer.
 *** skg-connection-end
 Closes the TCP connection to the Rust server.
 *** skg-rebuild-dbs
-Rebuilds TypeDB and Tantivy databases,
-using the .skg files on disk.
-*** automatic partial reload
-While connected, Emacs watches only the direct =.skg= children of each
-configured source.  A raw-file save or an external worktree change is queued,
-coalesced with nearby changes and compared with the server's exact accepted
-byte manifest.  Stable valid changes update the graph, TypeDB and Tantivy;
-reload itself never writes a =.skg= file.  =data/bash/pull-all.sh= brackets
-its serial pulls into one incident and requests one final sweep.
+Runs a durable full-rebuild maintenance incident from the exact =.skg= bytes
+on disk.  If Skg views are dirty, the confirmation explains that they will be
+archived and that impacted ones may become detached recovery buffers.  A
+modified raw =.skg= buffer is an unconditional refusal: save or revert it
+first.
 
-If an external change would alter a modified Skg view, Skg leaves that buffer
-untouched, sounds the harsh warning beep and opens =*SKG Disk-Client
-Conflicts*=.  Clean buffers continue updating.  Raw =.skg= saves and Magit
-commands which could change a configured worktree are refused earlier while
-any Skg view is dirty; save the view and retry.
+Validation and archival happen before destruction.  Ordinary queries can
+continue against the old generation during that preflight, but are refused
+during the visibly exclusive TypeDB/Tantivy reconstruction window.  A clean
+impacted view is refreshed; a dirty impacted view is retired with its text and
+undo preserved in the archive; an orthogonal dirty view remains editable and
+is marked presentation-stale.  Search membership and ranking are not rerun.
+Do not close all views merely because a rebuild completed.
+
+A preflight failure leaves the old stores selected and queryable.  A failure
+after destruction keeps the incident durably locked while Skg attempts to
+restore them.  Read the error, preserve the archive, and use
+=skg-maintenance-status= after fixing the underlying problem or reconnecting.
+*** process-owned disk observation
+The Rust server, not Emacs, watches the direct =.skg= children of every
+configured source.  Observation continues while the editor is disconnected
+and does not itself change the selected graph or stores.  A stable valid
+semantic difference produces a prompt to reconcile now or later.  Choosing
+later keeps the old generation queryable and editable, but blocks every Skg
+view save until the candidate is reconciled or disk is explicitly reverted.
+Invalid or unstable disk is reported as persistent pending work rather than
+being selected silently.
+
+Magit refresh also asks the server to observe both exact source bytes and Git
+presentation.  Raw-file saves need no editor watcher hook.  Reload and
+reconciliation never write a =.skg= file themselves.
 *** skg-reload-changed
-Requests an exact server-side sweep of every configured source.  This is the
-manual fallback after a missed file notification or an out-of-band tool which
-did not trigger one.  It compares content digests, not mtimes.
+Queues a low-priority exact server-side sweep of every configured source.  It
+compares content digests, not mtimes.  This command observes only; if it finds
+a valid semantic change, the ordinary reconciliation prompt follows.
+*** skg-reconcile-pending-changes
+Reopens the acceptance prompt for the latest pending valid disk candidate.
+Accepting starts the same archive-first maintenance protocol as pull and
+explicit partial reload.  Dirty impacted views become detached recovery;
+orthogonal dirty views remain byte-for-byte untouched and editable, with an
+honest stale-presentation marker.
 *** skg-reload-from-id-stack
 Opens a transient copy of the ID stack in reload-selection mode.  Use Org's
 ordinary =S-left= or =S-right= TODO cycling to mark each desired node
@@ -797,16 +819,54 @@ ordinary =S-left= or =S-right= TODO cycling to mark each desired node
 its complete cross-source telescope.  Acknowledged marks clear; rejected marks
 remain with their reasons.  This transient buffer cannot replace or save the
 ordinary ID stack.
-*** skg-resolve-disk-client-conflict
-From a save-blocked conflicted view, opens an Ediff comparison among its last
-rendered base, the unsaved local text and the incoming disk-derived rendering.
-Reconcile the editable buffer manually.  With a prefix argument, this command
-then submits that text through the normal save path; the conflict marker
-clears only after save succeeds.  Saving without resolving is refused because
-it could silently clobber the external change.
+
+This is an explicit partial-reload maintenance incident, not a direct store
+mutation.  If views are dirty, Skg first asks whether to archive them; declining
+does nothing.  A requested extra ID conservatively validates the complete
+corpus.  Scalar text which would cross a restricted-source privacy boundary
+gets its own exact authorization prompt.
+*** skg-reload-paths (Lisp API)
+Programmatic callers can pass paths and/or IDs to =skg-reload-paths=; it uses
+the same durable explicit-partial-reload path.  The obsolete =full-sweep=
+argument is observation-only and never selects disk.
+*** skg-pull-all
+Pulls every distinct Git repository containing a configured source, serially
+and asynchronously, through one durable maintenance incident.  The active
+source-set must be =all=; switch to it first.  Modified raw =.skg= buffers are
+refused.  When rendered Skg views are dirty, the confirmation names them and
+explains the archive and impacted/orthogonal dispositions.
+
+Skg publishes the initial recovery archive before starting the first Git
+child.  Authentication prompts and output appear in an incident-specific pull
+buffer.  A cancellation, child loss, merge conflict, or nonzero exit is
+recorded per repository; Skg still observes and reconciles the final disk
+state instead of pretending that nothing changed.  Preserve the diagnostic
+buffer and archive when reporting or repairing a failure.
+*** skg-maintenance-status
+Requests the server's durable status.  Use it after a transport interruption
+or failure to resume the exact incident; reconnect never manufactures a new
+one or unlocks views merely because the socket ended.
+*** skg-cancel-maintenance
+Cancels only before =ARCHIVE-READY= has been published.  After the point of no
+return, cancellation is refused; use =skg-maintenance-status= and resolve the
+reported blocked phase.
+*** maintenance recovery archives
+Every maintenance operation publishes a private incident directory beneath
+=maintenance_archive_folder=.  Publication reports this incident's exact and
+IEC byte size plus the exact/IEC total for all retained incidents.  The final
+message names the archive path.  Skg never deletes an archive automatically;
+do not remove one while its incident is active.
+
+If native undo cannot be archived, the default is to abort before risky work.
+A second explicit prompt can waive only that buffer's native undo and continue
+with exact text and diff recovery.  An incomplete =.staging= directory is
+retained for inspection after any archive failure.  An impacted dirty buffer
+is detached recovery and has no live Skg save authority; open a fresh view for
+the current graph rather than saving the retired text as if it were current.
 *** skg-recover-reload-incident
-After a fatal =.skg= parse/read error, explicitly confirms recovery of a
-durably journaled incident.  Skg first verifies that the incident bytes have
+This older, separate command handles a fatal =.skg= parse/read recovery
+journal, not a maintenance archive.  It explicitly confirms recovery after
+Skg verifies that the incident bytes have
 not changed, creates the three reported =oops-N_*= evidence refs without
 moving HEAD or the index, and restores only fatal files in owned sources to
 their last-good bytes.  If disk changed meanwhile, recovery refuses, retains
@@ -831,7 +891,8 @@ the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',
 which should show nothing.
 *** skg-close-all-skg-buffers
-This may be warranted after a database rebuild.
+Closes every Skg view buffer.  A maintained database rebuild reconciles views,
+so rebuilding alone is not a reason to run this command.
 *** skg-reload
 Unloads all skg elisp modules and reloads them from disk.
 Useful when you've changed elisp code
