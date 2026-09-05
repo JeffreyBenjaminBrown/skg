@@ -147,6 +147,34 @@ impl MaintenanceCoordinator {
     g0_graph_generation : GraphGeneration,
     g0_manifest_revision : ManifestRevision,
     buffer_records : Vec<FrozenBufferRecord>,
+    targets       : MaintenanceTargets,
+  ) -> Result<ActiveMaintenance, String> {
+    let active = self . begin_epoch_with_archive_contract_and_targets (
+      origin,
+      candidate,
+      client_session_id,
+      client_kind,
+      source_set,
+      g0_graph_generation,
+      g0_manifest_revision,
+      targets)?;
+    self . freeze_locked_census (
+      &active . incident_id, active . epoch, buffer_records)?;
+    let CoordinatorState::Active (active) = &self . state else {
+      unreachable! ("freezing a new incident preserves active maintenance"); };
+    Ok (active . clone ())
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn begin_epoch_with_archive_contract_and_targets (
+    &mut self,
+    origin       : MaintenanceOrigin,
+    candidate    : Option<CandidateSummary>,
+    client_session_id : String,
+    client_kind  : String,
+    source_set   : String,
+    g0_graph_generation : GraphGeneration,
+    g0_manifest_revision : ManifestRevision,
     mut targets  : MaintenanceTargets,
   ) -> Result<ActiveMaintenance, String> {
     targets . paths . sort ();
@@ -201,29 +229,6 @@ impl MaintenanceCoordinator {
       return Err ("maintenance requires a supported archive client" . into ()); }
     if source_set . is_empty () {
       return Err ("maintenance requires an active source-set" . into ()); }
-    let mut buffer_census = std::collections::BTreeMap::new ();
-    for record in buffer_records {
-      if record . buffer_id . is_empty () {
-        return Err ("maintenance census has an empty buffer ID" . into ()); }
-      if record . undo_required && !record . dirty {
-        return Err ("undo-required buffer is absent from the dirty census" . into ()); }
-      let id = record . buffer_id . clone ();
-      if buffer_census . insert (id . clone (), record) . is_some () {
-        return Err (format! (
-          "maintenance buffer census repeats '{}'", id)); }
-    }
-    let mut registered_buffer_ids : Vec<String> =
-      buffer_census . keys () . cloned () . collect ();
-    let mut dirty_buffer_ids : Vec<String> = buffer_census . values ()
-      . filter (|record| record . dirty)
-      . map (|record| record . buffer_id . clone ()) . collect ();
-    let mut undo_required_buffer_ids : Vec<String> = buffer_census . values ()
-      . filter (|record| record . undo_required)
-      . map (|record| record . buffer_id . clone ()) . collect ();
-    registered_buffer_ids . sort ();
-    dirty_buffer_ids . sort ();
-    undo_required_buffer_ids . sort ();
-    undo_required_buffer_ids . dedup ();
     match &self . state {
       CoordinatorState::Idle => {}
       CoordinatorState::Pending (pending) => {
@@ -260,7 +265,7 @@ impl MaintenanceCoordinator {
       incident_id,
       epoch: self . epoch,
       origin,
-      phase: MaintenancePhase::PreparingArchive,
+      phase: MaintenancePhase::AwaitingLockedCensus,
       candidate,
       archive_status: ArchiveStatus::Preparing,
       started_at_utc,
@@ -269,10 +274,10 @@ impl MaintenanceCoordinator {
       source_set,
       g0_graph_generation,
       g0_manifest_revision,
-      registered_buffer_ids,
-      dirty_buffer_ids,
-      undo_required_buffer_ids,
-      buffer_census,
+      registered_buffer_ids: Vec::new (),
+      dirty_buffer_ids: Vec::new (),
+      undo_required_buffer_ids: Vec::new (),
+      buffer_census: Default::default (),
       targets,
       requested_id_outcomes: Vec::new (),
       external_mutation: None,
@@ -290,6 +295,56 @@ impl MaintenanceCoordinator {
     };
     self . state = CoordinatorState::Active (active . clone ());
     Ok (active)
+  }
+
+  /// Freeze the exact client registry only after the client has installed the
+  /// server-owned epoch on every current buffer.  An exact retry is a no-op.
+  pub fn freeze_locked_census (
+    &mut self,
+    incident_id   : &IncidentId,
+    epoch         : MaintenanceEpoch,
+    buffer_records : Vec<FrozenBufferRecord>,
+  ) -> Result<bool, String> {
+    let active = self . matching_active_mut (incident_id, epoch)?;
+    let mut buffer_census = std::collections::BTreeMap::new ();
+    for record in buffer_records {
+      if record . buffer_id . is_empty () {
+        return Err ("maintenance census has an empty buffer ID" . into ()); }
+      if record . undo_required && !record . dirty {
+        return Err (
+          "undo-required buffer is absent from the dirty census" . into ()); }
+      let id = record . buffer_id . clone ();
+      if buffer_census . insert (id . clone (), record) . is_some () {
+        return Err (format! (
+          "maintenance buffer census repeats '{}'", id)); }
+    }
+    let mut registered_buffer_ids : Vec<String> =
+      buffer_census . keys () . cloned () . collect ();
+    let mut dirty_buffer_ids : Vec<String> = buffer_census . values ()
+      . filter (|record| record . dirty)
+      . map (|record| record . buffer_id . clone ()) . collect ();
+    let mut undo_required_buffer_ids : Vec<String> = buffer_census . values ()
+      . filter (|record| record . undo_required)
+      . map (|record| record . buffer_id . clone ()) . collect ();
+    registered_buffer_ids . sort ();
+    dirty_buffer_ids . sort ();
+    undo_required_buffer_ids . sort ();
+    undo_required_buffer_ids . dedup ();
+    if active . phase == MaintenancePhase::PreparingArchive {
+      if active . buffer_census != buffer_census {
+        return Err ("maintenance locked-census retry changed its exact records"
+          . into ()); }
+      return Ok (false);
+    }
+    if active . phase != MaintenancePhase::AwaitingLockedCensus {
+      return Err (format! (
+        "locked census is invalid during {:?}", active . phase)); }
+    active . registered_buffer_ids = registered_buffer_ids;
+    active . dirty_buffer_ids = dirty_buffer_ids;
+    active . undo_required_buffer_ids = undo_required_buffer_ids;
+    active . buffer_census = buffer_census;
+    active . phase = MaintenancePhase::PreparingArchive;
+    Ok (true)
   }
 
   pub fn transition (
@@ -858,7 +913,8 @@ impl MaintenanceCoordinator {
   ) -> Result<(), String> {
     let active = self . matching_active_mut (incident_id, epoch)? . clone ();
     if !matches! (active . phase,
-      MaintenancePhase::PreparingArchive
+      MaintenancePhase::AwaitingLockedCensus
+      | MaintenancePhase::PreparingArchive
       | MaintenancePhase::AwaitingArchiveWaiver)
     {
       return Err (format! (
@@ -1075,6 +1131,46 @@ mod tests {
       . unwrap_err ();
     assert! (error . contains ("stale"), "{}", error);
     assert! (matches! (coordinator . state, CoordinatorState::Pending (_)));
+  }
+
+  #[test]
+  fn epoch_precedes_the_exact_replay_safe_locked_census () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin_epoch_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, MaintenanceTargets {
+        paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default ()
+      }) . unwrap ();
+    assert_eq! (active . phase, MaintenancePhase::AwaitingLockedCensus);
+    assert! (active . buffer_census . is_empty ());
+    assert! (coordinator . archive_ready (
+      &active . incident_id, active . epoch, "too-early" . into ()) . is_err ());
+    let frozen = FrozenBufferRecord {
+      buffer_id: "view" . into (), kind: BufferKind::ContentView,
+      view_uri: Some ("uri-view" . into ()), graph_generation: 1,
+      presentation_generation: 0, server_revision: 4,
+      application_token: 9, dirty: true, undo_required: true,
+      last_fetched_sha256: "a" . repeat (64),
+      current_sha256: "b" . repeat (64),
+    };
+    assert! (coordinator . freeze_locked_census (
+      &active . incident_id, active . epoch, vec![frozen . clone ()])
+      . unwrap ());
+    let CoordinatorState::Active (locked) = &coordinator . state else {
+      panic! ("locked census stopped being active"); };
+    assert_eq! (locked . phase, MaintenancePhase::PreparingArchive);
+    assert_eq! (locked . registered_buffer_ids, ["view"]);
+    assert_eq! (locked . dirty_buffer_ids, ["view"]);
+    assert_eq! (locked . undo_required_buffer_ids, ["view"]);
+    assert! (!coordinator . freeze_locked_census (
+      &active . incident_id, active . epoch, vec![frozen . clone ()])
+      . unwrap ());
+    let mut changed = frozen;
+    changed . current_sha256 = "c" . repeat (64);
+    assert! (coordinator . freeze_locked_census (
+      &active . incident_id, active . epoch, vec![changed]) . is_err ());
   }
 
   #[test]

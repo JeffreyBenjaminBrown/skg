@@ -41,6 +41,7 @@ use crate::serve::handlers::maintenance_protocol::{
   handle_maintenance_archive_finalized_request,
   handle_maintenance_archive_ready_request,
   handle_maintenance_evidence_request,
+  handle_maintenance_locked_census_request,
   handle_maintenance_status_request,
   handle_maintenance_view_settled_request,
   handle_finish_maintenance_origin_request,
@@ -287,7 +288,8 @@ fn handle_connection (
            && !matches! (request_type,
              RequestType::VerifyConnection
              | RequestType::ClientCensus
-             | RequestType::ClientCensusTexts)
+             | RequestType::ClientCensusTexts
+             | RequestType::MaintenanceLockedCensus)
            && !runtime . interactive . lock () . unwrap ()
              . attached_client . as_ref ()
              . map (|client| client . census_complete)
@@ -656,6 +658,8 @@ fn dispatch_request (
       { send_runtime_error (stream, &error); }}
     RequestType::BeginMaintenance =>
       handle_begin_maintenance_request (stream, request, runtime),
+    RequestType::MaintenanceLockedCensus =>
+      handle_maintenance_locked_census_request (stream, request, runtime),
     RequestType::RunMaintenanceOrigin =>
       handle_run_maintenance_origin_request (stream, request, runtime),
     RequestType::FinishMaintenanceOrigin =>

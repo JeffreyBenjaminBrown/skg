@@ -100,27 +100,18 @@ fn begin_maintenance (
     validate_repository_mapping (
       &snapshot . env . config, &targets . pull_repositories)?;
   }
-  let (client, source_set, census) = {
+  let (client, source_set) = {
     let interactive = runtime . interactive . lock ()
       . map_err (|_| "interactive session poisoned" . to_string ())?;
     let client = interactive . attached_client . clone ()
       . ok_or_else (|| "no interactive client is attached" . to_string ())?;
     if !client . census_complete {
       return Err ("client census is not complete" . into ()); }
-    (
-      client,
-      interactive . active_source_set . name . 0 . clone (),
-      interactive . live_census . values () . cloned () . collect::<Vec<_>> (),
-    )
+    (client, interactive . active_source_set . name . 0 . clone ())
   };
-  validate_client_archive_capability (&client, &census)?;
-  let dirty_raw : Vec<_> = census . iter () . filter (|descriptor|
-      descriptor . dirty && descriptor . kind == "raw-skg-file")
-    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
-  if !dirty_raw . is_empty () {
-    return Err (format! (
-      "maintenance refuses modified raw .skg buffers: {}",
-      dirty_raw . join (", "))); }
+  // Undo requirements and raw-file dirtiness belong to the later exact locked
+  // census.  The format capability itself can be rejected before allocating.
+  validate_client_archive_capability (&client, &[])?;
   if origin == MaintenanceOrigin::Pull && source_set != "all" {
     return Err (format! (
       "pull requires source-set 'all'; the retained source-set is '{}'",
@@ -144,11 +135,8 @@ fn begin_maintenance (
       return Err (format! ("candidate {} was superseded", candidate . id)); }
   }
 
-  let frozen_census = census . iter ()
-    . map (CensusDescriptor::frozen_record)
-    . collect::<Result<Vec<_>, _>> ()?;
   let active = runtime . transition_maintenance (|coordinator|
-    coordinator . begin_with_archive_contract_and_targets (
+    coordinator . begin_epoch_with_archive_contract_and_targets (
       origin,
       candidate,
       client . session_id . clone (),
@@ -156,9 +144,65 @@ fn begin_maintenance (
       source_set,
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision,
-      frozen_census,
       targets))?;
-  Ok (maintenance_offer_payload (&active,
+  Ok (maintenance_offer_payload (
+    "install-maintenance-epoch-and-submit-locked-census", &active,
+    &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
+    &snapshot . env . config . maintenance_archive_identity . to_string_lossy ()))
+}
+
+pub fn handle_maintenance_locked_census_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let result = freeze_maintenance_census (request, runtime);
+  send_result (stream, TcpToClient::MaintenanceOffer, "complete", result);
+}
+
+fn freeze_maintenance_census (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  let incident = IncidentId::parse (
+    &value_from_request_sexp ("incident-id", request)?)?;
+  let epoch = MaintenanceEpoch::parse (
+    &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  let active = require_archive_owner (runtime, &incident, epoch)?;
+  if !matches! (active . phase,
+    MaintenancePhase::AwaitingLockedCensus
+    | MaintenancePhase::PreparingArchive)
+  {
+    return Err (format! (
+      "locked census is invalid during {:?}", active . phase)); }
+  let (client, census) = {
+    let interactive = runtime . interactive . lock ()
+      . map_err (|_| "interactive session poisoned" . to_string ())?;
+    let client = interactive . attached_client . clone ()
+      . ok_or_else (|| "no interactive client is attached" . to_string ())?;
+    if !client . census_complete {
+      return Err ("locked client census is not complete" . into ()); }
+    let census = interactive . live_census . values () . cloned ()
+      . collect::<Vec<_>> ();
+    (client, census)
+  };
+  validate_client_archive_capability (&client, &census)?;
+  let dirty_raw : Vec<_> = census . iter () . filter (|descriptor|
+      descriptor . dirty && descriptor . kind == "raw-skg-file")
+    . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
+  if !dirty_raw . is_empty () {
+    return Err (format! (
+      "maintenance refuses modified raw .skg buffers: {}",
+      dirty_raw . join (", "))); }
+  let frozen_census = census . iter ()
+    . map (CensusDescriptor::frozen_record)
+    . collect::<Result<Vec<_>, _>> ()?;
+  runtime . transition_maintenance (|coordinator|
+    coordinator . freeze_locked_census (&incident, epoch, frozen_census))?;
+  let active = matching_active (runtime, &incident, epoch)?;
+  let snapshot = runtime . selected_snapshot ();
+  Ok (maintenance_offer_payload (
+    "locked-census-accepted-publish-initial-archive", &active,
     &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
     &snapshot . env . config . maintenance_archive_identity . to_string_lossy ()))
 }
@@ -1082,9 +1126,19 @@ fn active_status_sexp (
     atom_field ("candidate-id", active . candidate . as_ref ()
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     atom_field ("archive-directory-name", &active . archive_directory_name),
+    atom_field ("started-at-utc", &active . started_at_utc),
+    atom_field ("source-set", &active . source_set),
+    integer_field ("g0-graph-generation", active . g0_graph_generation . get ()),
+    integer_field ("g0-manifest-revision", active . g0_manifest_revision . get ()),
     list_field ("requested-paths", &active . targets . paths),
     list_field ("requested-ids", &active . targets . ids),
     pull_repositories_field (&active . targets . pull_repositories),
+    list_field ("registered-buffer-ids", &active . registered_buffer_ids),
+    list_field ("dirty-buffer-ids", &active . dirty_buffer_ids),
+    list_field (
+      "undo-required-buffer-ids", &active . undo_required_buffer_ids),
+    atom_field ("lock-census-sha256",
+      &lock_census_sha256 (&active . registered_buffer_ids)),
   ];
   if active . selected_store . is_some () {
     let _ = append_selected_fields (&mut fields, active);
@@ -1673,12 +1727,13 @@ fn validate_partial_reload_paths (
 }
 
 fn maintenance_offer_payload (
+  status                    : &str,
   active                    : &crate::maintenance::ActiveMaintenance,
   archive_folder            : &str,
   archive_server_identity   : &str,
 ) -> String {
   Sexp::List (vec![
-    atom_field ("status", "accepted-lock-and-publish-initial-archive"),
+    atom_field ("status", status),
     atom_field ("allocated-incident-id", active . incident_id . as_str ()),
     integer_field ("maintenance-epoch", active . epoch . get ()),
     atom_field ("origin", active . origin . label ()),
@@ -1803,13 +1858,41 @@ mod tests {
         ids: vec!["alias" . into ()],
         ..MaintenanceTargets::default ()
       }) . unwrap ();
-    let offer = maintenance_offer_payload (&active, "archive", "/archive");
+    let offer = maintenance_offer_payload (
+      "locked-census-accepted-publish-initial-archive",
+      &active, "archive", "/archive");
     let status = active_status_sexp (&active) . to_string ();
     for payload in [offer, status] {
       assert! (payload . contains (
         "(requested-paths (source/node.skg))"), "{}", payload);
       assert! (payload . contains ("(requested-ids (alias))"), "{}", payload);
     }
+  }
+
+  #[test]
+  fn epoch_offer_precedes_the_locked_archive_offer () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let epoch = coordinator . begin_epoch_with_archive_contract_and_targets (
+      MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+      "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+      ManifestRevision::INITIAL, MaintenanceTargets {
+        paths: vec!["source/node.skg" . into ()], ids: Vec::new (),
+        ..MaintenanceTargets::default ()
+      }) . unwrap ();
+    let first = maintenance_offer_payload (
+      "install-maintenance-epoch-and-submit-locked-census",
+      &epoch, "archive", "/archive");
+    assert! (first . contains ("(registered-buffer-ids ())"), "{}", first);
+    assert! (first . contains ("(maintenance-epoch 1)"), "{}", first);
+    coordinator . freeze_locked_census (
+      &epoch . incident_id, epoch . epoch, Vec::new ()) . unwrap ();
+    let CoordinatorState::Active (locked) = &coordinator . state else {
+      panic! ("locked census stopped being active"); };
+    let second = maintenance_offer_payload (
+      "locked-census-accepted-publish-initial-archive",
+      locked, "archive", "/archive");
+    assert! (second . contains ("locked-census-accepted"), "{}", second);
+    assert_eq! (locked . phase, MaintenancePhase::PreparingArchive);
   }
 
   #[test]

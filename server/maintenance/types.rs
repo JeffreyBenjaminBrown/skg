@@ -150,6 +150,7 @@ pub struct ExternalMutationRecord {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum MaintenancePhase {
+  AwaitingLockedCensus,
   PreparingArchive,
   AwaitingArchiveWaiver,
   ArchiveReady,
@@ -168,6 +169,7 @@ pub enum MaintenancePhase {
 impl MaintenancePhase {
   pub fn label (&self) -> &'static str {
     match self {
+      Self::AwaitingLockedCensus => "awaiting-locked-census",
       Self::PreparingArchive => "preparing-archive",
       Self::AwaitingArchiveWaiver => "awaiting-archive-waiver",
       Self::ArchiveReady => "archive-ready",

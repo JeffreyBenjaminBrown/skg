@@ -37,6 +37,7 @@ pub enum RequestType {
   ViewVisited,
   ObservePresentation,
   BeginMaintenance,
+  MaintenanceLockedCensus,
   RunMaintenanceOrigin,
   FinishMaintenanceOrigin,
   MaintenanceArchiveReady,
@@ -89,6 +90,8 @@ impl RequestType {
       "view visited"             => Ok (RequestType::ViewVisited),
       "observe presentation"     => Ok (RequestType::ObservePresentation),
       "begin maintenance"        => Ok (RequestType::BeginMaintenance),
+      "maintenance locked census" =>
+        Ok (RequestType::MaintenanceLockedCensus),
       "run maintenance origin"   => Ok (RequestType::RunMaintenanceOrigin),
       "finish maintenance origin" => Ok (RequestType::FinishMaintenanceOrigin),
       "maintenance archive ready" => Ok (RequestType::MaintenanceArchiveReady),
@@ -116,6 +119,13 @@ mod tests {
     assert_eq! (RequestType::from_client_string (
       "finish maintenance origin") . unwrap (),
       RequestType::FinishMaintenanceOrigin);
+  }
+
+  #[test]
+  fn locked_census_ack_has_its_own_request_type () {
+    assert_eq! (RequestType::from_client_string (
+      "maintenance locked census") . unwrap (),
+      RequestType::MaintenanceLockedCensus);
   }
 }
 
