@@ -568,15 +568,38 @@ what's imperfect about what's done; choices determining the future.
   pulls serially in incident-qualified interactive process buffers, and reports
   even a lost child as an indeterminate possible mutation before exact final
   observation.  Full Emacs and Neovim unit suites pass.
+- Replaced the stale maintenance-entry census with the agreed epoch-first
+  barrier.  The server now durably allocates an incident and epoch before any
+  archive work, both clients apply that epoch to every existing buffer and to
+  later buffer constructors, and an incident-qualified descriptor/text census
+  must complete before the exact live inventory is frozen and acknowledged.
+  Archive publication cannot begin in the new =awaiting-locked-census= phase.
+  Reconnect status can replay either side of the barrier.  The focused Rust
+  maintenance suite passes 47/47, all 376 Emacs tests pass (two optional
+  undo-fu-session cases skip when the package is absent), and the complete
+  Neovim suite passes.
 - Added a two-client, real-server pull integration harness with a local bare Git
-  remote.  Its first Emacs run reached maintenance entry and deliberately
-  failed closed before Git, exposing that the server had frozen the empty
-  reconnect census although the client had since opened a registered view.
+  remote.  Both editors now pass the entire path: open a live pre-pull view,
+  install and report the locked census, publish a zero-dirty initial archive,
+  perform a real local Git pull, observe and select exact final disk, update the
+  same live view, append exact server evidence, publish =FINALIZED=, acknowledge
+  terminal authority, return idle/unlocked, leave the Git worktree clean, and
+  retain incident-qualified process diagnostics.
+- The real Neovim run exposed and fixed three wire/lifecycle gaps which mocked
+  unit fixtures had hidden: external-result list members must be sibling atoms
+  rather than one nested list; the Lua reader's singleton representation of a
+  bare =nil= scalar must normalize back to false in final-archive authority;
+  and Neovim's terminal job renames its buffer to =term://=, so the stable
+  =skg://pull/INCIDENT/...= diagnostic name is restored after process exit.
+  Each has a focused regression test.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
   types, before the client archive writer.  Every later archive and handshake
   path now has one validated config fact to consume.
+- The first real pull integration was added before the full-rebuild entry path.
+  That run exposed the stale-census race, so the epoch-first locked-census
+  barrier and its reconnect phase were completed before proceeding to rebuild.
 
 ** what's imperfect about what's done
 - The census currently reconstructs only live view forests; recipes, attached
@@ -595,28 +618,8 @@ what's imperfect about what's done; choices determining the future.
   clean ones close) rather than being settled with their parent.  The durable
   settlement inventory and ACK gate are in place, but workflow-parent-aware
   settlement is not yet implemented.
-- Maintenance bootstrap currently freezes =InteractiveSession.live_census=,
-  which is refreshed only on connection/reconnection.  A view opened after
-  handshake therefore makes the server's lock inventory stale; both clients
-  detect the mismatch and cancel safely, so no archive or external mutation
-  occurs, but ordinary real-world maintenance cannot yet start with such a
-  view.  Constructors also do not yet apply an already-active epoch to newly
-  registered buffers, contrary to the agreed born-locked policy.
 
 ** choices determining the future
-- Maintenance entry needs the planned epoch-first locked-census barrier.  The
-  recommended correction is to split bootstrap into two durable steps: first
-  the server validates origin facts and allocates the incident/epoch; then the
-  client installs that epoch on every registered buffer, makes later
-  constructors inherit it, and submits a compact incident-qualified census.
-  The server freezes and acknowledges that exact census (requesting text only
-  through the existing selective-text mechanism if needed) before the client
-  publishes its initial archive.  This directly implements the ordering in
-  =7_plan.org= and gives reconnect a durable phase to resume.
-- A smaller alternative is for the client to take an unnumbered local lock,
-  refresh the ordinary census, and only then request an incident.  That avoids
-  a server phase but reverses the agreed epoch-before-lock ownership, creates a
-  client-only crash interval, and must separately fence in-flight presentation
-  and buffers born between the census and offer.  It is not recommended.
-- The Undo Tree discovery remains resolved by the agreed fail-closed active-
-  mode check; merely having the package installed has no effect.
+- No new architectural choice arose from the locked-census or end-to-end pull
+  slice.  The Undo Tree discovery remains resolved by the agreed fail-closed
+  active-mode check; merely having the package installed has no effect.
