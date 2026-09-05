@@ -6,7 +6,10 @@
 * [[./docs/data-model.org][The Skg data model]]
   Describes the ideas but not the code.
 * to understand the code
-The graph uses [[./schema.tql][this TypeDB schema]]. The server is written in Rust, which makes TypeDB queries. Clients could be written for other editors; so far I've written one, for Emacs, in Emacs Lisp.
+The graph uses [[./schema.tql][this TypeDB schema]]. The server is written in
+Rust, which makes TypeDB queries.  There are clients for Emacs (in Emacs Lisp)
+and Neovim (in Lua).  One server process has one retained interactive user and
+accepts only one interactive client connection at a time.
 
 The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.md][api-and-formats.md]].
 
