@@ -30,6 +30,7 @@ M.config_path = nil
 ---the same editor session and reconnecting only on the next request.
 function M.install_session_surface ()
   local state = require('skg.state')
+  local pull = require('skg.pull')
   state.register_server_push_handler(
     'collateral-view',
     require('skg.save').background_collateral_offer_handler)
@@ -50,6 +51,9 @@ function M.install_session_surface ()
     { force = true })
   vim.api.nvim_create_user_command('SkgCancelMaintenance',
     function () require('skg.maintenance').cancel() end,
+    { force = true })
+  vim.api.nvim_create_user_command('SkgPullAll',
+    function () pull.pull_all() end,
     { force = true })
   vim.api.nvim_create_user_command('SkgReloadIds',
     function (options)
