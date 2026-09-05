@@ -773,6 +773,10 @@ end
 
 local function required_text (value, key, context)
   local result = required_field(value, key, context)
+  -- The shared wire reader represents both the bare atom `nil' and () as
+  -- its singleton empty list.  Boolean false fields emitted by the server
+  -- therefore arrive as this value even though they are scalar authority.
+  if sexpr.is_nil(result) then return 'nil' end
   if sexpr.is_list(result) or sexpr.is_pair(result) then
     fail(context .. ' has non-atomic ' .. key) end
   return sexpr.atom_text(result)

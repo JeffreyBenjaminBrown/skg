@@ -319,8 +319,17 @@ describe('skg recovery archive', function ()
         missing_application)
       assert.is_false(accepted)
       assert.is_truthy(tostring(validation_error):find(
-        'no exact rendered identity', 1, true))
+        'no exact rendered identity', 1, true), tostring(validation_error))
       assert.is_nil(vim.uv.fs_lstat(initial.path .. '/FINALIZED'))
+      for _, settlement in ipairs(bundle.settlements) do
+        for _, key in ipairs({ 'dirty', 'impacted', 'parse-uncertain' }) do
+          for _, field in ipairs(settlement) do
+            if payload.field_text({ field }, key) == 'nil' then
+              field[2] = sexpr.NIL
+            end
+          end
+        end
+      end
       local result = archive.finalize(
         initial, bundle.descriptor, bundle.opaque, bundle.settlements)
       local replayed = archive.finalize(
