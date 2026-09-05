@@ -1332,4 +1332,174 @@ function M.finalize (initial_result, descriptor, opaque_bytes, settlements)
   }
 end
 
+-- ---- read-only retained-incident inspection ----------------------
+
+---Read one recorded artifact only after its path, privacy, length, and
+---checksum have been verified.  This is also the recovery UI's read boundary.
+function M.verify_recorded_artifact (incident_root, record, context)
+  context = context or 'archive artifact'
+  local relative = required_text(record, 'path', context)
+  local declared_bytes = required_integer(record, 'bytes', context)
+  local declared_sha = required_text(record, 'sha256', context)
+  if relative:sub(1, 1) == '/' or relative:find('\\', 1, true)
+     or not sha256_valid(declared_sha) then
+    fail(context .. ' has an unsafe artifact record') end
+  local components = {}
+  for component in (relative .. '/'):gmatch('(.-)/') do
+    table.insert(components, component) end
+  for _, component in ipairs(components) do
+    if component == '' or component == '.' or component == '..' then
+      fail(context .. ' has an unsafe artifact record') end
+  end
+  if table.concat(components, '/') ~= relative then
+    fail(context .. ' has an unsafe artifact record') end
+  local path = assert_confined_parent(incident_root .. '/' .. relative,
+    incident_root)
+  local bytes, stat = read_regular_file(path)
+  if mode_bits(stat) ~= 384 or (stat.nlink and stat.nlink ~= 1)
+     or #bytes ~= declared_bytes or vim.fn.sha256(bytes) ~= declared_sha then
+    fail(context .. ' is not the exact private recorded artifact') end
+  return bytes
+end
+
+local function verify_archive_marker (
+    incident_root, marker_name, manifest_name, expected_kind)
+  local manifest_path = incident_root .. '/' .. manifest_name
+  local marker_path = incident_root .. '/' .. marker_name
+  local manifest_bytes = read_regular_file(manifest_path)
+  local manifest = read_exact_sexpr(manifest_path)
+  local marker = read_exact_sexpr(marker_path)
+  local context = marker_name .. ' marker'
+  local sha = vim.fn.sha256(manifest_bytes)
+  if required_integer(manifest, 'archive-format-version', manifest_name)
+       ~= M.archive_format_version
+     or required_text(manifest, 'manifest-kind', manifest_name) ~= expected_kind
+     or required_integer(marker, 'archive-format-version', context)
+       ~= M.archive_format_version
+     or required_text(marker, 'incident-id', context)
+       ~= required_text(manifest, 'incident-id', manifest_name)
+     or required_text(marker, 'manifest-sha256', context) ~= sha then
+    fail(marker_name .. ' does not bind the exact ' .. manifest_name) end
+  return { value = manifest, bytes = manifest_bytes, sha256 = sha }
+end
+
+local function changed_node_count (final)
+  local seen, count = {}, 0
+  for _, record in ipairs(required_list(
+    final, 'node-artifacts', 'final manifest')) do
+    local relative = required_text(record, 'path', 'final node artifact')
+    local components = safe_evidence_components(relative)
+    local key = components[1] .. '/' .. components[2]
+    if not seen[key] then seen[key], count = true, count + 1 end
+  end
+  return count
+end
+
+local function current_nvim_version ()
+  local version = vim.version()
+  return string.format('%d.%d.%d',
+    version.major, version.minor, version.patch)
+end
+
+local function native_undo_compatible (initial)
+  local client_kind = required_text(initial, 'client-kind', 'initial manifest')
+  for _, buffer in ipairs(required_list(
+    initial, 'buffers', 'initial manifest')) do
+    local undo = required_list(buffer, 'undo', 'initial buffer')
+    if required_text(undo, 'status', 'buffer undo') == 'archived'
+       and (client_kind ~= 'neovim'
+         or required_text(undo, 'kind', 'buffer undo') ~= 'nvim-wundo'
+         or required_text(undo, 'version', 'buffer undo')
+           ~= current_nvim_version()) then
+      return false end
+  end
+  return true
+end
+
+---Verify and summarize one published maintenance incident without a server.
+function M.inspect (incident_root)
+  incident_root = absolute(incident_root)
+  require_directory(incident_root, 448, 'incident directory')
+  local name = vim.fs.basename(incident_root)
+  if not valid_final_name(name) then
+    fail('invalid retained incident directory name: ' .. name) end
+  local ready = verify_archive_marker(
+    incident_root, 'ARCHIVE-READY', 'manifest.initial.sexp', 'initial')
+  local initial = ready.value
+  local incident_id = required_text(initial, 'incident-id', 'initial manifest')
+  if name ~= required_text(
+      initial, 'archive-directory-name', 'initial manifest')
+     or name:sub(-#incident_id) ~= incident_id then
+    fail('incident directory and initial manifest differ') end
+  local has_final_marker = vim.uv.fs_lstat(
+    incident_root .. '/FINALIZED') ~= nil
+  local has_final_manifest = vim.uv.fs_lstat(
+    incident_root .. '/manifest.final.sexp') ~= nil
+  if has_final_marker ~= has_final_manifest then
+    fail('incident has an incomplete final marker pair') end
+
+  local final, status
+  if has_final_marker then
+    local verified = verify_archive_marker(
+      incident_root, 'FINALIZED', 'manifest.final.sexp', 'final')
+    final, status = verified.value, 'finalized'
+    if required_text(final, 'incident-id', 'final manifest') ~= incident_id
+       or required_text(final, 'initial-manifest-sha256', 'final manifest')
+         ~= ready.sha256 then
+      fail('final manifest belongs to another archive') end
+  else status = 'archive-ready' end
+
+  local dispositions = final and required_list(
+    final, 'buffer-dispositions', 'final manifest') or {}
+  local interrupted, released = 0, 0
+  for _, record in ipairs(dispositions) do
+    local disposition = required_text(record, 'disposition', 'buffer disposition')
+    if disposition == 'interrupted' then interrupted = interrupted + 1
+    elseif disposition == 'released-unimpacted' then released = released + 1 end
+  end
+  local bytes = tree_bytes(incident_root)
+  return {
+    name = name, path = incident_root, incident_id = incident_id,
+    status = status,
+    origin = required_text(initial, 'origin', 'initial manifest'),
+    started_at_utc = required_text(
+      initial, 'started-at-utc', 'initial manifest'),
+    client_kind = required_text(initial, 'client-kind', 'initial manifest'),
+    client_version = required_text(
+      initial, 'client-version', 'initial manifest'),
+    g0 = required_integer(initial, 'g0-graph-generation', 'initial manifest'),
+    g1 = final and required_integer(
+      final, 'g1-graph-generation', 'final manifest') or nil,
+    changed_nodes = final and changed_node_count(final) or 0,
+    dirty_buffers = #required_list(initial, 'buffers', 'initial manifest'),
+    interrupted_buffers = interrupted, released_buffers = released,
+    native_undo_compatible = native_undo_compatible(initial),
+    bytes = bytes, iec = iec_size(bytes), initial = initial, final = final,
+  }
+end
+
+---List every strict-named retained incident, preserving corrupt entries as
+---invalid summaries so one bad archive cannot hide its healthy siblings.
+function M.list (archive_root)
+  local root = M.resolve_archive_root(archive_root)
+  local scanner, scan_error = vim.uv.fs_scandir(root)
+  if not scanner then fail('cannot list retained archives: ' .. scan_error) end
+  local summaries = {}
+  while true do
+    local name = vim.uv.fs_scandir_next(scanner)
+    if not name then break end
+    if valid_final_name(name) then
+      local path = root .. '/' .. name
+      local ok, result = pcall(M.inspect, path)
+      if ok then table.insert(summaries, result)
+      else table.insert(summaries, {
+        name = name, path = path, status = 'invalid', error = tostring(result),
+      }) end
+    end
+  end
+  table.sort(summaries, function (left, right)
+    return left.name > right.name end)
+  return summaries
+end
+
 return M

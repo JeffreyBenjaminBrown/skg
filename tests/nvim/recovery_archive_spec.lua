@@ -29,6 +29,13 @@ local function read_bytes (path)
   return result
 end
 
+local function replace_bytes (path, bytes)
+  local handle = assert(io.open(path, 'wb'))
+  assert(handle:write(bytes))
+  assert(handle:flush())
+  assert(handle:close())
+end
+
 local function raw_text (buf)
   return registry.raw_text(buf)
 end
@@ -355,6 +362,78 @@ describe('skg recovery archive', function ()
       assert.is_truthy(read_bytes(initial.path
         .. '/interrupted-buffers/README.org'):find(
           'buffer%-snapshots/.*/unsaved%-changes.org'))
+    end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('inspects ready and finalized retained archives without a server',
+     function ()
+    local value = fixture()
+    local ok, error_text = xpcall(function ()
+      local initial = archive.publish_initial(value.offer, { value.buf }, {
+        client_nonce = '0123456789abcdef01234567',
+      })
+      local ready = archive.inspect(initial.path)
+      assert.are.equal('archive-ready', ready.status)
+      assert.are.equal('explicit-partial-reload', ready.origin)
+      assert.are.equal(7, ready.g0)
+      assert.is_nil(ready.g1)
+      assert.are.equal(1, ready.dirty_buffers)
+      assert.are.equal(0, ready.changed_nodes)
+      assert.is_true(ready.native_undo_compatible)
+      assert.is_true(ready.bytes > 0)
+      assert.is_truthy(ready.iec)
+
+      local bundle = final_bundle(initial)
+      archive.finalize(
+        initial, bundle.descriptor, bundle.opaque, bundle.settlements)
+      local final = archive.inspect(initial.path)
+      assert.are.equal('finalized', final.status)
+      assert.are.equal(8, final.g1)
+      assert.are.equal(1, final.changed_nodes)
+      assert.are.equal(1, final.interrupted_buffers)
+      assert.are.equal(0, final.released_buffers)
+    end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('lists invalid strict-named siblings beside healthy incidents', function ()
+    local value = fixture()
+    local ok, error_text = xpcall(function ()
+      local initial = archive.publish_initial(value.offer, { value.buf }, {
+        client_nonce = '0123456789abcdef01234567',
+      })
+      local invalid_name =
+        '20260904T123457.123456Z_abcdefab-1234-4234-8234-abcdefabcdef'
+      mkdir(value.archive_root .. '/' .. invalid_name)
+      local summaries = archive.list()
+      assert.are.equal(2, #summaries)
+      local by_name = {}
+      for _, summary in ipairs(summaries) do by_name[summary.name] = summary end
+      assert.are.equal('invalid', by_name[invalid_name].status)
+      assert.are.equal('archive-ready',
+        by_name[vim.fs.basename(initial.path)].status)
+    end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('rejects a corrupt finalized marker during inspection', function ()
+    local value = fixture()
+    local ok, error_text = xpcall(function ()
+      local initial = archive.publish_initial(value.offer, { value.buf }, {
+        client_nonce = '0123456789abcdef01234567',
+      })
+      local bundle = final_bundle(initial)
+      archive.finalize(
+        initial, bundle.descriptor, bundle.opaque, bundle.settlements)
+      replace_bytes(initial.path .. '/FINALIZED',
+        '((archive-format-version 1))\n')
+      local inspected, inspect_error = pcall(archive.inspect, initial.path)
+      assert.is_false(inspected)
+      assert.is_truthy(tostring(inspect_error):find('lacks', 1, true))
     end, debug.traceback)
     cleanup(value)
     assert(ok, error_text)

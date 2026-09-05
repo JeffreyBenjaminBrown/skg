@@ -1479,4 +1479,197 @@ creates FINALIZED only after every other durable artifact."
               (plist-get evidence :artifact-bytes-sha256)
               :sizes sizes)))))
 
+;;; ---- read-only retained-incident inspection ----------------------
+
+(defun skg-recovery--verify-recorded-artifact (incident-root record context)
+  "Return exact bytes for RECORD below INCIDENT-ROOT after verification."
+  (let* ((relative (skg-recovery--required-text record 'path context))
+         (declared-bytes (skg-recovery--required-nonnegative-integer
+                          record 'bytes context))
+         (declared-sha (skg-recovery--required-text record 'sha256 context)))
+    (unless (and (not (file-name-absolute-p relative))
+                 (not (string-match-p "\\\\" relative))
+                 (cl-every (lambda (component)
+                             (not (member component '("" "." ".."))))
+                           (split-string relative "/" nil))
+                 (skg-recovery--sha256-p declared-sha))
+      (skg-recovery--fail "%s has an unsafe artifact record" context))
+    (let* ((path (expand-file-name relative incident-root))
+           (_parent (skg-recovery--assert-confined-parent path incident-root))
+           (attributes (file-attributes path 'integer))
+           (bytes (skg-recovery--read-bytes path)))
+      (unless (and attributes
+                   (= (logand (or (file-modes path) 0) #o777) #o600)
+                   (= (file-attribute-link-number attributes) 1)
+                   (= (length bytes) declared-bytes)
+                   (equal (secure-hash 'sha256 bytes) declared-sha))
+        (skg-recovery--fail
+         "%s is not the exact private recorded artifact" context))
+      bytes)))
+
+(defun skg-recovery--verify-archive-marker
+    (incident-root marker-name manifest-name expected-kind)
+  "Read and verify MARKER-NAME and MANIFEST-NAME below INCIDENT-ROOT."
+  (let* ((manifest-path (expand-file-name manifest-name incident-root))
+         (marker-path (expand-file-name marker-name incident-root))
+         (manifest-bytes (skg-recovery--read-bytes manifest-path))
+         (manifest (skg-recovery--read-exact-sexpr manifest-path))
+         (marker (skg-recovery--read-exact-sexpr marker-path))
+         (context (format "%s marker" marker-name))
+         (sha (secure-hash 'sha256 manifest-bytes)))
+    (unless (and
+             (= (skg-recovery--required-nonnegative-integer
+                 manifest 'archive-format-version manifest-name)
+                skg-recovery-archive-format-version)
+             (equal (skg-recovery--required-text
+                     manifest 'manifest-kind manifest-name)
+                    expected-kind)
+             (= (skg-recovery--required-nonnegative-integer
+                 marker 'archive-format-version context)
+                skg-recovery-archive-format-version)
+             (equal (skg-recovery--required-text
+                     marker 'incident-id context)
+                    (skg-recovery--required-text
+                     manifest 'incident-id manifest-name))
+             (equal (skg-recovery--required-text
+                     marker 'manifest-sha256 context)
+                    sha))
+      (skg-recovery--fail "%s does not bind the exact %s"
+                          marker-name manifest-name))
+    (list :value manifest :bytes manifest-bytes :sha256 sha)))
+
+(defun skg-recovery--changed-node-count (final)
+  (let ((seen (make-hash-table :test #'equal)))
+    (dolist (record (skg-recovery--required-list
+                     final 'node-artifacts "final manifest"))
+      (let* ((relative (skg-recovery--required-text
+                        record 'path "final node artifact"))
+             (components
+              (skg-recovery--safe-evidence-path-components relative)))
+        (puthash (format "%s/%s" (car components) (cadr components))
+                 t seen)))
+    (hash-table-count seen)))
+
+(defun skg-recovery--native-undo-compatible-p (initial)
+  (let ((client-kind (skg-recovery--required-text
+                      initial 'client-kind "initial manifest")))
+    (cl-every
+     (lambda (buffer)
+       (let* ((undo (skg-recovery--required-list
+                     buffer 'undo "initial buffer"))
+              (status (skg-recovery--required-text
+                       undo 'status "buffer undo")))
+         (or (not (equal status "archived"))
+             (and (equal client-kind "emacs")
+                  (equal (skg-recovery--required-text
+                          undo 'kind "buffer undo") "undo-fu-session")
+                  (equal (skg-recovery--required-text
+                          undo 'version "buffer undo") "0.8")
+                  (equal (skg-undo-sidecar-package-version) "0.8")))))
+     (skg-recovery--required-list initial 'buffers "initial manifest"))))
+
+(defun skg-recovery-archive-inspect (incident-root)
+  "Verify and summarize one published maintenance INCIDENT-ROOT.
+This is read-only and does not require a running server."
+  (setq incident-root (directory-file-name (expand-file-name incident-root)))
+  (skg-recovery--require-directory incident-root "incident directory")
+  (let* ((name (file-name-nondirectory incident-root))
+         (_valid-name (unless (skg-recovery--strict-final-name-p name)
+                        (skg-recovery--fail
+                         "invalid retained incident directory name: %s" name)))
+         (ready (skg-recovery--verify-archive-marker
+                 incident-root "ARCHIVE-READY" "manifest.initial.sexp"
+                 "initial"))
+         (initial (plist-get ready :value))
+         (incident-id (skg-recovery--required-text
+                       initial 'incident-id "initial manifest"))
+         (final-marker-path (expand-file-name "FINALIZED" incident-root))
+         (final-manifest-path
+          (expand-file-name "manifest.final.sexp" incident-root))
+         (has-final-marker (or (file-exists-p final-marker-path)
+                               (file-symlink-p final-marker-path)))
+         (has-final-manifest (or (file-exists-p final-manifest-path)
+                                 (file-symlink-p final-manifest-path)))
+         final status dispositions interrupted released changed g1 bytes)
+    (unless (and (equal name
+                        (skg-recovery--required-text
+                         initial 'archive-directory-name "initial manifest"))
+                 (string-suffix-p incident-id name))
+      (skg-recovery--fail "incident directory and initial manifest differ"))
+    (unless (eq has-final-marker has-final-manifest)
+      (skg-recovery--fail "incident has an incomplete final marker pair"))
+    (if has-final-marker
+        (let ((verified (skg-recovery--verify-archive-marker
+                         incident-root "FINALIZED" "manifest.final.sexp"
+                         "final")))
+          (setq final (plist-get verified :value)
+                status 'finalized)
+          (unless (and
+                   (equal incident-id
+                          (skg-recovery--required-text
+                           final 'incident-id "final manifest"))
+                   (equal (plist-get ready :sha256)
+                          (skg-recovery--required-text
+                           final 'initial-manifest-sha256 "final manifest")))
+            (skg-recovery--fail "final manifest belongs to another archive")))
+      (setq status 'archive-ready))
+    (setq dispositions
+          (and final (skg-recovery--required-list
+                      final 'buffer-dispositions "final manifest"))
+          interrupted (cl-count "interrupted" dispositions
+                                :test #'equal
+                                :key (lambda (record)
+                                       (skg-recovery--required-text
+                                        record 'disposition
+                                        "buffer disposition")))
+          released (cl-count "released-unimpacted" dispositions
+                             :test #'equal
+                             :key (lambda (record)
+                                    (skg-recovery--required-text
+                                     record 'disposition
+                                     "buffer disposition")))
+          changed (if final (skg-recovery--changed-node-count final) 0)
+          g1 (and final (skg-recovery--required-nonnegative-integer
+                         final 'g1-graph-generation "final manifest"))
+          bytes (skg-recovery--tree-bytes incident-root))
+    (list :name name :path incident-root :incident-id incident-id
+          :status status
+          :origin (skg-recovery--required-text
+                   initial 'origin "initial manifest")
+          :started-at-utc (skg-recovery--required-text
+                           initial 'started-at-utc "initial manifest")
+          :client-kind (skg-recovery--required-text
+                        initial 'client-kind "initial manifest")
+          :client-version (skg-recovery--required-text
+                           initial 'client-version "initial manifest")
+          :g0 (skg-recovery--required-nonnegative-integer
+               initial 'g0-graph-generation "initial manifest")
+          :g1 g1 :changed-nodes changed
+          :dirty-buffers (length (skg-recovery--required-list
+                                  initial 'buffers "initial manifest"))
+          :interrupted-buffers interrupted :released-buffers released
+          :native-undo-compatible
+          (skg-recovery--native-undo-compatible-p initial)
+          :bytes bytes :iec (skg-recovery--iec-size bytes)
+          :initial initial :final final)))
+
+(defun skg-recovery-archive-list (&optional archive-root)
+  "Return summaries for every retained incident below ARCHIVE-ROOT.
+Malformed strict-named entries are retained as =invalid= summaries so one bad
+archive cannot hide its healthy siblings."
+  (let ((root (skg-recovery-resolve-archive-root archive-root)) summaries)
+    (dolist (path (directory-files
+                   root t directory-files-no-dot-files-regexp t))
+      (let ((name (file-name-nondirectory path)))
+        (when (skg-recovery--strict-final-name-p name)
+          (condition-case error-data
+              (push (skg-recovery-archive-inspect path) summaries)
+            (error
+             (push (list :name name :path path :status 'invalid
+                         :error (error-message-string error-data))
+                   summaries))))))
+    (sort summaries (lambda (left right)
+                      (string> (plist-get left :name)
+                               (plist-get right :name))))))
+
 (provide 'skg-recovery-archive)

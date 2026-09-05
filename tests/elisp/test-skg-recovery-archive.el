@@ -367,6 +367,102 @@
                     'utf-8-unix t))))
       (skg-test-recovery--cleanup fixture))))
 
+(ert-deftest test-skg-recovery-inspects-ready-and-finalized-archives ()
+  (let* ((fixture (skg-test-recovery--fixture))
+         (buffer (plist-get fixture :buffer))
+         (skg-recovery-archive-native-undo-function
+          (lambda (&rest _)
+            '(:status empty :kind undo-fu-session :version "not-required"))))
+    (unwind-protect
+        (let* ((initial-result
+                (skg-recovery-archive-publish-initial
+                 (plist-get fixture :offer)
+                 :buffers (list buffer)
+                 :client-nonce "0123456789abcdef01234567"))
+               (root (plist-get initial-result :path))
+               (ready (skg-recovery-archive-inspect root))
+               (bundle (skg-test-recovery--final-bundle initial-result)))
+          (should (eq (plist-get ready :status) 'archive-ready))
+          (should (equal (plist-get ready :origin)
+                         "explicit-partial-reload"))
+          (should (= (plist-get ready :g0) 7))
+          (should-not (plist-get ready :g1))
+          (should (= (plist-get ready :dirty-buffers) 1))
+          (should (= (plist-get ready :changed-nodes) 0))
+          (should (plist-get ready :native-undo-compatible))
+          (skg-recovery-archive-finalize
+           initial-result (plist-get bundle :descriptor)
+           (plist-get bundle :opaque) (plist-get bundle :settlements))
+          (let ((final (skg-recovery-archive-inspect root)))
+            (should (eq (plist-get final :status) 'finalized))
+            (should (= (plist-get final :g1) 8))
+            (should (= (plist-get final :changed-nodes) 1))
+            (should (= (plist-get final :interrupted-buffers) 1))
+            (should (= (plist-get final :released-buffers) 0))
+            (should (> (plist-get final :bytes) 0))))
+      (skg-test-recovery--cleanup fixture))))
+
+(ert-deftest test-skg-recovery-list-retains-invalid-strict-named-siblings ()
+  (let* ((fixture (skg-test-recovery--fixture))
+         (buffer (plist-get fixture :buffer))
+         (invalid-name
+          "20260904T123457.123456Z_abcdefab-1234-4234-8234-abcdefabcdef")
+         (skg-recovery-archive-native-undo-function
+          (lambda (&rest _)
+            '(:status empty :kind undo-fu-session :version "not-required"))))
+    (unwind-protect
+        (let* ((initial-result
+                (skg-recovery-archive-publish-initial
+                 (plist-get fixture :offer)
+                 :buffers (list buffer)
+                 :client-nonce "0123456789abcdef01234567"))
+               (invalid (expand-file-name
+                         invalid-name (plist-get fixture :archive-root))))
+          (with-file-modes #o700 (make-directory invalid))
+          (let ((summaries (skg-recovery-archive-list)))
+            (should (= (length summaries) 2))
+            (should
+             (eq (plist-get
+                  (cl-find invalid-name summaries :test #'equal
+                           :key (lambda (entry) (plist-get entry :name)))
+                  :status)
+                 'invalid))
+            (should
+             (eq (plist-get
+                  (cl-find (file-name-nondirectory
+                            (plist-get initial-result :path))
+                           summaries :test #'equal
+                           :key (lambda (entry) (plist-get entry :name)))
+                  :status)
+                 'archive-ready))))
+      (skg-test-recovery--cleanup fixture))))
+
+(ert-deftest test-skg-recovery-inspection-rejects-corrupt-final-marker ()
+  (let* ((fixture (skg-test-recovery--fixture))
+         (buffer (plist-get fixture :buffer))
+         (skg-recovery-archive-native-undo-function
+          (lambda (&rest _)
+            '(:status empty :kind undo-fu-session :version "not-required"))))
+    (unwind-protect
+        (let* ((initial-result
+                (skg-recovery-archive-publish-initial
+                 (plist-get fixture :offer)
+                 :buffers (list buffer)
+                 :client-nonce "0123456789abcdef01234567"))
+               (bundle (skg-test-recovery--final-bundle initial-result))
+               (root (plist-get initial-result :path))
+               (marker (expand-file-name "FINALIZED" root)))
+          (skg-recovery-archive-finalize
+           initial-result (plist-get bundle :descriptor)
+           (plist-get bundle :opaque) (plist-get bundle :settlements))
+          (let ((coding-system-for-write 'utf-8-unix))
+            (with-temp-buffer
+              (insert "((archive-format-version 1))\n")
+              (write-region (point-min) (point-max) marker nil 'silent)))
+          (should-error (skg-recovery-archive-inspect root)
+                        :type 'skg-recovery-archive-error))
+      (skg-test-recovery--cleanup fixture))))
+
 (ert-deftest test-skg-recovery-refuses-changed-opaque-final-evidence ()
   (let* ((fixture (skg-test-recovery--fixture))
          (buffer (plist-get fixture :buffer))
