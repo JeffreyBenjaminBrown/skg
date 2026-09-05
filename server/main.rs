@@ -22,7 +22,7 @@ use skg::dbs::in_rust_graph::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
-use skg::serve::serve;
+use skg::serve::{prepare_runtime, serve};
 use skg::sound::play_ready_sound_in_background;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
@@ -160,6 +160,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     had_id_set, all_node_ids,
     link_dests, map_to_content, map_to_containers );
 
+  // Runtime construction includes exact Git-presentation seeding, recovery
+  // journal loading, watcher installation and worker startup.  Connections
+  // must continue receiving the initializing response until all of it is
+  // complete; otherwise TCP can queue a request behind work performed after a
+  // misleading "Server ready" message.
+  let runtime = prepare_runtime (env)
+    . map_err (|error| Box::new (error) as Box<dyn Error>)?;
+
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()
     . expect ("busysignal thread panicked");
@@ -168,7 +176,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   if config . beep_when_server_becomes_available {
     play_ready_sound_in_background (); }
 
-  serve (env, listener)
+  serve (runtime, listener)
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }

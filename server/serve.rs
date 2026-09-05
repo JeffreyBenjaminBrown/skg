@@ -163,12 +163,10 @@ fn authenticate_connection (
   }
 }
 
-/// Pipes TCP input from Emacs into handle_emacs.
-pub fn serve (
-  env            : SkgEnv,
-  emacs_listener : TcpListener,
-) -> std::io::Result<()> {
-
+/// Complete process-owned setup before the startup busy-signal is retired.
+/// Keeping this separate from `serve` makes "Server ready" mean that a queued
+/// connection can actually reach the request loop.
+pub fn prepare_runtime (env : SkgEnv) -> std::io::Result<Arc<ServerRuntime>> {
   match load_recovery_journals (&env . config) {
     Ok (count) if count > 0 => tracing::warn! (
       count, "loaded unresolved fatal-reload recovery journals"),
@@ -183,7 +181,14 @@ pub fn serve (
   runtime . start_background_services ()
     . map_err (|error| std::io::Error::new (
       std::io::ErrorKind::Other, error))?;
+  Ok (runtime)
+}
 
+/// Pipe TCP input from the sole interactive client and narrow control peers.
+pub fn serve (
+  runtime        : Arc<ServerRuntime>,
+  emacs_listener : TcpListener,
+) -> std::io::Result<()> {
   for stream_res in emacs_listener . incoming() { // the loop
     match stream_res {
       Ok (stream) => {
