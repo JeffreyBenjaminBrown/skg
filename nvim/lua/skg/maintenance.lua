@@ -438,6 +438,25 @@ local function without_ack (settlement)
   return result
 end
 
+local function client_acknowledged_settlement (settlement)
+  local result = without_ack(settlement)
+  table.insert(result, { sexpr.symbol('acknowledged'), 'true' })
+  table.insert(result,
+    { sexpr.symbol('settlement-resolution'), 'client-acknowledged' })
+  return result
+end
+
+local function replace_settlement (records, replacement)
+  local buffer_id = payload.field_text(replacement, 'buffer-id')
+  for index, record in ipairs(records or {}) do
+    if payload.field_text(record, 'buffer-id') == buffer_id then
+      records[index] = replacement
+      return
+    end
+  end
+  error('Maintenance ACK names an uninstalled settlement')
+end
+
 local function locally_applied (incident, buffer_id)
   local applied = incident.locally_applied or {}
   if applied[buffer_id] == true then return true end
@@ -598,6 +617,8 @@ function M.handle_preselection_retirement_ack (_payload_text, response)
      or buffer_id ~= payload.field_text(first, 'buffer-id')
      or payload.field_text(response, 'required-ack') ~= 'retirement-ack' then
     error('Dirty-buffer retirement ACK changed identity') end
+  retirement = client_acknowledged_settlement(retirement)
+  replace_settlement(incident.preselection_retirements, retirement)
   table.insert(incident.acknowledged_preselection_retirements, retirement)
   table.remove(incident.pending_preselection_retirements, 1)
   incident.in_flight_preselection_retirement = nil
@@ -680,13 +701,17 @@ function M.handle_settlement_ack (_payload_text, response)
   if not settlement then
     error('Maintenance settlement ACK arrived without an in-flight action') end
   local buffer_id = payload.field_text(settlement, 'buffer-id')
-  if buffer_id ~= payload.field_text(response, 'buffer-id')
+  local status = payload.field_text(response, 'status')
+  if (status ~= 'view-settlement-recorded' and status ~= 'all-views-settled')
+     or buffer_id ~= payload.field_text(response, 'buffer-id')
      or payload.field_text(settlement, 'required-ack')
         ~= payload.field_text(response, 'required-ack') then
     error('Maintenance settlement ACK response changed identity') end
   local first = incident.pending_settlements[1]
   if not first or buffer_id ~= payload.field_text(first, 'buffer-id') then
     error('Maintenance settlement response arrived out of order') end
+  settlement = client_acknowledged_settlement(settlement)
+  replace_settlement(incident.settlements, settlement)
   table.insert(incident.acknowledged_settlements, settlement)
   table.remove(incident.pending_settlements, 1)
   incident.in_flight_settlement = nil

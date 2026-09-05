@@ -533,6 +533,12 @@
       (skg--maintenance-handle-preselection-retirement-ack
        nil
        "((status all-invalid-dirty-buffers-retired) (buffer-id dirty) (required-ack retirement-ack))")
+      (should
+       (equal "client-acknowledged"
+              (skg--maintenance-text
+               (car (plist-get skg--maintenance-client-incident
+                               :preselection-retirements))
+               'settlement-resolution)))
       (funcall scheduled))
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'server-blocked))
@@ -783,6 +789,37 @@
     (should (eq settlement
                 (plist-get skg--maintenance-client-incident
                            :in-flight-settlement)))))
+
+(ert-deftest test-skg-maintenance-settlement-ack-updates-final-record ()
+  (let* ((settlement (append
+                      (skg-test-maintenance--settlement
+                       "one" "content-view" "view-one" "nil"
+                       "release-ack" "retained-clean")
+                      '((settlement-resolution "pending"))))
+         scheduled
+         (skg--maintenance-client-incident
+          (list :settlements (list settlement)
+                :pending-settlements (list settlement)
+                :acknowledged-settlements nil
+                :in-flight-settlement settlement)))
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest _arguments)
+                 (setq scheduled function))))
+      (should-error
+       (skg--maintenance-handle-settlement-ack
+        nil
+        "((status invalid-dirty-buffer-retired) (buffer-id one) (required-ack release-ack))"))
+      (skg--maintenance-handle-settlement-ack
+       nil
+       "((status all-views-settled) (buffer-id one) (required-ack release-ack))"))
+    (should (eq scheduled #'skg--maintenance-settle-next))
+    (let ((record (car (plist-get skg--maintenance-client-incident
+                                  :settlements))))
+      (should (equal "true"
+                     (skg--maintenance-text record 'acknowledged)))
+      (should (equal "client-acknowledged"
+                     (skg--maintenance-text
+                      record 'settlement-resolution))))))
 
 (ert-deftest test-skg-maintenance-terminal-unlocks-exact-census ()
   (skg-test-maintenance--with-buffer 'content-view

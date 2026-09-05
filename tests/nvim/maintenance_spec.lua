@@ -471,6 +471,9 @@ describe('skg Neovim maintenance handshake', function ()
       f('status', 'all-invalid-dirty-buffers-retired'),
       f('buffer-id', 'dirty'), f('required-ack', 'retirement-ack'),
     })
+    assert.are.equal('client-acknowledged', payload.field_text(
+      state.maintenance_client_incident.preselection_retirements[1],
+      'settlement-resolution'))
     scheduled()
     maintenance.apply_settlement = real_apply
     maintenance.send_preselection_retirement_ack = real_send
@@ -588,6 +591,38 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal(record, sent)
     assert.are.equal(record,
       state.maintenance_client_incident.in_flight_settlement)
+  end)
+
+  it('records the acknowledged settlement used to finalize the archive',
+     function ()
+    local record = settlement('one', 'release-ack', false)
+    table.insert(record, f('settlement-resolution', 'pending'))
+    state.maintenance_client_incident = {
+      settlements = { record }, pending_settlements = { record },
+      acknowledged_settlements = {}, in_flight_settlement = record,
+    }
+    local scheduled
+    local settle_runs = 0
+    local real_settle = maintenance.settle_next
+    maintenance.settle_next = function () settle_runs = settle_runs + 1 end
+    maintenance.defer = function (callback) scheduled = callback end
+    assert.has_error(function ()
+      maintenance.handle_settlement_ack(nil, {
+        f('status', 'invalid-dirty-buffer-retired'),
+        f('buffer-id', 'one'), f('required-ack', 'release-ack'),
+      })
+    end)
+    maintenance.handle_settlement_ack(nil, {
+      f('status', 'all-views-settled'),
+      f('buffer-id', 'one'), f('required-ack', 'release-ack'),
+    })
+    scheduled()
+    maintenance.settle_next = real_settle
+    assert.are.equal(1, settle_runs)
+    local final = state.maintenance_client_incident.settlements[1]
+    assert.are.equal('true', payload.field_text(final, 'acknowledged'))
+    assert.are.equal('client-acknowledged',
+      payload.field_text(final, 'settlement-resolution'))
   end)
 
   it('unlocks only the exact terminal census and waits for its ACK',

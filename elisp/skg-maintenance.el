@@ -469,6 +469,27 @@ old implementation."
                         '(acknowledged settlement-resolution)))
                 settlement))
 
+(defun skg--maintenance-client-acknowledged-settlement (settlement)
+  "Return SETTLEMENT with this client's exact ACK state installed."
+  (cons '(acknowledged "true")
+        (cons '(settlement-resolution "client-acknowledged")
+              (skg--maintenance-settlement-without-ack settlement))))
+
+(defun skg--maintenance-replace-settlement (records replacement)
+  "Replace REPLACEMENT's buffer record in RECORDS without reordering it."
+  (let ((buffer-id (skg--maintenance-text replacement 'buffer-id))
+        found)
+    (prog1
+        (mapcar
+         (lambda (record)
+           (if (equal buffer-id
+                      (skg--maintenance-text record 'buffer-id))
+               (progn (setq found t) replacement)
+             record))
+         records)
+      (unless found
+        (error "Maintenance ACK names an uninstalled settlement")))))
+
 (defun skg--maintenance-require-stable-settlements (old new)
   "Permit only acknowledgement bits to change between OLD and NEW."
   (when old
@@ -643,6 +664,11 @@ old implementation."
                  (equal (skg--maintenance-text response 'required-ack)
                         "retirement-ack"))
       (error "Dirty-buffer retirement ACK changed identity"))
+    (setq retirement
+          (skg--maintenance-client-acknowledged-settlement retirement))
+    (setf (plist-get state :preselection-retirements)
+          (skg--maintenance-replace-settlement
+           (plist-get state :preselection-retirements) retirement))
     (push retirement
           (plist-get state :acknowledged-preselection-retirements))
     (setf (plist-get state :pending-preselection-retirements)
@@ -864,8 +890,11 @@ old implementation."
   (let* ((response (read payload))
          (state skg--maintenance-client-incident)
          (settlement (plist-get state :in-flight-settlement))
+         (status (skg--maintenance-text response 'status))
          (buffer-id (skg--maintenance-text settlement 'buffer-id)))
     (unless (and settlement
+                 (member status '("view-settlement-recorded"
+                                  "all-views-settled"))
                  (equal buffer-id
                         (skg--maintenance-text response 'buffer-id))
                  (equal (skg--maintenance-text settlement 'required-ack)
@@ -875,6 +904,11 @@ old implementation."
                    (skg--maintenance-text
                     (car (plist-get state :pending-settlements)) 'buffer-id))
       (error "Maintenance settlement response arrived out of order"))
+    (setq settlement
+          (skg--maintenance-client-acknowledged-settlement settlement))
+    (setf (plist-get state :settlements)
+          (skg--maintenance-replace-settlement
+           (plist-get state :settlements) settlement))
     (push settlement (plist-get state :acknowledged-settlements))
     (setf (plist-get state :pending-settlements)
           (cdr (plist-get state :pending-settlements))
