@@ -187,6 +187,35 @@ enum OriginObservationFailure {
   Operational (String),
 }
 
+fn validate_live_config_replacement (
+  old : &crate::types::misc::SkgConfig,
+  new : &crate::types::misc::SkgConfig,
+) -> Result<(), String> {
+  let mut startup_only = Vec::new ();
+  if old . port != new . port { startup_only . push ("port"); }
+  if old . timing_log != new . timing_log {
+    startup_only . push ("timing_log"); }
+  if old . auto_audit_daily != new . auto_audit_daily {
+    startup_only . push ("auto_audit_daily"); }
+  if old . beep_when_server_becomes_available
+      != new . beep_when_server_becomes_available
+  {
+    startup_only . push ("beep_when_server_becomes_available"); }
+  if old . delete_on_quit != new . delete_on_quit {
+    startup_only . push ("delete_on_quit"); }
+  if old . db_name != new . db_name && old . auto_audit_daily {
+    startup_only . push ("db_name (active audit daemon)"); }
+  if old . db_name != new . db_name && old . delete_on_quit {
+    startup_only . push ("db_name (installed shutdown handler)"); }
+  if startup_only . is_empty () {
+    Ok (( ))
+  } else {
+    Err (format! (
+      "startup-only setting(s) changed: {}; restart the server to apply them",
+      startup_only . join (", ")))
+  }
+}
+
 impl From<String> for OriginObservationFailure {
   fn from (error : String) -> Self { Self::Operational (error) }
 }
@@ -226,6 +255,9 @@ fn run_final_observation (
       let config = load_config (&path) . map_err (|error|
         OriginObservationFailure::InvalidDisk (format! (
           "replacement config is invalid: {}", error)))?;
+      validate_live_config_replacement (&snapshot . env . config, &config)
+        . map_err (|error| OriginObservationFailure::InvalidDisk (format! (
+          "replacement config requires a server restart: {}", error)))?;
       reject_archive_source_overlap (
         &config . maintenance_archive_identity, &snapshot . env . config)
         . map_err (|error| OriginObservationFailure::InvalidDisk (format! (
@@ -561,4 +593,50 @@ fn list_field (key : &str, values : &[String]) -> Sexp {
     Sexp::List (values . iter () . map (|value|
       Sexp::Atom (Atom::S (value . clone ()))) . collect ()),
   ])
+}
+
+#[cfg(test)]
+mod tests {
+  use super::validate_live_config_replacement;
+  use crate::types::misc::SkgConfig;
+
+  fn config () -> SkgConfig {
+    SkgConfig::dummyFromSources (Default::default ())
+  }
+
+  #[test]
+  fn live_replacement_rejects_process_startup_settings () {
+    let old = config ();
+    let mut new = old . clone ();
+    new . port += 1;
+    new . timing_log = !old . timing_log;
+    let error = validate_live_config_replacement (&old, &new) . unwrap_err ();
+    assert! (error . contains ("port"), "{}", error);
+    assert! (error . contains ("timing_log"), "{}", error);
+    assert! (error . contains ("restart the server"), "{}", error);
+  }
+
+  #[test]
+  fn live_replacement_accepts_runtime_paths_and_limits () {
+    let old = config ();
+    let mut new = old . clone ();
+    new . db_name = "replacement-database" . into ();
+    new . tantivy_folder = "replacement-index" . into ();
+    new . maintenance_archive_folder = "replacement-archives" . into ();
+    new . initial_node_limit += 1;
+    new . max_ancestry_depth += 1;
+    assert! (validate_live_config_replacement (&old, &new) . is_ok ());
+  }
+
+  #[test]
+  fn active_startup_services_pin_their_database_name () {
+    let mut old = config ();
+    old . auto_audit_daily = true;
+    old . delete_on_quit = true;
+    let mut new = old . clone ();
+    new . db_name = "replacement-database" . into ();
+    let error = validate_live_config_replacement (&old, &new) . unwrap_err ();
+    assert! (error . contains ("active audit daemon"), "{}", error);
+    assert! (error . contains ("installed shutdown handler"), "{}", error);
+  }
 }
