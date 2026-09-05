@@ -678,6 +678,46 @@ what's imperfect about what's done; choices determining the future.
   both clients' buffer-entry notifications repeat pending-disk, epoch-lock,
   preserved-presentation and stale-search warnings.  The public recovery
   commands are documented and included in Emacs hot re-evaluation order.
+- Completed the compact buffer census rather than treating a URI as the whole
+  identity of a view.  Both clients now send stable buffer ID, explicit kind,
+  lifecycle/disposable policy, continuation, normalized recipe and roots,
+  source set, complete graph/presentation/revision/application authority,
+  exact last/current text digests, dirty and stale state, herald presence and
+  maintenance epoch.  The server freezes and validates the same descriptor,
+  requests exact texts only through the incident-qualified artifact stream,
+  and binds the archive and every settlement ACK to that complete census.
+- Added exact attached-workflow parentage.  Metadata editors, fork
+  confirmations, relationship menus and the remaining late-stream Ediff
+  recovery bundle name their origin buffer ID, URI, application token and
+  normalized location.  Their live presence makes the origin logically dirty;
+  server classification couples each child disposition to its verified parent,
+  and client teardown recomputes the parent's unfinished-workflow count.
+- Routed every product buffer constructor in Emacs and Neovim through an
+  explicit registry policy.  The registry rejects omitted lifecycle or
+  disposability, source-scanning tests enumerate every remaining direct editor
+  buffer allocation, and configured direct =.skg= file buffers enroll as
+  =raw-skg-file=/=ordinary-file= without becoming graph views.  Regenerable
+  derived reports are explicitly disposable; ID-stack edits, workflows,
+  durable diagnostics and detached recovery are not inferred from conventional
+  names.
+- Conventional-name reuse is now limited to a registered, clean, explicitly
+  disposable buffer with no continuation or active maintenance epoch.  Dirty
+  search views and ID stacks remain byte-for-byte untouched, while warning,
+  recovery and declined-fork reports get distinct names instead of erasing an
+  earlier account.  Maintenance locks apply only to graph views, attached
+  workflows, maintenance controls and raw files, and Neovim restores the exact
+  prior =modifiable= state.
+- Tightened server cleanup to the same explicit rule.  A clean buffer closes
+  automatically only when it is disposable and continuation-free (apart from
+  the relationship menu's typed cancellation); reload selectors, durable or
+  edited derived state, and unfinished workflows receive a release or
+  conservative interruption instead.  The legacy Emacs late-stream conflict
+  path registers both Ediff variants under one continuation and terminates the
+  control/variant bundle explicitly after a successful reconciliation.
+- Validation after the constructor/workflow slice: the focused Rust view-impact
+  tests pass, all 400 Emacs tests pass with three optional undo-sidecar tests
+  skipped, and the complete Neovim suite passes.  The slice was committed as
+  separate server, Emacs and Neovim changes.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -690,10 +730,12 @@ what's imperfect about what's done; choices determining the future.
   workflow-census pass.  Their maintained pull/reload/rebuild replacements and
   end-to-end tests already made the deletion safe, and removing them reduced
   the number of constructors and mutation routes the remaining audit must cover.
+- The client constructor inventory and close-policy matrix were completed
+  immediately after full census/archive parentage, before the later ordinary
+  save fence.  That made the census closed over the actual live buffer set and
+  exposed conventional-name overwrite risks while the policy was still local.
 
 ** what's imperfect about what's done
-- The census currently reconstructs only live view forests; recipes, attached
-  workflows and stale-state detail still need the fuller descriptor schema.
 - A same-editor-process socket replacement resumes presentation exactly in
   both clients.  The server-restart/new-editor cases still need explicit
   reconciliation for a locally applied but unacknowledged clean offer and for
@@ -702,11 +744,6 @@ what's imperfect about what's done; choices determining the future.
   exact application/ACK authority used by retained collateral offers.
 - Both clients can finish an already-selected disk candidate, explicit reload,
   client-owned pull and full rebuild through the common post-archive path.
-- Attached workflow parentage is not present in the current census schema, so
-  workflow buffers are classified conservatively (dirty ones are interrupted,
-  clean ones close) rather than being settled with their parent.  The durable
-  settlement inventory and ACK gate are in place, but workflow-parent-aware
-  settlement is not yet implemented.
 - The recovery command layer is complete for retained client archives, but the
   server's remaining invalid-disk/store/fatal-Git recovery actions still need a
   complete public resume-command audit in both clients.
