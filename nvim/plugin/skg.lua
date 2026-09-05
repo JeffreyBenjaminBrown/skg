@@ -61,8 +61,20 @@ vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufNewFile' }, {
   callback = function (event)
     require('skg.keymaps').attach_file_buffer(event.buf)
     require('skg.readable_ids').enable(event.buf)
-    require('skg.buffer_registry').register_raw_file_if_configured(event.buf)
+    require('skg.raw_file').enroll(event.buf, true)
   end,
+})
+
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*.skg',
+  callback = function (event)
+    require('skg.raw_file').guard_before_save(event.buf) end,
+})
+
+vim.api.nvim_create_autocmd('BufWritePost', {
+  pattern = '*.skg',
+  callback = function (event)
+    require('skg.raw_file').after_save(event.buf) end,
 })
 
 -- Re-annotate readable ids whenever neogit refreshes its status (the

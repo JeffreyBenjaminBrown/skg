@@ -52,9 +52,9 @@ function M.install_source_inventory (wire_entries)
     })
   end
   M.source_inventory = inventory
-  local loaded = package.loaded['skg.buffer_registry']
-  if loaded and loaded.register_open_raw_files then
-    loaded.register_open_raw_files() end
+  local raw_file = package.loaded['skg.raw_file']
+  if raw_file and raw_file.enroll_open_files then
+    raw_file.enroll_open_files() end
 end
 
 ---@return string|nil the active config path, if it exists on disk
