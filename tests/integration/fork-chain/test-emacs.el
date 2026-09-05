@@ -67,6 +67,8 @@
       (beginning-of-line)
       (skg--change-source-at-point "public")
       (skg-approve-fork)))
+  (unless (skg-test-wait-for-response 10)
+    (test-fail "the approved public fork did not finish"))
   (message "✓ foreign N forked into a public clone")
 
   ;; 4. Reopen P: the public clone C is drawn in N's place.
@@ -98,6 +100,8 @@
       (beginning-of-line)
       (skg--change-source-at-point "private")
       (skg-approve-fork)))
+  (unless (skg-test-wait-for-response 10)
+    (test-fail "the approved private fork did not finish"))
   (message "✓ the public clone was forked into a private clone (source rotated)")
 
   ;; 7. Reopen P (all sources active): the chain end D -- a PRIVATE-source
@@ -125,14 +129,9 @@
       ;;    chain-end carrier).
       (with-current-buffer p-buf
         (skg-request-save-buffer))
-      (let ((saved (skg-test-wait-for
-                    (lambda ()
-                      (with-current-buffer p-buf
-                        (not (buffer-modified-p))))
-                    10)))
-        (unless saved
-          (test-fail "saving the chain-end view did not complete"))
-        (message "✓ saving the chain-end view succeeded"))))
+      (unless (skg-test-wait-for-response 10)
+        (test-fail "saving the chain-end view did not complete"))
+      (message "✓ saving the chain-end view succeeded")))
 
   (message "PASS: Override-chain integration test successful!")
   (kill-emacs 0))

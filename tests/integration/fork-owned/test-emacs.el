@@ -26,6 +26,19 @@
                                   (point-min) (point-max)))))))
    (buffer-list)))
 
+(defun fork-test--confirmation-showing (id)
+  "Return the typed fork-confirmation buffer whose text names ID."
+  (seq-find
+   (lambda (buffer)
+     (with-current-buffer buffer
+       (and skg--buffer-record
+            (eq (skg--buffer-record-kind skg--buffer-record)
+                'fork-confirmation)
+            (string-match-p (regexp-quote (format "(id %s)" id))
+                            (buffer-substring-no-properties
+                             (point-min) (point-max))))))
+   (skg-registered-buffers)))
+
 (defun fork-test--goto-headline (id)
   "Move point onto the headline carrying (id ID) in the current buffer.
 Fails the test if it is not found."
@@ -52,7 +65,7 @@ Fails the test if it is not found."
       (set-buffer-modified-p t)
       (fork-test--goto-headline "M")
       (skg-fork-node)
-      (when (get-buffer "*SKG Fork Confirmation*")
+      (when (fork-test--confirmation-showing "M")
         (test-fail "a dirty buffer must not produce a fork confirmation"))
       (message "✓ forking a dirty buffer was refused")
       (set-buffer-modified-p nil)
@@ -63,7 +76,7 @@ Fails the test if it is not found."
 
   ;; 4. The confirmation buffer appears and lists M; APPROVE it.
   (let ((confirm-buf (skg-test-wait-for
-                      (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
+                      (lambda () (fork-test--confirmation-showing "M")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
     (with-current-buffer confirm-buf
       (unless (string-match-p "(id M)" (buffer-string))
@@ -81,6 +94,8 @@ Fails the test if it is not found."
       (beginning-of-line)
       (skg--change-source-at-point "owned")
       (skg-approve-fork)))
+  (unless (skg-test-wait-for-response 10)
+    (test-fail "the approved fork did not finish"))
 
   ;; 5. Reopen Q fresh: override substitution now draws the clone in M's
   ;;    place, carrying (overridesHere M).
@@ -110,7 +125,7 @@ Fails the test if it is not found."
       (fork-test--goto-headline "M2")
       (skg-fork-node)))
   (let ((confirm-buf (skg-test-wait-for
-                      (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
+                      (lambda () (fork-test--confirmation-showing "M2")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation buffer for M2 appeared"))
     (with-current-buffer confirm-buf
       (skg-decline-fork)))
@@ -147,12 +162,7 @@ Fails the test if it is not found."
   ;; The M2 decline left a confirmation buffer open (it reuses one name),
   ;; so wait until it actually shows M3 before dismissing it.
   (let ((confirm-buf (skg-test-wait-for
-                      (lambda ()
-                        (let ((b (get-buffer "*SKG Fork Confirmation*")))
-                          (and b
-                               (with-current-buffer b
-                                 (string-match-p "(id M3)" (buffer-string)))
-                               b)))
+                      (lambda () (fork-test--confirmation-showing "M3"))
                       10)))
     (unless confirm-buf (test-fail "no fork-confirmation for M3 appeared"))
     ;; Dismiss by killing the buffer directly -- no approve, no decline.

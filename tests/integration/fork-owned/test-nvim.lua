@@ -28,12 +28,14 @@ local function buffer_showing (id)
   return nil
 end
 
----The live buffer named NAME, or nil. No polling -- for asserting the
----ABSENCE of a buffer that should never appear.
-local function find_buffer_named (name)
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(buf)
-       and vim.api.nvim_buf_get_name(buf) == name then
+---The typed fork-confirmation buffer whose text names ID, or nil.
+local function confirmation_showing (id)
+  local needle = '(id ' .. id .. ')'
+  local registry = require('skg.buffer_registry')
+  for _, buf in ipairs(registry.buffers()) do
+    local record = registry.record(buf)
+    if record.kind == 'fork-confirmation'
+       and T.buffer_text(buf):find(needle, 1, true) then
       return buf
     end
   end
@@ -89,7 +91,7 @@ T.check(T.buffer_text(q_buf):find('(id M)', 1, true),
 vim.bo[q_buf].modified = true
 goto_owned_headline('M')
 view_requests.fork_node()
-T.check(not find_buffer_named('skg://fork-confirmation'),
+T.check(not confirmation_showing('M'),
         'a dirty buffer must not produce a fork confirmation')
 print('forking a dirty buffer was refused')
 vim.bo[q_buf].modified = false
@@ -99,7 +101,8 @@ goto_owned_headline('M')
 view_requests.fork_node()
 
 -- 4. The confirmation buffer appears and lists M; APPROVE it.
-local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
+local confirm_buf = T.wait_for(function ()
+  return confirmation_showing('M') end, 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
 T.check(T.buffer_text(confirm_buf):find('(id M)', 1, true),
@@ -115,6 +118,7 @@ local clone_line = goto_line_starting_with('* (skg (node (source ',
   'could not find the clone-to-be headline')
 metadata.change_source_at_line(clone_line, 'owned')
 save.approve_fork()
+T.check(T.wait_for_response(10), 'the approved fork finished')
 
 -- 5. Reopen Q fresh: override substitution now draws the clone in M's
 --    place, carrying (overridesHere M).
@@ -140,7 +144,8 @@ vim.api.nvim_set_current_buf(q2_buf)
 goto_owned_headline('M2')
 view_requests.fork_node()
 
-local decline_confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
+local decline_confirm_buf = T.wait_for(function ()
+  return confirmation_showing('M2') end, 10)
 T.check(decline_confirm_buf, 'no fork-confirmation buffer for M2 appeared')
 vim.api.nvim_set_current_buf(decline_confirm_buf)
 save.decline_fork()
@@ -175,8 +180,7 @@ view_requests.fork_node()
 -- The M2 decline left a confirmation buffer open (it reuses one name),
 -- so wait until it actually shows M3 before dismissing it.
 local m3_confirm_buf = T.wait_for(function ()
-  local buf = find_buffer_named('skg://fork-confirmation')
-  return buf and T.buffer_text(buf):find('(id M3)', 1, true) and buf
+  return confirmation_showing('M3')
 end, 10)
 T.check(m3_confirm_buf, 'no fork-confirmation for M3 appeared')
 -- Dismiss by killing the buffer directly -- no approve, no decline.

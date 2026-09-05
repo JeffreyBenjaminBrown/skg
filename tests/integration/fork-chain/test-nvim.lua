@@ -92,6 +92,7 @@ local clone_line_1 = goto_line_starting_with('* (skg (node (source ',
   'could not find the clone-to-be headline')
 metadata.change_source_at_line(clone_line_1, 'public')
 save.approve_fork()
+T.check(T.wait_for_response(10), 'the approved public fork finished')
 print('foreign N forked into a public clone')
 
 -- 4. Reopen P: the public clone C is drawn in N's place.
@@ -116,6 +117,7 @@ local clone_line_2 = goto_line_starting_with('* (skg (node (source ',
   'could not find the clone-to-be headline')
 metadata.change_source_at_line(clone_line_2, 'private')
 save.approve_fork()
+T.check(T.wait_for_response(10), 'the approved private fork finished')
 print('the public clone was forked into a private clone (source rotated)')
 
 -- 7. Reopen P (all sources active): the chain end D -- a PRIVATE-source
@@ -138,10 +140,8 @@ print("the chain end D (private) is drawn in N's place (overridesHere N)")
 --    chain-end carrier).
 vim.api.nvim_set_current_buf(p_buf)
 save.request_save_buffer()
-local saved = T.wait_for(function ()
-  return not vim.bo[p_buf].modified
-end, 10)
-T.check(saved, 'saving the chain-end view did not complete')
+T.check(T.wait_for_response(10),
+        'saving the chain-end view did not complete')
 print('saving the chain-end view succeeded')
 
 T.pass('PASS: Override-chain integration test successful!')

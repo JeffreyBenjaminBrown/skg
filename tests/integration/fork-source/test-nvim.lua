@@ -112,6 +112,8 @@ print("rotated the clone's source to owned2")
 
 -- 5. Approve: re-save the origin with the chosen source.
 save.approve_fork()
+T.check(T.wait_for_response(10),
+        'the approved source-rotated fork finished')
 
 -- 6. The clone must land in owned2 (rotated), NOT owned (inferred).
 local committed = T.wait_for(function ()

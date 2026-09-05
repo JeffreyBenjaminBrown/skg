@@ -91,6 +91,7 @@ local clone_line = goto_line_starting_with('* (skg (node (source ',
   'could not find the clone-to-be headline')
 metadata.change_source_at_line(clone_line, 'owned')
 save.approve_fork()
+T.check(T.wait_for_response(10), 'the approved fork finished')
 
 -- 6. The fork commits: when P's saved view re-renders, N is now
 --    overridden and subscribed (its graphStats say so). (The saved

@@ -71,6 +71,8 @@
       (beginning-of-line)
       (skg--change-source-at-point "owned")
       (skg-approve-fork)))
+  (unless (skg-test-wait-for-response 10)
+    (test-fail "the approved fork did not finish"))
 
   ;; 6. The fork commits: when P's saved view re-renders, N is now
   ;;    overridden and subscribed (its graphStats say so). (The saved

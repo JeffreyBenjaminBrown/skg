@@ -88,6 +88,8 @@ the clone landed in the rotated source."
       (message "✓ rotated the clone's source to owned2")
       ;; 5. Approve: re-save the origin with the chosen source.
       (skg-approve-fork)))
+  (unless (skg-test-wait-for-response 10)
+    (test-fail "the approved source-rotated fork did not finish"))
 
   ;; 6. The clone must land in owned2 (rotated), NOT owned (inferred).
   (let ((committed (skg-test-wait-for
