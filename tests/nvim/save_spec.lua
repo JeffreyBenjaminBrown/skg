@@ -9,6 +9,7 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
+local config = require('skg.config')
 local registry = require('skg.buffer_registry')
 local folds = require('skg.folds')
 local lock = require('skg.lock')
@@ -85,6 +86,7 @@ describe('skg.save pipeline', function ()
     helpers.reset_client_state()
     helpers.wipe_skg_buffers()
     lock.end_stream()
+    config.store_state = nil
   end)
 
   it('round-trips a save: markers out, redraw in, point restored',
@@ -131,6 +133,38 @@ describe('skg.save pipeline', function ()
     -- Unlocked, unmodified.
     assert.is_true(vim.bo[buf].modifiable)
     assert.is_false(vim.bo[buf].modified)
+  end)
+
+  it('advances the graph baseline inherited by later buffers', function ()
+    config.store_state = { graph_generation = 1 }
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        respond(helpers.framed(
+          '((response-type save-result)'
+          .. ' (content "* (skg (node (id root))) root\\n")'
+          .. ' (errors ()) (warnings ()) (root-ids (root))'
+          .. ' (graph-generation 2) (presentation-generation 0)'
+          .. ' (server-revision 1) (client-application-token 2))'))
+      end
+    end)
+    local saved = open_view(
+      '* (skg (node (id root))) root', 'skg://save-generation',
+      'uri-save-generation')
+    assert.are.equal(1, registry.record(saved).graph_generation)
+    save.request_save_buffer()
+    assert.is_true(vim.wait(3000, function ()
+      return lock.stream_in_progress == nil
+             and config.store_state.graph_generation == 2
+    end, 10))
+    local later = buffer.open_org_buffer_from_text(
+      '* later', 'skg://later-generation', 'uri-later-generation', {
+        kind = 'new-empty-content-view', recipe = { kind = 'new-empty' },
+      })
+    assert.are.equal(2, registry.record(later).graph_generation)
+    config.observe_graph_generation(1)
+    assert.are.equal(2, config.store_state.graph_generation)
   end)
 
   it('locks all views, then unlocks non-collateral on save-lock',

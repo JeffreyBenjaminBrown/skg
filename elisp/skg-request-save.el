@@ -7,6 +7,7 @@
 (require 'skg-focus)
 (require 'skg-metadata)
 (require 'skg-buffer)
+(require 'skg-config)
 (require 'skg-lock-buffers)
 
 (defvar-local skg--last-rendered-content nil
@@ -896,6 +897,9 @@ every component of the registered application record must still match."
         (when (plist-member authority :root-ids)
           (setf (skg--buffer-record-root-ids skg--buffer-record)
                 (plist-get authority :root-ids)))))
+      (when authority
+        (skg-observe-server-graph-generation
+         (plist-get authority :graph-generation)))
     (setq skg--background-refresh-stale nil)
     (set-buffer-modified-p
      ;; Clear modified flag and re-register the one-shot hook

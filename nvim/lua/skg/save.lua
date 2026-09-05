@@ -6,6 +6,7 @@
 
 local buffer = require('skg.buffer')
 local client = require('skg.client')
+local config = require('skg.config')
 local focus = require('skg.focus')
 local folds = require('skg.folds')
 local lock = require('skg.lock')
@@ -440,6 +441,7 @@ function M.replace_buffer_with_new_content (buf, new_content,
     vim.b[buf].skg_record_source_set =
       authority.source_set or vim.b[buf].skg_record_source_set
     if authority.root_ids then vim.b[buf].skg_root_ids = authority.root_ids end
+    config.observe_graph_generation(authority.graph_generation)
   end
   vim.b[buf].skg_background_refresh_stale = nil
   buffer.arm_first_change_warning(buf)

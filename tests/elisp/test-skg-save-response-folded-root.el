@@ -233,6 +233,46 @@ headline and not back on the focused headline."
                                     (nth 2 shown)))))
       (kill-buffer buf))))
 
+(ert-deftest test-save-response-advances-new-buffer-graph-baseline ()
+  "A new view opened after a save inherits the save's selected generation."
+  (let ((saved (generate-new-buffer "*test-save-generation-saved*"))
+        (later (generate-new-buffer "*test-save-generation-later*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--server-store-state '((graph-generation . 1))))
+    (unwind-protect
+        (progn
+          (with-current-buffer saved
+            (org-mode)
+            (setq-local skg-view-uri "saved-uri")
+            (insert "* (skg (node (id root))) root\n")
+            (skg-register-buffer
+             saved 'content-view :lifecycle 'live-view :disposable nil
+             :view-uri skg-view-uri :last-fetched (buffer-string)
+             :graph-generation 1 :presentation-generation 0
+             :server-revision 0 :application-token 1)
+            (skg-handle-save-sexp
+             (prin1-to-string
+              '((content "* (skg (node (id root))) root\n")
+                (errors ()) (warnings ()) (root-ids (root))
+                (graph-generation 2) (presentation-generation 0)
+                (server-revision 1) (client-application-token 2)))))
+          (should (= 2 (alist-get 'graph-generation
+                                  skg--server-store-state)))
+          (with-current-buffer later
+            (org-mode)
+            (insert "* later\n")
+            (skg-register-buffer
+             later 'new-empty-content-view
+             :lifecycle 'live-view :disposable nil :view-uri "later-uri"
+             :last-fetched (buffer-string))
+            (should (= 2 (skg--buffer-record-graph-generation
+                          skg--buffer-record))))
+          (skg-observe-server-graph-generation 1)
+          (should (= 2 (alist-get 'graph-generation
+                                  skg--server-store-state))))
+      (kill-buffer saved)
+      (kill-buffer later))))
+
 (ert-deftest test-save-response-failure-with-errors-and-warnings-shows_both ()
   (let ((buf (generate-new-buffer "*test-save-response-errors-warnings*"))
         (shown nil)

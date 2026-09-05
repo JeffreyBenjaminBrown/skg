@@ -21,6 +21,17 @@ Nil before connection; local TOML readers are the startup fallback.")
 (defvar skg--server-store-state nil
   "Authoritative graph generation, path outcomes and store health from server.")
 
+(defun skg-observe-server-graph-generation (generation)
+  "Advance the connection's selected graph baseline to GENERATION.
+GENERATION observations can arrive on ordinary operation responses as well as
+the connection handshake.  Never regress the baseline if an older response is
+handled after a newer one."
+  (when (natnump generation)
+    (let ((current (cdr (assq 'graph-generation skg--server-store-state))))
+      (when (or (not (natnump current)) (> generation current))
+        (setf (alist-get 'graph-generation skg--server-store-state)
+              generation)))))
+
 (defun skg--atom-string (value)
   "Normalize a wire atom VALUE to a string, preserving nil."
   (when value (format "%s" value)))

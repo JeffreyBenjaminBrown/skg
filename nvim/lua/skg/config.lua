@@ -26,6 +26,18 @@ M.source_inventory = nil
 ---@type table|nil
 M.store_state = nil
 
+---Advance the selected graph baseline from an authoritative response.
+---Responses from older operations must not regress a newer observation.
+---@param generation integer|nil
+function M.observe_graph_generation (generation)
+  if type(generation) ~= 'number' or generation < 0
+     or generation ~= math.floor(generation) then return end
+  M.store_state = M.store_state or {}
+  local current = M.store_state.graph_generation
+  if type(current) ~= 'number' or generation > current then
+    M.store_state.graph_generation = generation end
+end
+
 local function optional_atom_text (value)
   if value == nil or sexpr.is_nil(value) then return nil end
   return sexpr.atom_text(value)
