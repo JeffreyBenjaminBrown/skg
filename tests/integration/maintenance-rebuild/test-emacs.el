@@ -39,8 +39,20 @@
       (write-region (point-min) (point-max) config nil 'silent))))
 
 (defun rebuild-test-break-config ()
+  (let ((config (getenv "SKG_TEST_CONFIG")))
+    (with-temp-buffer
+      (insert-file-contents-literally config)
+      (setq rebuild-test-valid-config (buffer-string)))
+    (with-temp-file config
+      (insert "this is not valid TOML = [\n"))))
+
+(defvar rebuild-test-valid-config nil)
+
+(defun rebuild-test-repair-config ()
+  (unless rebuild-test-valid-config
+    (rebuild-test-fail "no valid replacement config was retained"))
   (with-temp-file (getenv "SKG_TEST_CONFIG")
-    (insert "this is not valid TOML = [\n")))
+    (insert rebuild-test-valid-config)))
 
 (defun rebuild-test-main ()
   (setq skg-port (string-to-number (getenv "SKG_TEST_PORT")))
@@ -128,17 +140,37 @@
       30)
      "an invalid replacement config blocked before store mutation")
     (skg-request-single-root-content-view-from-id "y")
-    (rebuild-test-check
-     (skg-test-wait-for
-      (lambda ()
-        (let ((buffer (rebuild-test-buffer "y")))
-          (and buffer
-               (with-current-buffer buffer
-                 (string-match-p
-                  "queryable after invalid preflight"
-                  (buffer-substring-no-properties (point-min) (point-max)))))))
-      15)
-     "the selected graph remained queryable after invalid preflight"))
+    (let ((blocked-view
+           (skg-test-wait-for
+            (lambda ()
+              (let ((buffer (rebuild-test-buffer "y")))
+                (and buffer
+                     (with-current-buffer buffer
+                       (string-match-p
+                        "queryable after invalid preflight"
+                        (buffer-substring-no-properties
+                         (point-min) (point-max))))
+                     buffer)))
+            15)))
+      (rebuild-test-check
+       blocked-view
+       "the selected graph remained queryable after invalid preflight")
+      (rebuild-test-check
+       (with-current-buffer blocked-view
+         (equal (skg--buffer-record-maintenance-epoch skg--buffer-record)
+                (plist-get skg--maintenance-client-incident :epoch)))
+       "a view opened during blocked maintenance was born locked")
+      (rebuild-test-repair-config)
+      (skg-retry-maintenance)
+      (rebuild-test-check
+       (skg-test-wait-for
+        (lambda () (null skg--maintenance-client-incident))
+        60)
+       "the repaired incident retried to its terminal ACK")
+      (rebuild-test-check
+       (with-current-buffer blocked-view
+         (null (skg--buffer-record-maintenance-epoch skg--buffer-record)))
+       "the mid-incident view joined terminal settlement and unlocked")))
   (rebuild-test-check
    (directory-files-recursively
     (expand-file-name "maintenance-archives" skg-config-dir)

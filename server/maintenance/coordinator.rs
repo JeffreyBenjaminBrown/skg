@@ -431,11 +431,22 @@ impl MaintenanceCoordinator {
   /// never became a client buffer and may resolve it absent.
   pub fn enroll_presentation_census (
     &mut self,
-    records                : Vec<FrozenBufferRecord>,
-    authoritative_reconnect : bool,
+    records         : Vec<FrozenBufferRecord>,
+    requested_epoch : Option<u64>,
   ) -> Result<Vec<String>, String> {
     let CoordinatorState::Active (active) = &mut self . state else {
       return Ok (Vec::new ()); };
+    if let Some (requested_epoch) = requested_epoch {
+      if requested_epoch != active . epoch . get () {
+        return Err (format! (
+          "client census names maintenance epoch {}, current epoch is {}",
+          requested_epoch, active . epoch . get ())); }
+    }
+    // The bootstrap census is about to become the immutable initial census;
+    // it predates the distinction between old buffers and late enrollment.
+    // `freeze_locked_census` validates and installs it in the next request.
+    if active . phase == MaintenancePhase::AwaitingLockedCensus {
+      return Ok (Vec::new ()); }
     if active . presentation_buffer_census . is_empty ()
        && !active . buffer_census . is_empty ()
     {
@@ -496,7 +507,7 @@ impl MaintenanceCoordinator {
       active . presentation_buffer_census
         . insert (record . buffer_id . clone (), record);
     }
-    if authoritative_reconnect {
+    if requested_epoch . is_none () {
       active . pending_view_enrollments
         . retain (|uri, _| census_uris . contains (uri)); }
     Ok (added)
@@ -1978,6 +1989,11 @@ mod tests {
       last_fetched_sha256: "a" . repeat (64),
       current_sha256: "b" . repeat (64),
     };
+    let mut bootstrap = frozen . clone ();
+    bootstrap . maintenance_epoch = Some (active . epoch . get ());
+    assert! (coordinator . enroll_presentation_census (
+      vec![bootstrap], Some (active . epoch . get ()))
+      . unwrap () . is_empty ());
     assert! (coordinator . freeze_locked_census (
       &active . incident_id, active . epoch, vec![frozen . clone ()])
       . unwrap ());
@@ -2013,7 +2029,8 @@ mod tests {
     assert! (coordinator . enroll_pending_view (pending . clone ()) . unwrap ());
     assert! (!coordinator . enroll_pending_view (pending) . unwrap ());
     assert_eq! (coordinator . enroll_presentation_census (
-      vec![late_clean_view ("late-buffer", "late-view", active . epoch)], false)
+      vec![late_clean_view ("late-buffer", "late-view", active . epoch)],
+      Some (active . epoch . get ()))
       . unwrap (), ["late-buffer"]);
     let CoordinatorState::Active (enrolled) = &coordinator . state else {
       panic! ("late view stopped being active"); };
@@ -2032,11 +2049,12 @@ mod tests {
       view_uri: "lost-response" . into (), graph_generation: 1,
       presentation_generation: 0, server_revision: 1, application_token: 1,
     }) . unwrap ();
-    coordinator . enroll_presentation_census (Vec::new (), true) . unwrap ();
+    coordinator . enroll_presentation_census (Vec::new (), None) . unwrap ();
     let mut dirty = late_clean_view ("dirty", "client-created", active . epoch);
     dirty . kind = BufferKind::NewEmptyContentView;
     dirty . dirty = true;
-    assert! (coordinator . enroll_presentation_census (vec![dirty], false)
+    assert! (coordinator . enroll_presentation_census (
+      vec![dirty], Some (active . epoch . get ()))
       . unwrap_err () . contains ("absent from the initial archive"));
     let CoordinatorState::Active (enrolled) = &coordinator . state else {
       panic! ("late view stopped being active"); };

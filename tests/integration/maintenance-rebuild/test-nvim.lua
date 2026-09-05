@@ -6,6 +6,7 @@ T.arm_timeout(75)
 local maintenance = require('skg.maintenance')
 local state = require('skg.state')
 local config = require('skg.config')
+local valid_replacement_config
 
 local function replace_config ()
   local path = assert(os.getenv('SKG_TEST_CONFIG'))
@@ -77,7 +78,11 @@ T.check(config.source_inventory[1].name == 'replacement',
 maintenance.register_origin_operation_handler('full-rebuild',
   function (incident, phase, response)
     if phase == 'archive-ready' then
-      local file = assert(io.open(os.getenv('SKG_TEST_CONFIG'), 'w'))
+      local path = os.getenv('SKG_TEST_CONFIG')
+      local file = assert(io.open(path, 'r'))
+      valid_replacement_config = file:read('*a')
+      file:close()
+      file = assert(io.open(path, 'w'))
       file:write('this is not valid TOML = [\n')
       file:close()
     end
@@ -104,11 +109,26 @@ T.check(T.wait_for(function ()
 end, 30), 'an invalid replacement config blocked before store mutation')
 
 require('skg.content_view').request_single_root_content_view_from_id('y')
-T.check(T.wait_for(function ()
+local blocked_view = T.wait_for(function ()
   local buf = view_of('y')
   return buf and T.buffer_text(buf):find(
-    'queryable after invalid preflight', 1, true)
-end, 15), 'the selected graph remained queryable after invalid preflight')
+    'queryable after invalid preflight', 1, true) and buf or nil
+end, 15)
+T.check(blocked_view ~= nil,
+        'the selected graph remained queryable after invalid preflight')
+T.check(vim.b[blocked_view].skg_maintenance_epoch
+          == state.maintenance_client_incident.epoch,
+        'a view opened during blocked maintenance was born locked')
+
+local config_file = assert(io.open(os.getenv('SKG_TEST_CONFIG'), 'w'))
+config_file:write(assert(valid_replacement_config))
+config_file:close()
+maintenance.retry()
+T.check(T.wait_for(function ()
+  return state.maintenance_client_incident == nil
+end, 60), 'the repaired incident retried to its terminal ACK')
+T.check(vim.b[blocked_view].skg_maintenance_epoch == nil,
+        'the mid-incident view joined terminal settlement and unlocked')
 
 local finalized = vim.fn.globpath(
   vim.fs.dirname(os.getenv('SKG_TEST_CONFIG')) .. '/maintenance-archives',
