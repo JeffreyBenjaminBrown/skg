@@ -56,10 +56,18 @@ pub fn presentation_signature (
     let head_tree = repo . head () . ok ()
       . and_then (|head| head . peel_to_tree () . ok ());
     let index = repo . index () . map_err (|error| error . to_string ())?;
-    let mut paths : BTreeSet<Vec<u8>> = index . iter ()
-      . filter (|entry| direct_skg_in_scopes (&entry . path, &scopes . prefixes))
-      . map (|entry| entry . path . clone ())
-      . collect ();
+    // Group the index once.  Looking up every path by rescanning the complete
+    // index made startup quadratic (roughly 900 million entry comparisons in
+    // the real 30k-file repository).
+    let mut index_stages : BTreeMap<Vec<u8>, Vec<IndexEntry>> = BTreeMap::new ();
+    for entry in index . iter () . filter (|entry|
+        direct_skg_in_scopes (&entry . path, &scopes . prefixes))
+    {
+      index_stages . entry (entry . path . clone ())
+        . or_default () . push (entry);
+    }
+    let mut paths : BTreeSet<Vec<u8>> =
+      index_stages . keys () . cloned () . collect ();
     if let Some (tree) = &head_tree {
       collect_head_paths (&repo, tree, &scopes . prefixes, &mut paths)?; }
     for path_bytes in paths {
@@ -73,9 +81,8 @@ pub fn presentation_signature (
           feed (&mut hasher, entry . id () . as_bytes ());
         } else { feed (&mut hasher, b"h-absent"); }
       } else { feed (&mut hasher, b"h-unborn"); }
-      let mut stages : Vec<IndexEntry> = index . iter ()
-        . filter (|entry| entry . path == path_bytes)
-        . collect ();
+      let mut stages = index_stages . remove (&path_bytes)
+        . unwrap_or_default ();
       stages . sort_by_key (index_stage);
       if stages . is_empty () { feed (&mut hasher, b"i-absent"); }
       for entry in stages {
