@@ -863,6 +863,43 @@ with exact text and diff recovery.  An incomplete =.staging= directory is
 retained for inspection after any archive failure.  An impacted dirty buffer
 is detached recovery and has no live Skg save authority; open a fresh view for
 the current graph rather than saving the retired text as if it were current.
+*** skg-list-maintenance-incidents
+Lists every retained incident without contacting the server.  The table shows
+its UTC time, origin and status; changed, interrupted and released counts;
+client and =G0/G1=; exact and IEC size; and whether this Emacs can use its
+native undo sidecar.  A strict-named corrupt incident remains visible as
+invalid instead of hiding its healthy siblings.
+
+From this table, =RET= opens an interrupted buffer, =f= opens the corresponding
+fresh live view, =d= deletes a completed incident after confirmation, and =g=
+refreshes the list.
+*** skg-open-interrupted-view
+Selects a finalized incident and one interrupted view, verifies its manifests
+and every required artifact, then opens a new independent =SKG-Recovery=
+buffer containing the exact archived unsaved text.  It restores point/folds
+best-effort and restores native undo when the recorded Emacs and
+=undo-fu-session= versions pass their round-trip checks.  A missing, corrupt,
+foreign-editor or incompatible sidecar warns and falls back to exact text and
+diff recovery.
+
+The buffer is deliberately detached: it has no view URI or Skg save authority,
+and ordinary save, save-as and write-file are refused.  Use =C-/= and =C-?= for
+its local undo/redo, =C-c C-o= to select a checksum-verified artifact, and
+=C-c C-f= to open a separate current live view.  Opening the same archive
+twice creates two independent buffers and undo histories.
+*** skg-open-fresh-view-for-interrupted
+From a recovery buffer or incident selection, requests the recorded content
+root against the current selected generation.  If several roots were recorded,
+it asks which one.  For a search archive it shows the recorded terms and asks
+before explicitly rerunning them against current data.  It never copies or
+saves archived text into the live view.
+*** skg-delete-maintenance-incident
+Deletes one completed finalized incident only after revalidating its entire
+tree as a private, symlink-free immediate child of the configured archive root.
+The confirmation shows exact and IEC size and states that this is ordinary
+deletion, not secure erase.  Deletion is refused while the active maintenance
+incident still needs the archive; it never deletes server journals or Git
+recovery refs.
 *** skg-recover-reload-incident
 This older, separate command handles a fatal =.skg= parse/read recovery
 journal, not a maintenance archive.  It explicitly confirms recovery after

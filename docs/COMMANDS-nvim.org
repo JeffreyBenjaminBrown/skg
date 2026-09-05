@@ -764,6 +764,42 @@ for inspection.  An impacted dirty buffer is detached recovery without live
 Skg save authority; open a fresh view for the current graph rather than
 saving its retired text as if it were current.
 
+*** :SkgListMaintenanceIncidents
+Lists every retained incident without contacting the server.  The Org table
+shows its UTC time, origin and status; changed, interrupted and released
+counts; client and =G0/G1=; exact and IEC size; and whether this Neovim can use
+its native undo sidecar.  A strict-named corrupt incident remains visible as
+invalid instead of hiding its healthy siblings.
+
+In the list, =<CR>= opens an interrupted buffer, =f= opens the corresponding
+fresh live view, =d= deletes a completed incident after confirmation, and =r=
+refreshes the list.
+*** :SkgOpenInterruptedView
+Selects a finalized incident and one interrupted view, verifies its manifests
+and every required artifact, then opens a new independent detached Org buffer
+containing the exact archived unsaved text.  It restores point/folds
+best-effort and restores the native undo tree when the recorded Neovim version
+passes its round-trip checks.  A missing, corrupt, foreign-editor or
+incompatible sidecar warns and falls back to exact text and diff recovery.
+
+The buffer has no view URI, registry record or Skg save authority.  =:write=
+is refused.  Use ordinary Neovim undo/redo, =<localleader>ro= to select a
+checksum-verified artifact, and =<localleader>rf= to open a separate current
+live view.  Opening the same archive twice creates independent buffers and
+undo trees.
+*** :SkgOpenFreshViewForInterrupted
+From a recovery buffer or incident selection, requests the recorded content
+root against the current selected generation.  If several roots were recorded,
+it asks which one.  For a search archive it shows the recorded terms and asks
+before explicitly rerunning them against current data.  It never copies or
+writes archived text into the live view.
+*** :SkgDeleteMaintenanceIncident
+Deletes one completed finalized incident only after revalidating its entire
+tree as a private, symlink-free immediate child of the configured archive root.
+The confirmation shows exact and IEC size and states that this is ordinary
+deletion, not secure erase.  Deletion is refused while active maintenance still
+needs the archive; it never deletes server journals or Git recovery refs.
+
 Fatal =.skg= parse/read journals are an older separate recovery system.
 Neovim shows them persistently but does not confirm or dismiss them; use the
 Emacs recovery commands or repair manually.  The private server journal

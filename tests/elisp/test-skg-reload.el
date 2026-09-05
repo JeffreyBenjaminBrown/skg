@@ -156,6 +156,18 @@ error AND leave the captured table installed."
       (should-error (skg-reload))
       (should (equal heralds--transform-rules '(skg test-sentinel))))))
 
+(ert-deftest test-skg-reload-refreshes-detached-recovery-commands ()
+  (should (member "skg-recovery-ui.el"
+                  skg--reload-by-evaluation-files))
+  (should (< (cl-position "skg-recovery-archive.el"
+                          skg--reload-by-evaluation-files :test #'equal)
+             (cl-position "skg-recovery-ui.el"
+                          skg--reload-by-evaluation-files :test #'equal)))
+  (should (< (cl-position "skg-recovery-ui.el"
+                          skg--reload-by-evaluation-files :test #'equal)
+             (cl-position "skg-maintenance.el"
+                          skg--reload-by-evaluation-files :test #'equal))))
+
 (ert-deftest test-skg-reload-selection-is-a-distinct-id-stack-entry-path ()
   "Only the explicit reload command installs TO-RELOAD selection state."
   (let ((skg-id-stack '(("id-a" "Alpha") ("id-b" "Beta"))))

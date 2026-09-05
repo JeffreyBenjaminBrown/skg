@@ -6,7 +6,7 @@
 (defun skg-reload ()
   "Unload *almost* all skg features and reload from disk.
 
-Eight stateful files are deliberately absent from the unload list:
+Nine stateful files are deliberately absent from the unload list:
 
 - `skg-buffer' defines `skg-content-view-mode' and the
   permanent-local `skg-view-uri'. `unload-feature' would
@@ -39,10 +39,14 @@ Eight stateful files are deliberately absent from the unload list:
   and client Git-child retry state.  Their `defvar' state must likewise survive
   while their functions are refreshed.
 
+- `skg-recovery-ui' defines the modes and buffer-local recovery context used
+  by already-open detached recovery buffers.  Re-evaluation refreshes its
+  commands without disturbing those independent buffers.
+
 - `skg-worktree-guard' installs process-boundary advice.  Plain
   re-evaluation refreshes its functions without duplicating advice.
 
-All eight stateful files are idempotent on re-evaluation, so we pick up
+All nine stateful files are idempotent on re-evaluation, so we pick up
 edits to them via plain `load-file' instead.
 
 The herald rule table (`heralds--transform-rules', fetched from
@@ -83,6 +87,20 @@ error still propagates so the user can fix it."
         (heralds-install-rules herald-rules))))
   (message "skg: all modules reloaded"))
 
+(defconst skg--reload-by-evaluation-files
+  '("skg-state.el"
+    "skg-buffer-registry.el"
+    "skg-keymaps-and-aliases.el"
+    "skg-init.el"
+    "skg-recovery-archive.el"
+    "skg-recovery-ui.el"
+    "skg-maintenance.el"
+    "skg-pull.el"
+    "skg-worktree-guard.el"
+    "skg-request-reload-paths.el"
+    "skg-buffer.el")
+  "Skg files re-evaluated in order without unloading their live state.")
+
 (defun skg--reload-modules (elisp-dir)
   "Unload every skg feature and reload the client from ELISP-DIR.
 The destructive half of `skg-reload', kept separate so the
@@ -90,7 +108,7 @@ herald-table preservation in `skg-reload' can be exercised without
 actually unloading the world.  See `skg-reload' for why
 `skg-buffer', `skg-keymaps-and-aliases', `skg-state', `skg-buffer-registry',
 `skg-request-reload-paths', `skg-maintenance', `skg-pull', and
-`skg-worktree-guard' are
+`skg-recovery-ui' and `skg-worktree-guard' are
 reloaded by hand rather than via `unload-feature'.  The stateless recovery
 archive writer is also re-evaluated before the incident coordinator which
 calls it."
@@ -134,15 +152,7 @@ calls it."
     (dolist (feat skg-features)
       (when (featurep feat)
         (unload-feature feat t)))
-    (load-file (expand-file-name "skg-state.el"                elisp-dir))
-    (load-file (expand-file-name "skg-buffer-registry.el"      elisp-dir))
-    (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
-    (load-file (expand-file-name "skg-init.el"                elisp-dir))
-    (load-file (expand-file-name "skg-recovery-archive.el"    elisp-dir))
-    (load-file (expand-file-name "skg-maintenance.el"         elisp-dir))
-    (load-file (expand-file-name "skg-pull.el"                elisp-dir))
-    (load-file (expand-file-name "skg-worktree-guard.el"      elisp-dir))
-    (load-file (expand-file-name "skg-request-reload-paths.el" elisp-dir))
-    (load-file (expand-file-name "skg-buffer.el"              elisp-dir))))
+    (dolist (file skg--reload-by-evaluation-files)
+      (load-file (expand-file-name file elisp-dir)))))
 
 (provide 'skg-reload)
