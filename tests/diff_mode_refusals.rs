@@ -29,7 +29,7 @@ use skg::test_utils::{graph_handle_from_config, read_lp_message,
 use skg::test_utils::run_with_shared_test_db;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, ViewUri};
 use typedb_driver::TypeDBDriver;
 
 #[test]
@@ -195,6 +195,8 @@ async fn switch_refusals_take_the_unwinding_shape (
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           terms          : "untouched by a refusal" . to_string (),
+          view_uri       : ViewUri::SearchView (
+            "untouched by a refusal" . to_string ()),
           search_results : vec![],
           ancestry_by_id : HashMap::new (),
           graphnodestats : AllGraphNodeStats::empty (),

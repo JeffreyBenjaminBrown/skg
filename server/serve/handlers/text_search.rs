@@ -116,6 +116,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
   pub terms          : String,
+  pub view_uri       : ViewUri,
   pub search_results : Vec<ID>,
   pub ancestry_by_id : HashMap<ID, AncestryTree>,
   pub graphnodestats : AllGraphNodeStats,
@@ -160,6 +161,9 @@ pub fn handle_text_search_request (
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
+  let requested_view_uri : Option<ViewUri> =
+    extract_v_from_kv_pair_in_sexp ( &sexp, "view-uri" ) . ok ()
+    . map (ViewUri::from_client_string);
   let search_choice : Option<SearchUglinessChoice> =
     match search_choice_from_request (&sexp) {
       Ok (choice) => choice,
@@ -270,8 +274,16 @@ pub fn handle_text_search_request (
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &env . config )
             . expect ("search viewforest rendering never fails");
-          let uri : ViewUri =
-            ViewUri::SearchView ( search_terms . clone () );
+          let uri : ViewUri = requested_view_uri . clone ()
+            . unwrap_or_else (||
+              ViewUri::SearchView ( search_terms . clone () ));
+          if !matches! (&uri, ViewUri::SearchView (_)) {
+            let _ = send_response_with_length_prefix (
+              stream,
+              &tag_text_response (
+                TcpToClient::Error,
+                "A text-search view URI must begin with search:"));
+            return; }
           if views_state . open_views . views . contains_key (&uri) {
             // Replace prior search with the same terms.
             views_state . open_views . unregister_view (&uri); }
@@ -283,7 +295,7 @@ pub fn handle_text_search_request (
             crate::maintenance::BufferKind::SearchView,
             Some (format! ("search:{}", search_terms)) );
           let response = add_view_authority_to_response (
-            &mk_search_results_sexp (&rendered, &warnings),
+            &mk_search_results_sexp (&rendered, &warnings, &uri),
             views_state . open_views . views . get (&uri)
               . expect ("registered search view exists"));
           let _ = send_response_with_length_prefix (
@@ -294,7 +306,7 @@ pub fn handle_text_search_request (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled, lease,
             &search_terms, &search_results, active,
-            include_ugly_telescopes, presentation_generation ); },
+            include_ugly_telescopes, presentation_generation, &uri ); },
         Err (e) => {
           let _ = send_response_with_length_prefix (
             stream,
@@ -345,6 +357,7 @@ fn spawn_enrichment_thread (
   active           : &ActiveSourceSet,
   include_ugly_telescopes : bool,
   presentation_generation : u64,
+  view_uri        : &ViewUri,
 ) {
   { // Clear stale enrichment before spawning.
     // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
@@ -357,6 +370,7 @@ fn spawn_enrichment_thread (
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
   let active_clone  : ActiveSourceSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
+  let view_uri_clone : ViewUri          = view_uri . clone ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
   std::thread::spawn ( move || {
     let env = &lease . snapshot . env;
@@ -413,6 +427,7 @@ fn spawn_enrichment_thread (
       slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
       terms          : terms_clone,
+      view_uri       : view_uri_clone,
       search_results : ids_clone,
       ancestry_by_id,
       graphnodestats,
@@ -464,6 +479,7 @@ pub fn mk_search_enrichment_sexp (
 fn mk_search_results_sexp (
   content  : &str,
   warnings : &[String],
+  uri      : &ViewUri,
 ) -> String {
   Sexp::List ( vec! [
     Sexp::List ( vec! [
@@ -474,6 +490,10 @@ fn mk_search_results_sexp (
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ("content" . to_string ()) ),
       Sexp::Atom ( Atom::S (content . to_string ()) ),
+    ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ("view-uri" . to_string ()) ),
+      Sexp::Atom ( Atom::S (uri . repr_in_client ()) ),
     ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ("warnings" . to_string ()) ),

@@ -364,6 +364,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           terms          : "shared ranking term" . to_string (),
+          view_uri       : uri . clone (),
           search_results : vec![ID::from ("active-search-hit")],
           ancestry_by_id : HashMap::new (),
           graphnodestats : AllGraphNodeStats::empty (),

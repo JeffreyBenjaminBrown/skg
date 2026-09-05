@@ -140,11 +140,16 @@ So far there are these endpoints:
 
 ## Text search
   - Request: `((request . "text search") (terms . "SEARCH_TERMS")
-    (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))`, plus
+    (regex . "BOOL") (body . "BOOL") (operators . "BOOL")
+    (view-uri . "search:URI"))`, plus
     optional `(ugly-telescopes . "include")` or
     `(ugly-telescopes . "exclude")`.
     - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link dests, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
     - `regex`, `body`, `operators` are optional; each defaults to "false".
+    - `view-uri` is optional and normally defaults to
+      `search:SEARCH_TERMS`.  Detached recovery supplies a fresh
+      `search:recovery:UUID`, allowing an explicit rerun to coexist with an
+      older same-terms search without replacing it.
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
       - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, the query is parsed as a boolean expression over the per-token regexes: AND / OR / NOT / +foo / -bar, conventional precedence (NOT > AND > OR, bare adjacency = OR), and grouping via parens that stand ALONE between whitespace (a paren attached to a pattern is regex syntax within that piece). Malformed operator syntax is an error; phrase syntax does not apply. Detailed in docs/COMMANDS.org.
@@ -166,14 +171,15 @@ So far there are these endpoints:
       warning if the results include ugly telescopes.
 
   - Phase 1, immediate: Server sends LP `((response-type
-    search-results) (content "ORG") (warnings ("..." ...)))`.
+    search-results) (content "ORG") (view-uri "search:URI")
+    (warnings ("..." ...)))`.
     Results are ordinary indefinitive non-content TrueNodes (not
     special scaffold types). A no-match or error response has the same
     response type and a single `content` field.
 
   - Phase 2, enrichment: A three-message sequence:
-    1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
-    2. Emacs replies with `((request . "snapshot response") (terms . "TERMS") (request-id . "SAME_ID"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
+    1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS") ("view-uri" "search:URI"))` — asking the client for a snapshot of that exact search buffer.
+    2. The client replies with `((request . "snapshot response") (terms . "TERMS") (view-uri . "search:URI") (request-id . "SAME_ID"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. The client makes that exact buffer readonly before sending.
     3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG") ("warnings" (...)))`. Emacs replaces the buffer and exits readonly.
     - Enrichment uses the same active source-set as the original
       search. Containerward ancestry truncates before inactive

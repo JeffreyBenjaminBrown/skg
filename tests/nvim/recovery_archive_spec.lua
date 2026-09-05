@@ -634,6 +634,7 @@ describe('skg recovery archive', function ()
       assert.is_true(request[2])
       assert.is_false(request[3])
       assert.is_true(request[4])
+      assert.is_truthy(request[6]:find('^search:recovery:'))
     end, debug.traceback)
     ui.confirm = old_confirm
     search.request_text_search = old_request

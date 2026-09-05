@@ -54,6 +54,38 @@ describe('skg.search', function ()
       '(ugly-telescopes . "exclude")', 1, true))
   end)
 
+  it('opens an explicitly fresh same-terms search independently', function ()
+    local existing = buffer.open_org_buffer_from_text(
+      '* old search', buffer.search_buffer_name('dog'), 'search:dog', {
+        kind = 'search-view', recipe = { kind = 'search', terms = 'dog' },
+      })
+    local fresh_uri = 'search:recovery:12345678-1234-4234-8234-123456789abc'
+    local seen
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('text search', 1, true) then
+        seen = line
+        respond(helpers.framed(
+          '((response-type search-results) (content "* new search")'
+          .. ' (view-uri "' .. fresh_uri .. '") (warnings ()))'))
+      end
+    end)
+    search.request_text_search('dog', true, false, true, nil, fresh_uri)
+    local fresh
+    vim.wait(2000, function ()
+      fresh = buffer.find_buffer_by_uri(fresh_uri)
+      return fresh ~= nil
+    end, 10)
+    assert.is_truthy(seen:find('(view-uri . "' .. fresh_uri .. '")',
+      1, true))
+    assert.are_not.equal(existing, fresh)
+    assert.are_not.equal(vim.api.nvim_buf_get_name(existing),
+      vim.api.nvim_buf_get_name(fresh))
+    local recipe = require('skg.buffer_registry').record(fresh).recipe
+    assert.is_true(recipe.regex)
+    assert.is_false(recipe.body)
+    assert.is_true(recipe.operators)
+  end)
+
   it('opens results, snapshots on request, and applies enrichment',
      function ()
     local snapshot = nil
@@ -66,7 +98,7 @@ describe('skg.search', function ()
         -- Immediately ask for the snapshot, as the server does.
         respond(helpers.framed(
           '((response-type request-snapshot)'
-          .. ' (content "dog"))'))
+          .. ' (content "dog") (view-uri "search:dog"))'))
       elseif line:find('snapshot response', 1, true) then
         snapshot = line
         local buffer_id = line:match(
@@ -104,6 +136,7 @@ describe('skg.search', function ()
     assert.is_truthy(buf)
     assert.are.equal('skg://?dog', vim.api.nvim_buf_get_name(buf))
     assert.is_truthy(snapshot)
+    assert.is_truthy(snapshot:find('(view-uri . "search:dog")', 1, true))
     local text = table.concat(
       vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
     assert.is_truthy(text:find('first result enriched', 1, true))

@@ -89,7 +89,7 @@ use crate::runtime::interactive_session::{
   ClientKind,
   InteractiveSession,
 };
-use crate::serve::util::{ begin_request_context, ensure_request_has_terminal_response, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_server_push_sexp_response, tag_terminal_text_response, tag_text_response, take_send_failure, value_from_request_sexp};
+use crate::serve::util::{ begin_request_context, ensure_request_has_terminal_response, read_length_prefixed_content, request_context_active, request_type_from_request, send_response_with_length_prefix, tag_server_push_sexp_response, tag_sexp_response, tag_terminal_text_response, tag_text_response, take_send_failure, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
@@ -342,15 +342,25 @@ fn handle_connection (
             if guard . is_some () {
               // Peek at the terms without taking the payload yet.
               // The payload stays in the slot until the snapshot arrives.
-              let terms : String =
-                guard . as_ref () . unwrap () . terms . clone ();
+              let payload = guard . as_ref () . unwrap ();
+              let terms : String = payload . terms . clone ();
+              let view_uri : String = payload . view_uri . repr_in_client ();
               drop (guard); // release the lock
               tracing::debug! ("slot drain: requesting snapshot for '{}'", terms);
               let _ = send_response_with_length_prefix (
                 &mut stream,
-                & tag_text_response (
+                &tag_sexp_response (
                   TcpToClient::RequestSnapshot,
-                  &terms ));
+                  &Sexp::List (vec![
+                    Sexp::List (vec![
+                      Sexp::Atom (Atom::S ("content" . into ())),
+                      Sexp::Atom (Atom::S (terms)),
+                    ]),
+                    Sexp::List (vec![
+                      Sexp::Atom (Atom::S ("view-uri" . into ())),
+                      Sexp::Atom (Atom::S (view_uri)),
+                    ]),
+                  ]) . to_string () ));
               snapshot_requested = true; }}}
         if ! request_context_active () {
           let reconciliation = reconciliation_generation ();
@@ -829,6 +839,16 @@ fn handle_snapshot_response (
         &format! ("Snapshot terms mismatch: '{}' vs '{}'",
                   payload . terms, terms)));
     return; }
+  let snapshot_view_uri = match value_from_request_sexp (
+      "view-uri", request)
+  {
+    Ok (value) => ViewUri::from_client_string (value),
+    Err (error) => { send_runtime_error (stream, &error); return; }
+  };
+  if snapshot_view_uri != payload . view_uri {
+    send_runtime_error (stream, "snapshot search view URI changed");
+    return;
+  }
   let client_buffer_id = match value_from_request_sexp (
       "client-buffer-id", request)
   {
@@ -866,7 +886,7 @@ fn handle_snapshot_response (
     send_runtime_error (
       stream, "search source-set changed before enrichment snapshot");
     return; }
-  let uri = ViewUri::SearchView (terms . clone ());
+  let uri = payload . view_uri . clone ();
   {
     let Some (state) = views_state . open_views . views . get_mut (&uri)
     else {

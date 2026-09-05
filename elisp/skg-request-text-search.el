@@ -67,7 +67,7 @@ headline documenting `skg-search-interactive'."
   (if b "true" "false"))
 
 (defun skg--request-text-search (search-terms regex body operators
-                                              &optional ugly-choice)
+                                              &optional ugly-choice view-uri)
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
@@ -83,7 +83,8 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                       (body      . ,(skg--bool-to-string body))
                       (operators . ,(skg--bool-to-string operators)))
                     (when ugly-choice
-                      `((ugly-telescopes . ,ugly-choice)))))
+                      `((ugly-telescopes . ,ugly-choice)))
+                    (when view-uri `((view-uri . ,view-uri)))))
                   "\n")))
     (skg-register-response-handler
      ;; Register phase 1 handler (one-shot)
@@ -91,7 +92,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      (lambda (_tcp-proc payload)
        (skg-remove-response-handler 'ugly-telescope-confirmation)
        (skg--display-search-phase1
-        payload clean-terms regex body operators ugly-choice))
+        payload clean-terms regex body operators ugly-choice view-uri))
      t)
     (skg-register-response-handler
      ;; Register phase 2 handler for search results 'enriched' with containerward paths and graphnodestats. Persists until fired or replaced.
@@ -120,7 +121,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                           "include"
                         "exclude")))
          (skg--request-text-search
-          clean-terms regex body operators choice)))
+          clean-terms regex body operators choice view-uri)))
      nil)
     (skg-submit-request tcp-proc request-s-exp)))
 
@@ -134,7 +135,8 @@ buffer to link-creation mode.")
   "Arguments which reproduce this live search after rank-only repair.")
 
 (defun skg--display-search-phase1
-    (payload search-terms regex body operators ugly-choice)
+    (payload search-terms regex body operators ugly-choice
+             &optional requested-view-uri)
   "Display phase 1 search results (without paths).
 Sets skg-view-uri to \"search:TERMS\" and registers a
 kill-buffer-hook to send close-view to the server."
@@ -142,10 +144,14 @@ kill-buffer-hook to send close-view to the server."
          (content (skg--as-string (cadr (assoc 'content response))))
          (warnings (cadr (assoc 'warnings response)))
          (authority (skg--view-authority-from-response response))
-         (view-uri (concat "search:" search-terms)))
+         (view-uri (or (skg--as-string (cadr (assoc 'view-uri response)))
+                       requested-view-uri
+                       (concat "search:" search-terms))))
     (when content
       (with-current-buffer
-          (get-buffer-create (skg-search-buffer-name search-terms))
+          (if requested-view-uri
+              (generate-new-buffer (skg-search-buffer-name search-terms))
+            (get-buffer-create (skg-search-buffer-name search-terms)))
         (let ((inhibit-read-only t))
           (skg--replace-search-content content)
           (skg-content-view-mode)
@@ -302,8 +308,10 @@ Exits readonly after replacing content."
 - Client sends its text back to the server for 'enrichment'."
   (let* ((response (read payload))
          (terms (skg--as-string (cadr (assoc 'content response))))
-         (buf (when terms
-                (get-buffer (skg-search-buffer-name terms)))))
+         (view-uri (skg--as-string (cadr (assoc 'view-uri response))))
+         (buf (or (and view-uri (skg-find-buffer-by-uri view-uri))
+                  (when terms
+                    (get-buffer (skg-search-buffer-name terms))))))
     (when (and buf (buffer-live-p buf))
       (with-current-buffer buf
         (setq buffer-read-only t)
@@ -314,6 +322,7 @@ Exits readonly after replacing content."
                 (concat (prin1-to-string
                          `((request . "snapshot response")
                            (terms . ,terms)
+                           (view-uri . ,(skg--buffer-record-view-uri record))
                            (client-buffer-id
                             . ,(skg--buffer-record-id record))
                            (graph-generation

@@ -2,6 +2,7 @@
 
 (require 'cl-lib)
 (require 'org)
+(require 'org-id)
 (require 'tabulated-list)
 (require 'subr-x)
 (require 'skg-recovery-archive)
@@ -561,7 +562,8 @@
           (skg-recovery-ui--recipe-value recipe 'body))
          (skg-recovery-ui--true-p
           (skg-recovery-ui--recipe-value recipe 'operators))
-         (skg-recovery-ui--recipe-value recipe 'ugly-choice))))
+         (skg-recovery-ui--recipe-value recipe 'ugly-choice)
+         (concat "search:recovery:" (org-id-uuid)))))
      (t
       (user-error "Fresh recovery is unsupported for archived kind %s" kind)))
     summary))

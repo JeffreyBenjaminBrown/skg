@@ -82,7 +82,7 @@ end
 ---@param body boolean
 ---@param operators boolean
 function M.request_text_search (search_terms, regex, body, operators,
-                                ugly_choice)
+                                ugly_choice, view_uri)
   local request_form = {
     sexpr.pair(sexpr.symbol('request'), 'text search'),
     sexpr.pair(sexpr.symbol('terms'), search_terms),
@@ -93,11 +93,15 @@ function M.request_text_search (search_terms, regex, body, operators,
   if ugly_choice then
     table.insert(request_form,
       sexpr.pair(sexpr.symbol('ugly-telescopes'), ugly_choice)) end
+  if view_uri then
+    table.insert(request_form,
+      sexpr.pair(sexpr.symbol('view-uri'), view_uri)) end
   local request = sexpr.to_string(request_form) .. '\n'
   state.register_response_handler('search-results',
     function (_payload_text, response)
       state.remove_response_handler('ugly-telescope-confirmation')
-      M.display_search_phase1(response, search_terms)
+      M.display_search_phase1(
+        response, search_terms, regex, body, operators, ugly_choice, view_uri)
     end, true)
   state.register_response_handler('search-enrichment',
     function (_payload_text, response)
@@ -122,7 +126,7 @@ function M.request_text_search (search_terms, regex, body, operators,
       local choice = vim.fn.confirm(
         prompt, '&Include\n&Exclude', 2) == 1 and 'include' or 'exclude'
       M.request_text_search(
-        search_terms, regex, body, operators, choice)
+        search_terms, regex, body, operators, choice, view_uri)
     end, false)
   client.submit_request(request)
 end
@@ -131,15 +135,23 @@ end
 ---under the uri 'search:TERMS'.
 ---@param response any
 ---@param search_terms string
-function M.display_search_phase1 (response, search_terms)
+function M.display_search_phase1 (response, search_terms, regex, body,
+                                  operators, ugly_choice, requested_view_uri)
   local content = payload.field_text(response, 'content')
   if not content then return end
+  local view_uri = payload.field_text(response, 'view-uri')
+    or requested_view_uri or ('search:' .. search_terms)
   local buf = buffer.open_org_buffer_from_text(
     content and (vim.trim(content) .. '\n') or '',
     buffer.search_buffer_name(search_terms),
-    'search:' .. search_terms, {
+    view_uri, {
       kind = 'search-view',
-      recipe = { kind = 'search', terms = search_terms },
+      force_new = requested_view_uri ~= nil,
+      recipe = {
+        kind = 'search', terms = search_terms,
+        regex = regex == true, body = body == true,
+        operators = operators == true, ugly_choice = ugly_choice,
+      },
       graph_generation = tonumber(
         payload.field_text(response, 'graph-generation')),
       presentation_generation = tonumber(
@@ -260,7 +272,9 @@ end
 ---@param response any
 function M.handle_snapshot_request (response)
   local terms = payload.field_text(response, 'content')
-  local buf = terms and buffer.find_buffer_by_uri('search:' .. terms)
+  local uri = payload.field_text(response, 'view-uri')
+    or (terms and ('search:' .. terms))
+  local buf = uri and buffer.find_buffer_by_uri(uri)
   if not buf then return end
   vim.bo[buf].modifiable = false
   vim.notify('Enriching search results...')
@@ -269,6 +283,7 @@ function M.handle_snapshot_request (response)
   client.submit_request_continuation(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'snapshot response'),
     sexpr.pair(sexpr.symbol('terms'), terms),
+    sexpr.pair(sexpr.symbol('view-uri'), record.view_uri),
     sexpr.pair(sexpr.symbol('client-buffer-id'), record.id),
     sexpr.pair(sexpr.symbol('graph-generation'),
                tostring(record.graph_generation)),

@@ -187,7 +187,44 @@
             (skg-open-fresh-view-for-interrupted
              (plist-get fixture :summary)
              (plist-get fixture :buffer-key)))
-          (should (equal request '("octopus" t nil t nil))))
+          (should (equal (butlast request) '("octopus" t nil t nil)))
+          (should (string-prefix-p "search:recovery:" (car (last request)))))
       (skg-test-recovery--cleanup fixture))))
+
+(ert-deftest test-skg-recovery-search-opens-beside-same-terms-view ()
+  (let* ((terms "octopus")
+         (old (generate-new-buffer (skg-search-buffer-name terms)))
+         (fresh-uri "search:recovery:12345678-1234-4234-8234-123456789abc")
+         fresh)
+    (unwind-protect
+        (save-window-excursion
+          (with-current-buffer old
+            (insert "* old search\n")
+            (skg-content-view-mode)
+            (setq skg-view-uri (concat "search:" terms))
+            (skg-register-buffer
+             old 'search-view :view-uri skg-view-uri
+             :recipe `((kind . "search") (terms . ,terms))))
+          (let ((skg--search-buffer-setup-hook nil))
+            (skg--display-search-phase1
+             (prin1-to-string
+              `((response-type search-results)
+                (content "* new search\n")
+                (view-uri ,fresh-uri)
+                (warnings ())))
+             terms t nil t nil fresh-uri))
+          (setq fresh (skg-find-buffer-by-uri fresh-uri))
+          (should (buffer-live-p fresh))
+          (should-not (eq old fresh))
+          (should-not (equal (buffer-name old) (buffer-name fresh)))
+          (with-current-buffer fresh
+            (should (equal (buffer-string) "* new search\n"))
+            (should (equal
+                     (cdr (assq 'regex
+                                (skg--buffer-record-recipe
+                                 skg--buffer-record)))
+                     t))))
+      (skg-test-recovery-ui--kill old)
+      (skg-test-recovery-ui--kill fresh))))
 
 (provide 'test-skg-recovery-ui)

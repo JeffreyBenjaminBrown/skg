@@ -533,7 +533,8 @@ function M.open_fresh_view_for_interrupted (incident, buffer_key)
         terms, truthy(recipe_value(recipe, 'regex')),
         truthy(recipe_value(recipe, 'body')),
         truthy(recipe_value(recipe, 'operators')),
-        recipe_value(recipe, 'ugly-choice'))
+        recipe_value(recipe, 'ugly-choice'),
+        'search:recovery:' .. require('skg.buffer').generate_uuid())
     end
     fail('fresh recovery is unsupported for archived kind ' .. kind)
   end)
