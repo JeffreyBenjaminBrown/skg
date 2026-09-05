@@ -400,4 +400,48 @@ function M.mark_census_buffers_stale (buffer_ids)
   end
 end
 
+---Warnings which remain relevant whenever BUF is entered.
+---@param buf integer
+---@return string[]
+function M.status_messages (buf)
+  local record = M.record(buf)
+  if not record then return {} end
+  local state = require('skg.state')
+  local messages = {}
+  if state.pending_maintenance_offer then
+    table.insert(messages,
+      'Disk reconciliation is pending; every Skg view save is blocked') end
+  if record.maintenance_epoch then
+    table.insert(messages, string.format(
+      'This Skg buffer is maintenance-locked for epoch %s',
+      record.maintenance_epoch)) end
+  if record.presentation_stale then
+    if vim.b[buf].skg_herald_bearing == true then
+      table.insert(messages,
+        'This preserved presentation is stale; generated heralds may describe an older graph')
+    else
+      table.insert(messages,
+        'This preserved presentation may describe an older graph') end
+  end
+  if record.search_stale then
+    table.insert(messages,
+      'Search membership and ranking are stale; rerun the search explicitly') end
+  return messages
+end
+
+function M.notify_status (buf)
+  local messages = M.status_messages(buf)
+  if #messages > 0 then
+    vim.notify('Skg: ' .. table.concat(messages, '; '), vim.log.levels.WARN)
+  end
+  return messages
+end
+
+local status_group = vim.api.nvim_create_augroup(
+  'skg-buffer-status', { clear = true })
+vim.api.nvim_create_autocmd('BufEnter', {
+  group = status_group,
+  callback = function (event) M.notify_status(event.buf) end,
+})
+
 return M

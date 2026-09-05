@@ -260,6 +260,25 @@
       (should (= 7 (skg--buffer-record-application-token skg--buffer-record)))
       (should (skg--buffer-record-presentation-stale skg--buffer-record)))))
 
+(ert-deftest test-skg-stale-and-pending-status-repeats-on-buffer-entry ()
+  (skg-test-maintenance--with-buffer 'search-view
+    (let ((skg--pending-maintenance-offer '((candidate-id . "candidate")))
+          echoed)
+      (setf (skg--buffer-record-presentation-stale skg--buffer-record) t
+            (skg--buffer-record-search-stale skg--buffer-record) t
+            (skg--buffer-record-herald-bearing skg--buffer-record) t)
+      (should (string-match-p "pending-disk" (skg-buffer-status-indicator)))
+      (should (string-match-p "presentation-stale"
+                              (skg-buffer-status-indicator)))
+      (should (string-match-p "search-stale" (skg-buffer-status-indicator)))
+      (cl-letf (((symbol-function 'message)
+                 (lambda (format-string &rest arguments)
+                   (setq echoed (apply #'format format-string arguments)))))
+        (skg-warn-buffer-status-on-entry))
+      (should (string-match-p "maintenance-locked" echoed))
+      (should (string-match-p "generated heralds" echoed))
+      (should (string-match-p "Search membership and ranking" echoed)))))
+
 (ert-deftest test-skg-maintenance-retirement-keeps-text-and-undo ()
   (skg-test-maintenance--with-buffer 'content-view
     (set-buffer-modified-p t)

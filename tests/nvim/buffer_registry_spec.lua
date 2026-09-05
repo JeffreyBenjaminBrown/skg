@@ -76,6 +76,28 @@ describe('skg maintenance buffer transitions', function ()
     assert.is_false(vim.bo[buf].modifiable)
   end)
 
+  it('repeats pending, maintenance and stale warnings on buffer entry',
+     function ()
+    local buf = make_buffer('search-view')
+    local state = require('skg.state')
+    local old_offer = state.pending_maintenance_offer
+    local old_notify = vim.notify
+    local notice
+    state.pending_maintenance_offer = { candidate_id = 'candidate' }
+    registry.lock_for_maintenance(buf, 4)
+    vim.b[buf].skg_presentation_stale = true
+    vim.b[buf].skg_search_stale = true
+    vim.b[buf].skg_herald_bearing = true
+    vim.notify = function (message) notice = message end
+    registry.notify_status(buf)
+    vim.notify = old_notify
+    state.pending_maintenance_offer = old_offer
+    assert.is_truthy(notice:find('every Skg view save is blocked', 1, true))
+    assert.is_truthy(notice:find('maintenance-locked for epoch 4', 1, true))
+    assert.is_truthy(notice:find('generated heralds', 1, true))
+    assert.is_truthy(notice:find('Search membership and ranking', 1, true))
+  end)
+
   it('rejects a settlement whose frozen base changed', function ()
     local buf = make_buffer('content-view')
     local exact = settlement(buf, false, 'release-ack')

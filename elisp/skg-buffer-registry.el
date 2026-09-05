@@ -16,6 +16,8 @@
 (defvar skg--buffer-registry (make-hash-table :test #'equal)
   "Skg-owned buffers keyed by stable client-local buffer ID.")
 
+(defvar skg--pending-maintenance-offer)
+
 (defvar-local skg--buffer-record nil)
 (put 'skg--buffer-record 'permanent-local t)
 
@@ -92,6 +94,8 @@
       (setq skg--buffer-record record)
       (puthash id buffer skg--buffer-registry)
       (add-hook 'kill-buffer-hook #'skg-unregister-current-buffer nil t)
+      (add-hook 'buffer-list-update-hook
+                #'skg-warn-buffer-status-on-entry nil t)
       (setq-local mode-line-process
                   '(:eval (skg-buffer-status-indicator)))
       (when (and (listp skg--maintenance-state)
@@ -310,6 +314,9 @@
 (defun skg-buffer-status-indicator ()
   (when skg--buffer-record
     (concat
+     (when (and (boundp 'skg--pending-maintenance-offer)
+                skg--pending-maintenance-offer)
+       " pending-disk")
      (when (skg--buffer-record-maintenance-epoch skg--buffer-record)
        (format " M:%s"
                (skg--buffer-record-maintenance-epoch skg--buffer-record)))
@@ -317,6 +324,30 @@
        " presentation-stale")
      (when (skg--buffer-record-search-stale skg--buffer-record)
        " search-stale"))))
+
+(defun skg-buffer-status-messages ()
+  "Return warnings which remain relevant to the current Skg buffer."
+  (when skg--buffer-record
+    (delq
+     nil
+     (list
+      (when (and (boundp 'skg--pending-maintenance-offer)
+                 skg--pending-maintenance-offer)
+        "Disk reconciliation is pending; every Skg view save is blocked")
+      (when-let ((epoch (skg--buffer-record-maintenance-epoch
+                         skg--buffer-record)))
+        (format "This Skg buffer is maintenance-locked for epoch %s" epoch))
+      (when (skg--buffer-record-presentation-stale skg--buffer-record)
+        (if (skg--buffer-record-herald-bearing skg--buffer-record)
+            "This preserved presentation is stale; generated heralds may describe an older graph"
+          "This preserved presentation may describe an older graph"))
+      (when (skg--buffer-record-search-stale skg--buffer-record)
+        "Search membership and ranking are stale; rerun the search explicitly")))))
+
+(defun skg-warn-buffer-status-on-entry ()
+  "Repeat persistent maintenance and staleness warnings on buffer entry."
+  (when-let ((messages (skg-buffer-status-messages)))
+    (message "Skg: %s" (string-join messages "; "))))
 
 (defun skg-buffer-census ()
   "Return a compact, portable census of registered buffers."
