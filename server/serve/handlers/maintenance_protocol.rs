@@ -11,6 +11,7 @@ use crate::maintenance::evidence::{
   ClientEvidenceBundle,
 };
 use crate::maintenance::selection::select_archived_candidate;
+use crate::maintenance::pull::validate_repository_mapping;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
   CandidateId,
@@ -53,12 +54,12 @@ use crate::serve::util::{
 use sexp::{Atom, Sexp};
 use sha2::{Digest, Sha256};
 use futures::executor::block_on;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::net::TcpStream;
 use std::path::Path;
 
 use crate::types::misc::ID;
-use crate::types::sexp::extract_string_list_from_sexp;
+use crate::types::sexp::{atom_to_string, extract_string_list_from_sexp};
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{
@@ -89,10 +90,15 @@ fn begin_maintenance (
   let targets = MaintenanceTargets {
     paths: optional_string_list (&parsed, "paths")?,
     ids: optional_string_list (&parsed, "ids")?,
+    pull_repositories: optional_pull_repositories (&parsed)?,
   };
   let snapshot = runtime . selected_snapshot ();
   if origin == MaintenanceOrigin::ExplicitPartialReload {
     validate_partial_reload_paths (&snapshot . env . config, &targets . paths)?;
+  }
+  if origin == MaintenanceOrigin::Pull {
+    validate_repository_mapping (
+      &snapshot . env . config, &targets . pull_repositories)?;
   }
   let (client, source_set, census) = {
     let interactive = runtime . interactive . lock ()
@@ -489,6 +495,8 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
   } else {
     let mut fields = archive_verification_fields (&verified);
     fields . insert (0, atom_field ("status", "archive-ready"));
+    fields . push (pull_repositories_field (
+      &active . targets . pull_repositories));
     fields . push (atom_field (
       "next-action", "origin-specific-operation-required"));
     return Ok (Sexp::List (fields) . to_string ());
@@ -1076,6 +1084,7 @@ fn active_status_sexp (
     atom_field ("archive-directory-name", &active . archive_directory_name),
     list_field ("requested-paths", &active . targets . paths),
     list_field ("requested-ids", &active . targets . ids),
+    pull_repositories_field (&active . targets . pull_repositories),
   ];
   if active . selected_store . is_some () {
     let _ = append_selected_fields (&mut fields, active);
@@ -1580,6 +1589,69 @@ fn optional_string_list (sexp : &Sexp, key : &str)
   else { Ok (Vec::new ()) }
 }
 
+fn field_values<'a> (sexp : &'a Sexp, key : &str)
+  -> Option<&'a [Sexp]>
+{
+  let Sexp::List (items) = sexp else { return None; };
+  items . iter () . find_map (|item| {
+    let Sexp::List (parts) = item else { return None; };
+    match parts . first () {
+      Some (Sexp::Atom (Atom::S (candidate))) if candidate == key =>
+        Some (&parts[1..]),
+      _ => None,
+    }
+  })
+}
+
+fn required_record_atom (record : &Sexp, key : &str)
+  -> Result<String, String>
+{
+  let values = field_values (record, key)
+    . ok_or_else (|| format! ("pull repository has no {}", key))?;
+  let value = match values {
+    [value] => value,
+    [Sexp::Atom (Atom::S (dot)), value] if dot == "." => value,
+    _ => return Err (format! (
+      "pull repository {} must contain exactly one atom", key)),
+  };
+  atom_to_string (value)
+    . map_err (|_| format! ("pull repository {} is not an atom", key))
+}
+
+fn required_record_string_list (record : &Sexp, key : &str)
+  -> Result<Vec<String>, String>
+{
+  let values = field_values (record, key)
+    . ok_or_else (|| format! ("pull repository has no {}", key))?;
+  let [Sexp::List (items)] = values else { return Err (format! (
+    "pull repository {} must be one nested list", key)); };
+  items . iter () . map (|item| atom_to_string (item)
+    . map_err (|_| format! ("pull repository {} contains a non-atom", key)))
+  . collect ()
+}
+
+fn optional_pull_repositories (sexp : &Sexp)
+  -> Result<BTreeMap<String, Vec<String>>, String>
+{
+  let Some (values) = field_values (sexp, "pull-repositories") else {
+    return Ok (BTreeMap::new ()); };
+  let [Sexp::List (records)] = values else { return Err (
+    "pull-repositories must be one nested list" . into ()); };
+  let mut repositories = BTreeMap::new ();
+  for record in records {
+    let key = required_record_atom (record, "repository-key")?;
+    let mut sources = required_record_string_list (record, "sources")?;
+    let source_count = sources . len ();
+    sources . sort ();
+    sources . dedup ();
+    if sources . len () != source_count {
+      return Err (format! ("pull repository {} repeats a source", key)); }
+    if repositories . insert (key . clone (), sources) . is_some () {
+      return Err (format! ("pull repository key {} is repeated", key)); }
+  }
+  Ok (repositories)
+}
+
 fn validate_partial_reload_paths (
   config : &crate::types::misc::SkgConfig,
   paths  : &[String],
@@ -1621,6 +1693,7 @@ fn maintenance_offer_payload (
       . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
     list_field ("requested-paths", &active . targets . paths),
     list_field ("requested-ids", &active . targets . ids),
+    pull_repositories_field (&active . targets . pull_repositories),
     list_field ("registered-buffer-ids", &active . registered_buffer_ids),
     list_field ("dirty-buffer-ids", &active . dirty_buffer_ids),
     list_field ("undo-required-buffer-ids", &active . undo_required_buffer_ids),
@@ -1662,6 +1735,20 @@ fn list_field (key : &str, values : &[String]) -> Sexp {
   ])
 }
 
+fn pull_repositories_field (
+  repositories : &BTreeMap<String, Vec<String>>,
+) -> Sexp {
+  let records = repositories . iter () . map (|(key, sources)|
+    Sexp::List (vec![
+      atom_field ("repository-key", key),
+      list_field ("sources", sources),
+    ])) . collect ();
+  Sexp::List (vec![
+    Sexp::Atom (Atom::S ("pull-repositories" . into ())),
+    Sexp::List (records),
+  ])
+}
+
 fn send_result (
   stream        : &mut TcpStream,
   response_type : TcpToClient,
@@ -1684,12 +1771,26 @@ mod tests {
     FrozenBufferRecord,
     MaintenanceCoordinator,
     ObservationSequence,
+    pull_repository_key,
     SelectedStoreRecord,
     ServerEvidenceRecord,
     ViewDisposition,
   };
   use crate::types::tree::forest::ViewForest;
   use crate::types::store_state::{GraphGeneration, ManifestRevision};
+
+  #[test]
+  fn pull_repository_request_parser_normalizes_nested_source_groups () {
+    let sources = vec!["one" . to_string (), "two" . to_string ()];
+    let key = pull_repository_key (&sources);
+    let request = sexp::parse (&format! (
+      "((pull-repositories (((repository-key . \"{}\") \
+       (sources (\"two\" \"one\"))))))",
+      key)) . unwrap ();
+    assert_eq! (
+      optional_pull_repositories (&request) . unwrap (),
+      BTreeMap::from ([(key, sources)]));
+  }
 
   #[test]
   fn partial_reload_offer_and_status_repeat_the_frozen_targets () {
@@ -1700,6 +1801,7 @@ mod tests {
       ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
         paths: vec!["source/node.skg" . into ()],
         ids: vec!["alias" . into ()],
+        ..MaintenanceTargets::default ()
       }) . unwrap ();
     let offer = maintenance_offer_payload (&active, "archive", "/archive");
     let status = active_status_sexp (&active) . to_string ();
@@ -1729,6 +1831,10 @@ mod tests {
     assert! (status . contains ("(external-outcome failed)"), "{}", status);
     assert! (status . contains (
       "(external-details (\"repo-a exited 1\"))"), "{}", status);
+    let key = pull_repository_key (&["test-source" . into ()]);
+    assert! (status . contains (&format! (
+      "(pull-repositories (((repository-key {}) (sources (test-source)))))",
+      key)), "{}", status);
   }
 
   #[test]
@@ -1815,6 +1921,7 @@ mod tests {
         current_sha256: "a" . repeat (64),
       }], MaintenanceTargets {
         paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default ()
       }) . unwrap ();
     active . selected_store = Some (SelectedStoreRecord {
       graph_generation: GraphGeneration::INITIAL . successor (),

@@ -1011,6 +1011,7 @@ mod tests {
         current_sha256: sha256 (current),
       }], crate::maintenance::MaintenanceTargets {
         paths: Vec::new (), ids: vec!["node" . into ()],
+        ..crate::maintenance::MaintenanceTargets::default ()
       }) . unwrap ();
     let final_path = root . join (&active . archive_directory_name);
     create_private_directory (&final_path);

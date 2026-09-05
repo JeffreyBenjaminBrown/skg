@@ -10,6 +10,7 @@ pub mod candidate;
 pub mod evidence;
 pub mod journal;
 pub mod observation;
+pub mod pull;
 pub mod selection;
 pub mod types;
 pub mod view_impact;

@@ -13,6 +13,13 @@
   "Return non-nil when PROCESS is a live Emacs subprocess."
   (and (processp process) (process-live-p process)))
 
+(defun skg--pull-repository-key (sources)
+  "Return the portable logical key for sorted source names SOURCES."
+  (secure-hash
+   'sha256
+   (skg--utf8-unix-bytes
+    (mapconcat #'identity sources (string 0)))))
+
 (defun skg--pull-local-repositories ()
   "Return a deterministic local repository plan for every configured source."
   (unless skg--server-source-inventory
@@ -32,10 +39,27 @@
        local-names server-names))
     (dolist (source local-sources)
       (let* ((name (car source))
-             (path (cdr source)))
+             (path (cdr source))
+             (server-source
+              (cl-find name skg--server-source-inventory
+                       :key (lambda (entry) (plist-get entry :name))
+                       :test #'equal))
+             (configured-path (plist-get server-source :configured-path)))
+        (unless (and (stringp configured-path)
+                     (not (string-empty-p configured-path)))
+          (user-error "Server source %s has no raw path descriptor" name))
         (unless (file-directory-p path)
           (user-error "Configured source %s is not a local directory: %s"
                       name path))
+        (let ((described-path
+               (expand-file-name configured-path
+                                 (file-name-directory config-file))))
+          (unless (and (file-directory-p described-path)
+                       (equal (file-truename path)
+                              (file-truename described-path)))
+            (user-error
+             "Local source %s does not match the server's raw path %s"
+             name configured-path)))
         (let ((root (vc-git-root path)))
           (unless root
             (user-error "Configured source %s is not in a Git worktree: %s"
@@ -45,10 +69,7 @@
       (maphash
        (lambda (root names)
          (setq names (sort names #'string<))
-         (push (list :key (substring
-                           (secure-hash
-                            'sha256 (mapconcat #'identity names (string 0)))
-                           0 16)
+         (push (list :key (skg--pull-repository-key names)
                      :root (file-name-as-directory root)
                      :sources names)
                repositories))
@@ -57,6 +78,31 @@
             (lambda (left right)
               (string< (plist-get left :root)
                        (plist-get right :root)))))))
+
+(defun skg--pull-logical-repositories (repositories)
+  "Drop client-local roots from REPOSITORIES and return a canonical map."
+  (sort
+   (mapcar (lambda (repository)
+             (list :key (plist-get repository :key)
+                   :sources (sort
+                             (copy-sequence
+                              (plist-get repository :sources))
+                             #'string<)))
+           repositories)
+   (lambda (left right)
+     (string< (plist-get left :key) (plist-get right :key)))))
+
+(defun skg--pull-request-fields (repositories)
+  "Encode REPOSITORIES without exposing client-local absolute roots."
+  (list
+   (list
+    'pull-repositories
+    (mapcar
+     (lambda (repository)
+       (list
+        (cons 'repository-key (plist-get repository :key))
+        (list 'sources (plist-get repository :sources))))
+     (skg--pull-logical-repositories repositories)))))
 
 (defun skg--pull-dirty-buffers ()
   (cl-remove-if-not #'skg-buffer-dirty-p (skg-registered-buffers)))
@@ -105,6 +151,7 @@
       (skg-begin-maintenance
        "pull" nil nil nil #'skg--pull-terminal
        (list :repositories repositories
+             :server-repositories nil
              :remaining nil
              :current-process nil
              :advance-timer nil
@@ -112,7 +159,8 @@
              :details nil
              :failures nil
              :external-result nil
-             :diagnostic-buffer nil)))))
+             :diagnostic-buffer nil)
+       (skg--pull-request-fields repositories)))))
 
 (defun skg--pull-context ()
   "Return or create the active pull's process-local context."
@@ -120,7 +168,8 @@
     (unless (and state (equal (plist-get state :origin) "pull"))
       (error "No client-owned pull incident is active"))
     (or (plist-get state :origin-context)
-        (let ((context (list :repositories nil :remaining nil
+        (let ((context (list :repositories nil :server-repositories nil
+                             :remaining nil
                              :current-process nil :advance-timer nil
                              :started nil
                              :details nil :failures nil
@@ -323,6 +372,7 @@
             (unless repositories
               (user-error "No configured Git repositories can be pulled"))
             (setf (plist-get context :repositories) repositories)))
+        (skg--pull-require-matching-repositories context)
         (skg--pull-request-authorization))
     (error
      (display-warning
@@ -346,6 +396,52 @@
        0 nil #'skg--pull-finish-origin "indeterminate"
        (list lost-child-reason))))))
 
+(defun skg--pull-response-repositories (response)
+  "Parse and validate the logical pull repository map in RESPONSE."
+  (let ((records (or (skg--maintenance-field response 'pull-repositories)
+                     nil))
+        repositories keys)
+    (dolist (record records)
+      (let* ((key (skg--maintenance-text record 'repository-key))
+             (sources (sort
+                       (skg--maintenance-string-list record 'sources)
+                       #'string<)))
+        (unless (and (string-match-p "\\`[0-9a-f]\\{64\\}\\'" (or key ""))
+                     sources
+                     (= (length sources)
+                        (length (delete-dups (copy-sequence sources))))
+                     (equal key (skg--pull-repository-key sources)))
+          (error "Server returned an invalid pull repository mapping"))
+        (when (member key keys)
+          (error "Server repeated pull repository key %s" key))
+        (push key keys)
+        (push (list :key key :sources sources) repositories)))
+    (sort repositories
+          (lambda (left right)
+            (string< (plist-get left :key) (plist-get right :key))))))
+
+(defun skg--pull-require-matching-repositories (context)
+  "Prove CONTEXT's local roots implement the server's logical mapping."
+  (when-let ((server (plist-get context :server-repositories)))
+    (unless (equal server
+                   (skg--pull-logical-repositories
+                    (plist-get context :repositories)))
+      (error "Local Git roots do not match the server repository mapping"))))
+
+(defun skg--pull-install-server-repositories (response)
+  "Retain and verify the repository map journaled in RESPONSE."
+  (when (assoc 'pull-repositories response)
+    (let* ((context (skg--pull-context))
+           (repositories (skg--pull-response-repositories response))
+           (prior (plist-get context :server-repositories)))
+      (unless repositories
+        (error "Server returned an empty pull repository mapping"))
+      (when (and prior (not (equal prior repositories)))
+        (error "Server changed the pull repository mapping"))
+      (setf (plist-get context :server-repositories) repositories)
+      (when (plist-get context :repositories)
+        (skg--pull-require-matching-repositories context)))))
+
 (defun skg--pull-install-server-result (response)
   "Retain the exact external mutation result journaled in RESPONSE."
   (when (assoc 'external-outcome response)
@@ -363,6 +459,7 @@
 (defun skg--pull-origin-handler (phase response)
   "Resume the client-owned pull from durable server PHASE."
   (skg--pull-context)
+  (skg--pull-install-server-repositories response)
   (skg--pull-install-server-result response)
   (pcase phase
     ("archive-ready"

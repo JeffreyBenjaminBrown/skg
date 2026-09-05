@@ -118,11 +118,19 @@ impl MaintenanceCoordinator {
     let manifest_revision = candidate . as_ref ()
       . map (|candidate| candidate . base_manifest_revision)
       . unwrap_or (ManifestRevision::INITIAL);
-    let targets = if origin == MaintenanceOrigin::ExplicitPartialReload {
-      MaintenanceTargets {
+    let targets = match origin {
+      MaintenanceOrigin::ExplicitPartialReload => MaintenanceTargets {
         paths: Vec::new (), ids: vec!["test-target" . into ()],
-      }
-    } else { MaintenanceTargets::default () };
+        ..MaintenanceTargets::default ()
+      },
+      MaintenanceOrigin::Pull => MaintenanceTargets {
+        pull_repositories: std::collections::BTreeMap::from ([
+          (pull_repository_key (&["test-source" . into ()]),
+           vec!["test-source" . into ()])]),
+        ..MaintenanceTargets::default ()
+      },
+      _ => MaintenanceTargets::default (),
+    };
     self . begin_with_archive_contract_and_targets (
       origin, candidate, client_session_id, "emacs" . into (), "all" . into (),
       graph_generation, manifest_revision, Vec::new (), targets)
@@ -145,17 +153,48 @@ impl MaintenanceCoordinator {
     targets . paths . dedup ();
     targets . ids . sort ();
     targets . ids . dedup ();
-    if origin == MaintenanceOrigin::ExplicitPartialReload
-       && targets . paths . is_empty () && targets . ids . is_empty ()
-    {
-      return Err (
-        "explicit partial reload requires at least one path or ID" . into ()); }
-    if origin != MaintenanceOrigin::ExplicitPartialReload
-       && (!targets . paths . is_empty () || !targets . ids . is_empty ())
-    {
-      return Err (format! (
-        "maintenance origin '{}' does not accept partial-reload targets",
-        origin . label ())); }
+    for (repository_key, sources) in &mut targets . pull_repositories {
+      if repository_key . is_empty () {
+        return Err ("pull repository key cannot be empty" . into ()); }
+      if sources . is_empty () || sources . iter () . any (String::is_empty) {
+        return Err (format! (
+          "pull repository {} has no complete source inventory",
+          repository_key)); }
+      let original_len = sources . len ();
+      sources . sort ();
+      sources . dedup ();
+      if sources . len () != original_len {
+        return Err (format! (
+          "pull repository {} repeats a source", repository_key)); }
+      if repository_key != &pull_repository_key (sources) {
+        return Err (format! (
+          "pull repository key {} does not match its source inventory",
+          repository_key)); }
+    }
+    match origin {
+      MaintenanceOrigin::ExplicitPartialReload => {
+        if targets . paths . is_empty () && targets . ids . is_empty () {
+          return Err (
+            "explicit partial reload requires at least one path or ID"
+              . into ()); }
+        if !targets . pull_repositories . is_empty () {
+          return Err (
+            "explicit partial reload does not accept pull repositories"
+              . into ()); }
+      }
+      MaintenanceOrigin::Pull => {
+        if !targets . paths . is_empty () || !targets . ids . is_empty () {
+          return Err ("pull does not accept partial-reload targets" . into ()); }
+        if targets . pull_repositories . is_empty () {
+          return Err ("pull requires a verified repository mapping" . into ()); }
+      }
+      _ if !targets . paths . is_empty () || !targets . ids . is_empty ()
+             || !targets . pull_repositories . is_empty () =>
+        return Err (format! (
+          "maintenance origin '{}' does not accept explicit targets",
+          origin . label ())),
+      _ => {}
+    }
     if client_session_id . is_empty () {
       return Err ("maintenance requires an owning client session" . into ()); }
     if !matches! (client_kind . as_str (), "emacs" | "neovim") {
@@ -1232,6 +1271,7 @@ mod tests {
       MaintenanceTargets {
         paths: vec!["z.skg" . into (), "a.skg" . into (), "z.skg" . into ()],
         ids: vec!["extra" . into (), "node" . into (), "extra" . into ()],
+        ..MaintenanceTargets::default ()
       }) . unwrap ();
     assert_eq! (active . targets . paths, vec!["a.skg", "z.skg"]);
     assert_eq! (active . targets . ids, vec!["extra", "node"]);
@@ -1249,6 +1289,25 @@ mod tests {
       GraphGeneration::INITIAL, ManifestRevision::INITIAL, Vec::new (),
       MaintenanceTargets {
         paths: Vec::new (), ids: vec!["not-a-pull-target" . into ()],
+        pull_repositories: std::collections::BTreeMap::from ([
+          (pull_repository_key (&["source" . into ()]),
+           vec!["source" . into ()])]),
+      }) . is_err ());
+    let mut missing = MaintenanceCoordinator::new ();
+    assert! (missing . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::Pull, None,
+      "client-session" . into (), "emacs" . into (), "all" . into (),
+      GraphGeneration::INITIAL, ManifestRevision::INITIAL, Vec::new (),
+      MaintenanceTargets::default ()) . is_err ());
+    let mut false_key = MaintenanceCoordinator::new ();
+    assert! (false_key . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::Pull, None,
+      "client-session" . into (), "emacs" . into (), "all" . into (),
+      GraphGeneration::INITIAL, ManifestRevision::INITIAL, Vec::new (),
+      MaintenanceTargets {
+        pull_repositories: std::collections::BTreeMap::from ([
+          ("not-the-source-hash" . into (), vec!["source" . into ()])]),
+        ..MaintenanceTargets::default ()
       }) . is_err ());
   }
 
@@ -1260,6 +1319,7 @@ mod tests {
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
         paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default ()
       }) . unwrap ();
     coordinator . archive_ready (
       &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
@@ -1332,6 +1392,7 @@ mod tests {
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
         paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default ()
       }) . unwrap ();
     coordinator . archive_ready (
       &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
@@ -1385,7 +1446,8 @@ mod tests {
       MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, vec![frozen ("one"), frozen ("two")],
-      MaintenanceTargets { paths: Vec::new (), ids: vec!["node" . into ()] })
+      MaintenanceTargets { paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default () })
       . unwrap ();
     coordinator . archive_ready (
       &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
@@ -1484,6 +1546,7 @@ mod tests {
         current_sha256: "a" . repeat (64),
       }], MaintenanceTargets {
         paths: Vec::new (), ids: vec!["node" . into ()],
+        ..MaintenanceTargets::default ()
       }) . unwrap ();
     let CoordinatorState::Active (state) = &mut coordinator . state else {
       unreachable! () };

@@ -1,6 +1,7 @@
 use crate::types::store_state::{GraphGeneration, ManifestRevision};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -504,13 +505,22 @@ pub struct FrozenBufferRecord {
   pub current_sha256          : String,
 }
 
-/// The exact partial-reload selector authorized when maintenance begins.
-/// Paths retain the client's spelling for reporting; the server resolves and
-/// validates them against its own source catalog before observing disk.
+/// The exact origin-specific target set authorized when maintenance begins.
+/// Paths retain the client's spelling for reporting; pull repository keys
+/// bind client-local worktrees to server-verified groups of stable source
+/// names without putting either side's absolute roots on the wire.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MaintenanceTargets {
   pub paths : Vec<String>,
   pub ids   : Vec<String>,
+  #[serde(default)]
+  pub pull_repositories : BTreeMap<String, Vec<String>>,
+}
+
+pub fn pull_repository_key (sources : &[String]) -> String {
+  let mut digest = Sha256::new ();
+  digest . update (sources . join ("\0") . as_bytes ());
+  format! ("{:x}", digest . finalize ())
 }
 
 /// Durable resolution of one user-supplied ID in an explicit partial reload.

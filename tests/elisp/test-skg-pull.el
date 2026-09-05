@@ -7,7 +7,9 @@
 
 (ert-deftest test-skg-pull-groups-local-sources-by-canonical-git-root ()
   (let ((skg--server-source-inventory
-         '((:name "one") (:name "three") (:name "two"))))
+         '((:name "one" :configured-path "a/one")
+           (:name "three" :configured-path "b/three")
+           (:name "two" :configured-path "a/two"))))
     (cl-letf (((symbol-function 'skg-config-file)
                (lambda () "/client/skgconfig.toml"))
               ((symbol-function 'skg-source-paths-from-toml)
@@ -37,10 +39,7 @@
                   repositories)
           (mapcar
            (lambda (names)
-             (substring
-              (secure-hash 'sha256
-                           (mapconcat #'identity names (string 0)))
-              0 16))
+             (skg--pull-repository-key names))
            '(("one" "two") ("three")))))))))
 
 (ert-deftest test-skg-pull-requires-the-verified-server-inventory ()
@@ -59,8 +58,9 @@
       (should-error (skg-pull-all) :type 'user-error))))
 
 (ert-deftest test-skg-pull-begins-one-maintenance-with-local-plan ()
-  (let* ((repositories
-          '((:key "repo" :root "/client/repo/" :sources ("one"))))
+  (let* ((key (make-string 64 ?a))
+         (repositories
+          `((:key ,key :root "/client/repo/" :sources ("one"))))
          (skg--active-source-set-name "all")
          (skg--maintenance-client-incident nil)
          submitted)
@@ -73,7 +73,31 @@
     (should (equal (car submitted) "pull"))
     (should (eq (nth 4 submitted) #'skg--pull-terminal))
     (should (equal (plist-get (nth 5 submitted) :repositories)
-                   repositories))))
+                   repositories))
+    (should
+     (equal
+      (nth 6 submitted)
+      `((pull-repositories
+         (((repository-key . ,key) (sources ("one"))))))))))
+
+(ert-deftest test-skg-pull-bootstrap-sends-only-the-logical-repository-map ()
+  (let* ((key (skg--pull-repository-key '("one")))
+         (fields
+          `((pull-repositories
+             (((repository-key . ,key) (sources ("one")))))))
+         request)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'tcp))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (&rest _arguments) nil))
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp wire &rest _arguments) (setq request wire))))
+      (skg-begin-maintenance "pull" nil nil nil nil nil fields))
+    (let* ((parsed (read request))
+           (mapping (cadr (assoc 'pull-repositories parsed)))
+           (record (car mapping)))
+      (should (equal (cdr (assoc 'repository-key record)) key))
+      (should (equal (cadr (assoc 'sources record)) '("one")))
+      (should-not (string-match-p "/client/" request)))))
 
 (ert-deftest test-skg-pull-refuses-a-dirty-raw-file-before-maintenance ()
   (let ((buffer (generate-new-buffer " *skg-pull-raw*"))
@@ -169,7 +193,11 @@
       (should (skg--pull-resume-running "lost")))))
 
 (ert-deftest test-skg-pull-final-observation-restores-server-result ()
-  (let* ((context (list :external-result nil))
+  (let* ((sources '("one"))
+         (key (skg--pull-repository-key sources))
+         (repositories `((:key ,key :root "/repo/" :sources ,sources)))
+         (context (list :repositories repositories
+                        :server-repositories nil :external-result nil))
          (skg--maintenance-client-incident
           (list :incident-id "incident" :epoch 4 :origin "pull"
                 :origin-context context))
@@ -179,14 +207,33 @@
                  (setq scheduled (cons function arguments)))))
       (skg--pull-origin-handler
        "final-observation"
-       '((external-outcome failed)
+       `((pull-repositories
+          (((repository-key ,key) (sources ,sources))))
+         (external-outcome failed)
          (external-details ("repo failed" "disk may differ")))))
+    (should (equal (plist-get context :server-repositories)
+                   `((:key ,key :sources ,sources))))
     (should (equal (plist-get context :external-result)
                    '(:outcome "failed"
                      :details ("repo failed" "disk may differ"))))
     (should (eq (car scheduled) #'skg--pull-send-finish))
     (should (equal (cadr scheduled)
                    (plist-get context :external-result)))))
+
+(ert-deftest test-skg-pull-refuses-a-server-repository-topology-change ()
+  (let* ((local-sources '("one" "two"))
+         (local-key (skg--pull-repository-key local-sources))
+         (server-key (skg--pull-repository-key '("one")))
+         (context
+          (list :repositories
+                `((:key ,local-key :root "/repo/" :sources ,local-sources))))
+         (skg--maintenance-client-incident
+          (list :incident-id "incident" :epoch 4 :origin "pull"
+                :origin-context context)))
+    (should-error
+     (skg--pull-install-server-repositories
+      `((pull-repositories
+         (((repository-key ,server-key) (sources ("one"))))))))))
 
 (ert-deftest test-skg-pull-completion-reports-exact-external-outcome ()
   (let* ((context (list :external-result nil))

@@ -1098,12 +1098,14 @@ old implementation."
        (run-at-time 0 nil #'skg-cancel-maintenance incident-id epoch)))))
 
 (defun skg-begin-maintenance
-    (origin &optional candidate-id paths ids terminal-callback origin-context)
+    (origin &optional candidate-id paths ids terminal-callback origin-context
+            origin-fields)
   "Begin server-owned maintenance for ORIGIN.
 CANDIDATE-ID accepts a pending observation.  PATHS and IDS are the exact
 targets of an explicit partial reload.  TERMINAL-CALLBACK receives the parsed
 terminal response only after the server completes the incident.
-ORIGIN-CONTEXT is opaque client state retained across the origin adapter."
+ORIGIN-CONTEXT is opaque client state retained across the origin adapter.
+ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg-register-response-handler
      'maintenance-offer
@@ -1120,7 +1122,8 @@ ORIGIN-CONTEXT is opaque client state retained across the origin adapter."
           (origin . ,origin)
           (candidate-id . ,(or candidate-id "none")))
         (when paths `((paths ,@paths)))
-        (when ids `((ids ,@ids)))))
+        (when ids `((ids ,@ids)))
+        origin-fields))
       "\n"))))
 
 (defun skg-reconcile-pending-changes ()
