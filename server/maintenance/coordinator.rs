@@ -232,18 +232,25 @@ impl MaintenanceCoordinator {
     match &self . state {
       CoordinatorState::Idle => {}
       CoordinatorState::Pending (pending) => {
-        match (pending . candidate . as_ref (), candidate . as_ref ()) {
-          (Some (expected), Some (actual)) if expected . id == actual . id => {}
-          (Some (expected), Some (actual)) => return Err (format! (
-            "candidate {} is stale; current candidate is {}",
-            actual . id, expected . id)),
-          (Some (expected), None) => return Err (format! (
-            "pending candidate {} must be named explicitly", expected . id)),
-          (None, Some (actual)) => return Err (format! (
-            "candidate {} is not the pending invalid disk state", actual . id)),
-          (None, None) => {}
+        if origin == MaintenanceOrigin::FullRebuild && candidate . is_none () {
+          // A full rebuild deliberately supersedes an incidental watcher
+          // candidate with its own post-archive complete observation.
+        } else {
+          match (pending . candidate . as_ref (), candidate . as_ref ()) {
+            (Some (expected), Some (actual)) if expected . id == actual . id => {}
+            (Some (expected), Some (actual)) => return Err (format! (
+              "candidate {} is stale; current candidate is {}",
+              actual . id, expected . id)),
+            (Some (expected), None) => return Err (format! (
+              "pending candidate {} must be named explicitly", expected . id)),
+            (None, Some (actual)) => return Err (format! (
+              "candidate {} is not the pending invalid disk state", actual . id)),
+            (None, None) => {}
+          }
         }
       }
+      CoordinatorState::Observing
+        if origin == MaintenanceOrigin::FullRebuild => {}
       CoordinatorState::Observing =>
         return Err ("wait for the current observation to finish" . into ()),
       CoordinatorState::Active (active) =>
@@ -1198,6 +1205,27 @@ mod tests {
       . unwrap_err ();
     assert! (error . contains ("stale"), "{}", error);
     assert! (matches! (coordinator . state, CoordinatorState::Pending (_)));
+  }
+
+  #[test]
+  fn full_rebuild_replaces_a_pending_candidate_with_its_own_observation () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    coordinator . set_pending_valid (candidate ()) . unwrap ();
+    let active = coordinator . begin (MaintenanceOrigin::FullRebuild, None)
+      . unwrap ();
+    assert_eq! (active . origin, MaintenanceOrigin::FullRebuild);
+    assert! (active . candidate . is_none ());
+    assert_eq! (active . phase, MaintenancePhase::PreparingArchive);
+  }
+
+  #[test]
+  fn full_rebuild_supersedes_an_in_progress_ordinary_observation () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    coordinator . observation_started () . unwrap ();
+    let active = coordinator . begin (MaintenanceOrigin::FullRebuild, None)
+      . unwrap ();
+    assert_eq! (active . origin, MaintenanceOrigin::FullRebuild);
+    assert! (matches! (coordinator . state, CoordinatorState::Active (_)));
   }
 
   #[test]
