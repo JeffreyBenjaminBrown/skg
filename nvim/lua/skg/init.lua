@@ -63,6 +63,16 @@ function M.install_session_surface ()
     function (options)
       require('skg.maintenance').reload_paths(options.fargs) end,
     { nargs = '+', complete = 'file', force = true })
+  vim.api.nvim_create_user_command('SkgRecoverReloadIncident',
+    function (options)
+      require('skg.reload_recovery').recover(
+        options.args ~= '' and options.args or nil) end,
+    { nargs = '?', force = true })
+  vim.api.nvim_create_user_command('SkgDismissReloadRecoveryIncident',
+    function (options)
+      require('skg.reload_recovery').dismiss(
+        options.args ~= '' and options.args or nil) end,
+    { nargs = '?', force = true })
 end
 
 ---Initialize the client against a server config: remember the

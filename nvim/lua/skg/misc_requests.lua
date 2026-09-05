@@ -159,36 +159,9 @@ function M.connection_verify ()
   client.submit_request(handshake_request())
 end
 
----Neovim does not yet implement the destructive confirmation UI. Never let
----that omission make recovery automatic: show every durable incident and
----direct the user to an Emacs client or manual repair.
 ---@param response any
 function M.show_pending_recovery_incidents (response)
-  local incidents = payload.field(response, 'pending-recovery-incidents')
-  if incidents == nil or not sexpr.is_list(incidents) or #incidents == 0 then
-    return end
-  local lines = { '* WARNING: Fatal reload recovery is pending' }
-  for _, incident in ipairs(incidents) do
-    table.insert(lines, '** ' ..
-      (payload.field_text(incident, 'incident-id') or '[unknown incident]'))
-    local fatal = payload.field(incident, 'fatal')
-    if fatal and sexpr.is_list(fatal) then
-      for _, item in ipairs(fatal) do
-        table.insert(lines, '*** ' ..
-          (payload.field_text(item, 'pid') or '[unknown pid]'))
-        table.insert(lines,
-          payload.field_text(item, 'reason') or 'Unspecified fatal error')
-      end
-    end
-  end
-  table.insert(lines, '** what to do')
-  table.insert(lines,
-    'The Neovim client cannot yet confirm automatic recovery. Use the Emacs client recovery command or repair manually; Skg has retained the incident journal and will not recover automatically.')
-  messages.big_nonfatal_message(
-    'skg://messages/pending-reload-recovery',
-    string.format('WARNING: %d fatal reload recovery incident(s) remain unresolved.',
-                  #incidents),
-    table.concat(lines, '\n'))
+  require('skg.reload_recovery').install_pending(response)
 end
 
 ---Show structured initialization/reconnect warnings persistently.

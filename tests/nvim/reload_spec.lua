@@ -71,6 +71,10 @@ describe('skg.reload', function ()
     state.maintenance_client_incident = incident
     state.maintenance_state = { epoch = 9, state = 'active' }
     state.pending_maintenance_offer = { candidate_id = 'candidate' }
+    local recovery_incidents = {
+      { { 'incident-id', incident.incident_id } },
+    }
+    state.pending_recovery_incidents = recovery_incidents
     state.active_source_set_name = 'private'
     state.next_request_number = 41
     state.id_stack = { { 'id', 'title' } }
@@ -94,6 +98,8 @@ describe('skg.reload', function ()
     assert.are.equal('reconnect-required',
       reloaded_state.maintenance_client_incident.phase)
     assert.are.equal('active', reloaded_state.maintenance_state.state)
+    assert.are.equal(recovery_incidents,
+      reloaded_state.pending_recovery_incidents)
     assert.are.equal('private', reloaded_state.active_source_set_name)
     assert.are.equal(last_request_number, reloaded_state.next_request_number)
     assert.are.same({ { 'id', 'title' } }, reloaded_state.id_stack)
@@ -108,6 +114,7 @@ describe('skg.reload', function ()
     reloaded_state.maintenance_client_incident = nil
     reloaded_state.maintenance_state = nil
     reloaded_state.pending_maintenance_offer = nil
+    reloaded_state.pending_recovery_incidents = {}
     reloaded_config.config_file_path = nil
     reloaded_config.source_inventory = nil
     reloaded_config.store_state = nil

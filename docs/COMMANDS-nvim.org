@@ -800,10 +800,19 @@ The confirmation shows exact and IEC size and states that this is ordinary
 deletion, not secure erase.  Deletion is refused while active maintenance still
 needs the archive; it never deletes server journals or Git recovery refs.
 
-Fatal =.skg= parse/read journals are an older separate recovery system.
-Neovim shows them persistently but does not confirm or dismiss them; use the
-Emacs recovery commands or repair manually.  The private server journal
-survives reconnects and restarts.
+Fatal =.skg= parse/read journals are an older separate recovery system.  The
+private server journal survives reconnects and restarts.
+*** :SkgRecoverReloadIncident [INCIDENT-ID]
+After explicit confirmation, asks the server to recover one fatal reload
+journal.  The server first verifies that the incident bytes have not changed,
+creates the three reported =oops-N_*= evidence refs without moving HEAD or the
+index, and restores only fatal files in owned sources to their last-good bytes.
+If disk changed meanwhile, recovery refuses, retains the journal, and queues a
+fresh successor observation.
+*** :SkgDismissReloadRecoveryIncident [INCIDENT-ID]
+Permanently deletes one unresolved private fatal-reload journal without
+changing source files or Git.  Use this only when you accept that Skg can no
+longer perform automatic recovery for that incident.
 *** :SkgRecomputeCyclicRoots
 Recomputes the rank-only =CyclicRoot= cache from the complete current
 graph and updates the affected Tantivy documents.  Ordinary saves and

@@ -169,6 +169,12 @@ M.commands = {
   DeleteMaintenanceIncident = {
     module = 'skg.recovery_ui', fn = 'delete_maintenance_incident',
     desc = 'Delete a terminal recovery incident after confirmation' },
+  RecoverReloadIncident = {
+    module = 'skg.reload_recovery', fn = 'recover',
+    desc = 'Confirm recovery of a fatal reload journal' },
+  DismissReloadRecoveryIncident = {
+    module = 'skg.reload_recovery', fn = 'dismiss',
+    desc = 'Permanently dismiss a fatal reload journal' },
   ViewSourceList = { module = 'skg.picker', fn = 'view_source_list',
                      desc = 'List configured sources and their paths' },
   BeginningOfLine = { module = 'skg.metadata', fn = 'beginning_of_line',

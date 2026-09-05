@@ -20,6 +20,7 @@ M.maintenance_archive_identity = nil
 M.maintenance_state = nil
 M.maintenance_client_incident = M.maintenance_client_incident or nil
 M.pending_maintenance_offer = M.pending_maintenance_offer or nil
+M.pending_recovery_incidents = M.pending_recovery_incidents or {}
 
 ---The persistent TCP connection to the Rust backend: a vim.uv tcp
 ---handle, or nil when disconnected.
