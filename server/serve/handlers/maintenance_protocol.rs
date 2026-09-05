@@ -506,10 +506,22 @@ fn acknowledge_terminal_maintenance (
   {
     tracing::warn! (%error,
       "could not compact acknowledged maintenance journal"); }
+  let successor_queued = match runtime . schedule_full_observation (
+      crate::maintenance::QueuedObservationReason::MaintenanceCompleted)
+  {
+    Ok (( )) => true,
+    Err (error) => {
+      tracing::warn! (%error,
+        "could not queue post-maintenance successor observation");
+      false
+    }
+  };
   Ok (Sexp::List (vec![
     atom_field ("status", "idle"),
     atom_field ("terminal-acknowledged",
       if newly_acknowledged { "true" } else { "already-idle" }),
+    atom_field ("successor-observation-queued",
+      if successor_queued { "true" } else { "nil" }),
   ]) . to_string ())
 }
 
@@ -1012,6 +1024,8 @@ fn candidate_selected_payload (
     active, "candidate-selected"));
   append_selected_fields (&mut fields, active)?;
   append_presentation_fence_fields (&mut fields, active);
+  fields . push (atom_field ("successor-observation-required",
+    if active . successor_observation_required { "true" } else { "nil" }));
   fields . push (atom_field ("source-set", &active . source_set));
   fields . push (source_inventory_field (config));
   fields . push (atom_field ("maintenance-archive-folder",

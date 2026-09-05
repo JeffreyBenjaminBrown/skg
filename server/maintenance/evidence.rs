@@ -160,9 +160,19 @@ impl MaintenanceEvidenceStore {
     let final_path = self . directory . join (active . incident_id . as_str ());
     if final_path . exists () {
       let (bundle, publication) = self . load (&active . incident_id)?;
-      if bundle . candidate != candidate . summary {
-        return Err ("incident evidence already names another candidate" . into ()); }
-      return Ok (publication);
+      if bundle . candidate == candidate . summary {
+        return Ok (publication); }
+      // A candidate can become stale after its bundle is durable but before
+      // the first store mutation.  Preserve that attempted evidence under a
+      // unique sibling and free the canonical incident path for the exact
+      // replacement candidate.  Nothing is deleted or overwritten.
+      let superseded_path = self . directory . join (format! (
+        "{}--superseded--{}--{}",
+        active . incident_id, bundle . candidate . id, uuid::Uuid::new_v4 ()));
+      fs::rename (&final_path, &superseded_path)
+        . map_err (|error| format! (
+          "could not preserve superseded candidate evidence: {}", error))?;
+      sync_directory (&self . directory)?;
     }
 
     let temporary = self . directory . join (format! (
@@ -807,7 +817,23 @@ mod tests {
     assert! (client . artifacts . is_empty ());
     assert! (client . bytes . is_empty ());
     assert_eq! (client . artifact_bytes_sha256, sha256_hex (&[]));
-    write_private_file (&publication . path . join ("extra"), b"no") . unwrap ();
+    let mut replacement_candidate = candidate . clone ();
+    replacement_candidate . summary . id = CandidateId::new ();
+    let mut replacement_active = active . clone ();
+    replacement_active . candidate = Some (
+      replacement_candidate . summary . clone ());
+    let replacement_publication = store . publish_candidate (
+      &replacement_active, &config, &selected, &replacement_candidate)
+      . unwrap ();
+    assert_eq! (store . load (&active . incident_id) . unwrap () . 0
+      . candidate, replacement_candidate . summary);
+    let preserved_prefix = format! (
+      "{}--superseded--{}--", active . incident_id, candidate . summary . id);
+    assert! (fs::read_dir (&store . directory) . unwrap ()
+      . filter_map (Result::ok) . any (|entry| entry . file_name ()
+        . to_string_lossy () . starts_with (&preserved_prefix)));
+    write_private_file (
+      &replacement_publication . path . join ("extra"), b"no") . unwrap ();
     assert! (store . load (&active . incident_id) . is_err ());
   }
 

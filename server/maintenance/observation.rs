@@ -343,7 +343,9 @@ fn run_final_observation (
         return Ok (None); };
       if active . incident_id != incident || active . epoch != epoch
       || !matches! (active . origin,
-        MaintenanceOrigin::Pull | MaintenanceOrigin::FullRebuild)
+        MaintenanceOrigin::PendingReconciliation
+        | MaintenanceOrigin::Pull
+        | MaintenanceOrigin::FullRebuild)
       || active . phase != MaintenancePhase::FinalObservation
       {
         return Ok (None); }
@@ -568,13 +570,23 @@ fn run_observation (
 ) {
   paths . sort ();
   paths . dedup ();
-  let sequence = {
+  let (sequence, deferred) = {
     let mut coordinator = runtime . maintenance . lock () . unwrap ();
-    let sequence = coordinator . next_observation_sequence ();
-    let _ = coordinator . observation_started ();
-    sequence
+    if let Some (sequence) = coordinator . defer_ordinary_observation () {
+      (sequence, true)
+    } else {
+      let sequence = coordinator . next_observation_sequence ();
+      let _ = coordinator . observation_started ();
+      (sequence, false)
+    }
   };
   runtime . persist_maintenance_state ();
+  if deferred {
+    tracing::debug! (
+      observation_sequence = sequence . get (),
+      "deferred ordinary observation until serialized maintenance completes");
+    return;
+  }
   let snapshot = runtime . selected_snapshot ();
   let result = observe_complete_disk (
     &snapshot . env . config, &snapshot . selected, sequence);

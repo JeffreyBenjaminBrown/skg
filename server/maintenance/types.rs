@@ -447,6 +447,7 @@ pub enum QueuedObservationReason {
   SelectedGenerationAdvanced,
   SourceCatalogChanged,
   SaveFenceMismatch,
+  MaintenanceCompleted,
 }
 
 impl QueuedObservationReason {
@@ -460,6 +461,7 @@ impl QueuedObservationReason {
       Self::SelectedGenerationAdvanced => "selected-generation-advanced",
       Self::SourceCatalogChanged => "source-catalog-changed",
       Self::SaveFenceMismatch => "save-fence-mismatch",
+      Self::MaintenanceCompleted => "maintenance-completed",
     }
   }
 }
@@ -672,6 +674,8 @@ pub struct ActiveMaintenance {
   pub selected_store    : Option<SelectedStoreRecord>,
   #[serde(default)]
   pub presentation_fence : Option<MaintenancePresentationFence>,
+  #[serde(default)]
+  pub successor_observation_required : bool,
   #[serde(default)]
   pub scalar_release    : Option<ScalarReleaseRecord>,
   #[serde(default)]

@@ -8,7 +8,6 @@ use super::types::{
   IncidentId,
   MaintenanceEpoch,
   MaintenancePhase,
-  QueuedObservationReason,
   SelectedStoreRecord,
   ServerEvidenceRecord,
 };
@@ -67,10 +66,16 @@ pub fn select_archived_candidate (
     . ok_or_else (|| format! (
       "candidate {} is not retained in this process", summary . id))?;
   let snapshot = runtime . selected_snapshot ();
-  validate_preselection (
-    runtime, &active, &snapshot . env . config, &snapshot . selected,
-    &candidate)?;
-  revalidate_candidate (&snapshot . env . config, &candidate)?;
+  if let Err (reason) = validate_preselection (
+      runtime, &active, &snapshot . env . config, &snapshot . selected,
+      &candidate) . and_then (|_| revalidate_candidate (
+        &snapshot . env . config, &candidate))
+  {
+    reschedule_superseded_candidate (runtime, &active, reason . clone ())?;
+    return Err (format! (
+      "candidate was superseded before evidence publication: {}; incident-specific observation was queued",
+      reason));
+  }
 
   let evidence = runtime . maintenance_evidence . publish_candidate (
     &active, &snapshot . env . config, &snapshot . selected, &candidate)?;
@@ -102,13 +107,9 @@ pub fn select_archived_candidate (
       })
     }
     Err (SelectionFailure::Superseded (reason)) => {
-      runtime . transition_maintenance (|coordinator|
-        coordinator . selection_superseded (
-          incident_id, epoch, reason . clone ()))?;
-      let _ = runtime . schedule_full_observation (
-        QueuedObservationReason::SelectedGenerationAdvanced);
+      reschedule_superseded_candidate (runtime, &active, reason . clone ())?;
       Err (format! (
-        "candidate was superseded before mutation: {}; exact observation was queued",
+        "candidate was superseded before mutation: {}; incident-specific observation was queued",
         reason))
     }
     Err (SelectionFailure::Stores { reason, queryable_g0 }) => {
@@ -147,10 +148,16 @@ pub fn rebuild_archived_candidate (
   {
     return Err ("full rebuild requires a complete-disk candidate" . into ()); }
   let snapshot = runtime . selected_snapshot ();
-  validate_rebuild_preselection (
-    runtime, &active, &snapshot . env . config, &snapshot . selected,
-    &candidate)?;
-  revalidate_candidate (&candidate . config, &candidate)?;
+  if let Err (reason) = validate_rebuild_preselection (
+      runtime, &active, &snapshot . env . config, &snapshot . selected,
+      &candidate) . and_then (|_| revalidate_candidate (
+        &candidate . config, &candidate))
+  {
+    reschedule_superseded_candidate (runtime, &active, reason . clone ())?;
+    return Err (format! (
+      "full rebuild candidate was superseded before evidence publication: {}; incident-specific observation was queued",
+      reason));
+  }
 
   let evidence = runtime . maintenance_evidence . publish_candidate (
     &active, &candidate . config, &snapshot . selected, &candidate)?;
@@ -182,13 +189,9 @@ pub fn rebuild_archived_candidate (
       })
     }
     Err (SelectionFailure::Superseded (reason)) => {
-      runtime . transition_maintenance (|coordinator|
-        coordinator . selection_superseded (
-          incident_id, epoch, reason . clone ()))?;
-      let _ = runtime . schedule_full_observation (
-        QueuedObservationReason::SelectedGenerationAdvanced);
+      reschedule_superseded_candidate (runtime, &active, reason . clone ())?;
       Err (format! (
-        "full rebuild candidate was superseded before mutation: {}; exact observation was queued",
+        "full rebuild candidate was superseded before mutation: {}; incident-specific observation was queued",
         reason))
     }
     Err (SelectionFailure::Stores { reason, queryable_g0 }) => {
@@ -207,6 +210,29 @@ pub fn rebuild_archived_candidate (
 enum SelectionFailure {
   Superseded (String),
   Stores { reason : String, queryable_g0 : bool },
+}
+
+fn reschedule_superseded_candidate (
+  runtime : &ServerRuntime,
+  active  : &super::types::ActiveMaintenance,
+  reason  : String,
+) -> Result<(), String> {
+  runtime . transition_maintenance (|coordinator|
+    coordinator . selection_superseded (
+      &active . incident_id, active . epoch, reason . clone ()))?;
+  match active . origin {
+    super::types::MaintenanceOrigin::ExplicitPartialReload =>
+      runtime . schedule_maintenance_target_observation (
+        active . incident_id . clone (), active . epoch),
+    super::types::MaintenanceOrigin::PendingReconciliation
+    | super::types::MaintenanceOrigin::Pull
+    | super::types::MaintenanceOrigin::FullRebuild =>
+      runtime . schedule_maintenance_final_observation (
+        active . incident_id . clone (), active . epoch),
+    ref origin => Err (format! (
+      "maintenance origin '{}' has no candidate reobservation adapter",
+      origin . label ())),
+  }
 }
 
 async fn rebuild_stores (

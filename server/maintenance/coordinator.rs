@@ -26,6 +26,24 @@ impl MaintenanceCoordinator {
     self . observation_sequence
   }
 
+  /// Ordinary watcher work cannot publish over a serialized maintenance or
+  /// terminal state.  Retain its monotonic sequence and make the active
+  /// incident report that a complete successor sweep is owed instead of
+  /// spending work on a result the state machine must reject.
+  pub fn defer_ordinary_observation (&mut self) -> Option<ObservationSequence> {
+    if !matches! (self . state,
+      CoordinatorState::Active (_)
+      | CoordinatorState::Terminal (_)
+      | CoordinatorState::BlockedStoreHealth { .. })
+    {
+      return None;
+    }
+    self . observation_sequence = self . observation_sequence . successor ();
+    if let CoordinatorState::Active (active) = &mut self . state {
+      active . successor_observation_required = true; }
+    Some (self . observation_sequence)
+  }
+
   pub fn observation_started (&mut self) -> Result<(), String> {
     match self . state {
       CoordinatorState::Idle | CoordinatorState::Observing => {
@@ -296,6 +314,7 @@ impl MaintenanceCoordinator {
       client_evidence_acknowledged: false,
       selected_store: None,
       presentation_fence: None,
+      successor_observation_required: false,
       scalar_release: None,
       view_settlements: Default::default (),
       blocking_reason: None,
@@ -528,6 +547,7 @@ impl MaintenanceCoordinator {
       return Err (format! (
         "observed candidate is invalid during {:?}", active . phase)); }
     active . candidate = Some (candidate);
+    active . successor_observation_required = false;
     active . blocking_reason = None;
     active . phase = MaintenancePhase::ArchiveReady;
     Ok (true)
@@ -1102,6 +1122,18 @@ impl MaintenanceCoordinator {
     {
       return Err (format! (
         "candidate supersession is invalid during {:?}", active . phase)); }
+    if active . client_evidence_transfer . is_some ()
+    || !active . view_settlements . is_empty ()
+    {
+      return Err (
+        "candidate cannot be superseded after client presentation began"
+          . into ());
+    }
+    active . candidate = None;
+    active . server_evidence = None;
+    active . presentation_fence = None;
+    active . scalar_release = None;
+    active . successor_observation_required = true;
     active . blocking_reason = Some (reason);
     active . phase = MaintenancePhase::FinalObservation;
     Ok (( ))
@@ -1766,7 +1798,10 @@ mod tests {
       &active . incident_id, active . epoch, outcomes . clone ()) . unwrap ());
     assert! (!coordinator . record_requested_id_outcomes (
       &active . incident_id, active . epoch, outcomes . clone ()) . unwrap ());
-    let sequence = coordinator . next_observation_sequence ();
+    let sequence = coordinator . defer_ordinary_observation () . unwrap ();
+    let CoordinatorState::Active (deferred) = &coordinator . state else {
+      panic! ("deferred incident stopped being active"); };
+    assert! (deferred . successor_observation_required);
     let observed = CandidateSummary {
       id: CandidateId::new (),
       base_graph_generation: GraphGeneration::INITIAL,
@@ -1783,6 +1818,49 @@ mod tests {
     assert_eq! (recorded . phase, MaintenancePhase::ArchiveReady);
     assert_eq! (recorded . candidate, Some (observed));
     assert_eq! (recorded . requested_id_outcomes, outcomes);
+    assert! (!recorded . successor_observation_required);
+  }
+
+  #[test]
+  fn preselection_supersession_retains_the_incident_for_exact_reobservation () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let first = candidate ();
+    coordinator . set_pending_valid (first . clone ()) . unwrap ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation, Some (first)) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "manifest" . into ()) . unwrap ();
+    coordinator . record_server_evidence (
+      &active . incident_id, active . epoch, ServerEvidenceRecord {
+        path: "first-evidence" . into (), bundle_sha256: "first" . into (),
+        artifact_count: 1, total_file_bytes: 1,
+      }) . unwrap ();
+    coordinator . transition (
+      &active . incident_id, active . epoch,
+      MaintenancePhase::SelectingPartial) . unwrap ();
+    coordinator . selection_superseded (
+      &active . incident_id, active . epoch, "disk advanced" . into ())
+      . unwrap ();
+    let CoordinatorState::Active (retrying) = &coordinator . state else {
+      panic! ("superseded incident stopped being active"); };
+    assert_eq! (retrying . phase, MaintenancePhase::FinalObservation);
+    assert! (retrying . candidate . is_none ());
+    assert! (retrying . server_evidence . is_none ());
+    assert! (retrying . successor_observation_required);
+
+    let sequence = coordinator . next_observation_sequence ();
+    let replacement = CandidateSummary {
+      id: CandidateId::new (), covered_sequence: sequence,
+      ..candidate ()
+    };
+    assert! (coordinator . record_observed_candidate (
+      &active . incident_id, active . epoch, replacement . clone ())
+      . unwrap ());
+    let CoordinatorState::Active (ready) = &coordinator . state else {
+      panic! ("replacement candidate stopped being active"); };
+    assert_eq! (ready . candidate, Some (replacement));
+    assert_eq! (ready . phase, MaintenancePhase::ArchiveReady);
+    assert! (!ready . successor_observation_required);
   }
 
   #[test]
