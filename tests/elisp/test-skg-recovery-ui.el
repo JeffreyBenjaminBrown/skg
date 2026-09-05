@@ -3,11 +3,13 @@
 (require 'test-skg-recovery-archive)
 (require 'skg-recovery-ui)
 
-(defun skg-test-recovery-ui--finalize (fixture)
+(defun skg-test-recovery-ui--finalize (fixture &optional native-undo-function)
   (let* ((buffer (plist-get fixture :buffer))
          (skg-recovery-archive-native-undo-function
-          (lambda (&rest _)
-            '(:status empty :kind undo-fu-session :version "not-required")))
+          (or native-undo-function
+              (lambda (&rest _)
+                '(:status empty :kind undo-fu-session
+                  :version "not-required"))))
          (initial
           (skg-recovery-archive-publish-initial
            (plist-get fixture :offer)
@@ -70,6 +72,39 @@
             (should (equal text (buffer-string)))))
       (skg-test-recovery-ui--kill first)
       (skg-test-recovery-ui--kill second)
+      (skg-test-recovery--cleanup fixture))))
+
+(ert-deftest test-skg-recovery-ui-uses-text-for-other-client-sidecar ()
+  (let* ((fixture (skg-test-recovery--fixture))
+         (text (skg-buffer-raw-text (plist-get fixture :buffer)))
+         recovery)
+    (unwind-protect
+        (save-window-excursion
+          (skg-test-recovery-ui--finalize
+           fixture
+           (lambda (_buffer _pseudo sidecar staging)
+             (let ((file-name-handler-alist nil))
+               (skg-recovery--write-private-file
+                sidecar (string-as-unibyte "real foreign sidecar\n") staging))
+             '(:status archived :kind undo-fu-session :version "0.8")))
+          (plist-put
+           fixture :summary
+           (skg-test-recovery--retag-client-kind
+            (plist-get (plist-get fixture :summary) :path) "neovim"))
+          (should-not
+           (plist-get (plist-get fixture :summary)
+                      :native-undo-compatible))
+          (setq recovery
+                (skg-open-interrupted-view
+                 (plist-get fixture :summary)
+                 (plist-get fixture :buffer-key)))
+          (with-current-buffer recovery
+            (should (equal text (buffer-string)))
+            (should (eq skg-recovery-native-undo-status
+                        'text-only-other-client))
+            (should-not (local-variable-p 'skg-view-uri))
+            (should-not skg--buffer-record)))
+      (skg-test-recovery-ui--kill recovery)
       (skg-test-recovery--cleanup fixture))))
 
 (ert-deftest test-skg-recovery-ui-refuses-corrupt-required-text ()

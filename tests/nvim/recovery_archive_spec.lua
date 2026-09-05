@@ -36,6 +36,43 @@ local function replace_bytes (path, bytes)
   assert(handle:close())
 end
 
+local function set_field (record, name, value)
+  for _, field in ipairs(record) do
+    if tostring(field[1]) == name then
+      field[2] = value
+      return
+    end
+  end
+  error('missing machine-record field ' .. name)
+end
+
+local function retag_client_kind (incident_root, client_kind)
+  local initial_path = incident_root .. '/manifest.initial.sexp'
+  local initial = sexpr.read(read_bytes(initial_path))
+  set_field(initial, 'client-kind', client_kind)
+  local initial_bytes = archive.canonical_sexpr(initial) .. '\n'
+  replace_bytes(initial_path, initial_bytes)
+  local initial_sha = vim.fn.sha256(initial_bytes)
+
+  local ready_path = incident_root .. '/ARCHIVE-READY'
+  local ready = sexpr.read(read_bytes(ready_path))
+  set_field(ready, 'manifest-sha256', initial_sha)
+  replace_bytes(ready_path, archive.canonical_sexpr(ready) .. '\n')
+
+  local final_path = incident_root .. '/manifest.final.sexp'
+  local final = sexpr.read(read_bytes(final_path))
+  set_field(final, 'initial-manifest-sha256', initial_sha)
+  set_field(final, 'client-kind', client_kind)
+  local final_bytes = archive.canonical_sexpr(final) .. '\n'
+  replace_bytes(final_path, final_bytes)
+
+  local finalized_path = incident_root .. '/FINALIZED'
+  local finalized = sexpr.read(read_bytes(finalized_path))
+  set_field(finalized, 'manifest-sha256', vim.fn.sha256(final_bytes))
+  replace_bytes(finalized_path, archive.canonical_sexpr(finalized) .. '\n')
+  return archive.inspect(incident_root)
+end
+
 local function raw_text (buf)
   return registry.raw_text(buf)
 end
@@ -495,6 +532,28 @@ describe('skg recovery archive', function ()
     end, debug.traceback)
     delete_buffer(first)
     delete_buffer(second)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('uses exact text when the native sidecar belongs to Emacs', function ()
+    local ui = require('skg.recovery_ui')
+    local value = fixture()
+    local recovery
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      finalized.summary = retag_client_kind(
+        finalized.summary.path, 'emacs')
+      assert.is_false(finalized.summary.native_undo_compatible)
+      recovery = ui.open_interrupted_view(
+        finalized.summary, finalized.buffer_key)
+      assert.are.equal(finalized.text, raw_text(recovery))
+      assert.are.equal('text-only-other-client',
+        vim.b[recovery].skg_recovery_native_undo_status)
+      assert.is_nil(vim.b[recovery].skg_view_uri)
+      assert.is_nil(registry.record(recovery))
+    end, debug.traceback)
+    delete_buffer(recovery)
     cleanup(value)
     assert(ok, error_text)
   end)

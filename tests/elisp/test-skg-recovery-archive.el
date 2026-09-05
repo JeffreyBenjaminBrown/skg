@@ -16,6 +16,45 @@
       (with-file-modes #o600
         (write-region (point-min) (point-max) path nil 'silent nil 'excl)))))
 
+(defun skg-test-recovery--replace-machine-record (path value)
+  (let ((bytes
+         (skg--utf8-unix-bytes
+          (concat (skg-recovery-canonical-sexpr value) "\n")))
+        (coding-system-for-write 'no-conversion)
+        (write-region-inhibit-fsync nil))
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      (insert bytes)
+      (write-region (point-min) (point-max) path nil 'silent))
+    (set-file-modes path #o600)
+    bytes))
+
+(defun skg-test-recovery--retag-client-kind (incident-root client-kind)
+  "Retag a real finalized fixture and restore its checksum chain."
+  (let* ((initial-path
+          (expand-file-name "manifest.initial.sexp" incident-root))
+         (initial (skg-recovery--read-exact-sexpr initial-path))
+         (ready-path (expand-file-name "ARCHIVE-READY" incident-root))
+         (ready (skg-recovery--read-exact-sexpr ready-path)))
+    (setf (cadr (assoc 'client-kind initial)) client-kind)
+    (let* ((initial-bytes
+            (skg-test-recovery--replace-machine-record initial-path initial))
+           (initial-sha (secure-hash 'sha256 initial-bytes))
+           (final-path (expand-file-name "manifest.final.sexp" incident-root))
+           (finalized-path (expand-file-name "FINALIZED" incident-root))
+           (final (skg-recovery--read-exact-sexpr final-path))
+           (finalized (skg-recovery--read-exact-sexpr finalized-path)))
+      (setf (cadr (assoc 'manifest-sha256 ready)) initial-sha)
+      (skg-test-recovery--replace-machine-record ready-path ready)
+      (setf (cadr (assoc 'initial-manifest-sha256 final)) initial-sha
+            (cadr (assoc 'client-kind final)) client-kind)
+      (let* ((final-bytes
+              (skg-test-recovery--replace-machine-record final-path final))
+             (final-sha (secure-hash 'sha256 final-bytes)))
+        (setf (cadr (assoc 'manifest-sha256 finalized)) final-sha)
+        (skg-test-recovery--replace-machine-record finalized-path finalized))))
+  (skg-recovery-archive-inspect incident-root))
+
 (defun skg-test-recovery--fixture ()
   (let* ((directory (make-temp-file "skg-recovery-archive-test-" t))
          (owned (expand-file-name "owned" directory))
