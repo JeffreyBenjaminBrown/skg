@@ -191,6 +191,12 @@ fn freeze_maintenance_census (
     (client, census)
   };
   validate_client_archive_capability (&client, &census)?;
+  if census . iter () . any (|descriptor|
+       descriptor . maintenance_epoch != Some (epoch . get ()))
+  {
+    return Err (format! (
+      "maintenance census contains a buffer not locked for epoch {}",
+      epoch . get ())); }
   let dirty_raw : Vec<_> = census . iter () . filter (|descriptor|
       descriptor . dirty && descriptor . kind == "raw-skg-file")
     . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
@@ -2065,9 +2071,14 @@ mod tests {
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, vec![FrozenBufferRecord {
         buffer_id: "buffer" . into (), kind: BufferKind::SearchView,
+        lifecycle: "live-view" . into (), disposable: false,
+        continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+        source_set: "all" . into (),
         view_uri: Some ("search:terms" . into ()), graph_generation: 1,
         presentation_generation: 3, server_revision: 4,
-        application_token: 7, dirty: false, undo_required: false,
+        application_token: 7, dirty: false, logical_dirty: false,
+        undo_required: false, maintenance_epoch: None,
+        presentation_stale: false, search_stale: false, herald_bearing: false,
         last_fetched_sha256: "a" . repeat (64),
         current_sha256: "a" . repeat (64),
       }], MaintenanceTargets {

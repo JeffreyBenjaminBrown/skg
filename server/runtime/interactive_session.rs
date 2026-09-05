@@ -50,30 +50,59 @@ pub struct QueuedServerEvent {
 pub struct CensusDescriptor {
   pub buffer_id            : String,
   pub kind                 : String,
+  pub lifecycle            : String,
+  pub disposable           : bool,
+  pub continuation_id      : Option<String>,
   pub view_uri             : Option<ViewUri>,
+  pub recipe               : String,
+  pub root_ids             : Vec<String>,
+  pub source_set           : String,
   pub graph_generation     : u64,
   pub presentation_generation : u64,
   pub server_revision      : u64,
   pub application_token    : u64,
   pub dirty                : bool,
+  pub logical_dirty        : bool,
   pub undo_required        : bool,
+  pub maintenance_epoch    : Option<u64>,
+  pub modification_tick    : u64,
+  pub presentation_stale   : bool,
+  pub search_stale         : bool,
+  pub herald_bearing       : bool,
   pub last_fetched_sha256  : String,
   pub current_sha256       : String,
 }
 
 impl CensusDescriptor {
   pub fn frozen_record (&self) -> Result<crate::maintenance::FrozenBufferRecord, String> {
+    if self . lifecycle . is_empty () {
+      return Err ("census buffer lifecycle is empty" . into ()); }
+    if self . source_set . is_empty () {
+      return Err ("census buffer source-set is empty" . into ()); }
+    if self . logical_dirty && !self . dirty {
+      return Err ("logically dirty census buffer is not marked dirty" . into ()); }
     Ok (crate::maintenance::FrozenBufferRecord {
       buffer_id: self . buffer_id . clone (),
       kind: crate::maintenance::BufferKind::parse (&self . kind)?,
+      lifecycle: self . lifecycle . clone (),
+      disposable: self . disposable,
+      continuation_id: self . continuation_id . clone (),
       view_uri: self . view_uri . as_ref ()
         . map (ViewUri::repr_in_client),
+      recipe: self . recipe . clone (),
+      root_ids: self . root_ids . clone (),
+      source_set: self . source_set . clone (),
       graph_generation: self . graph_generation,
       presentation_generation: self . presentation_generation,
       server_revision: self . server_revision,
       application_token: self . application_token,
       dirty: self . dirty,
+      logical_dirty: self . logical_dirty,
       undo_required: self . undo_required,
+      maintenance_epoch: self . maintenance_epoch,
+      presentation_stale: self . presentation_stale,
+      search_stale: self . search_stale,
+      herald_bearing: self . herald_bearing,
       last_fetched_sha256: self . last_fetched_sha256 . clone (),
       current_sha256: self . current_sha256 . clone (),
     })

@@ -1262,9 +1262,14 @@ mod tests {
       &active . incident_id, active . epoch, "too-early" . into ()) . is_err ());
     let frozen = FrozenBufferRecord {
       buffer_id: "view" . into (), kind: BufferKind::ContentView,
+      lifecycle: "live-view" . into (), disposable: false,
+      continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+      source_set: "all" . into (),
       view_uri: Some ("uri-view" . into ()), graph_generation: 1,
       presentation_generation: 0, server_revision: 4,
-      application_token: 9, dirty: true, undo_required: true,
+      application_token: 9, dirty: true, logical_dirty: false,
+      undo_required: true, maintenance_epoch: None,
+      presentation_stale: false, search_stale: false, herald_bearing: false,
       last_fetched_sha256: "a" . repeat (64),
       current_sha256: "b" . repeat (64),
     };
@@ -1681,9 +1686,14 @@ mod tests {
     let mut coordinator = MaintenanceCoordinator::new ();
     let frozen = |id : &str| FrozenBufferRecord {
       buffer_id: id . into (), kind: BufferKind::ContentView,
+      lifecycle: "live-view" . into (), disposable: false,
+      continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+      source_set: "all" . into (),
       view_uri: Some (format! ("uri-{}", id)), graph_generation: 1,
       presentation_generation: 0, server_revision: 4,
-      application_token: 9, dirty: true, undo_required: false,
+      application_token: 9, dirty: true, logical_dirty: false,
+      undo_required: false, maintenance_epoch: None,
+      presentation_stale: false, search_stale: false, herald_bearing: false,
       last_fetched_sha256: "a" . repeat (64),
       current_sha256: "b" . repeat (64),
     };
@@ -1784,9 +1794,14 @@ mod tests {
       "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
       ManifestRevision::INITIAL, vec![FrozenBufferRecord {
         buffer_id: "view" . into (), kind: BufferKind::ContentView,
+        lifecycle: "live-view" . into (), disposable: false,
+        continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+        source_set: "all" . into (),
         view_uri: Some ("uri-view" . into ()), graph_generation: 1,
         presentation_generation: 0, server_revision: 4,
-        application_token: 9, dirty: false, undo_required: false,
+        application_token: 9, dirty: false, logical_dirty: false,
+        undo_required: false, maintenance_epoch: None,
+        presentation_stale: false, search_stale: false, herald_bearing: false,
         last_fetched_sha256: "a" . repeat (64),
         current_sha256: "a" . repeat (64),
       }], MaintenanceTargets {

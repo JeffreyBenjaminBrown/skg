@@ -126,6 +126,47 @@
           (should (overlayp skg--maintenance-lock-overlay)))
       (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
+(ert-deftest test-skg-buffer-census-emits-complete-normalized-descriptor ()
+  (let ((buffer (generate-new-buffer " *skg-census-test*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--server-store-state '((graph-generation . 7)))
+        (skg--active-source-set-name "private"))
+    (unwind-protect
+        (with-current-buffer buffer
+          (org-mode)
+          (insert "* Original\n")
+          (setq skg-view-uri "search:dog")
+          (skg-register-buffer
+           buffer 'search-view :view-uri "search:dog"
+           :recipe '((kind . "search") (terms . "dog")
+                     (regex . t) (body . nil) (operators . t))
+           :root-ids '("z-root" "a-root" "z-root")
+           :lifecycle 'live-view :continuation-id "continuation-1")
+          (setf (skg--buffer-record-logical-dirty skg--buffer-record) t
+                (skg--buffer-record-presentation-stale skg--buffer-record) t
+                (skg--buffer-record-search-stale skg--buffer-record) t
+                (skg--buffer-record-herald-bearing skg--buffer-record) t)
+          (skg-lock-buffer-for-maintenance buffer 9)
+          (let ((descriptor (car (skg-buffer-census))))
+            (should (equal (cdr (assq 'lifecycle descriptor)) "live-view"))
+            (should (equal (cdr (assq 'continuation-id descriptor))
+                           "continuation-1"))
+            (should (equal (cdr (assq 'source-set descriptor)) "private"))
+            (should (equal (cdr (assq 'maintenance-epoch descriptor)) 9))
+            (should (equal (cdr (assq 'dirty descriptor)) "true"))
+            (should (equal (cdr (assq 'logical-dirty descriptor)) "true"))
+            (should (equal (cdr (assq 'presentation-stale descriptor))
+                           "true"))
+            (should (equal (cdr (assq 'search-stale descriptor)) "true"))
+            (should (equal (cdr (assq 'herald-bearing descriptor)) "true"))
+            (should (equal (cadr (assq 'root-ids descriptor))
+                           '("a-root" "z-root")))
+            (should
+             (equal (cdr (assq 'recipe descriptor))
+                    "((body \"nil\") (kind \"search\") (operators \"true\") (regex \"true\") (terms \"dog\"))"))
+            (should (natnump (cdr (assq 'modification-tick descriptor))))))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
 (ert-deftest test-skg-maintenance-census-is-incident-qualified ()
   (let (submitted)
     (cl-letf (((symbol-function 'skg-buffer-census) (lambda () nil))

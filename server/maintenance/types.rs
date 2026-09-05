@@ -496,13 +496,35 @@ pub struct ScalarReleaseRecord {
 pub struct FrozenBufferRecord {
   pub buffer_id               : String,
   pub kind                    : BufferKind,
+  #[serde(default)]
+  pub lifecycle               : String,
+  #[serde(default)]
+  pub disposable              : bool,
+  #[serde(default)]
+  pub continuation_id         : Option<String>,
   pub view_uri                : Option<String>,
+  #[serde(default)]
+  pub recipe                  : String,
+  #[serde(default)]
+  pub root_ids                : Vec<String>,
+  #[serde(default)]
+  pub source_set              : String,
   pub graph_generation        : u64,
   pub presentation_generation : u64,
   pub server_revision         : u64,
   pub application_token       : u64,
   pub dirty                   : bool,
+  #[serde(default)]
+  pub logical_dirty           : bool,
   pub undo_required           : bool,
+  #[serde(default)]
+  pub maintenance_epoch       : Option<u64>,
+  #[serde(default)]
+  pub presentation_stale      : bool,
+  #[serde(default)]
+  pub search_stale            : bool,
+  #[serde(default)]
+  pub herald_bearing          : bool,
   pub last_fetched_sha256     : String,
   pub current_sha256          : String,
 }

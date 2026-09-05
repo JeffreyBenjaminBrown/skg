@@ -124,10 +124,16 @@ So far there are these endpoints:
   payload of descriptors.  The accepted descriptor authority is:
 
   ```text
-  ((buffer-id . "ID") (kind . "KIND") (view-uri . "URI"|"nil")
+  ((buffer-id . "ID") (kind . "KIND") (lifecycle . "CLASS")
+   (disposable . "true"|"nil") (continuation-id . "ID"|"nil")
+   (view-uri . "URI"|"nil") (recipe . "NORMALIZED-SEXP")
+   (root-ids ("ID" ...)) (source-set . "NAME")
    (graph-generation . N) (presentation-generation . N)
    (server-revision . N) (application-token . N)
-   (dirty . "true"|"nil") (undo-required . "true"|"nil")
+   (dirty . "true"|"nil") (logical-dirty . "true"|"nil")
+   (undo-required . "true"|"nil") (maintenance-epoch . N|"nil")
+   (modification-tick . N) (presentation-stale . "true"|"nil")
+   (search-stale . "true"|"nil") (herald-bearing . "true"|"nil")
    (last-fetched-sha256 . "SHA256") (current-sha256 . "SHA256"))
   ```
 

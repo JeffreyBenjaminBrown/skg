@@ -28,6 +28,70 @@ local function digest (text)
   return vim.fn.sha256(text)
 end
 
+local function normalized_recipe_value (value)
+  local value_type = type(value)
+  if value == nil then return 'nil' end
+  if value_type == 'string' or value_type == 'number' then return value end
+  if value_type == 'boolean' then return value and 'true' or 'nil' end
+  local sexpr = require('skg.sexpr.parse')
+  if sexpr.is_symbol(value) then return value.name end
+  if sexpr.is_pair(value) then
+    return {
+      sexpr.symbol('pair'), normalized_recipe_value(value.car),
+      normalized_recipe_value(value.cdr),
+    }
+  end
+  if value_type ~= 'table' then
+    error('Skg buffer recipe contains unsupported ' .. value_type) end
+  local count, maximum, map = 0, 0, false
+  for key in pairs(value) do
+    if type(key) ~= 'number' or key < 1 or key ~= math.floor(key) then
+      map = true
+    else
+      count = count + 1
+      maximum = math.max(maximum, key)
+    end
+  end
+  if not map and count == maximum then
+    local result = {}
+    for _, item in ipairs(value) do
+      table.insert(result, normalized_recipe_value(item)) end
+    return result
+  end
+  local keys = {}
+  for key in pairs(value) do
+    table.insert(keys, { text = tostring(key):gsub('_', '-'), original = key })
+  end
+  table.sort(keys, function (left, right) return left.text < right.text end)
+  local result = {}
+  for _, key in ipairs(keys) do
+    table.insert(result, {
+      sexpr.symbol(key.text), normalized_recipe_value(value[key.original]),
+    })
+  end
+  return result
+end
+
+---The deterministic, language-neutral recipe spelling used by census.
+function M.recipe_text (recipe)
+  local sexpr = require('skg.sexpr.parse')
+  return sexpr.to_string(
+    recipe == nil and sexpr.NIL or normalized_recipe_value(recipe))
+end
+
+local function normalized_strings (values)
+  local result, seen = {}, {}
+  for _, value in ipairs(values or {}) do
+    value = tostring(value)
+    if value ~= '' and not seen[value] then
+      seen[value] = true
+      table.insert(result, value)
+    end
+  end
+  table.sort(result)
+  return result
+end
+
 local function conservative_ids (text)
   local result, seen = {}, {}
   for _, key in ipairs({ 'id', 'pid', 'extra_ids', 'extraIds' }) do
@@ -321,13 +385,25 @@ function M.census ()
     table.insert(result, {
       buffer_id = record.id,
       kind = record.kind,
+      lifecycle = record.lifecycle,
+      disposable = record.disposable,
+      continuation_id = record.continuation_id,
       view_uri = record.view_uri or 'nil',
+      recipe = M.recipe_text(record.recipe),
+      root_ids = normalized_strings(record.root_ids),
+      source_set = record.source_set or 'all',
       graph_generation = record.graph_generation or 0,
       presentation_generation = record.presentation_generation or 0,
       server_revision = record.server_revision or 0,
       application_token = record.application_token or 0,
       dirty = M.dirty(buf),
+      logical_dirty = record.logical_dirty,
       undo_required = M.dirty(buf) and #(undo_tree.entries or {}) > 0,
+      maintenance_epoch = record.maintenance_epoch,
+      modification_tick = vim.api.nvim_buf_get_changedtick(buf),
+      presentation_stale = record.presentation_stale,
+      search_stale = record.search_stale,
+      herald_bearing = vim.b[buf].skg_herald_bearing == true,
       last_fetched_sha256 = record.last_fetched_sha256,
       current_sha256 = digest(current),
     })
@@ -346,15 +422,34 @@ function M.census_payload ()
     table.insert(records, {
       atom_pair(sexpr, 'buffer-id', descriptor.buffer_id),
       atom_pair(sexpr, 'kind', descriptor.kind),
+      atom_pair(sexpr, 'lifecycle', descriptor.lifecycle),
+      atom_pair(sexpr, 'disposable',
+                descriptor.disposable and 'true' or 'nil'),
+      atom_pair(sexpr, 'continuation-id',
+                descriptor.continuation_id or 'nil'),
       atom_pair(sexpr, 'view-uri', descriptor.view_uri),
+      atom_pair(sexpr, 'recipe', descriptor.recipe),
+      { sexpr.symbol('root-ids'), descriptor.root_ids },
+      atom_pair(sexpr, 'source-set', descriptor.source_set),
       atom_pair(sexpr, 'graph-generation', descriptor.graph_generation),
       atom_pair(sexpr, 'presentation-generation',
                 descriptor.presentation_generation),
       atom_pair(sexpr, 'server-revision', descriptor.server_revision),
       atom_pair(sexpr, 'application-token', descriptor.application_token),
       atom_pair(sexpr, 'dirty', descriptor.dirty and 'true' or 'nil'),
+      atom_pair(sexpr, 'logical-dirty',
+                descriptor.logical_dirty and 'true' or 'nil'),
       atom_pair(sexpr, 'undo-required',
                 descriptor.undo_required and 'true' or 'nil'),
+      atom_pair(sexpr, 'maintenance-epoch',
+                descriptor.maintenance_epoch or 'nil'),
+      atom_pair(sexpr, 'modification-tick', descriptor.modification_tick),
+      atom_pair(sexpr, 'presentation-stale',
+                descriptor.presentation_stale and 'true' or 'nil'),
+      atom_pair(sexpr, 'search-stale',
+                descriptor.search_stale and 'true' or 'nil'),
+      atom_pair(sexpr, 'herald-bearing',
+                descriptor.herald_bearing and 'true' or 'nil'),
       atom_pair(sexpr, 'last-fetched-sha256',
                 descriptor.last_fetched_sha256),
       atom_pair(sexpr, 'current-sha256', descriptor.current_sha256),

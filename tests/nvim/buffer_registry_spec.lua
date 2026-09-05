@@ -16,6 +16,10 @@ local function make_buffer (kind, options)
   vim.b[buf].skg_view_uri = options.view_uri or 'view:test'
   registry.register(buf, kind, {
     disposable = options.disposable,
+    lifecycle = options.lifecycle,
+    continuation_id = options.continuation_id,
+    recipe = options.recipe,
+    root_ids = options.root_ids,
     last_fetched = '* Original\nbody\n',
     graph_generation = 7,
     presentation_generation = 3,
@@ -59,6 +63,42 @@ end
 describe('skg maintenance buffer transitions', function ()
   before_each(wipe_registered_buffers)
   after_each(wipe_registered_buffers)
+
+  it('emits the complete normalized reconnect descriptor', function ()
+    local buf = make_buffer('search-view', {
+      lifecycle = 'live-view',
+      continuation_id = 'continuation-1',
+      root_ids = { 'z-root', 'a-root', 'z-root' },
+      recipe = {
+        kind = 'search', terms = 'dog', regex = true,
+        body = false, operators = true,
+      },
+    })
+    vim.b[buf].skg_record_source_set = 'private'
+    vim.b[buf].skg_logical_dirty = true
+    vim.b[buf].skg_presentation_stale = true
+    vim.b[buf].skg_search_stale = true
+    vim.b[buf].skg_herald_bearing = true
+    registry.lock_for_maintenance(buf, 9)
+    local descriptor = registry.census()[1]
+    assert.are.equal('live-view', descriptor.lifecycle)
+    assert.are.equal('continuation-1', descriptor.continuation_id)
+    assert.are.same({ 'a-root', 'z-root' }, descriptor.root_ids)
+    assert.are.equal('private', descriptor.source_set)
+    assert.are.equal(9, descriptor.maintenance_epoch)
+    assert.is_true(descriptor.dirty)
+    assert.is_true(descriptor.logical_dirty)
+    assert.is_true(descriptor.presentation_stale)
+    assert.is_true(descriptor.search_stale)
+    assert.is_true(descriptor.herald_bearing)
+    assert.are.equal(
+      '((body "nil") (kind "search") (operators "true")'
+        .. ' (regex "true") (terms "dog"))', descriptor.recipe)
+    local wire = sexpr.read(registry.census_payload())[1]
+    assert.are.same({ 'a-root', 'z-root' },
+      payload.string_list(payload.field(wire, 'root-ids')))
+    assert.are.equal(descriptor.recipe, payload.field_text(wire, 'recipe'))
+  end)
 
   it('releases exact dirty search text against G1 without unlocking it',
      function ()

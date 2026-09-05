@@ -37,6 +37,41 @@
 (defun skg--sha256-text (text)
   (secure-hash 'sha256 (skg--utf8-unix-bytes text)))
 
+(defun skg--normalized-recipe-value (value)
+  "Return VALUE in the portable proper-list recipe grammar."
+  (cond
+   ((null value) "nil")
+   ((eq value t) "true")
+   ((stringp value) value)
+   ((numberp value) value)
+   ((symbolp value) (symbol-name value))
+   ((and (proper-list-p value) (cl-every #'consp value))
+    (mapcar
+     (lambda (entry)
+       (let* ((key (replace-regexp-in-string
+                    "_" "-" (format "%s" (car entry))))
+              (entry-value
+               (if (and (proper-list-p entry) (= (length entry) 2))
+                   (cadr entry)
+                 (cdr entry))))
+         (list (intern key) (skg--normalized-recipe-value entry-value))))
+     (sort (copy-sequence value)
+           (lambda (left right)
+             (string< (format "%s" (car left))
+                      (format "%s" (car right)))))))
+   ((proper-list-p value)
+    (mapcar #'skg--normalized-recipe-value value))
+   (t (error "Skg buffer recipe contains unsupported value: %S" value))))
+
+(defun skg-buffer-recipe-text (recipe)
+  "Return RECIPE's deterministic, language-neutral census spelling."
+  (prin1-to-string
+   (if recipe (skg--normalized-recipe-value recipe) nil)))
+
+(defun skg--normalized-string-list (values)
+  (sort (delete-dups (mapcar (lambda (value) (format "%s" value)) values))
+        #'string<))
+
 (defun skg--conservative-ids-from-text (text)
   "Collect recognizable metadata IDs from TEXT without validating the view."
   (let ((start 0) ids)
@@ -359,10 +394,17 @@
          `((buffer-id . ,(skg--buffer-record-id record))
            (kind . ,(symbol-name (skg--buffer-record-kind record)))
            (lifecycle . ,(symbol-name (skg--buffer-record-lifecycle record)))
+           (disposable
+            . ,(if (skg--buffer-record-disposable record) "true" "nil"))
+           (continuation-id
+            . ,(or (skg--buffer-record-continuation-id record) "nil"))
            (view-uri . ,(or (skg--buffer-record-view-uri record) "nil"))
-           (recipe . ,(skg--buffer-record-recipe record))
-           (root-ids . ,(skg--buffer-record-root-ids record))
-           (source-set . ,(skg--buffer-record-source-set record))
+           (recipe . ,(skg-buffer-recipe-text
+                       (skg--buffer-record-recipe record)))
+           (root-ids
+            ,(skg--normalized-string-list
+              (skg--buffer-record-root-ids record)))
+           (source-set . ,(or (skg--buffer-record-source-set record) "all"))
            (graph-generation . ,(or (skg--buffer-record-graph-generation record) 0))
            (presentation-generation
             . ,(or (skg--buffer-record-presentation-generation record) 0))
@@ -377,11 +419,16 @@
                    "true" "nil"))
            (logical-dirty
             . ,(if (skg--buffer-record-logical-dirty record) "true" "nil"))
+           (maintenance-epoch
+            . ,(or (skg--buffer-record-maintenance-epoch record) "nil"))
+           (modification-tick . ,(buffer-chars-modified-tick))
            (presentation-stale
             . ,(if (skg--buffer-record-presentation-stale record)
                    "true" "nil"))
            (search-stale
             . ,(if (skg--buffer-record-search-stale record) "true" "nil"))
+           (herald-bearing
+            . ,(if (skg--buffer-record-herald-bearing record) "true" "nil"))
            (last-fetched-sha256 . ,(skg--buffer-record-last-fetched-sha256 record))
            (current-sha256 . ,(skg--sha256-text current))))))
    (skg-registered-buffers)))

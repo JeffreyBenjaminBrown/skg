@@ -11,7 +11,7 @@ use crate::serve::util::{
 };
 use crate::types::env::SkgEnv;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
+use crate::types::sexp::{atom_to_string, extract_v_from_kv_pair_in_sexp};
 use crate::types::views_state::{ViewUri, pids_from_viewforest};
 
 use sexp::{Atom, Sexp};
@@ -171,24 +171,41 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
     if !ids . insert (buffer_id . clone ()) {
       return Err (format! ("duplicate census buffer-id '{}'", buffer_id)); }
     let uri = field (&record, "view-uri")?;
-    let dirty = field (&record, "dirty")? == "true";
+    let mut root_ids = list_field_values (&record, "root-ids")?;
+    root_ids . sort ();
+    root_ids . dedup ();
+    let dirty = bool_field (&record, "dirty")?;
+    let last_fetched_sha256 = sha256_field (&record, "last-fetched-sha256")?;
+    let current_sha256 = sha256_field (&record, "current-sha256")?;
     result . push (CensusDescriptor {
       buffer_id,
       kind: field (&record, "kind")?,
+      lifecycle: field (&record, "lifecycle")?,
+      disposable: bool_field (&record, "disposable")?,
+      continuation_id: optional_text_field (&record, "continuation-id")?,
       view_uri: if uri == "nil" { None }
                 else { Some (ViewUri::from_client_string (uri)) },
+      recipe: normalized_recipe_field (&record)?,
+      root_ids,
+      source_set: field (&record, "source-set")?,
       graph_generation: unsigned_field (&record, "graph-generation")?,
       presentation_generation: unsigned_field (
         &record, "presentation-generation") . unwrap_or (0),
       server_revision: unsigned_field (&record, "server-revision")?,
       application_token: unsigned_field (&record, "application-token")?,
       dirty,
+      logical_dirty: bool_field (&record, "logical-dirty")?,
       // A pre-extension peer which omits this field is conservative: every
       // dirty record might carry native undo which must not be discarded.
       undo_required: field (&record, "undo-required")
         . map (|value| value == "true") . unwrap_or (dirty),
-      last_fetched_sha256: field (&record, "last-fetched-sha256")?,
-      current_sha256: field (&record, "current-sha256")?,
+      maintenance_epoch: optional_unsigned_field (&record, "maintenance-epoch")?,
+      modification_tick: unsigned_field (&record, "modification-tick")?,
+      presentation_stale: bool_field (&record, "presentation-stale")?,
+      search_stale: bool_field (&record, "search-stale")?,
+      herald_bearing: bool_field (&record, "herald-bearing")?,
+      last_fetched_sha256,
+      current_sha256,
     });
   }
   Ok (result)
@@ -215,6 +232,68 @@ fn field (record : &Sexp, key : &str) -> Result<String, String> {
 fn unsigned_field (record : &Sexp, key : &str) -> Result<u64, String> {
   field (record, key)? . parse::<u64> ()
     . map_err (|_| format! ("census field '{}' must be unsigned", key))
+}
+
+fn optional_unsigned_field (
+  record : &Sexp,
+  key    : &str,
+) -> Result<Option<u64>, String> {
+  let value = field (record, key)?;
+  if value == "nil" { return Ok (None); }
+  value . parse::<u64> () . map (Some)
+    . map_err (|_| format! ("census field '{}' must be unsigned or nil", key))
+}
+
+fn optional_text_field (
+  record : &Sexp,
+  key    : &str,
+) -> Result<Option<String>, String> {
+  let value = field (record, key)?;
+  Ok (if value == "nil" { None } else { Some (value) })
+}
+
+fn bool_field (record : &Sexp, key : &str) -> Result<bool, String> {
+  match field (record, key)? . as_str () {
+    "true" => Ok (true),
+    "nil" => Ok (false),
+    _ => Err (format! ("census field '{}' must be true or nil", key)),
+  }
+}
+
+fn list_field_values (record : &Sexp, key : &str) -> Result<Vec<String>, String> {
+  let Sexp::List (fields) = record else {
+    return Err ("census descriptor must be a list" . into ()); };
+  for candidate in fields {
+    let Sexp::List (parts) = candidate else { continue; };
+    let Some (Sexp::Atom (Atom::S (name))) = parts . first () else {
+      continue; };
+    if name != key { continue; }
+    if parts . len () == 2 {
+      return match &parts [1] {
+        Sexp::List (values) => values . iter () . map (atom_to_string) . collect (),
+        Sexp::Atom (Atom::S (nil)) if nil == "nil" => Ok (Vec::new ()),
+        _ => Err (format! ("census field '{}' must be a list", key)),
+      }; }
+    return parts [1..] . iter () . map (atom_to_string) . collect ();
+  }
+  Err (format! ("No {} list found in S-expression", key))
+}
+
+fn normalized_recipe_field (record : &Sexp) -> Result<String, String> {
+  let recipe = field (record, "recipe")?;
+  match sexp::parse (&recipe) {
+    Ok (Sexp::List (items)) => Ok (Sexp::List (items) . to_string ()),
+    Ok (_) => Err ("census recipe must encode a list" . into ()),
+    Err (error) => Err (format! ("census recipe is invalid: {}", error)),
+  }
+}
+
+fn sha256_field (record : &Sexp, key : &str) -> Result<String, String> {
+  let value = field (record, key)?;
+  if value . len () == 64
+     && value . bytes () . all (|byte| byte . is_ascii_hexdigit ())
+  { Ok (value . to_ascii_lowercase ()) }
+  else { Err (format! ("census field '{}' must be a SHA-256 digest", key)) }
 }
 
 fn parse_kind (kind : &str) -> Result<BufferKind, String> {
@@ -269,4 +348,53 @@ fn send_result (stream : &mut TcpStream, result : Result<String, String>) {
       TcpToClient::Error, "failed", &error),
   };
   let _ = send_response_with_length_prefix (stream, &response);
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn complete_descriptor (overrides : &str) -> String {
+    format! (concat! (
+      "(((buffer-id . \"buffer-1\") (kind . \"search-view\") ",
+      "(lifecycle . \"live-view\") (disposable . \"nil\") ",
+      "(continuation-id . \"continuation-1\") ",
+      "(view-uri . \"search:dog\") ",
+      "(recipe . \"((terms \\\"dog\\\") (kind \\\"search\\\"))\") ",
+      "(root-ids (\"z\" \"a\" \"z\")) (source-set . \"private\") ",
+      "(graph-generation . 7) (presentation-generation . 3) ",
+      "(server-revision . 11) (application-token . 5) ",
+      "(dirty . \"true\") (logical-dirty . \"true\") ",
+      "(undo-required . \"true\") (maintenance-epoch . 9) ",
+      "(modification-tick . 17) (presentation-stale . \"true\") ",
+      "(search-stale . \"true\") (herald-bearing . \"true\") ",
+      "(last-fetched-sha256 . \"{}\") (current-sha256 . \"{}\") {}))"),
+      "a" . repeat (64), "B" . repeat (64), overrides)
+  }
+
+  #[test]
+  fn parses_the_complete_normalized_descriptor () {
+    let parsed = parse_descriptors (&complete_descriptor ("")).unwrap ();
+    let descriptor = &parsed [0];
+    assert_eq! (descriptor . lifecycle, "live-view");
+    assert_eq! (descriptor . continuation_id . as_deref (), Some ("continuation-1"));
+    assert_eq! (descriptor . recipe, "((terms dog) (kind search))");
+    assert_eq! (descriptor . root_ids, ["a", "z"]);
+    assert_eq! (descriptor . source_set, "private");
+    assert_eq! (descriptor . maintenance_epoch, Some (9));
+    assert! (descriptor . dirty && descriptor . logical_dirty);
+    assert! (descriptor . presentation_stale && descriptor . search_stale);
+    assert! (descriptor . herald_bearing);
+    assert_eq! (descriptor . current_sha256, "b" . repeat (64));
+  }
+
+  #[test]
+  fn rejects_non_list_recipes_and_non_boolean_flags () {
+    let malformed_recipe = complete_descriptor ("")
+      . replace ("((terms \\\"dog\\\") (kind \\\"search\\\"))", "not-a-list");
+    assert! (parse_descriptors (&malformed_recipe) . is_err ());
+    let malformed_flag = complete_descriptor ("")
+      . replace ("(logical-dirty . \"true\")", "(logical-dirty . \"maybe\")");
+    assert! (parse_descriptors (&malformed_flag) . is_err ());
+  }
 }
