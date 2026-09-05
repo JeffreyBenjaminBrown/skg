@@ -72,7 +72,7 @@ Elsewhere, such as YAML parsing and serialization, **scalar** retains
 its ordinary broader meaning: any single YAML value rather than a
 sequence or mapping.
 
-## manifest, path-digest manifest, and tombstone
+## manifest, path-digest manifest, manifest revision, and tombstone
 
 A **manifest** is a finite inventory: a map saying which named things belong
 to one snapshot and what is known about each. In partial reload, the
@@ -80,12 +80,67 @@ to one snapshot and what is known about each. In partial reload, the
 digest of its exact bytes. Comparing manifests finds additions, deletions and
 same-size rewrites without assuming anything about repository layout.
 
+A **manifest revision** identifies one exact selected path/byte manifest.  It
+can advance without a new graph generation when disk bytes change but fold to
+the same graph semantics.  It is therefore not a synonym for graph generation.
+
 A **tombstone** is an explicit record that a named thing is absent. Recovery
 manifests map a possible telescope-section path to either `Some(bytes)` or an
 absent tombstone (`None`). The tombstone matters because “this file was
 deleted” is incident data, whereas omitting the path could merely mean that
 it was never inspected. Here a tombstone is metadata in a snapshot, not a
 placeholder `.skg` file written to disk.
+
+## G0, observation, Gdisk, G1, and pending disk work
+
+**G0** is the server's coherent selected generation: the in-Rust graph,
+TypeDB projection, committed Tantivy generation, exact selected path manifest,
+and store-health state from which requests are answered.
+
+An **observation** reads and validates disk relative to a named G0 without
+selecting what it finds.  **Gdisk** is an immutable exact-byte candidate which
+folded and validated successfully and is semantically different from its base
+G0.  **G1** is that candidate only after maintenance has committed and
+published the graph, both derived stores, and exact manifest coherently.
+
+**Pending disk work** means changed disk cannot yet be forgotten or selected.
+A pending valid candidate is a Gdisk awaiting acceptance; pending invalid or
+unstable disk records changed bytes from which no coherent candidate could be
+built.  A declined valid candidate remains pending: queries and editing may
+continue on G0, but Skg view saves remain blocked until the user reconciles or
+explicitly reverts disk.
+
+## maintenance epoch and archive boundaries
+
+**Maintenance** is the durable fenced protocol for selecting disk not written
+by the current Skg save.  Its **maintenance epoch** is the monotonically
+increasing policy interval which binds its buffer census, locks, requests,
+settlements, and terminal unlock.  It is distinct from the incident ID and
+graph generation.
+
+**Archive ready** is the durable client boundary at which the initial dirty
+buffer snapshots, native undo sidecars, manifest, and checksum marker have
+been published.  Only then may an external mutation or destructive store step
+begin.  **Archive finalized** means semantic evidence and every final buffer
+disposition have subsequently been added and the final checksummed marker has
+been published.  The server journal records transaction authority; the client
+archive is permanent recovery evidence.
+
+## orthogonal, retired recovery view, and stale presentation
+
+An **orthogonal** dirty view has no identifiable overlap with the maintenance
+change under the conservative impact rule.  It remains byte-for-byte untouched
+and editable after selection, although generated details can be stale.
+
+A **retired recovery view** is an impacted dirty buffer whose live view URI and
+Skg save authority have been removed.  It is preserved as detached recovery,
+not killed or silently replaced.  A fresh live view is a separate buffer under
+the current generation.
+
+**Presentation stale** means generated display details such as heralds may
+describe an older graph or Git presentation.  **Search stale** separately
+means a search buffer retains old membership or ranking.  Maintenance never
+reruns a query automatically; the user explicitly requests a fresh search.
 
 ## placement, anchor
 
