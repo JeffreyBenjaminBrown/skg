@@ -223,6 +223,30 @@ local function final_bundle (initial)
   }
 end
 
+local function finalized_fixture (value)
+  local text = raw_text(value.buf)
+  local initial = archive.publish_initial(value.offer, { value.buf }, {
+    client_nonce = '0123456789abcdef01234567',
+  })
+  local bundle = final_bundle(initial)
+  archive.finalize(
+    initial, bundle.descriptor, bundle.opaque, bundle.settlements)
+  local summary = archive.inspect(initial.path)
+  local record = payload.field(summary.initial, 'buffers')[1]
+  return {
+    initial = initial, summary = summary, text = text,
+    buffer_key = payload.field_text(record, 'buffer-key'),
+  }
+end
+
+local function delete_buffer (buf)
+  if buf and vim.api.nvim_buf_is_valid(buf) then
+    vim.bo[buf].modifiable = true
+    vim.bo[buf].modified = false
+    pcall(vim.api.nvim_buf_delete, buf, { force = true })
+  end
+end
+
 describe('skg recovery archive', function ()
   it('uses a deterministic, cross-client canonical S-expression', function ()
     assert.are.equal(
@@ -435,6 +459,183 @@ describe('skg recovery archive', function ()
       assert.is_false(inspected)
       assert.is_truthy(tostring(inspect_error):find('lacks', 1, true))
     end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('opens independent authority-free detached recovery buffers', function ()
+    local ui = require('skg.recovery_ui')
+    local value = fixture()
+    local first, second = nil, nil
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      first = ui.open_interrupted_view(
+        finalized.summary, finalized.buffer_key)
+      second = ui.open_interrupted_view(
+        finalized.summary, finalized.buffer_key)
+      assert.is_true(vim.api.nvim_buf_is_valid(first))
+      assert.is_true(vim.api.nvim_buf_is_valid(second))
+      assert.are_not.equal(first, second)
+      assert.are_not.equal(vim.api.nvim_buf_get_name(first),
+        vim.api.nvim_buf_get_name(second))
+      for _, buf in ipairs({ first, second }) do
+        assert.are.equal(finalized.text, raw_text(buf))
+        assert.are.equal('acwrite', vim.bo[buf].buftype)
+        assert.is_true(vim.b[buf].skg_recovery)
+        assert.is_nil(vim.b[buf].skg_view_uri)
+        assert.is_nil(registry.record(buf))
+        assert.are.equal('native-restored',
+          vim.b[buf].skg_recovery_native_undo_status)
+        local written = pcall(vim.api.nvim_buf_call, buf, function ()
+          vim.cmd('write') end)
+        assert.is_false(written)
+      end
+      vim.api.nvim_buf_set_lines(first, -1, -1, false, { 'edit' })
+      assert.are.equal(finalized.text, raw_text(second))
+    end, debug.traceback)
+    delete_buffer(first)
+    delete_buffer(second)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('refuses corrupt required recovery text before opening a buffer', function ()
+    local ui = require('skg.recovery_ui')
+    local value = fixture()
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      local record = payload.field(finalized.summary.initial, 'buffers')[1]
+      local current_path
+      for _, artifact in ipairs(payload.field(record, 'artifacts')) do
+        local relative = payload.field_text(artifact, 'path')
+        if vim.endswith(relative, '/unsaved-changes.org') then
+          current_path = finalized.summary.path .. '/' .. relative end
+      end
+      assert.is_truthy(current_path)
+      replace_bytes(current_path, 'corrupt\n')
+      local opened, open_error = pcall(ui.open_interrupted_view,
+        finalized.summary, finalized.buffer_key)
+      assert.is_false(opened)
+      assert.is_truthy(tostring(open_error):find(
+        'exact private recorded artifact', 1, true))
+    end, debug.traceback)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('refuses an explicit unknown buffer key without opening a picker', function ()
+    local ui = require('skg.recovery_ui')
+    local value = fixture()
+    local old_picker = ui.buffer_picker
+    local picker_called = false
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      ui.buffer_picker = function () picker_called = true end
+      local opened, open_error = pcall(ui.open_interrupted_view,
+        finalized.summary, 'unknown-buffer')
+      assert.is_false(opened)
+      assert.is_truthy(tostring(open_error):find(
+        'no interrupted buffer with key unknown-buffer', 1, true))
+      assert.is_false(picker_called)
+    end, debug.traceback)
+    ui.buffer_picker = old_picker
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('lists and safely deletes terminal retained incidents', function ()
+    local ui = require('skg.recovery_ui')
+    local value = fixture()
+    local list_buf = nil
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      list_buf = ui.list_maintenance_incidents()
+      assert.is_true(vim.api.nvim_buf_is_valid(list_buf))
+      assert.is_truthy(table.concat(
+        vim.api.nvim_buf_get_lines(list_buf, 0, -1, false), '\n')
+        :find('explicit%-partial%-reload'))
+      assert.is_true(ui.delete_maintenance_incident(
+        finalized.summary, true))
+      assert.is_nil(vim.uv.fs_lstat(finalized.summary.path))
+    end, debug.traceback)
+    delete_buffer(list_buf)
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('refuses deletion while the same incident remains active', function ()
+    local ui = require('skg.recovery_ui')
+    local skg_state = require('skg.state')
+    local value = fixture()
+    local old_incident = skg_state.maintenance_client_incident
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      skg_state.maintenance_client_incident = { incident_id = incident_id }
+      local deleted, delete_error = pcall(
+        ui.delete_maintenance_incident, finalized.summary, true)
+      assert.is_false(deleted)
+      assert.is_truthy(tostring(delete_error):find(
+        'active maintenance incident', 1, true))
+    end, debug.traceback)
+    skg_state.maintenance_client_incident = old_incident
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('opens a selected recorded root as a fresh live view', function ()
+    local ui = require('skg.recovery_ui')
+    local content_view = require('skg.content_view')
+    local value = fixture()
+    local old_picker = ui.root_picker
+    local old_request = content_view.request_single_root_content_view_from_id
+    local roots, requested_root
+    local ok, error_text = xpcall(function ()
+      local finalized = finalized_fixture(value)
+      ui.root_picker = function (choices, _prompt, callback)
+        roots = choices
+        return callback(choices[2])
+      end
+      content_view.request_single_root_content_view_from_id = function (root)
+        requested_root = root
+      end
+      ui.open_fresh_view_for_interrupted(
+        finalized.summary, finalized.buffer_key)
+      assert.same({ 'root-a', 'root-b' }, roots)
+      assert.are.equal('root-b', requested_root)
+    end, debug.traceback)
+    ui.root_picker = old_picker
+    content_view.request_single_root_content_view_from_id = old_request
+    cleanup(value)
+    assert(ok, error_text)
+  end)
+
+  it('reruns an archived search only after confirmation', function ()
+    local ui = require('skg.recovery_ui')
+    local search = require('skg.search')
+    local value = fixture()
+    local old_confirm = ui.confirm
+    local old_request = search.request_text_search
+    local request
+    local ok, error_text = xpcall(function ()
+      vim.b[value.buf].skg_buffer_kind = 'search-view'
+      vim.b[value.buf].skg_recipe = {
+        kind = 'search', terms = 'octopus', regex = true,
+        body = false, operators = true,
+      }
+      local finalized = finalized_fixture(value)
+      ui.confirm = function () return true end
+      search.request_text_search = function (...)
+        request = { ... }
+      end
+      ui.open_fresh_view_for_interrupted(
+        finalized.summary, finalized.buffer_key)
+      assert.are.equal('octopus', request[1])
+      assert.is_true(request[2])
+      assert.is_false(request[3])
+      assert.is_true(request[4])
+    end, debug.traceback)
+    ui.confirm = old_confirm
+    search.request_text_search = old_request
     cleanup(value)
     assert(ok, error_text)
   end)

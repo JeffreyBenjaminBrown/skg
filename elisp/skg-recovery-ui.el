@@ -231,20 +231,25 @@
           (and (derived-mode-p 'skg-recovery-mode)
                skg-recovery-buffer-record
                (skg-recovery--required-text
-                skg-recovery-buffer-record 'buffer-key "initial buffer"))))
-    (or (and buffer-key
-             (cl-find (format "%s" buffer-key) records :test #'equal
-                      :key (lambda (record)
-                             (skg-recovery--required-text
-                              record 'buffer-key "initial buffer"))))
-        (and current-key
-             (cl-find current-key records :test #'equal
-                      :key (lambda (record)
-                             (skg-recovery--required-text
-                              record 'buffer-key "initial buffer"))))
-        (funcall skg-recovery-ui-buffer-picker
-                 records "Interrupted buffer: ")
-        (user-error "No interrupted buffer selected"))))
+                skg-recovery-buffer-record 'buffer-key "initial buffer")))
+         (requested
+          (and buffer-key
+               (cl-find (format "%s" buffer-key) records :test #'equal
+                        :key (lambda (record)
+                               (skg-recovery--required-text
+                                record 'buffer-key "initial buffer"))))))
+    (cond
+     (requested requested)
+     (buffer-key
+      (user-error "Incident has no interrupted buffer with key %s" buffer-key))
+     ((and current-key
+           (cl-find current-key records :test #'equal
+                    :key (lambda (record)
+                           (skg-recovery--required-text
+                            record 'buffer-key "initial buffer")))))
+     ((funcall skg-recovery-ui-buffer-picker
+               records "Interrupted buffer: "))
+     (t (user-error "No interrupted buffer selected")))))
 
 (defun skg-recovery-ui--parse-exact-bytes (bytes context)
   (let* ((text (decode-coding-string bytes 'utf-8-unix)) value end)

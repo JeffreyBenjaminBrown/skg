@@ -157,6 +157,18 @@ M.commands = {
                      desc = 'List the configured source-sets' },
   ActiveSourceSet = { module = 'skg.source_sets', fn = 'active_source_set',
                       desc = 'Echo the active source-set' },
+  ListMaintenanceIncidents = {
+    module = 'skg.recovery_ui', fn = 'list_maintenance_incidents',
+    desc = 'List retained maintenance recovery incidents' },
+  OpenInterruptedView = {
+    module = 'skg.recovery_ui', fn = 'open_interrupted_view',
+    desc = 'Open a detached copy of an interrupted view' },
+  OpenFreshViewForInterrupted = {
+    module = 'skg.recovery_ui', fn = 'open_fresh_view_for_interrupted',
+    desc = 'Open a fresh live view beside archived recovery' },
+  DeleteMaintenanceIncident = {
+    module = 'skg.recovery_ui', fn = 'delete_maintenance_incident',
+    desc = 'Delete a terminal recovery incident after confirmation' },
   ViewSourceList = { module = 'skg.picker', fn = 'view_source_list',
                      desc = 'List configured sources and their paths' },
   BeginningOfLine = { module = 'skg.metadata', fn = 'beginning_of_line',

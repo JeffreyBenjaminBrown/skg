@@ -104,6 +104,21 @@
              :type 'skg-recovery-archive-error)))
       (skg-test-recovery--cleanup fixture))))
 
+(ert-deftest test-skg-recovery-ui-refuses-an-explicit-unknown-buffer-key ()
+  (let ((fixture (skg-test-recovery--fixture))
+        (picker-called nil))
+    (unwind-protect
+        (progn
+          (skg-test-recovery-ui--finalize fixture)
+          (let ((skg-recovery-ui-buffer-picker
+                 (lambda (&rest _) (setq picker-called t))))
+            (should-error
+             (skg-open-interrupted-view
+              (plist-get fixture :summary) "unknown-buffer")
+             :type 'user-error))
+          (should-not picker-called))
+      (skg-test-recovery--cleanup fixture))))
+
 (ert-deftest test-skg-recovery-ui-lists-and-deletes-finalized-incidents ()
   (let ((fixture (skg-test-recovery--fixture)) list-buffer)
     (unwind-protect

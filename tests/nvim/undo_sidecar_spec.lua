@@ -14,6 +14,13 @@ local function write_private (path, bytes)
   assert(vim.uv.fs_close(descriptor))
 end
 
+local function read_bytes (path)
+  local handle = assert(io.open(path, 'rb'))
+  local bytes = assert(handle:read('*a'))
+  assert(handle:close())
+  return bytes
+end
+
 local function raw_text (buf)
   local text = table.concat(
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
