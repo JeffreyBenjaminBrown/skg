@@ -28,7 +28,10 @@ use crate::serve::handlers::reload_batch::reload_batch_active;
 use crate::types::misc::SkgConfig;
 
 use git2::Repository;
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{AccessKind, AccessMode};
+use notify::{
+  Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use sexp::{Atom, Sexp};
 use std::collections::BTreeSet;
 use std::fs;
@@ -131,9 +134,10 @@ fn configured_source_watcher (
   let callback_sender = sender . clone ();
   let mut watcher = RecommendedWatcher::new (
     move |result : notify::Result<Event>| match result {
-      Ok (event) => {
+      Ok (event) if event_may_describe_mutation (&event . kind) => {
         let _ = callback_sender . send (ObservationSignal::Paths (
           event . paths, QueuedObservationReason::FilesystemEvent)); }
+      Ok (_) => { }
       Err (error) => {
         let _ = callback_sender . send (
           ObservationSignal::WatcherFailure (error . to_string ())); }
@@ -160,8 +164,9 @@ fn configured_presentation_watcher (
   let callback_sender = sender . clone ();
   let mut watcher = RecommendedWatcher::new (
     move |result : notify::Result<Event>| match result {
-      Ok (_) => {
+      Ok (event) if event_may_describe_mutation (&event . kind) => {
         let _ = callback_sender . send (ObservationSignal::GitPresentation); }
+      Ok (_) => { }
       Err (error) => {
         let _ = callback_sender . send (
           ObservationSignal::WatcherFailure (error . to_string ())); }
@@ -176,6 +181,19 @@ fn configured_presentation_watcher (
       target . path . display (), error))?;
   }
   Ok (watcher)
+}
+
+/// `notify` 8's Linux watcher subscribes to `IN_OPEN`.  Exact source and Git
+/// presentation observations necessarily open the files they inspect, so
+/// treating an open/read notification as a change makes either observer feed
+/// itself forever.  A close-after-write remains relevant (and conservative
+/// unknown access kinds remain relevant), because some backends may use it as
+/// their only durable indication of a write.
+fn event_may_describe_mutation (kind : &EventKind) -> bool {
+  !matches! (kind,
+    EventKind::Access (AccessKind::Open (_))
+    | EventKind::Access (AccessKind::Read)
+    | EventKind::Access (AccessKind::Close (AccessMode::Read)))
 }
 
 /// Watch replaceable Git metadata through its containing directories.  A
@@ -754,14 +772,22 @@ fn list_field (key : &str, values : &[String]) -> Sexp {
 #[cfg(test)]
 mod tests {
   use super::{
+    ObservationSignal,
     PresentationWatchTarget,
+    configured_source_watcher,
+    event_may_describe_mutation,
     presentation_watch_targets,
     validate_live_config_replacement,
   };
   use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
   use git2::{Repository, Signature};
+  use notify::event::{AccessKind, AccessMode, ModifyKind};
+  use notify::EventKind;
   use std::collections::HashMap;
+  use std::fs;
   use std::path::Path;
+  use std::sync::mpsc;
+  use std::time::Duration;
   use tempfile::TempDir;
 
   fn config () -> SkgConfig {
@@ -822,6 +848,44 @@ mod tests {
     let error = validate_live_config_replacement (&old, &new) . unwrap_err ();
     assert! (error . contains ("active audit daemon"), "{}", error);
     assert! (error . contains ("installed shutdown handler"), "{}", error);
+  }
+
+  #[test]
+  fn watcher_events_ignore_reads_but_retain_possible_writes () {
+    assert! (!event_may_describe_mutation (&EventKind::Access (
+      AccessKind::Open (AccessMode::Read))));
+    assert! (!event_may_describe_mutation (&EventKind::Access (
+      AccessKind::Open (AccessMode::Any))));
+    assert! (!event_may_describe_mutation (&EventKind::Access (
+      AccessKind::Read)));
+    assert! (!event_may_describe_mutation (&EventKind::Access (
+      AccessKind::Close (AccessMode::Read))));
+    assert! (event_may_describe_mutation (&EventKind::Access (
+      AccessKind::Close (AccessMode::Write))));
+    assert! (event_may_describe_mutation (&EventKind::Modify (
+      ModifyKind::Any)));
+  }
+
+  #[cfg(target_os = "linux")]
+  #[test]
+  fn reading_watched_source_does_not_queue_an_observation () {
+    let temporary = TempDir::new () . unwrap ();
+    let path = temporary . path () . join ("node.skg");
+    fs::write (&path, "- id: node\n") . unwrap ();
+    let (sender, receiver) = mpsc::channel ();
+    let _watcher = configured_source_watcher (
+      &sender, &source_config (temporary . path ())) . unwrap ();
+
+    fs::read (&path) . unwrap ();
+    assert! (matches! (
+      receiver . recv_timeout (Duration::from_millis (250)),
+      Err (mpsc::RecvTimeoutError::Timeout)));
+
+    fs::write (&path, "- id: changed\n") . unwrap ();
+    let signal = receiver . recv_timeout (Duration::from_secs (2)) . unwrap ();
+    assert! (matches! (signal,
+      ObservationSignal::Paths (paths, _)
+        if paths . iter () . any (|event_path| event_path == &path)));
   }
 
   #[test]
