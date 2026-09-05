@@ -592,6 +592,38 @@ what's imperfect about what's done; choices determining the future.
   and Neovim's terminal job renames its buffer to =term://=, so the stable
   =skg://pull/INCIDENT/...= diagnostic name is restored after process exit.
   Each has a focused regression test.
+- Routed explicit full rebuild through the same epoch-first locked census,
+  private initial archive, complete post-archive observation, durable evidence,
+  exact view settlement, final archive and terminal acknowledgement path as
+  partial reload and pull.  The raw =rebuild dbs= request no longer mutates
+  stores, and the import helper no longer sends it.
+- Full rebuild now validates and retains one immutable complete candidate before
+  taking the exclusive generation gate.  Under that gate it reconstructs
+  TypeDB, Tantivy and context labels from the candidate, publishes the exact
+  graph/manifest/config/index/warning tuple together, and attempts complete G0
+  reconstruction on every destructive failure boundary.
+- A replacement config is loaded from the same governing path and fenced by
+  its exact BLAKE3 bytes.  A changed source catalog is checked against both old
+  and new archive-root relationships; all replacement watches are prepared
+  before the old set is dropped.  The old active source-set is retained by
+  exact name or falls back to =all=, never to a similar name.
+- Candidate selection and status replay now refresh both clients' normalized
+  source inventory, selected source-set and archive-root identities.  Each
+  later maintenance offer also carries its own archive-root authority, so a
+  post-replacement incident cannot publish into the retired root.
+- The real-server rebuild harness now passes for both Emacs and Neovim.  It
+  replaces =main/notes= with =replacement/replacement-notes= at
+  =ARCHIVE-READY=, reconciles the same live view, proves the =all= fallback,
+  advances the graph generation, finalizes the old-root archive, then proves a
+  second incident uses the replacement archive root.  Its malformed-config
+  preflight remains locked before exclusivity while a fresh G0 content query
+  succeeds.
+- Live replacement rejects process-startup-only settings (listener, tracing,
+  audit-daemon, readiness-sound and shutdown-handler configuration) with an
+  explicit restart instruction.  Runtime source, database/index, archive and
+  render-limit settings remain replaceable.  The focused maintenance suite is
+  55/55; focused Emacs maintenance/archive tests, the complete Neovim suite and
+  both real-editor rebuild integrations pass.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -611,8 +643,7 @@ what's imperfect about what's done; choices determining the future.
 - Older foreground rerender streams still need to be routed through the same
   exact application/ACK authority used by retained collateral offers.
 - Both clients can finish an already-selected disk candidate, explicit reload,
-  and client-owned pull.  Rebuild execution still needs to be connected to the
-  common post-archive path.
+  client-owned pull and full rebuild through the common post-archive path.
 - Attached workflow parentage is not present in the current census schema, so
   workflow buffers are classified conservatively (dirty ones are interrupted,
   clean ones close) rather than being settled with their parent.  The durable
