@@ -399,6 +399,7 @@ function M.start_terminal (repository, context, on_exit)
       end,
     })
   end)
+  vim.b[buf].skg_pull_diagnostic_name = name
   return job, buf
 end
 
@@ -476,6 +477,8 @@ function M.start_next ()
     key = repository.key,
     repository = repository,
     diagnostic_buffer = diagnostic_buffer,
+    diagnostic_name = diagnostic_buffer
+      and vim.b[diagnostic_buffer].skg_pull_diagnostic_name or nil,
   }
 end
 
@@ -487,6 +490,12 @@ function M.job_exited (incident_id, repository_key, job_id, exit_code, event)
   if not current or current.id ~= job_id or current.key ~= repository_key then
     return end
   context.current_job = nil
+  if current.diagnostic_buffer
+     and vim.api.nvim_buf_is_valid(current.diagnostic_buffer) then
+    local name = current.diagnostic_name
+      or vim.b[current.diagnostic_buffer].skg_pull_diagnostic_name
+    if name then vim.api.nvim_buf_set_name(current.diagnostic_buffer, name) end
+  end
   local event_label = type(event) == 'string' and vim.trim(event) or 'exit'
   if event_label == '' then event_label = 'exit' end
   local detail = string.format('%s: %s %s',

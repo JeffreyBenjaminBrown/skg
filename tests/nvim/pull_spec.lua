@@ -227,6 +227,17 @@ describe('skg Neovim client-owned pull', function ()
     assert.is_not_nil(vim.api.nvim_buf_get_name(buf):find(
       'skg://pull/' .. incident_id, 1, true))
     assert.are.equal('hide', vim.bo[buf].bufhidden)
+
+    local stable_name = vim.b[buf].skg_pull_diagnostic_name
+    vim.api.nvim_buf_set_name(buf, 'term://temporary-git-name')
+    context.current_job = {
+      id = job, key = repository.key, repository = repository,
+      diagnostic_buffer = buf, diagnostic_name = stable_name,
+    }
+    pull.defer = function () end
+    pull.job_exited(incident_id, repository.key, job, 0, 'exit')
+    assert.is_not_nil(vim.api.nvim_buf_get_name(buf):find(
+      'skg://pull/' .. incident_id, 1, true))
   end)
 
   it('runs repository jobs serially and reports partial failure', function ()
