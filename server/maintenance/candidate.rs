@@ -34,6 +34,7 @@ use crate::types::store_state::{
   SelectedStoreState,
 };
 use crate::telescope::fold::fold_telescope_collecting_warnings;
+use crate::telescope::invariants::TelescopeViolation;
 use crate::telescope::types::Telescope;
 
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,9 @@ pub struct ObservedDiskCandidate {
   pub evidence         : BTreeMap<ID, SemanticChangeEvidence>,
   pub selected_bytes   : BTreeMap<PathBuf, Vec<u8>>,
   pub warnings         : Vec<String>,
+  /// Load-time warnings which cannot be recovered from the folded graph
+  /// alone (for example ignored foreign PID collisions).
+  pub load_violations  : Vec<(ID, TelescopeViolation)>,
   pub disk_fence       : CandidateDiskFence,
 }
 
@@ -160,12 +164,7 @@ fn observe_complete_disk_inner (
   retain_noop_candidate : bool,
 ) -> Result<DiskObservation, String> {
   let captured = capture_selected_corpus (config)?;
-  if captured . manifest == selected . manifest {
-    if retain_noop_candidate {
-      return Ok (DiskObservation::Valid (complete_candidate (
-        config, selected, covered_sequence,
-        captured . manifest, captured . selected_bytes,
-        selected . graph . clone (), Vec::new ()))); }
+  if captured . manifest == selected . manifest && !retain_noop_candidate {
     return Ok (DiskObservation::ByteEquivalent); }
 
   let (nodes, violations) = fold_grouped_sections (
@@ -197,8 +196,7 @@ fn observe_complete_disk_inner (
       return Ok (DiskObservation::Valid (complete_candidate (
         config, selected, covered_sequence,
         captured . manifest, captured . selected_bytes,
-        Arc::new (graph), violations . into_iter () . map (|(pid, warning)|
-          format! ("{}: {}", pid, warning)) . collect ()))); }
+        Arc::new (graph), violations))); }
     return Ok (DiskObservation::SemanticallyEqual {
       manifest: captured . manifest,
       selected_bytes: captured . selected_bytes,
@@ -207,8 +205,7 @@ fn observe_complete_disk_inner (
   Ok (DiskObservation::Valid (complete_candidate (
     config, selected, covered_sequence,
     captured . manifest, captured . selected_bytes, Arc::new (graph),
-    violations . into_iter () . map (|(pid, warning)|
-      format! ("{}: {}", pid, warning)) . collect ())))
+    violations)))
 }
 
 fn complete_candidate (
@@ -218,7 +215,7 @@ fn complete_candidate (
   manifest         : SelectedPathManifest,
   selected_bytes   : BTreeMap<PathBuf, Vec<u8>>,
   graph            : Arc<InRustGraph>,
-  warnings         : Vec<String>,
+  load_violations  : Vec<(ID, TelescopeViolation)>,
 ) -> Arc<ObservedDiskCandidate> {
   let before_nodes = nodes_by_pid (nodecompletes_from_graph (&selected . graph));
   let after_nodes = nodes_by_pid (nodecompletes_from_graph (&graph));
@@ -245,6 +242,8 @@ fn complete_candidate (
     covered_sequence,
     changed_primary_ids,
   };
+  let warnings = load_violations . iter () . map (|(pid, warning)|
+    format! ("{}: {}", pid, warning)) . collect ();
   Arc::new (ObservedDiskCandidate {
     summary,
     config_identity: config_identity (config),
@@ -259,6 +258,7 @@ fn complete_candidate (
     evidence,
     selected_bytes,
     warnings,
+    load_violations,
     disk_fence: CandidateDiskFence::Complete,
   })
 }
@@ -402,6 +402,7 @@ fn observe_targeted_disk_inner (
     evidence,
     selected_bytes: captured . selected_bytes,
     warnings,
+    load_violations: Vec::new (),
     disk_fence: CandidateDiskFence::Targeted (captured . path_fence),
   })))
 }

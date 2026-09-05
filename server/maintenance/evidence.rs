@@ -782,6 +782,7 @@ mod tests {
       evidence: Default::default (),
       selected_bytes: Default::default (),
       warnings: Vec::new (),
+      load_violations: Vec::new (),
       disk_fence: crate::maintenance::candidate::CandidateDiskFence::Complete,
     };
     let mut coordinator = MaintenanceCoordinator::new ();
@@ -847,6 +848,7 @@ mod tests {
       ]),
       selected_bytes: BTreeMap::from ([(path, after_bytes . clone ())]),
       warnings: Vec::new (),
+      load_violations: Vec::new (),
       disk_fence: crate::maintenance::candidate::CandidateDiskFence::Complete,
     };
     let mut coordinator = MaintenanceCoordinator::new ();
