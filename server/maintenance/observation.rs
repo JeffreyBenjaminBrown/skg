@@ -184,7 +184,8 @@ fn run_final_observation (
       let CoordinatorState::Active (active) = &coordinator . state else {
         return Ok (None); };
       if active . incident_id != incident || active . epoch != epoch
-      || active . origin != MaintenanceOrigin::Pull
+      || !matches! (active . origin,
+        MaintenanceOrigin::Pull | MaintenanceOrigin::FullRebuild)
       || active . phase != MaintenancePhase::FinalObservation
       {
         return Ok (None); }

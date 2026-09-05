@@ -10,7 +10,10 @@ use crate::maintenance::evidence::{
   ClientEvidenceArtifact,
   ClientEvidenceBundle,
 };
-use crate::maintenance::selection::select_archived_candidate;
+use crate::maintenance::selection::{
+  rebuild_archived_candidate,
+  select_archived_candidate,
+};
 use crate::maintenance::pull::validate_repository_mapping;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
@@ -269,6 +272,27 @@ fn run_maintenance_origin (
         atom_field ("phase", "running-external-mutation"),
         atom_field ("replayed", if authorized { "nil" } else { "true" }),
         atom_field ("next-action", "run-client-pull"),
+      ]) . to_string ())
+    }
+    MaintenanceOrigin::FullRebuild => {
+      let started = runtime . transition_maintenance (|coordinator|
+        coordinator . begin_full_rebuild_observation (&incident, epoch))?;
+      if let Err (error) = runtime . schedule_maintenance_final_observation (
+          incident . clone (), epoch)
+      {
+        let _ = runtime . transition_maintenance (|coordinator|
+          coordinator . block_invalid_disk (
+            &incident, epoch, error . clone ()));
+        return Err (format! (
+          "could not schedule full rebuild preflight: {}", error));
+      }
+      Ok (Sexp::List (vec![
+        atom_field ("status", "origin-operation-started"),
+        atom_field ("incident-id", incident . as_str ()),
+        integer_field ("maintenance-epoch", epoch . get ()),
+        atom_field ("phase", "final-observation"),
+        atom_field ("replayed", if started { "nil" } else { "true" }),
+        atom_field ("next-action", "await-maintenance-status"),
       ]) . to_string ())
     }
     _ => Err (format! (
@@ -562,7 +586,12 @@ pub(crate) fn select_and_stage_candidate (
   epoch    : MaintenanceEpoch,
   verified : &VerifiedInitialArchive,
 ) -> Result<String, String> {
-  select_archived_candidate (runtime, incident, epoch)?;
+  let origin = matching_active (runtime, incident, epoch)? . origin;
+  match origin {
+    MaintenanceOrigin::FullRebuild => {
+      rebuild_archived_candidate (runtime, incident, epoch)?; }
+    _ => { select_archived_candidate (runtime, incident, epoch)?; }
+  }
   let active = matching_active (runtime, incident, epoch)?;
   let candidate_id = active . candidate . as_ref ()
     . expect ("selected incident has candidate") . id . clone ();
