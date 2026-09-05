@@ -558,6 +558,20 @@ what's imperfect about what's done; choices determining the future.
   receive the same one-time archive warning; server-push candidate selection,
   failure and terminal outcomes drive the existing exact handshake.  The full
   Neovim suite passes.
+- Generalized Neovim's maintenance origins to the same adapter boundary as
+  Emacs, including durable opaque origin context and reconnect dispatch for
+  archive-ready, running-external-mutation, and final-observation phases.  The
+  complete Neovim suite passes.
+- Routed pull through maintenance in both clients.  Each client derives and
+  proves the same logical-repository mapping from its local source inventory,
+  refuses modified raw files, archives before mutation, runs exact argv Git
+  pulls serially in incident-qualified interactive process buffers, and reports
+  even a lost child as an indeterminate possible mutation before exact final
+  observation.  Full Emacs and Neovim unit suites pass.
+- Added a two-client, real-server pull integration harness with a local bare Git
+  remote.  Its first Emacs run reached maintenance entry and deliberately
+  failed closed before Git, exposing that the server had frozen the empty
+  reconnect census although the client had since opened a registered view.
 
 ** Changes to the plan's envisioned order.
 - Archive-root validation was implemented alongside the first shared identity
@@ -573,15 +587,36 @@ what's imperfect about what's done; choices determining the future.
   clean frozen views absent from the replacement editor.
 - Older foreground rerender streams still need to be routed through the same
   exact application/ACK authority used by retained collateral offers.
-- Both clients can finish an already-selected disk candidate.  Origin-specific
-  pull, explicit reload and rebuild execution still need to be connected to
-  the common post-archive path.
+- Both clients can finish an already-selected disk candidate, explicit reload,
+  and client-owned pull.  Rebuild execution still needs to be connected to the
+  common post-archive path.
 - Attached workflow parentage is not present in the current census schema, so
   workflow buffers are classified conservatively (dirty ones are interrupted,
   clean ones close) rather than being settled with their parent.  The durable
   settlement inventory and ACK gate are in place, but workflow-parent-aware
   settlement is not yet implemented.
+- Maintenance bootstrap currently freezes =InteractiveSession.live_census=,
+  which is refreshed only on connection/reconnection.  A view opened after
+  handshake therefore makes the server's lock inventory stale; both clients
+  detect the mismatch and cancel safely, so no archive or external mutation
+  occurs, but ordinary real-world maintenance cannot yet start with such a
+  view.  Constructors also do not yet apply an already-active epoch to newly
+  registered buffers, contrary to the agreed born-locked policy.
 
 ** choices determining the future
-- None.  The Undo Tree discovery is resolved by the agreed fail-closed active-
+- Maintenance entry needs the planned epoch-first locked-census barrier.  The
+  recommended correction is to split bootstrap into two durable steps: first
+  the server validates origin facts and allocates the incident/epoch; then the
+  client installs that epoch on every registered buffer, makes later
+  constructors inherit it, and submits a compact incident-qualified census.
+  The server freezes and acknowledges that exact census (requesting text only
+  through the existing selective-text mechanism if needed) before the client
+  publishes its initial archive.  This directly implements the ordering in
+  =7_plan.org= and gives reconnect a durable phase to resume.
+- A smaller alternative is for the client to take an unnumbered local lock,
+  refresh the ordinary census, and only then request an incident.  That avoids
+  a server phase but reverses the agreed epoch-before-lock ownership, creates a
+  client-only crash interval, and must separately fence in-flight presentation
+  and buffers born between the census and offer.  It is not recommended.
+- The Undo Tree discovery remains resolved by the agreed fail-closed active-
   mode check; merely having the package installed has no effect.
