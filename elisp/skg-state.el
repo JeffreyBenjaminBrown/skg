@@ -169,15 +169,18 @@ INCIDENT-ID keeps retries in one longer reconciliation episode."
         finalizer))
 
 (defun skg-submit-priority-request (tcp-proc request-text handlers
-                                             &optional content)
+                                             &optional content incident-id)
   "Queue an internal REQUEST-TEXT before ordinary drafts.
 HANDLERS has the request-record handler representation.  This is reserved for
-the connection handshake: it deliberately does not consume or mutate the
-ordinary request draft which may have caused a reconnect."
+connection and maintenance barriers: it deliberately does not consume or
+mutate the ordinary request draft which may have caused a reconnect.
+INCIDENT-ID, when non-nil, binds every response to that maintenance incident."
   (let* ((record (make-skg--request-record
-                  :id (skg--fresh-request-id) :handlers handlers))
+                  :id (skg--fresh-request-id) :handlers handlers
+                  :incident-id incident-id))
          (request-id (skg--request-record-id record))
-         (wire (skg--request-wire request-text request-id nil content)))
+         (wire (skg--request-wire
+                request-text request-id incident-id content)))
     (puthash request-id record skg--request-records)
     (setq skg-lp--pending-count
           (+ skg-lp--pending-count (cl-count-if #'cddr handlers)))

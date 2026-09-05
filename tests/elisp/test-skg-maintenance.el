@@ -65,6 +65,75 @@
       (should (equal (cdr (assoc 'ids parsed)) '("alias" "B"))))
     (should (functionp registered-handler))))
 
+(ert-deftest test-skg-maintenance-locks-before-incident-census-and-archives-after-ack ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (lock-sha (skg--maintenance-lock-census-sha256 (list id)))
+           (base
+            (format
+             (concat " (allocated-incident-id incident)"
+                     " (maintenance-epoch 9) (origin test-origin)"
+                     " (started-at-utc now) (archive-directory-name archive)"
+                     " (source-set all) (g0-graph-generation 1)"
+                     " (g0-manifest-revision 2) (requested-paths ())"
+                     " (requested-ids ())")))
+           (skg--maintenance-client-incident nil)
+           (skg--maintenance-state '((epoch . 0) (state . idle)))
+           census-arguments published)
+      (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+                 (lambda () 'tcp))
+                ((symbol-function 'skg--submit-buffer-census)
+                 (lambda (&rest arguments)
+                   (setq census-arguments arguments)))
+                ((symbol-function 'skg--maintenance-publish-initial)
+                 (lambda () (setq published t))))
+        (skg--maintenance-handle-bootstrap
+         nil (concat "((status install-maintenance-epoch-and-submit-locked-census)"
+                     base " (registered-buffer-ids ()))")
+         #'ignore 'origin-context)
+        (should (equal census-arguments '(tcp "incident" 9)))
+        (should (eq (plist-get skg--maintenance-client-incident :phase)
+                    'awaiting-locked-census))
+        (should (= 9 (skg--buffer-record-maintenance-epoch
+                      skg--buffer-record)))
+        (should-not published)
+        (skg--maintenance-handle-bootstrap
+         nil
+         (concat
+          "((status locked-census-accepted-publish-initial-archive)"
+          base " (registered-buffer-ids (" id "))"
+          " (lock-census-sha256 " lock-sha "))"))
+        (should published)
+        (should (eq (plist-get skg--maintenance-client-incident :phase)
+                    'preparing-archive))
+        (should (equal (plist-get skg--maintenance-client-incident
+                                  :registered-buffer-ids)
+                       (list id)))))))
+
+(ert-deftest test-skg-buffer-born-during-maintenance-inherits-epoch ()
+  (let ((buffer (generate-new-buffer " *skg-born-locked-test*"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        (skg--server-store-state '((graph-generation . 1)))
+        (skg--maintenance-state '((epoch . 12) (state . active))))
+    (unwind-protect
+        (with-current-buffer buffer
+          (org-mode)
+          (insert "* Born locked\n")
+          (skg-register-buffer buffer 'content-view :view-uri "new-view")
+          (should (= 12 (skg--buffer-record-maintenance-epoch
+                         skg--buffer-record)))
+          (should (overlayp skg--maintenance-lock-overlay)))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
+(ert-deftest test-skg-maintenance-census-is-incident-qualified ()
+  (let (submitted)
+    (cl-letf (((symbol-function 'skg-buffer-census) (lambda () nil))
+              ((symbol-function 'skg-submit-priority-request)
+               (lambda (&rest arguments) (setq submitted arguments))))
+      (skg--submit-buffer-census 'tcp "incident" 9))
+    (should (equal (nth 4 submitted) "incident"))
+    (should (string-match-p "maintenance-epoch \\. 9" (nth 1 submitted)))))
+
 (ert-deftest test-skg-archive-ready-schedules-explicit-origin-worker ()
   (let ((skg--maintenance-client-incident
          '(:origin "explicit-partial-reload" :phase preparing-archive))

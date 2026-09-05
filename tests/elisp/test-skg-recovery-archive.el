@@ -158,6 +158,24 @@
        (empty nil)))
     "((archive-format-version 1) (name \"a\\n\\\"b\\\\c\") (empty ()))")))
 
+(ert-deftest test-skg-recovery-exact-reader-accepts-record-newline-only ()
+  (let* ((directory (make-temp-file "skg-machine-record-test-" t))
+         (path (expand-file-name "record.sexp" directory)))
+    (unwind-protect
+        (progn
+          (set-file-modes directory #o700)
+          (skg-test-recovery--write-private path "((key value))\n")
+          (should (equal (skg-recovery--read-exact-sexpr path)
+                         '((key value))))
+          (let ((coding-system-for-write 'utf-8-unix))
+            (with-temp-buffer
+              (insert "((key value))\ntrailing")
+              (write-region (point-min) (point-max) path nil 'silent)))
+          (should-error (skg-recovery--read-exact-sexpr path)
+                        :type 'skg-recovery-archive-error))
+      (when (file-directory-p directory)
+        (delete-directory directory t)))))
+
 (ert-deftest test-skg-recovery-final-settlement-binds-application-not-content ()
   (let* ((settlement
           `((buffer-id "buffer") (buffer-key "none")

@@ -5,6 +5,7 @@
 (require 'skg-buffer-registry)
 (require 'skg-length-prefix)
 (require 'skg-recovery-archive)
+(require 'skg-request-verify-connection)
 (require 'skg-request-save)
 (require 'skg-state)
 
@@ -91,13 +92,37 @@ old implementation."
         (push buffer-id ordinary)))
     (skg-mark-census-buffers-stale (nreverse ordinary))))
 
-(defun skg-resume-maintenance-after-census ()
+(defun skg-resume-maintenance-after-census
+    (&optional maintenance-incident-id maintenance-epoch)
   "Resume durable maintenance only after reconnect census completes."
+  (when maintenance-incident-id
+    (skg--maintenance-require-client-incident
+     maintenance-incident-id maintenance-epoch))
   (let ((state (and (listp skg--maintenance-state)
                     (format "%s"
                             (cdr (assq 'state skg--maintenance-state))))))
     (when (member state '("active" "terminal"))
-      (skg-maintenance-status t))))
+      (if (and skg--maintenance-client-incident
+               (eq (plist-get skg--maintenance-client-incident :phase)
+                   'awaiting-locked-census))
+          (skg--maintenance-send-locked-census)
+        (skg-maintenance-status t)))))
+
+(defun skg--maintenance-send-locked-census ()
+  "Ask the server to freeze the just-completed epoch-locked census."
+  (let* ((state skg--maintenance-client-incident)
+         (incident-id (plist-get state :incident-id))
+         (epoch (plist-get state :epoch))
+         (tcp-proc (skg-tcp-connect-to-rust)))
+    (skg-submit-priority-request
+     tcp-proc
+     (concat
+      (prin1-to-string
+       `((request . "maintenance locked census")
+         (maintenance-epoch . ,epoch)))
+      "\n")
+     `((maintenance-offer ,#'skg--maintenance-handle-bootstrap . t))
+     nil incident-id)))
 
 (defun skg--maintenance-registered-ids ()
   (sort (mapcar (lambda (buffer)
@@ -944,7 +969,15 @@ old implementation."
      ((equal phase "finalizing-archive")
       (setf (plist-get state :phase) 'finalizing-archive)
       (run-at-time 0 nil #'skg--maintenance-resume-finalization))
+     ((equal phase "awaiting-locked-census")
+      (setf (plist-get state :phase) 'awaiting-locked-census)
+      (run-at-time 0 nil #'skg--maintenance-send-locked-census))
      ((equal phase "preparing-archive")
+      (unless (plist-get state :lock-census-sha256)
+        (setf (plist-get state :registered-buffer-ids)
+              (skg--maintenance-string-list response 'registered-buffer-ids)
+              (plist-get state :lock-census-sha256)
+              (skg--maintenance-lock-offer response)))
       (setf (plist-get state :phase) 'preparing-archive)
       (if-let ((archive (plist-get state :archive)))
           (run-at-time
@@ -1051,51 +1084,79 @@ old implementation."
 (defun skg--maintenance-handle-bootstrap
     (_tcp-proc payload &optional terminal-callback origin-context)
   (let* ((response (read payload))
+         (status (skg--maintenance-text response 'status))
          (incident-id (skg--maintenance-text response
                                              'allocated-incident-id))
          (epoch (skg--maintenance-field response 'maintenance-epoch))
          (offer (skg--maintenance-offer-for-writer response)))
-    (setq skg--maintenance-client-incident
-          (list :incident-id incident-id
-                :epoch epoch
-                :origin (skg--maintenance-text response 'origin)
-                :requested-paths
-                (skg--maintenance-string-list response 'requested-paths)
-                :requested-ids
-                (skg--maintenance-string-list response 'requested-ids)
-                :phase 'preparing-archive
-                :offer offer
-                :undo-waivers nil
-                :undo-failure nil
-                :registered-buffer-ids
-                (skg--maintenance-string-list
-                 response 'registered-buffer-ids)
-                :g1-graph-generation nil
-                :g1-manifest-revision nil
-                :tantivy-generation nil
-                :server-evidence-sha256 nil
-                :scalar-challenge nil
-                :settlements nil
-                :pending-settlements nil
-                :acknowledged-settlements nil
-                :locally-applied nil
-                :in-flight-settlement nil
-                :archive nil
-                :evidence nil
-                :final-archive nil
-                :terminal nil
-                :origin-context origin-context
-                :terminal-callback terminal-callback
-                :terminal-callback-fired nil))
-    (condition-case error-data
-        (progn
-          (setf (plist-get skg--maintenance-client-incident
-                           :lock-census-sha256)
-                (skg--maintenance-lock-offer response))
-          (skg--maintenance-publish-initial))
-      (error
-       (display-warning 'skg (error-message-string error-data) :error)
-       (run-at-time 0 nil #'skg-cancel-maintenance incident-id epoch)))))
+    (pcase status
+      ("install-maintenance-epoch-and-submit-locked-census"
+       (when skg--maintenance-client-incident
+         (error "Another client-known maintenance incident is active"))
+       (setq skg--maintenance-client-incident
+             (list :incident-id incident-id
+                   :epoch epoch
+                   :origin (skg--maintenance-text response 'origin)
+                   :requested-paths
+                   (skg--maintenance-string-list response 'requested-paths)
+                   :requested-ids
+                   (skg--maintenance-string-list response 'requested-ids)
+                   :phase 'awaiting-locked-census
+                   :offer offer
+                   :undo-waivers nil
+                   :undo-failure nil
+                   :registered-buffer-ids nil
+                   :g1-graph-generation nil
+                   :g1-manifest-revision nil
+                   :tantivy-generation nil
+                   :server-evidence-sha256 nil
+                   :scalar-challenge nil
+                   :settlements nil
+                   :pending-settlements nil
+                   :acknowledged-settlements nil
+                   :locally-applied nil
+                   :in-flight-settlement nil
+                   :archive nil
+                   :evidence nil
+                   :final-archive nil
+                   :terminal nil
+                   :origin-context origin-context
+                   :terminal-callback terminal-callback
+                   :terminal-callback-fired nil))
+       (skg--maintenance-set-handshake-summary 'active epoch)
+       (dolist (buffer (skg-registered-buffers))
+         (skg-lock-buffer-for-maintenance buffer epoch))
+       (skg--submit-buffer-census
+        (skg-tcp-connect-to-rust) incident-id epoch))
+      ("locked-census-accepted-publish-initial-archive"
+       (skg--maintenance-require-client-incident incident-id epoch)
+       (unless (and (equal offer
+                           (plist-get skg--maintenance-client-incident :offer))
+                    (equal (skg--maintenance-text response 'origin)
+                           (plist-get skg--maintenance-client-incident :origin))
+                    (equal (skg--maintenance-string-list
+                            response 'requested-paths)
+                           (plist-get skg--maintenance-client-incident
+                                      :requested-paths))
+                    (equal (skg--maintenance-string-list response 'requested-ids)
+                           (plist-get skg--maintenance-client-incident
+                                      :requested-ids)))
+         (error "Maintenance locked-census offer changed bootstrap authority"))
+       (setf (plist-get skg--maintenance-client-incident
+                        :registered-buffer-ids)
+             (skg--maintenance-string-list response 'registered-buffer-ids))
+       (condition-case error-data
+           (progn
+             (setf (plist-get skg--maintenance-client-incident
+                              :lock-census-sha256)
+                   (skg--maintenance-lock-offer response)
+                   (plist-get skg--maintenance-client-incident :phase)
+                   'preparing-archive)
+             (skg--maintenance-publish-initial))
+         (error
+          (display-warning 'skg (error-message-string error-data) :error)
+          (run-at-time 0 nil #'skg-cancel-maintenance incident-id epoch))))
+      (_ (error "Unexpected maintenance bootstrap status %S" status)))))
 
 (defun skg-begin-maintenance
     (origin &optional candidate-id paths ids terminal-callback origin-context

@@ -538,7 +538,12 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
     return select_and_stage_candidate (runtime, &incident, epoch, &verified);
   } else {
     let mut fields = archive_verification_fields (&verified);
-    fields . insert (0, atom_field ("status", "archive-ready"));
+    fields . splice (0..0, vec![
+      atom_field ("status", "archive-ready"),
+      atom_field ("incident-id", active . incident_id . as_str ()),
+      integer_field ("maintenance-epoch", active . epoch . get ()),
+      atom_field ("phase", "archive-ready"),
+    ]);
     fields . push (pull_repositories_field (
       &active . targets . pull_repositories));
     fields . push (atom_field (

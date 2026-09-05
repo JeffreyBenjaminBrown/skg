@@ -75,9 +75,9 @@ This inspects the public package header without enabling any package mode."
     (setq skg--active-source-set-name
           (format "%s" (cadr (assoc 'active-source-set response)))
           skg--maintenance-archive-folder
-          (cadr (assoc 'maintenance-archive-folder response))
+          (format "%s" (cadr (assoc 'maintenance-archive-folder response)))
           skg--maintenance-archive-identity
-          (cadr (assoc 'maintenance-archive-identity response))
+          (format "%s" (cadr (assoc 'maintenance-archive-identity response)))
           skg--maintenance-state
           `((epoch . ,(cadr (assoc 'maintenance-epoch response)))
             (state . ,(cadr (assoc 'maintenance-state response)))
@@ -102,16 +102,30 @@ This inspects the public package header without enabling any package mode."
                        "connected; reconciling buffer census"))
     (skg--submit-buffer-census tcp-proc)))
 
-(defun skg--submit-buffer-census (tcp-proc)
-  "Send compact descriptors without embedding any complete view text."
+(defun skg--submit-buffer-census
+    (tcp-proc &optional maintenance-incident-id maintenance-epoch)
+  "Send compact descriptors without embedding any complete view text.
+When MAINTENANCE-INCIDENT-ID is non-nil, bind the census to its locked
+MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
   (require 'skg-buffer-registry)
   (skg-submit-priority-request
    tcp-proc
-   "((request . \"client census\"))\n"
-   `((client-census ,#'skg--handle-buffer-census-response . t))
-   (prin1-to-string (skg-buffer-census))))
+   (concat
+    (prin1-to-string
+     (append '((request . "client census"))
+             (when maintenance-epoch
+               `((maintenance-epoch . ,maintenance-epoch)))))
+    "\n")
+   `((client-census
+      ,(lambda (tcp payload)
+         (skg--handle-buffer-census-response
+          tcp payload maintenance-incident-id maintenance-epoch))
+      . t))
+   (prin1-to-string (skg-buffer-census))
+   maintenance-incident-id))
 
-(defun skg--handle-buffer-census-response (tcp-proc payload)
+(defun skg--handle-buffer-census-response
+    (tcp-proc payload &optional maintenance-incident-id maintenance-epoch)
   "Complete census or answer the server's targeted text request."
   (let* ((response (read payload))
          (required (mapcar (lambda (value) (format "%s" value))
@@ -127,14 +141,24 @@ This inspects the public package header without enabling any package mode."
           (setq skg--connection-handshake-state 'census-texts)
           (skg-submit-priority-request
            tcp-proc
-           "((request . \"client census texts\"))\n"
-           `((client-census ,#'skg--finish-buffer-census . t))
-           (prin1-to-string (skg-buffer-census-texts required))))
-      (setq skg--connection-handshake-state 'verified)
-      (when (fboundp 'skg-resume-maintenance-after-census)
-        (run-at-time 0 nil #'skg-resume-maintenance-after-census)))))
+           (concat
+            (prin1-to-string
+             (append '((request . "client census texts"))
+                     (when maintenance-epoch
+                       `((maintenance-epoch . ,maintenance-epoch)))))
+            "\n")
+           `((client-census
+              ,(lambda (tcp payload)
+                 (skg--finish-buffer-census
+                  tcp payload maintenance-incident-id maintenance-epoch))
+              . t))
+           (prin1-to-string (skg-buffer-census-texts required))
+           maintenance-incident-id))
+      (skg--complete-buffer-census
+       maintenance-incident-id maintenance-epoch))))
 
-(defun skg--finish-buffer-census (_tcp-proc payload)
+(defun skg--finish-buffer-census
+    (_tcp-proc payload &optional maintenance-incident-id maintenance-epoch)
   "Install the terminal disposition of requested census texts."
   (let* ((response (read payload))
          (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
@@ -144,9 +168,17 @@ This inspects the public package header without enabling any package mode."
     (unless (equal (format "%s" (cadr (assoc 'census-complete response)))
                    "true")
       (error "Skg server did not complete the buffer census"))
-    (setq skg--connection-handshake-state 'verified)
-    (when (fboundp 'skg-resume-maintenance-after-census)
-      (run-at-time 0 nil #'skg-resume-maintenance-after-census))))
+    (skg--complete-buffer-census
+     maintenance-incident-id maintenance-epoch)))
+
+(defun skg--complete-buffer-census
+    (&optional maintenance-incident-id maintenance-epoch)
+  "Complete connection census or its incident-qualified maintenance barrier."
+  (setq skg--connection-handshake-state 'verified)
+  (when (fboundp 'skg-resume-maintenance-after-census)
+    (run-at-time
+     0 nil #'skg-resume-maintenance-after-census
+     maintenance-incident-id maintenance-epoch)))
 
 (defun skg--submit-connection-handshake (tcp-proc)
   "Put the mandatory handshake first without consuming an ordinary draft."

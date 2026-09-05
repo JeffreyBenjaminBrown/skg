@@ -94,6 +94,14 @@
       (add-hook 'kill-buffer-hook #'skg-unregister-current-buffer nil t)
       (setq-local mode-line-process
                   '(:eval (skg-buffer-status-indicator)))
+      (when (and (listp skg--maintenance-state)
+                 (equal (format "%s"
+                                (cdr (assq 'state skg--maintenance-state)))
+                        "active"))
+        (let ((epoch (cdr (assq 'epoch skg--maintenance-state))))
+          (unless (natnump epoch)
+            (error "Active maintenance has no valid epoch"))
+          (skg-lock-buffer-for-maintenance buffer epoch)))
       record)))
 
 (defun skg-unregister-current-buffer ()

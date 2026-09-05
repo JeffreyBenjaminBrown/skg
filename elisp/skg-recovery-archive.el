@@ -827,7 +827,7 @@ path, manifest checksum, and size report."
           (setq value parsed end position))
       (error (skg-recovery--fail "invalid machine record %s: %s"
                                  path (error-message-string error-data))))
-    (unless (string-match-p "\\`[[:space:]]*\\'" (substring text end))
+    (unless (string-blank-p (substring text end))
       (skg-recovery--fail "machine record has trailing data: %s" path))
     value))
 
