@@ -13,12 +13,82 @@
 (require 'skg-buffer)
 (require 'skg-config)
 
+(defvar-local skg--raw-file-recorded-disk-state nil
+  "Exact disk state from the last raw-file read or successful save.")
+(put 'skg--raw-file-recorded-disk-state 'permanent-local t)
+
+(defvar-local skg--raw-file-externally-stale nil
+  "Non-nil after the raw file's live bytes differ from its recorded state.")
+(put 'skg--raw-file-externally-stale 'permanent-local t)
+
+(defun skg--raw-file-current-disk-state (&optional path)
+  "Return exact safe state of PATH as (regular SHA256) or (absent).
+Every other filesystem type or inspection failure returns (unsafe REASON)."
+  (let ((path (or path buffer-file-name)))
+    (condition-case error-data
+        (cond
+         ((not (stringp path)) '(unsafe "buffer has no file name"))
+         ((file-symlink-p path) '(unsafe "path is a symbolic link"))
+         ((not (file-exists-p path)) '(absent))
+         ((not (file-regular-p path))
+          '(unsafe "path is not a regular file"))
+         (t
+          (with-temp-buffer
+            (set-buffer-multibyte nil)
+            (insert-file-contents-literally path)
+            (list 'regular (secure-hash 'sha256 (current-buffer))))))
+      (file-error
+       (list 'unsafe (error-message-string error-data))))))
+
+(defun skg-record-raw-file-disk-state (&optional buffer)
+  "Record BUFFER's exact raw-file disk baseline after a read or save."
+  (with-current-buffer (or buffer (current-buffer))
+    (setq skg--raw-file-recorded-disk-state
+          (skg--raw-file-current-disk-state buffer-file-name)
+          skg--raw-file-externally-stale nil)
+    (when (and skg--buffer-record
+               (eq (skg--buffer-record-kind skg--buffer-record)
+                   'raw-skg-file))
+      (let ((text (skg-buffer-raw-text)))
+        (setf (skg--buffer-record-last-fetched skg--buffer-record) text
+              (skg--buffer-record-last-fetched-sha256 skg--buffer-record)
+              (skg--sha256-text text))))
+    skg--raw-file-recorded-disk-state))
+
+(defun skg--raw-file-safe-disk-state-p (state)
+  "Whether STATE can serve as an exact raw-file before fact."
+  (memq (car-safe state) '(regular absent)))
+
+(defun skg--describe-raw-file-disk-state (state)
+  "Return a concise user-facing description of raw-file STATE."
+  (pcase (car-safe state)
+    ('regular (format "SHA-256 %s" (cadr state)))
+    ('absent "absence")
+    ('unsafe (format "unsafe state (%s)" (or (cadr state) "unknown")))
+    (_ "no recorded state")))
+
+(defun skg--queue-raw-file-observation ()
+  "Queue a nonmutating exact sweep after a raw-file event."
+  (if (fboundp 'skg--request-reload-full-sweep)
+      (condition-case error-data
+          (skg--request-reload-full-sweep)
+        (error
+         (display-warning
+          'skg
+          (format "Raw .skg change is safe, but observation could not be queued: %s"
+                  (error-message-string error-data))
+          :warning)))
+    (display-warning
+     'skg
+     "Raw .skg change is safe, but the observation command is not loaded"
+     :warning)))
+
 (defun skg--dirty-view-buffers ()
   "Return every live Skg view with unsaved changes."
   (cl-remove-if-not
    (lambda (buffer)
      (and (skg-buffer-p buffer)
-          (buffer-modified-p buffer)))
+          (skg-buffer-dirty-p buffer)))
    (buffer-list)))
 
 (defun skg--dirty-view-buffer-names ()
@@ -37,7 +107,35 @@
   "Before-save guard for a raw file in a configured Skg source."
   (when (and buffer-file-name
              (skg--configured-skg-file-p buffer-file-name))
+    (unless (and skg--buffer-record
+                 (eq (skg--buffer-record-kind skg--buffer-record)
+                     'raw-skg-file))
+      (when (fboundp 'skg-register-raw-file-buffer-if-configured)
+        (skg-register-raw-file-buffer-if-configured (current-buffer))))
+    (when (and skg--buffer-record
+               (skg--buffer-record-maintenance-epoch skg--buffer-record))
+      (user-error
+       "Raw .skg save refused: maintenance epoch %s is active"
+       (skg--buffer-record-maintenance-epoch skg--buffer-record)))
+    (let ((expected skg--raw-file-recorded-disk-state)
+          (actual (skg--raw-file-current-disk-state buffer-file-name)))
+      (unless (and (skg--raw-file-safe-disk-state-p expected)
+                   (skg--raw-file-safe-disk-state-p actual)
+                   (equal expected actual))
+        (setq skg--raw-file-externally-stale t)
+        (skg--queue-raw-file-observation)
+        (user-error
+         "Raw .skg save refused: disk changed since this buffer was read (expected %s, found %s); revert or reconcile explicitly"
+         (skg--describe-raw-file-disk-state expected)
+         (skg--describe-raw-file-disk-state actual))))
     (skg--refuse-worktree-write-if-views-dirty "Raw .skg save")))
+
+(defun skg--raw-skg-after-save ()
+  "Advance the raw-file baseline and queue exact disk observation."
+  (when (and buffer-file-name
+             (skg--configured-skg-file-p buffer-file-name))
+    (skg-record-raw-file-disk-state (current-buffer))
+    (skg--queue-raw-file-observation)))
 
 (defun skg--configured-skg-file-p (path)
   "Whether PATH is a direct .skg child of a configured source."

@@ -96,6 +96,100 @@
         (with-current-buffer buffer (set-buffer-modified-p nil))
         (kill-buffer buffer)))))
 
+(ert-deftest test-skg-raw-file-exact-before-state-refuses-external-rewrite ()
+  (let* ((directory (make-temp-file "skg-raw-fence-" t))
+         (path (expand-file-name "node.skg" directory))
+         (buffer (generate-new-buffer " *skg raw fence*"))
+         (skg--buffer-registry (make-hash-table :test #'equal))
+         (queued 0))
+    (unwind-protect
+        (progn
+          (with-temp-file path (insert "pid: old\n"))
+          (with-current-buffer buffer
+            (setq buffer-file-name path)
+            (insert "pid: old\n")
+            (set-buffer-modified-p nil)
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t)))
+              (skg-register-raw-file-buffer-if-configured buffer))
+            (should (eq 'regular
+                        (car skg--raw-file-recorded-disk-state))))
+          ;; Same size and shape is deliberately insufficient: exact bytes win.
+          (with-temp-file path (insert "pid: new\n"))
+          (with-current-buffer buffer
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t))
+                      ((symbol-function 'skg--queue-raw-file-observation)
+                       (lambda () (setq queued (1+ queued)))))
+              (should-error (skg--guard-raw-skg-save) :type 'user-error))
+            (should skg--raw-file-externally-stale)
+            (should (equal "pid: old\n" (buffer-string))))
+          (should (= 1 queued))
+          (should (equal "pid: new\n"
+                         (with-temp-buffer
+                           (insert-file-contents-literally path)
+                           (buffer-string)))))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory directory t))))
+
+(ert-deftest test-skg-raw-file-save-advances-baseline-and-queues-observation ()
+  (let* ((directory (make-temp-file "skg-raw-save-" t))
+         (path (expand-file-name "node.skg" directory))
+         (buffer (generate-new-buffer " *skg raw save*"))
+         (skg--buffer-registry (make-hash-table :test #'equal))
+         (queued 0))
+    (unwind-protect
+        (progn
+          (with-temp-file path (insert "pid: old\n"))
+          (with-current-buffer buffer
+            (setq buffer-file-name path)
+            (insert "pid: old\n")
+            (set-buffer-modified-p nil)
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t)))
+              (skg-register-raw-file-buffer-if-configured buffer)))
+          (with-temp-file path (insert "pid: new\n"))
+          (with-current-buffer buffer
+            (erase-buffer)
+            (insert "pid: new\n")
+            (set-buffer-modified-p nil)
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t))
+                      ((symbol-function 'skg--queue-raw-file-observation)
+                       (lambda () (setq queued (1+ queued)))))
+              (skg--raw-skg-after-save)
+              (skg--guard-raw-skg-save))
+            (should-not skg--raw-file-externally-stale)
+            (should (equal "pid: new\n"
+                           (skg--buffer-record-last-fetched
+                            skg--buffer-record))))
+          (should (= 1 queued)))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory directory t))))
+
+(ert-deftest test-skg-raw-file-save-refuses-an-active-maintenance-epoch ()
+  (let* ((directory (make-temp-file "skg-raw-lock-" t))
+         (path (expand-file-name "node.skg" directory))
+         (buffer (generate-new-buffer " *skg raw lock*"))
+         (skg--buffer-registry (make-hash-table :test #'equal)))
+    (unwind-protect
+        (progn
+          (with-temp-file path (insert "pid: old\n"))
+          (with-current-buffer buffer
+            (setq buffer-file-name path)
+            (insert "pid: old\n")
+            (set-buffer-modified-p nil)
+            (cl-letf (((symbol-function 'skg--configured-skg-file-p)
+                       (lambda (_path) t)))
+              (skg-register-raw-file-buffer-if-configured buffer)
+              (setf (skg--buffer-record-maintenance-epoch
+                     skg--buffer-record)
+                    9)
+              (should-error (skg--guard-raw-skg-save)
+                            :type 'user-error))))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory directory t))))
+
 (ert-deftest test-skg-search-display-preserves-a-dirty-conventional-namesake ()
   (let* ((name (skg-search-buffer-name "dog"))
          (existing (generate-new-buffer name))

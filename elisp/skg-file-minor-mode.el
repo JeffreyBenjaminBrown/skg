@@ -23,8 +23,12 @@ and .skg filenames.  The server-owned watcher observes a plain save."
   (if skg-file-minor-mode
       (progn
         (add-hook 'before-save-hook #'skg--guard-raw-skg-save nil t)
+        (add-hook 'after-save-hook #'skg--raw-skg-after-save nil t)
+        (add-hook 'after-revert-hook #'skg-record-raw-file-disk-state nil t)
         (skg-register-raw-file-buffer-if-configured (current-buffer)))
     (remove-hook 'before-save-hook #'skg--guard-raw-skg-save t)
+    (remove-hook 'after-save-hook #'skg--raw-skg-after-save t)
+    (remove-hook 'after-revert-hook #'skg-record-raw-file-disk-state t)
     (when (and skg--buffer-record
                (eq (skg--buffer-record-kind skg--buffer-record)
                    'raw-skg-file))
@@ -34,16 +38,18 @@ and .skg filenames.  The server-owned watcher observes a plain save."
   "Register BUFFER when it visits a direct child of a configured source."
   (with-current-buffer (or buffer (current-buffer))
     (when (and buffer-file-name
-               (skg--configured-skg-file-p buffer-file-name)
-               (not (and skg--buffer-record
-                         (eq (skg--buffer-record-kind skg--buffer-record)
-                             'raw-skg-file))))
-      (skg-register-buffer
-       (current-buffer) 'raw-skg-file
-       :lifecycle 'ordinary-file :disposable nil
-       :recipe `((kind . "raw-skg-file")
-                 (name . ,(file-name-nondirectory buffer-file-name)))
-       :last-fetched (skg-buffer-raw-text)))))
+               (skg--configured-skg-file-p buffer-file-name))
+      (unless (and skg--buffer-record
+                   (eq (skg--buffer-record-kind skg--buffer-record)
+                       'raw-skg-file))
+        (skg-register-buffer
+         (current-buffer) 'raw-skg-file
+         :lifecycle 'ordinary-file :disposable nil
+         :recipe `((kind . "raw-skg-file")
+                   (name . ,(file-name-nondirectory buffer-file-name)))
+         :last-fetched (skg-buffer-raw-text)))
+      (unless skg--raw-file-recorded-disk-state
+        (skg-record-raw-file-disk-state (current-buffer))))))
 
 (defun skg-register-open-raw-file-buffers ()
   "Register configured raw files which predate verified source inventory."
