@@ -12,7 +12,7 @@
 (require 'skg-buffer)       ; for skg-find-buffer-by-uri
 (require 'skg-lock-buffers)
 
-(defun skg-request-rerender-all-views (&optional approved-pids)
+(defun skg-request-rerender-all-views ()
   "Ask the server to re-render every open view.
 Locks all skg buffers, then registers handlers for the
 queueing protocol: rerender-lock, rerender-done, then exact offers."
@@ -21,46 +21,18 @@ queueing protocol: rerender-lock, rerender-done, then exact offers."
     (skg--register-stream-request-cleanup "rerender")
     (skg--lock-all-skg-buffers)
     (skg--register-rerender-stream-handlers)
-    (skg--register-rerender-ugly-confirmation
-     (lambda (pids) (skg-request-rerender-all-views pids)))
     (skg-submit-request
      tcp-proc
-     (concat (prin1-to-string
-              (append
-               '((request . "rerender all views"))
-               (when approved-pids
-                 `((allow-ugly-telescopes ,@approved-pids)))))
+     (concat (prin1-to-string '((request . "rerender all views")))
              "\n"))))
-
-(defun skg--register-rerender-ugly-confirmation
-    (retry &optional unfired-response-type)
-  "End a challenged rerender and optionally retry with approved PIDs.
-UNFIRED-RESPONSE-TYPE is the one-shot acknowledgement the challenged
-request replaced; remove it and balance its pending count."
-  (skg-register-response-handler
-   'ugly-telescope-confirmation
-   (lambda (_tcp-proc payload)
-     (skg-remove-response-handler 'ugly-telescope-confirmation)
-     (when unfired-response-type
-       (skg-remove-response-handler unfired-response-type))
-     (let* ((response (read payload))
-            (prompt (format "%s" (cadr (assoc 'prompt response))))
-            (pids (mapcar (lambda (pid) (format "%s" pid))
-                          (cadr (assoc 'pids response)))))
-       (skg--end-stream)
-       (skg--unlock-all-save-locked)
-       (when (y-or-n-p (concat prompt " "))
-         (run-at-time 0 nil (lambda () (funcall retry pids))))))
-   nil))
 
 (defun skg--register-rerender-stream-handlers ()
   "Register the two handlers for a queued rerender response.
 Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
   (skg-register-response-handler
-   ;; 1. Lock message: unlock buffers not in the URI list.
+   ;; 1. Lock message: release the command's transient broad lock.
    'rerender-lock
    (lambda (_tcp-proc payload)
-     (skg-remove-response-handler 'ugly-telescope-confirmation)
      (condition-case err
          (let* ((response (read payload))
                 (lock-entry (assoc 'lock-views response)))

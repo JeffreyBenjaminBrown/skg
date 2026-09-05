@@ -14,7 +14,7 @@ local M = {}
 ---Toggle diff mode; the server answers with a git-diff-mode ACK, then
 ---queues exact retained-session rerender offers. Refuses while any skg buffer has
 ---unsaved edits.
-function M.toggle (approved_pids)
+function M.toggle ()
   local unsaved = save.other_unsaved_skg_buffers(-1)
   if #unsaved > 0 then
     local names = {}
@@ -36,16 +36,9 @@ function M.toggle (approved_pids)
         vim.notify(content or 'toggled') end
     end, true)
   rerender.register_rerender_stream_handlers()
-  rerender.register_ugly_confirmation(function (pids)
-    M.toggle(pids)
-  end, 'git-diff-mode')
   local sexpr = require('skg.sexpr.parse')
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'git diff mode toggle') }
-  if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-ugly-telescopes') }
-    for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
-    table.insert(request, approval) end
   client.submit_request(sexpr.to_string(request) .. '\n')
 end
 

@@ -1,7 +1,6 @@
 use crate::git_ops::read_repo::open_repo;
 use crate::serve::ViewsState;
 use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
-use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
@@ -13,15 +12,14 @@ use std::net::TcpStream;
 
 pub fn handle_rerender_all_views_request (
   stream     : &mut TcpStream,
-  request    : &str,
+  _request   : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
   collateral_scheduler : &mut CollateralScheduler,
 ) {
   let uris = collateral_scheduler . replace_for_explicit_rerender (
-    views_state, env, active_source_set,
-    &approved_pids_from_request (request),
+    views_state, env, active_source_set, &Default::default (),
     "rerender-all-views", false);
   stream_queued_rerender (stream, &uris); }
 
@@ -68,10 +66,10 @@ pub fn stream_empty_rerender (
 
 /// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,
-/// then streams re-rendered views.
+/// then queues exact retained-session view offers.
 pub fn handle_git_diff_toggle_and_rerender (
   stream     : &mut TcpStream,
-  request    : &str,
+  _request   : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
@@ -99,8 +97,7 @@ pub fn handle_git_diff_toggle_and_rerender (
   let next_diff_mode : bool = ! views_state . diff_mode_enabled;
   views_state . diff_mode_enabled = next_diff_mode;
   let uris = collateral_scheduler . replace_for_explicit_rerender (
-    views_state, env, active_source_set,
-    &approved_pids_from_request (request),
+    views_state, env, active_source_set, &Default::default (),
     "diff-mode-rerender", false);
   let msg : String =
     git_diff_mode_message (views_state . diff_mode_enabled, &env . config);

@@ -3,7 +3,6 @@ use crate::serve::handlers::collateral_scheduler::CollateralScheduler;
 use crate::serve::handlers::rerender_all_views::{
   stream_empty_rerender,
   stream_queued_rerender};
-use crate::serve::handlers::scalar_release::approved_pids_from_request;
 use crate::serve::handlers::text_search::SearchEnrichmentPayload;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
@@ -56,8 +55,8 @@ pub fn handle_source_set_request (
 /// inactive owners, indefinitive partners, emptied cols and dead
 /// scaffolds are pruned), then completion with PartnerCol creation
 /// enabled, because a switch can also ACTIVATE sources, revealing
-/// members and cols.  Results stream via the rerender-all message
-/// flow (lock, per-view, done).
+/// members and cols.  The foreground request only queues the
+/// retained-session work; exact offers apply views independently.
 fn set_active_source_set (
   stream           : &mut TcpStream,
   request          : &str,
@@ -98,8 +97,7 @@ fn set_active_source_set (
     *slot = None; }
   *active_source_set = active;
   let uris = collateral_scheduler . replace_for_explicit_rerender (
-    views_state, env, active_source_set,
-    &approved_pids_from_request (request),
+    views_state, env, active_source_set, &Default::default (),
     "source-set-switch-rerender", true);
   send_active_source_set_response (stream, active_source_set, false);
   stream_queued_rerender (stream, &uris); }

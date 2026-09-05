@@ -46,10 +46,10 @@ end
 ---when absent), after confirmation; the server replies with the
 ---confirmation and queues exact retained-session rerender offers.
 ---@param name string|nil
-function M.set_active_source_set (name, approved_pids)
+function M.set_active_source_set (name)
   name = name or picker.prompt_for_source_set()
   if not name then return end
-  if not approved_pids and #vim.api.nvim_list_uis() > 0
+  if #vim.api.nvim_list_uis() > 0
      and vim.fn.confirm(
        'Switch source-set and re-render all SKG buffers?',
        '&Yes\n&No', 2) ~= 1 then
@@ -66,16 +66,9 @@ function M.set_active_source_set (name, approved_pids)
   lock.register_stream_request_cleanup('source-set switch')
   lock.lock_all_skg_buffers()
   rerender.register_rerender_stream_handlers()
-  rerender.register_ugly_confirmation(function (pids)
-    M.set_active_source_set(name, pids)
-  end, 'active-source-set')
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'set active source set'),
     sexpr.pair(sexpr.symbol('name'), name) }
-  if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-ugly-telescopes') }
-    for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
-    table.insert(request, approval) end
   client.submit_request(sexpr.to_string(request) .. '\n')
 end
 
