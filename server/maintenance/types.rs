@@ -576,6 +576,19 @@ pub struct FrozenBufferRecord {
   pub current_sha256          : String,
 }
 
+/// A retained view which the server has successfully produced during an
+/// active incident, but whose concrete editor buffer does not exist yet.
+/// The following incident-qualified client census binds this server-known
+/// identity to the client's stable buffer ID.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct PendingViewEnrollment {
+  pub view_uri                : String,
+  pub graph_generation        : u64,
+  pub presentation_generation : u64,
+  pub server_revision         : u64,
+  pub application_token       : u64,
+}
+
 /// The exact origin-specific target set authorized when maintenance begins.
 /// Paths retain the client's spelling for reporting; pull repository keys
 /// bind client-local worktrees to server-verified groups of stable source
@@ -656,6 +669,14 @@ pub struct ActiveMaintenance {
   pub undo_required_buffer_ids : Vec<String>,
   #[serde(default)]
   pub buffer_census     : BTreeMap<String, FrozenBufferRecord>,
+  /// Monotonic presentation inventory.  `buffer_census` remains the
+  /// immutable initial archive authority; clean buffers born later join only
+  /// this map.
+  #[serde(default)]
+  pub presentation_buffer_census : BTreeMap<String, FrozenBufferRecord>,
+  /// Server-known query results waiting for their client-local buffer ID.
+  #[serde(default)]
+  pub pending_view_enrollments : BTreeMap<String, PendingViewEnrollment>,
   #[serde(default)]
   pub targets           : MaintenanceTargets,
   #[serde(default)]
@@ -717,6 +738,27 @@ impl ActiveMaintenance {
     if self . controller_session_id . is_empty () {
       &self . archive_owner_session_id
     } else { &self . controller_session_id }
+  }
+
+  /// Old journals predate the separate presentation census.  Treat their
+  /// immutable initial census as the presentation inventory until a new
+  /// enrollment causes the coordinator to materialize the new map.
+  pub fn presentation_census (&self) -> &BTreeMap<String, FrozenBufferRecord> {
+    if self . presentation_buffer_census . is_empty ()
+       && !self . buffer_census . is_empty ()
+    { &self . buffer_census }
+    else { &self . presentation_buffer_census }
+  }
+
+  pub fn presentation_buffer_ids (&self) -> Vec<String> {
+    self . presentation_census () . keys () . cloned () . collect ()
+  }
+
+  pub fn presentation_buffer (
+    &self,
+    buffer_id : &str,
+  ) -> Option<&FrozenBufferRecord> {
+    self . presentation_census () . get (buffer_id)
   }
 }
 

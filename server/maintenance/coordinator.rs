@@ -305,6 +305,8 @@ impl MaintenanceCoordinator {
       dirty_buffer_ids: Vec::new (),
       undo_required_buffer_ids: Vec::new (),
       buffer_census: Default::default (),
+      presentation_buffer_census: Default::default (),
+      pending_view_enrollments: Default::default (),
       targets,
       requested_id_outcomes: Vec::new (),
       external_mutation: None,
@@ -373,9 +375,131 @@ impl MaintenanceCoordinator {
     active . registered_buffer_ids = registered_buffer_ids;
     active . dirty_buffer_ids = dirty_buffer_ids;
     active . undo_required_buffer_ids = undo_required_buffer_ids;
+    active . presentation_buffer_census = buffer_census . clone ();
     active . buffer_census = buffer_census;
     active . phase = MaintenancePhase::PreparingArchive;
     Ok (true)
+  }
+
+  /// Journal a successful query result before its response is allowed onto
+  /// the wire.  The URI is the identity available at this boundary; a later
+  /// client census supplies the editor-owned buffer ID.
+  pub fn enroll_pending_view (
+    &mut self,
+    enrollment : PendingViewEnrollment,
+  ) -> Result<bool, String> {
+    let CoordinatorState::Active (active) = &mut self . state else {
+      return Ok (false); };
+    if enrollment . view_uri . is_empty () {
+      return Err ("pending maintenance view has an empty URI" . into ()); }
+    if active . client_evidence_transfer . is_some ()
+       || matches! (active . archive_status, ArchiveStatus::Finalized { .. })
+    {
+      return Err (
+        "a new view cannot enter maintenance after final evidence transfer"
+          . into ()); }
+    if let Some (record) = active . presentation_census () . values ()
+      . find (|record| record . view_uri . as_deref ()
+        == Some (&enrollment . view_uri))
+    {
+      if record . graph_generation == enrollment . graph_generation
+        && record . presentation_generation
+             == enrollment . presentation_generation
+        && record . server_revision == enrollment . server_revision
+        && record . application_token == enrollment . application_token
+      { return Ok (false); }
+      return Err (format! (
+        "view '{}' changed authority during maintenance enrollment",
+        enrollment . view_uri));
+    }
+    if let Some (existing) = active . pending_view_enrollments
+      . get (&enrollment . view_uri)
+    {
+      if existing == &enrollment { return Ok (false); }
+      return Err (format! (
+        "view '{}' changed pending maintenance authority",
+        enrollment . view_uri));
+    }
+    active . pending_view_enrollments
+      . insert (enrollment . view_uri . clone (), enrollment);
+    Ok (true)
+  }
+
+  /// Bind clean buffers born after the immutable initial archive census.
+  /// An incident-qualified census is a monotonic enrollment barrier; an
+  /// ordinary reconnect census additionally proves that an unbound response
+  /// never became a client buffer and may resolve it absent.
+  pub fn enroll_presentation_census (
+    &mut self,
+    records                : Vec<FrozenBufferRecord>,
+    authoritative_reconnect : bool,
+  ) -> Result<Vec<String>, String> {
+    let CoordinatorState::Active (active) = &mut self . state else {
+      return Ok (Vec::new ()); };
+    if active . presentation_buffer_census . is_empty ()
+       && !active . buffer_census . is_empty ()
+    {
+      active . presentation_buffer_census = active . buffer_census . clone (); }
+    let census_uris : BTreeSet<String> = records . iter ()
+      . filter_map (|record| record . view_uri . clone ()) . collect ();
+    let mut added = Vec::new ();
+    for record in records {
+      if active . presentation_buffer_census . contains_key (&record . buffer_id) {
+        continue; }
+      if record . maintenance_epoch != Some (active . epoch . get ()) {
+        return Err (format! (
+          "new buffer '{}' is not locked for maintenance epoch {}",
+          record . buffer_id, active . epoch . get ())); }
+      if record . dirty || record . logical_dirty || record . undo_required {
+        return Err (format! (
+          "new maintenance buffer '{}' is dirty but absent from the initial archive",
+          record . buffer_id)); }
+      if active . presentation_buffer_census . values () . any (|existing|
+          existing . view_uri . is_some ()
+          && existing . view_uri == record . view_uri)
+      {
+        return Err (format! (
+          "new buffer '{}' repeats a maintenance view URI", record . buffer_id)); }
+      if let Some (uri) = &record . view_uri {
+        if let Some (pending) = active . pending_view_enrollments . get (uri) {
+          if pending . graph_generation != record . graph_generation
+          || pending . presentation_generation
+               != record . presentation_generation
+          || pending . server_revision != record . server_revision
+          || pending . application_token != record . application_token
+          {
+            return Err (format! (
+              "buffer '{}' does not match pending authority for view '{}'",
+              record . buffer_id, uri)); }
+        } else if record . kind != BufferKind::NewEmptyContentView {
+          return Err (format! (
+            "buffer '{}' has no pending maintenance view enrollment",
+            record . buffer_id)); }
+      }
+      if active . selected_store . is_some ()
+         && !active . view_settlements . is_empty ()
+      {
+        let selected_generation = active . selected_store . as_ref ()
+          . expect ("checked selected store") . graph_generation . get ();
+        if record . graph_generation != selected_generation {
+          return Err (format! (
+            "G0 view '{}' reached the client after settlement planning",
+            record . buffer_id)); }
+        active . view_settlements . insert (
+          record . buffer_id . clone (), current_generation_settlement (&record));
+        if active . phase == MaintenancePhase::FinalizingArchive {
+          active . phase = MaintenancePhase::Presenting; }
+      }
+      if let Some (uri) = &record . view_uri {
+        active . pending_view_enrollments . remove (uri); }
+      added . push (record . buffer_id . clone ());
+      active . presentation_buffer_census
+        . insert (record . buffer_id . clone (), record);
+    }
+    if authoritative_reconnect {
+      active . pending_view_enrollments
+        . retain (|uri, _| census_uris . contains (uri)); }
+    Ok (added)
   }
 
   pub fn transition (
@@ -654,9 +778,10 @@ impl MaintenanceCoordinator {
         "archive-finalized is invalid during {:?}", active . phase)); }
     let settlement_ids : BTreeSet<_> = active . view_settlements
       . keys () . cloned () . collect ();
-    let registered_ids : BTreeSet<_> = active . registered_buffer_ids
-      . iter () . cloned () . collect ();
+    let registered_ids : BTreeSet<_> = active . presentation_census ()
+      . keys () . cloned () . collect ();
     if settlement_ids != registered_ids
+    || !active . pending_view_enrollments . is_empty ()
     || active . view_settlements . values ()
       . any (|record| !record . acknowledged)
     {
@@ -863,8 +988,11 @@ impl MaintenanceCoordinator {
       if records . insert (id . clone (), record) . is_some () {
         return Err (format! ("view settlement repeats buffer '{}'", id)); }
     }
-    let expected : BTreeSet<_> = active . registered_buffer_ids
-      . iter () . cloned () . collect ();
+    if !active . pending_view_enrollments . is_empty () {
+      return Err (
+        "view classification awaits pending URI enrollment" . into ()); }
+    let expected : BTreeSet<_> = active . presentation_census ()
+      . keys () . cloned () . collect ();
     let actual : BTreeSet<_> = records . keys () . cloned () . collect ();
     if actual != expected {
       return Err (format! (
@@ -1420,7 +1548,8 @@ impl MaintenanceCoordinator {
     if disposition == TerminalDisposition::Completed
     && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
         || !active . client_evidence_acknowledged
-        || active . presentation_fence . is_none ())
+        || active . presentation_fence . is_none ()
+        || !active . pending_view_enrollments . is_empty ())
     {
       return Err (
         "completed maintenance requires an acknowledged finalized archive and presentation fence"
@@ -1438,7 +1567,7 @@ impl MaintenanceCoordinator {
       controller_session_id: active . controlling_session_id () . to_string (),
       archive_directory_name: active . archive_directory_name . clone (),
       archive_manifest_sha256: manifest_sha256,
-      registered_buffer_ids: active . registered_buffer_ids . clone (),
+      registered_buffer_ids: active . presentation_buffer_ids (),
       selected_store: active . selected_store . clone (),
       requested_id_outcomes: active . requested_id_outcomes . clone (),
     };
@@ -1481,6 +1610,36 @@ impl MaintenanceCoordinator {
         "stale maintenance epoch {}; current epoch is {}",
         epoch . get (), active . epoch . get ())); }
     Ok (active)
+  }
+}
+
+fn current_generation_settlement (
+  record : &FrozenBufferRecord,
+) -> ViewSettlementRecord {
+  ViewSettlementRecord {
+    buffer_id: record . buffer_id . clone (),
+    buffer_key: None,
+    kind: record . kind . clone (),
+    view_uri: record . view_uri . clone (),
+    origin_buffer_id: record . origin_buffer_id . clone (),
+    origin_view_uri: record . origin_view_uri . clone (),
+    origin_application_token: record . origin_application_token,
+    origin_location: record . origin_location . clone (),
+    dirty: false,
+    impacted: false,
+    parse_uncertain: false,
+    uncertainty_reason: None,
+    observed_ids: Vec::new (),
+    resolved_primary_ids: Vec::new (),
+    base_graph_generation: record . graph_generation,
+    base_presentation_generation: record . presentation_generation,
+    base_server_revision: record . server_revision,
+    base_application_token: record . application_token,
+    planned_disposition: ViewDisposition::RetainedClean,
+    requirement: ViewSettlementRequirement::ReleaseAck,
+    application: None,
+    resolution: Default::default (),
+    acknowledged: false,
   }
 }
 
@@ -1581,6 +1740,27 @@ mod tests {
       presentation_stale: false, search_stale: false, herald_bearing: false,
       last_fetched_sha256: "a" . repeat (64),
       current_sha256: "b" . repeat (64),
+    }
+  }
+
+  fn late_clean_view (
+    buffer_id : &str,
+    view_uri  : &str,
+    epoch     : MaintenanceEpoch,
+  ) -> FrozenBufferRecord {
+    FrozenBufferRecord {
+      buffer_id: buffer_id . into (), kind: BufferKind::ContentView,
+      lifecycle: "live-view" . into (), disposable: false,
+      continuation_id: None, recipe: "()" . into (), root_ids: Vec::new (),
+      origin_buffer_id: None, origin_view_uri: None,
+      origin_application_token: None, origin_location: None,
+      source_set: "all" . into (), view_uri: Some (view_uri . into ()),
+      graph_generation: 1, presentation_generation: 2, server_revision: 3,
+      application_token: 4, dirty: false, logical_dirty: false,
+      undo_required: false, maintenance_epoch: Some (epoch . get ()),
+      presentation_stale: false, search_stale: false, herald_bearing: false,
+      last_fetched_sha256: "a" . repeat (64),
+      current_sha256: "a" . repeat (64),
     }
   }
 
@@ -1814,6 +1994,54 @@ mod tests {
     changed . current_sha256 = "c" . repeat (64);
     assert! (coordinator . freeze_locked_census (
       &active . incident_id, active . epoch, vec![changed]) . is_err ());
+  }
+
+  #[test]
+  fn server_view_uri_binds_a_late_clean_client_buffer_monotonically () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    coordinator . archive_ready (
+      &active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . block_invalid_disk (
+      &active . incident_id, active . epoch, "invalid candidate" . into ())
+      . unwrap ();
+    let pending = PendingViewEnrollment {
+      view_uri: "late-view" . into (), graph_generation: 1,
+      presentation_generation: 2, server_revision: 3, application_token: 4,
+    };
+    assert! (coordinator . enroll_pending_view (pending . clone ()) . unwrap ());
+    assert! (!coordinator . enroll_pending_view (pending) . unwrap ());
+    assert_eq! (coordinator . enroll_presentation_census (
+      vec![late_clean_view ("late-buffer", "late-view", active . epoch)], false)
+      . unwrap (), ["late-buffer"]);
+    let CoordinatorState::Active (enrolled) = &coordinator . state else {
+      panic! ("late view stopped being active"); };
+    assert! (enrolled . buffer_census . is_empty ());
+    assert! (enrolled . registered_buffer_ids . is_empty ());
+    assert_eq! (enrolled . presentation_buffer_ids (), ["late-buffer"]);
+    assert! (enrolled . pending_view_enrollments . is_empty ());
+  }
+
+  #[test]
+  fn reconnect_resolves_an_unconstructed_pending_view_but_not_dirty_work () {
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    coordinator . enroll_pending_view (PendingViewEnrollment {
+      view_uri: "lost-response" . into (), graph_generation: 1,
+      presentation_generation: 0, server_revision: 1, application_token: 1,
+    }) . unwrap ();
+    coordinator . enroll_presentation_census (Vec::new (), true) . unwrap ();
+    let mut dirty = late_clean_view ("dirty", "client-created", active . epoch);
+    dirty . kind = BufferKind::NewEmptyContentView;
+    dirty . dirty = true;
+    assert! (coordinator . enroll_presentation_census (vec![dirty], false)
+      . unwrap_err () . contains ("absent from the initial archive"));
+    let CoordinatorState::Active (enrolled) = &coordinator . state else {
+      panic! ("late view stopped being active"); };
+    assert! (enrolled . pending_view_enrollments . is_empty ());
+    assert! (enrolled . presentation_census () . is_empty ());
   }
 
   #[test]

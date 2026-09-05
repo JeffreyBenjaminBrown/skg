@@ -42,7 +42,7 @@ pub fn plan_incident_view_settlements (
     . map (|snapshot| (snapshot . buffer_id . as_str (), snapshot))
     . collect ();
   let mut settlements = Vec::new ();
-  for (buffer_id, frozen) in &active . buffer_census {
+  for (buffer_id, frozen) in active . presentation_census () {
     let archived_buffer = archived . get (buffer_id . as_str ()) . copied ();
     if frozen . dirty && archived_buffer . is_none () {
       return Err (format! (
