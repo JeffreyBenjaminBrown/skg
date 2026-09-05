@@ -67,6 +67,30 @@
       (should (equal (cdr (assoc 'ids parsed)) '("alias" "B"))))
     (should (functionp registered-handler))))
 
+(ert-deftest test-skg-every-maintenance-origin-refuses-dirty-raw-files-first ()
+  (let ((buffer (generate-new-buffer "raw-maintenance-preflight.skg"))
+        (skg--buffer-registry (make-hash-table :test #'equal))
+        connected)
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (insert "pid: dirty\n")
+            (skg-register-buffer
+             buffer 'raw-skg-file
+             :lifecycle 'ordinary-file :disposable nil)
+            (set-buffer-modified-p t))
+          (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+                     (lambda () (setq connected t) 'tcp)))
+            (let ((error-data
+                   (should-error
+                    (skg-begin-maintenance "explicit-partial-reload")
+                    :type 'user-error)))
+              (should (string-match-p
+                       "raw-maintenance-preflight\\.skg"
+                       (error-message-string error-data)))))
+          (should-not connected))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
 (ert-deftest test-skg-maintenance-locks-before-incident-census-and-archives-after-ack ()
   (skg-test-maintenance--with-buffer 'content-view
     (let* ((id (skg--buffer-record-id skg--buffer-record))

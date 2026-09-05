@@ -154,6 +154,23 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal(incident_id, requests[3].incident)
   end)
 
+  it('refuses dirty raw files before every maintenance origin', function ()
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_name(buf, 'raw-maintenance-preflight.skg')
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { 'pid: dirty' })
+    registry.register(buf, 'raw-skg-file', {
+      lifecycle = 'ordinary-file', disposable = false,
+    })
+    vim.bo[buf].modified = true
+    local submitted = false
+    require('skg.client').submit_request = function () submitted = true end
+    local ok, reason = pcall(
+      maintenance.begin, 'explicit-partial-reload')
+    assert.is_false(ok)
+    assert.matches('raw-maintenance-preflight.skg', tostring(reason), 1, true)
+    assert.is_false(submitted)
+  end)
+
   it('begins full rebuild through maintenance instead of a raw request',
      function ()
     local misc = require('skg.misc_requests')

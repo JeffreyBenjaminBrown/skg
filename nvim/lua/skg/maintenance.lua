@@ -82,6 +82,22 @@ local function registered_ids ()
   return sorted_copy(result)
 end
 
+local function refuse_modified_raw_files ()
+  local dirty = {}
+  for _, buf in ipairs(registry.buffers()) do
+    local record = registry.record(buf)
+    if record.kind == 'raw-skg-file' and vim.bo[buf].modified then
+      local name = vim.api.nvim_buf_get_name(buf)
+      table.insert(dirty, name ~= '' and name or ('buffer ' .. tostring(buf)))
+    end
+  end
+  if #dirty > 0 then
+    table.sort(dirty)
+    error('Maintenance refuses modified raw .skg buffers: '
+      .. table.concat(dirty, ', '))
+  end
+end
+
 local function field_present (record, key)
   if not sexpr.is_list(record) then return false end
   for _, entry in ipairs(record) do
@@ -1033,6 +1049,7 @@ end
 function M.begin (
     origin, candidate_id, paths, ids, terminal_callback, origin_context,
     origin_fields)
+  refuse_modified_raw_files()
   state.register_response_handler('maintenance-offer',
     function (payload_text, response)
       handle_bootstrap(

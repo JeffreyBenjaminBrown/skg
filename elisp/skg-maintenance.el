@@ -131,6 +131,23 @@ old implementation."
                 (skg-registered-buffers))
         #'string<))
 
+(defun skg--maintenance-modified-raw-file-buffers ()
+  "Return configured raw file buffers which have unsaved editor text."
+  (cl-remove-if-not
+   (lambda (buffer)
+     (with-current-buffer buffer
+       (and skg--buffer-record
+            (eq (skg--buffer-record-kind skg--buffer-record) 'raw-skg-file)
+            (buffer-modified-p buffer))))
+   (skg-registered-buffers)))
+
+(defun skg--maintenance-refuse-modified-raw-files ()
+  "Refuse maintenance before allocating an incident if raw files are dirty."
+  (when-let ((dirty (skg--maintenance-modified-raw-file-buffers)))
+    (user-error
+     "Maintenance refuses modified raw .skg buffers: %s"
+     (mapconcat #'buffer-name dirty ", "))))
+
 (defun skg--maintenance-lock-census-sha256 (ids)
   (secure-hash
    'sha256
@@ -1198,6 +1215,7 @@ targets of an explicit partial reload.  TERMINAL-CALLBACK receives the parsed
 terminal response only after the server completes the incident.
 ORIGIN-CONTEXT is opaque client state retained across the origin adapter.
 ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
+  (skg--maintenance-refuse-modified-raw-files)
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg-register-response-handler
      'maintenance-offer
