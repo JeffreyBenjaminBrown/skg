@@ -376,6 +376,60 @@ describe('skg Neovim maintenance handshake', function ()
     end)
   end)
 
+  it('retains the exact blocked reason and recovery command', function ()
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9, phase = 'waiting-for-server',
+      offer = { origin = 'pull' }, requested_paths = {}, requested_ids = {},
+    }
+    local notification
+    local original_notify = vim.notify
+    vim.notify = function (message) notification = message end
+    local ok, reason = pcall(maintenance.resume_active, {
+        f('status', 'active'), f('active-incident-id', incident_id),
+        f('maintenance-epoch', 9), f('phase', 'blocked-store-health'),
+        f('origin', 'pull'), f('requested-paths', {}),
+        f('requested-ids', {}),
+        f('blocking-reason', 'TypeDB is unavailable'),
+      })
+    vim.notify = original_notify
+    assert.is_true(ok, tostring(reason))
+    local incident = state.maintenance_client_incident
+    assert.are.equal('server-blocked', incident.phase)
+    assert.are.equal('blocked-store-health', incident.server_phase)
+    assert.are.equal('TypeDB is unavailable', incident.blocking_reason)
+    assert.matches('SkgRetryMaintenance', notification, 1, true)
+  end)
+
+  it('retries blocked maintenance with the exact incident envelope',
+     function ()
+    local client_module = require('skg.client')
+    local submitted
+    client_module.submit_request = function (wire, _content, incident)
+      submitted = { wire = wire, incident = incident }
+    end
+    state.maintenance_client_incident = {
+      incident_id = incident_id, epoch = 9, phase = 'server-blocked',
+      server_phase = 'blocked-invalid-after-mutation',
+      blocking_reason = 'malformed source',
+    }
+    maintenance.retry()
+    assert.are.equal('maintenance-retry-pending',
+      state.maintenance_client_incident.phase)
+    assert.are.equal(incident_id, submitted.incident)
+    assert.matches('retry maintenance', submitted.wire, 1, true)
+    assert.matches('maintenance%-epoch %. 9', submitted.wire)
+    local handler = state.request_draft.handlers['maintenance-status'].handler
+    handler(nil, {
+      f('status', 'maintenance-retry-queued'),
+      f('incident-id', incident_id), f('maintenance-epoch', 9),
+      f('recovery-mode', 'targeted'),
+    })
+    local incident = state.maintenance_client_incident
+    assert.are.equal('waiting-for-origin-observation', incident.phase)
+    assert.is_nil(incident.server_phase)
+    assert.is_nil(incident.blocking_reason)
+  end)
+
   it('offers a deduplicated explicit ID API without prompting when clean',
      function ()
     local captured

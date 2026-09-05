@@ -55,6 +55,9 @@ function M.install_session_surface ()
   vim.api.nvim_create_user_command('SkgCancelMaintenance',
     function () require('skg.maintenance').cancel() end,
     { force = true })
+  vim.api.nvim_create_user_command('SkgRetryMaintenance',
+    function () require('skg.maintenance').retry() end,
+    { force = true })
   vim.api.nvim_create_user_command('SkgPullAll',
     function () pull.pull_all() end,
     { force = true })

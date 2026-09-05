@@ -960,8 +960,13 @@ function M.resume_active (response)
   elseif phase == 'blocked-invalid-after-mutation'
       or phase == 'blocked-store-health' then
     incident.phase = 'server-blocked'
-    vim.notify('Maintenance ' .. incident_id
-      .. ' remains locked in server phase ' .. phase, vim.log.levels.ERROR)
+    incident.server_phase = phase
+    incident.blocking_reason =
+      payload.field_text(response, 'blocking-reason') or 'unspecified'
+    vim.notify(string.format(
+      'Maintenance %s remains locked in server phase %s: %s. Repair the '
+        .. 'reported problem, then run :SkgRetryMaintenance.',
+      incident_id, phase, incident.blocking_reason), vim.log.levels.ERROR)
   else
     incident.phase = 'waiting-for-server'
     vim.notify('Skg maintenance ' .. incident_id
@@ -1271,10 +1276,13 @@ function M.server_status_handler (payload_text, response)
       payload.field_text(response, 'incident-id'),
       nat(response, 'maintenance-epoch'))
     incident.phase = 'server-blocked'
+    incident.server_phase = payload.field_text(response, 'phase')
+    incident.blocking_reason =
+      payload.field_text(response, 'error') or 'unknown error'
     vim.notify(string.format(
-      'Explicit reload remains locked in server phase %s: %s',
-      payload.field_text(response, 'phase') or '?',
-      payload.field_text(response, 'error') or 'unknown error'),
+      'Maintenance remains locked in server phase %s: %s. Repair the '
+        .. 'reported problem, then run :SkgRetryMaintenance.',
+      incident.server_phase or '?', incident.blocking_reason),
       vim.log.levels.ERROR)
   elseif status == 'active' or status == 'terminal' or status == 'idle' then
     M.handle_status(payload_text, response)
@@ -1299,6 +1307,41 @@ function M.cancel ()
   state.set_request_failure_handler(fail_request(
     'cancellation-pending', 'Maintenance cancellation was not acknowledged'))
   client.submit_request(request('cancel maintenance', {
+    { 'maintenance-epoch', incident.epoch },
+  }), nil, incident.incident_id)
+end
+
+function M.handle_retry (_payload_text, response)
+  local incident = require_client_incident(
+    payload.field_text(response, 'incident-id'),
+    nat(response, 'maintenance-epoch'))
+  if payload.field_text(response, 'status') ~= 'maintenance-retry-queued' then
+    error('Server did not queue blocked maintenance recovery') end
+  local mode = payload.field_text(response, 'recovery-mode') or 'unknown'
+  incident.phase = 'waiting-for-origin-observation'
+  incident.server_phase = nil
+  incident.blocking_reason = nil
+  vim.notify(string.format(
+    'Skg queued %s maintenance recovery for %s', mode,
+    incident.incident_id))
+end
+
+function M.retry ()
+  local incident = assert(state.maintenance_client_incident,
+    'no client-known blocked maintenance incident')
+  if incident.phase ~= 'server-blocked' then
+    error('no client-known blocked maintenance incident') end
+  incident.phase = 'maintenance-retry-pending'
+  state.register_response_handler(
+    'maintenance-status', M.handle_retry, true)
+  state.set_request_failure_handler(function (reason)
+    local current = state.maintenance_client_incident
+    if current and current.incident_id == incident.incident_id
+       and current.epoch == incident.epoch then
+      current.phase = 'server-blocked' end
+    warn('Maintenance retry was not acknowledged: ' .. tostring(reason))
+  end)
+  client.submit_request(request('retry maintenance', {
     { 'maintenance-epoch', incident.epoch },
   }), nil, incident.incident_id)
 end
