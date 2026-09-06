@@ -31,6 +31,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 #[cfg(unix)]
 use std::os::unix::fs::{
@@ -163,6 +164,13 @@ pub struct ClientEvidenceBundle {
 pub struct MaintenanceEvidenceStore {
   directory       : PathBuf,
   config_identity : PathBuf,
+  published       : Arc<Mutex<BTreeMap<IncidentId, CachedPublishedEvidence>>>,
+}
+
+#[derive(Clone, Debug)]
+struct CachedPublishedEvidence {
+  header      : MaintenanceEvidenceHeader,
+  publication : PublishedMaintenanceEvidence,
 }
 
 struct ArtifactBytes {
@@ -175,12 +183,17 @@ impl MaintenanceEvidenceStore {
     Self {
       directory: journal . directory () . join ("evidence"),
       config_identity: journal . config_identity () . to_path_buf (),
+      published: Arc::new (Mutex::new (BTreeMap::new ())),
     }
   }
 
   #[cfg(test)]
   fn at_root (directory : PathBuf, config_identity : PathBuf) -> Self {
-    Self { directory, config_identity }
+    Self {
+      directory,
+      config_identity,
+      published: Arc::new (Mutex::new (BTreeMap::new ())),
+    }
   }
 
   pub fn publish_candidate (
@@ -208,6 +221,7 @@ impl MaintenanceEvidenceStore {
       fs::rename (&final_path, &superseded_path)
         . map_err (|error| format! (
           "could not preserve superseded candidate evidence: {}", error))?;
+      self . forget_publication (&active . incident_id)?;
       sync_directory (&self . directory)?;
     }
 
@@ -244,10 +258,12 @@ impl MaintenanceEvidenceStore {
       fs::rename (&temporary, &final_path)
         . map_err (|error| error . to_string ())?;
       sync_directory (&self . directory)?;
-      Ok (PublishedMaintenanceEvidence {
+      let publication = PublishedMaintenanceEvidence {
         path: final_path . clone (),
         .. publication
-      })
+      };
+      self . remember_publication (header, publication . clone ())?;
+      Ok (publication)
     })();
     // Incomplete temporary directories are intentionally retained.  They are
     // crash evidence and, unlike the final path, never grant mutation authority.
@@ -258,10 +274,13 @@ impl MaintenanceEvidenceStore {
     &self,
     incident : &IncidentId,
   ) -> Result<(MaintenanceEvidenceBundle, PublishedMaintenanceEvidence), String> {
-    load_evidence_directory (
+    let result = load_evidence_directory (
       &self . directory . join (incident . as_str ()),
       &self . config_identity,
-      Some (incident))
+      Some (incident))?;
+    self . remember_publication (
+      result . 0 . header . clone (), result . 1 . clone ())?;
+    Ok (result)
   }
 
   /// Re-read the already-published evidence and concatenate its declared
@@ -271,10 +290,20 @@ impl MaintenanceEvidenceStore {
     &self,
     incident : &IncidentId,
   ) -> Result<ClientEvidenceBundle, String> {
-    let (header, publication, _) = load_evidence_header (
-      &self . directory . join (incident . as_str ()),
-      &self . config_identity,
-      Some (incident), true)?;
+    let cached = self . published . lock ()
+      . map_err (|_| "maintenance evidence cache was poisoned" . to_string ())?
+      . get (incident) . cloned ();
+    let (header, publication) = if let Some (cached) = cached {
+      validate_cached_publication (&cached)?;
+      (cached . header, cached . publication)
+    } else {
+      let (header, publication, _) = load_evidence_header (
+        &self . directory . join (incident . as_str ()),
+        &self . config_identity,
+        Some (incident), true)?;
+      self . remember_publication (header . clone (), publication . clone ())?;
+      (header, publication)
+    };
     let mut bytes = Vec::new ();
     let mut records = Vec::new ();
     for (index, artifact) in header . artifacts . iter () . enumerate () {
@@ -310,6 +339,27 @@ impl MaintenanceEvidenceStore {
       artifacts: records,
       bytes,
     })
+  }
+
+  fn remember_publication (
+    &self,
+    header      : MaintenanceEvidenceHeader,
+    publication : PublishedMaintenanceEvidence,
+  ) -> Result<(), String> {
+    self . published . lock ()
+      . map_err (|_| "maintenance evidence cache was poisoned" . to_string ())?
+      . insert (header . incident_id . clone (), CachedPublishedEvidence {
+        header,
+        publication,
+      });
+    Ok (( ))
+  }
+
+  fn forget_publication (&self, incident : &IncidentId) -> Result<(), String> {
+    self . published . lock ()
+      . map_err (|_| "maintenance evidence cache was poisoned" . to_string ())?
+      . remove (incident);
+    Ok (( ))
   }
 }
 
@@ -692,16 +742,15 @@ fn verify_new_publication (
   verify_exact_file (&directory . join (HEADER_FILENAME), header_bytes)?;
   verify_exact_file (
     &directory . join (RECOVERY_FILENAME), recovery_bytes)?;
-  let mut expected_files = BTreeSet::from ([
-    PathBuf::from (HEADER_FILENAME),
-    PathBuf::from (RECOVERY_FILENAME),
-  ]);
+  let expected_files = evidence_file_inventory (header)?;
+  if header . artifacts != artifacts . iter ()
+    . map (|artifact| artifact . metadata . clone ())
+    . collect::<Vec<_>> ()
+  {
+    return Err ("evidence header has the wrong artifact inventory" . into ()); }
   let mut total_file_bytes = header_bytes . len () as u64
     + recovery_bytes . len () as u64;
   for artifact in artifacts {
-    if !expected_files . insert (artifact . metadata . relative_path . clone ()) {
-      return Err (format! ("duplicate evidence artifact {}",
-        artifact . metadata . relative_path . display ())); }
     verify_exact_file (
       &directory . join (&artifact . metadata . relative_path),
       &artifact . bytes)?;
@@ -718,6 +767,44 @@ fn verify_new_publication (
     artifact_count: artifacts . len (),
     total_file_bytes,
   })
+}
+
+fn validate_cached_publication (
+  cached : &CachedPublishedEvidence,
+) -> Result<(), String> {
+  require_private_directory (&cached . publication . path)?;
+  let header_path = cached . publication . path . join (HEADER_FILENAME);
+  require_private_regular_file (&header_path)?;
+  let header_bytes = fs::read (&header_path) . map_err (|error| format! (
+    "could not read {}: {}", header_path . display (), error))?;
+  if sha256_hex (&header_bytes) != cached . publication . bundle_sha256 {
+    return Err ("evidence header changed after publication" . into ()); }
+  let recovery_path = cached . publication . path
+    . join (&cached . header . recovery . relative_path);
+  validate_recovery_file (&recovery_path, &cached . header . recovery)?;
+  let expected_files = evidence_file_inventory (&cached . header)?;
+  let actual_files = regular_file_inventory (&cached . publication . path)?;
+  if actual_files != expected_files {
+    return Err (format! (
+      "evidence file inventory mismatch: expected {:?}, found {:?}",
+      expected_files, actual_files)); }
+  Ok (( ))
+}
+
+fn evidence_file_inventory (
+  header : &MaintenanceEvidenceHeader,
+) -> Result<BTreeSet<PathBuf>, String> {
+  let mut expected_files = BTreeSet::from ([
+    PathBuf::from (HEADER_FILENAME),
+    PathBuf::from (RECOVERY_FILENAME),
+  ]);
+  for artifact in &header . artifacts {
+    validate_relative_artifact_path (&artifact . relative_path)?;
+    if !expected_files . insert (artifact . relative_path . clone ()) {
+      return Err (format! ("duplicate evidence artifact {}",
+        artifact . relative_path . display ())); }
+  }
+  Ok (expected_files)
 }
 
 fn verify_exact_file (path : &Path, expected : &[u8]) -> Result<(), String> {
@@ -768,16 +855,9 @@ fn load_evidence_header (
     . map_err (|error| format! ("invalid evidence header: {}", error))?;
   validate_header (&header, incident, config_identity)?;
 
-  let mut expected_files = BTreeSet::from ([
-    PathBuf::from (HEADER_FILENAME),
-    PathBuf::from (RECOVERY_FILENAME),
-  ]);
+  let expected_files = evidence_file_inventory (&header)?;
   let mut total_file_bytes = header_bytes . len () as u64;
   for artifact in &header . artifacts {
-    validate_relative_artifact_path (&artifact . relative_path)?;
-    if !expected_files . insert (artifact . relative_path . clone ()) {
-      return Err (format! ("duplicate evidence artifact {}",
-        artifact . relative_path . display ())); }
     let path = directory . join (&artifact . relative_path);
     require_private_regular_file (&path)?;
     let length = fs::metadata (&path) . map_err (|error| error . to_string ())?
@@ -794,13 +874,7 @@ fn load_evidence_header (
   if recovery_length != header . recovery . byte_length {
     return Err ("recovery evidence length mismatch" . into ()); }
   let recovery_bytes = if verify_recovery_checksum {
-    let bytes = fs::read (&recovery_path) . map_err (|error| format! (
-      "could not read {}: {}", recovery_path . display (), error))?;
-    if sha256_hex (&bytes) != header . recovery . sha256
-    || blake3_hex (&bytes) != header . recovery . blake3
-    {
-      return Err ("recovery evidence checksum mismatch" . into ()); }
-    Some (bytes)
+    Some (validate_recovery_file (&recovery_path, &header . recovery)?)
   } else { None };
   total_file_bytes += recovery_length;
   let actual_files = regular_file_inventory (directory)?;
@@ -815,6 +889,22 @@ fn load_evidence_header (
     artifact_count,
     total_file_bytes,
   }, recovery_bytes))
+}
+
+fn validate_recovery_file (
+  path   : &Path,
+  record : &RecoveryPayloadRecord,
+) -> Result<Vec<u8>, String> {
+  require_private_regular_file (path)?;
+  let bytes = fs::read (path) . map_err (|error| format! (
+    "could not read {}: {}", path . display (), error))?;
+  if bytes . len () as u64 != record . byte_length {
+    return Err ("recovery evidence length mismatch" . into ()); }
+  if sha256_hex (&bytes) != record . sha256
+  || blake3_hex (&bytes) != record . blake3
+  {
+    return Err ("recovery evidence checksum mismatch" . into ()); }
+  Ok (bytes)
 }
 
 fn validate_header (
