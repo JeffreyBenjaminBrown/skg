@@ -1155,6 +1155,8 @@ fn blake3_hex (bytes : &[u8]) -> String {
 mod tests {
   use super::*;
   use crate::dbs::in_rust_graph::InRustGraph;
+  use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_with_manifest;
+  use crate::dbs::filesystem::not_nodes::load_config;
   use crate::maintenance::{
     CandidateId,
     MaintenanceCoordinator,
@@ -1166,6 +1168,7 @@ mod tests {
   use crate::types::nodes::complete::empty_node_complete;
   use crate::types::store_state::{PathDigest, SelectedStoreState};
   use std::sync::Arc;
+  use std::time::{Duration, Instant};
   use tempfile::tempdir;
 
   #[test]
@@ -1326,6 +1329,91 @@ mod tests {
     assert! (compact_bytes . len () * 10 < duplicated_bytes . len () * 6,
       "one-baseline payload was {} bytes; duplicated corpus was {} bytes",
       compact_bytes . len (), duplicated_bytes . len ());
+  }
+
+  /// Manual regression benchmark for the repository's approximately 30,000-
+  /// node development corpus.  It writes only to a temporary evidence root.
+  #[test]
+  #[ignore = "requires the repository's real data/skgconfig.toml corpus"]
+  fn real_corpus_one_node_publication_stays_under_three_seconds () {
+    let config = load_config ("data/skgconfig.toml") . unwrap ();
+    let loaded = read_all_skg_files_with_manifest (&config) . unwrap ();
+    let selected = SelectedStoreState::initial (
+      InRustGraph::from_nodecompletes (&loaded . nodes),
+      loaded . manifest);
+    let before_complete = nodecompletes_from_graph (&selected . graph)
+      . into_iter () . next () . expect ("real corpus is nonempty");
+    let mut after_complete = before_complete . clone ();
+    after_complete . title . push_str (" [evidence latency probe]");
+    let pid = before_complete . pid . clone ();
+    let before = SemanticNodeEvidence::from (&before_complete);
+    let after = SemanticNodeEvidence::from (&after_complete);
+    let mut after_nodes = nodecompletes_from_graph (&selected . graph);
+    let changed = after_nodes . iter_mut ()
+      . find (|node| node . pid == pid) . unwrap ();
+    *changed = after_complete;
+    let summary = CandidateSummary {
+      id: CandidateId::new (),
+      base_graph_generation: selected . graph_generation,
+      base_manifest_revision: selected . manifest_revision,
+      covered_sequence: ObservationSequence::INITIAL,
+      changed_primary_ids: vec![pid . to_string ()],
+    };
+    let candidate = ObservedDiskCandidate {
+      summary: summary . clone (),
+      config_identity: config_identity (&config),
+      config_file_blake3: config_file_blake3 (&config),
+      source_catalog_blake3: source_catalog_blake3 (&config),
+      config: Arc::new (config . clone ()),
+      manifest: selected . manifest . clone (),
+      base_graph: selected . graph . clone (),
+      graph: Arc::new (InRustGraph::from_nodecompletes (&after_nodes)),
+      definitions: Vec::new (),
+      added_primary_ids: Default::default (),
+      deleted_primary_ids: Default::default (),
+      modified_primary_ids: BTreeSet::from ([pid . clone ()]),
+      evidence: BTreeMap::from ([
+        (pid, SemanticChangeEvidence {
+          before: Some (before),
+          after: Some (after),
+          diff: "latency probe" . into (),
+        }),
+      ]),
+      selected_bytes: Default::default (),
+      warnings: Vec::new (),
+      load_violations: Vec::new (),
+      disk_fence: crate::maintenance::candidate::CandidateDiskFence::Targeted (
+        Default::default ()),
+    };
+    let mut coordinator = MaintenanceCoordinator::new ();
+    let active = coordinator . begin (
+      MaintenanceOrigin::PendingReconciliation, Some (summary)) . unwrap ();
+    let temporary = tempdir () . unwrap ();
+    let store = MaintenanceEvidenceStore::at_root (
+      temporary . path () . join ("evidence"), config_identity (&config));
+    let started = Instant::now ();
+    let publication = store . publish_candidate (
+      &active, &config, &selected, &candidate) . unwrap ();
+    let publish_elapsed = started . elapsed ();
+    let load_started = Instant::now ();
+    store . load (&active . incident_id) . unwrap ();
+    let load_elapsed = load_started . elapsed ();
+    let transfer_started = Instant::now ();
+    store . client_bundle (&active . incident_id) . unwrap ();
+    let transfer_elapsed = transfer_started . elapsed ();
+    eprintln! (
+      "version-3 real-corpus evidence: publish {:?}, recovery load {:?}, client transfer {:?}, {} bytes",
+      publish_elapsed, load_elapsed, transfer_elapsed,
+      publication . total_file_bytes);
+    assert! (publish_elapsed < Duration::from_secs (3),
+      "one-node evidence publication took {:?}", publish_elapsed);
+    assert! (load_elapsed < Duration::from_secs (3),
+      "one-node recovery evidence load took {:?}", load_elapsed);
+    assert! (transfer_elapsed < Duration::from_secs (1),
+      "one-node client evidence transfer took {:?}", transfer_elapsed);
+    assert! (publication . total_file_bytes < 10 * 1024 * 1024,
+      "one-node evidence publication retained {} bytes",
+      publication . total_file_bytes);
   }
 
   #[test]
