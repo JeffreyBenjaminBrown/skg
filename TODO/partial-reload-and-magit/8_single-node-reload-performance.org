@@ -2,22 +2,101 @@
 
 ** Result
 
-The roughly 40-second pause is not the one-node reload, TypeDB, Tantivy, view
-classification, or the ordinary filesystem observer.  It is the server's
-pre-mutation recovery-evidence publication.  Every maintenance incident
-currently serializes the complete 29,973-node graph twice, as =g0_nodes= and
+The roughly 40-second pause was not the one-node reload, TypeDB, Tantivy, view
+classification, or the ordinary filesystem observer.  It was the server's
+pre-mutation recovery-evidence publication.  Every version-2 maintenance
+incident serialized the complete 29,973-node graph twice, as =g0_nodes= and
 =g1_nodes= inside a human-readable YAML envelope, even when one title changed.
-The publisher then parses and serializes that 53 MiB envelope repeatedly to
+The publisher then parsed and serialized that 53 MiB envelope repeatedly to
 prove its checksums.
 
-There is no small, semantics-neutral deletion which makes this properly fast.
-The useful fix requires choosing a durable recovery representation.  I have
-therefore made no production-code change yet.
+There was no small, semantics-neutral deletion which would make this properly
+fast.  The accepted representation change is implemented and validated below.
 
 I stopped the live development server while benchmarking.  Its active incident
-=00dd1e20-3eec-42f9-8ba6-46a1ce58ab48= had already published =ARCHIVE-READY=;
-the private client archive and process journal remain on disk, so stopping the
-process did not discard the recovery evidence.
+=00dd1e20-3eec-42f9-8ba6-46a1ce58ab48= had already published =ARCHIVE-READY=,
+so the stop itself did not discard recovery evidence.  Once the user confirmed
+that these were disposable experiments and no legacy reader was wanted, the
+two version-2 client archives and the exact old process-state directory were
+removed before starting the version-3 server.
+
+** DONE Implementation and validation
+
+The server now writes evidence format version 3 as two machine-level files:
+
+- a small =header.yaml= containing incident/config/generation identities,
+  checksums, classifications, warnings and the human-artifact inventory; and
+- a zstd-level-3 compressed CBOR =recovery.cbor.zst= containing one complete
+  canonical G0 semantic-node/path baseline plus reversible before/after
+  node/path deltas.
+
+Applying the checked deltas reconstructs complete G1 node and path maps.  The
+reader rejects duplicate deltas, false =before= values, mismatched primary IDs,
+inconsistent classifications, trailing CBOR bytes, decompression length
+mismatches, checksum changes, unsafe paths and undeclared files.  There is no
+version-2 reader.
+
+Publication serializes and compresses the recovery value once, durably writes
+each file, rereads each exact byte sequence once, and atomically renames the
+completed directory.  It no longer parses and reserializes a corpus-sized YAML
+document before selection.  The process caches the validated small header and
+artifact inventory.  Client-archive transfer rechecks the small header, the
+compressed recovery checksum and each transferred artifact, but does not
+decompress or deserialize the recovery corpus.
+
+*** Real-corpus measurements
+
+The checked-in ignored regression test uses the repository's 29,973-node
+corpus and enforces the agreed three-second development-profile ceiling:
+
+| operation                                      | measured wall time |
+|------------------------------------------------+--------------------|
+| publish one-title version-3 evidence           | 0.852 s            |
+| checksum, decode and reconstruct both versions | 0.612 s            |
+| ordinary client evidence transfer              | 0.076 s            |
+
+The complete retained evidence was 5,454,257 bytes, versus 55,134,806 bytes
+for the measured version-2 publication.  A format regression test also proves
+that a one-node transition stores one baseline and one node delta rather than
+two full node collections.
+
+I then exercised the actual Emacs/server maintenance protocol against the same
+ID and config used in the report:
+
+| operation                                             | client wall time |
+|-------------------------------------------------------+------------------|
+| explicit unchanged-ID reload                         | 2.431 s          |
+| literal =cooking= -> probe-title disk edit and reload | 2.743 s          |
+| exact restoration to =cooking= and reload             | 2.797 s          |
+
+The title-change run reached its first store transition 1.561 seconds after
+the =run maintenance origin= request, where the old runs paused for about 40
+seconds.  Its evidence request/final client-archive exchange took about 0.15
+seconds rather than about 13 seconds.  The source file is restored to
+=title: cooking=, and both TypeDB and Tantivy consumed the restoration.
+
+The server was then stopped, cold-started with the version-3 incidents present,
+and connected through the documented Emacs startup snippet without an error.
+Afterward, all three zero-buffer validation archives and evidence directories
+were removed, the server was cold-started again, and the startup snippet again
+reported =skg ready on port 1731 -- 24 herald rules loaded.=  The server is
+currently running and ready on port 1731.
+
+*** Tests
+
+- All seven focused evidence tests pass.
+- The real-corpus latency/size guard passes when explicitly enabled.
+- The complete library suite passes serially: 314 passed, one ignored (the
+  real-corpus guard).
+- A parallel library run exposed six existing order-sensitive tests in
+  =from_text::supplement_from_disk=; all 15 tests in that module and the whole
+  library pass serially.  The evidence code does not touch that subsystem.
+
+*** Remaining choices
+
+None for this repair.  Content-addressed generation sharing remains a possible
+future optimization, but the measured self-contained format is already below
+the accepted interactive-latency ceiling without its lifecycle complexity.
 
 ** Evidence
 
@@ -81,7 +160,7 @@ complete =G0= or =G1= after a crash.  Although the current restart path does
 not yet consume =g0_nodes= or =g1_nodes= for reconstruction, simply removing
 them would weaken that intended guarantee rather than merely optimize code.
 
-** Choice 1: keep self-contained G0/G1 recovery? (recommended: yes)
+** DONE Choice 1: keep self-contained G0/G1 recovery? (accepted: yes)
 
 *** Option A -- Keep the strong recovery guarantee (recommended)
 
@@ -100,7 +179,7 @@ not recommend accepting that loss merely to obtain acceptable latency: the
 recommended representation should eliminate the 40-second delay while keeping
 the stronger recovery guarantee.
 
-** Choice 2: representation if the strong guarantee stays
+** DONE Choice 2: representation if the strong guarantee stays
 
 *** Option A -- Version 3: one compact baseline plus reversible delta (recommended)
 
@@ -124,15 +203,58 @@ the already-validated small header and client artifact inventory, so serving
 the final client archive does not parse the recovery payload.  A restarted
 server parses it only when recovery actually needs it.
 
-The reader should continue to accept existing version-2 YAML evidence, because
-the current unfinished incident and retained diagnostics already refer to it.
-New incidents would use version 3.  A format/size regression should assert that
-a one-node transition does not write two corpus-sized node collections, and a
-recovery round-trip should derive byte-identical semantic =G0= and =G1= maps.
+All current incidents are disposable development data, so version 3 can replace
+version 2 outright.  A format/size regression should assert that a one-node
+transition does not write two corpus-sized node collections, and a recovery
+round-trip should derive byte-identical semantic =G0= and =G1= maps.
 
 This is my recommendation.  It attacks the scaling error, preserves the
-recovery promise, keeps the human evidence human-readable, and removes the
-13-second full parse from the ordinary client-transfer path.
+recovery promise, keeps the human evidence human-readable, replaces the
+40-second publication path, and removes the later 13-second full parse from the
+ordinary client-transfer path.
+
+**** How this addresses the 40-second phase
+
+The current 39.476-second publication is approximately three corpus-sized YAML
+validation cycles, each comparable to the independently measured 13.417-second
+load.  Version 3 removes all three from the pre-mutation path.  I prototyped its
+large recovery payload against the same 29,973-node real corpus:
+
+| version-3 prototype stage                  | measured wall time | bytes     |
+|--------------------------------------------+--------------------+-----------|
+| construct one complete canonical G0 DTO    | 79.8 ms            |           |
+| serialize it as binary                     | 81.0 ms            | 12,669,612 |
+| compress it with zstd level 3              | 197.4 ms           | 5,163,761 |
+| durable write and exact checksum reread    | 145.4 ms           | 5,163,761 |
+| total pre-mutation recovery-payload work   | 503.6 ms           |           |
+| decompress and deserialize during recovery | 191.1 ms           |           |
+
+The diagnostic prototype and temporary dependency were removed after the
+measurement.  It was run in the same unoptimized development profile as the
+40-second benchmark.  It used =bincode= only to measure the representation's
+cost; that experiment does not by itself choose the permanent wire/storage
+encoding, which should have an explicit stable version contract.  A real
+implementation adds a small header, one-node delta and human artifacts, but
+none scales like another complete graph.
+
+Combined with the measured 0.662-second candidate construction and sub-0.2-
+second store/view transition, the corresponding title-change path should be
+around 1.5 seconds rather than 40 seconds.  The implementation should enforce
+a generous real-corpus ceiling (for example, three seconds in the development
+profile) so the representation is not accepted merely because it is faster
+than the current pathological one.
+
+**** DONE The current unfinished incident is of no consequence.
+It's just experimental data, used to test this work.
+I don't want to have to maintain legacy code.
+
+***** Codex agrees
+
+Agreed.  I had treated retained development evidence as if it were user data,
+which would impose permanent reader complexity for no benefit.  Before testing
+the new writer, remove the current test journal, server evidence and client
+archives through their safe scoped cleanup paths.  Implement only the new
+format; do not add a version-2 reader.
 
 *** Option B -- Keep version-2 YAML, remove repeated validation passes
 
@@ -153,7 +275,15 @@ collection, cross-incident ownership and deletion-policy questions.  I would
 consider it a later storage optimization after the self-contained version-3
 format works.
 
-** Choice 3: should the observer queue be changed in this repair?
+This is the main alternative if even the measured half-second evidence
+publication is too expensive.  A complete snapshot could be prepared after
+startup or after the preceding generation is selected, outside the next
+interactive reload.  The incident would then durably reference that immutable
+snapshot and write only its small reversible delta.  It preserves the strong
+recovery guarantee and moves nearly all corpus-sized work off the interactive
+path, at the cost of the lifecycle complexity above.
+
+** DONE Choice 3: should the observer queue be changed in this repair?
 
 Recommendation: no.  The plan still promises chunked cancellation and path
 coalescing which the current observer does not fully implement, and that debt
@@ -163,7 +293,7 @@ one-target candidate took 0.662 seconds.  Combining queue surgery with the
 evidence-format migration would enlarge the proof surface without addressing
 the measured 40-second stage.
 
-** Proposed scope after the choices are settled
+** DONE Proposed scope after the choices are settled
 
 If the recommendations above are accepted, the implementation should:
 
@@ -173,8 +303,9 @@ If the recommendations above are accepted, the implementation should:
 3. publish and checksum each byte sequence once, with exact durable rereads;
 4. retain the small transfer inventory in memory and avoid loading the recovery
    payload during ordinary evidence transfer;
-5. keep a read-only legacy version-2 loader for the active and retained
-   incidents already on disk;
-6. add focused corruption, crash-boundary, replay and size-scaling tests; and
+5. remove the disposable version-2 development incidents and implement no
+   legacy reader;
+6. add focused corruption, crash-boundary, replay, size-scaling and real-corpus
+   latency tests; and
 7. repeat the real one-title workflow and record stage timings and retained
    bytes here before calling the repair complete.
