@@ -98,7 +98,7 @@ test failures.
 
 * Critical details not fixed by the scenario
 
-** ONGOING Reciprocal cross-source edges cannot all follow one strict privacy order
+** DONE Reciprocal cross-source edges cannot all follow one strict privacy order
 
 This is the important specification tension.  Forking creates edges from the
 Economist clone to China-Scholar's original, and “subscribes back” creates an
@@ -216,3 +216,38 @@ If “any relationship” is meant literally to include hides despite that
 inference, that is the remaining substantive choice.  I would recommend the
 exception above unless you want an explicit public hide to count as permission
 to reveal its supporting subscription too.
+
+* DONE Implementation and verification
+
+Implemented the agreed division of responsibility:
+
+- Save-time relationship defaults still use the writer's local ownership
+  knowledge.  In particular, an owned P naming a foreign R defaults to P's
+  home, while the stricter owned-to-owned floor remains intact.
+- Load/rebuild validation now accepts direct =contains=, =subscribes_to=, and
+  =overrides_view_of= relationships as disclosures by P's publisher instead
+  of reclassifying them from the receiver's ownership perspective.
+- =hides_from_its_subscriptions= retains its target-side privacy check and its
+  existing save-time explaining-subscription floor.
+
+The first integration run had also exposed an independent maintenance race:
+the generated Git pull diagnostic buffer was enrolled after initial archive
+publication, but ordinary process output had marked it dirty.  Generated
+diagnostic writes now stay clean and advance that report's clean baseline;
+authored durable reports remain governed by the ordinary dirty-buffer rules.
+
+Verification passed:
+
+- all 4 telescope-invariant Rust tests;
+- all 14 =skg-pull= Emacs tests, including a new generated-diagnostic
+  cleanliness regression test; and
+- the complete Rust library suite when run serially (314 passed, 1 ignored)
+  and the complete Emacs suite (436 passed, 3 dependency-gated skips); and
+- the complete two-user integration test.
+
+The complete test reported no collected warning or protocol failure.  Its two
+measured pull-to-unlock intervals were 1.086 seconds for China-Scholar and
+1.119 seconds for Economist, both below the required 4.0-second ceiling.  It
+also verified the fork and title, first/only containment position, inbound
+subscriber on both sides, reciprocal subscription, fresh final view, and that
+each originally open buffer remained live after its pull.
