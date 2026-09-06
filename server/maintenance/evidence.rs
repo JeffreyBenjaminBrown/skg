@@ -549,7 +549,18 @@ fn build_evidence (
     node_delta,
     path_delta,
   };
-  reconstruct_evidence (&recovery)?;
+  let reconstructed = reconstruct_evidence (&recovery)?;
+  if reconstructed . g1_manifest != candidate . manifest {
+    return Err ("recovery path delta does not reconstruct candidate G1"
+      . into ()); }
+  let expected_g1_nodes : BTreeMap<String, SemanticNodeEvidence> =
+    nodecompletes_from_graph (&candidate . graph) . iter ()
+      . map (SemanticNodeEvidence::from)
+      . map (|node| (node . pid . clone (), node))
+      . collect ();
+  if reconstructed . g1_nodes != expected_g1_nodes {
+    return Err ("recovery node delta does not reconstruct candidate G1"
+      . into ()); }
   let header = MaintenanceEvidenceHeader {
     format_version: EVIDENCE_FORMAT_VERSION,
     incident_id: active . incident_id . clone (),
