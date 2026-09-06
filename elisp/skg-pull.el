@@ -177,6 +177,35 @@
           (setf (plist-get state :origin-context) context)
           context))))
 
+(defun skg--pull-mark-diagnostic-current (buffer)
+  "Make generated text in pull diagnostic BUFFER its clean baseline."
+  (with-current-buffer buffer
+    (set-buffer-modified-p nil)
+    (when skg--buffer-record
+      (let ((text (skg-buffer-raw-text buffer)))
+        (setf (skg--buffer-record-last-fetched skg--buffer-record) text
+              (skg--buffer-record-last-fetched-sha256 skg--buffer-record)
+              (skg--sha256-text text))))))
+
+(defun skg--pull-append-diagnostic (buffer text)
+  "Append generated TEXT to pull diagnostic BUFFER without making it dirty."
+  (with-current-buffer buffer
+    (let ((inhibit-read-only t))
+      (with-silent-modifications
+        (goto-char (point-max))
+        (insert text)))
+    (skg--pull-mark-diagnostic-current buffer)))
+
+(defun skg--pull-process-filter (process output)
+  "Insert generated PROCESS OUTPUT while keeping its pull report clean."
+  (when-let ((buffer (process-buffer process)))
+    (when (buffer-live-p buffer)
+      (with-current-buffer buffer
+        (let ((inhibit-read-only t))
+          (with-silent-modifications
+            (comint-output-filter process output)))
+        (skg--pull-mark-diagnostic-current buffer)))))
+
 (defun skg--pull-diagnostic-buffer (context)
   (or (and (buffer-live-p (plist-get context :diagnostic-buffer))
            (plist-get context :diagnostic-buffer))
@@ -187,9 +216,8 @@
                       (format "*Skg Pull %s*" short))))
         (with-current-buffer buffer
           (comint-mode)
-          (let ((inhibit-read-only t))
-            (insert (format "Skg pull maintenance incident %s\n\n" incident)))
-          (set-buffer-modified-p nil)
+          (skg--pull-append-diagnostic
+           buffer (format "Skg pull maintenance incident %s\n\n" incident))
           (skg-register-buffer
            buffer 'durable-report :lifecycle 'client-local :disposable nil
            :recipe `((kind . "pull-diagnostic") (incident-id . ,incident))
@@ -270,10 +298,8 @@
              (key (plist-get repository :key))
              (buffer (skg--pull-diagnostic-buffer context)))
         (setf (plist-get context :remaining) (cdr remaining))
-        (with-current-buffer buffer
-          (let ((inhibit-read-only t))
-            (goto-char (point-max))
-            (insert (format "\n$ git -C %s pull\n" root))))
+        (skg--pull-append-diagnostic
+         buffer (format "\n$ git -C %s pull\n" root))
         (condition-case error-data
             (let ((process
                    (make-process
@@ -283,6 +309,7 @@
                     :connection-type 'pty
                     :coding 'utf-8-unix
                     :noquery nil
+                    :filter #'skg--pull-process-filter
                     :sentinel #'skg--pull-process-sentinel)))
               (process-put process 'skg-pull-root root)
               (process-put process 'skg-pull-key key)
@@ -313,9 +340,8 @@
       (when-let ((buffer (process-buffer process)))
         (when (buffer-live-p buffer)
           (with-current-buffer buffer
-            (let ((inhibit-read-only t))
-              (goto-char (point-max))
-              (insert (format "[%s]\n" (string-trim event)))))))
+            (skg--pull-append-diagnostic
+             buffer (format "[%s]\n" (string-trim event))))))
       (skg--pull-schedule-next))))
 
 (defun skg--pull-finish-origin (outcome details)

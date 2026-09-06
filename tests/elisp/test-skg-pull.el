@@ -146,9 +146,34 @@
                   '("git" "-C" "/repo with space/" "pull")))
           (should (eq (plist-get process-arguments :sentinel)
                       #'skg--pull-process-sentinel))
+          (should (eq (plist-get process-arguments :filter)
+                      #'skg--pull-process-filter))
           (should (eq (plist-get context :current-process) 'fake-process))
           (should-not (plist-get context :remaining)))
       (kill-buffer buffer))))
+
+(ert-deftest test-skg-pull-generated-diagnostic-output-remains-clean ()
+  (let* ((skg--buffer-registry (make-hash-table :test #'equal))
+         (skg--maintenance-state nil)
+         (context (list :diagnostic-buffer nil))
+         (skg--maintenance-client-incident
+          (list :incident-id "incident" :epoch 4 :origin "pull"
+                :origin-context context))
+         buffer)
+    (unwind-protect
+        (progn
+          (setq buffer (skg--pull-diagnostic-buffer context))
+          (skg--pull-append-diagnostic buffer "generated output\n")
+          (with-current-buffer buffer
+            (should-not (skg-buffer-dirty-p buffer))
+            (should
+             (equal (skg-buffer-raw-text buffer)
+                    (skg--buffer-record-last-fetched skg--buffer-record)))
+            (should
+             (equal (skg--sha256-text (skg-buffer-raw-text buffer))
+                    (skg--buffer-record-last-fetched-sha256
+                     skg--buffer-record)))))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
 (ert-deftest test-skg-pull-replayed-authorization-reports-child-loss ()
   (let* ((context (list :current-process nil))
