@@ -131,17 +131,23 @@ Two things are documented inexpressibles, by design:
   a relationship may move to a more-private source, never to one
   more public than its default.
 
-## What leaks, and what repair fixes
+## Direct disclosure and load-time warnings
 
-A public file naming a private node's ID is a "leak-shaped
-membership". It can arrive from a hand edit or a pull, and it is what
-this model exists to prevent. The server warns about these
-(`telescope-warnings.org` in your data root) rather than erroring: a
-pull must never brick a source. Repair one with
-`skg-set-relationship-source` (`C-c s r`), which moves the
-membership into the right section. What no repair can fix: if a
-public repo ever *committed* a leaked ID, its git history still holds
-it; rewriting history is manual.
+A direct relationship recorded at P's home is a disclosure by P's
+publisher, even when it names a node whose home is less public.  This
+is especially important across repositories: the writer may own P and
+not R, while the receiver's ownership facts are reversed.  A receiver
+therefore accepts that relationship at P's home (or a later section)
+instead of reinterpreting the writer's choice and calling it
+leak-shaped.  Save-time defaults remain stricter when the local writer
+owns both endpoints and can safely place the relationship at the
+more-private endpoint's home.
+
+Hides are the exception.  Their source remains at least as private as
+the hidden endpoint and the subscription which explains the hide, so a
+hide cannot reveal a deliberately private subscription.  Other
+telescope problems found while loading or folding are reported in
+`telescope-warnings.org`; they warn rather than refusing a pull.
 
 (A wholesale migration, `skg-migrate-to-telescopes`, existed while
 pre-telescope data did. It is buried in

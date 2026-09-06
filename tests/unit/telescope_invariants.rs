@@ -1,6 +1,6 @@
-//! Unit tests for the telescope invariant validator: the leak shape
-//! (an edge more public than its target's home) is caught; honest
-//! shapes and unknown targets are not; extra-id anchors resolve.
+//! Unit tests for the telescope invariant validator.  Direct relationships
+//! may intentionally disclose a later-homed target; hides retain their
+//! target-side privacy floor; unknown targets are ignored; extra IDs resolve.
 
 use super::{TelescopeViolation, telescope_violations_of, validate_all_telescopes};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -42,7 +42,7 @@ fn node_at (
   n }
 
 #[test]
-fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
+fn direct_relationships_may_disclose_a_later_homed_target (
 ) {
   let config : SkgConfig = two_source_config ();
   let mut container : NodeComplete = node_at ("container", "public");
@@ -52,20 +52,19 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
     // honest: public member in the public source
     MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("open") ),
-    // THE LEAK: private-homed member recorded in the public source
     MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("secret") ) ];
+  container . subscribes_to = MSV::Specified (vec! [
+    MemberAtSource::at_source ( SourceName::from ("public"),
+                          ID::new ("secret") ) ]);
+  container . overrides_view_of = MSV::Specified (vec! [
+    MemberAtSource::at_source ( SourceName::from ("public"),
+                          ID::new ("secret") ) ]);
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
       & [ container, private_child, public_child ] );
-  let violations : Vec<TelescopeViolation> =
-    telescope_violations_of (
-      &config, &graph, &ID::new ("container") );
-  assert_eq! ( violations . len (), 1, "{:?}", violations );
-  assert! ( matches! (
-    & violations [0],
-    TelescopeViolation::LeakShapedMember { member, member_home, .. }
-      if member . 0 == "secret" && member_home . 0 == "private" ));
+  assert! ( telescope_violations_of (
+    &config, &graph, &ID::new ("container") ) . is_empty () );
 }
 
 #[test]
@@ -85,15 +84,15 @@ fn private_membership_of_a_public_member_is_fine (
 }
 
 #[test]
-fn leak_check_resolves_extra_ids (
-) { // an edge naming a merged-away extra id judges the OWNER's home
+fn hide_check_resolves_extra_ids (
+) { // a hide naming a merged-away extra id judges the OWNER's home
   let config : SkgConfig = two_source_config ();
   let mut container : NodeComplete = node_at ("container", "public");
   let mut private_child : NodeComplete = node_at ("secret", "private");
   private_child . extra_ids = vec! [ ID::new ("old-name") ];
-  container . contains = vec! [
+  container . hides_from_its_subscriptions = MSV::Specified (vec! [
     MemberAtSource::at_source ( SourceName::from ("public"),
-                          ID::new ("old-name") ) ];
+                          ID::new ("old-name") ) ]);
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
       & [ container, private_child ] );
@@ -110,7 +109,7 @@ fn unconfigured_source_and_msv_relations_are_covered (
   let mut node : NodeComplete = node_at ("n", "public");
   let target : NodeComplete = node_at ("t", "private");
   node . subscribes_to = MSV::Specified ( vec! [
-    // leak via a non-contains relation
+    // A direct disclosure is intentional, even across the source floor.
     MemberAtSource::at_source ( SourceName::from ("public"),
                           ID::new ("t") ) ] );
   node . hides_from_its_subscriptions = MSV::Specified (
@@ -121,10 +120,7 @@ fn unconfigured_source_and_msv_relations_are_covered (
   let violations : Vec<TelescopeViolation> =
     validate_all_telescopes (&config, &graph)
     . into_iter () . map ( |(_, v)| v ) . collect ();
-  assert_eq! ( violations . len (), 2, "{:?}", violations );
-  assert! ( violations . iter () . any ( |v| matches! (
-    v, TelescopeViolation::LeakShapedMember {
-      relation : "subscribes_to", .. } )));
+  assert_eq! ( violations . len (), 1, "{:?}", violations );
   assert! ( violations . iter () . any ( |v| matches! (
     v, TelescopeViolation::UnconfiguredSource { .. } )));
 }

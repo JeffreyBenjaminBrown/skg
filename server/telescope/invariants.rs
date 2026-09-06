@@ -24,14 +24,12 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// THE leak shape: a relationship instance recorded at a source
-  /// more public than its target's home, so the (more public) file
-  /// names an ID whose node is more private -- exactly what the
-  /// telescope exists to prevent. Repair: move the membership's source
-  /// to the target's home or beyond ('skg-set-relationship-source',
-  /// C-c s r). NOTE the git caveat: the leaking file's
-  /// history already contains the ID; repair only stops the
-  /// bleeding.
+  /// A hide recorded more publicly than the hidden node's home.  Direct
+  /// relationships intentionally have no corresponding load-time warning:
+  /// the publisher of their owner may choose to disclose that the owner names
+  /// a less-public foreign node, and a receiver cannot reconstruct the
+  /// publisher's ownership boundary.  Hides retain this target-side floor
+  /// because they are derived from a subscription and can disclose it.
   LeakShapedMember {
     relation    : &'static str,
     source      : SourceName,
@@ -89,8 +87,11 @@ impl fmt::Display for TelescopeViolation {
         write! ( f, "{}", w ), }}}
 
 /// THE PRIMITIVE both gates call: one node's telescope violations,
-/// judged against the whole graph (targets' homes) and the config
-/// (the privacy order).
+/// judged against the whole graph (hidden targets' homes) and the config (the
+/// privacy order).  Every stored relationship is checked for a configured
+/// source; only hides have a target-side privacy floor at load time.  Save-time
+/// validation retains the stricter defaults which the local writer's ownership
+/// knowledge makes possible.
 pub fn telescope_violations_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
@@ -100,7 +101,8 @@ pub fn telescope_violations_of (
     graph . nodes . get (pid) else { return Vec::new (); };
   let mut violations : Vec<TelescopeViolation> = Vec::new ();
   let mut check = |relation : &'static str,
-                   members  : &[MemberAtSource<ID>]| {
+                   members  : &[MemberAtSource<ID>],
+                   enforce_target_floor : bool| {
     for m in members {
       if config . source_position ( &m . source ) . is_none () {
         violations . push ( TelescopeViolation::UnconfiguredSource {
@@ -108,6 +110,7 @@ pub fn telescope_violations_of (
           source : m . source . clone (),
           member : m . member . clone (), } );
         continue; }
+      if ! enforce_target_floor { continue; }
       let target_home : Option<SourceName> =
         graph . pid_of ( &m . member )
         . and_then ( |p| graph . nodes . get (&p) )
@@ -122,15 +125,15 @@ pub fn telescope_violations_of (
             source      : m . source . clone (),
             member      : m . member . clone (),
             member_home : home, } ); }} }};
-  check ("contains", &node . contains);
+  check ("contains", &node . contains, false);
   let msv = |m : &MSV<MemberAtSource<ID>>| -> Vec<MemberAtSource<ID>> {
     m . or_default () . to_vec () };
   check ("subscribes_to",
-         & msv ( &node . subscribes_to ));
+         & msv ( &node . subscribes_to ), false);
   check ("hides_from_its_subscriptions",
-         & msv ( &node . hides_from_its_subscriptions ));
+         & msv ( &node . hides_from_its_subscriptions ), true);
   check ("overrides_view_of",
-         & msv ( &node . overrides_view_of ));
+         & msv ( &node . overrides_view_of ), false);
   violations }
 
 /// The init/rebuild gate: every node, aggregated. Returns the

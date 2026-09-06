@@ -98,7 +98,7 @@ test failures.
 
 * Critical details not fixed by the scenario
 
-** Reciprocal cross-source edges cannot all follow one strict privacy order
+** ONGOING Reciprocal cross-source edges cannot all follow one strict privacy order
 
 This is the important specification tension.  Forking creates edges from the
 Economist clone to China-Scholar's original, and “subscribes back” creates an
@@ -114,14 +114,16 @@ public/public shape, represent equally public sources, change the collaboration
 gesture or data layout, or declare this particular warning expected.  The test
 does not silently choose among those architectural options.
 
-** “First” currently means “only”
+** DONE “First” currently means “only”
 
 Economics starts without content, so the clone's position is asserted to be
 the first content position but there is no second member against which to
 prove ordering.  Add a pre-existing Economics child if relative ordering is a
 behavior this scenario is intended to protect.
 
-** This is a correctness/SLA smoke test, not a scale benchmark
+*** TODO jeff: let's ignore
+
+** DONE This is a correctness/SLA smoke test, not a scale benchmark
 
 The deliberately tiny four-node final graph makes the current pulls finish in
 under a second.  It enforces the four-second user-facing ceiling for this happy
@@ -129,3 +131,88 @@ path, but it cannot reproduce a forty-second cost that grows with the real
 corpus.  A scale regression needs a separate representative-corpus benchmark;
 inflating this behavioral test would make the ordinary integration suite slow
 and noisy.
+*** TODO jeff : I'll run into scale issues while using the app if they exist.
+* Jeff thinks
+For any relationship from P to R, even if P is more public than R,
+if P is owned and R is not owned, then the relationship should default
+to being at P's publicity level. The user can make it more private if they want.
+
+This applies not just to subscriptions but to any relationship,
+even containment.
+
+* Codex thinks: yes; make the disclosure rule belong to P
+
+I agree with the rule for a direct relationship asserted by P.  If I publish P
+and choose to make it contain, subscribe to, override, or link to R, then I
+have chosen to publish the fact that P names R.  R being less public does not
+make that assertion accidental.  Defaulting the relationship to P's home is
+the least surprising behavior; moving it to one of P's more-private owned
+sources should remain available as an explicit choice.
+
+This is, importantly, already the save default for the three independently
+stored, writable node relations: =contains=, =subscribes_to=, and
+=overrides_view_of=.  =SkgConfig::relationship_default_source= returns P's
+home when P is owned and R is foreign, and =apply_sticky_sources= uses it for
+all three.  The test's reciprocal subscription was therefore written exactly
+where the save rule intended it to go.
+
+The contradiction is in the telescope warning invariant.  It currently asks
+only whether the relationship's source precedes R's home.  It does not ask
+whether that source is the intentional default for an owned P pointing to a
+foreign R.  Thus a legal save creates a shape which the warning code
+immediately calls leak-shaped.  I think that is plainly the wrong result.
+
+** The rule must continue to make sense on the receiver's machine
+
+There is a wrinkle beyond merely calling
+=relationship_default_source(P-home, R-home)= from the warning validator.
+Ownership is local to a config.  On China-Scholar's machine, Chinese Economics
+is owned and Economics of China is foreign.  On Economist's machine those
+facts reverse.  If Economist recomputes China-Scholar's original default using
+Economist's local ownership, the warning reappears even though
+China-Scholar's save was legal.
+
+I recommend this division of responsibility:
+
+- At save time, continue using the writer's ownership knowledge.  A new
+  owned-P to foreign-R edge defaults to P's home.  A relationship between two
+  owned nodes can retain the stricter current rule, because that writer can
+  place the relationship at the more-private endpoint's level.
+
+- At load or pull time, do not call a relationship leak-shaped merely because
+  its member is homed later than its owner.  A foreign repository can contain
+  the result of a perfectly legal save made by that repository's owner, and a
+  receiver cannot reconstruct the writer's ownership facts from the current
+  config.  An edge recorded at P's home (or a more-private section of P's
+  telescope) is a disclosure by P's publisher and should be accepted as such.
+
+This gives the rule a stable meaning after sharing: the writer chooses how
+public P's assertion is; receivers do not reinterpret that choice according
+to who happens to own R locally.  The cost is that the loader can no longer
+diagnose every hand-authored “public P names private R” as suspicious.  I
+think that cost follows necessarily from the desired rule: on disk, an
+intentional public reference and the supposedly suspicious reference are the
+same fact.  Save-time validation can still prevent unintended owned-to-owned
+disclosures where the server actually knows both ownership facts.
+
+Under that interpretation, the reciprocal-subscription warning in this test
+should disappear, and the warning assertion should stay strict rather than
+special-casing the test.
+
+** One relationship deserves an explicit footnote: hides
+
+=textlinks_to= already lives in P's title/body and has no independently
+selectable relationship source, so it naturally follows P's publicity.
+
+=hides_from_its_subscriptions= is different.  Its present source floor also
+depends on the subscription which explains the hide.  Otherwise a public hide
+could reveal that a deliberately private subscription exists.  My preference
+is to retain that explaining-subscription floor: it is derived privacy, not
+the ordinary “P openly names R” case.  Everything you specifically named --
+including containment -- follows your rule, while a hide does not become more
+public than the subscription that gives it meaning.
+
+If “any relationship” is meant literally to include hides despite that
+inference, that is the remaining substantive choice.  I would recommend the
+exception above unless you want an explicit public hide to count as permission
+to reveal its supporting subscription too.
