@@ -1,0 +1,131 @@
+* partial rebuild : happy path integration test
+Suppose there are two users named China-Scholar and Economist.
+China-Scholar startrs with a node called China that contains the node Chinese Economics.
+Economist starts with a node called Economics.
+(Both users only have public data.)
+Each has a separate config, appropriate to their data, that includes the other's data.
+
+First, Economist is using the server (one client at a time).
+Economist forks Chinese Economics, changes the title to Economics of China,
+makes it the first content node of Economics,
+and pushes those changes to the remote (both remotes are on disk,
+in a subfolder of the folder that hosts this integration test).
+
+Economist disconnects.
+China-Scholar connects, opens their China node,
+and pulls new changes into their graph.
+The test measures how long before the China buffer is unlocked.
+The test notes a failure (but continues to execute and collect any more failures)
+if it takes longer than 4 seconds.
+
+CS visits their version of Chinese Economics.
+In the resulting view, CS should see that it now has a subscriber.
+CS subscribes back.
+
+CS disconnects. E connects, opens their Economics node,
+and pulls new changes.
+Again measure the time to unfreeze, and fail if more than 4 seconds.
+(Also log it, whatever it is,
+because I hope even 4 seconds is much slower than necessary.)
+
+E visits their Economics of China node in a new buffer.
+The buffer should reveal that it now has a subscriber.
+
+If anything returns warnings, those should be collected as failures too.
+
+* Implementation
+
+The integration test lives in
+=tests/integration/partial-reload-happy-path/=.  It constructs two bare Git
+remotes below a temporary =work-*= subdirectory of the test directory and four
+clones: each user's owned clone and their stale clone of the other user's
+remote.  The two configs use separate data roots, ownership boundaries,
+Tantivy indexes and TypeDB database names.  Three separate server/Emacs
+lifetimes drive the Economist, China-Scholar, and Economist-again phases, so
+the disconnects and stale pulls are real rather than simulated in memory.
+
+The Emacs driver performs the fork, chooses =economist-public= for the clone,
+adds it as Economics's first (and only) content node, commits and pushes;
+opens China before pulling; visits the original Chinese Economics with
+override substitution bypassed; verifies and reciprocates the subscription;
+commits and pushes; then opens Economics before the final pull and verifies the
+new inbound subscription in a fresh view of Economics of China.
+
+Failures are appended to one file shared by the three Emacs processes.  A
+failure does not make a phase stop unless the missing prerequisite makes the
+rest of that phase impossible, and a failed phase does not prevent the later
+server/client phases from running.  The driver captures response warning
+lists, =display-warning= calls, structured startup telescope warnings, and
+non-signaling =SKG request failed:= messages.  The runner also treats every
+Rust =WARN= log record as a failure.  It prints all collected failures only
+after the final phase.
+
+** What “pull to unlock” means in the test
+
+The monotonic-ish Emacs =float-time= clock starts immediately before
+=skg-pull-all=.  The test requires that the already-open target buffer is
+observed with its maintenance overlay, records the first instant after that
+overlay disappears, and then continues waiting for the maintenance incident
+to terminate before proceeding.  Thus it measures the user's whole wait from
+invoking pull until that buffer becomes editable, not merely the server's
+partial-reload computation.  Both pulls have the corrected four-second limit,
+and both exact durations are always written to =timings.log= and printed.
+
+** First execution against the current branch
+
+The complete scenario reached its end and every graph assertion passed.  The
+two measured pull-to-unlock intervals were 0.919 seconds for China-Scholar and
+0.823 seconds for Economist on the second verification run.  The aggregate
+test nevertheless failed, correctly, with three collected failures:
+
+- Each pull emitted =SKG request failed: new maintenance buffer '...' is dirty
+  but absent from the initial archive=.  The named buffer is the pull
+  diagnostics buffer created after the initial archive; this is a reproducible
+  instance of the transient-buffer/archive problem.
+
+- Saving China-Scholar's reciprocal subscription logged a telescope warning:
+  the =china-scholar-public= section names the Economist clone, whose home is
+  =economist-public= later in the configured privacy order.
+
+Run just this test with:
+
+#+begin_src bash
+tests/integration/partial-reload-happy-path/run-test.sh
+#+end_src
+
+It currently exits 1 because it is preserving those observed regressions as
+test failures.
+
+* Critical details not fixed by the scenario
+
+** Reciprocal cross-source edges cannot all follow one strict privacy order
+
+This is the important specification tension.  Forking creates edges from the
+Economist clone to China-Scholar's original, and “subscribes back” creates an
+edge in the opposite direction.  With two distinct sources in a strict linear
+privacy order, one of those directions necessarily records an edge in the
+earlier source that names a node homed in the later source.  Reversing the
+source order only changes which direction gets the leak-shaped-member warning.
+
+The test therefore follows the document literally: it creates the reciprocal
+edge and fails on the resulting warning.  Making this a genuinely warning-free
+happy path requires a later product choice: exempt this deliberately shared
+public/public shape, represent equally public sources, change the collaboration
+gesture or data layout, or declare this particular warning expected.  The test
+does not silently choose among those architectural options.
+
+** “First” currently means “only”
+
+Economics starts without content, so the clone's position is asserted to be
+the first content position but there is no second member against which to
+prove ordering.  Add a pre-existing Economics child if relative ordering is a
+behavior this scenario is intended to protect.
+
+** This is a correctness/SLA smoke test, not a scale benchmark
+
+The deliberately tiny four-node final graph makes the current pulls finish in
+under a second.  It enforces the four-second user-facing ceiling for this happy
+path, but it cannot reproduce a forty-second cost that grows with the real
+corpus.  A scale regression needs a separate representative-corpus benchmark;
+inflating this behavioral test would make the ordinary integration suite slow
+and noisy.
