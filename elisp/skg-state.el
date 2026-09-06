@@ -124,7 +124,8 @@ INCIDENT-ID keeps retries in one longer reconciliation episode."
     (puthash request-id record skg--request-records)
     (setq skg--request-draft nil)
     (setq skg--request-queue
-          (nconc skg--request-queue (list (list request-id tcp-proc wire))))
+          (nconc skg--request-queue
+                 (list (list request-id tcp-proc wire nil))))
     (skg--dispatch-next-request)
     request-id))
 
@@ -151,8 +152,17 @@ INCIDENT-ID keeps retries in one longer reconciliation episode."
       (and record (skg--request-record-incident-id record)) content))))
 
 (defun skg--dispatch-next-request ()
-  (when (and (null skg--active-request-id) skg--request-queue)
-    (pcase-let ((`(,request-id ,tcp-proc ,wire)
+  ;; A new socket is not ordinary-request authority.  In particular, a
+  ;; verification response can finish while its handler is still arranging
+  ;; the required census (or can fail while constructing that census).  Do not
+  ;; let the next ordinary draft escape merely because the verification record
+  ;; became terminal.  Barrier requests are explicitly marked and may pass;
+  ;; ordinary work is released only by `skg--complete-buffer-census'.
+  (when (and (null skg--active-request-id)
+             skg--request-queue
+             (or (nth 3 (car skg--request-queue))
+                 (eq skg--connection-handshake-state 'verified)))
+    (pcase-let ((`(,request-id ,tcp-proc ,wire . ,_)
                  (pop skg--request-queue)))
       (setq skg--active-request-id request-id)
       (condition-case err
@@ -193,7 +203,7 @@ INCIDENT-ID, when non-nil, binds every response to that maintenance incident."
     (setq skg-lp--pending-count
           (+ skg-lp--pending-count (cl-count-if #'cddr handlers)))
     (setq skg--request-queue
-          (cons (list request-id tcp-proc wire) skg--request-queue))
+          (cons (list request-id tcp-proc wire t) skg--request-queue))
     (skg--dispatch-next-request)
     request-id))
 

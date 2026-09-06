@@ -62,21 +62,65 @@ old implementation."
             (state . ,state)
             (census-required . ,census-required)))))
 
-(defun skg-maintenance-adopt-handshake-epoch ()
-  "Install an active handshake epoch on every current registered buffer."
-  (when (and (listp skg--maintenance-state)
-             (equal (format "%s" (cdr (assq 'state skg--maintenance-state)))
-                    "active"))
-    (let ((epoch (cdr (assq 'epoch skg--maintenance-state))))
-      (unless (natnump epoch)
-        (error "Active maintenance handshake has no valid epoch"))
-      (when (and skg--maintenance-client-incident
-                 (not (equal epoch
-                             (plist-get skg--maintenance-client-incident
-                                        :epoch))))
-        (error "Maintenance handshake changed the active client epoch"))
-      (dolist (buffer (skg-registered-buffers))
-        (skg-lock-buffer-for-maintenance buffer epoch)))))
+(defun skg--maintenance-release-obsolete-local-incident
+    (server-authority &optional explicitly-abandoned-incident)
+  "Release a local incident which SERVER-AUTHORITY proves is obsolete.
+Never changes buffer text or undo history.  When
+EXPLICITLY-ABANDONED-INCIDENT names the same incident, another warning path
+will give the more precise server explanation."
+  (when skg--maintenance-client-incident
+    (let ((incident
+           (plist-get skg--maintenance-client-incident :incident-id))
+          (local-epoch
+           (plist-get skg--maintenance-client-incident :epoch)))
+      (if (eq (plist-get skg--maintenance-client-incident :phase)
+              'terminal-received)
+          (skg--maintenance-finish-idle)
+        (when (natnump local-epoch)
+          (dolist (buffer (skg-registered-buffers))
+            (skg-unlock-buffer-after-maintenance buffer local-epoch)))
+        (setq skg--maintenance-client-incident nil
+              skg--maintenance-enrollment-census-scheduled nil)
+        (unless (and explicitly-abandoned-incident
+                     (equal (format "%s" incident)
+                            (format "%s" explicitly-abandoned-incident)))
+          (display-warning
+           'skg
+           (format
+            (concat "%s and no longer retains the client-known maintenance "
+                    "incident %s.  Its obsolete local buffer locks were "
+                    "released; buffer text and undo history were not changed.")
+            server-authority incident)
+           :warning))))))
+
+(defun skg-maintenance-adopt-handshake-epoch
+    (&optional explicitly-abandoned-incident)
+  "Reconcile local maintenance state with the authoritative handshake.
+Install an active epoch on every current registered buffer.  When the server
+has no incident but this Emacs still remembers one, release those obsolete
+local locks without changing any buffer text or undo history.
+EXPLICITLY-ABANDONED-INCIDENT suppresses the redundant local warning when the
+verification response already carries the server's more precise warning."
+  (when (listp skg--maintenance-state)
+    (let ((server-state
+           (format "%s" (cdr (assq 'state skg--maintenance-state))))
+          (server-epoch (cdr (assq 'epoch skg--maintenance-state))))
+      (cond
+       ((equal server-state "active")
+        (unless (natnump server-epoch)
+          (error "Active maintenance handshake has no valid epoch"))
+        (when (and skg--maintenance-client-incident
+                   (not (equal
+                         server-epoch
+                         (plist-get skg--maintenance-client-incident :epoch))))
+          (error "Maintenance handshake changed the active client epoch"))
+        (dolist (buffer (skg-registered-buffers))
+          (skg-lock-buffer-for-maintenance buffer server-epoch)))
+       ((and skg--maintenance-client-incident
+             (member server-state '("idle" "observing" "pending")))
+        (skg--maintenance-release-obsolete-local-incident
+         (format "The Skg server handshake reports %s" server-state)
+         explicitly-abandoned-incident))))))
 
 (defun skg-maintenance-handle-census-stale (buffer-ids)
   "Detach genuinely stale BUFFER-IDS, preserving active settlement debt."
@@ -1511,7 +1555,11 @@ checksummed final marker."
     (pcase status
       ("install-maintenance-epoch-and-submit-locked-census"
        (when skg--maintenance-client-incident
-         (error "Another client-known maintenance incident is active"))
+         ;; Successful allocation proves that the coordinator no longer owns
+         ;; the older client record.  Keeping it would strand the new server
+         ;; incident before its locked census.
+         (skg--maintenance-release-obsolete-local-incident
+          "The Skg server allocated a new maintenance incident"))
        (setq skg--maintenance-client-incident
              (list :incident-id incident-id
                    :epoch epoch

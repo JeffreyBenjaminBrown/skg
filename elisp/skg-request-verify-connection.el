@@ -146,7 +146,8 @@ This inspects the public package header without enabling any package mode."
        (cdr (assq 'graph-generation skg--server-store-state))
        skg--active-source-set-name))
     (when (fboundp 'skg-maintenance-adopt-handshake-epoch)
-      (skg-maintenance-adopt-handshake-epoch))
+      (skg-maintenance-adopt-handshake-epoch
+       (cadr (assoc 'abandoned-prearchive-incident response))))
     (setq skg--connection-handshake-state 'census)
     (skg--show-handshake-telescope-warnings response)
     (skg--show-abandoned-prearchive-maintenance response)
@@ -237,6 +238,9 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
     (&optional maintenance-incident-id maintenance-epoch)
   "Complete connection census or its incident-qualified maintenance barrier."
   (setq skg--connection-handshake-state 'verified)
+  ;; Ordinary work queued by the command which discovered a dead connection
+  ;; was deliberately held behind verification and census.
+  (skg--dispatch-next-request)
   (when (fboundp 'skg-resume-maintenance-after-census)
     (run-at-time
      0 nil #'skg-resume-maintenance-after-census

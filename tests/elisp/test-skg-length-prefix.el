@@ -102,6 +102,7 @@
         (skg--request-queue nil)
         (skg--active-request-id nil)
         (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'verified)
         (skg-lp--pending-count 0)
         sent
         calls)
@@ -140,6 +141,7 @@
         (skg--request-draft nil)
         (skg--request-queue nil)
         (skg--active-request-id nil)
+        (skg--connection-handshake-state 'verified)
         (skg-lp--pending-count 0))
     (cl-letf (((symbol-function 'process-send-string) #'ignore))
       (skg-register-response-handler
@@ -155,6 +157,88 @@
         (should-not (gethash request-id skg--request-records))
         (should-not skg--active-request-id)
         (should (= 0 skg-lp--pending-count))))))
+
+(ert-deftest test-skg-ordinary-request-waits-for-connection-census ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'census)
+        (skg-lp--pending-count 0)
+        sent)
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (let ((request-id
+             (skg-submit-request
+              'proc "((request . \"text search\"))\n")))
+        (should-not sent)
+        (should-not skg--active-request-id)
+        (should (equal request-id (caar skg--request-queue)))
+        (setq skg--connection-handshake-state 'verified)
+        (skg--dispatch-next-request)
+        (should (= 1 (length sent)))
+        (should (equal request-id skg--active-request-id))))))
+
+(ert-deftest test-skg-priority-census-passes-a-waiting-ordinary-request ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'census)
+        (skg-lp--pending-count 0)
+        sent)
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (let ((ordinary-id
+             (skg-submit-request
+              'proc "((request . \"text search\"))\n"))
+            (census-id
+             (skg-submit-priority-request
+              'proc "((request . \"client census\"))\n" nil)))
+        (should (= 1 (length sent)))
+        (should (string-match-p "client census" (car sent)))
+        (should (equal census-id skg--active-request-id))
+        (should (equal ordinary-id (caar skg--request-queue)))))))
+
+(ert-deftest test-skg-handshake-handler-failure-cannot-leak-ordinary-work ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'sent)
+        (skg-lp--pending-count 0)
+        sent
+        failed)
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (let ((handshake-id
+             (skg-submit-priority-request
+              'proc "((request . \"verify connection\"))\n"
+              `((verify-connection
+                 ,(lambda (&rest _)
+                    (setq skg--connection-handshake-state 'census)
+                    (error "could not construct census"))
+                 . t)))))
+        (skg-set-request-failure-handler
+         (lambda (reason) (setq failed reason)))
+        (skg-submit-request 'proc "((request . \"text search\"))\n")
+        (should (= 1 (length sent)))
+        (skg-lp--dispatch-frame
+         nil
+         (format
+          "((response-type verify-connection) (request-id %S) (frame-kind verify-connection) (terminal-status complete))"
+          handshake-id))
+        (should (= 1 (length sent)))
+        (should (string-match-p "could not construct census" failed))
+        (should (eq skg--connection-handshake-state 'failed))
+        (should (string-match-p
+                 "could not construct census"
+                 skg--connection-handshake-error))
+        (should-not skg--request-queue)
+        (should-not skg--active-request-id)))))
 
 (ert-deftest test-skg-server-push-dispatches-without-request-id ()
   (let ((skg--server-push-handlers (make-hash-table :test #'equal))

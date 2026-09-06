@@ -127,10 +127,22 @@ If there is buffered data and a handler matched, continues the loop."
               (when terminal-status
                 (skg--finish-request request-id terminal-status)))))))
     (error
-     (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
-              err (substring payload 0 (min 80 (length payload))))
-     (skg-fail-all-requests
-      (format "response dispatch failed: %s" (error-message-string err))))))
+     (let ((reason
+            (format "response dispatch failed: %s"
+                    (error-message-string err))))
+       (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
+                err (substring payload 0 (min 80 (length payload))))
+       (message "SKG response handling failed: %s"
+                (error-message-string err))
+       ;; A failed verification/census callback leaves the socket alive but
+       ;; without ordinary-request authority.  Mark it unusable so the next
+       ;; command reconnects instead of accumulating behind a census which can
+       ;; no longer complete.
+       (when (memq skg--connection-handshake-state
+                   '(sent census census-texts))
+         (setq skg--connection-handshake-error reason
+               skg--connection-handshake-state 'failed))
+       (skg-fail-all-requests reason)))))
 
 (defun skg-lp-step (buf bytes-left)
   "One pure(ish) step of the LP machine.

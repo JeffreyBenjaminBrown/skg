@@ -1332,3 +1332,63 @@ what's imperfect about what's done; choices determining the future.
   reported title edit is already selected and the live maintenance journal is
   idle.  A later edit followed by ID-stack reload will exercise the repaired
   no-restart path.
+
+* post-restart search waits for reconnect census instead of escaping it
+
+** diagnosis
+- This was not the earlier slow-first-query problem.  The server reported
+  =Server ready= at =18:55:34.075=.  The Emacs session connected at
+  =18:55:39.167=, sent =verify connection=, then sent the ordinary
+  =text search= for =science= only 11 ms later.  It never sent =client census=,
+  the server never entered =Finding matches=, and the pre-census protocol gate
+  rejected the search and closed the socket.  Waiting another 30 seconds could
+  not produce a result because no search had run.
+- The request coordinator prioritized a census once the verification callback
+  successfully constructed one, but treated completion of the verification
+  request itself as authority to dispatch the next ordinary request.  If that
+  callback failed before submitting census, its terminal cleanup therefore
+  leaked the queued search onto the unverified connection.  The callback error
+  was written only to the normally disabled client log, so the visible symptom
+  was just an empty wait.
+- The affected long-lived Emacs also had evidence of obsolete maintenance
+  state: two earlier =begin maintenance= requests reached the server without a
+  following client census.  A newly allocated server incident could hit an old
+  =skg--maintenance-client-incident= in the callback and fail before replacing
+  it.  On reconnect, an idle server likewise left the obsolete local record
+  and buffer locks intact.
+
+** repair
+- Queue entries now distinguish connection/maintenance barriers from ordinary
+  work.  Verification and census barriers may run before connection authority;
+  every ordinary request remains queued until the complete client census sets
+  the handshake state to =verified=.  A verification callback which fails can
+  no longer leak search—or any other ordinary command—past that gate.
+- A response-handler failure during verification or census now marks the live
+  socket failed, records and displays the exact callback error, and clears its
+  queued operations.  The next command replaces that unusable socket rather
+  than waiting forever for a census which can no longer complete.
+- An idle, observing, or pending handshake is authoritative proof that a
+  client-only maintenance record is obsolete.  The client now releases only
+  that record's exact-epoch overlays and clears the record while preserving all
+  buffer text and undo history.  A successful new incident allocation provides
+  the same proof and retires an older client record before installing and
+  censusing the new epoch.  This prevents the callback failure which could
+  strand another pre-archive incident.
+
+** live state and validation
+- A diagnostic connection from a different client session caused the server to
+  apply its existing safe rule to the already stranded pre-archive incident:
+  it abandoned that incident before any archive, disk mutation, or server-store
+  mutation.  The maintenance journal is now idle; any still-wanted reload must
+  be requested again.
+- Against the running real server, a batch Emacs initialized normally, opened
+  the production ID-stack interface, deliberately lost its socket, and issued
+  =science= immediately.  The wire order was verification, client census, then
+  text search; the result buffer arrived in 0.133 seconds with verified state
+  and an empty queue.  A second live run with another registered client-local
+  buffer completed in 0.306 seconds, both well below the four-second bound.
+- Regressions cover ordinary-request gating, priority census passage, callback
+  failure without leakage, failed-socket retirement, idle-handshake lock
+  release, and replacement of an obsolete record on new allocation.  All 444
+  Emacs tests have 441 expected passes and the three expected skips for absent
+  =undo-fu-session=.  =git diff --check= is clean.

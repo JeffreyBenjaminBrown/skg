@@ -3,6 +3,24 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problem found while investigating partial-reload pauses (2026-09-03)
+** A genuine reconnect's exact sweep monopolizes the foreground channel
+   The reported hot-reload path no longer creates a new connection or sweep;
+   see TODO/partial-reload-and-magit/6_bugs.org.  A real connection/watch gap,
+   however, still sends =(full-sweep . "true")= through the ordinary serialized
+   request coordinator.  =changed_paths_since_selected= synchronously calls
+   =selected_path_digest_manifest=, which reads and hashes every selected file
+   (29,973 in the current corpus).  No later save/search request can reach this
+   connection's server loop until that finishes.  The observed corpus sweep
+   occupied about 40.5 seconds.
+
+   This diverges from 5_plan.org's explicit low-priority, foreground-preemptible
+   observation worker.  Fixing it requires a design choice: accept and clearly
+   report the rare exact-recovery pause, or implement a cooperative
+   yield/cancel/resume worker which preserves watcher generations and returns
+   conflict presentation to the connection owning its ViewsState.  Metadata
+   shortcuts weaken the exact-byte invariant; a second connection lacks the
+   owning connection's view/conflict state.
 * Problems noted while cleaning up stray servers (2026-07-26)
   Context: two cargo-watch processes and one skg were alive at once;
   the newer skg had died with 'Address already in use'. Root cause is

@@ -67,6 +67,56 @@
       (should (equal (cdr (assoc 'ids parsed)) '("alias" "B"))))
     (should (functionp registered-handler))))
 
+(ert-deftest test-skg-idle-handshake-releases-obsolete-local-incident ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let ((skg--maintenance-client-incident
+           '(:incident-id "old-incident" :epoch 9 :phase waiting-for-server))
+          (skg--maintenance-state '((epoch . 10) (state . idle)))
+          (skg--maintenance-enrollment-census-scheduled t)
+          shown)
+      (cl-letf (((symbol-function 'display-warning)
+                 (lambda (type message level &rest _)
+                   (setq shown (list type message level)))))
+        (skg-maintenance-adopt-handshake-epoch))
+      (should-not skg--maintenance-client-incident)
+      (should-not skg--maintenance-enrollment-census-scheduled)
+      (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record))
+      (should-not skg--maintenance-lock-overlay)
+      (should (eq (car shown) 'skg))
+      (should (string-match-p "old-incident" (cadr shown)))
+      (should (eq (nth 2 shown) :warning)))))
+
+(ert-deftest test-skg-new-allocation-replaces-obsolete-local-incident ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let ((skg--maintenance-client-incident
+           '(:incident-id "old-incident" :epoch 9 :phase waiting-for-server))
+          (skg--maintenance-state '((epoch . 9) (state . active)))
+          submitted
+          shown)
+      (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+                 (lambda () 'tcp))
+                ((symbol-function 'skg--submit-buffer-census)
+                 (lambda (&rest arguments) (setq submitted arguments)))
+                ((symbol-function 'display-warning)
+                 (lambda (_type message _level &rest _)
+                   (setq shown message))))
+        (skg--maintenance-handle-bootstrap
+         nil
+         (concat
+          "((status install-maintenance-epoch-and-submit-locked-census)"
+          " (allocated-incident-id new-incident) (maintenance-epoch 10)"
+          " (origin explicit-partial-reload) (started-at-utc now)"
+          " (archive-directory-name archive) (source-set all)"
+          " (g0-graph-generation 1) (g0-manifest-revision 2)"
+          " (requested-paths ()) (requested-ids (node)))")))
+      (should (equal (plist-get skg--maintenance-client-incident :incident-id)
+                     "new-incident"))
+      (should (= 10 (plist-get skg--maintenance-client-incident :epoch)))
+      (should (= 10 (skg--buffer-record-maintenance-epoch
+                     skg--buffer-record)))
+      (should (equal submitted '(tcp "new-incident" 10)))
+      (should (string-match-p "old-incident" shown)))))
+
 (ert-deftest test-skg-every-maintenance-origin-refuses-dirty-raw-files-first ()
   (let ((buffer (generate-new-buffer "raw-maintenance-preflight.skg"))
         (skg--buffer-registry (make-hash-table :test #'equal))
