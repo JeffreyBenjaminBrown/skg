@@ -301,7 +301,14 @@ end
 ---untouched). Rewrites exactly the .skg files whose bodies change;
 ---derived caches are refreshed.
 function M.strip_body_whitespace ()
+  client.connect()
+  if not M.ensure_connection_handshake() then
+    error('Cannot strip body whitespace before server verification') end
   vim.notify('Stripping trailing whitespace from bodies ...')
+  local operation_id = require('skg.buffer').generate_uuid()
+  local server_session_id = state.server_session_id
+  if not server_session_id then
+    error('Verified SKG connection has no server session') end
   state.register_response_handler('strip-body-whitespace',
     function (_payload, response)
       local content = payload.field_text(response, 'content')
@@ -310,7 +317,11 @@ function M.strip_body_whitespace ()
                  .. " review with 'git diff --ignore-all-space'"
                  .. ' (it should show nothing).')
     end, true)
-  client.submit_request('((request . "strip body whitespace"))\n')
+  client.submit_request(sexpr.to_string({
+    sexpr.pair(sexpr.symbol('request'), 'strip body whitespace'),
+    sexpr.pair(sexpr.symbol('operation-id'), operation_id),
+    sexpr.pair(sexpr.symbol('server-session-id'), server_session_id),
+  }) .. '\n')
 end
 
 return M
