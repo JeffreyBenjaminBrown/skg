@@ -4,6 +4,7 @@ local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(75)
 
 local maintenance = require('skg.maintenance')
+local query_wait = require('skg.query_wait')
 local state = require('skg.state')
 local config = require('skg.config')
 local valid_replacement_config
@@ -116,9 +117,20 @@ local blocked_view = T.wait_for(function ()
 end, 15)
 T.check(blocked_view ~= nil,
         'the selected graph remained queryable after invalid preflight')
-T.check(vim.b[blocked_view].skg_maintenance_epoch
-          == state.maintenance_client_incident.epoch,
-        'a view opened during blocked maintenance was born locked')
+T.check(vim.b[blocked_view].skg_maintenance_epoch == nil
+          and vim.b[blocked_view].skg_view_write_authority == 'read-only',
+        'a read-only query during maintenance remains outside the fixed census')
+
+local query_terms = 'title after rebuild'
+local query_id = query_wait.submit(query_terms, false, false, false, nil)
+local query_record = state.query_waits[query_id]
+local query_buffer = query_record.buffer
+local query_initial_token = vim.b[query_buffer].skg_application_token
+T.check(query_id ~= nil, 'a query wait was accepted for the active incident')
+T.check(vim.api.nvim_buf_is_valid(query_buffer)
+          and query_record.terms == query_terms
+          and vim.b[query_buffer].skg_view_write_authority == 'read-only',
+        'the query wait placeholder retains its terms and read-only authority')
 
 local config_file = assert(io.open(os.getenv('SKG_TEST_CONFIG'), 'w'))
 config_file:write(assert(valid_replacement_config))
@@ -126,9 +138,15 @@ config_file:close()
 maintenance.retry()
 T.check(T.wait_for(function ()
   return state.maintenance_client_incident == nil
-end, 60), 'the repaired incident retried to its terminal ACK')
+    and query_record.status == 'delivered'
+end, 60), 'the repaired incident retried and delivered the query wait result')
+T.check(T.buffer_text(query_buffer):find(query_terms, 1, true) ~= nil
+          and query_record.terms == query_terms
+          and vim.b[query_buffer].skg_view_write_authority == 'read-only'
+          and vim.b[query_buffer].skg_application_token == query_initial_token + 1,
+        'the query wait applied one exact read-only result with expected terms')
 T.check(vim.b[blocked_view].skg_maintenance_epoch == nil,
-        'the mid-incident view joined terminal settlement and unlocked')
+        'the read-only query remains outside incident settlement')
 
 local finalized = vim.fn.globpath(
   vim.fs.dirname(os.getenv('SKG_TEST_CONFIG')) .. '/maintenance-archives',

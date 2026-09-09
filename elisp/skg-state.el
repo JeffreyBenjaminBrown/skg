@@ -236,7 +236,8 @@ Report-local selected-* fields never update the current graph identity."
                                             "verify connection")))
                        `((server-session-id . ,skg--server-session-id)))
                      `((request-id . ,request-id))
-                     (when incident-id
+                     (when (and incident-id
+                                (not (assoc 'incident-id request)))
                        `((incident-id . ,incident-id)))))
             "\n")))
 
@@ -262,7 +263,10 @@ Report-local selected-* fields never update the current graph identity."
 (defun skg-require-current-server-session (response &optional record)
   "Return RESPONSE's current server session, or reject stale authority.
 When RECORD is non-nil, also require that its origin session matches."
-  (let ((session (cadr (assoc 'server-session-id response))))
+  (let* ((raw-session (cadr (assoc 'server-session-id response)))
+         ;; Rust prints space-free string atoms without quotes, so `read'
+         ;; may return the UUID as a symbol.
+         (session (and raw-session (format "%s" raw-session))))
     (unless (and (stringp session)
                  (equal session skg--server-session-id))
       (error "Skg refused authority from server session %S; current session is %S"

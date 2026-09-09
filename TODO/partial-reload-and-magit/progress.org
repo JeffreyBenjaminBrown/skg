@@ -2188,3 +2188,37 @@ The implemented interface is in
 [[file:../../codex-thinking/query-wait-server.org][the query server note]]. Result identity controls delivery deduplication;
 idle polling does not reread staged bytes. ACK registration grants read-only
 authority. Finish actual editor verification next; no new question for Jeff.
+
+* Simplify/cohere checkpoint: actual editor query delivery
+** what's done and went well
+'12934a53' commits authenticated TCP query delivery. Real maintenance-rebuild
+integration passes in both editors, including a query accepted while an
+incident is blocked, resumption after repair, expected result text, read-only
+authority and exactly one application-token increment. Logs are
+'/tmp/query-wait-maintenance-rebuild-nvim-final.log' and
+'/tmp/query-wait-maintenance-rebuild-emacs-7.log'. Focused Emacs checks pass
+nine query cases and ten handshake/session cases. 'cargo check --all-targets
+--jobs 2' passes; log is 'query-all-targets-check.log' under
+'/tmp/simplify-cohere-baseline'.
+** Changes to the plan's envisioned order.
+The integration pass required small wire-boundary fixes before closing this
+slice: canonical dotted recipes, UUID atom normalization, and incident-bound
+requests without duplicate incident fields. '617f1c97' pins conservation rules
+at the start of orientation, with [[file:../../codex-thinking/token-discipline.org][a durable handoff reminder]].
+** what's imperfect about what's done
+Old integration assertions expected new queries to enlarge the incident census.
+They now verify the planned read-only outcome and absence of an incident lock.
+The first Emacs run rejected unquoted UUID atoms because Emacs reads them as
+symbols. Normalizing that boundary fixes the failure; a regression test covers
+the server's actual spelling.
+** choices determining the future
+Keep subsequent migrations narrow and commit each verified slice. The next
+boundaries remain the owner/interactive compatibility adapters, remaining
+ordinary writers, per-incident client restrictions and final acceptance checks.
+The original plan remains unchanged; no new architectural question for Jeff.
+
+The final recovery check found that both transport validators rejected status
+for a bufferless record whose incident was not yet known. A narrowly scoped
+query-status exception now allows that authenticated response to bind the
+retained target. Focused transport suites pass 11 Emacs and 20 Neovim cases;
+query suites still pass 9 and 8 respectively.

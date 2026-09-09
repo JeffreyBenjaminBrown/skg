@@ -231,13 +231,18 @@ describe('skg query waits', function ()
     local recipe_text = '((kind . "text-search") (terms . "apple"))'
     local digest = vim.fn.sha256(recipe_text)
     handler('', sexpr.read(string.format(
-      '((status ready) (server-session-id %q) (query-recipe %q)'
+      '((status ready) (server-session-id %q) (incident-id incident-cold)'
+      .. ' (maintenance-epoch 9) (query-recipe %q)'
       .. ' (query-recipe-digest %q))', state.server_session_id,
       recipe_text, digest)))
     assert.are.equal(recipe_text,
                      state.query_waits['restart-ready'].recipe_text)
     assert.are.equal(digest,
                      state.query_waits['restart-ready'].recipe_digest)
+    assert.are.equal('incident-cold',
+                     state.query_waits['restart-ready'].incident_id)
+    assert.are.equal(9,
+                     state.query_waits['restart-ready'].maintenance_epoch)
 
     assert.has_error(function ()
       handler('', sexpr.read(string.format(

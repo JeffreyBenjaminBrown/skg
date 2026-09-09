@@ -83,7 +83,10 @@ This inspects the public package header without enabling any package mode."
 (defun skg--handshake-authority (response)
   "Validate and return RESPONSE's protocol and server-session authority."
   (let ((version (cadr (assoc 'protocol-version response)))
-        (session-id (cadr (assoc 'server-session-id response))))
+        ;; The Rust sexp printer emits space-free string atoms without
+        ;; quotes; `read' therefore returns a symbol for a UUID.
+        (session-value (cadr (assoc 'server-session-id response))))
+    (let ((session-id (and session-value (format "%s" session-value))))
     (unless (equal version skg--protocol-version)
       (error "Skg protocol mismatch: client requires version %d, server reported %S"
              skg--protocol-version version))
@@ -92,7 +95,7 @@ This inspects the public package header without enabling any package mode."
     (when (and skg--server-session-id
                (not (equal session-id skg--server-session-id)))
       (error "Skg server session changed on an already verified connection"))
-    session-id))
+      session-id)))
 
 (defun skg--show-handshake-telescope-warnings (response)
   "Display structured load WARNINGS carried by RESPONSE."
@@ -297,7 +300,9 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
   (when (fboundp 'skg-resume-maintenance-after-census)
     (run-at-time
      0 nil #'skg-resume-maintenance-after-census
-     maintenance-incident-id maintenance-epoch)))
+     maintenance-incident-id maintenance-epoch))
+  (when (fboundp 'skg-query-wait-resume-all)
+    (run-at-time 0 nil #'skg-query-wait-resume-all)))
 
 (defun skg--submit-connection-handshake (tcp-proc)
   "Put the mandatory handshake first without consuming an ordinary draft."

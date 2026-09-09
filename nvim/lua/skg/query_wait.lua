@@ -148,6 +148,14 @@ local function record_status (response, operation_id)
     or payload.field_text(response, 'query-wait-status')
     or 'pending'
   record.status = status
+  local incident_id = payload.field_text(response, 'incident-id')
+  local epoch = payload.field(response, 'maintenance-epoch')
+  local candidate_id = payload.field_text(response, 'candidate-id')
+  if incident_id or epoch or candidate_id then
+    record.incident_id = incident_id or record.incident_id
+    record.maintenance_epoch = epoch or record.maintenance_epoch
+    record.candidate_id = candidate_id or record.candidate_id
+  end
   record.reason = payload.field_text(response, 'reason')
   record.result_digest = payload.field_text(response, 'result-digest')
   return record
@@ -238,7 +246,7 @@ function M.submit (terms, regex, body, operators, ugly_choice, operation_id)
   }
   local record = state.query_waits[id]
   state.register_response_handler('query-wait-status', status_handler(id), true)
-  client.submit_request(fields(record, 'query wait'))
+  client.submit_request(fields(record, 'query wait'), nil, record.incident_id)
   return id
 end
 
@@ -297,7 +305,7 @@ local function send_applied (record, response)
     for key, value in pairs(destination(record.buffer)) do
       table.insert(ack, sexpr.pair(sexpr.symbol(key:gsub('_', '-')), value)) end
   end
-  client.submit_request(sexpr.to_string(ack) .. '\n')
+  client.submit_request(sexpr.to_string(ack) .. '\n', nil, record.incident_id)
 end
 
 function M.result_handler (_payload_text, response)
@@ -374,7 +382,8 @@ function M.resume_all ()
         vim.b[record.buffer].skg_server_session_id = state.server_session_id
       end
       state.register_response_handler('query-wait-status', status_handler(id), true)
-      client.submit_request(fields(record, 'query wait status'))
+      client.submit_request(fields(record, 'query wait status'), nil,
+                            record.incident_id)
     end
   end
 end
@@ -383,7 +392,8 @@ function M.cancel (operation_id)
   local record = state.query_waits[operation_id]
   if not record then error('Unknown query operation ' .. tostring(operation_id)) end
   state.register_response_handler('query-wait-status', status_handler(operation_id), true)
-  client.submit_request(fields(record, 'query wait cancel'))
+  client.submit_request(fields(record, 'query wait cancel'), nil,
+                        record.incident_id)
 end
 
 function M.recover (operation_id, terms)
@@ -414,7 +424,8 @@ function M.status (operation_id)
   local record = state.query_waits[operation_id]
   if not record then error('Unknown query operation ' .. tostring(operation_id)) end
   state.register_response_handler('query-wait-status', status_handler(operation_id), true)
-  client.submit_request(fields(record, 'query wait status'))
+  client.submit_request(fields(record, 'query wait status'), nil,
+                        record.incident_id)
 end
 
 if state.pending_query_waits_raw ~= nil then

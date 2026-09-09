@@ -85,7 +85,11 @@ function M.dispatch_frame (payload, artifact_bytes)
   if not record then
     log.log('warn', 'dispatch', 'unknown/stale request-id: %s', request_id)
     return end
-  if incident_id ~= record.incident_id then
+  -- A cold query-wait status request has no local target yet; the durable
+  -- server response supplies that target and the query handler binds it.
+  local cold_query_status = frame_kind == 'query-wait-status'
+    and record.incident_id == nil
+  if incident_id ~= record.incident_id and not cold_query_status then
     vim.notify('SKG protocol failure: incident identity changed',
                vim.log.levels.ERROR)
     if record.failure_handler then

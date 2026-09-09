@@ -161,7 +161,7 @@ local function request_with_identity (request_text, request_id, incident_id)
     identity = string.format(
       ' (server-session-id . %q)', state.server_session_id) end
   identity = identity .. string.format(' (request-id . %q)', request_id)
-  if incident_id then
+  if incident_id and not request:find('(incident-id ', 1, true) then
     identity = identity
       .. string.format(' (incident-id . %q)', incident_id) end
   return request:sub(1, -2) .. identity .. ')\n'

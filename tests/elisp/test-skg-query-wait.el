@@ -187,7 +187,7 @@
     (should-not (plist-get (gethash "restart-ready" skg--query-waits)
                            :buffer))
     (cl-letf (((symbol-function 'skg-submit-request)
-               (lambda (_tcp request) (setq wire request)))
+              (lambda (_tcp request &rest _) (setq wire request)))
               ((symbol-function 'skg-tcp-connect-to-rust)
                (lambda () 'tcp))
               ((symbol-function 'skg-register-response-handler)
@@ -202,12 +202,16 @@
         (should-not (assq 'view-uri request))
         (should-not (assq 'client-buffer-id request))))
     (skg-query-wait--record-status
-     (read (format "((status ready) (query-recipe %S) (query-recipe-digest %S))"
+     (read (format "((status ready) (incident-id incident-cold) (maintenance-epoch 9) (query-recipe %S) (query-recipe-digest %S))"
                    recipe-text digest))
      "restart-ready")
     (let ((record (gethash "restart-ready" skg--query-waits)))
       (should (equal recipe-text (plist-get record :recipe-text)))
-      (should (equal digest (plist-get record :recipe-digest))))
+      (should (equal digest (plist-get record :recipe-digest)))
+      (should (equal "incident-cold"
+                     (plist-get (plist-get record :target) :incident-id)))
+      (should (= 9
+                 (plist-get (plist-get record :target) :maintenance-epoch))))
     (should-error
      (skg-query-wait--record-status
       (read (format "((status ready) (query-recipe %S) (query-recipe-digest %S))"

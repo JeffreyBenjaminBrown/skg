@@ -89,8 +89,10 @@ If there is buffered data and a handler matched, continues the loop."
                    (substring payload 0 (min 80 (length payload)))))
          ((not record)
           (skg-log 'warn 'dispatch "unknown/stale request-id: %s" request-id))
-         ((not (equal (and incident-id (format "%s" incident-id))
-                      (skg--request-record-incident-id record)))
+         ((and (not (equal (and incident-id (format "%s" incident-id))
+                           (skg--request-record-incident-id record)))
+               (not (and (eq frame-kind 'query-wait-status)
+                         (null (skg--request-record-incident-id record)))))
           (ding)
           (skg-log 'error 'dispatch
                    "incident-id mismatch on request %s" request-id)

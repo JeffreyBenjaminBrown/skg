@@ -41,15 +41,18 @@
 
 (defun skg-query-wait--field (response key)
   (let ((entry (assoc key response)))
-    (and entry (cadr entry))))
+    (when entry
+      (let ((value (cadr entry)))
+        (if (symbolp value) (symbol-name value) value)))))
 
 (defun skg-query-wait--entry-field (entry key)
   "Read KEY from either proper or dotted alist ENTRY."
   (let ((field (assoc key entry)))
     (and field
-         (if (and (proper-list-p field) (= (length field) 2))
-             (cadr field)
-           (cdr field)))))
+         (let ((value (if (and (proper-list-p field) (= (length field) 2))
+                          (cadr field)
+                        (cdr field))))
+           (if (symbolp value) (symbol-name value) value)))))
 
 (defun skg-query-wait--target ()
   "Return the active incident or retained candidate-only wait target."
@@ -91,7 +94,12 @@
     (source-set . ,skg--active-source-set-name)))
 
 (defun skg-query-wait--recipe-text (recipe)
-  (skg-buffer-recipe-text recipe))
+  ;; Query-wait's Rust parser accepts the canonical dotted-pair recipe
+  ;; grammar.  The shared buffer census spelling intentionally uses proper
+  ;; two-element lists, so convert only this wire boundary.
+  (let ((normalized (skg--normalized-recipe-value recipe)))
+    (prin1-to-string
+     (mapcar (lambda (entry) (cons (car entry) (cadr entry))) normalized))))
 
 (defun skg-query-wait--recipe-digest (recipe)
   (secure-hash 'sha256
@@ -207,8 +215,8 @@ status response supplies a verifiable recipe."
 
 (defun skg-query-wait--record-status (response operation-id)
   (when operation-id
-    (let ((record (skg-query-wait--ensure-record operation-id)))
-    (let* ((recipe-text (skg-query-wait--field response 'query-recipe))
+    (let* ((record (skg-query-wait--ensure-record operation-id))
+           (recipe-text (skg-query-wait--field response 'query-recipe))
            (recipe-digest (skg-query-wait--field response
                                                   'query-recipe-digest))
            (known-digest (plist-get record :recipe-digest)))
@@ -226,17 +234,25 @@ status response supplies a verifiable recipe."
         (error "Skg query wait status recipe identity changed"))
       (when (and recipe-digest (not recipe-text) (not known-digest))
         (setf (plist-get record :recipe-digest) recipe-digest))
-        (let ((status (format "%s"
-                           (or (skg-query-wait--field response 'status)
-                               (skg-query-wait--field response
-                                                       'query-wait-status)
-                               "pending"))))
-      (setf (plist-get record :status) (intern status)
-            (plist-get record :reason)
-            (skg-query-wait--field response 'reason)
-            (plist-get record :result-digest)
-            (skg-query-wait--field response 'result-digest))
-          record)))))
+      (let* ((status (format "%s"
+                             (or (skg-query-wait--field response 'status)
+                                 (skg-query-wait--field response
+                                                         'query-wait-status)
+                                 "pending")))
+             (incident-id (skg-query-wait--field response 'incident-id))
+             (epoch (skg-query-wait--field response 'maintenance-epoch))
+             (candidate-id (skg-query-wait--field response 'candidate-id)))
+        (setf (plist-get record :status) (intern status)
+              (plist-get record :target)
+              (if (or incident-id epoch candidate-id)
+                  (list :incident-id incident-id :maintenance-epoch epoch
+                        :candidate-id candidate-id)
+                (plist-get record :target))
+              (plist-get record :reason)
+              (skg-query-wait--field response 'reason)
+              (plist-get record :result-digest)
+              (skg-query-wait--field response 'result-digest))
+        record))))
 
 (defun skg-query-wait--status-handler (operation-id)
   (lambda (_tcp payload)
@@ -256,12 +272,14 @@ status response supplies a verifiable recipe."
        (skg-query-wait--record-status response operation-id)))))
 
 (defun skg-query-wait--submit-record (record)
-  (let ((operation-id (plist-get record :query-operation-id)))
+  (let* ((operation-id (plist-get record :query-operation-id))
+         (target (plist-get record :target)))
     (skg-register-response-handler
      'query-wait-status (skg-query-wait--status-handler operation-id) t)
     (skg-submit-request
      (skg-tcp-connect-to-rust)
-     (concat (prin1-to-string (skg-query-wait--request-fields record)) "\n"))))
+     (concat (prin1-to-string (skg-query-wait--request-fields record)) "\n")
+     nil (plist-get target :incident-id))))
 
 (defun skg-query-wait--placeholder (operation-id terms recipe)
   (let* ((uri (concat "search:wait:" operation-id))
@@ -319,7 +337,8 @@ status response supplies a verifiable recipe."
          (result-digest . ,digest)
          (applied . "true")
          ,@(skg-query-wait--destination buffer)))
-      "\n"))))
+      "\n")
+     nil (plist-get (plist-get record :target) :incident-id))))
 
 (defun skg-query-wait--apply-result (tcp response record)
   (let* ((operation-id (skg-query-wait--field response 'query-operation-id))
@@ -458,7 +477,8 @@ status response supplies a verifiable recipe."
         (skg-tcp-connect-to-rust)
         (concat
          (prin1-to-string (skg-query-wait--status-fields record))
-         "\n"))))
+         "\n")
+        nil (plist-get (plist-get record :target) :incident-id))))
    skg--query-waits))
 
 (defun skg-query-wait-recover (operation-id &optional terms)
@@ -501,7 +521,8 @@ This is the explicit recovery path after an editor restart or buffer loss."
          ,@(when (plist-get (plist-get record :target) :candidate-id)
              `((candidate-id . ,(plist-get (plist-get record :target)
                                            :candidate-id)))))
-      "\n")))))
+      "\n")
+     nil (plist-get (plist-get record :target) :incident-id)))))
 
 (defun skg-query-wait-status (&optional operation-id)
   "Request durable status, or list retained operation IDs when nil."
@@ -523,7 +544,8 @@ This is the explicit recovery path after an editor restart or buffer loss."
      (skg-tcp-connect-to-rust)
       (concat
       (prin1-to-string (skg-query-wait--status-fields record))
-      "\n")))))
+      "\n")
+     nil (plist-get (plist-get record :target) :incident-id)))))
 
 (skg-register-server-push-handler
  'query-wait-result #'skg-query-wait-result-handler)

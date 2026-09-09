@@ -176,6 +176,20 @@ describe('skg.length_prefix dispatch', function ()
     assert.is_nil(state.active_request_id)
   end)
 
+  it('allows a cold query status response to supply its incident target',
+     function ()
+    local seen = false
+    state.register_response_handler('query-wait-status',
+      function () seen = true end, true)
+    local record = activate_request()
+    length_prefix.dispatch_frame(string.format(
+      '((response-type query-wait-status) (request-id %q)'
+      .. ' (frame-kind query-wait-status) (incident-id incident-cold)'
+      .. ' (terminal-status complete))', record.id))
+    assert.is_true(seen)
+    assert.is_nil(state.request_records[record.id])
+  end)
+
   it('dispatches a server push without a request ID', function ()
     local seen = nil
     state.register_server_push_handler('collateral-view',

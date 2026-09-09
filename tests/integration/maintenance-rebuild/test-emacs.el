@@ -157,20 +157,53 @@
        "the selected graph remained queryable after invalid preflight")
       (rebuild-test-check
        (with-current-buffer blocked-view
-         (equal (skg--buffer-record-maintenance-epoch skg--buffer-record)
-                (plist-get skg--maintenance-client-incident :epoch)))
-       "a view opened during blocked maintenance was born locked")
+         (and buffer-read-only
+              (eq (skg--buffer-record-view-write-authority skg--buffer-record)
+                  'read-only)
+              (null (skg--buffer-record-maintenance-epoch skg--buffer-record))))
+       "a new read-only query during blocked maintenance stays outside the census")
+      (let* ((query-terms "title after rebuild")
+             (query-id (skg-query-wait-submit
+                        query-terms nil nil nil nil))
+             (query-record (gethash query-id skg--query-waits))
+             (query-buffer (plist-get query-record :buffer))
+             (query-initial-token
+              (with-current-buffer query-buffer
+                (skg--buffer-record-application-token skg--buffer-record))))
+        (rebuild-test-check query-id
+                            "a query wait was accepted for the active incident")
+        (rebuild-test-check
+         (and (buffer-live-p query-buffer)
+              (equal query-terms (plist-get query-record :terms))
+              (eq (skg--buffer-record-view-write-authority
+                   (buffer-local-value 'skg--buffer-record query-buffer))
+                  'read-only))
+         "the query wait placeholder retains its terms and read-only authority")
       (rebuild-test-repair-config)
       (skg-retry-maintenance)
       (rebuild-test-check
        (skg-test-wait-for
-        (lambda () (null skg--maintenance-client-incident))
+        (lambda ()
+          (and (null skg--maintenance-client-incident)
+               (eq (plist-get (gethash query-id skg--query-waits) :status)
+                   'delivered)))
         60)
-       "the repaired incident retried to its terminal ACK")
+       "the repaired incident retried and delivered the query wait result")
+      (rebuild-test-check
+       (with-current-buffer query-buffer
+         (and (string-match-p "title after rebuild" (buffer-string))
+              (equal (plist-get (gethash query-id skg--query-waits) :terms)
+                     query-terms)
+              (= (skg--buffer-record-application-token skg--buffer-record)
+                 (1+ query-initial-token))
+              (eq (skg--buffer-record-view-write-authority skg--buffer-record)
+                  'read-only)))
+       "the query wait applied one exact read-only result with expected terms")
       (rebuild-test-check
        (with-current-buffer blocked-view
          (null (skg--buffer-record-maintenance-epoch skg--buffer-record)))
        "the mid-incident view joined terminal settlement and unlocked")))
+      )
   (rebuild-test-check
    (directory-files-recursively
     (expand-file-name "maintenance-archives" skg-config-dir)

@@ -137,6 +137,28 @@
           (should (= 0 (hash-table-count skg--request-records)))
           (should-not skg--active-request-id))))))
 
+(ert-deftest test-skg-cold-query-status-binds-server-incident-after-dispatch ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (skg-lp--pending-count 0)
+        seen)
+    (cl-letf (((symbol-function 'process-send-string) (lambda (&rest _) nil)))
+      (skg-register-response-handler
+       'query-wait-status (lambda (&rest _) (setq seen t)) t)
+      (let ((request-id
+             (skg-submit-request
+              'proc "((request . \"query wait status\"))\n")))
+        (skg-lp--dispatch-frame
+         nil
+         (format "((response-type query-wait-status) (request-id %S) (frame-kind query-wait-status) (incident-id incident-cold) (terminal-status complete))"
+                 request-id))
+        (should seen)
+        (should-not (gethash request-id skg--request-records))))))
+
 (ert-deftest test-skg-authoritative-frame-updates-explicit-rebuilding-status ()
   (let ((skg--request-records (make-hash-table :test #'equal))
         (skg--request-draft nil)

@@ -31,6 +31,13 @@
   (let ((request (read (skg--connection-handshake-request))))
     (should (= 2 (cdr (assoc 'protocol-version request))))))
 
+(ert-deftest test-skg-handshake-accepts-unquoted-server-session-uuid ()
+  (should
+   (equal skg-test-session-new
+          (skg--handshake-authority
+           (read (concat "((protocol-version 2) (server-session-id "
+                         skg-test-session-new "))"))))))
+
 (ert-deftest test-skg-queued-request-is-stamped-after-handshake ()
   (let* ((skg--server-session-id skg-test-session-new)
          (wire "((request . \"text search\") (request-id . \"r1\"))\n")
