@@ -102,7 +102,7 @@ pub fn expand_true_content_at_activeNode (
             => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
-      clobberIndefinitiveViewnode(graph_snap,  tree, node, config ) ?;
+      clobberIndefinitiveViewnode(graph_snap,  tree, node) ?;
       return Ok (( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_activeNode_to_deletednode (
@@ -117,7 +117,7 @@ pub fn expand_true_content_at_activeNode (
   clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      graph_snap, config, &pid, &initial_source ) ?;
+      graph_snap, &pid, &initial_source ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
@@ -234,7 +234,7 @@ fn reconcile_content_children (
   // regenerating contains-minus-hides is correct. The TODO/DONE/local-view-update/plan_v2.org §5.3 cascade draws
   // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
-    content_goal_list( tree, node, &content_ids, is_sub, config,
+    content_goal_list( tree, node, &content_ids, is_sub,
                        graph_snap, active_source_set ) ?;
   let apparent_content_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: rendering omits every
@@ -411,7 +411,6 @@ fn content_goal_list (
   node               : NodeId,
   content_ids        : &[ID],
   is_subscribee      : bool,
-  config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
@@ -423,7 +422,7 @@ fn content_goal_list (
                                     "content_goal_list" ) ?;
     let grandparent_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        graph_snap, config, &grandparent_pid, &grandparent_source ) ?;
+        graph_snap, &grandparent_pid, &grandparent_source ) ?;
     // Resolve the subtrahends through extra_id -> pid the same way
     // 'content_ids' (the minuend) was resolved by the caller. Without
     // this, a child the subscriber has integrated under a now-MERGED id
@@ -725,7 +724,7 @@ fn build_child_creation_data (
           drawn . 0 )) ? };
     let skg : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        graph_snap, config, fetch_id, &fetch_source ) ?;
+        graph_snap, fetch_id, &fetch_source ) ?;
     result . insert( id . clone(),
                    ChildData { title: skg . title . clone(),
                                source: skg . source . clone(),

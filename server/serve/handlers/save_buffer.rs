@@ -570,7 +570,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
             "buffer_to_validated_saveplan"
           ) . entered();
         buffer_to_validated_saveplan_with_fork_sources (
-          &env . in_rust_graph_snapshot (), org_buffer_text, &env . config, &env . driver,
+          &env . in_rust_graph_snapshot (), org_buffer_text, &env . config,
           active_source_set, fork_sources ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
@@ -636,9 +636,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
     nodes };
 
-  { // The ordinary-save and nodeMerge phases execute separately, but their
-    // filesystem validity is one save-level decision. Check their union now,
-    // before either phase writes or deletes anything.
+  let define_nodes : Vec<DefineNode> = crate::save::combined_save_definitions (
+    &env . in_rust_graph_snapshot (), nonmerge_defineNodes . clone (), &nodeMerges);
+
+  { // Validate the complete authored proposal before applying its final batch.
     if let Some (authority) = requested_authority {
       validate_save_authority (
         authority, viewuri_from_request_result, views_state,
@@ -665,7 +666,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &source_moves,
       env . config . clone(),
       &mut env . tantivy_index,
-      &env . driver,
       &env . in_rust_graph,
       hoist_approved_pids,
       requested_authority . map (|authority|
@@ -677,13 +677,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ?; }
 
-  let define_nodes : Vec<DefineNode> = // includes the nodeMerges
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "define_nodes_build" ). entered();
-      nonmerge_defineNodes . iter () . cloned ()
-      . chain ( nodeMerges . iter ()
-                . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
-      . collect () };
+
+
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "coherence_debug_assert" ). entered();

@@ -18,7 +18,6 @@ use crate::context::{
   had_id_set_from_nodes,
   link_dests_from_nodes,
 };
-use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::dbs::init::create_empty_tantivy_index;
 use crate::dbs::tantivy::background_writer::{
   TantivyGenerationStatus,
@@ -321,14 +320,6 @@ async fn rebuild_stores (
       "replacement config removed the active source-set; using exact fallback");
   }
 
-  if let Err (error) = wipe_then_init_typedb_db (
-      &candidate . config, &env . driver, &nodes) . await
-  {
-    let reason = format! ("TypeDB full reconstruction failed: {}", error);
-    return fail_rebuild_and_restore (
-      runtime, selection, env, _write_guard, old_selected, old_nodes, reason)
-      . await;
-  }
   let replacement_tantivy = if candidate . config . tantivy_folder
       == env . config . tantivy_folder
   {
@@ -423,7 +414,7 @@ async fn fail_rebuild_and_restore (
   reason       : String,
 ) -> Result<SelectedStoreRecord, SelectionFailure> {
   let recovery = restore_g0 (
-    &env . config, &env . driver, &env . tantivy_index,
+    &env . config, &env . tantivy_index,
     &old_selected, &old_nodes) . await;
   let (queryable_g0, full_reason) = match recovery {
     Ok (( )) => {
@@ -432,9 +423,6 @@ async fn fail_rebuild_and_restore (
     }
     Err (recovery_reason) => {
       let poisoned = Arc::new (old_selected
-        . with_typedb_poisoned (format! (
-          "full rebuild restoration could not prove TypeDB: {}",
-          recovery_reason))
         . with_tantivy_poisoned (format! (
           "{}; G0 restoration failed: {}", reason, recovery_reason)));
       env . in_rust_graph . store (poisoned);
@@ -496,7 +484,7 @@ async fn select_stores (
   let old_nodes = nodecompletes_from_graph (&old_selected . graph);
   let outcome = match apply_define_nodes_to_stores (
       candidate . definitions . clone (), &[], env . config . clone (),
-      &env . tantivy_index, &env . driver, &env . in_rust_graph,
+      &env . tantivy_index, &env . in_rust_graph,
       false, Some (candidate . manifest . clone ()), &HashSet::new ()) . await
   {
     Ok (outcome) => outcome,
@@ -504,7 +492,6 @@ async fn select_stores (
       let reason = format! ("derived-store transition failed: {}", error);
       let current = env . in_rust_graph . load_full ();
       let coherent_g0 = same_selected_identity (&current, &old_selected)
-        && healthy (&current . typedb_health)
         && healthy (&current . tantivy_health);
       runtime . publish_selected_from_env (&env);
       drop (env);
@@ -524,7 +511,7 @@ async fn select_stores (
       format! ("reconstructed-after-incremental-failure: {}", reason),
     TantivyGenerationStatus::Failed (reason) => {
       let recovery = restore_g0 (
-        &env . config, &env . driver, &env . tantivy_index,
+        &env . config, &env . tantivy_index,
         &old_selected, &old_nodes) . await;
       let (queryable_g0, full_reason) = match recovery {
         Ok (( )) => {
@@ -535,8 +522,6 @@ async fn select_stores (
         }
         Err (recovery_reason) => {
           let poisoned = Arc::new (old_selected
-            . with_typedb_poisoned (format! (
-              "store restoration could not prove TypeDB: {}", recovery_reason))
             . with_tantivy_poisoned (format! (
               "candidate index failed: {}; restoration failed: {}",
               reason, recovery_reason)));
@@ -564,7 +549,6 @@ async fn select_stores (
   if selected . graph_generation != outcome . graph_generation
   || selected . manifest != candidate . manifest
   || graph_nodes (&selected . graph) != graph_nodes (&candidate . graph)
-  || !healthy (&selected . typedb_health)
   || !healthy (&selected . tantivy_health)
   {
     let reason = "store transition completed without the exact candidate publication"
@@ -775,14 +759,11 @@ fn validate_locked_rebuild (
 }
 
 async fn restore_g0 (
-  config        : &crate::types::misc::SkgConfig,
-  driver        : &typedb_driver::TypeDBDriver,
+  _config        : &crate::types::misc::SkgConfig,
   tantivy_index : &crate::types::misc::TantivyIndex,
   old_selected  : &crate::types::store_state::SelectedStoreState,
   old_nodes     : &[crate::types::nodes::complete::NodeComplete],
 ) -> Result<(), String> {
-  wipe_then_init_typedb_db (config, driver, old_nodes) . await
-    . map_err (|error| format! ("TypeDB G0 reconstruction failed: {}", error))?;
   let labels = context_origin_types_for_graph (
     &old_selected . graph, &old_selected . cyclic_roots);
   reconstruct_index_from_nodes (old_nodes, tantivy_index, &labels)

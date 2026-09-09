@@ -15,7 +15,6 @@ use crate::types::misc::{ID, SkgConfig};
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 struct NodeMergeValidationData<'a> {
   acquirer_viewnodes    : Vec<&'a MpViewnode>,
@@ -30,7 +29,7 @@ pub async fn validate_nodeMerge_requests(
   graph : &InRustGraph,
   viewforest: &Tree<MpViewnode>,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let nodeMerge_validation_data : NodeMergeValidationData =
@@ -49,7 +48,7 @@ pub async fn validate_nodeMerge_requests(
     if let Some(EditRequest::NodeMerge (acquiree_id))
       = t . edit_request ()
     { let pair_errors : Vec<String> = validate_nodeMerge_pair(graph,
-        config, driver, acquirer_id, acquiree_id,
+        config,  acquirer_id, acquiree_id,
         &nodeMerge_validation_data . to_delete_ids) . await?;
       errors . extend (pair_errors); }}
   errors . extend( {
@@ -100,7 +99,7 @@ fn collect_nodeMerge_validation_data<'a>(
 async fn validate_nodeMerge_pair(
   graph : &InRustGraph,
   _config: &SkgConfig,
-  _driver: &TypeDBDriver,
+
   acquirer_id: &ID,
   acquiree_id: &ID,
   to_delete_ids: &HashSet<ID>,

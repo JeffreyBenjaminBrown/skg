@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::{SkgEnv, find_source};
+use crate::types::env::{find_source};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list};
 use crate::update_buffer::reconcile::omit_inactive_members;
@@ -41,7 +41,6 @@ pub async fn reconcile_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
@@ -49,7 +48,7 @@ pub async fn reconcile_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
-    read_subscribee_col_context (graph, tree, node, env, active_source_set) ?;
+    read_subscribee_col_context (graph, tree, node, active_source_set) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_outbound_col (
       &context . parent_pid, &context . parent_source,
@@ -99,7 +98,7 @@ pub async fn reconcile_subscribee_col_children (
       build_child_data (
         graph, tree, node,
         &goal_list, &removed_ids, &axes_for_removed,
-        source_diffs, deleted_since_head_pid_src_map, env ) ?;
+        source_diffs, deleted_since_head_pid_src_map) ?;
     reconcile_partnerCol_children_against_goal_list(
       tree, node, kind,
       &goal_list, &child_data ) ?;
@@ -119,7 +118,6 @@ fn read_subscribee_col_context (
   graph : &InRustGraph,
   tree               : &Tree<ViewNode>,
   node               : NodeId,
-  env                : &SkgEnv,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Active vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
@@ -146,7 +144,7 @@ fn read_subscribee_col_context (
     // inactive level must not appear here even though the
     // subscribee node itself may be active.
     nodecomplete_rustFirst_by_pid_and_source (
-      graph, &env . config, &parent_pid, &parent_source )
+      graph, &parent_pid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . iter ()
               . filter ( |m| match active_source_set {

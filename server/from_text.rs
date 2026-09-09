@@ -44,7 +44,6 @@ use crate::types::viewnode::{ViewNodeKind, Vognode, ViewRequest};
 use std::collections::{HashMap, HashSet};
 use crate::types::misc::SourceName;
 use crate::types::save::ForkSpec;
-use typedb_driver::TypeDBDriver;
 
 /// Save preparation deliberately validates at several
 /// data-maturity stages:
@@ -64,14 +63,13 @@ pub async fn buffer_to_validated_saveplan (
   graph : &InRustGraph,
   buffer_text : &str,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone sources: every fork's source resolves by
   // inference-else-default. The fork-confirmation re-save uses the
   // _with_fork_sources entry below.
   buffer_to_validated_saveplan_with_fork_sources (graph,
-    buffer_text, config, driver, active_source_set, &HashMap::new () )
+    buffer_text, config, active_source_set, &HashMap::new () )
     . await }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
@@ -82,7 +80,6 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   graph : &InRustGraph,
   buffer_text : &str,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   fork_sources : &HashMap<ID, SourceName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
@@ -104,7 +101,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       // because those validators compare nodes by pid,
       // and expect sources to be inherited/resolved.
       add_missing_info_to_viewforest (graph,
-        & mut maybePlaced_viewforest, & config . db_name, driver )
+        & mut maybePlaced_viewforest )
       . await } . map_err (SaveError::DatabaseError) ?;
   absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
@@ -113,7 +110,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "find_buffer_errors_for_saving" ). entered();
         find_buffer_errors_for_saving (graph,
-          & maybePlaced_viewforest, config, driver )
+          & maybePlaced_viewforest, config )
         . await } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
@@ -130,14 +127,14 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = extract_nonmergeSavePlan_locally (graph,
-        &viewforest, config, driver, restricted_source_set )
+        &viewforest, config, restricted_source_set )
       . await . map_err (SaveError::DatabaseError) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
     // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_activeNode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodeMerge_instructions_from_pairs" ). entered();
       nodeMerge_instructions_from_pairs (graph,
-        &nodeMerge_acquisitions, config, driver )
+        &nodeMerge_acquisitions, config )
       . await } . map_err (SaveError::DatabaseError) ?;
   // C's source is inferred from N's nearest OWNED vognode ancestor in
   // the view. The flat DefineNodes have lost that ancestry, so resolve
@@ -196,8 +193,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         &nodeMerge_instructions,
         &clone_source_inputs,
         &adopt_clone_source,
-        config,
-        driver )
+        config )
       . await } . map_err ( |errors| SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone () } ) ?;
   validate_no_simultaneous_move_and_nodeMerge (
@@ -215,7 +211,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     let mut specs : Vec<ForkSpec> = fork_specs;
     specs . extend (
       explicit_fork_specs_from_viewforest (graph,
-        &viewforest, config, &clone_source_inputs )
+        &viewforest, &clone_source_inputs )
       . map_err ( |errors| SaveError::BufferValidationErrors {
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
@@ -293,7 +289,6 @@ fn dead_link_warnings (
 fn explicit_fork_specs_from_viewforest (
   graph : &InRustGraph,
   viewforest          : &ViewForest,
-  config              : &SkgConfig,
   clone_source_inputs : &CloneSourceInputs,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
   let mut specs  : Vec<ForkSpec> = Vec::new ();
@@ -309,8 +304,7 @@ fn explicit_fork_specs_from_viewforest (
     // one spec. (D2 already rejected a genuine second fork request.)
     if ! seen . insert (pid . clone ()) { continue; }
     let snapshot : NodeComplete =
-      match nodecomplete_rustFirst_by_pid_and_source (graph,
-        config, pid, & t . source ) {
+      match nodecomplete_rustFirst_by_pid_and_source (graph, pid, & t . source ) {
         Ok (nc) => nc,
         Err (e) => {
           errors . push ( BufferValidationError::Other ( format! (

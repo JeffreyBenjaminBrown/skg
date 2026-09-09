@@ -209,7 +209,6 @@ fn verify_connection_response (
       &config . maintenance_archive_folder . to_string_lossy ())),
     field ("maintenance-archive-identity", atom (
       &config . maintenance_archive_identity . to_string_lossy ())),
-    field ("typedb-health", health (&selected . typedb_health)),
     field ("tantivy-health", health (&selected . tantivy_health)),
   ];
   if let Some ((incident, origin)) = abandoned_prearchive {

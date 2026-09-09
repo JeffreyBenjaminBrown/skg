@@ -3,6 +3,7 @@ use crate::context::context_origin_types_for_transition;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
 };
+use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::telescope::invariants::telescope_violations_of;
 use crate::dbs::in_rust_graph::{
   InRustGraph,
@@ -21,10 +22,19 @@ use crate::dbs::tantivy::background_writer::{
   TantivyWriteTask,
 };
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
+use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
+use crate::dbs::typedb::nodes::delete_nodes_from_pids;
+use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
+use crate::dbs::typedb::sources::update_node_source;
+use crate::dbs::typedb::nodes::which_ids_exist;
+use crate::dbs::typedb::relationships::apply_relationship_deltas_for_nodes;
+use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
 use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::store_state::{
@@ -34,14 +44,18 @@ use crate::types::store_state::{
 };
 use crate::dbs::tantivy::background_writer::TantivyGeneration;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tantivy::IndexWriter;
+use typedb_driver::TypeDBDriver;
 
-/// Identifies the graph and completed search batch selected by one update.
+/// Updates **everything** from already prepared `DefineNode`s, in order:
+///   1) Filesystem (source of truth)
+///   2) TypeDB (with recovery: rebuild from disk on failure)
+///   3) Tantivy (with recovery: rebuild from disk on failure)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StoreUpdateOutcome {
   pub graph_generation   : GraphGeneration,
@@ -52,11 +66,12 @@ pub async fn update_graph_minus_nodeMerges (
   source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
 ) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
   let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
   let outcome = update_graph_minus_nodeMerges_with_hoist_approval (
-    node_defs, source_moves, config, tantivy_index, graph,
+    node_defs, source_moves, config, tantivy_index, driver, graph,
     &HashSet::new () ) . await ?;
   require_tantivy_commit (outcome) ?;
   Ok (outcome)
@@ -69,7 +84,7 @@ fn require_tantivy_commit (
     TantivyGenerationStatus::Committed
     | TantivyGenerationStatus::Reconstructed (_) => Ok (()),
     TantivyGenerationStatus::Failed (reason) => Err (format! (
-      "graph generation {} committed, but Tantivy generation {} \
+      "graph generation {} and TypeDB committed, but Tantivy generation {} \
        failed: {}",
       outcome . graph_generation . get (),
       outcome . tantivy_generation . get (), reason) . into ()),
@@ -81,10 +96,11 @@ async fn update_graph_minus_nodeMerges_with_hoist_approval (
   source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
 ) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
-  tracing::info!("Updating FS and the graph/search pair ...");
+  tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "apply_delete_propagation_cleanup" ). entered();
     let graph_snap : Arc<InRustGraph> =
@@ -95,13 +111,14 @@ async fn update_graph_minus_nodeMerges_with_hoist_approval (
                                  source_moves,
                                  config,
                                  tantivy_index,
+                                 driver,
                                  graph,
                                  true,
                                  None,
                                  hoist_approved_pids ). await }
 
 /// Apply prepared `DefineNode`s to the derived stores (in-Rust graph,
-/// Tantivy), optionally writing the filesystem first.
+/// TypeDB, Tantivy), optionally writing the filesystem first.
 ///
 /// `write_fs = true` is the save path: the filesystem is the source of
 /// truth and is written first. `write_fs = false` is the RELOAD path:
@@ -115,11 +132,13 @@ pub(crate) async fn apply_define_nodes_to_stores (
   source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
   write_fs      : bool,
   reload_manifest : Option<SelectedPathManifest>,
   hoist_approved_pids : &HashSet<ID>,
 ) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
+  let db_name : &str = &config . db_name;
   let old_selected = graph . load_full ();
   let old_graph_snap : Arc<InRustGraph> = old_selected . graph . clone ();
   let mut new_graph : InRustGraph = (*old_graph_snap) . clone ();
@@ -155,7 +174,7 @@ pub(crate) async fn apply_define_nodes_to_stores (
         &old_graph_snap, &new_graph, &node_defs,
         &old_selected . cyclic_roots ) };
   // Context-only neighbors join the same Tantivy generation as the saved
-  // documents.  They are deliberately not filesystem instructions;
+  // documents.  They are deliberately NOT TypeDB or filesystem instructions;
   // rewriting their complete index documents is the simplest atomic way to
   // change a stored rank label (including clearing it to the empty string).
   let mut tantivy_instructions = node_defs . clone ();
@@ -169,6 +188,51 @@ pub(crate) async fn apply_define_nodes_to_stores (
     if let Some (node) = new_graph . nodes . get (pid) {
       tantivy_instructions . push (DefineNode::Save (SaveNode (
         nodecomplete_from_noderust (node)))); }}
+
+  // TypeDB (foreground): only TypeDB must finish before the save
+  // responds, because the response is re-rendered from the in-Rust
+  // graph (never from Tantivy).
+  if let Err (e) = {
+    let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "update_typedb_from_saveinstructions") . entered ();
+    update_typedb_from_saveinstructions (
+      db_name, driver, &node_defs, source_moves,
+      Some ( old_graph_snap . as_ref () )) . await }
+    { tracing::error!(
+        "TypeDB incremental update failed: {}. Reconstructing candidate graph...",
+        e);
+      let candidate_nodes = nodecompletes_from_graph (&new_graph);
+      match wipe_then_init_typedb_db (
+        &config, driver, &candidate_nodes) . await {
+        Ok (()) => tracing::warn! (
+          "TypeDB selected the candidate graph by complete reconstruction."),
+        Err (candidate_error) if !write_fs => {
+          let previous_nodes = nodecompletes_from_graph (&old_graph_snap);
+          match wipe_then_init_typedb_db (
+            &config, driver, &previous_nodes) . await {
+            Ok (()) => return Err (format! (
+              "TypeDB rejected the reload candidate (incremental: {}; \
+               reconstruction: {}) and was restored to graph generation {}; \
+               disk was not changed and no reload mutation was published",
+              e, candidate_error,
+              old_selected . graph_generation . get ()) . into ()),
+            Err (previous_error) => {
+              let reason = format! (
+                "TypeDB is poisoned: candidate reconstruction failed ({}); \
+                 previous-graph reconstruction also failed ({})",
+                candidate_error, previous_error);
+              graph . store (Arc::new (
+                old_selected . with_typedb_poisoned (reason . clone ())));
+              return Err (reason . into ()); }}}
+        Err (candidate_error) => {
+          let reason = format! (
+            "TypeDB is poisoned after filesystem save: candidate graph \
+             reconstruction failed ({})", candidate_error);
+          graph . store (Arc::new (
+            old_selected . with_typedb_poisoned (reason . clone ())));
+          return Err (reason . into ()); }}
+    } else {
+      tracing::info!("   TypeDB update complete."); }
 
   // Finish the exact index batch before selecting its graph. Existing
   // readers retain their captured Searcher throughout this preparation.
@@ -198,14 +262,18 @@ pub(crate) async fn apply_define_nodes_to_stores (
   graph . store (Arc::new (selected));
   Ok (StoreUpdateOutcome { graph_generation, tantivy_generation }) }
 
-/// Consolidate ordinary edits and merges into one filesystem/index batch.
-/// A merge tombstone supersedes an earlier Hoist repair of its acquiree.
+/// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
+/// order, applying any Tantivy rebuild from either step to the
+/// caller's '&mut TantivyIndex'. The sole place the save pipeline
+/// should call when it has both save_instructions and
+/// nodeMerge_instructions in hand.
 pub async fn update_graph_including_nodeMerges (
   save_instructions  : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
   source_moves       : &[SourceMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
+  driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
   expected_graph_generation : u64,
@@ -221,6 +289,19 @@ pub async fn update_graph_including_nodeMerges (
       "save expected graph generation {}, but writer acquired generation {}",
       expected_graph_generation,
       selected_before . graph_generation . get ())))); }
+  { // Exact save fence.  It covers the union of the ordinary and merge
+    // phases, including every collateral cleanup/tombstone, before either
+    // phase can write its first byte.
+    let all_filesystem_outputs : Vec<DefineNode> =
+      save_instructions . iter () . cloned ()
+      . chain (nodeMerge_instructions . iter ()
+        . flat_map (|node_merge| node_merge . to_vec ()))
+      . collect ();
+    prepare_fs_update (
+      &all_filesystem_outputs, source_moves, &config,
+      hoist_approved_pids)?
+      . with_selected_fence (&selected_before . manifest)
+      . validate_selected_fence ()?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "validate_override_invariants_after_save" ). entered();
     validate_override_invariants_after_save (
@@ -228,17 +309,32 @@ pub async fn update_graph_including_nodeMerges (
       nodeMerge_instructions,
       &config,
       graph ) } ?;
-  let definitions : Vec<DefineNode> = combined_save_definitions (
-    &selected_before . graph, save_instructions, nodeMerge_instructions);
-  let touched_pids_for_telescope_gate : Vec<ID> = definitions . iter ()
-    . filter_map (|definition| match definition {
-      DefineNode::Save (node) => Some (node . 0 . pid . clone ()),
-      DefineNode::Delete (_) => None,
-    }) . collect ();
+  let touched_pids_for_telescope_gate : Vec<ID> =
+    // captured before update_graph consumes save_instructions;
+    // checked after the update, against the post-save graph
+    save_instructions . iter ()
+    . filter_map ( |d| match d {
+      DefineNode::Save (s) => Some ( s . 0 . pid . clone () ),
+      DefineNode::Delete (_) => None } )
+    . collect ();
   let config_for_telescope_gate : SkgConfig = config . clone ();
-  apply_define_nodes_to_stores (
-    definitions, source_moves, config, tantivy_index, graph,
-    true, None, hoist_approved_pids) . await?;
+  let save_outcome : StoreUpdateOutcome =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "update_graph_minus_nodeMerges" ). entered();
+      update_graph_minus_nodeMerges_with_hoist_approval (
+        save_instructions, source_moves, config . clone(),
+        tantivy_index, driver, graph,
+        hoist_approved_pids ) . await } ?;
+  require_tantivy_commit (save_outcome) ?;
+  let nodeMerge_replacement : Option<TantivyIndex> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "merge_nodes" ). entered();
+      crate::nodeMerge::merge_nodes_with_hoist_approval (
+        nodeMerge_instructions, config,
+        tantivy_index, driver, graph,
+        hoist_approved_pids ) . await } ?;
+  if let Some (new_index) = nodeMerge_replacement {
+    *tantivy_index = new_index; }
   { // The save-side telescope warning gate: same primitive as the
     // init/rebuild gate, on the touched nodes only. Warnings, never
     // failures (the write has already, deliberately, happened).
@@ -250,31 +346,6 @@ pub async fn update_graph_including_nodeMerges (
                          "telescope warning after save" ); }} }
   Ok (( )) }
 
-/// Preserve final instruction order while keeping only the last definition
-/// of each primary ID. Cleanup applies to ordinary deletes; a merge instead
-/// retains incoming references through the acquirer's new extra ID.
-pub(crate) fn combined_save_definitions (
-  graph : &InRustGraph,
-  mut ordinary : Vec<DefineNode>,
-  merges : &[NodeMerge],
-) -> Vec<DefineNode> {
-  apply_delete_propagation_cleanup (&mut ordinary, graph);
-  ordinary . extend (merges . iter () . flat_map (NodeMerge::to_vec));
-  let mut last : HashMap<ID, usize> = HashMap::new ();
-  for (index, definition) in ordinary . iter () . enumerate () {
-    last . insert (definition_pid (definition) . clone (), index); }
-  ordinary . into_iter () . enumerate ()
-    . filter_map (|(index, definition)|
-      (last . get (definition_pid (&definition)) == Some (&index))
-        . then_some (definition)) . collect () }
-
-fn definition_pid (definition : &DefineNode) -> &ID {
-  match definition {
-    DefineNode::Save (node) => &node . 0 . pid,
-    DefineNode::Delete (node) => &node . id,
-  }
-}
-
 pub fn validate_override_invariants_after_save (
   save_instructions  : &[DefineNode],
   nodeMerge_instructions : &[NodeMerge],
@@ -285,11 +356,21 @@ pub fn validate_override_invariants_after_save (
     graph . load_full () . graph . clone ();
   let mut simulated : InRustGraph =
     (*graph_snap) . clone ();
-  let definitions : Vec<DefineNode> = combined_save_definitions (
-    &graph_snap, save_instructions . to_vec (), nodeMerge_instructions);
-  apply_definenodes_to_inRustGraph (&mut simulated, &definitions);
-  let touched : HashSet<ID> = definitions . iter ()
-    . map (|definition| definition_pid (definition) . clone ()) . collect ();
+  let mut nonmerge : Vec<DefineNode> =
+    save_instructions . to_vec ();
+  apply_delete_propagation_cleanup (&mut nonmerge, &graph_snap);
+  apply_definenodes_to_inRustGraph (&mut simulated, &nonmerge);
+  let nodeMerge_definenodes : Vec<DefineNode> =
+    nodeMerge_instructions . iter ()
+    . flat_map ( |nodeMerge| nodeMerge . to_vec () )
+    . collect ();
+  apply_definenodes_to_inRustGraph (&mut simulated, &nodeMerge_definenodes);
+  let touched : HashSet<ID> = // every node this save actually wrote
+    nonmerge . iter () . chain ( nodeMerge_definenodes . iter () )
+    . map ( |dn| match dn {
+        DefineNode::Save (SaveNode (n)) => n . pid . clone (),
+        DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), } )
+    . collect ();
   let violations =
     validate_touched_override_invariants (config, &simulated, &touched);
   if violations . is_empty () {
@@ -304,6 +385,110 @@ pub fn validate_override_invariants_after_save (
       // them. update_from_and_rerender_buffer also back-fills the
       // save's parse warnings onto any post-parse validation error.
       warnings : vec![], } )) }}
+
+/// Update the DB from a batch of `DefineNode`s:
+/// 1) Delete all nodes marked Delete, using delete_nodes_from_pids
+/// 2) Remove deleted nodes from further processing
+/// 3) Create only nodes whose IDs are not present, via
+///      create_only_nodes_with_no_ids_present
+/// 4) Delete all outbound `contains` from those nodes, via
+///      delete_out_links
+///    PITFALL: Only the primary ID from each NodeComplete is used.
+/// 5) Recreate all relationships for those nodes, via
+///      create_all_relationships
+pub async fn update_typedb_from_saveinstructions (
+  db_name      : &str,
+  driver       : &TypeDBDriver,
+  node_defs    : &[DefineNode],
+  source_moves : &[SourceMove],
+  old_graph    : Option<&InRustGraph>, // Some → write only the edge delta vs this pre-save snapshot; None → bulk delete-all + recreate-all (the nodeMerge path, where pid migration makes a set-diff subtle).
+) -> Result<(), Box<dyn Error>> {
+
+  // PITFALL: Below, each get(0) on an 'ids' field
+  // is not motivated by separating the PID from the others,
+  // because (see add_missing_info_to_viewforest) there are no others.
+  // It is simply to turn the Vec<ID> into a bare ID.
+
+  let ( to_delete, to_save )
+    : ( Vec<DeleteNode>, Vec<SaveNode> )
+    = DefineNode::partition_save_and_delete (node_defs);
+
+  { // delete
+    let to_delete_pids : Vec<ID> =
+      to_delete . iter ()
+      . map ( |DeleteNode { id, .. }| id . clone() )
+      . collect ();
+    if ! to_delete_pids . is_empty () {
+      tracing::debug!("Deleting nodes with PIDs: {:?}", to_delete_pids);
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "delete_nodes_from_pids") . entered ();
+        // PITFALL: deletions cascade in TypeDB by default,
+        // so we are left with no incomplete relationships.
+        delete_nodes_from_pids (
+          db_name, driver, & to_delete_pids )
+        . await } ?; }}
+
+  { // create | update
+    let to_write_nodecompletes : Vec<NodeComplete> =
+      to_save . iter ()
+      . map ( |SaveNode (node) | node . clone() )
+      . collect ();
+    let to_write_pids : Vec<ID> =
+      to_write_nodecompletes . iter ()
+      . map ( |n| n . pid . clone() )
+      . collect ();
+    let to_write_typedb : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
+      to_write_nodecompletes . iter ()
+      . map (NodeTypedb::from_complete_parsing_textlinks)
+      . collect ();
+    let pre_existing_pids : HashSet<String> = { // "Pre-existing" = not being created now. Existing ones need their has_extra_id relations re-synced below; create_only_nodes_with_no_ids_present handles extra_ids only for newly-created nodes via its internal call to 'create_node'.
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "which_ids_exist" ). entered();
+      let pids_btreeset : BTreeSet<String> =
+        to_write_pids . iter ()
+        . map ( |p| p . to_string () )
+        . collect ();
+      which_ids_exist (db_name, driver, &pids_btreeset) . await ? };
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "create_only_nodes_with_no_ids_present") . entered ();
+      create_only_nodes_with_no_ids_present (
+        db_name, driver, & to_write_typedb )
+      . await } ?;
+    { // For existing nodes, re-sync extra_ids.
+      // PITFALL: This pass must complete for every pre-existing pid before any create_all_relationships call runs, because those calls resolve target IDs through has_extra_id — a neighbor save whose target is a merged-into acquirer needs the freshly-added has_extra_id (acquiree_pid → acquirer) to exist at lookup time.
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "replace_extra_ids_of_existing_nodes") . entered ();
+      for node in & to_write_typedb {
+        if pre_existing_pids . contains (node . pid . as_str ()) {
+          overwrite_extra_ids_of_node (
+            db_name, driver, node ) . await ?; } } }
+    match old_graph {
+      Some (old_graph) => { // incremental: write only the changed edges
+        let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "apply_relationship_deltas_for_nodes") . entered ();
+        apply_relationship_deltas_for_nodes (
+          db_name, driver, old_graph, & to_write_typedb,
+          & pre_existing_pids )
+        . await ? ; }
+      None => {
+        { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
+          let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "delete_all_outbound_relationships_to_nodes") . entered ();
+          delete_all_outbound_relationships_to_nodes (
+            db_name, driver, & to_write_pids )
+          . await ?; }
+        { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "create_all_relationships") . entered ();
+          create_all_relationships (
+            db_name, driver, & to_write_typedb )
+          . await ?; } } } }
+
+  for sm in source_moves { // TODO ? parallelize
+    update_node_source (
+      db_name, driver,
+      &sm . pid, &sm . new_source ) . await ?; }
+
+  Ok (( )) }
 
 /// Two-phase cleanup so deletes don't leave dangling references on
 /// disk:
@@ -323,8 +508,10 @@ pub fn validate_override_invariants_after_save (
 ///
 /// 'deleted_id_set' includes both the primary pid of each delete
 /// AND the extra_ids of that node from the in-Rust graph.
-/// Referencers may have stored any of those ids in their outbound
-/// lists; cleanup removes both primary and extra-ID spellings.
+/// Referencers may have stored any of those ids (TypeDB resolves
+/// them all to the primary at relationship time, but the on-disk
+/// list is whatever the buffer that wrote it had); we want all of
+/// them gone.
 ///
 /// Skipped fields:
 /// - extra_ids of referencers: per the data model, an id can only
@@ -335,7 +522,7 @@ pub fn validate_override_invariants_after_save (
 ///   placeholders when followed, so this is non-fatal.
 pub(crate) fn apply_delete_propagation_cleanup (
   node_defs  : &mut Vec<DefineNode>,
-  graph_snap : &InRustGraph,
+  graph_snap : &Arc<InRustGraph>,
 ) {
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
     . filter_map ( |d| match d {
@@ -613,7 +800,7 @@ pub(crate) fn prepare_fs_update (
   // explicit old-path delete here would even be WRONG for a
   // private->public home move, where the old (more private) source
   // legitimately retains a section holding the node's private
-  // memberships. (source_moves still matter to Tantivy,
+  // memberships. (source_moves still matter to TypeDB/Tantivy,
   // handled elsewhere.)
   let mut path_manifest : BTreeMap<PathBuf, PreparedPathMutation> =
     BTreeMap::new ();
@@ -679,45 +866,6 @@ mod save_fence_tests {
       ]),
     } . with_selected_fence (selected_before)
   }
-
-  #[test]
-  fn merge_tombstone_supersedes_repair_without_cleaning_redirected_references () {
-    use crate::types::nodes::complete::empty_node_complete;
-    use crate::types::misc::{MemberAtSource, SourceName};
-    let mut acquiree : NodeComplete = empty_node_complete ();
-    acquiree . pid = ID::from ("acquiree");
-    acquiree . title = "retained text" . into ();
-    let mut acquirer : NodeComplete = empty_node_complete ();
-    acquirer . pid = ID::from ("acquirer");
-    let mut neighbor : NodeComplete = empty_node_complete ();
-    neighbor . pid = ID::from ("neighbor");
-    neighbor . contains = vec![MemberAtSource {
-      source: SourceName::from ("main"), member: acquiree . pid . clone () }];
-    let original : InRustGraph = InRustGraph::from_nodecompletes (
-      &[acquiree . clone (), acquirer . clone (), neighbor . clone ()]);
-    acquirer . extra_ids . push (acquiree . pid . clone ());
-    let mut preserver : NodeComplete = acquiree . clone ();
-    preserver . pid = ID::from ("preserver");
-    let merge : NodeMerge = NodeMerge {
-      acquiree_text_preserver: SaveNode (preserver . clone ()),
-      updated_acquirer: SaveNode (acquirer . clone ()),
-      acquiree_to_delete: DeleteNode {
-        id: acquiree . pid . clone (), source: acquiree . source . clone () },
-    };
-    let definitions : Vec<DefineNode> = combined_save_definitions (
-      &original, vec![DefineNode::Save (SaveNode (acquiree . clone ()))], &[merge]);
-    assert_eq! (definitions . len (), 3);
-    assert! (!definitions . iter () . any (|definition|
-      matches! (definition, DefineNode::Save (node) if node . 0 . pid == acquiree . pid)));
-    let mut selected : InRustGraph = original;
-    apply_definenodes_to_inRustGraph (&mut selected, &definitions);
-    let reference : InRustGraph = InRustGraph::from_nodecompletes (
-      &[acquirer, preserver, neighbor]);
-    assert_eq! (selected . nodes, reference . nodes);
-    assert_eq! (selected . contained_by, reference . contained_by);
-    assert_eq! (selected . extra_id_to_pid, reference . extra_id_to_pid);
-    assert_eq! (selected . pid_and_source (&acquiree . pid),
-      Some ((ID::from ("acquirer"), SourceName::from ("main")))); }
 
   #[test]
   fn exact_non_ascii_bytes_pass_and_same_length_rewrite_fails () {

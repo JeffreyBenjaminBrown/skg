@@ -283,12 +283,12 @@ async fn reload_touched_telescopes_for_incident (
   let config = env . config . clone ();
   let store_outcome : StoreUpdateOutcome = match apply_define_nodes_to_stores (
     defs, &[], config,
-    &env . tantivy_index, &env . driver, &env . in_rust_graph,
+    &env . tantivy_index,  &env . in_rust_graph,
     false /* write_fs */, Some (manifest), &HashSet::new () ) . await {
     Ok (outcome) => outcome,
     Err (e) => return Err ( format! (
       "store update failed: {}", e )), };
-  // The graph/TypeDB generation is now selected and the lock is still held.
+  // The graph/search generation is now selected and the lock is still held.
   // Make its recovery evidence durable before either releasing the writer or
   // telling the client; this closes the crash window between store commit and
   // journal creation.
@@ -300,7 +300,7 @@ async fn reload_touched_telescopes_for_incident (
     TantivyGenerationStatus::Committed => None,
     TantivyGenerationStatus::Reconstructed (reason) => Some (reason),
     TantivyGenerationStatus::Failed (reason) => return Err (format! (
-      "graph generation {} and TypeDB committed, but Tantivy generation {} \
+      "graph generation {} committed, but Tantivy generation {} \
        failed: {}",
       store_outcome . graph_generation . get (),
       store_outcome . tantivy_generation . get (), reason)),

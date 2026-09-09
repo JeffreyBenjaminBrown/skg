@@ -13,12 +13,12 @@ use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_ugly_telescope, search_index};
-use crate::dbs::typedb::ancestry::{ AncestryTree, full_containerward_ancestry_from_in_rust_graph};
+use crate::dbs::graph_queries::ancestry::{ AncestryTree, full_containerward_ancestry};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::typedb::search::all_graphnodestats::{
+use crate::dbs::graph_queries::all_graphnodestats::{
   AllGraphNodeStats,
-  fetch_all_graphnodestats_in_rust};
+  fetch_all_graphnodestats};
 use crate::runtime::RuntimeQueryLease;
 use crate::runtime::ServerRuntime;
 use crate::org_to_text::viewforest_to_string;
@@ -386,8 +386,8 @@ fn spawn_enrichment_thread (
               ids_clone . len ());
     let ancestry_by_id : HashMap<ID, AncestryTree> =
       ids_clone . iter () . map (|id| (id . clone (),
-        full_containerward_ancestry_from_in_rust_graph (
-          &graph, id, max_depth))) . collect ();
+        full_containerward_ancestry (
+          &graph, id, max_depth, Some (&active_clone)))) . collect ();
     tracing::info! ("search enrichment: ancestry computed ({} entries)",
               ancestry_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
@@ -412,9 +412,8 @@ fn spawn_enrichment_thread (
           (id . clone (), (node . title . clone (), node . source . clone ()))))
       . collect ();
     let graphnodestats : AllGraphNodeStats =
-      fetch_all_graphnodestats_in_rust (
+      fetch_all_graphnodestats (
         &graph, &all_enriched_ids,
-        &all_enriched_ids . iter () . cloned () . collect (),
         Some (&active_clone));
     tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
               all_enriched_ids . len ());

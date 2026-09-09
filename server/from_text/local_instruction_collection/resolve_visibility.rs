@@ -33,7 +33,6 @@ use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// The 'visibility' pairs are (subscriber, signal), as
 /// 'lower_collected_intents' extracted them from the map.
@@ -42,24 +41,20 @@ pub async fn resolve_visibility (
   mut lowered : LoweredIntents,
   visibility  : &[(ID, SubscribeeVisibility)],
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<LoweredIntents, Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (graph,
-    visibility, config, driver ) . await ?;
+    visibility) . await ?;
   infer_hides_from_contains_removals (graph,
     // Before the signal loop below, so that an explicit
     // subscribee-as-such gesture about the same child wins.
-    &mut lowered, visibility, config, driver,
-    restricted_source_set ) . await ?;
+    &mut lowered, visibility, config, restricted_source_set ) . await ?;
   for (subscriber, signal) in visibility {
     let Some (subscribee_from_disk) =
-      optNodeComplete_rustFIrst_by_id (graph,
-        config, driver, &signal . subscribee ) . await ?
+      optNodeComplete_rustFIrst_by_id (graph, &signal . subscribee ) . await ?
     else { continue; };
     let Some (subscriber_from_disk) =
-      optNodeComplete_rustFIrst_by_id (graph,
-        config, driver, subscriber ) . await ?
+      optNodeComplete_rustFIrst_by_id (graph, subscriber ) . await ?
     else { continue; };
     if ! config . user_owns_source (&subscriber_from_disk . source) {
       continue; }
@@ -113,15 +108,13 @@ async fn infer_hides_from_contains_removals (
   lowered    : &mut LoweredIntents,
   visibility : &[(ID, SubscribeeVisibility)],
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   for (subscriber_pid, source, new_contains, subscribes_msv)
     in lowered . save_intents_with_specified_contains () {
     if ! config . user_owns_source (&source) { continue; }
     let Some (subscriber_from_disk) =
-      optNodeComplete_rustFIrst_by_id (graph,
-        config, driver, &subscriber_pid ) . await ?
+      optNodeComplete_rustFIrst_by_id (graph, &subscriber_pid ) . await ?
     else { continue; };
     let subscriber_contains : Vec<ID> =
       members_of (&subscriber_from_disk . contains);
@@ -164,8 +157,7 @@ async fn infer_hides_from_contains_removals (
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =
-              optNodeComplete_rustFIrst_by_id (graph,
-                config, driver, subscribee ) . await ?
+              optNodeComplete_rustFIrst_by_id (graph, subscribee ) . await ?
             { content . extend (
                 members_of (& subscribee_from_disk . contains) ); }}
           content };
@@ -185,8 +177,6 @@ async fn infer_hides_from_contains_removals (
 async fn validate_no_overlapping_subscribee_hiderel_conflicts (
   graph : &InRustGraph,
   visibility : &[(ID, SubscribeeVisibility)],
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // This needs the visibility signals plus disk contains lists,
   // because the conflict is per subscriber/subscribee-content pair,
@@ -194,8 +184,7 @@ async fn validate_no_overlapping_subscribee_hiderel_conflicts (
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
   for (subscriber, signal) in visibility {
     let subscribee_from_disk : NodeComplete =
-      match optNodeComplete_rustFIrst_by_id (graph,
-        config, driver, &signal . subscribee ) . await ?
+      match optNodeComplete_rustFIrst_by_id (graph, &signal . subscribee ) . await ?
       { Some (subscribee_from_disk) => subscribee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =

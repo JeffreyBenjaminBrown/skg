@@ -20,7 +20,6 @@ use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::collections::HashMap;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub struct Definenodes_with_Sourcemoves {
   pub instructions : Vec<DefineNode>,
@@ -55,7 +54,6 @@ pub async fn build_diskSupplemented_defineNodes (
   graph : &InRustGraph,
   intents : Vec<NodeIntent>,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
   let mut result : Definenodes_with_Sourcemoves =
@@ -63,7 +61,7 @@ pub async fn build_diskSupplemented_defineNodes (
   for intent in intents {
     let supplemented : Definenode_with_Opt_Sourcemove =
       supplement_nodeeditintent_from_disk (graph,
-        intent, config, driver, restricted_source_set ) . await ?;
+        intent, config, restricted_source_set ) . await ?;
     result . push (supplemented); }
   Ok (result) }
 
@@ -71,7 +69,6 @@ async fn supplement_nodeeditintent_from_disk (
   graph : &InRustGraph,
   intent : NodeIntent,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   match intent {
@@ -88,21 +85,19 @@ async fn supplement_nodeeditintent_from_disk (
     _ => supplement_saveintent_from_disk (graph,
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      config, driver, restricted_source_set ) . await,
+      config, restricted_source_set ) . await,
   }}
 
 async fn supplement_saveintent_from_disk (
   graph : &InRustGraph,
   from_buffer : NodeSaveIntent,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
-    optNodeComplete_rustFIrst_by_id (graph,
-      config, driver, &pid) . await ?;
+    optNodeComplete_rustFIrst_by_id (graph, &pid) . await ?;
   match from_disk {
     None => {
       // A brand-new node has no sticky sources (no disk edges to be

@@ -80,7 +80,7 @@ pub struct ContextComputation {
 /// Returns the map from node ID to context origin type label.
 ///
 /// Fully in-Rust-graph: all data is pre-computed from NodeCompletes at init.
-/// No TypeDB queries, no async. On a 28k-node dataset this is
+/// No external queries or async work. On a 28k-node dataset this is
 /// near-instantaneous (sub-second).
 pub fn compute_and_store_context_types (
   tantivy_index : &TantivyIndex,
@@ -238,7 +238,7 @@ fn context_origin_type_for_node (
 // Step 1: identify origins (using the in-Rust graph)
 //
 
-/// Build origin_types map from in-Rust-graph data + one TypeDB query result.
+/// Build origin_types from the selected graph context maps.
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's a Dest, etc.
 /// Therefore higher-priority origin types are processed later.

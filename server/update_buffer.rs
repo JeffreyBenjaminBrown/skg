@@ -13,7 +13,7 @@ pub use graphnodestats::{
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_viewforest, CompletionContext};
-use crate::dbs::in_rust_graph::{ InRustGraph, scheduled_audit::take_pending_audit_warning};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -45,7 +45,6 @@ use std::error::Error;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
-use typedb_driver::TypeDBDriver;
 
 pub struct RerenderAfterSaveContext<'a> {
   pub env          : &'a SkgEnv,
@@ -63,7 +62,7 @@ pub struct RerenderAfterSaveContext<'a> {
 
 /// Immutable authority for one background render attempt.  Advancing the
 /// shared epoch makes the attempt obsolete without trying to interrupt a
-/// TypeDB call mid-flight; checkpoints stop it before the next costly stage.
+/// query mid-flight; checkpoints stop it before the next costly stage.
 #[derive(Clone)]
 pub struct RenderCancellationTicket {
   epoch    : Arc<AtomicU64>,
@@ -341,8 +340,6 @@ pub async fn update_views_after_save (
       scalar_approved_pids);
     let _ = refresh . send (stream);
   }
-  if let Some (w) = take_pending_audit_warning () {
-    context . warnings . insert (0, w); }
   Ok ( SaveResponse {
     saved_view          : saved_text,
     errors              : context . errors,
@@ -424,7 +421,7 @@ pub async fn render_initial_view (
   let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_ids (
-      &graph_snap, root_ids, &env . config, &env . driver, &mut stub_defmap,
+      &graph_snap, root_ids, &env . config, &mut stub_defmap,
       active ) . await ?;
   // De-novo (and ONLY de-novo) asks each view-root for its containerward
   // ancestry, as a self-consuming view request. The during-completion dispatch
@@ -524,7 +521,6 @@ pub async fn rerender_view (
       finish_viewforest_cancellable (
         &context . graph_snap, viewforest,
         &context . env . config,
-        &context . env . driver,
         context . active_source_set,
         context . cancellation . as_ref ()) . await } ?;
   if let Some (ticket) = &context . cancellation { ticket . checkpoint () ?; }
@@ -553,18 +549,16 @@ pub async fn finish_viewforest (
   graph : &InRustGraph,
   viewforest        : &mut ViewForest,
   config            : &SkgConfig,
-  driver            : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<String, Box<dyn Error>> {
   finish_viewforest_cancellable (
-    graph, viewforest, config, driver, active_source_set, None) . await
+    graph, viewforest, config, active_source_set, None) . await
 }
 
 async fn finish_viewforest_cancellable (
   graph : &InRustGraph,
   viewforest        : &mut ViewForest,
   config            : &SkgConfig,
-  driver            : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   cancellation      : Option<&RenderCancellationTicket>,
 ) -> Result<String, Box<dyn Error>> {
@@ -576,12 +570,12 @@ async fn finish_viewforest_cancellable (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "fulfill_root_containerward_requests" ). entered();
     fulfill_root_containerward_requests (
-      graph, viewforest, config, driver, active_source_set ) . await ? ; }
+      graph, viewforest, config, active_source_set ) . await ? ; }
   checkpoint () ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
     attach_containerward_ancestries_to_removedhere_phantoms (
-      graph, viewforest, config, driver, active_source_set ) . await ? ; }
+      graph, viewforest, config, active_source_set ) . await ? ; }
   checkpoint () ?;
   mark_view_roots_parent_absent ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
@@ -597,10 +591,10 @@ async fn finish_viewforest_cancellable (
     match active_source_set {
       Some (active) =>
         set_graphnodestats_in_viewforest_with_source_set (
-          graph, viewforest, config, driver, active ) . await,
+          graph, viewforest, config, active ) . await,
       None =>
         set_graphnodestats_in_viewforest (
-          graph, viewforest, config, driver ) . await,
+          graph, viewforest, config ) . await,
     } ?;
   checkpoint () ?;
   set_viewnodestats_in_viewforest (
@@ -810,7 +804,6 @@ async fn fulfill_root_containerward_requests (
   graph : &InRustGraph,
   viewforest : &mut ViewForest,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   active     : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let requesting_root_nodeids : Vec<NodeId> =
@@ -824,7 +817,7 @@ async fn fulfill_root_containerward_requests (
       . collect ();
   if requesting_root_nodeids . is_empty () { return Ok (( )); }
   attach_containerward_ancestries_at_nodeids_with_source_set (
-    graph, viewforest, &requesting_root_nodeids, config, driver, active ) . await ?;
+    graph, viewforest, &requesting_root_nodeids, config, active ) . await ?;
   for nid in requesting_root_nodeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
@@ -833,13 +826,12 @@ async fn fulfill_root_containerward_requests (
   Ok (( )) }
 
 /// For every RemovedHere phantom in the viewforest, fetch its containerward
-/// ancestry from TypeDB and insert it as indefinitive Content children.
+/// ancestry from the selected graph and insert it as indefinitive Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
   graph : &InRustGraph,
   viewforest    : &mut ViewForest,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
   active        : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let phantom_nodeids : Vec<NodeId> = {
@@ -856,7 +848,7 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
         { result . push ( node_ref . id () ); }} }
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
-    graph, viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }
+    graph, viewforest, &phantom_nodeids, config, active ) . await }
 
 #[cfg(test)]
 mod cancellation_tests {

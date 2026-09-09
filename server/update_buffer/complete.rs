@@ -157,18 +157,18 @@ async fn dispatch_node_update (
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
-        context . graph_snap, treeid, tree, context . source_diffs, context . env,
+        context . graph_snap, treeid, tree, context . source_diffs,
         context . deleted_since_head_pid_src_map,
         context . active_source_set ) . await ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
-        context . graph_snap, treeid, tree, context . source_diffs, context . env,
+        context . graph_snap, treeid, tree, context . source_diffs,
         context . deleted_since_head_pid_src_map,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
-        context . graph_snap, treeid, tree, context . source_diffs, context . env,
+        context . graph_snap, treeid, tree, context . source_diffs,
         context . deleted_since_head_pid_src_map,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
@@ -179,8 +179,7 @@ async fn dispatch_node_update (
       // 'PartnerCol::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       reconcile_partnerCol_children (
-        treeid, tree, *role, context . source_diffs,
-        context . env, context . graph_snap,
+        treeid, tree, *role, context . source_diffs, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
@@ -190,10 +189,10 @@ async fn dispatch_node_update (
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
       super::reconcile::aliascol::reconcile_alias_col_children (
-        context . graph_snap, tree, treeid, context . source_diffs, &context . env . config ) ?,
+        context . graph_snap, tree, treeid, context . source_diffs) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::reconcile::id_col::reconcile_id_col_children (
-        context . graph_snap, treeid, tree, context . source_diffs, &context . env . config ) ?,
+        context . graph_snap, treeid, tree, context . source_diffs) ?,
     _ => {
       // No-op for: Inactive (an anonymous placeholder -- it carries no
       // identity, and flipping it to a "DELETED" marker would leak that
@@ -284,21 +283,18 @@ async fn visit_normal_node (
     if ! parent_is_partner_col {
       maybe_add_partnerCol_branches (
         context . graph_snap, tree, treeid, &context . env . config,
-        &context . env . driver,
         context . active_source_set,
         context . source_diffs ) . await ?; } }
   cancellation_checkpoint (context) ?;
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
-    context . graph_snap, treeid, tree, &context . env . config, &context . env . driver,
-    context . errors, context . active_source_set ) . await ?;
+    context . graph_snap, treeid, tree, &context . env . config, context . errors, context . active_source_set ) . await ?;
   cancellation_checkpoint (context) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
-    context . graph_snap, tree, treeid, &context . env . config, &context . env . driver,
-    context . active_source_set,
+    context . graph_snap, tree, treeid, &context . env . config, context . active_source_set,
     context . source_diffs ) . await ?;
   cancellation_checkpoint (context) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
@@ -313,8 +309,7 @@ async fn visit_normal_node (
       tree . get_mut (treeid) . unwrap ();
     process_activeNode_diff (
       context . graph_snap, node_mut, real_diffs,
-      context . deleted_since_head_pid_src_map,
-      &context . env . config )
+      context . deleted_since_head_pid_src_map)
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok(( )) }
 

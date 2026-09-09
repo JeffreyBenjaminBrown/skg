@@ -20,7 +20,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
-use crate::types::env::{SkgEnv, find_source};
+use crate::types::env::{find_source};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
@@ -68,7 +68,6 @@ pub fn build_child_data (
                                      -> (ExistenceAxes, MembershipAxes),
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  env                            : &SkgEnv,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
     let node_ref : NodeRef<ViewNode> =
@@ -96,7 +95,7 @@ pub fn build_child_data (
         axes_for_removed ( child_skgid, &child_src );
       let child_title : String =
         title_for_phantom (graph,  child_skgid, &child_src,
-                            source_diffs . as_ref (), &env . config );
+                            source_diffs . as_ref ());
       result . insert ( child_skgid . clone (),
                         ChildData { source  : child_src,
                                     title   : child_title,
@@ -113,7 +112,7 @@ pub fn build_child_data (
           "build_child_data: no source found for {}", child_skgid . 0
         ) . into () } ) ?;
       let skg : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
-        graph, &env . config, child_skgid, &child_src ) ?;
+        graph, child_skgid, &child_src ) ?;
       result . insert ( child_skgid . clone (),
                         ChildData { source  : skg . source . clone (),
                                     title   : skg . title . clone (),

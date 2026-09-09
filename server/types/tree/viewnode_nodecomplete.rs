@@ -3,7 +3,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 
 use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{members_of, ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{members_of, ID, MSV, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, ActiveNode, ParentIs };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, PartnerCol};
@@ -99,14 +99,13 @@ pub fn pids_for_subscriber_and_its_subscribees (
   graph : &InRustGraph,
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
-  config  : &SkgConfig,
 ) -> Result < ( ID, Vec < ID > ),
               Box<dyn Error> > {
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, node_id, "pids_for_subscriber_and_its_subscribees" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source (graph,  config, &pid, &source ) ?;
+    nodecomplete_rustFirst_by_pid_and_source (graph, &pid, &source ) ?;
   Ok (( nodecomplete . pid . clone (),
         members_of ( nodecomplete . subscribes_to . or_default() ) )) }
 
@@ -116,7 +115,6 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   graph : &InRustGraph,
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
-  config  : &SkgConfig,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
   let subscribee_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
   let node_ref : NodeRef < ViewNode > =
@@ -138,7 +136,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      graph, config, &subscriber_id, &subscriber_source ) ?;
+      graph, &subscriber_id, &subscriber_source ) ?;
   Ok (( subscribee_pid,
         nodecomplete . pid . clone() )) }
 

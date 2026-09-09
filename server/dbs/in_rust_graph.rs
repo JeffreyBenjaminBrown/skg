@@ -1,4 +1,4 @@
-//! The in-Rust partial projection of the graph.
+//! Immutable graph semantics and inverse relationship indexes.
 //!
 //! A single 'InRustGraph' value holds every node (as a 'NodeRust') the
 //! render / save pipeline can read from, plus inverse indexes for
@@ -7,73 +7,18 @@
 //! readers — writers clone via 'im''s structural sharing (O(log n)
 //! per mutation) and atomically publish a new snapshot.
 
-pub mod audit;
-pub mod audit_store;
 pub mod override_invariants;
 pub mod override_resolution;
 pub mod relation_accessors;
-pub mod scheduled_audit;
 
 use arc_swap::ArcSwap;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 use crate::types::store_state::{SelectedPathManifest, SelectedStoreState};
-
-/// Process-global handle to the in-Rust graph.
-///
-/// Set once, at server startup (see 'init_global_handle_for_first_time_or_panic'). Read-only
-/// afterwards. Functions on hot read paths (notably
-/// 'pid_and_source_from_id') consult this handle to bypass TypeDB
-/// without requiring every caller to thread a '&InRustGraph' parameter.
-///
-/// PITFALL: tests that don't initialize this will see 'None' here
-/// and must fall back to whatever they were using before. That's the
-/// reason the consulting callers check and degrade gracefully rather
-/// than panicking.
-static GLOBAL_HANDLE : OnceLock<InRustGraphHandle> =
-  OnceLock::new ();
-
-/// Set the process-global handle. Must be called exactly once, at
-/// server startup, after the initial 'InRustGraph' has been built.
-pub fn init_global_handle_for_first_time_or_panic (handle: InRustGraphHandle) {
-  GLOBAL_HANDLE . set (handle) . ok ()
-    . expect ("GLOBAL_HANDLE initialized twice"); }
-
-/// Idempotent variant, for tests whose process may already have a
-/// handle (in-process test runners share the OnceLock). Returns
-/// whether this call installed it.
-pub fn try_init_global_handle (handle: InRustGraphHandle) -> bool {
-  GLOBAL_HANDLE . set (handle) . is_ok () }
-
-/// For tests that share a process (consolidated sub-tests, plain
-/// 'cargo test'): make the process-global handle reflect `handle`'s
-/// current graph, whether or not the OnceLock is already set. The
-/// OnceLock itself can never be re-set, but its contents are an
-/// ArcSwap, so a later test can swap in its own graph. RETURNS the
-/// global handle, which callers should use in place of `handle` so
-/// that any subsequent swaps they make stay visible globally.
-pub fn install_or_swap_global_handle (
-  handle : InRustGraphHandle,
-) -> InRustGraphHandle {
-  if GLOBAL_HANDLE . set ( handle . clone () ) . is_err () {
-    let global : &InRustGraphHandle =
-      GLOBAL_HANDLE . get () . unwrap (); // safe: set() just failed, so it is initialized
-    global . store ( handle . load_full () );
-    return global . clone (); }
-  handle }
-
-/// Snap the current in-Rust graph if the global handle has been
-/// initialized; returns None otherwise. In the running server
-/// 'init_global_handle_for_first_time_or_panic' is called during startup before any request
-/// is served, so None here indicates a test that bypassed startup
-/// (or code running before startup completes).
-pub fn snapshot_global () -> Option<Arc<InRustGraph>> {
-  GLOBAL_HANDLE . get () . map ( |h|
-    h . load_full () . graph . clone () ) }
 
 /// The in-Rust-graph projection of the graph.
 ///

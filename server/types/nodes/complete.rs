@@ -25,8 +25,8 @@ pub enum FileProperty {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeComplete {
-  // There is a 1-to-1 correspondence between NodeCompletes and privacy TELESCOPES (families of same-pid .skg files, one section per source; see docs/telescopes.md). Reading FOLDS the sections into a NodeComplete; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. NodeComplete is the format used to initialize the TypeDB and Tantivy databases (via narrowing conversions to NodeTypedb / NodeTantivy at their boundaries).
-  // Tantivy receives some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
+  // There is a 1-to-1 correspondence between NodeCompletes and privacy TELESCOPES (families of same-pid .skg files, one section per source; see docs/telescopes.md). Reading FOLDS the sections into a NodeComplete; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. NodeComplete initializes the in-memory graph and the derived Tantivy index (via narrowing conversions to NodeRust / NodeTantivy at their boundaries).
+  // The graph holds node text, relationships, and their recording sources. Tantivy indexes titles and aliases. Rendering reads bodies from the same selected graph snapshot as the other node fields.
   // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges sourced there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
 
   pub title: String,
@@ -36,9 +36,9 @@ pub struct NodeComplete {
   pub ugly_telescope: bool,
   pub aliases: MSV<MemberAtSource<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the source of the telescope section that records it.
   pub source: SourceName, // source name, inferred from file location and SkgConfig
-  pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
+  pub pid: ID, // Primary ID. Determines filename, graph identity, Tantivy key, map key. Never changes.
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
-  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
+  pub body: Option<String>, // Stored in the graph; not indexed by Tantivy. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   // Each relationship member carries the privacy LEVEL of the edge
   // (see 'MemberAtSource'). List order is fold order.

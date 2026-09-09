@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 use std::time;
-use typedb_driver::TypeDBDriver;
 
 
 /// Whether an ID's definitive occurrence is Final (claimed by a
@@ -63,8 +62,6 @@ pub type DefinitiveMap =
 /// title. Absence returns None so callers can render an Unknown placeholder.
 pub async fn nodecomplete_and_viewnode_from_id (
   graph : &InRustGraph,
-  config : &SkgConfig,
-  _driver : &TypeDBDriver,
   skgid  : &ID,
 ) -> Result < Option<( NodeComplete, ViewNode )>, Box<dyn Error> > {
   let resolved : Option<(ID, SourceName)> = graph . pid_and_source (skgid);
@@ -73,18 +70,17 @@ pub async fn nodecomplete_and_viewnode_from_id (
     Some ((pid_resolved, source)) =>
       Ok ( Some (
         nodecomplete_and_viewnode_from_pid_and_source (
-          graph, config, &pid_resolved, &source ) ? )) } }
+          graph, &pid_resolved, &source ) ? )) } }
 
 /// Fetch a NodeComplete from the supplied graph given PID and source.
 /// Makes an ViewNode with validated title. Returns both.
 pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
   graph : &InRustGraph,
-  config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source (graph,  config, pid, source )?;
+    nodecomplete_rustFirst_by_pid_and_source (graph, pid, source )?;
   let title : String = nodecomplete . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -104,13 +100,12 @@ pub(super) fn makeIndefinitiveAndClobber (
   graph : &InRustGraph,
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
-  config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   write_at_activeNode_in_tree (
     tree, node_id,
     |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  clobberIndefinitiveViewnode (graph,  tree, node_id, config ) ?;
+  clobberIndefinitiveViewnode (graph,  tree, node_id) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -126,7 +121,6 @@ pub async fn complete_branch_minus_content (
   node_id  : NodeId,
   visited  : &mut DefinitiveMap,
   config   : &SkgConfig,
-  driver   : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
@@ -134,11 +128,11 @@ pub async fn complete_branch_minus_content (
     tree, node_id, visited ) ?;
   if activeNode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveViewnode (
-      graph, tree, node_id, config ) ?; }
+      graph, tree, node_id) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_partnerCol_branches" ). entered();
     maybe_add_partnerCol_branches (
-      graph, tree, node_id, config, driver, active_source_set,
+      graph, tree, node_id, config, active_source_set,
       // This birth path runs outside the diff-aware BFS (search
       // results, ancestry attachment, stubs); diff-mode col
       // existence is decided at each node's completion visit, which
@@ -199,7 +193,6 @@ pub async fn stub_viewforest_from_root_ids (
   graph : &InRustGraph,
   root_skgids : &[ID],
   config   : &SkgConfig,
-  driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < ViewForest, Box<dyn Error> > {
@@ -211,7 +204,7 @@ pub async fn stub_viewforest_from_root_ids (
     build_node_branch_minus_content (
       graph, Some ( (viewforest . as_internal_tree_mut (),
               viewforest_root_treeid) ),
-      root_skgid, config, driver, visited, active_source_set
+      root_skgid, config, visited, active_source_set
     ) . await ?; }
   Ok (viewforest) }
 
@@ -451,7 +444,6 @@ pub async fn build_node_branch_minus_content (
   tree_and_parent : Option<(&mut Tree<ViewNode>, NodeId)>, // if modifying an existing tree, attach as a child here
   skgid           : &ID, // what to fetch
   config          : &SkgConfig,
-  driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < NodeId, Box<dyn Error> > {
@@ -461,7 +453,7 @@ pub async fn build_node_branch_minus_content (
       Some ( (tree, parent_treeid) ) => {
         let lookup : Option<(NodeComplete, ViewNode)> =
           nodecomplete_and_viewnode_from_id (
-            graph, config, driver, skgid ) . await ?;
+            graph, skgid ) . await ?;
         match lookup {
           Some ((_nc, viewnode)) => {
             let child_treeid : NodeId = // Add ViewNode to tree
@@ -472,7 +464,7 @@ pub async fn build_node_branch_minus_content (
               . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
             complete_branch_minus_content (
               graph, tree, child_treeid, visited,
-              config, driver, active_source_set ) . await ?;
+              config, active_source_set ) . await ?;
             Ok (child_treeid) },
           None => { // Uknown node. Add it, don't 'complete' it.
             let viewnode : ViewNode =
@@ -487,7 +479,7 @@ pub async fn build_node_branch_minus_content (
       None => {
         let lookup : Option<(NodeComplete, ViewNode)> =
           nodecomplete_and_viewnode_from_id (
-            graph, config, driver, skgid ) . await ?;
+            graph, skgid ) . await ?;
         match lookup {
           Some ((_nc, viewnode)) => {
             let mut tree : Tree<ViewNode> =
@@ -495,7 +487,7 @@ pub async fn build_node_branch_minus_content (
             let root_treeid : NodeId = tree . root () . id ();
             complete_branch_minus_content (
               graph, &mut tree, root_treeid, visited,
-              config, driver, active_source_set ) . await ?;
+              config, active_source_set ) . await ?;
             Ok (root_treeid) },
           None => { // A singleton tree with an PhantomUnknown.
             let viewnode : ViewNode =

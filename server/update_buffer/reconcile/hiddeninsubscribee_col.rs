@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::{SkgEnv, find_source};
+use crate::types::env::{find_source};
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
@@ -44,7 +44,6 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -54,7 +53,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : HiddenInContext =
-    read_hiddenin_context (graph, tree, node, kind, env, active_source_set) ?;
+    read_hiddenin_context (graph, tree, node, kind, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddeninsubscribee_col (
@@ -87,7 +86,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     build_child_data (
       graph, tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+      source_diffs, deleted_since_head_pid_src_map) ?;
   let summary =
     reconcile_partnerCol_children_against_goal_list(
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
@@ -116,7 +115,6 @@ fn read_hiddenin_context (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   kind               : PartnerCol,
-  env                : &SkgEnv,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
@@ -142,7 +140,7 @@ fn read_hiddenin_context (
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        graph, &env . config, &subscribee_pid, &subscribee_source ) ?;
+        graph, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . iter ()
       . filter ( |m| source_active (& m . source) )
       . map ( |m| m . member . clone () )
@@ -150,7 +148,7 @@ fn read_hiddenin_context (
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        graph, &env . config, &subscriber_pid, &subscriber_source ) ?;
+        graph, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
       . filter ( |m| source_active (& m . source) )

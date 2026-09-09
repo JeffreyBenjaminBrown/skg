@@ -10,7 +10,7 @@ use crate::to_org::complete::partner_col::goal_list::{
   outbound_member_axes,
 };
 use crate::to_org::complete::partner_col::inverse_scan::inverse_scan_for_inbound_col;
-use crate::types::env::{SkgEnv, find_source};
+use crate::types::env::{find_source};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SourceName};
 use crate::source_sets::ActiveSourceSet;
@@ -37,7 +37,6 @@ pub fn reconcile_partnerCol_children (
   tree         : &mut Tree<ViewNode>,
   kind         : PartnerCol,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  env          : &SkgEnv,
   graph_snap   : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set : Option<&ActiveSourceSet>,
@@ -165,7 +164,7 @@ pub fn reconcile_partnerCol_children (
     build_child_data (
       graph_snap, tree, node,
       &goal_list, &removed_ids, axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+      source_diffs, deleted_since_head_pid_src_map) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a read-only PartnerCol
   // drops a stale leaf member instead of preserving it.

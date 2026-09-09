@@ -23,10 +23,6 @@ name = "skg_filenames_match_pids"
 path = "tools/introspect/skg_filenames_match_pids.rs"
 
 [[bin]]
-name = "cleanup-test-dbs"
-path = "tools/cleanup-test-dbs.rs"
-
-[[bin]]
 name = "emit-herald-rules"
 path = "tools/emit-herald-rules.rs"
 
@@ -35,28 +31,12 @@ name = "trim-node-bodies"
 path = "tools/trim-node-bodies.rs"
 
 [[bin]]
-name = "delete-one-db"
-path = "tools/delete-one-db.rs"
-
-[[bin]]
 name = "smsn-keywords"
 path = "thoughts/smsn/find-keywords.rs"
 
 [[bin]]
-name = "bench-context"
-path = "tools/bench-context.rs"
-
-[[bin]]
 name = "bench-context-inmemory"
 path = "tools/bench-context-inmemory.rs"
-
-[[bin]]
-name = "bench-audit"
-path = "tools/bench-audit.rs"
-
-[[bin]]
-name = "probe-audit"
-path = "tools/probe-audit.rs"
 
 [[bin]]
 name = "top-contents"
@@ -132,12 +112,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 tempfile = "3.3.0"
 tokio = { version = "1", features = ["full"] }
-# Pinned exactly to the TypeDB server version in
-# docker-typedb-rust/typedb.nix. The driver makes breaking API changes
-# within its 3.x series (see that repo's PITFALLS.org), so an exact pin
-# keeps a stray `cargo update` from drifting the driver out of step with
-# the server. Bump both together.
-typedb-driver = "=3.12.0"
 uuid = { version = "1.4.1", features = ["v4"] }
 walkdir = "2.4"
 zstd = "0.13"

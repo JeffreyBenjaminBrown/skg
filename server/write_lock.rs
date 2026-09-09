@@ -9,7 +9,7 @@
 //!
 //! It is a tokio async mutex, which is runtime-agnostic: it works under
 //! the `futures::executor::block_on` that drives each connection thread,
-//! so the critical section can span the async TypeDB update.
+//! so the critical section can span the asynchronous store update.
 
 use std::sync::OnceLock;
 use tokio::sync::{Mutex, MutexGuard};

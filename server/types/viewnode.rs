@@ -129,8 +129,8 @@ pub struct PhantomDeleted {
 /// (see PhantomDeleted for the shared framing).
 ///
 /// ARISES: when some node's `contains` (or similar list) names an ID that has no
-/// record anywhere -- not a primary pid, not an extra_id, not in TypeDB, not on
-/// disk, and not recoverable through any phantom/diff procedure. Built by
+/// record in the selected graph -- neither a primary pid nor an extra_id --
+/// and is not recoverable through the explicitly captured phantom/diff evidence. Built by
 /// `mk_unknown_viewnode`, e.g. when `nodecomplete_and_viewnode_from_id` returns
 /// None. A genuine dangling pointer.
 ///
@@ -217,7 +217,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or a Normal
 /// node flipped in place by `normal_to_phantom` because its own membership/
 /// existence axes went negative. "removed" vs "removedHere" (its .skg file is
-/// still in the worktree, so TypeDB can still answer about it) is told apart by
+/// still represented in the selected graph) is told apart by
 /// `is_removedhere_diffPhantom`.
 ///
 /// USED: as a read-only diff annotation. It depicts a removed member at its
@@ -537,9 +537,9 @@ impl < Id, Src > ActiveNode_Generic < Id, Src > {
     diff_axes_require_phantom (&self . existence, &self . membership) }
 
   /// A "removed-here" phantom: a phantom whose '.skg' file is still
-  /// present in the worktree (so TypeDB still knows the node and can
-  /// answer queries about it). Distinguished from a phantom whose file
-  /// is also gone, for which graph queries would fail.
+  /// present in the selected graph, which can answer queries about it.
+  /// Distinguished from a phantom whose file is also gone, for which
+  /// graph queries would fail.
   pub fn is_removedhere_diffPhantom (
     &self,
   ) -> bool {

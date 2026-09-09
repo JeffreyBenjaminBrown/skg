@@ -190,37 +190,9 @@ pub fn load_config (
   validate_and_create_maintenance_archive_root (&mut config)?;
   Ok (config) }
 
-/// Load config from TOML file with optional overrides for testing.
-///
-/// - If `db_name` is Some, overrides db_name and sets tantivy_folder to /tmp/tantivy-{db_name}
-/// - `source_overrides` replaces paths for the specified source names
-///
-/// # Examples
-/// ```ignore
-/// // Override just source paths:
-/// let config = load_config_with_overrides(
-///   "tests/my_test/fixtures/skgconfig.toml",
-///   None,
-///   &[("output", PathBuf::from("/tmp/output"))],
-/// ).unwrap();
-///
-/// // Override just db_name (for tests needing unique databases):
-/// let config = load_config_with_overrides(
-///   "tests/my_test/fixtures/skgconfig.toml",
-///   Some("skg-test-my-test"),
-///   &[],
-/// ).unwrap();
-///
-/// // Override both (for tests that copy fixtures to temp):
-/// let config = load_config_with_overrides(
-///   "tests/my_test/fixtures/skgconfig.toml",
-///   Some("skg-test-my-test"),
-///   &[("main", PathBuf::from("/tmp/fixtures-copy"))],
-/// ).unwrap();
-/// ```
+/// Load configuration while replacing the named source paths for fixtures.
 pub fn load_config_with_overrides (
   path             : &str,
-  db_name          : Option<&str>, // None for no override
   source_overrides : &[(&str, std::path::PathBuf)],
 ) -> Result <SkgConfig, Box<dyn std::error::Error>> {
   if !Path::new (path) . exists() {
@@ -242,10 +214,6 @@ pub fn load_config_with_overrides (
   make_paths_absolute (&mut config);
   derive_ownership_and_labels (&mut config);
   validate_source_sets (&config)?;
-  if let Some (name) = db_name {
-    config . db_name = name . to_string();
-    config . tantivy_folder =
-      std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
   for (source_name, new_path) in source_overrides {
     let key : SourceName = SourceName::from (*source_name);
     if ! config . sources . set_path_override (&key, new_path . clone ()) {

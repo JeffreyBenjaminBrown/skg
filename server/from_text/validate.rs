@@ -8,7 +8,6 @@ use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, 
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet};
-use typedb_driver::TypeDBDriver;
 
 /// Applies the foreign-node write policy, and -- this is where forking
 /// begins -- turns an edit of a foreign node into a fork.
@@ -38,7 +37,6 @@ pub async fn validate_and_filter_foreign_instructions(
   clone_source_inputs : &CloneSourceInputs, // everything clone-source resolution can draw on, in priority order
   adopt_clone_source : &HashMap<ID, ID>, // new node -> forked N whose clone's source it adopts (see 'new_foreign_nodes_adopting_clone_sources')
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
@@ -54,15 +52,13 @@ pub async fn validate_and_filter_foreign_instructions(
     outcomes . push (
       apply_foreign_policy(graph,
         instruction, /* fork_eligible = */ true,
-        adopt_clone_source, config, driver
-      ) . await? ); }
+        adopt_clone_source, config ) . await? ); }
   { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
     for instruction in nodeMerge_definenodes . iter () {
       outcomes . push (
         apply_foreign_policy(graph,
           instruction, /* fork_eligible = */ false,
-          &no_adoptions, config, driver
-        ) . await? ); }}
+          &no_adoptions, config ) . await? ); }}
   collect_foreign_policy_outcomes (&outcomes)?;
   // Build the clones from the fork candidates. A fork candidate only
   // ever arises from a regular `instructions` Save (a nodeMerge's saves
@@ -102,7 +98,6 @@ async fn apply_foreign_policy(
   fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
   adopt_clone_source: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
   config: &SkgConfig,
-  driver: &TypeDBDriver,
 ) -> Result<ForeignPolicyOutcome,
             Vec<BufferValidationError>> {
   match instr {
@@ -118,8 +113,7 @@ async fn apply_foreign_policy(
       if !source_is_foreign (config, &node . source) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match optNodeComplete_rustFIrst_by_id(graph,
-        config, driver, &node . pid
+      match optNodeComplete_rustFIrst_by_id(graph, &node . pid
       ) . await {
         Ok(Some (disk_node)) => {
           if buffernode_differs_from_disknode(node, &disk_node) {

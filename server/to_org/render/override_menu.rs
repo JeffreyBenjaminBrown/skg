@@ -59,8 +59,7 @@ pub async fn override_menu_view (
       &graph, active, pid, &mut path ); }
   let rendered : String =
     finish_viewforest (
-      &graph, &mut viewforest, &env . config, &env . driver,
-      active ) . await ?;
+      &graph, &mut viewforest, &env . config, active ) . await ?;
   let pids : Vec<ID> =
     pids_from_viewforest ( &viewforest )
     . into_iter () . collect ();

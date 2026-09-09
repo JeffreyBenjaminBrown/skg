@@ -12,6 +12,8 @@ pub mod parse_metadata_sexp;
 pub mod protocol;
 pub mod util;
 
+use crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS;
+use crate::dbs::typedb::util::delete_database;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
@@ -840,7 +842,26 @@ fn handle_shutdown_request (
       TcpToClient::Shutdown, "Server shutting down..." ));
   cleanup_and_shutdown (env); }
 
-/// Pending source effects remain recoverable from the durable save journal.
-fn cleanup_and_shutdown (_env : &SkgEnv) {
+/// Performs cleanup before server shutdown.
+/// Deletes the database if delete_on_quit is configured, then exits.
+fn cleanup_and_shutdown (env : &SkgEnv) {
+  if env . config . delete_on_quit {
+    tracing::info! (
+      db_name = %env . config . db_name,
+      "Deleting database before shutdown" );
+
+    // Wait briefly to allow any pending operations to complete.
+    // This helps ensure the database isn't marked as "in use".
+    std::thread::sleep (
+      std::time::Duration::from_millis (
+        SHUTDOWN_DB_DELETE_DELAY_MS ) );
+
+    futures::executor::block_on ( async {
+      if let Err (e) =
+        delete_database (
+          &env . driver, & env . config . db_name )
+        . await {
+          tracing::error! ( error = %e, "Failed to delete database" );
+        }} ); }
   tracing::info! ("Shutdown complete.");
   std::process::exit (0); }

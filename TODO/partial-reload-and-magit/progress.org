@@ -1623,3 +1623,34 @@ No new defect identified in this checkpoint.
 ** choices determining the future
 No architectural question. Runtime response integration will distinguish a
 known refusal from a blocked request with unresolved authorized effects.
+
+* Simplify/cohere checkpoint: retire the active TypeDB runtime
+** what's done and went well
+The production build, startup, query, render, merge, and save paths now use
+the explicit Rust graph and Tantivy. The driver dependency, obsolete service
+configuration fields, global graph lookup handles, scheduled audits and
+TypeDB-only binaries are removed. Historical implementations and schema are
+retained under '_burying/not_using/obsolete/typedb/'.
+
+The fixture migration is being validated target by target. The current
+integrated library passed 359 tests with one optional corpus skip; this
+includes owner and durable-save changes which will be committed separately.
+'grouped_unit', 'grouped_views' and 'grouped_overrides' compile with the
+new explicit graph fixture helpers. External save/source targets and final
+acceptance remain in progress.
+** Changes to the plan's envisioned order.
+The TypeDB production migration is checkpointed separately from the external
+fixture migration, server owner integration and editor protocol work. Saved
+production checkpoint bytes keep these concerns reviewable while preserving
+all later worktree edits. Editor durable operation records were independently
+committed as 'ae2c7f77'.
+** what's imperfect about what's done
+The production migration does not yet establish TypeDB removal from every
+setup document and runner. Full server/socket verification found two adapter
+issues: routing fields are appended after the logical save fingerprint, and
+compatible observer journal publication could spuriously refuse a save. Both
+are being corrected with retained first-failure logs.
+** choices determining the future
+No new architectural question. Continue fixture migration, socket/process
+crash coverage and fresh-session authority before completing the maintenance
+lifecycle and its acceptance tests.

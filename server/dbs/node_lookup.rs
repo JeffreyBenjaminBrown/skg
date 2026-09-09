@@ -2,17 +2,14 @@
 /// Absence is authoritative, including extra-ID and source lookups.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub async fn nodeComplete_rustFIrst_by_id (
   graph  : &InRustGraph,
-  _config : &SkgConfig,
-  _driver : &TypeDBDriver,
   id     : &ID,
 ) -> Result<NodeComplete, Box<dyn Error>> {
   nodecomplete_from_in_rust_graph (graph, id)
@@ -21,15 +18,12 @@ pub async fn nodeComplete_rustFIrst_by_id (
 
 pub async fn optNodeComplete_rustFIrst_by_id (
   graph  : &InRustGraph,
-  _config : &SkgConfig,
-  _driver : &TypeDBDriver,
   id     : &ID,
 ) -> Result<Option<NodeComplete>, Box<dyn Error>> {
   Ok (nodecomplete_from_in_rust_graph (graph, id)) }
 
 pub fn nodecomplete_rustFirst_by_pid_and_source (
   graph  : &InRustGraph,
-  _config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
 ) -> Result<NodeComplete, Box<dyn Error>> {

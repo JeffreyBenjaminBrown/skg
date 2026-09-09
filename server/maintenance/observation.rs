@@ -369,18 +369,10 @@ fn validate_live_config_replacement (
   if old . port != new . port { startup_only . push ("port"); }
   if old . timing_log != new . timing_log {
     startup_only . push ("timing_log"); }
-  if old . auto_audit_daily != new . auto_audit_daily {
-    startup_only . push ("auto_audit_daily"); }
   if old . beep_when_server_becomes_available
       != new . beep_when_server_becomes_available
   {
     startup_only . push ("beep_when_server_becomes_available"); }
-  if old . delete_on_quit != new . delete_on_quit {
-    startup_only . push ("delete_on_quit"); }
-  if old . db_name != new . db_name && old . auto_audit_daily {
-    startup_only . push ("db_name (active audit daemon)"); }
-  if old . db_name != new . db_name && old . delete_on_quit {
-    startup_only . push ("db_name (installed shutdown handler)"); }
   if startup_only . is_empty () {
     Ok (( ))
   } else {
@@ -876,24 +868,11 @@ mod tests {
   fn live_replacement_accepts_runtime_paths_and_limits () {
     let old = config ();
     let mut new = old . clone ();
-    new . db_name = "replacement-database" . into ();
     new . tantivy_folder = "replacement-index" . into ();
     new . maintenance_archive_folder = "replacement-archives" . into ();
     new . initial_node_limit += 1;
     new . max_ancestry_depth += 1;
     assert! (validate_live_config_replacement (&old, &new) . is_ok ());
-  }
-
-  #[test]
-  fn active_startup_services_pin_their_database_name () {
-    let mut old = config ();
-    old . auto_audit_daily = true;
-    old . delete_on_quit = true;
-    let mut new = old . clone ();
-    new . db_name = "replacement-database" . into ();
-    let error = validate_live_config_replacement (&old, &new) . unwrap_err ();
-    assert! (error . contains ("active audit daemon"), "{}", error);
-    assert! (error . contains ("installed shutdown handler"), "{}", error);
   }
 
   #[test]

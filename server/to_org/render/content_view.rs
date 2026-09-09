@@ -27,11 +27,9 @@ use std::sync::Arc;
 
 use ego_tree::Tree;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// See file header comment.
 pub async fn single_root_view (
-  driver            : &Arc<TypeDBDriver>,
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
   root_id           : &ID,
@@ -39,7 +37,6 @@ pub async fn single_root_view (
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   multi_root_view (
-    driver,
     config,
     tantivy_index,
     & [ root_id . clone () ],
@@ -47,7 +44,6 @@ pub async fn single_root_view (
 
 /// See file header comment.
 pub async fn multi_root_view (
-  driver            : &Arc<TypeDBDriver>,
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
   root_ids          : &[ID],
@@ -55,7 +51,7 @@ pub async fn multi_root_view (
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   multi_root_view_inner (
-    driver, config, tantivy_index, root_ids,
+    config, tantivy_index, root_ids,
     diff_mode_enabled, None ) . await
 }
 
@@ -65,7 +61,6 @@ pub async fn multi_root_view (
 /// This fixture adapter explicitly folds source files into a graph before
 /// rendering. Production passes its already selected environment directly.
 async fn multi_root_view_inner (
-  driver            : &Arc<TypeDBDriver>,
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
   root_ids          : &[ID],
@@ -85,7 +80,6 @@ async fn multi_root_view_inner (
     in_rust_graph : new_handle ( InRustGraph::from_nodecompletes (&nodes) ),
     searcher      : tantivy_owned . reader . searcher (),
     tantivy_index : tantivy_owned,
-    driver        : Arc::clone (driver),
     startup_warnings : Arc::new (Vec::new ()), };
   multi_root_view_via_env (
     &env, root_ids, diff_mode_enabled, active_source_set,
@@ -95,7 +89,7 @@ async fn multi_root_view_inner (
 
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the de-novo view, built through the ONE view completion path
 /// (render_initial_view). Takes a SkgEnv (carries
-/// config/driver/tantivy/graph), runs view completion over a stub forest of the
+/// config/tantivy/graph), runs view completion over a stub forest of the
 /// requested roots, then attaches containerward ancestry and stats and renders.
 /// Warning strings the render produces (today only the
 /// compound-override-chain notice) are appended to 'warnings_out'.
@@ -124,8 +118,7 @@ pub async fn multi_root_view_via_env (
   // itself is caller-agnostic -- no mode flag.
   let buffer_content : String =
     finish_viewforest (
-      &graph_snap, &mut viewforest, &env . config, &env . driver,
-      active_source_set ) . await ?;
+      &graph_snap, &mut viewforest, &env . config, active_source_set ) . await ?;
   // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
   // set, via the one shared source of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
@@ -135,7 +128,6 @@ pub async fn multi_root_view_via_env (
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
 pub async fn multi_root_view_with_source_set (
-  driver            : &Arc<TypeDBDriver>,
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
   root_ids          : &[ID],
@@ -146,5 +138,5 @@ pub async fn multi_root_view_with_source_set (
   // multi_root_view_inner applies the source set during rendering (inside
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
-    driver, config, tantivy_index, root_ids,
+    config, tantivy_index, root_ids,
     diff_mode_enabled, Some (active_source_set) ) . await }

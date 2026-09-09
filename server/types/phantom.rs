@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff, existence_axes_in_source_diff};
 use super::list::Diff_Item;
-use super::misc::{ID, SkgConfig, SourceName};
+use super::misc::{ID, SourceName};
 
 /// Unified title lookup for phantom nodes.
 /// Lookup order: source_diffs deleted_nodes → supplied graph → fallback.
@@ -19,14 +19,13 @@ pub fn title_for_phantom (
   id           : &ID,
   source       : &SourceName,
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
-  config       : &SkgConfig,
 ) -> String {
   source_diffs
     . and_then( |diffs| diffs . get (source) )
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
     . or_else( || nodecomplete_rustFirst_by_pid_and_source (
-                    graph, config, id, source )
+                    graph, id, source )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 

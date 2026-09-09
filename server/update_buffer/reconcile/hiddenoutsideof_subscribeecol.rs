@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::{SkgEnv, find_source};
+use crate::types::env::{find_source};
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
@@ -42,7 +42,6 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
@@ -55,7 +54,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   // subscriber through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 1 validates the
   // [SubscribeeCol, Normal] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
-    read_hiddenoutside_context (graph, tree, node, kind, env, active_source_set) ?;
+    read_hiddenoutside_context (graph, tree, node, kind, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddenoutsideof_subscribeecol (
@@ -88,7 +87,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
     build_child_data (
       graph, tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+      source_diffs, deleted_since_head_pid_src_map) ?;
   let summary =
     reconcile_partnerCol_children_against_goal_list(
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this read-only col is removed when a view-leaf
@@ -115,7 +114,6 @@ fn read_hiddenoutside_context (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   kind               : PartnerCol,
-  env                : &SkgEnv,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeCol, Normal] chain).
@@ -124,7 +122,7 @@ fn read_hiddenoutside_context (
       tree, node, 1, kind . caller_label () ) ?;
   let wt_subscriber_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      graph, &env . config, &subscriber_pid, &subscriber_source ) ?;
+      graph, &subscriber_pid, &subscriber_source ) ?;
   // Edge-source gating (render-and-gating, 5_plan.org): both are the
   // subscriber's own outbound lists (hides_from_its_subscriptions,
   // subscribes_to); a membership recorded in an inactive source must

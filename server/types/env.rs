@@ -1,11 +1,4 @@
-//! 'SkgEnv' bundles the per-process environment: the static config
-//! and handles to the four databases that back the system. It is
-//! constructed once at startup (after 'initialize_dbs') and threaded
-//! through subsystems that need access to multiple databases.
-//!
-//! Field order is by complexity: 'config' is plain data; 'in-Rust graph' is
-//! the in-process snapshot; 'tantivy_index' is in-process and indexed;
-//! 'driver' talks over the wire to TypeDB.
+//! Configuration and graph/search inputs for one selected publication.
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -13,7 +6,6 @@ use crate::telescope::invariants::TelescopeViolation;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 use tantivy::Searcher;
 
 #[derive(Clone)]
@@ -21,7 +13,6 @@ pub struct SkgEnv {
   pub config        : SkgConfig,
   pub in_rust_graph : InRustGraphHandle,
   pub tantivy_index : TantivyIndex,
-  pub driver        : Arc<TypeDBDriver>,
   /// Actual read snapshot captured with this environment's selected graph.
   pub searcher      : Searcher,
   /// Load-time telescope warnings waiting to be presented during the

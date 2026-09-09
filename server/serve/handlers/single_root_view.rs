@@ -1,4 +1,3 @@
-use crate::dbs::in_rust_graph::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::to_org::render::content_view::multi_root_view_via_env;
@@ -189,7 +188,6 @@ pub fn handle_single_root_view_request (
                   warning,
                 } = release {
                   warnings . push (warning); }
-                warnings . extend (take_pending_audit_warning ());
                 let formatted = format_override_menu_response_sexp (
                   &menu_content,
                   &menu_uri,
@@ -252,8 +250,6 @@ pub fn handle_single_root_view_request (
                       warning,
                     } = release {
                       warnings . push (warning); }
-                    warnings . extend (
-                      take_pending_audit_warning () );
                     warnings };
                 let formatted = format_buffer_response_sexp (
                   &buffer_content, &[], &warnings);
@@ -270,11 +266,9 @@ pub fn handle_single_root_view_request (
                   add_view_authority_to_response (&formatted, state)
                 } else { formatted };
                 tag_sexp_response (TcpToClient::ContentView, &formatted) },
-              Err (e) => { // If we fail to generate the view, ship the generation error (and any pending audit warning) in the errors vec, with empty content so the client skips opening a main buffer.
+              Err (e) => { // If we fail to generate the view, ship the generation error in the errors vec, with empty content so the client skips opening a main buffer.
                 let mut errors : Vec<String> = Vec::new ();
-                let mut warnings : Vec<String> = Vec::new ();
-                if let Some (w) = take_pending_audit_warning ()
-                { warnings . push (w); }
+                let warnings : Vec<String> = Vec::new ();
                 errors . push ( format! (
                   "Error generating document: {}", e ));
                 tag_sexp_response (

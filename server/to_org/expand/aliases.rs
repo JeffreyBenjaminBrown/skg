@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
-use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
+use crate::types::misc::{ID, MemberAtSource, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, ColRelation};
 use crate::types::viewnode::{QualCol, Qual};
@@ -11,19 +11,16 @@ use crate::types::tree::viewnode_nodecomplete::{
 
 use ego_tree::Tree;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_aliases_view_then_drop_request (
   graph : &InRustGraph,
   tree          : &mut Tree<ViewNode>,
   node_id       : ego_tree::NodeId,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_aliases (
-      graph, tree, node_id, config, typedb_driver ) . await;
+      graph, tree, node_id) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Col (ColRelation::Aliases),
@@ -46,8 +43,6 @@ pub async fn build_and_integrate_aliases (
   graph : &InRustGraph,
   tree      : &mut Tree<ViewNode>,
   node_id   : ego_tree::NodeId,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_id_from_treenode ( tree, node_id ) ?;
@@ -58,7 +53,7 @@ pub async fn build_and_integrate_aliases (
     // then reconcile_alias_col_children (in update_buffer) already handled it.
     return Ok (( )); }
   let node : Option<NodeComplete> =
-    optNodeComplete_rustFIrst_by_id (graph, config, driver, &node_id_val) . await ?;
+    optNodeComplete_rustFIrst_by_id (graph, &node_id_val) . await ?;
   let home : Option<SourceName> =
     node . as_ref () . map ( |node| node . source . clone () );
   let aliases : Vec<MemberAtSource<String>> = node

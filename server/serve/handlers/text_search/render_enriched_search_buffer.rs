@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::typedb::ancestry::AncestryTree;
+use crate::dbs::graph_queries::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;

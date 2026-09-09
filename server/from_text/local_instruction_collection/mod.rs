@@ -38,7 +38,6 @@ use types::CollectedIntents;
 use validate_text_claims::validate_text_claims;
 
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub struct NonmergeSavePlan {
   pub define_nodes : Vec<DefineNode>,
@@ -54,7 +53,6 @@ pub async fn extract_nonmergeSavePlan_locally (
   graph : &InRustGraph,
   viewforest : &ViewForest,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -62,7 +60,7 @@ pub async fn extract_nonmergeSavePlan_locally (
   let collected : CollectedIntents =
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  validate_text_claims (graph, &collected, config, driver) . await ?;
+  validate_text_claims (graph, &collected) . await ?;
   let nodeMerge_acquisitions : Vec<(ID, ID)> =
     nodeMerge_pairs (&collected);
   let resolved : lower::LoweredIntents = {
@@ -70,12 +68,11 @@ pub async fn extract_nonmergeSavePlan_locally (
       lower_collected_intents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (graph,
-      intents, &visibility, config, driver,
-      restricted_source_set ) . await ? };
+      intents, &visibility, config, restricted_source_set ) . await ? };
   let with_disk : Definenodes_with_Sourcemoves =
     build_diskSupplemented_defineNodes (graph,
       resolved . into_ordered_intents(),
-      config, driver, restricted_source_set ) . await ?;
+      config, restricted_source_set ) . await ?;
   let sans_noops : Vec<DefineNode> =
     filter_wouldbe_noop_defineNodes (graph, with_disk . instructions);
   let (define_nodes, source_moves, suppressed_writes)

@@ -20,7 +20,6 @@ use crate::types::viewnode::{ViewNode, ViewRequest, ColRelation, PartnerCol};
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_col_then_drop_request (
   graph : &InRustGraph,
@@ -28,13 +27,12 @@ pub async fn build_and_integrate_col_then_drop_request (
   node_id       : NodeId,
   rel           : ColRelation,
   config        : &SkgConfig,
-  driver        : &TypeDBDriver,
   errors        : &mut Vec < String >,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_col (
-      graph, tree, node_id, rel, config, driver, active_source_set ) . await;
+      graph, tree, node_id, rel, config, active_source_set ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Col (rel),
@@ -51,7 +49,6 @@ async fn build_and_integrate_col (
   node_id : NodeId,
   rel     : ColRelation,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   // Not a diff view: a Col request never runs in git-diff mode.
@@ -66,26 +63,25 @@ async fn build_and_integrate_col (
     ColRelation::Overrides => {
       // overriddenCol (writable) -- forced empty; overriderCol (read-only).
       maybe_add_one_partnerCol (
-        tree, node_id, PartnerCol::Overridden, config, driver, graph,
+        tree, node_id, PartnerCol::Overridden, config, graph,
         active_source_set, &no_diffs, true ) . await ?;
       maybe_add_one_partnerCol (
-        tree, node_id, PartnerCol::Overrider, config, driver, graph,
+        tree, node_id, PartnerCol::Overrider, config, graph,
         active_source_set, &no_diffs, false ) . await ?; },
     ColRelation::Hides => {
       // Both sides read-only: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden col.
       maybe_add_one_partnerCol (
-        tree, node_id, PartnerCol::Hider, config, driver, graph,
+        tree, node_id, PartnerCol::Hider, config, graph,
         active_source_set, &no_diffs, false ) . await ?;
       maybe_add_one_partnerCol (
-        tree, node_id, PartnerCol::Hidden, config, driver, graph,
+        tree, node_id, PartnerCol::Hidden, config, graph,
         active_source_set, &no_diffs, false ) . await ?; },
     ColRelation::Subscribes => {
       // subscribeeCol (writable) -- forced empty; subscriberCol (read-only).
       maybe_add_subscribeeCol_branch (
-        graph, tree, node_id, config, driver,
-        active_source_set, &no_diffs, true ) . await ?;
+        graph, tree, node_id, config, active_source_set, &no_diffs, true ) . await ?;
       maybe_add_one_partnerCol (
-        tree, node_id, PartnerCol::Subscriber, config, driver, graph,
+        tree, node_id, PartnerCol::Subscriber, config, graph,
         active_source_set, &no_diffs, false ) . await ?; }, }
   Ok (( )) }

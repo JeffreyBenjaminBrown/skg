@@ -16,7 +16,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::find_source;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_membership_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage, removed_membership_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual};
@@ -36,7 +36,6 @@ pub(crate) fn process_activeNode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config                         : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
     node_mut . id();
@@ -166,7 +165,7 @@ pub(crate) fn process_activeNode_diff (
   insert_phantoms_for_missing_contains (
     graph, &mut node_mut, tree_node_id, &net_contains, &removed_membership_by_id,
     source_diff, source_diffs,
-    deleted_since_head_pid_src_map, config ) ?;
+    deleted_since_head_pid_src_map) ?;
   Ok (( )) }
 
 /// Decide where each removed-member phantom belongs among its surviving
@@ -276,7 +275,6 @@ fn insert_phantoms_for_missing_contains (
   source_diff                    : &SourceDiff,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config                         : &SkgConfig,
 ) -> Result<(), String> {
   let plan : Vec<(ID, Option<ID>)> =
     phantom_insertion_plan (net_contains);
@@ -315,7 +313,7 @@ fn insert_phantoms_for_missing_contains (
     let child_title : String =
       title_for_phantom (
         graph, &id, &child_source,
-        Some (source_diffs), config );
+        Some (source_diffs));
     let phantom : ViewNode =
       mk_phantom_viewnode (
         id . clone (), child_source, child_title,

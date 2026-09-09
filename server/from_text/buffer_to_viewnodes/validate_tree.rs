@@ -18,7 +18,6 @@ use super::local;
 use ego_tree::iter::Edge;
 use ego_tree::NodeId;
 use std::collections::HashSet;
-use typedb_driver::TypeDBDriver;
 
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
@@ -42,7 +41,6 @@ pub async fn find_buffer_errors_for_saving (
   graph : &InRustGraph,
   viewforest: &MpViewForest,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
 { // Two phases: instruction validation and structure validation.
@@ -71,7 +69,7 @@ pub async fn find_buffer_errors_for_saving (
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =
-        validate_nodeMerge_requests(graph, viewforest, config, driver) . await?;
+        validate_nodeMerge_requests(graph, viewforest, config ) . await?;
       nodeMerge_errors }
     { errors . push(
         BufferValidationError::Other (error_msg)); }}
@@ -80,7 +78,7 @@ pub async fn find_buffer_errors_for_saving (
   validate_fork_view_requests(graph,
     viewforest, config, &mut errors);
   idCol_membership_errors (graph,
-    viewforest, config, driver, &mut errors ) . await ?;
+    viewforest, &mut errors ) . await ?;
   overridesHere_marker_errors (graph,
     viewforest, config, &mut errors );
   validate_view_roots (
@@ -118,8 +116,6 @@ pub async fn find_buffer_errors_for_saving (
 async fn idCol_membership_errors (
   graph : &InRustGraph,
   viewforest : &MpViewForest,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   errors     : &mut Vec<BufferValidationError>,
 ) -> Result<(), Box<dyn std::error::Error>> {
   for edge in viewforest . root () . traverse () {
@@ -146,7 +142,7 @@ async fn idCol_membership_errors (
           _ => None } )
       . collect ();
     let real_ids : Option<Vec<ID>> =
-      optNodeComplete_rustFIrst_by_id (graph, config, driver, &owner)
+      optNodeComplete_rustFIrst_by_id (graph, &owner)
       . await ?
       . map ( |nc| nc . all_ids () . cloned () . collect () );
     match real_ids {

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
+use crate::dbs::graph_queries::relations::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, MemberAtSource, SourceName, members_of};
@@ -17,7 +17,7 @@ pub enum NodeRelation {
 }
 
 impl NodeRelation {
-  pub fn typeql_name (self) -> &'static str {
+  pub fn relation_name (self) -> &'static str {
     match self {
       Self::Contains =>
         "contains",
@@ -55,7 +55,7 @@ impl NodeRelation {
         None, } }
 
   pub fn roles (self) -> (&'static str, &'static str) {
-    let relation_name : &'static str = self . typeql_name ();
+    let relation_name : &'static str = self . relation_name ();
     OUTBOUND_RELATIONSHIP_TYPES . iter ()
       . find ( |(candidate, _, _)| *candidate == relation_name )
       . map ( |(_, first, second)| (*first, *second) )
@@ -173,7 +173,7 @@ impl RelationRole {
   ) -> (&'static str, &'static str, &'static str) {
     let (first, second) : (&'static str, &'static str) =
       self . relation . roles ();
-    let relation : &'static str = self . relation . typeql_name ();
+    let relation : &'static str = self . relation . relation_name ();
     match self . position {
       BinaryRolePosition::First  => (relation, second, first),
       BinaryRolePosition::Second => (relation, first, second), } }

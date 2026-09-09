@@ -92,7 +92,7 @@ pub struct SelectedStoreState {
   pub manifest          : SelectedPathManifest,
   pub path_outcomes     : BTreeMap<PathBuf, SelectedPathOutcome>,
   pub cyclic_roots      : BTreeSet<ID>,
-  pub typedb_health     : StoreHealth,
+
   pub tantivy_health    : StoreHealth, }
 
 impl SelectedStoreState {
@@ -116,7 +116,7 @@ impl SelectedStoreState {
       manifest,
       path_outcomes,
       cyclic_roots: BTreeSet::new (),
-      typedb_health: StoreHealth::Healthy,
+
       tantivy_health: StoreHealth::Healthy, } }
 
   pub fn with_searcher (
@@ -170,7 +170,7 @@ impl SelectedStoreState {
       manifest,
       path_outcomes,
       cyclic_roots: self . cyclic_roots . clone (),
-      typedb_health: StoreHealth::Healthy,
+
       tantivy_health: StoreHealth::Healthy, } }
 
   pub fn with_selected_transition (
@@ -203,7 +203,7 @@ impl SelectedStoreState {
       manifest,
       path_outcomes,
       cyclic_roots: self . cyclic_roots . clone (),
-      typedb_health: self . typedb_health . clone (),
+
       tantivy_health: self . tantivy_health . clone (), } }
 
   pub fn with_tantivy_terminal (
@@ -224,10 +224,7 @@ impl SelectedStoreState {
       next . tantivy_health = StoreHealth::Poisoned (reason); }
     next }
 
-  pub fn with_typedb_poisoned (&self, reason : String) -> Self {
-    let mut next = self . clone ();
-    next . typedb_health = StoreHealth::Poisoned (reason);
-    next }
+
 
   pub fn with_tantivy_poisoned (&self, reason : String) -> Self {
     let mut next = self . clone ();

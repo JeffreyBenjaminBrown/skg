@@ -1545,8 +1545,6 @@ fn retry_maintenance (
         snapshot . selected . graph_generation == active . g0_graph_generation
         && snapshot . selected . manifest_revision
           == active . g0_manifest_revision
-        && matches! (&snapshot . selected . typedb_health,
-          StoreHealth::Healthy)
         && matches! (&snapshot . selected . tantivy_health,
           StoreHealth::Healthy);
       runtime . transition_maintenance (|coordinator|

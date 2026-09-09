@@ -290,7 +290,7 @@ impl CollateralScheduler {
     Ok ((true, queued))
   }
 
-  /// A foreground operation gets first use of TypeDB.  The current worker is
+  /// A foreground operation takes priority over collateral rendering.  The current worker is
   /// made obsolete and its URI returns to the newest queue.
   pub fn preempt (&mut self) {
     let Some (uri) = self . in_flight . clone () else { return; };

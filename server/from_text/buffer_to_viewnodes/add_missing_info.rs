@@ -12,13 +12,12 @@ use crate::types::viewnode::{IndefOrDef, QualCol, Qual};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
-use crate::dbs::typedb::util::pids_from_ids::{
+use crate::dbs::graph_queries::pids_from_ids::{
   collect_ids_in_tree, assign_pids_throughout_tree_from_map};
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::boxed::Box;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
 /// Which nodes enrichment INVENTED data for, as opposed to reading it
@@ -44,8 +43,8 @@ pub struct EnrichmentProvenance {
 pub async fn add_missing_info_to_viewforest(
   graph : &InRustGraph,
   viewforest  : &mut MpViewForest,
-  db_name : &str,
-  driver  : &TypeDBDriver,
+
+
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let root_id: NodeId =
     viewforest . internal_root_id ();
@@ -73,7 +72,7 @@ pub async fn add_missing_info_to_viewforest(
     // An id the graph does not know resolves to nothing and falls
     // through to parent-inheritance too.
     resolve_sources_for_sourceless_ided_nodes (graph,
-      viewforest, db_name, driver ) . await ?;
+      viewforest ) . await ?;
   let mut provenance : EnrichmentProvenance =
     EnrichmentProvenance {
       new_nodes              : HashSet::new (),
@@ -88,7 +87,7 @@ pub async fn add_missing_info_to_viewforest(
       let source_inherited : bool =
         inherit_parent_source_if_possible (&mut node)?;
       let id_assigned : bool =
-        assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so that fresh UUIDs don't trigger a pointless TypeDB lookup.
+        assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so that fresh UUIDs don't trigger a pointless graph lookup.
       if source_inherited || id_assigned {
         if let MpViewnodeKind::Vognode (MpVognode::Active (t))
           = & node . value () . kind
@@ -186,8 +185,8 @@ fn inherit_parent_source_if_possible(
 async fn resolve_sources_for_sourceless_ided_nodes (
   graph : &InRustGraph,
   viewforest : &MpViewForest,
-  _db_name   : &str,
-  _driver    : &TypeDBDriver,
+
+
 ) -> Result<HashMap<ID, SourceName>, Box<dyn Error>> {
   let mut ids : HashSet<ID> = HashSet::new ();
   collect_sourceless_active_ids ( viewforest . root (), &mut ids );
