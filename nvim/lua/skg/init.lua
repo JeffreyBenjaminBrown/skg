@@ -47,6 +47,12 @@ function M.install_session_surface ()
   state.register_server_push_handler(
     'maintenance-status',
     require('skg.maintenance').server_status_handler)
+  state.register_server_push_handler(
+    'query-wait-result',
+    require('skg.query_wait').result_handler)
+  state.register_server_push_handler(
+    'query-wait-status',
+    require('skg.query_wait').status_push_handler)
   vim.api.nvim_create_user_command('SkgReconcilePendingChanges',
     function () require('skg.maintenance').reconcile_pending() end,
     { force = true })
@@ -92,6 +98,18 @@ function M.install_session_surface ()
   vim.api.nvim_create_user_command('SkgRetryPendingSave',
     function () require('skg.save').retry_pending_save() end,
     { force = true })
+  vim.api.nvim_create_user_command('SkgQueryWaitStatus',
+    function (options)
+      require('skg.query_wait').status(options.args ~= '' and options.args or nil) end,
+    { nargs = '?', force = true })
+  vim.api.nvim_create_user_command('SkgQueryWaitCancel',
+    function (options)
+      require('skg.query_wait').cancel(options.args) end,
+    { nargs = 1, force = true })
+  vim.api.nvim_create_user_command('SkgQueryWaitRecover',
+    function (options)
+      require('skg.query_wait').recover(options.fargs[1], options.fargs[2]) end,
+    { nargs = '+', force = true })
 end
 
 ---Initialize the client against a server config: remember the

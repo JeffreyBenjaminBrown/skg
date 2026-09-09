@@ -49,6 +49,9 @@ The value is nil, `sent', `census', `census-texts', `verified',
 (defvar skg--pending-incidents nil
   "Compact server-reported maintenance incident summaries.")
 
+(defvar skg--pending-query-waits nil
+  "Verified coarse summaries of durable query waits from the server.")
+
 (defvar skg--client-constructor-admission 'open
   "Whether new editable client view constructors may join maintenance census.")
 
@@ -80,11 +83,13 @@ Report-local selected-* fields never update the current graph identity."
   (when (cl-some (lambda (key) (assoc key response))
                  '(current-graph-generation current-manifest-revision
                    graph-write-admission graph-transition-status rebuilding
-                   pending-incidents owner-publication-revision))
+                   pending-incidents pending-query-waits
+                   owner-publication-revision))
     (when (cl-some (lambda (key) (assoc key response))
                    '(current-graph-generation current-manifest-revision
                      graph-write-admission graph-transition-status
-                     pending-incidents owner-publication-revision))
+                     pending-incidents pending-query-waits
+                     owner-publication-revision))
       (skg-require-current-server-session response))
     (let* ((revision-entry (assoc 'owner-publication-revision response))
            (revision (and revision-entry (cadr revision-entry))))
@@ -111,6 +116,10 @@ Report-local selected-* fields never update the current graph identity."
           (setq skg--graph-transition-status (cadr entry)))
         (when-let ((entry (assoc 'pending-incidents response)))
           (setq skg--pending-incidents (cadr entry)))
+        (when-let ((entry (assoc 'pending-query-waits response)))
+          (setq skg--pending-query-waits (cadr entry))
+          (when (fboundp 'skg-query-wait-ingest-pending)
+            (skg-query-wait-ingest-pending skg--pending-query-waits)))
         (when-let ((entry (assoc 'current-graph-generation response)))
           (unless (natnump (cadr entry))
             (error "Invalid current graph generation %S" (cadr entry)))

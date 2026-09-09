@@ -11,6 +11,7 @@ local payload = require('skg.payload')
 local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
+local query_wait = require('skg.query_wait')
 
 local M = {}
 
@@ -26,7 +27,8 @@ M.search_buffer_setup_hooks = {}
 function M.search (search_terms)
   search_terms = search_terms or vim.fn.input('Search terms: ')
   if search_terms == nil or search_terms == '' then return end
-  M.request_text_search(search_terms, false, false, false)
+  M.request_text_search(search_terms, false, false, false,
+                        nil, nil, query_wait.policy_choice())
 end
 
 ---Text search choosing axes by typing option characters: 'r' for
@@ -48,7 +50,8 @@ function M.search_interactive (search_terms, options)
   M.request_text_search(search_terms,
                         options:find('r', 1, true) ~= nil,
                         options:find('b', 1, true) ~= nil,
-                        options:find('t', 1, true) ~= nil)
+                        options:find('t', 1, true) ~= nil,
+                        nil, nil, query_wait.policy_choice())
 end
 
 ---Open docs/COMMANDS-nvim.org (falling back to docs/COMMANDS.org),
@@ -82,7 +85,10 @@ end
 ---@param body boolean
 ---@param operators boolean
 function M.request_text_search (search_terms, regex, body, operators,
-                                ugly_choice, view_uri)
+                                ugly_choice, view_uri, query_policy)
+  if query_policy == 'wait' then
+    return query_wait.submit(
+      search_terms, regex, body, operators, ugly_choice) end
   client.connect()
   if not require('skg.misc_requests').ensure_connection_handshake() then
     error('Cannot search before server verification completes') end
@@ -94,7 +100,8 @@ function M.request_text_search (search_terms, regex, body, operators,
     sexpr.pair(sexpr.symbol('operators'),
                M.bool_to_string(operators)),
     sexpr.pair(sexpr.symbol('requested-view-write-authority'),
-               state.requested_view_write_authority()) }
+               state.requested_view_write_authority()),
+    sexpr.pair(sexpr.symbol('query-policy'), 'current') }
   if ugly_choice then
     table.insert(request_form,
       sexpr.pair(sexpr.symbol('ugly-telescopes'), ugly_choice)) end

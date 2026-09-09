@@ -25,6 +25,7 @@ M.client_constructor_admission = 'open'
 M.owner_publication_revision = nil
 M.graph_transition_status = nil
 M.pending_incidents = {}
+M.pending_query_waits_raw = nil
 M.maintenance_client_incident = M.maintenance_client_incident or nil
 M.pending_maintenance_offer = M.pending_maintenance_offer or nil
 M.pending_recovery_incidents = M.pending_recovery_incidents or {}
@@ -49,7 +50,7 @@ function M.update_global_server_status (response)
   local fields = {
     'current-graph-generation', 'current-manifest-revision',
     'graph-write-admission', 'graph-transition-status', 'rebuilding',
-    'pending-incidents', 'owner-publication-revision',
+    'pending-incidents', 'pending-query-waits', 'owner-publication-revision',
   }
   local present = false
   for _, key in ipairs(fields) do
@@ -61,6 +62,7 @@ function M.update_global_server_status (response)
      or payload.field(response, 'graph-write-admission') ~= nil
      or payload.field(response, 'graph-transition-status') ~= nil
      or payload.field(response, 'pending-incidents') ~= nil
+     or payload.field(response, 'pending-query-waits') ~= nil
      or payload.field(response, 'owner-publication-revision') ~= nil then
     M.require_current_server_session(response)
   end
@@ -89,6 +91,14 @@ function M.update_global_server_status (response)
   if transition then M.graph_transition_status = transition end
   local incidents = payload.field(response, 'pending-incidents')
   if incidents ~= nil then M.pending_incidents = incidents end
+  local pending_waits = payload.field(response, 'pending-query-waits')
+  if pending_waits ~= nil then
+    M.pending_query_waits_raw = pending_waits
+    local query_wait = package.loaded['skg.query_wait']
+    if query_wait and query_wait.ingest_pending then
+      query_wait.ingest_pending(pending_waits)
+    end
+  end
   local config = require('skg.config')
   config.store_state = config.store_state or {}
   local graph = payload.field(response, 'current-graph-generation')

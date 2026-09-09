@@ -8,6 +8,7 @@
 (require 'skg-length-prefix)
 (require 'skg-request-save) ; Shared warning presentation.
 (require 'heralds-minor-mode)
+(require 'skg-query-wait)
 
 (defconst skg--project-root
   (when (or load-file-name buffer-file-name)
@@ -24,7 +25,9 @@ only, no Tantivy operator syntax. Searches all nodes; rooty
 ones (roots, cyclic roots, link targets, hadID) are bumped in
 the ranking via their context-origin multiplier."
   (interactive "sSearch terms: ")
-  (skg--request-text-search search-terms nil nil nil))
+  (skg--request-text-search search-terms nil nil nil
+                            nil nil
+                            (skg-query-wait-policy-choice)))
 
 (defun skg-search-interactive (search-terms options)
   "Text search, choosing axes by typing option characters.
@@ -44,7 +47,8 @@ conservative defaults as `skg-search'."
      search-terms
      (and (string-search "r" options) t)
      (and (string-search "b" options) t)
-     (and (string-search "t" options) t))))
+     (and (string-search "t" options) t)
+     nil nil (skg-query-wait-policy-choice))))
 
 (defun skg--search-interactive-help ()
   "Open docs/COMMANDS.org, unfold it, and put point on the
@@ -67,10 +71,13 @@ headline documenting `skg-search-interactive'."
   (if b "true" "false"))
 
 (defun skg--request-text-search (search-terms regex body operators
-                                              &optional ugly-choice view-uri)
+                                              &optional ugly-choice view-uri
+                                              query-policy)
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
-  (let* ((tcp-proc (skg-tcp-connect-to-rust))
+  (if (equal query-policy "wait")
+      (skg-query-wait-submit search-terms regex body operators ugly-choice)
+    (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (_verified
           (unless (skg-connection-handshake-ensure)
             (error "Cannot search before server verification completes")))
@@ -87,7 +94,8 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                       (body      . ,(skg--bool-to-string body))
                       (operators . ,(skg--bool-to-string operators))
                       (requested-view-write-authority
-                       . ,requested-authority))
+                       . ,requested-authority)
+                      (query-policy . "current"))
                     (when ugly-choice
                       `((ugly-telescopes . ,ugly-choice)))
                     (when view-uri `((view-uri . ,view-uri)))))
@@ -129,7 +137,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
          (skg--request-text-search
           clean-terms regex body operators choice view-uri)))
      nil)
-    (skg-submit-request tcp-proc request-s-exp)))
+      (skg-submit-request tcp-proc request-s-exp))))
 
 (defvar skg--search-buffer-setup-hook nil
   "Hook run inside a freshly populated search buffer.

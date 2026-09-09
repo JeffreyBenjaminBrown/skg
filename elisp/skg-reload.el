@@ -141,6 +141,7 @@ calls it."
             skg-request-single-root-content-view
             skg-request-source-sets
             skg-request-text-search
+            skg-query-wait
             skg-request-verify-connection
             skg-search-make-link
             skg-request-views

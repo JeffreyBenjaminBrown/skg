@@ -26,6 +26,7 @@
 (require 'skg-client)
 (require 'skg-id-search)
 (require 'skg-request-text-search)
+(require 'skg-query-wait)
 (require 'skg-request-views)
 (require 'skg-sexpr-edit)
 (require 'skg-sexpr-search)

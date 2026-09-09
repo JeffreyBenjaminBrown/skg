@@ -137,7 +137,8 @@ local function complete_buffer_census (maintenance_incident_id, maintenance_epoc
   state.connection_handshake_state = 'verified'
   vim.schedule(function ()
     require('skg.maintenance').resume_after_census(
-      maintenance_incident_id, maintenance_epoch) end)
+      maintenance_incident_id, maintenance_epoch)
+    require('skg.query_wait').resume_all() end)
 end
 
 function M.handle_buffer_census_response (
