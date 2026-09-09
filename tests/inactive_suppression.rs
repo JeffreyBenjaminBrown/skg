@@ -66,7 +66,8 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             &graph . load_full () . graph,
-            buffer, config, Some (&active) ) . await ?;
+            buffer, config, Some (&active),
+            &graph . load_full () . manifest ) . await ?;
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("private-a")),
@@ -90,7 +91,8 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             &graph . load_full () . graph,
-            buffer, config, Some (&active) ) . await ?;
+            buffer, config, Some (&active),
+            &graph . load_full () . manifest ) . await ?;
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("private-a")),
@@ -109,7 +111,8 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             &graph . load_full () . graph,
-            buffer, config, Some (&active) ) . await ?;
+            buffer, config, Some (&active),
+            &graph . load_full () . manifest ) . await ?;
         assert! (
           plan . source_moves . is_empty (),
           "a move into an inactive source must be suppressed" );

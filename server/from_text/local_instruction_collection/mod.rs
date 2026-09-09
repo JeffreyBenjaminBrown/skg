@@ -30,6 +30,7 @@ use crate::from_text::weave::member_is_visible;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
+use crate::types::store_state::SelectedPathManifest;
 use crate::types::tree::forest::ViewForest;
 use lower::{lower_collected_intents, nodeMerge_pairs, LoweringOutput};
 use resolve_visibility::resolve_visibility;
@@ -54,6 +55,7 @@ pub async fn extract_nonmergeSavePlan_locally (
   viewforest : &ViewForest,
   config     : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
+  selected_manifest : &SelectedPathManifest,
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
@@ -72,7 +74,7 @@ pub async fn extract_nonmergeSavePlan_locally (
   let with_disk : Definenodes_with_Sourcemoves =
     build_diskSupplemented_defineNodes (graph,
       resolved . into_ordered_intents(),
-      config, restricted_source_set ) . await ?;
+      config, restricted_source_set, selected_manifest ) . await ?;
   let sans_noops : Vec<DefineNode> =
     filter_wouldbe_noop_defineNodes (graph, with_disk . instructions);
   let (define_nodes, source_moves, suppressed_writes)

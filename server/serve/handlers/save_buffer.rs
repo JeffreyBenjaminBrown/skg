@@ -40,6 +40,7 @@ use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SavePlan, format_save_error_as_org};
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
+use crate::types::store_state::SelectedStoreState;
 use crate::update_buffer::update_views_after_save;
 
 use futures::executor::block_on;
@@ -48,6 +49,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
+use std::sync::Arc;
 
 /// The ordinary terminal message in the save protocol. Hoist, fork, and
 /// scalar-release confirmations are alternative terminal messages.
@@ -519,9 +521,11 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
+        let selected : Arc<SelectedStoreState> =
+          env . in_rust_graph . load_full ();
         buffer_to_validated_saveplan_with_fork_sources (
-          &env . in_rust_graph_snapshot (), org_buffer_text, &env . config,
-          active_source_set, fork_sources ) . await
+          &selected . graph, org_buffer_text, &env . config,
+          active_source_set, fork_sources, &selected . manifest ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()

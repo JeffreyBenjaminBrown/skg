@@ -108,8 +108,9 @@ async fn define_nodes_from (
   let graph : InRustGraphHandle = graph_handle_from_config (config)
     . map_err (SaveError::DatabaseError) ?;
   Ok ( buffer_to_validated_saveplan (
-         &graph . load_full () . graph,
-         buffer, config, None ) . await ?
+          &graph . load_full () . graph,
+          buffer, config, None,
+          &graph . load_full () . manifest ) . await ?
        . 1 . define_nodes ) }
 
 async fn save_and_rerender (

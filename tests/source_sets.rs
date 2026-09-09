@@ -58,6 +58,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use skg::types::store_state::SelectedStoreState;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 async fn buffer_to_validated_saveplan (
@@ -66,9 +67,11 @@ async fn buffer_to_validated_saveplan (
   fixture_graph            : &InRustGraphHandle,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let selected : Arc<SelectedStoreState> = fixture_graph . load_full ();
   buffer_to_validated_saveplan_with_graph (
-    &fixture_graph . load_full () . graph,
-    buffer_text, config, active_source_set ) . await }
+    &selected . graph,
+    buffer_text, config, active_source_set,
+    &selected . manifest ) . await }
 
 #[test]
 fn all_tests

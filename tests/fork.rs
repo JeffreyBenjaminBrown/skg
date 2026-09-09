@@ -113,7 +113,8 @@ async fn fork_specs_from (
 ) -> Result<Vec<ForkSpec>, Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   Ok ( buffer_to_validated_saveplan (
-         &graph . load_full () . graph, buffer, config, None )
+         &graph . load_full () . graph, buffer, config, None,
+         &graph . load_full () . manifest )
        . await ? . 1 . fork_specs ) }
 
 fn node_from_disk (
@@ -247,7 +248,8 @@ async fn explicit_fork_on_unknown_node_errors (
     graph_handle_from_config (config) ?;
   let result = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    EXPLICIT_FORK_UNKNOWN_BUFFER, config, None ) . await;
+    EXPLICIT_FORK_UNKNOWN_BUFFER, config, None,
+    &graph . load_full () . manifest ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -291,7 +293,8 @@ async fn explicit_fork_round_trip_and_monogamy (
     graph_handle_from_config (config) ?;
   let result = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    EXPLICIT_FORK_BUFFER, config, None ) . await;
+    EXPLICIT_FORK_BUFFER, config, None,
+    &graph . load_full () . manifest ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -321,7 +324,8 @@ async fn fork_default_prefers_active_owned_source (
                                SourceName::from ("foreign") ]), };
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    FORK_ROOT_BUFFER, config, Some (&active) ) . await ?;
+    FORK_ROOT_BUFFER, config, Some (&active),
+    &graph . load_full () . manifest ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "the fork must resolve, not dead-end on an inactive default source" );
   assert_eq! ( save_plan . fork_specs[0] . clone . 0 . source,
@@ -343,7 +347,8 @@ async fn fork_user_set_source_not_owned_rejected (
     HashMap::from ([ ( ID::from ("N"), SourceName::from ("foreign") ) ]);
   let result = buffer_to_validated_saveplan_with_fork_sources (
     &graph . load_full () . graph,
-    FORK_BUFFER, config, None, &fork_sources ) . await;
+    FORK_BUFFER, config, None, &fork_sources,
+    &graph . load_full () . manifest ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -426,7 +431,7 @@ async fn explicit_new_child_source_confirms_clone_source (
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    buffer, config, None ) . await ?;
+    buffer, config, None, &graph . load_full () . manifest ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   let spec : &ForkSpec = & save_plan . fork_specs[0];
   assert_eq! ( spec . clone . 0 . source, SourceName::from ("owned2"),
@@ -462,7 +467,7 @@ async fn disagreeing_new_child_sources_leave_clone_source_unconfirmed (
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    buffer, config, None ) . await ?;
+    buffer, config, None, &graph . load_full () . manifest ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   assert! ( ! save_plan . fork_specs[0] . source_confirmed,
     "disagreeing explicit child sources must not confirm a clone source" );
@@ -523,7 +528,8 @@ async fn fork_from_bare_new_child_plan (
     graph_handle_from_config (config) ?;
   let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, None ) . await ?;
+    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, None,
+    &graph . load_full () . manifest ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "appending a bare new child must fork N: {:?}",
     save_plan . fork_specs );
@@ -593,7 +599,8 @@ async fn explicitly_foreign_new_child_still_rejected (
     graph_handle_from_config (config) ?;
   let result = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, None )
+    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, None,
+    &graph . load_full () . manifest )
     . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
@@ -630,7 +637,8 @@ async fn fork_monogamy (
     graph_handle_from_config (config) ?;
   let result = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    FORK_BUFFER, config, None ) . await;
+    FORK_BUFFER, config, None,
+    &graph . load_full () . manifest ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -659,7 +667,8 @@ async fn fork_source_inactive (
     sources : BTreeSet::from ([ SourceName::from ("foreign") ]), };
   let result = buffer_to_validated_saveplan (
     &graph . load_full () . graph,
-    FORK_BUFFER, config, Some (&active) ) . await;
+    FORK_BUFFER, config, Some (&active),
+    &graph . load_full () . manifest ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,

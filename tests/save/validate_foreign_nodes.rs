@@ -11,6 +11,8 @@ use skg::types::misc::{SkgConfig, ID, SourceName};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode, SavePlan};
 use skg::types::tree::forest::ViewForest;
 use std::error::Error;
+use std::sync::Arc;
+use skg::types::store_state::SelectedStoreState;
 
 async fn buffer_to_validated_saveplan (
   buffer_text       : &str,
@@ -20,9 +22,11 @@ async fn buffer_to_validated_saveplan (
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let graph : InRustGraphHandle = graph_handle_from_config (config)
     . map_err (SaveError::DatabaseError) ?;
+  let selected : Arc<SelectedStoreState> = graph . load_full ();
   buffer_to_validated_saveplan_with_graph (
-    &graph . load_full () . graph,
-    buffer_text, config, active_source_set ) . await }
+    &selected . graph,
+    buffer_text, config, active_source_set,
+    &selected . manifest ) . await }
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 

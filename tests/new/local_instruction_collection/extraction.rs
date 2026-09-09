@@ -152,7 +152,8 @@ async fn save_instructions_from_org_with_disk (
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (
       &graph . load_full () . graph,
-      &viewforest, config, None) . await?;
+      &viewforest, config, None,
+      &graph . load_full () . manifest) . await?;
   Ok (save_plan . define_nodes) }
 
 #[test]

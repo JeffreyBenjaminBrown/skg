@@ -121,7 +121,8 @@ fn dead_links_warn_on_save
       let ( _vf, _plan, warnings ) =
         buffer_to_validated_saveplan (
           &graph . load_full () . graph,
-          buffer, config, None ) . await ?;
+          buffer, config, None,
+          &graph . load_full () . manifest ) . await ?;
       assert! ( warnings . iter () . any ( |w|
           w . contains ("Dead link")
           && w . contains ("does-not-exist") ),

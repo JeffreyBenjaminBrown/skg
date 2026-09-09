@@ -19,8 +19,10 @@ use skg::types::save::{DefineNode, SavePlan};
 use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
+use skg::types::store_state::SelectedStoreState;
 
 async fn buffer_to_validated_saveplan (
   buffer_text      : &str,
@@ -28,9 +30,11 @@ async fn buffer_to_validated_saveplan (
   fixture_graph           : &InRustGraphHandle,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let selected : Arc<SelectedStoreState> = fixture_graph . load_full ();
   buffer_to_validated_saveplan_with_graph (
-    &fixture_graph . load_full () . graph,
-    buffer_text, config, active_source_set ) . await }
+    &selected . graph,
+    buffer_text, config, active_source_set,
+    &selected . manifest ) . await }
 
 /// Query Tantivy for a node by title and return its source.
 fn tantivy_source_for_id (

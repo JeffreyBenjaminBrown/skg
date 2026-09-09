@@ -18,6 +18,7 @@ use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::save::{NodeMerge, DefineNode, SavePlan};
+use crate::types::store_state::SelectedPathManifest;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 
@@ -64,12 +65,14 @@ pub async fn buffer_to_validated_saveplan (
   buffer_text : &str,
   config      : &SkgConfig,
   active_source_set : Option<&ActiveSourceSet>,
+  selected_manifest : &SelectedPathManifest,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone sources: every fork's source resolves by
   // inference-else-default. The fork-confirmation re-save uses the
   // _with_fork_sources entry below.
-  buffer_to_validated_saveplan_with_fork_sources (graph,
-    buffer_text, config, active_source_set, &HashMap::new () )
+  buffer_to_validated_saveplan_with_fork_sources (
+    graph, buffer_text, config, active_source_set,
+    &HashMap::new (), selected_manifest )
     . await }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
@@ -82,6 +85,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   config      : &SkgConfig,
   active_source_set : Option<&ActiveSourceSet>,
   fork_sources : &HashMap<ID, SourceName>,
+  selected_manifest : &SelectedPathManifest,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let restricted_source_set : Option<&ActiveSourceSet> =
     // The set 'all' restricts nothing; downstream stages treat None
@@ -127,7 +131,8 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = extract_nonmergeSavePlan_locally (graph,
-        &viewforest, config, restricted_source_set )
+        &viewforest, config, restricted_source_set,
+        selected_manifest )
       . await . map_err (SaveError::DatabaseError) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
     // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_activeNode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.

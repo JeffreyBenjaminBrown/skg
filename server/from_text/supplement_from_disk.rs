@@ -18,8 +18,11 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_of, members_at_source};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
+use crate::types::store_state::SelectedPathManifest;
+use crate::util::path_from_pid_and_source;
 use std::collections::HashMap;
 use std::error::Error;
+use std::path::Path;
 
 pub struct Definenodes_with_Sourcemoves {
   pub instructions : Vec<DefineNode>,
@@ -55,13 +58,15 @@ pub async fn build_diskSupplemented_defineNodes (
   intents : Vec<NodeIntent>,
   config  : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
+  selected_manifest : &SelectedPathManifest,
 ) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
   let mut result : Definenodes_with_Sourcemoves =
     Definenodes_with_Sourcemoves::with_capacity (intents . len());
   for intent in intents {
     let supplemented : Definenode_with_Opt_Sourcemove =
       supplement_nodeeditintent_from_disk (graph,
-        intent, config, restricted_source_set ) . await ?;
+        intent, config, restricted_source_set,
+        selected_manifest ) . await ?;
     result . push (supplemented); }
   Ok (result) }
 
@@ -70,12 +75,13 @@ async fn supplement_nodeeditintent_from_disk (
   intent : NodeIntent,
   config : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>,
+  selected_manifest : &SelectedPathManifest,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (ref delete) => {
       if let Some (active) = restricted_source_set {
         refuse_delete_with_inactive_sections (
-          config, active, & delete . id )
+          config, active, selected_manifest, & delete . id )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : intent . into_define_node()
@@ -206,15 +212,17 @@ fn preserve_invisible_members (
 /// destroy them. (The agreed small leak: the refusal reveals that
 /// inactive sections exist.)
 pub fn refuse_delete_with_inactive_sections (
-  config : &SkgConfig,
-  active : &ActiveSourceSet,
-  pid    : &ID,
+  config            : &SkgConfig,
+  active            : &ActiveSourceSet,
+  selected_manifest : &SelectedPathManifest,
+  pid               : &ID,
 ) -> Result<(), String> {
   for source_name in config . ordered_sources () {
     if active . contains_source (&source_name) { continue; }
-    if let Ok (path) = crate::util::path_from_pid_and_source (
+    if let Ok (path) = path_from_pid_and_source (
       config, &source_name, pid . clone () ) {
-      if std::path::Path::new (&path) . is_file () {
+      if selected_manifest . contains_key (
+        Path::new (&path) ) {
         return Err ( format! (
           "Cannot delete '{}': it has telescope sections in inactive sources. Widen the source-set (e.g. to 'all') and retry.",
           pid )); }} }

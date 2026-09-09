@@ -141,7 +141,8 @@ async fn pipeline_basic_mixed_tree (
         : (NonmergeSavePlan, Vec<(ID, ID)>) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &placed_forest_from_org (input), config, None) . await?;
+          &placed_forest_from_org (input), config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         vec![ ID::from ("root"), ID::from ("child"),
@@ -194,7 +195,8 @@ async fn pipeline_subscribee_hiderels (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, None) . await?;
+          &forest, config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await?;
       assert_eq!(
         members_msv (&saved_node_by_id (&plan . define_nodes, "r")
           . hides_from_its_subscriptions),
@@ -224,7 +226,8 @@ async fn pipeline_readonly_col_member_edits (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &placed_forest_from_org (input), config, None) . await?;
+          &placed_forest_from_org (input), config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         vec![ ID::from ("owner"), ID::from ("intruder"),
@@ -251,7 +254,8 @@ async fn pipeline_inactive_subtree (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &placed_forest_from_org (input), config, None) . await?;
+          &placed_forest_from_org (input), config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         // stowaway is on the new recursion surface.
@@ -298,7 +302,8 @@ async fn pipeline_phantom_subtree (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, None) . await?;
+          &forest, config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         // survivor is on the new recursion surface; the phantom
@@ -327,7 +332,8 @@ async fn pipeline_nodeMerge_requests (
       let (_plan, nodeMerge_acquisitions) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, None) . await?;
+          &forest, config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await?;
       assert_eq!( nodeMerge_acquisitions,
                   vec![ (ID::from ("1"), ID::from ("2")) ]);
       let nodeMerges : Vec<NodeMerge> =
@@ -358,7 +364,8 @@ async fn pipeline_rejects_text_claim_mismatch (
       let error : String =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, None) . await
+          &forest, config, None,
+          &graph_handle_from_config (config) ? . load_full () . manifest ) . await
         . err() . expect ("the title edit should be rejected")
         . to_string();
       assert!( error . contains ("Cannot edit title/body") );

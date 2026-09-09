@@ -12,8 +12,9 @@ use crate::types::misc::{
   ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
   SourceSetName};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::store_state::{PathDigest, SelectedPathManifest};
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 fn config_with_order (
@@ -504,15 +505,37 @@ fn restricted_delete_refusal_sees_inactive_sections (
     name    : SourceSetName::from ("public"),
     sources : [ SourceName::from ("public") ]
       . into_iter () . collect (), };
+  let selected_manifest : SelectedPathManifest = BTreeMap::from ([
+    (tmp . path () . join ("private/n.skg"),
+     PathDigest::of_bytes (b"pid: n\n")) ]);
+  std::fs::remove_file (tmp . path () . join ("private/n.skg"))
+    . unwrap ();
   let refusal : Result<(), String> =
     refuse_delete_with_inactive_sections (
-      &config, &active, &ID::new ("n") );
-  assert! ( refusal . is_err (), "private section must refuse" );
+      &config, &active, &selected_manifest, &ID::new ("n") );
+  assert! ( refusal . is_err (),
+            "selected inactive section must refuse after disk removal" );
   assert! ( refusal . unwrap_err ()
             . contains ("inactive sources") );
+  std::fs::write (
+    tmp . path () . join ("private/n.skg"), "changed later\n" )
+    . unwrap ();
+  let selected_without_path : SelectedPathManifest =
+    SelectedPathManifest::new ();
   assert! ( refuse_delete_with_inactive_sections (
-    &config, &active, &ID::new ("only-public") ) . is_ok (),
-    "a node with no inactive sections deletes fine" );
+    &config, &active, &selected_without_path,
+    &ID::new ("n") ) . is_ok (),
+    "later live disk edits must not authorize refusal" );
+
+  let empty_path : PathBuf = tmp . path () . join ("private/empty.skg");
+  std::fs::write (&empty_path, b"") . unwrap ();
+  let selected_empty_manifest : SelectedPathManifest = BTreeMap::from ([
+    (empty_path . clone (), PathDigest::of_bytes (b"")) ]);
+  std::fs::remove_file (&empty_path) . unwrap ();
+  assert! ( refuse_delete_with_inactive_sections (
+    &config, &active, &selected_empty_manifest,
+    &ID::new ("empty") ) . is_err (),
+    "selected empty inactive file must refuse after disk removal" );
 }
 
 #[test]

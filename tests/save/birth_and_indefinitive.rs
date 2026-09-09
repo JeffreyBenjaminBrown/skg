@@ -49,7 +49,8 @@ fn test_birth_and_indefinitive(
             &fixture_graph . load_full () . graph,
             org_text,
             config,
-            None ) . await?;
+            None,
+            &fixture_graph . load_full () . manifest ) . await?;
         update_fs_from_saveinstructions(
           &save_plan . define_nodes,
           &[],

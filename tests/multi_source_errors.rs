@@ -119,7 +119,7 @@ fn test_foreign_node_modification_errors(
         &graph . load_full () . graph,
         &buffer_text,
         config,
-        None ) . await;
+        None, &graph . load_full () . manifest ) . await;
 
       assert!(result . is_err(), "Expected errors for foreign node modifications");
 
@@ -194,7 +194,7 @@ fn test_foreign_node_modification_errors(
         &graph . load_full () . graph,
         &buffer_text,
         config,
-        None ) . await;
+        None, &graph . load_full () . manifest ) . await;
 
       assert!(result . is_err(),
               "Expected errors for foreign merge operations");
@@ -258,7 +258,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &graph . load_full () . graph,
         &buffer_text,
         config,
-        None ) . await;
+        None, &graph . load_full () . manifest ) . await;
 
       assert!(result . is_ok(),
               "Source move between owned sources should succeed, got: {:?}",
@@ -288,7 +288,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &graph . load_full () . graph,
         &buffer_text,
         config,
-        None ) . await;
+        None, &graph . load_full () . manifest ) . await;
 
       println!("\n=== InconsistentSources test ===");
 

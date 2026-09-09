@@ -512,7 +512,8 @@ async fn saveplan_nodes (
   let (_vf, plan, _warnings) =
     buffer_to_validated_saveplan (
       &graph . load_full () . graph,
-      buf, config, active ) . await ?;
+      buf, config, active,
+      &graph . load_full () . manifest ) . await ?;
   Ok (plan . define_nodes) }
 
 /// A fresh indefinitive public member line at the given indentation.
