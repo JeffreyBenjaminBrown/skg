@@ -216,7 +216,8 @@ impl MaintenanceJournalStore {
     coordinator : &MaintenanceCoordinator,
   ) -> Result<(), String> {
     if !matches! (coordinator . state, super::types::CoordinatorState::Idle)
-    || !coordinator . committed_incidents . is_empty () {
+    || !coordinator . committed_incidents . is_empty ()
+    || !coordinator . query_waits . waits . is_empty () {
       return Err ("cannot compact a maintenance journal with retained incident identity or obligations" . into ()); }
     let path = self . directory . join ("active.yaml");
     match fs::remove_file (&path) {
@@ -241,6 +242,7 @@ fn validate_envelope (
         observation_sequence: original . observation_sequence,
         state: original . state,
         committed_incidents: Default::default (),
+        query_waits: Default::default (),
       } . migrate_known_v1 ()? }
     JOURNAL_FORMAT_VERSION => {
       if payload . coordinator . get ("committed_incidents") . is_none () {
@@ -317,6 +319,7 @@ mod tests {
     let mut value : serde_yaml::Value = serde_yaml::to_value (coordinator) . unwrap ();
     let map : &mut serde_yaml::Mapping = value . as_mapping_mut () . unwrap ();
     map . remove ("committed_incidents");
+    map . remove ("query_waits");
     if let Some (details) = map . get_mut ("state")
         . and_then (|state| state . get_mut ("details"))
         . and_then (serde_yaml::Value::as_mapping_mut) {

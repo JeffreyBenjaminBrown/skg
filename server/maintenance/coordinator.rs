@@ -16,6 +16,8 @@ pub struct MaintenanceCoordinator {
   pub state                : CoordinatorState,
   #[serde(default)]
   pub committed_incidents  : BTreeMap<IncidentId, CommittedIncident>,
+  #[serde(default)]
+  pub query_waits           : super::query_waits::QueryWaitLedger,
 }
 
 impl MaintenanceCoordinator {
@@ -25,6 +27,7 @@ impl MaintenanceCoordinator {
       observation_sequence: ObservationSequence::INITIAL,
       state: CoordinatorState::Idle,
       committed_incidents: BTreeMap::new (),
+      query_waits: Default::default (),
     }
   }
 
@@ -160,7 +163,79 @@ impl MaintenanceCoordinator {
               return Err ("terminal report changed its committed incident authority" . into ()); }
             validate_census (active)?;
             validate_committed_incident (active)?; } } } }
+    self . query_waits . validate ()?;
     Ok (( )) }
+
+  pub fn register_query_wait (
+    &mut self,
+    record : super::query_waits::QueryWaitRecord,
+  ) -> Result<bool, String> {
+    self . query_waits . register (record)
+  }
+
+  pub fn resolve_query_wait_target (
+    &mut self,
+    operation_id : &str,
+    outcome      : super::query_waits::QueryWaitTargetOutcome,
+  ) -> Result<bool, String> {
+    self . query_waits . resolve_target (operation_id, outcome)
+  }
+
+  pub fn acknowledge_query_wait (
+    &mut self,
+    operation_id   : &str,
+    content_sha256 : &str,
+  ) -> Result<bool, String> {
+    self . query_waits . acknowledge (operation_id, content_sha256)
+  }
+
+  pub fn retry_query_wait (&mut self, operation_id : &str) -> Result<bool, String> {
+    self . query_waits . retry (operation_id)
+  }
+
+  pub fn mark_query_wait_result_ready (
+    &mut self,
+    operation_id : &str,
+    result : super::query_waits::QueryWaitResult,
+  ) -> Result<bool, String> {
+    self . query_waits . mark_result_ready (operation_id, result)
+  }
+
+  pub fn cancel_query_wait (
+    &mut self,
+    operation_id : &str,
+    reason : String,
+  ) -> Result<bool, String> {
+    self . query_waits . cancel (operation_id, reason)
+  }
+
+  pub fn supersede_query_wait (
+    &mut self,
+    operation_id : &str,
+    successor_operation_id : String,
+  ) -> Result<bool, String> {
+    self . query_waits . supersede (operation_id, successor_operation_id)
+  }
+
+  pub fn supersede_query_wait_target (
+    &mut self,
+    operation_id : &str,
+    reason : String,
+  ) -> Result<bool, String> {
+    self . query_waits . supersede_target (operation_id, reason)
+  }
+
+  pub fn fail_query_wait (
+    &mut self,
+    operation_id : &str,
+    reason : String,
+  ) -> Result<bool, String> {
+    self . query_waits . fail (operation_id, reason)
+  }
+
+  pub fn recover_query_waits_after_restart (&mut self) -> Result<Vec<String>, String> {
+    self . query_waits . recover_executing_after_restart ()
+  }
 
   pub fn next_observation_sequence (&mut self) -> ObservationSequence {
     self . observation_sequence = self . observation_sequence . successor ();

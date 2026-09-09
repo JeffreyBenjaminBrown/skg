@@ -11,6 +11,7 @@ pub mod evidence;
 pub mod journal;
 pub mod observation;
 pub mod pull;
+pub mod query_waits;
 pub(crate) mod save_journal;
 pub mod selection;
 pub mod types;
