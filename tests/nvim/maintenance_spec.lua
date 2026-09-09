@@ -73,6 +73,7 @@ local function reset ()
   state.maintenance_client_incident = nil
   state.pending_maintenance_offer = nil
   state.maintenance_state = nil
+  state.rebuilding = false
   state.connection_handshake_state = nil
   state.request_draft = nil
   config.source_inventory = nil
@@ -104,6 +105,33 @@ describe('skg Neovim maintenance handshake', function ()
       require('skg.client').submit_priority_request
     original_client_connect = require('skg.client').connect
     original_begin = maintenance.begin
+  end)
+
+  it('derives one orange rebuilding token from explicit server metadata',
+     function ()
+    local buf = new_buffer()
+    vim.api.nvim_set_current_buf(buf)
+    state.update_rebuilding_status(nil)
+    assert.is_false(state.rebuilding)
+    state.update_rebuilding_status('true')
+    assert.are.equal(' rebuilding', registry.rebuilding_indicator())
+    state.update_rebuilding_status(nil)
+    assert.is_true(state.rebuilding)
+    registry.install_rebuilding_statusline()
+    registry.install_rebuilding_statusline()
+    local _, occurrences = vim.o.statusline:gsub(
+      vim.pesc(registry.rebuilding_statusline_expression), '')
+    assert.are.equal(1, occurrences)
+    local rendered = vim.api.nvim_eval_statusline(
+      registry.rebuilding_statusline_expression,
+      { winid = 0, highlights = true })
+    assert.are.equal('rebuilding', rendered.str)
+    assert.are.equal('SkgRebuilding', rendered.highlights[1].group)
+    assert.are.equal(0xffa500,
+      vim.api.nvim_get_hl(0, { name = 'SkgRebuilding' }).fg)
+    state.update_rebuilding_status('nil')
+    assert.are.equal('', registry.rebuilding_indicator())
+    assert.are.equal(9, registry.record(buf).maintenance_epoch)
   end)
 
   after_each(function ()

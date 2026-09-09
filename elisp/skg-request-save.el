@@ -101,6 +101,11 @@ nothing. `skg--fork-confirmation-handler' then shows the confirmation
 buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
   (interactive)
+  (unless skg--buffer-record
+    (user-error "Cannot save: this buffer has no explicit Skg application record"))
+  (when-let ((reason (skg-known-save-restriction)))
+    (user-error "Cannot save while %s; nothing was saved; try again when ready"
+                reason))
   (when (and skg--disk-client-conflict
              (not skg--disk-conflict-resolution-in-progress))
     (user-error
@@ -118,8 +123,6 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
          (skg--current-save-point-position)))
     (skg-add-folded-markers)
     (skg-add-focused-marker)
-    (unless skg--buffer-record
-      (user-error "Cannot save: this buffer has no explicit Skg application record"))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (save-buffer (current-buffer))
            (saved-uri skg-view-uri)

@@ -1,6 +1,7 @@
 local payload = require('skg.payload')
 local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
+local lock = require('skg.lock')
 
 local function f (name, value)
   return { sexpr.symbol(name), value }
@@ -289,6 +290,18 @@ describe('skg maintenance buffer transitions', function ()
     assert.is_true(record.presentation_stale)
     assert.is_true(record.search_stale)
     assert.is_false(vim.bo[buf].modifiable)
+  end)
+
+  it('releases a raced save lock without releasing maintenance', function ()
+    local buf = make_buffer('content-view')
+    lock.lock_for_save(buf)
+    registry.lock_for_maintenance(buf, 4)
+    lock.unlock_after_save(buf)
+    assert.is_false(vim.b[buf].skg_save_locked)
+    assert.are.equal(4, registry.record(buf).maintenance_epoch)
+    assert.is_false(vim.bo[buf].modifiable)
+    registry.unlock_after_maintenance(buf, 4)
+    assert.is_true(vim.bo[buf].modifiable)
   end)
 
   it('repeats pending, maintenance and stale warnings on buffer entry',

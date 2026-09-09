@@ -8,6 +8,7 @@ local state = require('skg.state')
 local function reset_state ()
   state.lp_reset()
   state.clear_request_coordinator()
+  state.rebuilding = false
 end
 
 local function framed (payload)
@@ -90,6 +91,14 @@ describe('skg.length_prefix dispatch', function ()
       record, 'save-result', ' (content "x")', 'complete')
     length_prefix.handle_generic_chunk(framed(first) .. framed(second))
     assert.are.same({ 'lock', 'result' }, calls)
+  end)
+
+  it('updates rebuilding from an authoritative response field', function ()
+    state.register_response_handler('maintenance-status', function () end, true)
+    local record = activate_request()
+    length_prefix.handle_generic_chunk(framed(response(
+      record, 'maintenance-status', ' (rebuilding true)', 'complete')))
+    assert.is_true(state.rebuilding)
   end)
 
   it('removes one-shot handlers after use and decrements pending',

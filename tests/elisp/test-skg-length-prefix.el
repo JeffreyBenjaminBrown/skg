@@ -136,6 +136,26 @@
           (should (= 0 (hash-table-count skg--request-records)))
           (should-not skg--active-request-id))))))
 
+(ert-deftest test-skg-authoritative-frame-updates-explicit-rebuilding-status ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--connection-handshake-state 'verified)
+        (skg-lp--pending-count 0)
+        (skg--rebuilding nil))
+    (cl-letf (((symbol-function 'process-send-string) #'ignore))
+      (skg-register-response-handler 'maintenance-status #'ignore t)
+      (let ((request-id
+             (skg-submit-request
+              'proc "((request . \"maintenance status\"))\n")))
+        (skg-lp--dispatch-frame
+         nil
+         (format
+          "((response-type maintenance-status) (rebuilding true) (request-id %S) (frame-kind maintenance-status) (terminal-status complete))"
+          request-id))
+        (should skg--rebuilding)))))
+
 (ert-deftest test-skg-terminal-handler-error-still-cleans-request ()
   (let ((skg--request-records (make-hash-table :test #'equal))
         (skg--request-draft nil)

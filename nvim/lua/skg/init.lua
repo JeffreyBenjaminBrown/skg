@@ -31,6 +31,7 @@ M.config_path = nil
 function M.install_session_surface ()
   local state = require('skg.state')
   local pull = require('skg.pull')
+  require('skg.buffer_registry').install_rebuilding_statusline()
   state.register_server_push_handler(
     'collateral-view',
     require('skg.save').background_collateral_offer_handler)

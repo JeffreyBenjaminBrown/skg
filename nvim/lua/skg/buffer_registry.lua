@@ -4,6 +4,36 @@ local payload = require('skg.payload')
 
 local M = {}
 
+M.rebuilding_statusline_expression =
+  "%#SkgRebuilding#%{v:lua.require('skg.buffer_registry').rebuilding_indicator()}%*"
+
+function M.define_rebuilding_highlight ()
+  vim.api.nvim_set_hl(0, 'SkgRebuilding',
+    { fg = '#ffa500', default = true })
+end
+
+function M.rebuilding_indicator ()
+  local state = require('skg.state')
+  local buf = vim.api.nvim_get_current_buf()
+  return state.rebuilding and M.record(buf) and ' rebuilding' or ''
+end
+
+function M.install_rebuilding_statusline ()
+  M.define_rebuilding_highlight()
+  local expression = M.rebuilding_statusline_expression
+  if not vim.o.statusline:find(expression, 1, true) then
+    local base = vim.o.statusline
+    if base == '' then
+      base = '%<%f %h%m%r%=%-14.(%l,%c%V%) %P' end
+    vim.o.statusline = base .. expression
+  end
+  local group = vim.api.nvim_create_augroup(
+    'skg-rebuilding-highlight', { clear = true })
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    group = group, callback = M.define_rebuilding_highlight,
+  })
+end
+
 local function uuid ()
   local bytes = { vim.uv.random(16):byte(1, 16) }
   bytes[7] = bytes[7] % 16 + 64
@@ -504,7 +534,10 @@ function M.lock_for_maintenance (buf, epoch)
      or record.lifecycle == 'maintenance-control'
      or record.lifecycle == 'ordinary-file' then
     if not vim.b[buf].skg_maintenance_changed_modifiable then
-      vim.b[buf].skg_pre_maintenance_modifiable = vim.bo[buf].modifiable
+      vim.b[buf].skg_pre_maintenance_modifiable =
+        vim.b[buf].skg_save_locked
+        and vim.b[buf].skg_pre_save_modifiable
+        or vim.bo[buf].modifiable
       vim.b[buf].skg_maintenance_changed_modifiable = true
     end
     vim.bo[buf].modifiable = false
@@ -724,6 +757,19 @@ function M.status_messages (buf)
     table.insert(messages,
       'This raw .skg file changed on disk; revert or reconcile before saving') end
   return messages
+end
+
+function M.known_save_restriction (buf)
+  local record = M.record(buf)
+  local state = require('skg.state')
+  if state.rebuilding then
+    return 'the graph and search index are rebuilding' end
+  if record and record.maintenance_epoch then
+    return string.format('this buffer is maintenance-locked for epoch %s',
+                         record.maintenance_epoch) end
+  if state.pending_maintenance_offer then
+    return 'disk reconciliation is pending' end
+  return nil
 end
 
 function M.notify_status (buf)

@@ -18,9 +18,22 @@ M.active_source_set_name = vim.g.skg_active_source_set_name
 M.maintenance_archive_folder = nil
 M.maintenance_archive_identity = nil
 M.maintenance_state = nil
+M.rebuilding = M.rebuilding or false
 M.maintenance_client_incident = M.maintenance_client_incident or nil
 M.pending_maintenance_offer = M.pending_maintenance_offer or nil
 M.pending_recovery_incidents = M.pending_recovery_incidents or {}
+
+---Update rebuilding only when VALUE is explicit server status metadata.
+---An omitted field preserves the last authoritative value.
+---@param value string|nil
+function M.update_rebuilding_status (value)
+  if value == nil then return M.rebuilding end
+  if value == 'true' then M.rebuilding = true
+  elseif value == 'nil' then M.rebuilding = false
+  else error('Invalid rebuilding status ' .. tostring(value)) end
+  vim.cmd('redrawstatus')
+  return M.rebuilding
+end
 
 ---The persistent TCP connection to the Rust backend: a vim.uv tcp
 ---handle, or nil when disconnected.

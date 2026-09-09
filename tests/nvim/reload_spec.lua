@@ -70,6 +70,7 @@ describe('skg.reload', function ()
     }
     state.maintenance_client_incident = incident
     state.maintenance_state = { epoch = 9, state = 'active' }
+    state.rebuilding = true
     state.pending_maintenance_offer = { candidate_id = 'candidate' }
     local recovery_incidents = {
       { { 'incident-id', incident.incident_id } },
@@ -98,6 +99,7 @@ describe('skg.reload', function ()
     assert.are.equal('reconnect-required',
       reloaded_state.maintenance_client_incident.phase)
     assert.are.equal('active', reloaded_state.maintenance_state.state)
+    assert.is_true(reloaded_state.rebuilding)
     assert.are.equal(recovery_incidents,
       reloaded_state.pending_recovery_incidents)
     assert.are.equal('private', reloaded_state.active_source_set_name)
@@ -113,6 +115,7 @@ describe('skg.reload', function ()
 
     reloaded_state.maintenance_client_incident = nil
     reloaded_state.maintenance_state = nil
+    reloaded_state.rebuilding = false
     reloaded_state.pending_maintenance_offer = nil
     reloaded_state.pending_recovery_incidents = {}
     reloaded_config.config_file_path = nil

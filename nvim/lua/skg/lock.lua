@@ -52,6 +52,7 @@ end
 ---@param buf integer
 function M.lock_for_save (buf)
   if not vim.b[buf].skg_save_locked then
+    vim.b[buf].skg_pre_save_modifiable = vim.bo[buf].modifiable
     vim.b[buf].skg_save_locked = true
     vim.bo[buf].modifiable = false
   end
@@ -61,8 +62,11 @@ end
 function M.unlock_after_save (buf)
   if vim.api.nvim_buf_is_valid(buf)
      and vim.b[buf].skg_save_locked then
+    local prior = vim.b[buf].skg_pre_save_modifiable == true
     vim.b[buf].skg_save_locked = false
-    vim.bo[buf].modifiable = true
+    vim.b[buf].skg_pre_save_modifiable = nil
+    if not vim.b[buf].skg_maintenance_epoch then
+      vim.bo[buf].modifiable = prior end
   end
 end
 

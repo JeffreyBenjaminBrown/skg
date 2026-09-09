@@ -169,6 +169,7 @@ function M.reset_client_state ()
   local state = require('skg.state')
   state.close_connection()
   state.connection_handshake_state = nil
+  state.rebuilding = false
   state.clear_request_coordinator()
   state.lp_reset()
   state.connection_reset_hooks = {}

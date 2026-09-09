@@ -77,7 +77,6 @@ function M.request_save_buffer (fork_approved, fork_sources,
                                 hoist_approved_pids,
                                 scalar_approved_pids)
   local save_buf = vim.api.nvim_get_current_buf()
-  M.confirm_save_despite_other_unsaved(save_buf)
   local saved_uri = vim.b[save_buf].skg_view_uri
   if not saved_uri then
     -- A nil view-uri causes an unfiltered save AND the server won't
@@ -88,6 +87,11 @@ function M.request_save_buffer (fork_approved, fork_sources,
   local save_authority = assert(
     registry.record(save_buf),
     'Cannot save: this buffer has no explicit Skg application record')
+  local restriction = registry.known_save_restriction(save_buf)
+  if restriction then
+    error('Cannot save while ' .. restriction
+      .. '; nothing was saved; try again when ready') end
+  M.confirm_save_despite_other_unsaved(save_buf)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil

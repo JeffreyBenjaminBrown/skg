@@ -1486,3 +1486,29 @@ checkpoint and does not enable independent buffer release.
 ** choices determining the future
 No new architectural choice. Next pin the actual Searcher, remove ordinary
 fallback reads, and converge graph mutation and buffer authority on the owner.
+
+* Simplify/cohere checkpoint: client rebuilding display and prompt refusal
+** what's done and went well
+Both clients now consume explicit '(rebuilding true|nil)' response metadata.
+Their modelines show exactly one orange 'rebuilding' token; explicit false
+clears it independently of report/epoch bookkeeping. Known rebuilding,
+maintenance and pending-reconciliation restrictions refuse a save before its
+transient lock or buffer-marker edits. A raced Neovim save cleanup preserves
+an overlapping maintenance restriction and restores prior writability after
+both restrictions end. Emacs already keeps the two lock owners separate.
+
+The full Emacs suite passes 444 tests, with the same three missing native-undo
+package skips (447 discovered). The complete Neovim unit suite passes.
+Evidence: 'temp/simplify-cohere-baseline/rebuilding-ui-*.log'.
+** Changes to the plan's envisioned order.
+The independent client display/lock helper work ran alongside graph snapshot
+migration. It is committed separately for review; server lifecycle metadata
+and independent buffer release are still being integrated.
+** what's imperfect about what's done
+This client checkpoint alone does not establish the server's rebuilding
+interval. Server transitions must send explicit status; absent metadata
+preserves the last status instead of guessing from broad incident phases.
+The baseline native-undo package skips remain unverified coverage.
+** choices determining the future
+No architectural question. Continue the pinned graph/search publication and
+ordinary-save recovery prerequisites before changing release authority.

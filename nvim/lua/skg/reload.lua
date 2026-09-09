@@ -34,6 +34,7 @@ local function capture_session ()
       maintenance_archive_folder = old_state.maintenance_archive_folder,
       maintenance_archive_identity = old_state.maintenance_archive_identity,
       maintenance_state = old_state.maintenance_state,
+      rebuilding = old_state.rebuilding,
       maintenance_client_incident = old_state.maintenance_client_incident,
       pending_maintenance_offer = old_state.pending_maintenance_offer,
       pending_recovery_incidents = old_state.pending_recovery_incidents,

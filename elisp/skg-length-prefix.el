@@ -77,9 +77,11 @@ If there is buffered data and a handler matched, continues the loop."
           (if-let ((handler
                     (gethash (format "%s" frame-kind)
                              skg--server-push-handlers)))
-              (if artifact-bytes
-                  (funcall handler tcp-proc payload artifact-bytes)
-                (funcall handler tcp-proc payload))
+              (progn
+                (skg-update-rebuilding-status response)
+                (if artifact-bytes
+                    (funcall handler tcp-proc payload artifact-bytes)
+                  (funcall handler tcp-proc payload)))
             (skg-log 'warn 'dispatch
                      "no server-push handler for frame %s" frame-kind)))
          ((not request-id)
@@ -99,6 +101,7 @@ If there is buffered data and a handler matched, continues the loop."
                                'protocol-failed))
          (t
           (setq request-id (format "%s" request-id))
+          (skg-update-rebuilding-status response)
           (let ((handler-entry
                  (assoc frame-kind
                         (skg--request-record-handlers record)))

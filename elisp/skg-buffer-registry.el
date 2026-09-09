@@ -25,6 +25,10 @@
 (defvar-local skg--maintenance-lock-overlay nil)
 (put 'skg--maintenance-lock-overlay 'permanent-local t)
 
+(defface skg-rebuilding-face
+  '((t :foreground "orange"))
+  "Face for the compact graph/search rebuilding indicator.")
+
 (defun skg-buffer-raw-text (&optional buffer)
   "Return BUFFER's exact no-properties save-equivalent text."
   (with-current-buffer (or buffer (current-buffer))
@@ -513,6 +517,8 @@ Reload selectors hold only transient command input, never authored state."
 (defun skg-buffer-status-indicator ()
   (when skg--buffer-record
     (concat
+     (when skg--rebuilding
+       (concat " " (propertize "rebuilding" 'face 'skg-rebuilding-face)))
      (when (and (boundp 'skg--pending-maintenance-offer)
                 skg--pending-maintenance-offer)
        " pending-disk")
@@ -526,6 +532,20 @@ Reload selectors hold only transient command input, never authored state."
      (when (and (boundp 'skg--raw-file-externally-stale)
                 skg--raw-file-externally-stale)
        " external-file-stale"))))
+
+(defun skg-known-save-restriction (&optional buffer)
+  "Return the known reason BUFFER cannot begin a save, or nil."
+  (with-current-buffer (or buffer (current-buffer))
+    (cond
+     (skg--rebuilding
+      "the graph and search index are rebuilding")
+     ((and skg--buffer-record
+           (skg--buffer-record-maintenance-epoch skg--buffer-record))
+      (format "this buffer is maintenance-locked for epoch %s"
+              (skg--buffer-record-maintenance-epoch skg--buffer-record)))
+     ((and (boundp 'skg--pending-maintenance-offer)
+           skg--pending-maintenance-offer)
+      "disk reconciliation is pending"))))
 
 (defun skg-buffer-status-messages ()
   "Return warnings which remain relevant to the current Skg buffer."

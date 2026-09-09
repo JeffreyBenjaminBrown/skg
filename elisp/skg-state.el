@@ -34,6 +34,28 @@ The value is nil, `sent', `census', `census-texts', `verified',
 (defvar skg--maintenance-archive-identity nil)
 (defvar skg--maintenance-state nil)
 
+(defvar skg--rebuilding nil
+  "Non-nil exactly while server metadata says a graph/search pair is rebuilding.")
+
+(defun skg-update-rebuilding-status (response)
+  "Update the rebuilding flag when RESPONSE explicitly carries that status.
+An omitted field preserves the last authoritative value."
+  (when-let ((entry (assq 'rebuilding response)))
+    (let ((value (cadr entry)))
+      (cond
+       ((memq value '(t true))
+        (setq skg--rebuilding t))
+       ((null value)
+        (setq skg--rebuilding nil))
+       ((equal value "true")
+        (setq skg--rebuilding t))
+       ((equal value "nil")
+        (setq skg--rebuilding nil))
+       (t
+        (error "Invalid rebuilding status %S" value))))
+    (force-mode-line-update t))
+  skg--rebuilding)
+
 (cl-defstruct skg--request-record
   id incident-id handlers terminal-handler failure-handler finalizer finalized-p)
 

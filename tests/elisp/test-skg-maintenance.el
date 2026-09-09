@@ -679,6 +679,53 @@
       (should (string-match-p "generated heralds" echoed))
       (should (string-match-p "Search membership and ranking" echoed)))))
 
+(ert-deftest test-skg-rebuilding-status-is-explicit-orange-modeline-metadata ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let ((skg--rebuilding nil))
+      (skg-update-rebuilding-status '((status active)))
+      (should-not skg--rebuilding)
+      (skg-update-rebuilding-status '((rebuilding true)))
+      (let ((indicator (skg-buffer-status-indicator)))
+        (let ((start (string-match "rebuilding" indicator)))
+          (should start)
+          (should-not (string-match "rebuilding" indicator
+                                    (+ start (length "rebuilding"))))
+          (should (eq (get-text-property start 'face indicator)
+                      'skg-rebuilding-face))
+          (should (equal (face-attribute
+                          'skg-rebuilding-face :foreground nil t)
+                         "orange")))
+        (should (string-match-p "M:9" indicator)))
+      (skg-update-rebuilding-status '((status active)))
+      (should skg--rebuilding)
+      (skg-update-rebuilding-status '((rebuilding nil)))
+      (should-not (string-match-p "rebuilding"
+                                  (skg-buffer-status-indicator))))))
+
+(ert-deftest test-skg-known-rebuilding-refuses-save-before-transient-lock ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let ((skg--rebuilding t)
+          (before (skg-buffer-raw-text))
+          refusal)
+      (condition-case error-data
+          (skg-request-save-buffer)
+        (user-error (setq refusal (error-message-string error-data))))
+      (should (string-match-p "nothing was saved; try again" refusal))
+      (should (equal before (skg-buffer-raw-text)))
+      (should-not skg--save-lock-overlay)
+      (should skg--maintenance-lock-overlay))))
+
+(ert-deftest test-skg-raced-save-refusal-keeps-maintenance-lock ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (skg-unlock-buffer-after-maintenance buffer 9)
+    (skg--lock-for-save)
+    (skg-lock-buffer-for-maintenance buffer 10)
+    (skg--unlock-after-save)
+    (should-not skg--save-lock-overlay)
+    (should skg--maintenance-lock-overlay)
+    (should (= 10 (skg--buffer-record-maintenance-epoch
+                   skg--buffer-record)))))
+
 (ert-deftest test-skg-maintenance-retirement-keeps-text-and-undo ()
   (skg-test-maintenance--with-buffer 'content-view
     (set-buffer-modified-p t)

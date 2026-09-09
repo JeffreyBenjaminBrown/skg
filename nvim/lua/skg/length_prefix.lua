@@ -65,7 +65,11 @@ function M.dispatch_frame (payload, artifact_bytes)
       local handler = state.server_push_handlers[frame_kind]
       if handler then
         local handler_ok, handler_error =
-          pcall(handler, payload, response, artifact_bytes)
+          pcall(function ()
+            state.update_rebuilding_status(
+              M.field_atom(response, 'rebuilding'))
+            handler(payload, response, artifact_bytes)
+          end)
         if not handler_ok then
           log.log('error', 'dispatch',
                   'server-push dispatch error: %s for payload: %s',
@@ -92,6 +96,7 @@ function M.dispatch_frame (payload, artifact_bytes)
   local entry = record.handlers[frame_kind]
   state.dispatching_request_id = request_id
   local handler_ok, handler_error = pcall(function ()
+    state.update_rebuilding_status(M.field_atom(response, 'rebuilding'))
     if entry then
       entry.handler(payload, response, artifact_bytes)
     elseif frame_kind == 'error' then

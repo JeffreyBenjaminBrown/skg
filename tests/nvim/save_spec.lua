@@ -89,6 +89,37 @@ describe('skg.save pipeline', function ()
     config.store_state = nil
   end)
 
+  it('refuses known rebuilding before taking a transient save lock',
+     function ()
+    local buf = open_view(
+      '* (skg (node (id root))) root', 'skg://rebuilding',
+      'uri-rebuilding')
+    local before = registry.raw_text(buf)
+    state.rebuilding = true
+    local ok, err = pcall(save.request_save_buffer)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find(
+      'nothing was saved; try again when ready', 1, true))
+    assert.are.equal(before, registry.raw_text(buf))
+    assert.is_falsy(vim.b[buf].skg_save_locked)
+    assert.is_nil(lock.stream_in_progress)
+  end)
+
+  it('refuses a known maintenance restriction before the save lock',
+     function ()
+    local buf = open_view(
+      '* (skg (node (id root))) root', 'skg://maintenance-save',
+      'uri-maintenance-save')
+    registry.lock_for_maintenance(buf, 4)
+    local ok, err = pcall(save.request_save_buffer)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find(
+      'maintenance-locked for epoch 4', 1, true))
+    assert.is_falsy(vim.b[buf].skg_save_locked)
+    assert.are.equal(4, registry.record(buf).maintenance_epoch)
+    assert.is_false(vim.bo[buf].modifiable)
+  end)
+
   it('round-trips a save: markers out, redraw in, point restored',
      function ()
     local seen_request = nil
