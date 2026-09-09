@@ -1,3 +1,14 @@
+* Implemented boundary, 2026-09-09
+The design sketches below predate the finished wire adapter. For the current
+contract, use [[file:query-wait-server.org::* Implemented TCP boundary][the implemented server boundary]] and
+[[file:../TODO/partial-reload-and-magit/progress.org::* Simplify/cohere checkpoint: actual editor query delivery][the actual editor verification checkpoint]].
+Client records live in editor memory; the server ledger supplies durable
+recovery. A missing destination stays absent. Status recovers and binds its
+retained target and recipe without creating a new buffer. Requests use spaces
+in their names; response frame names use hyphens. Expected destination counters
+and resulting counters are distinct. Results are read-only and get no search
+enrichment continuation. These implemented choices supersede contrary details
+in the earlier interface sketches below.
 * Query waits for both clients
 
 This note narrows the remaining search wait contract from [[file:../TODO/partial-reload-and-magit/11_plan_simplify-cohere.org::513][Plan 11]] and the settled maintenance choice in [[file:../TODO/partial-reload-and-magit/10_architecture-review.org::945][Plan 10]]. It covers the Emacs and Neovim adapters and the server wire boundary. A pending wait owns a recipe and an outcome identity; it does not own a Tantivy Searcher, a graph lease, an editor callback, or a time based expiry.
