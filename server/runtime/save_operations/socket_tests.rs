@@ -30,6 +30,7 @@ use std::os::unix::process::ExitStatusExt;
 const WORKER_ROOT : &str = "SKG_SOCKET_SAVE_TEST_ROOT";
 const CRASH_POINT : &str = "SKG_SOCKET_SAVE_TEST_CRASH";
 const REPORT_HOLD : &str = "SKG_SOCKET_SAVE_TEST_REPORT_HOLD";
+const REBUILD_HOLD : &str = "SKG_SOCKET_SAVE_TEST_REBUILD_HOLD";
 const WORKER_NAME : &str =
   "runtime::save_operations::socket_tests::socket_process_worker";
 
@@ -307,6 +308,80 @@ fn socket_report_recovery_reconstructs_old_pair_after_restart () {
 }
 
 #[test]
+fn socket_full_rebuild_serves_reads_status_and_prompt_save_refusal () {
+  let fixture : Fixture = Fixture::new ();
+  let hold : PathBuf = fixture . root . join ("rebuild-hold");
+  let _process : ServerProcess = fixture . start_with_options ("none", None, Some (&hold));
+  let mut client : Client = Client::connect (&fixture);
+  let (request, _, _) : (String, String, String) = client . save_request ("Alpha", "Beta");
+  client . send (&request, Some (&save_body ("Alpha", "Beta")));
+  assert_eq! (field (&client . terminal (), "save-operation-state") . as_deref (), Some ("committed"));
+  let before : Vec<u8> = fs::read (fixture . node ("a")) . unwrap ();
+  client . send ("((request . \"begin maintenance\") (origin . \"full-rebuild\"))", None);
+  let offer : Sexp = client . terminal ();
+  let incident : String = field (&offer, "allocated-incident-id") . expect ("incident");
+  let epoch : String = field (&offer, "maintenance-epoch") . expect ("epoch");
+  client . generation = field (&offer, "g0-graph-generation") . unwrap () . parse () . unwrap ();
+  client . send (&format! (
+    "((request . \"maintenance locked census\") (incident-id . \"{}\") (maintenance-epoch . {}) (client-constructor-admission . \"closed\"))",
+    incident, epoch), None);
+  assert_eq! (field (&client . terminal (), "status") . as_deref (),
+    Some ("locked-census-accepted-publish-initial-archive"));
+  let checksum : String = write_empty_initial_archive (&offer);
+  client . send (&format! (
+    "((request . \"maintenance archive ready\") (incident-id . \"{}\") (maintenance-epoch . {}) (lock-census-sha256 . \"{}\") (manifest-sha256 . \"{}\"))",
+    incident, epoch, empty_lock_census_sha256 (), checksum), None);
+  let archived : Sexp = client . terminal ();
+  assert_eq! (field (&archived, "status") . as_deref (), Some ("archive-ready"), "{}", archived);
+  client . send (&format! (
+    "((request . \"run maintenance origin\") (incident-id . \"{}\") (maintenance-epoch . {}))",
+    incident, epoch), None);
+  assert_eq! (field (&client . terminal (), "status") . as_deref (), Some ("origin-operation-started"));
+  wait_for_path (&hold . with_extension ("ready"));
+  let status_request : String = format! (
+    "((request . \"maintenance status\") (incident-id . \"{}\") (maintenance-epoch . {}))", incident, epoch);
+  let status_started : Instant = Instant::now ();
+  client . send (&status_request, None);
+  let status : Sexp = client . terminal ();
+  let status_elapsed : Duration = status_started . elapsed ();
+  assert! (status_elapsed < Duration::from_secs (1), "status stalled: {:?}", status_elapsed);
+  assert_eq! (field (&status, "rebuilding") . as_deref (), Some ("true"), "{}", status);
+  assert_eq! (field (&status, "graph-write-admission") . as_deref (), Some ("closed"));
+  let (refused_request, _, _) : (String, String, String) = client . save_request ("Unwanted", "Beta");
+  let save_started : Instant = Instant::now ();
+  client . send (&refused_request, Some (&save_body ("Unwanted", "Beta")));
+  let refusal : Sexp = client . terminal ();
+  let save_elapsed : Duration = save_started . elapsed ();
+  assert! (save_elapsed < Duration::from_secs (1), "refusal stalled: {:?}", save_elapsed);
+  assert_eq! (field (&refusal, "save-operation-state") . as_deref (), Some ("refused"), "{}", refusal);
+  assert_eq! (fs::read (fixture . node ("a")) . unwrap (), before);
+  let query_started : Instant = Instant::now ();
+  client . send (&format! (
+    "((request . \"single root content view\") (id . \"a\") (view-uri . \"{}\") (fresh-view . \"true\") (requested-view-write-authority . \"editable\"))",
+    uuid::Uuid::new_v4 ()), None);
+  let view : Sexp = client . terminal ();
+  let query_elapsed : Duration = query_started . elapsed ();
+  assert! (query_elapsed < Duration::from_secs (1), "query stalled: {:?}", query_elapsed);
+  assert_eq! (field (&view, "view-write-authority") . as_deref (), Some ("read-only"), "{}", view);
+  assert! (field (&view, "content") . unwrap_or_default () . contains ("Alpha"));
+  let search : Sexp = client . text_search ("Beta");
+  assert! (field (&search, "content") . unwrap_or_default () . contains ("Beta"), "{}", search);
+  assert_eq! (field (&search, "view-write-authority") . as_deref (), Some ("read-only"));
+  fs::write (hold . with_extension ("release"), b"release") . unwrap ();
+  let publication_started : Instant = Instant::now ();
+  loop {
+    client . send (&status_request, None);
+    let result : Sexp = client . terminal ();
+    if field (&result, "graph-write-admission") . as_deref () == Some ("open") {
+      assert_ne! (field (&result, "rebuilding") . as_deref (), Some ("true"));
+      break; }
+    assert! (publication_started . elapsed () < Duration::from_secs (10), "{}", result);
+    std::thread::sleep (Duration::from_millis (20)); }
+  eprintln! ("held full rebuild: status={:?}, save refusal={:?}, view={:?}, publication after release={:?}",
+    status_elapsed, save_elapsed, query_elapsed, publication_started . elapsed ());
+}
+
+#[test]
 fn socket_process_worker () {
   let Some (root) : Option<std::ffi::OsString> = std::env::var_os (WORKER_ROOT)
     else { return; };
@@ -340,7 +415,15 @@ pub(crate) fn crash_point (boundary : &str) {
 /// report settlement planning is paused. The parent test owns the control
 /// files; the child never fabricates a candidate or journal record.
 pub(crate) fn hold_maintenance_report () {
-  let Some (control) : Option<PathBuf> = std::env::var_os (REPORT_HOLD)
+  hold_at (REPORT_HOLD); }
+
+pub(crate) fn hold_maintenance_rebuild () {
+  hold_at (REBUILD_HOLD); }
+
+fn hold_at (
+  variable : &str,
+) {
+  let Some (control) : Option<PathBuf> = std::env::var_os (variable)
     . map (PathBuf::from) else { return; };
   fs::write (control . with_extension ("ready"), b"ready") . unwrap ();
   while ! control . with_extension ("release") . exists () {
@@ -363,17 +446,18 @@ impl Fixture {
   fn node (&self, id : &str) -> PathBuf { self . root . join (format! ("owned/main/{}.skg", id)) }
 
   fn start (&self, boundary : &str) -> ServerProcess {
-    self . start_with_options (boundary, None)
+    self . start_with_options (boundary, None, None)
   }
 
   fn start_with_report_hold (&self, hold : &PathBuf) -> ServerProcess {
-    self . start_with_options ("none", Some (hold))
+    self . start_with_options ("none", Some (hold), None)
   }
 
   fn start_with_options (
     &self,
     boundary : &str,
     report_hold : Option<&PathBuf>,
+    rebuild_hold : Option<&PathBuf>,
   ) -> ServerProcess {
     let _ = fs::remove_file (self . root . join ("ready"));
     let log : PathBuf = self . root . join (format! ("server-{}.log", boundary));
@@ -385,6 +469,8 @@ impl Fixture {
       . env ("XDG_STATE_HOME", self . root . join ("private-state"));
     if let Some (hold) = report_hold {
       command . env (REPORT_HOLD, hold); }
+    if let Some (hold) = rebuild_hold {
+      command . env (REBUILD_HOLD, hold); }
     let child : Child = command
       . stdout (Stdio::from (output . try_clone () . unwrap ()))
       . stderr (Stdio::from (output)) . spawn () . unwrap ();

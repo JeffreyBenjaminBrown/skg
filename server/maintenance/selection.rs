@@ -378,22 +378,9 @@ async fn rebuild_reserved_stores (
   warnings . sort_by (|left, right| left . 0 . cmp (&right . 0));
   let source_catalog_changed : bool = source_catalog_blake3 (&env . config)
     != candidate . source_catalog_blake3;
-  let mut interactive : MutexGuard<'_, InteractiveSession> =
-    runtime . interactive . lock () . map_err (|_|
-      store_failure ("interactive session poisoned" . into ()))?;
-  let old_source_set : ActiveSourceSet = interactive . active_source_set . clone ();
-  let replacement_source_set : ActiveSourceSet = ActiveSourceSet::named (
-      &candidate . config, old_source_set . name . clone ())
-    . or_else (|_| ActiveSourceSet::named (
-      &candidate . config, SourceSetName::from ("all")))
-    . map_err (|error| store_failure (format! (
-      "replacement source-set is invalid: {}", error)))?;
-  if old_source_set . name != replacement_source_set . name {
-    tracing::warn! (
-      old = %old_source_set . name . 0,
-      new = %replacement_source_set . name . 0,
-      "replacement config removed the active source-set; using exact fallback"); }
   mutation . authorize ()?;
+  #[cfg(test)]
+  crate::runtime::save_operations::socket_tests::hold_maintenance_rebuild ();
   let replacement_tantivy : TantivyIndex = if candidate . config . tantivy_folder
       == env . config . tantivy_folder
   { env . tantivy_index . clone () }
@@ -424,6 +411,24 @@ async fn rebuild_reserved_stores (
       return fail_selection_and_restore (
         mutation, &mut env,
         format! ("replacement source watches failed: {}", error)); } }
+  // The selected pair remains readable throughout index preparation. Acquire
+  // interactive state only for the final source interpretation and publication,
+  // so status, save refusals and coherent queries can run while indexing.
+  let mut interactive : MutexGuard<'_, InteractiveSession> =
+    runtime . interactive . lock () . map_err (|_|
+      store_failure ("interactive session poisoned" . into ()))?;
+  let old_source_set : ActiveSourceSet = interactive . active_source_set . clone ();
+  let replacement_source_set : ActiveSourceSet = ActiveSourceSet::named (
+      &candidate . config, old_source_set . name . clone ())
+    . or_else (|_| ActiveSourceSet::named (
+      &candidate . config, SourceSetName::from ("all")))
+    . map_err (|error| store_failure (format! (
+      "replacement source-set is invalid: {}", error)))?;
+  if old_source_set . name != replacement_source_set . name {
+    tracing::warn! (
+      old = %old_source_set . name . 0,
+      new = %replacement_source_set . name . 0,
+      "replacement config removed the active source-set; using exact fallback"); }
   if let Err (error) = runtime . transition_maintenance (|coordinator|
       coordinator . replace_full_rebuild_source_set (
         incident_id, epoch, replacement_source_set . name . 0 . clone ()))
