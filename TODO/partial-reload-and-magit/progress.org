@@ -1861,3 +1861,26 @@ The user's latest preference supersedes the earlier model preference: new
 delegates use Luna with high reasoning. Existing higher-cost delegates stopped
 at explicit handoffs. Uncertain reasoning is recorded incrementally under
 [[file:../../codex-thinking/index.org][codex-thinking/]] (implementation questions only).
+
+* Simplify/cohere checkpoint: durable completion markers and bounded lookup
+** what's done and went well
+Acknowledging a terminal save first publishes a checksummed completion marker
+bound to the exact request, interpretation, predecessor record and outcome.
+Only then does cleanup remove retained source/staging blobs and the old record.
+Exact terminal outcome replay remains available; an old retry cannot reapply
+its effects after a newer save. Status and duplicate checks load only the named
+operation, while startup continues auditing the complete journal.
+
+Luna completed idempotent cleanup and regressions for all three interrupted
+completion cleanup boundaries, malformed predecessors, unsupported markers,
+request mismatch and newer-save preservation. All 20 journal-focused tests and
+'cargo check --lib --jobs 2' pass; see 'journal-compaction-focused.log' and
+'journal-compaction-check.log'.
+** Changes to the plan's envisioned order.
+Completion compaction was finished beside admission integration after the
+ordinary-save crash boundary was already exercised over real TCP.
+** what's imperfect about what's done
+The journal suite establishes the primitive and fresh-process cleanup; its
+publication still needs the plan's final common-owner adapter audit.
+** choices determining the future
+Continue the accepted integration; no new architecture question.

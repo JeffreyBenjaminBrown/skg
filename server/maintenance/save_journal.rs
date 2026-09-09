@@ -18,6 +18,7 @@ use std::path::{Component, Path, PathBuf};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
 const SAVE_JOURNAL_FORMAT_VERSION : u32 = 1;
+const COMPLETION_MARKER_FORMAT_VERSION : u32 = 1;
 const MAX_OPERATION_ID_BYTES : usize = 1_024;
 const MAX_FINGERPRINT_BYTES : usize = 8_192;
 const MAX_INTERPRETATION_IDENTITY_BYTES : usize = 8_192;
@@ -254,10 +255,57 @@ struct JournalRecordEnvelope {
   payload_blake3 : String,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CompletionTerminal {
+  Refused,
+  Committed,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CompletionCleanupState {
+  Pending,
+  Complete,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CompletionMarkerPayload {
+  format_version             : u32,
+  operation_id               : String,
+  request_base_fingerprint   : String,
+  binding_blake3             : String,
+  interpretation_identity    : String,
+  predecessor_record_blake3  : String,
+  terminal                   : CompletionTerminal,
+  outcome                    : JournalOutcome,
+  cleanup_state              : CompletionCleanupState,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CompletionMarkerEnvelope {
+  payload        : CompletionMarkerPayload,
+  payload_blake3 : String,
+}
+
 #[derive(Clone, Debug)]
 struct LoadedJournalRecord {
   directory : PathBuf,
   payload   : JournalRecordPayload,
+}
+
+#[derive(Clone, Debug)]
+struct LoadedCompletionMarker {
+  directory : PathBuf,
+  payload   : CompletionMarkerPayload,
+}
+
+#[derive(Clone, Debug)]
+enum LoadedSaveOperation {
+  Active    (LoadedJournalRecord),
+  Completed (LoadedCompletionMarker),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -279,21 +327,23 @@ impl SaveJournalStore {
     request : &DurableSaveRequest,
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
     validate_request (request, &self . root)?;
-    let existing_records : Vec<LoadedJournalRecord> =
-      self . load_records_require_clean ()?;
     let binding_blake3 : String = request_binding_blake3 (request);
-    if let Some (existing) = existing_records . iter () . find (|record|
-      record . payload . operation_id == request . operation_id)
-    {
-      require_matching_request (
-        &existing . payload, request, &binding_blake3)?;
-      if matches! (existing . payload . state,
-          JournalState::StagingUnAuthorized)
-      {
-        let mut resumable : LoadedJournalRecord = existing . clone ();
-        self . finish_staging (&mut resumable)?;
-        return snapshot (&resumable); }
-      return snapshot (existing); }
+    if let Some (existing) = self . load_operation_direct (
+      &request . operation_id)? {
+      match existing {
+        LoadedSaveOperation::Active (mut record) => {
+          require_matching_request (
+            &record . payload, request, &binding_blake3)?;
+          if matches! (record . payload . state,
+              JournalState::StagingUnAuthorized)
+          {
+            self . finish_staging (&mut record)?; }
+          return snapshot (&record); },
+        LoadedSaveOperation::Completed (marker) => {
+          require_matching_completion (
+            &marker . payload, request, &binding_blake3)?;
+          return completion_snapshot (&marker); },
+      }}
     validate_destination_parents (&request . mutations)?;
     let _ : Vec<PathDisposition> = inspect_batch_before_authorization (
       &request . operation_id, &request . mutations)?;
@@ -325,8 +375,12 @@ impl SaveJournalStore {
     operation_id             : &str,
     request_base_fingerprint : &str,
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
-    let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
-      operation_id, request_base_fingerprint)?;
+    let mut loaded : LoadedJournalRecord = match self . load_operation_require_clean (
+      operation_id, request_base_fingerprint)? {
+      LoadedSaveOperation::Active (loaded) => loaded,
+      LoadedSaveOperation::Completed (marker) =>
+        return completion_snapshot (&marker),
+    };
     match loaded . payload . state {
       JournalState::StagingUnAuthorized => return Err (
         SaveJournalError::WrongOperationState {
@@ -378,8 +432,19 @@ impl SaveJournalStore {
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
     validate_fingerprint (
       "resulting base fingerprint", &outcome . resulting_base_fingerprint)?;
-    let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
-      operation_id, request_base_fingerprint)?;
+    let mut loaded : LoadedJournalRecord = match self . load_operation_require_clean (
+      operation_id, request_base_fingerprint)? {
+      LoadedSaveOperation::Active (loaded) => loaded,
+      LoadedSaveOperation::Completed (marker) => {
+        let existing : SaveOperationSnapshot = completion_snapshot (&marker)?;
+        if matches! (&existing . status, SaveOperationStatus::Committed {
+          outcome: existing_outcome, .. } if existing_outcome == outcome)
+        { return Ok (existing); }
+        return Err (SaveJournalError::OperationIdConflict {
+          operation_id: operation_id . into (),
+          reason: "a different terminal outcome is already recorded" . into (),
+        }); },
+    };
     if let JournalState::Committed { .. } = &loaded . payload . state {
       let existing : SaveOperationSnapshot = snapshot (&loaded)?;
       if matches! (&existing . status, SaveOperationStatus::Committed {
@@ -433,8 +498,18 @@ impl SaveJournalStore {
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
     validate_fingerprint (
       "resulting base fingerprint", &outcome . resulting_base_fingerprint)?;
-    let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
-      operation_id, request_base_fingerprint)?;
+    let mut loaded : LoadedJournalRecord = match self . load_operation_require_clean (
+      operation_id, request_base_fingerprint)? {
+      LoadedSaveOperation::Active (loaded) => loaded,
+      LoadedSaveOperation::Completed (marker) => {
+        let existing : SaveOperationSnapshot = completion_snapshot (&marker)?;
+        if matches! (&existing . status, SaveOperationStatus::Refused {
+          outcome: old, .. } if old == outcome) { return Ok (existing); }
+        return Err (SaveJournalError::OperationIdConflict {
+          operation_id: operation_id . into (),
+          reason: "a different refusal is already recorded" . into (),
+        }); },
+    };
     match &loaded . payload . state {
       JournalState::StagingUnAuthorized | JournalState::PreparedUnAuthorized => {},
       JournalState::Refused { .. } => {
@@ -469,21 +544,75 @@ impl SaveJournalStore {
     operation_id             : &str,
     request_base_fingerprint : &str,
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
-    let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
+    self . acknowledge_delivery_with_progress_hook (
+      operation_id, request_base_fingerprint, &mut |_| {})
+  }
+
+  fn acknowledge_delivery_with_progress_hook (
+    &self,
+    operation_id             : &str,
+    request_base_fingerprint : &str,
+    progress_hook            : &mut dyn FnMut (&str),
+  ) -> Result<SaveOperationSnapshot, SaveJournalError> {
+    let loaded : LoadedSaveOperation = self . load_operation_require_clean (
       operation_id, request_base_fingerprint)?;
-    match &mut loaded . payload . state {
-      JournalState::Committed { delivery_acknowledged, .. }
-      | JournalState::Refused { delivery_acknowledged, .. } => {
-        if !*delivery_acknowledged {
-          *delivery_acknowledged = true;
-          persist_record (&loaded . directory, &loaded . payload)?; }
-        snapshot (&loaded)
+    let marker : LoadedCompletionMarker = match loaded {
+      LoadedSaveOperation::Completed (marker) => marker,
+      LoadedSaveOperation::Active (record) => {
+        if !matches! (record . payload . state,
+          JournalState::Committed { .. } | JournalState::Refused { .. })
+        {
+          return Err (SaveJournalError::WrongOperationState {
+            operation_id: operation_id . into (),
+            reason: "there is no committed client result to acknowledge" . into (),
+          }); }
+        let payload : CompletionMarkerPayload =
+          completion_marker_from_record (&record)?;
+        persist_completion_marker (&record . directory, &payload)?;
+        progress_hook ("completion-marker-published");
+        LoadedCompletionMarker {
+          directory: record . directory,
+          payload,
+        }
       },
-      _ => Err (SaveJournalError::WrongOperationState {
-        operation_id: operation_id . into (),
-        reason: "there is no committed client result to acknowledge" . into (),
-      }),
-    }
+    };
+    let marker : LoadedCompletionMarker =
+      self . finish_completion_cleanup (&marker, progress_hook)?;
+    completion_snapshot (&marker)
+  }
+
+  fn finish_completion_cleanup (
+    &self,
+    marker        : &LoadedCompletionMarker,
+    progress_hook : &mut dyn FnMut (&str),
+  ) -> Result<LoadedCompletionMarker, SaveJournalError> {
+    if marker . payload . cleanup_state == CompletionCleanupState::Complete {
+      return Ok (marker . clone ()); }
+    let record_path : PathBuf = marker . directory . join ("record.yaml");
+    let predecessor : Option<JournalRecordPayload> =
+      load_marker_predecessor (marker)?;
+    if let Some (payload) = predecessor {
+      cleanup_destination_staging (&payload)?;
+      cleanup_retained_request_blobs (&marker . directory, &payload)?;
+      cleanup_completion_temporaries (&marker . directory)?;
+      sync_directory (&marker . directory)?;
+      validate_cleanup_ready_directory (&marker . directory)?;
+      progress_hook ("completion-artifacts-cleaned");
+      remove_file_if_exists (&record_path, "remove compacted journal record")?;
+      sync_directory (&marker . directory)?;
+      progress_hook ("completion-record-removed");
+    } else {
+      validate_compacted_directory_contents (
+        &marker . directory, CompletionCleanupState::Pending)?; }
+    let mut completed : LoadedCompletionMarker = marker . clone ();
+    completed . payload . cleanup_state = CompletionCleanupState::Complete;
+    persist_completion_marker (&completed . directory, &completed . payload)?;
+    cleanup_completion_temporaries (&completed . directory)?;
+    sync_directory (&completed . directory)?;
+    validate_compacted_directory_contents (
+      &completed . directory, CompletionCleanupState::Complete)?;
+    progress_hook ("completion-cleanup-recorded");
+    Ok (completed)
   }
 
   pub(crate) fn status (
@@ -491,9 +620,9 @@ impl SaveJournalStore {
     operation_id             : &str,
     request_base_fingerprint : &str,
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
-    let loaded : LoadedJournalRecord = self . load_operation_require_clean (
+    let loaded : LoadedSaveOperation = self . load_operation_require_clean (
       operation_id, request_base_fingerprint)?;
-    snapshot (&loaded)
+    operation_snapshot (&loaded)
   }
 
   pub(crate) fn load_all (&self) -> SaveJournalLoadReport {
@@ -501,10 +630,10 @@ impl SaveJournalStore {
     let mut operations : Vec<SaveOperationSnapshot> = Vec::new ();
     let mut malformed : Vec<MalformedSaveJournal> = loaded . malformed;
     for record in loaded . records {
-      match snapshot (&record) {
+      match operation_snapshot (&record) {
         Ok (operation) => operations . push (operation),
         Err (error) => malformed . push (MalformedSaveJournal {
-          path: record . directory . join ("record.yaml"),
+          path: operation_record_path (&record),
           reason: error . to_string (),
         }),
       }}
@@ -524,19 +653,29 @@ impl SaveJournalStore {
   pub(crate) fn recover_all_unfinished (
     &self,
   ) -> Result<StartupSaveRecoveryReport, SaveJournalError> {
-    let records : Vec<LoadedJournalRecord> =
+    let records : Vec<LoadedSaveOperation> =
       self . load_records_require_clean ()?;
     for record in &records {
-      if matches! (record . payload . state, JournalState::Authorized { .. }) {
+      if let LoadedSaveOperation::Active (record) = record {
+        if !matches! (record . payload . state, JournalState::Authorized { .. }) {
+          continue; }
         let mutations : Vec<DurablePathMutation> =
           materialize_mutations (record)?;
         let _ : Vec<PathDisposition> = inspect_authorized_batch (
           &record . payload . operation_id, &mutations)?; }}
     for record in &records {
-      if matches! (record . payload . state, JournalState::Authorized { .. }) {
-        self . apply_authorized (
-          &record . payload . operation_id,
-          &record . payload . request_base_fingerprint)?; }}
+      match record {
+        LoadedSaveOperation::Active (record)
+          if matches! (record . payload . state,
+            JournalState::Authorized { .. }) => {
+          self . apply_authorized (
+            &record . payload . operation_id,
+            &record . payload . request_base_fingerprint)?; },
+        LoadedSaveOperation::Completed (marker)
+          if marker . payload . cleanup_state == CompletionCleanupState::Pending => {
+          self . finish_completion_cleanup (marker, &mut |_| {})?; },
+        _ => {},
+      }}
     let final_load : SaveJournalLoadReport = self . load_all ();
     let incomplete_publications : Vec<PathBuf> =
       final_load . incomplete_publications . clone ();
@@ -568,8 +707,12 @@ impl SaveJournalStore {
     request_base_fingerprint : &str,
     progress_hook            : &mut dyn FnMut (usize),
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
-    let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
-      operation_id, request_base_fingerprint)?;
+    let mut loaded : LoadedJournalRecord = match self . load_operation_require_clean (
+      operation_id, request_base_fingerprint)? {
+      LoadedSaveOperation::Active (loaded) => loaded,
+      LoadedSaveOperation::Completed (marker) =>
+        return completion_snapshot (&marker),
+    };
     if matches! (loaded . payload . state, JournalState::Committed { .. }
         | JournalState::Refused { .. }) {
       return snapshot (&loaded); }
@@ -610,15 +753,12 @@ impl SaveJournalStore {
     &self,
     operation_id             : &str,
     request_base_fingerprint : &str,
-  ) -> Result<LoadedJournalRecord, SaveJournalError> {
-    let records : Vec<LoadedJournalRecord> =
-      self . load_records_require_clean ()?;
-    let loaded : LoadedJournalRecord = records . into_iter () . find (|record|
-      record . payload . operation_id == operation_id)
+  ) -> Result<LoadedSaveOperation, SaveJournalError> {
+    let loaded : LoadedSaveOperation = self . load_operation_direct (operation_id)?
       . ok_or_else (|| SaveJournalError::OperationNotFound {
         operation_id: operation_id . into (),
       })?;
-    if loaded . payload . request_base_fingerprint != request_base_fingerprint {
+    if operation_request_base_fingerprint (&loaded) != request_base_fingerprint {
       return Err (SaveJournalError::OperationIdConflict {
         operation_id: operation_id . into (),
         reason: "the request/base fingerprint differs from the recorded operation"
@@ -627,9 +767,46 @@ impl SaveJournalStore {
     Ok (loaded)
   }
 
+  fn load_operation_direct (
+    &self,
+    operation_id : &str,
+  ) -> Result<Option<LoadedSaveOperation>, SaveJournalError> {
+    validate_nonempty_bounded (
+      "operation ID", operation_id, MAX_OPERATION_ID_BYTES)?;
+    let root_metadata : fs::Metadata = match fs::symlink_metadata (&self . root) {
+      Ok (metadata) => metadata,
+      Err (error) if error . kind () == std::io::ErrorKind::NotFound =>
+        return Ok (None),
+      Err (error) => return Err (io_error (
+        &self . root, "inspect durable save journal root", error)),
+    };
+    if !root_metadata . file_type () . is_dir ()
+    || !private_permissions_are_restrictive (&root_metadata)
+    {
+      return Err (SaveJournalError::MalformedJournals (vec![
+        MalformedSaveJournal {
+          path: self . root . clone (),
+          reason: "durable save journal root is not a restrictive private directory"
+            . into (),
+        } ])); }
+    let directory : PathBuf = self . root . join (format! (
+      "operation-{}", operation_key (operation_id)));
+    match fs::symlink_metadata (&directory) {
+      Ok (_) => load_operation_directory (&directory)
+        . map (Some)
+        . map_err (|reason| SaveJournalError::MalformedJournals (vec![
+          MalformedSaveJournal {
+            path: operation_authority_path (&directory), reason,
+          } ])),
+      Err (error) if error . kind () == std::io::ErrorKind::NotFound => Ok (None),
+      Err (error) => Err (io_error (
+        &directory, "inspect durable save operation", error)),
+    }
+  }
+
   fn load_records_require_clean (
     &self,
-  ) -> Result<Vec<LoadedJournalRecord>, SaveJournalError> {
+  ) -> Result<Vec<LoadedSaveOperation>, SaveJournalError> {
     let report : RawLoadReport = self . load_records ();
     if report . malformed . is_empty () { Ok (report . records) }
     else { Err (SaveJournalError::MalformedJournals (report . malformed)) }
@@ -688,15 +865,15 @@ impl SaveJournalStore {
           reason: "unexpected entry in the durable save journal root" . into (),
         });
         continue; }
-      match load_record (&path) {
+      match load_operation_directory (&path) {
         Ok (record) => report . records . push (record),
         Err (reason) => report . malformed . push (MalformedSaveJournal {
-          path: path . join ("record.yaml"), reason,
+          path: operation_authority_path (&path), reason,
         }),
       }
     }
     report . records . sort_by (|left, right|
-      left . directory . cmp (&right . directory));
+      operation_directory (left) . cmp (operation_directory (right)));
     report . malformed . sort_by (|left, right|
       left . path . cmp (&right . path));
     report . incomplete_publications . sort ();
@@ -706,7 +883,7 @@ impl SaveJournalStore {
 
 #[derive(Default)]
 struct RawLoadReport {
-  records                 : Vec<LoadedJournalRecord>,
+  records                 : Vec<LoadedSaveOperation>,
   malformed               : Vec<MalformedSaveJournal>,
   incomplete_publications : Vec<PathBuf>,
 }
@@ -965,6 +1142,26 @@ fn require_matching_request (
     return Err (SaveJournalError::OperationIdConflict {
       operation_id: request . operation_id . clone (),
       reason: "the prepared batch or interpretation evidence differs from the recorded operation"
+        . into (),
+    }); }
+  Ok (( ))
+}
+
+fn require_matching_completion (
+  payload        : &CompletionMarkerPayload,
+  request        : &DurableSaveRequest,
+  binding_blake3 : &str,
+) -> Result<(), SaveJournalError> {
+  if payload . request_base_fingerprint != request . request_base_fingerprint {
+    return Err (SaveJournalError::OperationIdConflict {
+      operation_id: request . operation_id . clone (),
+      reason: "the request/base fingerprint differs from the completed operation"
+        . into (),
+    }); }
+  if payload . binding_blake3 != binding_blake3 {
+    return Err (SaveJournalError::OperationIdConflict {
+      operation_id: request . operation_id . clone (),
+      reason: "the prepared batch or interpretation evidence differs from the completed operation"
         . into (),
     }); }
   Ok (( ))
@@ -1273,6 +1470,102 @@ fn snapshot (
   })
 }
 
+fn completion_snapshot (
+  loaded : &LoadedCompletionMarker,
+) -> Result<SaveOperationSnapshot, SaveJournalError> {
+  let client_result : Vec<u8> = read_blob (
+    &loaded . directory, &loaded . payload . outcome . client_result)?;
+  let outcome : DurableSaveOutcome = DurableSaveOutcome {
+    resulting_base_fingerprint:
+      loaded . payload . outcome . resulting_base_fingerprint . clone (),
+    client_result,
+  };
+  let status : SaveOperationStatus = match loaded . payload . terminal {
+    CompletionTerminal::Committed => SaveOperationStatus::Committed {
+      outcome, delivery_acknowledged: true,
+    },
+    CompletionTerminal::Refused => SaveOperationStatus::Refused {
+      outcome, delivery_acknowledged: true,
+    },
+  };
+  Ok (SaveOperationSnapshot {
+    operation_id: loaded . payload . operation_id . clone (),
+    request_base_fingerprint:
+      loaded . payload . request_base_fingerprint . clone (),
+    binding_blake3: loaded . payload . binding_blake3 . clone (),
+    interpretation_identity:
+      loaded . payload . interpretation_identity . clone (),
+    status,
+  })
+}
+
+fn operation_snapshot (
+  loaded : &LoadedSaveOperation,
+) -> Result<SaveOperationSnapshot, SaveJournalError> {
+  match loaded {
+    LoadedSaveOperation::Active (record) => snapshot (record),
+    LoadedSaveOperation::Completed (marker) => completion_snapshot (marker),
+  }
+}
+
+fn operation_directory (loaded : &LoadedSaveOperation) -> &Path {
+  match loaded {
+    LoadedSaveOperation::Active (record) => &record . directory,
+    LoadedSaveOperation::Completed (marker) => &marker . directory,
+  }
+}
+
+fn operation_record_path (loaded : &LoadedSaveOperation) -> PathBuf {
+  operation_authority_path (operation_directory (loaded))
+}
+
+fn operation_authority_path (directory : &Path) -> PathBuf {
+  let completion : PathBuf = directory . join ("completion.yaml");
+  if completion . exists () { completion }
+  else { directory . join ("record.yaml") }
+}
+
+fn operation_request_base_fingerprint (loaded : &LoadedSaveOperation) -> &str {
+  match loaded {
+    LoadedSaveOperation::Active (record) =>
+      &record . payload . request_base_fingerprint,
+    LoadedSaveOperation::Completed (marker) =>
+      &marker . payload . request_base_fingerprint,
+  }
+}
+
+fn completion_marker_from_record (
+  loaded : &LoadedJournalRecord,
+) -> Result<CompletionMarkerPayload, SaveJournalError> {
+  let (terminal, outcome) : (CompletionTerminal, JournalOutcome) =
+    match &loaded . payload . state {
+      JournalState::Committed { outcome, .. } =>
+        (CompletionTerminal::Committed, outcome . clone ()),
+      JournalState::Refused { outcome, .. } =>
+        (CompletionTerminal::Refused, outcome . clone ()),
+      _ => return Err (SaveJournalError::WrongOperationState {
+        operation_id: loaded . payload . operation_id . clone (),
+        reason: "there is no terminal operation to compact" . into (),
+      }),
+    };
+  let record_path : PathBuf = loaded . directory . join ("record.yaml");
+  let record_bytes : Vec<u8> = read_bounded_file (&record_path, MAX_RECORD_BYTES)?;
+  Ok (CompletionMarkerPayload {
+    format_version: COMPLETION_MARKER_FORMAT_VERSION,
+    operation_id: loaded . payload . operation_id . clone (),
+    request_base_fingerprint:
+      loaded . payload . request_base_fingerprint . clone (),
+    binding_blake3: loaded . payload . binding_blake3 . clone (),
+    interpretation_identity:
+      loaded . payload . interpretation_identity . clone (),
+    predecessor_record_blake3:
+      blake3::hash (&record_bytes) . to_hex () . to_string (),
+    terminal,
+    outcome,
+    cleanup_state: CompletionCleanupState::Pending,
+  })
+}
+
 fn persist_record (
   directory : &Path,
   payload   : &JournalRecordPayload,
@@ -1311,6 +1604,332 @@ fn persist_record (
   fs::rename (&temporary, &final_path) . map_err (|error|
     io_error (&final_path, "publish journal record", error))?;
   sync_directory (directory)
+}
+
+fn persist_completion_marker (
+  directory : &Path,
+  payload   : &CompletionMarkerPayload,
+) -> Result<(), SaveJournalError> {
+  let payload_bytes : Vec<u8> = serde_yaml::to_string (payload)
+    . map_err (|error| SaveJournalError::Io {
+      path: directory . join ("completion.yaml"),
+      action: "serialize save completion marker" . into (),
+      reason: error . to_string (),
+    })? . into_bytes ();
+  let envelope : CompletionMarkerEnvelope = CompletionMarkerEnvelope {
+    payload: payload . clone (),
+    payload_blake3: blake3::hash (&payload_bytes) . to_hex () . to_string (),
+  };
+  let bytes : Vec<u8> = serde_yaml::to_string (&envelope)
+    . map_err (|error| SaveJournalError::Io {
+      path: directory . join ("completion.yaml"),
+      action: "serialize save completion envelope" . into (),
+      reason: error . to_string (),
+    })? . into_bytes ();
+  if bytes . len () as u64 > MAX_RECORD_BYTES {
+    return Err (SaveJournalError::InvalidRequest (format! (
+      "the save completion marker exceeds {} bytes", MAX_RECORD_BYTES))); }
+  let temporary : PathBuf = directory . join (format! (
+    ".completion.{}.tmp", uuid::Uuid::new_v4 ()));
+  write_new_file (&temporary, &bytes, Some (0o600))?;
+  let reread : Vec<u8> = fs::read (&temporary) . map_err (|error|
+    io_error (&temporary, "verify temporary save completion marker", error))?;
+  validate_completion_marker_envelope (&reread) . map_err (|reason|
+    SaveJournalError::Io {
+      path: temporary . clone (),
+      action: "verify temporary save completion marker" . into (),
+      reason,
+    })?;
+  let final_path : PathBuf = directory . join ("completion.yaml");
+  fs::rename (&temporary, &final_path) . map_err (|error|
+    io_error (&final_path, "publish save completion marker", error))?;
+  sync_directory (directory)
+}
+
+fn load_operation_directory (
+  directory : &Path,
+) -> Result<LoadedSaveOperation, String> {
+  match fs::symlink_metadata (directory . join ("completion.yaml")) {
+    Ok (_) => load_completion_marker (directory)
+      . map (LoadedSaveOperation::Completed),
+    Err (error) if error . kind () == std::io::ErrorKind::NotFound =>
+      load_record (directory) . map (LoadedSaveOperation::Active),
+    Err (error) => Err (format! (
+      "could not inspect save completion marker: {}", error)),
+  }
+}
+
+fn load_completion_marker (
+  directory : &Path,
+) -> Result<LoadedCompletionMarker, String> {
+  let metadata : fs::Metadata = fs::symlink_metadata (directory)
+    . map_err (|error| error . to_string ())?;
+  if !metadata . file_type () . is_dir ()
+  || !private_permissions_are_restrictive (&metadata)
+  {
+    return Err (
+      "completed operation entry is not a restrictive private directory"
+        . into ()); }
+  let marker_path : PathBuf = directory . join ("completion.yaml");
+  let bytes : Vec<u8> = read_bounded_file (&marker_path, MAX_RECORD_BYTES)
+    . map_err (|error| error . to_string ())?;
+  let payload : CompletionMarkerPayload =
+    validate_completion_marker_envelope (&bytes)?;
+  let expected_directory_name : String = format! (
+    "operation-{}", operation_key (&payload . operation_id));
+  let directory_name : &str = directory . file_name ()
+    . and_then (|name| name . to_str ()) . unwrap_or_default ();
+  if directory_name != expected_directory_name {
+    return Err ("operation ID does not match its completion directory" . into ()); }
+  validate_completion_marker_payload (directory, &payload)?;
+  let loaded : LoadedCompletionMarker = LoadedCompletionMarker {
+    directory: directory . into (), payload,
+  };
+  match loaded . payload . cleanup_state {
+    CompletionCleanupState::Pending => {
+      if load_marker_predecessor_string_error (&loaded)? . is_none () {
+        validate_compacted_directory_contents_string_error (
+          directory, CompletionCleanupState::Pending)?; }
+    },
+    CompletionCleanupState::Complete => {
+      if directory . join ("record.yaml") . exists () {
+        return Err (
+          "completed cleanup still contains its predecessor record" . into ()); }
+      validate_compacted_directory_contents_string_error (
+        directory, CompletionCleanupState::Complete)?;
+    },
+  }
+  Ok (loaded)
+}
+
+fn validate_completion_marker_envelope (
+  bytes : &[u8],
+) -> Result<CompletionMarkerPayload, String> {
+  let envelope : CompletionMarkerEnvelope = serde_yaml::from_slice (bytes)
+    . map_err (|error| error . to_string ())?;
+  if envelope . payload . format_version != COMPLETION_MARKER_FORMAT_VERSION {
+    return Err (format! ("unsupported durable save completion marker version {}",
+      envelope . payload . format_version)); }
+  let payload_bytes : Vec<u8> = serde_yaml::to_string (&envelope . payload)
+    . map_err (|error| error . to_string ())? . into_bytes ();
+  let checksum : String =
+    blake3::hash (&payload_bytes) . to_hex () . to_string ();
+  if checksum != envelope . payload_blake3 {
+    return Err ("durable save completion marker checksum mismatch" . into ()); }
+  Ok (envelope . payload)
+}
+
+fn validate_completion_marker_payload (
+  directory : &Path,
+  payload   : &CompletionMarkerPayload,
+) -> Result<(), String> {
+  validate_nonempty_bounded (
+    "operation ID", &payload . operation_id, MAX_OPERATION_ID_BYTES)
+    . map_err (|error| error . to_string ())?;
+  validate_fingerprint (
+    "request/base fingerprint", &payload . request_base_fingerprint)
+    . map_err (|error| error . to_string ())?;
+  validate_nonempty_bounded (
+    "interpretation identity", &payload . interpretation_identity,
+    MAX_INTERPRETATION_IDENTITY_BYTES)
+    . map_err (|error| error . to_string ())?;
+  validate_blake3_hex (&payload . binding_blake3, "request binding")?;
+  validate_blake3_hex (
+    &payload . predecessor_record_blake3, "predecessor record")?;
+  validate_fingerprint (
+    "resulting base fingerprint", &payload . outcome . resulting_base_fingerprint)
+    . map_err (|error| error . to_string ())?;
+  if payload . outcome . client_result . file_name != "outcome.bin" {
+    return Err ("completion marker has an invalid outcome blob name" . into ()); }
+  validate_blob (directory, &payload . outcome . client_result)
+}
+
+fn validate_blake3_hex (value : &str, label : &str) -> Result<(), String> {
+  if value . len () != 64
+  || !value . bytes () . all (|byte|
+    byte . is_ascii_digit () || (b'a' ..= b'f') . contains (&byte))
+  {
+    return Err (format! ("{} checksum is not lowercase BLAKE3 hex", label)); }
+  Ok (( ))
+}
+
+fn load_marker_predecessor (
+  marker : &LoadedCompletionMarker,
+) -> Result<Option<JournalRecordPayload>, SaveJournalError> {
+  load_marker_predecessor_string_error (marker) . map_err (|reason|
+    SaveJournalError::MalformedJournals (vec![MalformedSaveJournal {
+      path: marker . directory . join ("record.yaml"), reason,
+    }]))
+}
+
+fn load_marker_predecessor_string_error (
+  marker : &LoadedCompletionMarker,
+) -> Result<Option<JournalRecordPayload>, String> {
+  let record_path : PathBuf = marker . directory . join ("record.yaml");
+  match fs::symlink_metadata (&record_path) {
+    Err (error) if error . kind () == std::io::ErrorKind::NotFound =>
+      return Ok (None),
+    Err (error) => return Err (format! (
+      "could not inspect completion predecessor: {}", error)),
+    Ok (_) => {},
+  }
+  let bytes : Vec<u8> = read_bounded_file (&record_path, MAX_RECORD_BYTES)
+    . map_err (|error| error . to_string ())?;
+  let checksum : String = blake3::hash (&bytes) . to_hex () . to_string ();
+  if checksum != marker . payload . predecessor_record_blake3 {
+    return Err ("completion predecessor record checksum mismatch" . into ()); }
+  let predecessor : JournalRecordPayload = validate_record_envelope (&bytes)?;
+  if predecessor . operation_id != marker . payload . operation_id
+  || predecessor . request_base_fingerprint
+    != marker . payload . request_base_fingerprint
+  || predecessor . binding_blake3 != marker . payload . binding_blake3
+  || predecessor . interpretation_identity
+    != marker . payload . interpretation_identity
+  {
+    return Err ("completion marker does not identify its predecessor record"
+      . into ()); }
+  let (terminal, outcome) : (CompletionTerminal, &JournalOutcome) =
+    match &predecessor . state {
+      JournalState::Committed { outcome, .. } =>
+        (CompletionTerminal::Committed, outcome),
+      JournalState::Refused { outcome, .. } =>
+        (CompletionTerminal::Refused, outcome),
+      _ => return Err (
+        "completion marker predecessor is not terminal" . into ()),
+    };
+  if terminal != marker . payload . terminal
+  || outcome != &marker . payload . outcome {
+    return Err ("completion marker terminal outcome differs from its predecessor"
+      . into ()); }
+  Ok (Some (predecessor))
+}
+
+fn cleanup_destination_staging (
+  payload : &JournalRecordPayload,
+) -> Result<(), SaveJournalError> {
+  let mut stage_directories : BTreeSet<PathBuf> = BTreeSet::new ();
+  for mutation in &payload . mutations {
+    if let Some (stage) = &mutation . destination_stage_path {
+      remove_file_if_exists (stage, "remove completed destination stage")?;
+      if let Some (directory) = stage . parent () {
+        stage_directories . insert (directory . into ()); }
+    }}
+  for directory in stage_directories {
+    match fs::symlink_metadata (&directory) {
+      Ok (metadata) if metadata . file_type () . is_dir () => {},
+      Ok (_) => return Err (SaveJournalError::Io {
+        path: directory . clone (),
+        action: "remove completed destination stage directory" . into (),
+        reason: "path is not a directory" . into (),
+      }),
+      Err (error) if error . kind () == std::io::ErrorKind::NotFound => continue,
+      Err (error) => return Err (io_error (
+        &directory, "inspect completed destination stage directory", error)),
+    }
+    sync_directory (&directory)?;
+    match fs::remove_dir (&directory) {
+      Ok (( )) => {
+        if let Some (parent) = directory . parent () { sync_directory (parent)?; }
+      },
+      Err (error) if error . kind () == std::io::ErrorKind::NotFound => {},
+      Err (error) => return Err (io_error (
+        &directory, "remove completed destination stage directory", error)),
+    }}
+  Ok (( ))
+}
+
+fn cleanup_retained_request_blobs (
+  directory : &Path,
+  payload   : &JournalRecordPayload,
+) -> Result<(), SaveJournalError> {
+  remove_file_if_exists (
+    &directory . join (&payload . interpretation_evidence . file_name),
+    "remove compacted interpretation evidence")?;
+  for mutation in &payload . mutations {
+    for blob in [&mutation . before, &mutation . after] {
+      if let Some (blob) = blob {
+        remove_file_if_exists (
+          &directory . join (&blob . file_name),
+          "remove compacted recovery blob")?; }}}
+  Ok (( ))
+}
+
+fn cleanup_completion_temporaries (
+  directory : &Path,
+) -> Result<(), SaveJournalError> {
+  let entries : fs::ReadDir = fs::read_dir (directory)
+    . map_err (|error| io_error (
+      directory, "inspect completion cleanup directory", error))?;
+  for entry in entries {
+    let entry : fs::DirEntry = entry . map_err (|error| io_error (
+      directory, "inspect completion cleanup entry", error))?;
+    let name : String = entry . file_name () . to_string_lossy () . into_owned ();
+    if (name . starts_with (".completion.")
+        || name . starts_with (".record."))
+    && name . ends_with (".tmp") {
+      remove_file_if_exists (
+        &entry . path (), "remove incomplete journal publication")?; }
+  }
+  Ok (( ))
+}
+
+fn validate_compacted_directory_contents (
+  directory : &Path,
+  state     : CompletionCleanupState,
+) -> Result<(), SaveJournalError> {
+  validate_compacted_directory_contents_string_error (directory, state)
+    . map_err (|reason| SaveJournalError::MalformedJournals (vec![
+      MalformedSaveJournal {
+        path: directory . join ("completion.yaml"), reason,
+      } ]))
+}
+
+fn validate_compacted_directory_contents_string_error (
+  directory : &Path,
+  state     : CompletionCleanupState,
+) -> Result<(), String> {
+  for entry in fs::read_dir (directory) . map_err (|error| error . to_string ())? {
+    let entry : fs::DirEntry = entry . map_err (|error| error . to_string ())?;
+    let name : String = entry . file_name () . to_string_lossy () . into_owned ();
+    let temporary : bool = (name . starts_with (".completion.")
+      || name . starts_with (".record.")) && name . ends_with (".tmp");
+    let allowed : bool = name == "completion.yaml" || name == "outcome.bin"
+      || (state == CompletionCleanupState::Pending && temporary);
+    if !allowed {
+      return Err (format! (
+        "compacted operation contains unexpected entry {:?}", name)); }
+  }
+  Ok (( ))
+}
+
+fn validate_cleanup_ready_directory (
+  directory : &Path,
+) -> Result<(), SaveJournalError> {
+  for entry in fs::read_dir (directory) . map_err (|error| io_error (
+    directory, "inspect compacted operation", error))? {
+    let entry : fs::DirEntry = entry . map_err (|error| io_error (
+      directory, "inspect compacted operation entry", error))?;
+    let name : String = entry . file_name () . to_string_lossy () . into_owned ();
+    if name != "completion.yaml" && name != "outcome.bin"
+    && name != "record.yaml" {
+      return Err (SaveJournalError::MalformedJournals (vec![
+        MalformedSaveJournal {
+          path: entry . path (),
+          reason: "unexpected entry remains before completion cleanup" . into (),
+        } ])); }
+  }
+  Ok (( ))
+}
+
+fn remove_file_if_exists (
+  path   : &Path,
+  action : &str,
+) -> Result<(), SaveJournalError> {
+  match fs::remove_file (path) {
+    Ok (( )) => Ok (( )),
+    Err (error) if error . kind () == std::io::ErrorKind::NotFound => Ok (( )),
+    Err (error) => Err (io_error (path, action, error)),
+  }
 }
 
 fn load_record (directory : &Path) -> Result<LoadedJournalRecord, String> {
@@ -1844,6 +2463,169 @@ mod tests {
   }
 
   #[test]
+  fn acknowledged_completion_compacts_to_exact_outcome_and_marker () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    let outcome : DurableSaveOutcome = standard_outcome ();
+    store . prepare (&request) . unwrap ();
+    store . authorize (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . apply_authorized (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . record_committed_outcome (
+      &request . operation_id, &request . request_base_fingerprint, &outcome)
+      . unwrap ();
+    let snapshot : SaveOperationSnapshot = store . acknowledge_delivery (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    assert_eq! (snapshot . status, SaveOperationStatus::Committed {
+      outcome: outcome . clone (), delivery_acknowledged: true,
+    });
+    let directory : PathBuf = store . root () . join (format! (
+      "operation-{}", operation_key (&request . operation_id)));
+    assert! (directory . join ("completion.yaml") . is_file ());
+    assert! (!directory . join ("record.yaml") . exists ());
+    assert_eq! (fs::read (directory . join ("outcome.bin")) . unwrap (),
+      outcome . client_result);
+    let mut entries : Vec<String> = fs::read_dir (&directory) . unwrap ()
+      . map (|entry| entry . unwrap () . file_name () . to_string_lossy () . into ())
+      . collect ();
+    entries . sort ();
+    assert_eq! (entries, vec!["completion.yaml", "outcome.bin"]);
+    let marker : LoadedCompletionMarker = load_completion_marker (&directory)
+      . unwrap ();
+    assert_eq! (marker . payload . cleanup_state, CompletionCleanupState::Complete);
+    assert_eq! (marker . payload . terminal, CompletionTerminal::Committed);
+    assert_eq! (marker . payload . operation_id, request . operation_id);
+    assert_eq! (marker . payload . request_base_fingerprint,
+      request . request_base_fingerprint);
+    assert_eq! (marker . payload . interpretation_identity,
+      request . interpretation_evidence . identity);
+    assert_eq! (marker . payload . outcome, JournalOutcome {
+      resulting_base_fingerprint: outcome . resulting_base_fingerprint,
+      client_result: BlobReference {
+        file_name: "outcome.bin" . into (), byte_len: 24,
+        blake3: blake3::hash (b"rendered client response") . to_hex () . to_string (),
+      },
+    });
+  }
+
+  #[test]
+  fn changed_request_is_refused_after_completion_compaction () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    store . prepare (&request) . unwrap ();
+    store . authorize (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . apply_authorized (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . record_committed_outcome (
+      &request . operation_id, &request . request_base_fingerprint,
+      &standard_outcome ()) . unwrap ();
+    store . acknowledge_delivery (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    let mut changed : DurableSaveRequest = request . clone ();
+    changed . mutations [0] . after = Some (b"changed-after" . to_vec ());
+    assert! (matches! (store . prepare (&changed),
+      Err (SaveJournalError::OperationIdConflict { .. })));
+    fixture . assert_after_values ();
+  }
+
+  #[test]
+  fn direct_lookup_ignores_unrelated_malformed_directory_but_startup_audits_it () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    store . prepare (&request) . unwrap ();
+    store . authorize (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . apply_authorized (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . record_committed_outcome (
+      &request . operation_id, &request . request_base_fingerprint,
+      &standard_outcome ()) . unwrap ();
+    store . acknowledge_delivery (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    let unrelated : PathBuf = store . root () . join ("operation-unrelated");
+    create_private_directory (&unrelated) . unwrap ();
+    fs::write (unrelated . join ("record.yaml"), b"invalid: [") . unwrap ();
+    assert!(matches! (store . prepare (&request) . unwrap () . status,
+      SaveOperationStatus::Committed { delivery_acknowledged: true, .. }));
+    assert!(matches! (store . status (
+      &request . operation_id, &request . request_base_fingerprint),
+      Ok (SaveOperationSnapshot {
+        status: SaveOperationStatus::Committed {
+          delivery_acknowledged: true, .. }, .. })));
+    let report : SaveJournalLoadReport = store . load_all ();
+    assert_eq! (report . malformed . len (), 1);
+    assert!(matches! (store . recover_all_unfinished (),
+      Err (SaveJournalError::MalformedJournals (_))));
+  }
+
+  #[test]
+  fn valid_completion_marker_with_corrupt_predecessor_fails_closed () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    store . prepare (&request) . unwrap ();
+    store . authorize (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . apply_authorized (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . record_committed_outcome (
+      &request . operation_id, &request . request_base_fingerprint,
+      &standard_outcome ()) . unwrap ();
+    let directory : PathBuf = store . root () . join (format! (
+      "operation-{}", operation_key (&request . operation_id)));
+    let record : LoadedJournalRecord = load_record (&directory) . unwrap ();
+    let marker : CompletionMarkerPayload = completion_marker_from_record (&record)
+      . unwrap ();
+    persist_completion_marker (&directory, &marker) . unwrap ();
+    fs::write (directory . join ("record.yaml"), b"corrupt predecessor") . unwrap ();
+    assert!(matches! (store . status (
+      &request . operation_id, &request . request_base_fingerprint),
+      Err (SaveJournalError::MalformedJournals (_))));
+    assert!(matches! (store . recover_all_unfinished (),
+      Err (SaveJournalError::MalformedJournals (_))));
+    fixture . assert_after_values ();
+  }
+
+  #[test]
+  fn unsupported_completion_marker_fails_closed () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    store . prepare (&request) . unwrap ();
+    store . authorize (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . apply_authorized (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . record_committed_outcome (
+      &request . operation_id, &request . request_base_fingerprint,
+      &standard_outcome ()) . unwrap ();
+    let directory : PathBuf = store . root () . join (format! (
+      "operation-{}", operation_key (&request . operation_id)));
+    let record : LoadedJournalRecord = load_record (&directory) . unwrap ();
+    let mut payload : CompletionMarkerPayload = completion_marker_from_record (&record)
+      . unwrap ();
+    payload . format_version += 1;
+    let payload_bytes : Vec<u8> = serde_yaml::to_string (&payload) . unwrap ()
+      . into_bytes ();
+    let envelope : CompletionMarkerEnvelope = CompletionMarkerEnvelope {
+      payload, payload_blake3: blake3::hash (&payload_bytes) . to_hex () . to_string (),
+    };
+    fs::write (directory . join ("completion.yaml"),
+      serde_yaml::to_string (&envelope) . unwrap ()) . unwrap ();
+    assert!(matches! (store . status (
+      &request . operation_id, &request . request_base_fingerprint),
+      Err (SaveJournalError::MalformedJournals (_))));
+    assert!(matches! (store . recover_all_unfinished (),
+      Err (SaveJournalError::MalformedJournals (_))));
+    fixture . assert_after_values ();
+  }
+
+  #[test]
   fn exact_duplicate_is_deduplicated_and_any_binding_change_conflicts () {
     let fixture : Fixture = Fixture::new ();
     let store : SaveJournalStore = fixture . store ();
@@ -1920,11 +2702,41 @@ mod tests {
   }
 
   #[test]
-  fn lost_ack_then_newer_save_does_not_let_the_old_duplicate_reapply () {
+  fn startup_finishes_completion_cleanup_after_each_published_boundary () {
+    for mode in [
+      "after-completion-marker-published",
+      "after-completion-artifacts-cleaned",
+      "after-completion-record-removed",
+    ] {
+      let fixture : Fixture = Fixture::new ();
+      run_crash_worker (&fixture, mode);
+      fixture . assert_after_values ();
+      let report : StartupSaveRecoveryReport = fixture . store ()
+        . recover_all_unfinished () . unwrap ();
+      assert! (!report . has_unresolved_operations);
+      assert_eq! (report . operations . len (), 1);
+      assert_eq! (report . operations [0] . status,
+        SaveOperationStatus::Committed {
+          outcome: standard_outcome (), delivery_acknowledged: true,
+        });
+      let directory : PathBuf = fixture . store () . root () . join (format! (
+        "operation-{}", operation_key ("save-operation")));
+      let mut entries : Vec<String> = fs::read_dir (&directory) . unwrap ()
+        . map (|entry| entry . unwrap () . file_name () . to_string_lossy () . into ())
+        . collect ();
+      entries . sort ();
+      assert_eq! (entries, vec!["completion.yaml", "outcome.bin"]);
+    }
+  }
+
+  #[test]
+  fn compacted_old_retry_after_newer_save_preserves_newer_bytes () {
     let fixture : Fixture = Fixture::new ();
     run_crash_worker (&fixture, "after-commit");
     fixture . assert_after_values ();
     let store : SaveJournalStore = fixture . store ();
+    store . acknowledge_delivery (
+      "save-operation", "request-base") . unwrap ();
     let newer : DurableSaveRequest = request_for_values (
       "newer-save", "newer-request-base", &fixture . first,
       Some (b"new-a"), Some (b"newest-a"), &fixture . deleted,
@@ -1945,7 +2757,7 @@ mod tests {
     let duplicate : SaveOperationSnapshot =
       store . prepare (&old_request) . unwrap ();
     assert_eq! (duplicate . status, SaveOperationStatus::Committed {
-      outcome: standard_outcome (), delivery_acknowledged: false,
+      outcome: standard_outcome (), delivery_acknowledged: true,
     });
     assert_eq! (fs::read (&fixture . first) . unwrap (), b"newest-a");
     assert_eq! (fs::read (&fixture . deleted) . unwrap (), b"newest-b");
@@ -2095,6 +2907,17 @@ mod tests {
       &request . operation_id, &request . request_base_fingerprint,
       &standard_outcome ()) . unwrap ();
     if mode == "after-commit" { exit_without_cleanup (); }
+    let completion_crash : bool = matches! (mode . as_str (),
+      "after-completion-marker-published"
+      | "after-completion-artifacts-cleaned"
+      | "after-completion-record-removed");
+    if completion_crash {
+      store . acknowledge_delivery_with_progress_hook (
+        &request . operation_id, &request . request_base_fingerprint,
+        &mut |step| {
+          if mode == format! ("after-{}", step) { exit_without_cleanup (); }
+        }) . unwrap ();
+    }
     panic! ("unknown crash-worker mode {:?}", mode);
   }
 
