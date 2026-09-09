@@ -74,6 +74,11 @@ local function reset ()
   state.pending_maintenance_offer = nil
   state.maintenance_state = nil
   state.rebuilding = false
+  state.client_constructor_admission = 'open'
+  state.owner_publication_revision = nil
+  state.graph_write_admission = nil
+  state.graph_transition_status = nil
+  state.pending_incidents = {}
   state.connection_handshake_state = nil
   state.server_session_id = nil
   state.request_draft = nil
@@ -841,18 +846,25 @@ describe('skg Neovim maintenance handshake', function ()
       1, true)
 
     state.server_session_id = 'server-session'
+    state.owner_publication_revision = 2
+    state.graph_write_admission = 'open'
+    state.rebuilding = false
     maintenance.handle_terminal_ack(nil, {
       f('status', 'terminal-acknowledged'),
       f('incident-id', incident_id), f('maintenance-epoch', 9),
       f('server-session-id', 'server-session'),
+      f('owner-publication-revision', 1),
       f('current-graph-generation', 2),
       f('current-manifest-revision', 6),
-      f('graph-write-admission', 'open'),
-      f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
+      f('graph-write-admission', 'closed'),
+      f('graph-transition-status', 'transitioning'), f('rebuilding', 'true'),
       f('pending-incidents', {}),
     })
     assert.is_nil(state.maintenance_client_incident)
     assert.are.equal('terminal', state.maintenance_state.state)
+    assert.are.equal(2, state.owner_publication_revision)
+    assert.are.equal('open', state.graph_write_admission)
+    assert.is_false(state.rebuilding)
   end)
 
   it('does not detach active settlement debt during reconnect census',

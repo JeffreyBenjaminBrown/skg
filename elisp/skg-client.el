@@ -96,6 +96,7 @@
           skg--connection-handshake-error nil
           skg--connection-busy-message nil
           skg--server-session-id nil
+          skg--owner-publication-revision nil
           skg--graph-write-admission nil
           skg--client-constructor-admission
           (cond
@@ -197,6 +198,7 @@ the request record named by its request-id."
           (setq skg--connection-handshake-state 'busy-initializing
                 skg--connection-handshake-error nil
                 skg--server-session-id nil
+                skg--owner-publication-revision nil
                 skg--graph-write-admission nil
                 skg--client-constructor-admission
                 (if (and (boundp 'skg--maintenance-client-incident)
@@ -220,6 +222,7 @@ the request record named by its request-id."
     (unless (eq skg--connection-handshake-state 'busy-initializing)
       (setq skg--connection-handshake-state nil))
     (setq skg--server-session-id nil
+          skg--owner-publication-revision nil
           skg--graph-write-admission nil
           skg--client-constructor-admission
           (if (and (boundp 'skg--maintenance-client-incident)

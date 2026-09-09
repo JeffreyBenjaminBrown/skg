@@ -73,6 +73,8 @@ function M.install_connection_verification (_payload_text, response, tcp)
   if not ok then
     state.connection_handshake_state = 'failed'
     error(server_session_id) end
+  if state.server_session_id ~= server_session_id then
+    state.owner_publication_revision = nil end
   state.server_session_id = server_session_id
   state.update_global_server_status(response)
   config.install_source_inventory(

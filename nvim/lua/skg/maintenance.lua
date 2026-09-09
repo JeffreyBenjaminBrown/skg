@@ -946,7 +946,6 @@ function M.finish_idle ()
   local path = incident.final_archive and incident.final_archive.path or '?'
   state.maintenance_client_incident = nil
   state.pending_maintenance_offer = nil
-  state.client_constructor_admission = 'open'
   vim.notify('Skg maintenance complete; recovery archive: ' .. path)
 end
 

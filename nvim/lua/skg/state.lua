@@ -22,6 +22,7 @@ M.maintenance_state = nil
 M.rebuilding = M.rebuilding or false
 M.graph_write_admission = nil
 M.client_constructor_admission = 'open'
+M.owner_publication_revision = nil
 M.graph_transition_status = nil
 M.pending_incidents = {}
 M.maintenance_client_incident = M.maintenance_client_incident or nil
@@ -48,7 +49,7 @@ function M.update_global_server_status (response)
   local fields = {
     'current-graph-generation', 'current-manifest-revision',
     'graph-write-admission', 'graph-transition-status', 'rebuilding',
-    'pending-incidents',
+    'pending-incidents', 'owner-publication-revision',
   }
   local present = false
   for _, key in ipairs(fields) do
@@ -59,8 +60,19 @@ function M.update_global_server_status (response)
      or payload.field(response, 'current-manifest-revision') ~= nil
      or payload.field(response, 'graph-write-admission') ~= nil
      or payload.field(response, 'graph-transition-status') ~= nil
-     or payload.field(response, 'pending-incidents') ~= nil then
+     or payload.field(response, 'pending-incidents') ~= nil
+     or payload.field(response, 'owner-publication-revision') ~= nil then
     M.require_current_server_session(response)
+  end
+  local owner_revision = payload.field(response, 'owner-publication-revision')
+  if owner_revision ~= nil then
+    if type(owner_revision) ~= 'number' or owner_revision < 0
+       or owner_revision ~= math.floor(owner_revision) then
+      error('Invalid owner publication revision') end
+    if M.owner_publication_revision ~= nil
+       and owner_revision < M.owner_publication_revision then
+      return end
+    M.owner_publication_revision = owner_revision
   end
   local admission = payload.field_text(response, 'graph-write-admission')
   if admission then

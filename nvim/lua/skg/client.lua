@@ -35,6 +35,7 @@ function M.connect ()
   config.source_inventory = nil
   config.store_state = nil
   state.server_session_id = nil
+  state.owner_publication_revision = nil
   state.graph_write_admission = nil
   -- A reconnect during an active incident must keep the constructor barrier
   -- closed until that incident's terminal acknowledgement settles.
@@ -113,6 +114,7 @@ function M.handle_rust_response (chunk)
     state.run_connection_reset_hooks()
     state.connection_handshake_state = nil
     state.server_session_id = nil
+    state.owner_publication_revision = nil
     state.graph_write_admission = nil
     state.client_constructor_admission = state.maintenance_client_incident
       and 'closed' or 'open'
@@ -132,6 +134,7 @@ function M.sentinel (event)
   state.close_connection()
   state.connection_handshake_state = nil
   state.server_session_id = nil
+  state.owner_publication_revision = nil
   state.graph_write_admission = nil
   state.client_constructor_admission = state.maintenance_client_incident
     and 'closed' or 'open'

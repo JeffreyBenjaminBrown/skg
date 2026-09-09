@@ -1054,6 +1054,35 @@
       (should (equal (cdr (assq 'state skg--maintenance-state))
                      'terminal)))))
 
+(ert-deftest test-skg-terminal-ack-keeps-newer-global-publication-state ()
+  (let* ((skg--server-session-id
+          "12345678-1234-4234-8234-123456789abc")
+         (skg--owner-publication-revision 2)
+         (skg--graph-write-admission 'open)
+         (skg--rebuilding nil)
+         (skg--graph-transition-status 'idle)
+         (skg--pending-incidents nil)
+         (skg--server-store-state '((graph-generation . 2)
+                                    (manifest-revision . 6)))
+         (skg--maintenance-client-incident
+          '(:incident-id "incident" :epoch 9 :phase terminal-received
+            :final-archive (:path "/archive"))))
+    (skg--maintenance-handle-terminal-ack
+     nil
+     "((status terminal-acknowledged) (incident-id incident)
+       (maintenance-epoch 9)
+       (server-session-id \"12345678-1234-4234-8234-123456789abc\")
+       (owner-publication-revision 1) (current-graph-generation 2)
+       (current-manifest-revision 6) (graph-write-admission closed)
+       (graph-transition-status transitioning) (rebuilding true)
+       (pending-incidents ((incident-id newer))))")
+    (should-not skg--maintenance-client-incident)
+    (should (= 2 skg--owner-publication-revision))
+    (should (eq 'open skg--graph-write-admission))
+    (should-not skg--rebuilding)
+    (should (eq 'idle skg--graph-transition-status))
+    (should-not skg--pending-incidents)))
+
 (ert-deftest test-skg-maintenance-census-stale-preserves-active-debt ()
   (skg-test-maintenance--with-buffer 'content-view
     (let ((id (skg--buffer-record-id skg--buffer-record))

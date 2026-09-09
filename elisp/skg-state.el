@@ -52,6 +52,9 @@ The value is nil, `sent', `census', `census-texts', `verified',
 (defvar skg--client-constructor-admission 'open
   "Whether new editable client view constructors may join maintenance census.")
 
+(defvar skg--owner-publication-revision nil
+  "Newest owner publication revision accepted for the current server session.")
+
 (defun skg-update-rebuilding-status (response)
   "Update the rebuilding flag when RESPONSE explicitly carries that status.
 An omitted field preserves the last authoritative value."
@@ -77,38 +80,48 @@ Report-local selected-* fields never update the current graph identity."
   (when (cl-some (lambda (key) (assoc key response))
                  '(current-graph-generation current-manifest-revision
                    graph-write-admission graph-transition-status rebuilding
-                   pending-incidents))
+                   pending-incidents owner-publication-revision))
     (when (cl-some (lambda (key) (assoc key response))
                    '(current-graph-generation current-manifest-revision
                      graph-write-admission graph-transition-status
-                     pending-incidents))
+                     pending-incidents owner-publication-revision))
       (skg-require-current-server-session response))
-    (when-let ((entry (assoc 'graph-write-admission response)))
-      (let ((value (intern (format "%s" (cadr entry)))))
-        (unless (memq value '(open closed))
-          (error "Invalid graph write admission %S" (cadr entry)))
-        (setq skg--graph-write-admission value)
-        ;; A published open graph reopens fresh editable views after a
-        ;; census barrier. The pre-census `closing' state still lets already
-        ;; serialized requests drain without admitting new constructors.
-        (when (and (eq value 'open)
-                   (eq skg--client-constructor-admission 'closed))
-          (setq skg--client-constructor-admission 'open))))
-    (when-let ((entry (assoc 'graph-transition-status response)))
-      (setq skg--graph-transition-status (cadr entry)))
-    (when-let ((entry (assoc 'pending-incidents response)))
-      (setq skg--pending-incidents (cadr entry)))
-    (when-let ((entry (assoc 'current-graph-generation response)))
-      (unless (natnump (cadr entry))
-        (error "Invalid current graph generation %S" (cadr entry)))
-      (setf (alist-get 'graph-generation skg--server-store-state)
-            (cadr entry)))
-    (when-let ((entry (assoc 'current-manifest-revision response)))
-      (unless (natnump (cadr entry))
-        (error "Invalid current manifest revision %S" (cadr entry)))
-      (setf (alist-get 'manifest-revision skg--server-store-state)
-            (cadr entry)))
-    (skg-update-rebuilding-status response)))
+    (let* ((revision-entry (assoc 'owner-publication-revision response))
+           (revision (and revision-entry (cadr revision-entry))))
+      (when revision-entry
+        (unless (natnump revision)
+          (error "Invalid owner publication revision %S" revision)))
+      (unless (and revision-entry
+                   skg--owner-publication-revision
+                   (< revision skg--owner-publication-revision))
+        (when revision-entry
+          (setq skg--owner-publication-revision revision))
+        (when-let ((entry (assoc 'graph-write-admission response)))
+          (let ((value (intern (format "%s" (cadr entry)))))
+            (unless (memq value '(open closed))
+              (error "Invalid graph write admission %S" (cadr entry)))
+            (setq skg--graph-write-admission value)
+            ;; A published open graph reopens fresh editable views after a
+            ;; census barrier. The pre-census `closing' state still lets
+            ;; already serialized requests drain.
+            (when (and (eq value 'open)
+                       (eq skg--client-constructor-admission 'closed))
+              (setq skg--client-constructor-admission 'open))))
+        (when-let ((entry (assoc 'graph-transition-status response)))
+          (setq skg--graph-transition-status (cadr entry)))
+        (when-let ((entry (assoc 'pending-incidents response)))
+          (setq skg--pending-incidents (cadr entry)))
+        (when-let ((entry (assoc 'current-graph-generation response)))
+          (unless (natnump (cadr entry))
+            (error "Invalid current graph generation %S" (cadr entry)))
+          (setf (alist-get 'graph-generation skg--server-store-state)
+                (cadr entry)))
+        (when-let ((entry (assoc 'current-manifest-revision response)))
+          (unless (natnump (cadr entry))
+            (error "Invalid current manifest revision %S" (cadr entry)))
+          (setf (alist-get 'manifest-revision skg--server-store-state)
+                (cadr entry)))
+        (skg-update-rebuilding-status response)))))
 
 (defun skg-requested-view-write-authority ()
   "Return the authority a new view request may ask the server to grant."

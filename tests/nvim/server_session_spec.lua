@@ -29,6 +29,7 @@ local function handshake (session_id, version)
     f('manifest-revision', 9), f('typedb-health', 'healthy'),
     f('tantivy-health', 'healthy'), f('content', 'connected'),
     f('current-graph-generation', 7), f('current-manifest-revision', 9),
+    f('owner-publication-revision', 1),
     f('graph-write-admission', 'open'),
     f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
     f('pending-incidents', {}),
@@ -66,6 +67,7 @@ describe('skg protocol-v2 server sessions', function ()
   it('keeps old origin through equal counters and stale census detaches it',
      function ()
     state.server_session_id = old_session
+    state.owner_publication_revision = 5
     state.active_source_set_name = 'all'
     config.store_state = { graph_generation = 7 }
     local buf = vim.api.nvim_create_buf(false, true)
@@ -86,6 +88,7 @@ describe('skg protocol-v2 server sessions', function ()
     state.server_session_id = nil
     misc.install_connection_verification(nil, handshake(new_session), {})
     misc.submit_buffer_census = real_submit
+    assert.are.equal(1, state.owner_publication_revision)
     assert.are.equal(old_session, census[1].server_session_id)
     require('skg.maintenance').handle_census_stale({ census[1].buffer_id })
     assert.are.equal(text_before, registry.raw_text(buf))
@@ -167,6 +170,7 @@ describe('skg protocol-v2 server sessions', function ()
     end)
     state.update_global_server_status({
       f('server-session-id', new_session),
+      f('owner-publication-revision', 1),
       f('current-graph-generation', 8),
       f('current-manifest-revision', 10),
       f('graph-write-admission', 'open'),
@@ -175,5 +179,58 @@ describe('skg protocol-v2 server sessions', function ()
     })
     assert.are.equal('open', state.client_constructor_admission)
     assert.are.equal('editable', state.requested_view_write_authority())
+  end)
+
+  it('ignores older owner publication frames without changing global state',
+     function ()
+    state.server_session_id = new_session
+    state.client_constructor_admission = 'closed'
+    state.update_global_server_status({
+      f('server-session-id', new_session),
+      f('owner-publication-revision', 2),
+      f('current-graph-generation', 7), f('current-manifest-revision', 9),
+      f('graph-write-admission', 'open'),
+      f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
+      f('pending-incidents', {}),
+    })
+    state.update_global_server_status({
+      f('server-session-id', new_session),
+      f('owner-publication-revision', 1),
+      f('current-graph-generation', 7), f('current-manifest-revision', 9),
+      f('graph-write-admission', 'closed'),
+      f('graph-transition-status', 'transitioning'), f('rebuilding', 'true'),
+      f('pending-incidents', { f('incident-id', 'old') }),
+    })
+    assert.are.equal(2, state.owner_publication_revision)
+    assert.are.equal('open', state.graph_write_admission)
+    assert.is_false(state.rebuilding)
+    assert.are.equal('idle', state.graph_transition_status)
+    assert.are.same({}, state.pending_incidents)
+    assert.are.equal('open', state.client_constructor_admission)
+  end)
+
+  it('accepts a newer frame after an older one in the same session',
+     function ()
+    state.server_session_id = new_session
+    state.owner_publication_revision = nil
+    state.update_global_server_status({
+      f('server-session-id', new_session),
+      f('owner-publication-revision', 1),
+      f('current-graph-generation', 7), f('current-manifest-revision', 9),
+      f('graph-write-admission', 'closed'),
+      f('graph-transition-status', 'transitioning'), f('rebuilding', 'true'),
+      f('pending-incidents', {}),
+    })
+    state.update_global_server_status({
+      f('server-session-id', new_session),
+      f('owner-publication-revision', 2),
+      f('current-graph-generation', 7), f('current-manifest-revision', 9),
+      f('graph-write-admission', 'open'),
+      f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
+      f('pending-incidents', {}),
+    })
+    assert.are.equal(2, state.owner_publication_revision)
+    assert.are.equal('open', state.graph_write_admission)
+    assert.is_false(state.rebuilding)
   end)
 end)

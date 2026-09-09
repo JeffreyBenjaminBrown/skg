@@ -1242,8 +1242,7 @@ verification response already carries the server's more precise warning."
     (unless (and state (eq (plist-get state :phase) 'terminal-received))
       (error "Server became idle before the client received terminal authority"))
     (setq skg--maintenance-client-incident nil
-          skg--pending-maintenance-offer nil
-          skg--client-constructor-admission 'open)
+          skg--pending-maintenance-offer nil)
     (message "Skg maintenance complete; recovery archive: %s" path)))
 
 (defun skg--maintenance-inspect-retained-incident (response require-final)

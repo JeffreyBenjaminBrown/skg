@@ -163,6 +163,7 @@ function M.fake_server (on_request)
             .. ' (graph-generation 1) (manifest-revision 1)'
             .. ' (current-graph-generation 1)'
             .. ' (current-manifest-revision 1)'
+            .. ' (owner-publication-revision 1)'
             .. ' (graph-write-admission open)'
             .. ' (graph-transition-status idle) (rebuilding nil)'
             .. ' (pending-incidents ())'

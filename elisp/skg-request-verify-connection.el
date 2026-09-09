@@ -153,6 +153,8 @@ This inspects the public package header without enabling any package mode."
                    (error-message-string err))
              (signal (car err) (cdr err)))))
          (content (cadr (assoc 'content response))))
+    (unless (equal skg--server-session-id server-session-id)
+      (setq skg--owner-publication-revision nil))
     (setq skg--server-session-id server-session-id)
     (skg-update-global-server-status response)
     (skg-install-source-inventory response)

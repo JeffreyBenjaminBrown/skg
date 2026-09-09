@@ -23,6 +23,7 @@
      (manifest-revision 9) (typedb-health healthy)
      (tantivy-health healthy) (content connected)
      (current-graph-generation 7) (current-manifest-revision 9)
+     (owner-publication-revision 1)
      (graph-write-admission open) (graph-transition-status idle)
      (rebuilding nil) (pending-incidents ()))))
 
@@ -51,11 +52,54 @@
         (view-write-authority editable))))
     (skg-update-global-server-status
      '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
-       (current-graph-generation 8) (current-manifest-revision 10)
+       (owner-publication-revision 1) (current-graph-generation 8)
+       (current-manifest-revision 10)
        (graph-write-admission open) (graph-transition-status idle)
        (rebuilding nil) (pending-incidents ())))
     (should (eq 'open skg--client-constructor-admission))
     (should (eq 'editable (skg-requested-view-write-authority)))))
+
+(ert-deftest test-skg-older-owner-publication-cannot-roll-back-global-state ()
+  (let ((skg--server-session-id skg-test-session-new)
+        (skg--owner-publication-revision nil)
+        (skg--client-constructor-admission 'closed)
+        (skg--server-store-state nil))
+    (skg-update-global-server-status
+     '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+       (owner-publication-revision 2) (current-graph-generation 7)
+       (current-manifest-revision 9) (graph-write-admission open)
+       (graph-transition-status idle) (rebuilding nil) (pending-incidents ())))
+    (skg-update-global-server-status
+     '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+       (owner-publication-revision 1) (current-graph-generation 7)
+       (current-manifest-revision 9) (graph-write-admission closed)
+       (graph-transition-status transitioning) (rebuilding true)
+       (pending-incidents ((incident-id old)))))
+    (should (= 2 skg--owner-publication-revision))
+    (should (eq 'open skg--graph-write-admission))
+    (should-not skg--rebuilding)
+    (should (eq 'idle skg--graph-transition-status))
+    (should-not skg--pending-incidents)
+    (should (eq 'open skg--client-constructor-admission))))
+
+(ert-deftest test-skg-newer-owner-publication-wins-in-same-session ()
+  (let ((skg--server-session-id skg-test-session-new)
+        (skg--owner-publication-revision nil)
+        (skg--server-store-state nil))
+    (skg-update-global-server-status
+     '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+       (owner-publication-revision 1) (current-graph-generation 7)
+       (current-manifest-revision 9) (graph-write-admission closed)
+       (graph-transition-status transitioning) (rebuilding true)
+       (pending-incidents ())))
+    (skg-update-global-server-status
+     '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+       (owner-publication-revision 2) (current-graph-generation 7)
+       (current-manifest-revision 9) (graph-write-admission open)
+       (graph-transition-status idle) (rebuilding nil) (pending-incidents ())))
+    (should (= 2 skg--owner-publication-revision))
+    (should (eq 'open skg--graph-write-admission))
+    (should-not skg--rebuilding)))
 
 (ert-deftest test-skg-protocol-mismatch-preserves-text-and-undo ()
   (let ((buffer (generate-new-buffer " *skg-protocol-mismatch*"))
@@ -87,6 +131,7 @@
   (let ((buffer (generate-new-buffer " *skg-old-session*"))
         (skg--buffer-registry (make-hash-table :test #'equal))
         (skg--server-session-id skg-test-session-old)
+        (skg--owner-publication-revision 5)
         (skg--server-store-state '((graph-generation . 7)))
         (skg--active-source-set-name "all")
         census)
@@ -115,6 +160,7 @@
                 (setq skg--server-session-id nil)
                 (skg--install-connection-verification
                  nil (skg-test-handshake-response skg-test-session-new)))
+              (should (= 1 skg--owner-publication-revision))
               (should (equal skg-test-session-old
                              (cdr (assoc 'server-session-id (car census)))))
               (skg--handle-buffer-census-response
