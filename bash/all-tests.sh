@@ -37,8 +37,6 @@ Environment:
   SKG_NEXTEST_BUILD_JOBS     Build jobs for the nextest phase.
                              Default: half the cores, capped at 8.
   SKG_NEXTEST_JOBS           Nextest jobs. Default: 1.
-  SKG_TYPEDB_CONCURRENT_TRANSACTIONS
-                             TypeDB operation fanout. Default: 4.
   SKG_TEST_NICE              nice level for test commands. Default: 15.
   SKG_TEST_IONICE=0          Disable idle I/O priority.
 EOF
@@ -77,18 +75,15 @@ BUILD_JOBS="$(skg_positive_int_or_default "${SKG_CARGO_BUILD_JOBS:-}" 2)"
 NEXTEST_BUILD_JOBS="$(skg_positive_int_or_default \
   "${SKG_NEXTEST_BUILD_JOBS:-}" "$(skg_default_jobs 8)")"
 NEXTEST_JOBS="$(skg_positive_int_or_default "${SKG_NEXTEST_JOBS:-}" 1)"
-export SKG_TYPEDB_CONCURRENT_TRANSACTIONS="$(
-  skg_positive_int_or_default "${SKG_TYPEDB_CONCURRENT_TRANSACTIONS:-}" 4)"
-
 echo -e "${BOLD}=== All Tests ===${NC}"
-echo -e "${DIM}Build jobs: $BUILD_JOBS (nextest phase: $NEXTEST_BUILD_JOBS); nextest jobs: $NEXTEST_JOBS; integration: sequential; TypeDB fanout: $SKG_TYPEDB_CONCURRENT_TRANSACTIONS${NC}"
+echo -e "${DIM}Build jobs: $BUILD_JOBS (nextest phase: $NEXTEST_BUILD_JOBS); nextest jobs: $NEXTEST_JOBS; integration: sequential${NC}"
 echo ""
 
 # ── Phase 1: Build ──────────────────────────────────────────────
 
 echo -n "Building... "
 T_BUILD=$SECONDS
-if skg_low_priority cargo build --jobs "$BUILD_JOBS" --bin skg --bin cleanup-test-dbs \
+if skg_low_priority cargo build --jobs "$BUILD_JOBS" --bin skg \
      >"$RESULTS_DIR/build.log" 2>&1; then
   ELAPSED_BUILD=$((SECONDS - T_BUILD))
   echo -e "${GREEN}OK${NC} ${DIM}(${ELAPSED_BUILD}s)${NC}"
@@ -100,7 +95,6 @@ else
   exit 1
 fi
 
-"$PROJECT_ROOT/target/debug/cleanup-test-dbs" >/dev/null 2>&1 || true
 echo ""
 
 # ── Phase 2: Run suites sequentially ────────────────────────────
@@ -161,10 +155,8 @@ echo -n "  Doctests ... "
 if (
   cd "$PROJECT_ROOT"
   # nextest structurally cannot run doctests, so they get their own
-  # phase. They compile and run pure examples and never open TypeDB, so
-  # they cannot hit the in-process collision that makes plain `cargo
-  # test` flaky here -- no serialization needed. --jobs caps build
-  # parallelism for politeness, matching the build phase.
+  # phase. --jobs caps build parallelism for politeness, matching the
+  # build phase.
   skg_low_priority cargo test --doc --jobs "$BUILD_JOBS"
 ) >"$RESULTS_DIR/doctest.log" 2>&1; then
   EXIT_DOCTEST=0
@@ -234,7 +226,6 @@ if [ ${#INTEGRATION_FAILED[@]} -gt 0 ]; then
   echo -e "${YELLOW}Retrying ${#INTEGRATION_FAILED[@]} failed integration test(s) once...${NC}"
 
   for name in "${INTEGRATION_FAILED[@]}"; do
-    "$PROJECT_ROOT/target/debug/cleanup-test-dbs" >/dev/null 2>&1 || true
     echo -n "  $name ... "
 
     # NAME is "CLIENT/DIR-NAME"; split it back apart.
@@ -297,15 +288,16 @@ else
 fi
 
 n_total=${#INTEGRATION_NAMES[@]}
-n_failed=${#INTEGRATION_FAILED[@]}
-n_real=${#RETRY_STILL_FAILING[@]}
+n_first_fail=${#INTEGRATION_FAILED[@]}
+n_retry_fail=${#RETRY_STILL_FAILING[@]}
 
-if [ $n_failed -eq 0 ]; then
+if [ $n_first_fail -eq 0 ]; then
   echo -e "  ${GREEN}PASS${NC}  Integration    ($n_total tests)"
-elif [ $n_real -eq 0 ]; then
-  echo -e "  ${GREEN}PASS${NC}  Integration    ($n_total tests, $n_failed recovered on retry)"
+elif [ $n_retry_fail -eq 0 ]; then
+  echo -e "  ${RED}FAIL${NC}  Integration    ($n_first_fail first-attempt failure(s); retries are diagnostic only)"
+  overall=1
 else
-  echo -e "  ${RED}FAIL${NC}  Integration    ($n_real real failure(s))"
+  echo -e "  ${RED}FAIL${NC}  Integration    ($n_retry_fail failure(s) after diagnostic retry; $n_first_fail first-attempt failure(s))"
   for name in "${RETRY_STILL_FAILING[@]}"; do
     echo -e "         ${RED}-${NC} $name  (see retry-${name%%/*}-${name#*/}.log)"
   done
@@ -369,11 +361,10 @@ ORG="$RESULTS_DIR/ALL.org"
   fi
 
   # Integration
-  n_pass=$((n_total - n_real))
-  if [ $n_real -eq 0 ]; then
+  if [ $n_first_fail -eq 0 ]; then
     echo "** PASS ($n_total of $n_total) : Integration tests"
   else
-    echo "** FAIL ($n_real of $n_total) : Integration tests"
+    echo "** FAIL ($n_first_fail of $n_total) : Integration tests (first attempt)"
   fi
 
   # *** primary run — failures first, then passes

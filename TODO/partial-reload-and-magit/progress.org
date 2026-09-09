@@ -1392,3 +1392,62 @@ what's imperfect about what's done; choices determining the future.
   release, and replacement of an obsolete record on new allocation.  All 444
   Emacs tests have 441 expected passes and the three expected skips for absent
   =undo-fu-session=.  =git diff --check= is clean.
+
+* Simplify/cohere execution: baseline, 2026-09-09
+** what's done and went well
+Starting revision: '06f0aaf5343c96883016af099474dfdbe2fff52d'.
+Read the orientation, coding guidance, API, glossary, schema, and the settled
+contract in document 11; recursive reference inventory is in progress.
+The requested implementation includes ordinary-save crash recovery and removes
+TypeDB entirely. Earlier contrary descriptions are superseded by document 11.
+
+Preserved the initial worktree status, patch and existing aggregate test results
+in [[file:../../temp/simplify-cohere-baseline/][temp/simplify-cohere-baseline/]]. Existing changes include 'TODO.org',
+'bash/docker.sh' and the untracked files recorded there. No Git state changed.
+
+Available commands: cargo, rustc, cargo-nextest, emacs, nvim, typedb, python3.
+Baseline 'cargo check --all-targets --jobs 2' is running in the isolated copy;
+unchanged editor suites are also being recorded before harness changes.
+** Changes to the plan's envisioned order.
+The checkout has a live cargo-watch process observing 'server/' and running
+'data/skgconfig.toml'. Implementation and verification therefore use the plain
+source copy '/tmp/skg-simplify-cohere', with separate build products and
+fixtures. Validated changes will be transferred to the working tree together.
+This avoids deploying intermediate recovery/protocol changes to the corpus.
+** what's imperfect about what's done
+No product changes or acceptance claim yet. Baseline results are pending.
+** choices determining the future
+No new architectural question. Proceed with the model, exclusive owner and
+coherent graph/search publication before enabling independent buffer release.
+
+* Simplify/cohere checkpoint: executable model and acceptance accounting
+** what's done and went well
+The six registered model tests pass under nextest. They exercise both worker
+completion orders, obsolete operation/base rejection, constructor draining
+before a fixed census, independent buffer settlement, a newer save before old
+report completion, stale ACKs during a successor incident, crash before live
+publication, fresh session identity and operation-based no-change query waits.
+Discovery output is retained in 'temp/simplify-cohere-baseline/model-discovery.log'.
+These are specification tests; real filesystem, restart and editor fault tests
+remain required and are not claimed by this result.
+
+The unchanged baseline passed 'cargo check --all-targets --jobs 2'. Emacs:
+444 tests, 441 expected passes and three undo-package skips. Neovim: all 30
+spec files passed. Logs are in the preserved baseline directory.
+
+The aggregate runner now keeps a failed first attempt as acceptance failure
+even if its diagnostic retry passes. A disposable fake-tool probe verified
+that exit status, and shell syntax checks passed. The two Rust/aggregate
+runners no longer invoke the obsolete TypeDB cleanup tool.
+** Changes to the plan's envisioned order.
+Jeff authorized stopping the test cargo-watch/server and requested regular
+commits on the existing 'partial-reload-and-magit' branch. Those processes are
+stopped. Work continues directly in the checkout; the temporary linked worktree
+was removed. The plain source copy remains disposable baseline material.
+User authorization to commit supersedes the older no-Git-change guidance.
+** what's imperfect about what's done
+The baseline's three native-undo skips must be resolved for the required undo
+acceptance coverage. The model is an abstract contract, not adapter evidence.
+** choices determining the future
+No architectural question. Continue with exclusive state ownership and pinned
+read publication; independent release stays gated on durable save recovery.

@@ -41,6 +41,9 @@ mod init_refusal;
 #[path = "multi_source_errors.rs"]
 mod multi_source_errors;
 
+#[path = "maintenance_model.rs"]
+mod maintenance_model;
+
 #[path = "multi_source_loading.rs"]
 mod multi_source_loading;
 
