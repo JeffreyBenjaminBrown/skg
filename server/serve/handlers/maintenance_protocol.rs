@@ -42,7 +42,7 @@ use crate::maintenance::{
 };
 use crate::from_text::buffer_to_viewnodes::uninterpreted::
   org_to_uninterpreted_viewforest;
-use crate::runtime::ServerRuntime;
+use crate::runtime::{SelectedRuntimeSnapshot, ServerRuntime};
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
 use crate::serve::handlers::client_census::source_inventory_field;
 use crate::serve::handlers::scalar_release::{
@@ -65,6 +65,7 @@ use futures::executor::block_on;
 use std::collections::{BTreeMap, HashSet};
 use std::net::TcpStream;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::types::misc::ID;
 use crate::types::sexp::{atom_to_string, extract_string_list_from_sexp};
@@ -72,6 +73,7 @@ use crate::types::store_state::StoreHealth;
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{
+  ViewSaveBase,
   ViewState,
   ViewUri,
   pids_from_viewforest,
@@ -1896,7 +1898,7 @@ fn acknowledge_view_settlement (
         application_token,
         application_ack . as_ref ())
     })?;
-  apply_server_settlement_effect (runtime, effect);
+  apply_server_settlement_effect (runtime, &incident, effect);
   let mut fields : Vec<Sexp> = vec![
     atom_field ("incident-id", incident . as_str ()),
     integer_field ("maintenance-epoch", epoch . get ()),
@@ -2068,6 +2070,7 @@ pub(crate) fn prepare_server_settlement_effect (
 
 fn apply_server_settlement_effect (
   runtime : &ServerRuntime,
+  incident : &IncidentId,
   effect  : ServerSettlementEffect,
 ) {
   let mut interactive = runtime . interactive . lock ()
@@ -2079,11 +2082,9 @@ fn apply_server_settlement_effect (
     ServerSettlementEffect::Preserve {
       uri, graph_generation, search_stale,
     } => {
-      let state = interactive . views . open_views . views . get_mut (&uri)
+      interactive . views . open_views . preserve_across_maintenance (
+        &uri, graph_generation, search_stale)
         . expect ("validated settlement view disappeared during one request");
-      state . graph_generation = graph_generation;
-      state . presentation_stale = true;
-      state . search_stale |= search_stale;
     }
     ServerSettlementEffect::Apply {
       uri,
@@ -2094,8 +2095,14 @@ fn apply_server_settlement_effect (
       application_token,
       search_stale,
     } => {
+      let selected_snapshot : Arc<SelectedRuntimeSnapshot> =
+        runtime . incident_snapshot (incident)
+        . expect ("validated maintenance application retains its G1 snapshot");
+      let source_set : String = interactive . views . open_views . views . get (&uri)
+        . expect ("validated maintenance view remains registered")
+        . source_set . clone ();
       assert! (interactive . views . open_views . update_view_if_revision (
-        &runtime . selected_snapshot () . selected . graph, &uri, base_revision, viewforest),
+        &selected_snapshot . selected . graph, &uri, base_revision, viewforest),
         "validated maintenance application advanced during one request");
       interactive . views . open_views . set_client_application_authority (
         &uri,
@@ -2103,8 +2110,11 @@ fn apply_server_settlement_effect (
         presentation_generation,
         application_token)
         . expect ("validated maintenance application view disappeared");
-      let state = interactive . views . open_views . views . get_mut (&uri)
+      let state : &mut ViewState = interactive . views . open_views . views . get_mut (&uri)
         . expect ("applied maintenance view remains registered");
+      state . retain_save_base (ViewSaveBase::from_env (
+        &selected_snapshot . env, &source_set))
+        . expect ("validated maintenance application retains its G1 base");
       state . search_stale |= search_stale;
     }
   }
@@ -2530,7 +2540,18 @@ mod tests {
     ClientKind,
   };
   use crate::types::tree::forest::ViewForest;
-  use crate::types::store_state::{GraphGeneration, ManifestRevision};
+  use crate::types::store_state::{
+    GraphGeneration, ManifestRevision, SelectedStoreState,
+  };
+  use crate::types::views_state::{OpenViews, ViewSaveBase};
+  use crate::types::misc::SkgConfig;
+  use crate::types::env::SkgEnv;
+  use crate::dbs::in_rust_graph::InRustGraph;
+  use crate::dbs::init::empty_in_ram_tantivy_index;
+  use arc_swap::ArcSwap;
+  use std::collections::HashMap;
+  use std::sync::Arc;
+  use tempfile::tempdir;
 
   fn census_descriptor (id : &str, kind : &str) -> CensusDescriptor {
     CensusDescriptor {
@@ -2860,6 +2881,7 @@ mod tests {
       acknowledged: false,
     };
     let state = ViewState {
+      save_base: None,
       writes_admitted: true,
       viewforest: ViewForest::new (), pids: Default::default (), revision: 4,
       root_ids: Default::default (),
@@ -2929,6 +2951,22 @@ mod tests {
       ServerSettlementEffect::None);
     assert! (prepare_server_settlement_effect (
       &active, &application, Some (&changed), Some (&wrong)) . is_err ());
+    let base_selected : Arc<SelectedStoreState> = Arc::new (
+      SelectedStoreState::initial (InRustGraph::new (), Default::default ()));
+    let base : ViewSaveBase = ViewSaveBase {
+      selected: base_selected . clone (),
+      config: SkgConfig::dummyFromSources (HashMap::new ()),
+      source_set: "all" . into (),
+    };
+    let uri = ViewUri::SearchView ("terms" . into ());
+    let mut open_views : OpenViews = OpenViews::new ();
+    open_views . register_view (
+      &InRustGraph::new (), uri . clone (), ViewForest::new (), &[]);
+    open_views . views . get_mut (&uri) . unwrap () . save_base = Some (base);
+    open_views . preserve_across_maintenance (&uri, 2, true) . unwrap ();
+    let preserved = open_views . views . get (&uri) . unwrap () . save_base
+      . as_ref () . unwrap ();
+    assert! (Arc::ptr_eq (&preserved . selected, &base_selected));
   }
 
   #[test]
@@ -3029,5 +3067,54 @@ mod tests {
     assert! (payload . contains ("ugly-pid"));
     assert! (!payload . contains ("view-settlements"));
     assert! (!payload . contains ("SECRET-STAGED-TEXT"));
+  }
+
+  #[test]
+  fn maintenance_application_installs_the_incident_save_base () {
+    let directory : tempfile::TempDir = tempdir () . unwrap ();
+    let mut config : SkgConfig = SkgConfig::dummyFromSources (HashMap::new ());
+    config . config_path = directory . path () . join ("config.toml");
+    config . data_root = directory . path () . to_path_buf ();
+    config . maintenance_archive_identity = directory . path ()
+      . join ("archive");
+    let index : crate::types::misc::TantivyIndex =
+      empty_in_ram_tantivy_index () . unwrap ();
+    let selected : Arc<SelectedStoreState> = Arc::new (
+      SelectedStoreState::initial (InRustGraph::new (), Default::default ())
+        . with_searcher (index . reader . searcher ()));
+    let runtime : ServerRuntime = ServerRuntime::new (SkgEnv {
+      config,
+      in_rust_graph: Arc::new (ArcSwap::from (selected . clone ())),
+      searcher: index . reader . searcher (),
+      tantivy_index: index,
+      startup_warnings: Arc::new (Vec::new ()),
+    }) . unwrap ();
+    let incident : IncidentId = IncidentId::new ();
+    runtime . retain_incident_snapshot (&incident, &SelectedStoreRecord {
+      graph_generation: GraphGeneration::INITIAL,
+      manifest_revision: ManifestRevision::INITIAL,
+      tantivy_generation: 1,
+      tantivy_outcome: "committed" . into (),
+    }) . unwrap ();
+    let uri : ViewUri = ViewUri::ContentView ("maintenance" . into ());
+    {
+      let mut interactive = runtime . interactive . lock () . unwrap ();
+      interactive . views . open_views . register_view (
+        &selected . graph, uri . clone (), ViewForest::new (), &[]);
+    }
+    apply_server_settlement_effect (&runtime, &incident,
+      ServerSettlementEffect::Apply {
+        uri: uri . clone (), base_revision: 0,
+        viewforest: ViewForest::new (), graph_generation: 1,
+        presentation_generation: 1, application_token: 2,
+        search_stale: false,
+      });
+    let interactive = runtime . interactive . lock () . unwrap ();
+    let state : &ViewState = interactive . views . open_views . views . get (&uri)
+      . unwrap ();
+    let save_base : &ViewSaveBase = state . save_base . as_ref () . unwrap ();
+    assert! (Arc::ptr_eq (&save_base . selected, &selected));
+    assert_eq! (save_base . selected . manifest, selected . manifest);
+    assert_eq! (state . graph_generation, 1);
   }
 }

@@ -197,7 +197,7 @@ pub fn handle_single_root_view_request (
                   &warnings );
                 let state = views_state . open_views . views . get_mut (&menu_uri)
                   . expect ("registered override menu exists");
-                if let Err (error) = runtime . admit_view_response (request, state)
+                if let Err (error) = runtime . admit_view_response (request, env, state)
                 {
                   views_state . open_views . unregister_view (&menu_uri);
                   return tag_text_response (TcpToClient::Error, &error); }
@@ -257,7 +257,7 @@ pub fn handle_single_root_view_request (
                 let formatted = if let Ok (view_uri) = &view_uri_result {
                   let state = views_state . open_views . views . get_mut (view_uri)
                     . expect ("registered content view exists");
-                  if let Err (error) = runtime . admit_view_response (request, state)
+                  if let Err (error) = runtime . admit_view_response (request, env, state)
                   {
                     views_state . open_views . unregister_view (view_uri);
                     return tag_text_response (TcpToClient::Error, &error); }

@@ -39,7 +39,7 @@ use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SavePlan, format_save_error_as_org};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::{ViewUri, ViewSaveBase};
 use crate::types::store_state::SelectedStoreState;
 use crate::update_buffer::update_views_after_save;
 
@@ -167,6 +167,9 @@ pub(crate) fn handle_save_buffer_request (
               uri, env . in_rust_graph . load_full () . graph_generation . get (),
               collateral_scheduler . presentation_generation (),
               authority . application_token . saturating_add (1));
+            if let Some (state) = views_state . open_views . views . get_mut (uri) {
+              state . retain_save_base (ViewSaveBase::from_env (env, &state . source_set))
+                . expect ("successful save and its returned view share one base"); }
           }
           let mut payload : String = saved . to_sexp_string ();
           if let Ok (uri) = &view_uri {
@@ -510,6 +513,10 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
   mut collateral_scheduler    : Option<&mut CollateralScheduler>,
   operation : Option<&crate::runtime::save_operations::SaveOperation>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  if let Some (authority) = requested_authority {
+    validate_save_authority (
+      authority, viewuri_from_request_result, views_state,
+      env . in_rust_graph . load_full () . graph_generation . get ())?; }
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
       env . config . sources . keys() . cloned() . collect();
@@ -594,10 +601,6 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
     &env . in_rust_graph_snapshot (), nonmerge_defineNodes . clone (), &nodeMerges);
 
   { // Validate the complete authored proposal before applying its final batch.
-    if let Some (authority) = requested_authority {
-      validate_save_authority (
-        authority, viewuri_from_request_result, views_state,
-        env . in_rust_graph . load_full () . graph_generation . get ())?; }
     let all_filesystem_outputs : Vec<DefineNode> =
       nonmerge_defineNodes . iter () . cloned ()
       .chain ( nodeMerges . iter ()

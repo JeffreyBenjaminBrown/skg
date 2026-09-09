@@ -2,10 +2,12 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::store_state::SelectedStoreState;
 use crate::telescope::invariants::TelescopeViolation;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use arc_swap::ArcSwap;
 use tantivy::Searcher;
 
 #[derive(Clone)]
@@ -21,6 +23,18 @@ pub struct SkgEnv {
 }
 
 impl SkgEnv {
+  /// Retained work must own the graph, manifest and matching search reader
+  /// from one publication even when its caller supplied the writer handle.
+  pub fn pinned (
+    &self,
+  ) -> Self {
+    let selected : Arc<SelectedStoreState> = self . in_rust_graph . load_full ();
+    let mut pinned : Self = self . clone ();
+    pinned . searcher = selected . searcher . clone ()
+      . expect ("a live environment has a matching Searcher");
+    pinned . in_rust_graph = Arc::new (ArcSwap::from (selected));
+    pinned }
+
   /// Snap the current in-Rust graph.
   pub fn in_rust_graph_snapshot (&self) -> Arc<InRustGraph> {
     self . in_rust_graph . load_full () . graph . clone () }

@@ -23,6 +23,8 @@ use crate::runtime::interactive_session::{
   QueuedServerEvent,
 };
 use crate::serve::protocol::TcpToClient;
+use crate::types::env::SkgEnv;
+use crate::types::views_state::{ViewSaveBase, ViewState};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -213,7 +215,8 @@ impl ServerRuntime {
   pub fn admit_view_response (
     &self,
     request : &str,
-    state : &mut crate::types::views_state::ViewState,
+    env : &SkgEnv,
+    state : &mut ViewState,
   ) -> Result<(), String> {
     let requested : String = crate::serve::util::value_from_request_sexp (
       "requested-view-write-authority", request)
@@ -223,6 +226,7 @@ impl ServerRuntime {
     state . writes_admitted = requested == "editable"
       && self . maintenance_snapshot () . state . policy () . skg_saves_allowed
       && self . authority_failure () . is_none ();
+    state . retain_save_base (ViewSaveBase::from_env (env, &state . source_set))?;
     Ok (( ))
   }
 

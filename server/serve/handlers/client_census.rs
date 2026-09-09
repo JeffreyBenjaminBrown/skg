@@ -1,11 +1,13 @@
 //! Two-step client census and retained-view reattachment.
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::maintenance::archive::{
   InitialArchiveExpectation,
   verify_initial_archive,
 };
 use crate::maintenance::{
+  ActiveMaintenance,
   ArchiveStatus,
   BufferKind,
   CoordinatorState,
@@ -15,7 +17,7 @@ use crate::maintenance::{
   ViewApplicationAcknowledgement,
   ViewSettlementRequirement,
 };
-use crate::runtime::ServerRuntime;
+use crate::runtime::{SelectedRuntimeSnapshot, ServerRuntime};
 use crate::runtime::interactive_session::{
   AttachedClient,
   CensusDescriptor,
@@ -38,6 +40,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::sexp::{atom_to_string, extract_v_from_kv_pair_in_sexp};
 use crate::types::store_state::{SelectedStoreState, StoreHealth};
 use crate::types::views_state::{
+  ViewSaveBase,
   ViewState,
   ViewUri,
   pids_from_viewforest,
@@ -55,6 +58,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashSet};
 use std::io::BufReader;
 use std::net::TcpStream;
+use std::sync::Arc;
 
 pub const PROTOCOL_VERSION : u32 = 2;
 
@@ -277,13 +281,14 @@ pub fn handle_client_census_request (
   runtime      : &ServerRuntime,
 ) {
   let result = (|| -> Result<String, String> {
+    let selected_env : SkgEnv = env . pinned ();
     let payload = read_length_prefixed_content (reader)
       . map_err (|error| format! ("could not read client census: {}", error))?;
     let descriptors = parse_descriptors (&payload)?;
     let requested_epoch = requested_maintenance_epoch (request)?;
     let live_buffer_ids : BTreeSet<String> = descriptors . iter ()
       . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
-    let current_generation = env . in_rust_graph . load_full ()
+    let current_generation = selected_env . in_rust_graph . load_full ()
       . graph_generation . get ();
     let maintenance = runtime . maintenance_snapshot ();
     let mut live_uris : HashSet<ViewUri> = HashSet::new ();
@@ -306,8 +311,10 @@ pub fn handle_client_census_request (
         continue;
       }
       let descriptor_kind = validate_live_descriptor (&descriptor)?;
+      let census_graph : Arc<InRustGraph> = census_application_graph (
+        runtime, &maintenance, &descriptor)?;
       let census_application = census_application_ack (
-        &env . in_rust_graph_snapshot (), &maintenance, &descriptor)?;
+        &census_graph, &maintenance, &descriptor)?;
       if !live_uris . insert (uri . clone ()) {
         return Err (format! (
           "client census names view '{}' more than once",
@@ -503,6 +510,30 @@ fn census_application_ack (
   })))
 }
 
+fn census_application_graph (
+  runtime     : &ServerRuntime,
+  coordinator : &MaintenanceCoordinator,
+  descriptor  : &CensusDescriptor,
+) -> Result<Arc<InRustGraph>, String> {
+  let Some (summary) = coordinator . incidents () . into_iter () . find (|incident|
+    Some (incident . epoch . get ()) == descriptor . maintenance_epoch
+    && incident . disposition . is_none ()) else {
+      return Ok (runtime . selected_snapshot () . selected . graph . clone ()); };
+  let active : &ActiveMaintenance = coordinator . incident (
+    &summary . incident_id, summary . epoch)?;
+  if active . authority_retired_by_session . is_some () {
+    return Ok (runtime . selected_snapshot () . selected . graph . clone ()); }
+  let has_live_application : bool = active . view_settlements
+    . get (&descriptor . buffer_id)
+    . map (|record| record . requirement == ViewSettlementRequirement::ApplicationAck
+      && !record . acknowledged && record . application . is_some ())
+    . unwrap_or (false);
+  if !has_live_application {
+    return Ok (runtime . selected_snapshot () . selected . graph . clone ()); }
+  Ok (runtime . incident_snapshot (&summary . incident_id)? . selected
+    . graph . clone ())
+}
+
 fn reconcile_census_applications (
   runtime      : &ServerRuntime,
   interactive  : &mut InteractiveSession,
@@ -524,10 +555,10 @@ fn reconcile_census_applications (
         "buffer '{}' census application has no retained forest",
         descriptor . buffer_id))?;
     if state_matches_descriptor (state, descriptor, &record . kind) {
-      effects . push (ServerSettlementEffect::None);
+      effects . push ((incident . clone (), ServerSettlementEffect::None));
     } else {
-      effects . push (prepare_server_settlement_effect (
-        active, record, Some (state), Some (acknowledgement))?); }
+      effects . push ((incident . clone (), prepare_server_settlement_effect (
+        active, record, Some (state), Some (acknowledgement))?)); }
   }
   runtime . transition_maintenance (|coordinator| {
     for (descriptor, (incident, epoch, acknowledgement)) in applications {
@@ -535,23 +566,30 @@ fn reconcile_census_applications (
         incident, *epoch, &descriptor . buffer_id, acknowledgement)?; }
     Ok (( ))
   })?;
-  for effect in effects {
+  for (incident, effect) in effects {
     match effect {
       ServerSettlementEffect::None => {}
       ServerSettlementEffect::Apply {
         uri, base_revision, viewforest, graph_generation,
         presentation_generation, application_token, search_stale,
       } => {
+        let selected_snapshot : Arc<SelectedRuntimeSnapshot> =
+          runtime . incident_snapshot (&incident)?;
+        let source_set : String = interactive . views . open_views . views
+          . get (&uri) . expect ("census-applied view remains registered")
+          . source_set . clone ();
         if !interactive . views . open_views . update_view_if_revision (
-            &runtime . selected_snapshot () . selected . graph,             &uri, base_revision, viewforest)
+            &selected_snapshot . selected . graph, &uri, base_revision, viewforest)
         {
           return Err ("census application base advanced after validation"
             . into ()); }
         interactive . views . open_views . set_client_application_authority (
           &uri, graph_generation, presentation_generation, application_token)?;
-        interactive . views . open_views . views . get_mut (&uri)
-          . expect ("census-applied view remains registered")
-          . search_stale |= search_stale;
+        let state : &mut ViewState = interactive . views . open_views . views . get_mut (&uri)
+          . expect ("census-applied view remains registered");
+        state . retain_save_base (ViewSaveBase::from_env (
+          &selected_snapshot . env, &source_set))?;
+        state . search_stale |= search_stale;
       }
       _ => return Err (
         "application census prepared a non-application server effect" . into ()),
@@ -570,6 +608,7 @@ pub fn handle_client_census_texts_request (
   runtime      : &ServerRuntime,
 ) {
   let result = (|| -> Result<String, String> {
+    let selected_env : SkgEnv = env . pinned ();
     let payload = read_length_prefixed_content (reader)
       . map_err (|error| format! ("could not read census texts: {}", error))?;
     let records = parse_text_records (&payload)?;
@@ -584,7 +623,7 @@ pub fn handle_client_census_texts_request (
         return Err (format! (
           "census texts include unrequested buffer '{}'", buffer_id)); };
       if !descriptor_has_session_authority (&descriptor, runtime . server_session_id ())
-      || descriptor . graph_generation != env . in_rust_graph . load_full ()
+      || descriptor . graph_generation != selected_env . in_rust_graph . load_full ()
         . graph_generation . get ()
       {
         stale . push (buffer_id);
@@ -609,7 +648,7 @@ pub fn handle_client_census_texts_request (
       let pids : Vec<_> = pids_from_viewforest (&viewforest)
         . into_iter () . collect ();
       interactive . views . open_views . register_view_with_authority (
-        &env . in_rust_graph_snapshot (),         uri . clone (), viewforest, &pids,
+        &selected_env . in_rust_graph_snapshot (), uri . clone (), viewforest, &pids,
         descriptor . graph_generation,
         descriptor . presentation_generation,
         descriptor . application_token,
@@ -621,6 +660,8 @@ pub fn handle_client_census_texts_request (
         . revision = descriptor . server_revision;
       let state = interactive . views . open_views . views . get_mut (&uri)
         . expect ("reconstructed census view exists");
+      state . retain_save_base (ViewSaveBase::from_env (
+        &selected_env, &descriptor . source_set))?;
       state . client_buffer_id = Some (descriptor . buffer_id . clone ());
       state . presentation_stale = descriptor . presentation_stale;
       state . search_stale = descriptor . search_stale;
@@ -648,8 +689,10 @@ pub fn handle_client_census_texts_request (
     let maintenance = runtime . maintenance_snapshot ();
     let mut census_applications = Vec::new ();
     for descriptor in &restored_descriptors {
+      let census_graph : Arc<InRustGraph> = census_application_graph (
+        runtime, &maintenance, descriptor)?;
       if let Some (ack) = census_application_ack (
-          &env . in_rust_graph_snapshot (), &maintenance, descriptor)?
+          &census_graph, &maintenance, descriptor)?
       {
         census_applications . push ((descriptor . clone (), ack)); }
     }
@@ -1173,6 +1216,7 @@ mod tests {
       . unwrap () . remove (0);
     let kind = validate_live_descriptor (&descriptor) . unwrap ();
     let state = ViewState {
+      save_base: None,
       viewforest: crate::types::tree::forest::ViewForest::new (),
       pids: Default::default (),
       root_ids: ["a", "z"] . into_iter ()
@@ -1247,8 +1291,6 @@ mod tests {
     use crate::maintenance::{
       FrozenBufferRecord,
       MaintenanceCoordinator,
-  IncidentId,
-  MaintenanceEpoch,
       MaintenanceOrigin,
       MaintenancePhase,
       MaintenanceTargets,

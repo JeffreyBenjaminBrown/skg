@@ -21,6 +21,7 @@ use crate::dbs::graph_queries::all_graphnodestats::{
   fetch_all_graphnodestats};
 use crate::runtime::RuntimeQueryLease;
 use crate::runtime::ServerRuntime;
+use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
@@ -122,6 +123,8 @@ pub struct SearchEnrichmentPayload {
   pub graphnodestats : AllGraphNodeStats,
   pub title_and_source_by_id : HashMap<ID, (String, SourceName)>,
   pub graph          : Arc<InRustGraph>,
+  /// The selected graph, manifest and matching searcher used for enrichment.
+  pub base_env       : SkgEnv,
   pub config         : SkgConfig,
   pub active_source_set : ActiveSourceSet,
   pub graph_generation : crate::types::store_state::GraphGeneration,
@@ -293,7 +296,7 @@ pub fn handle_text_search_request (
               }))));
           let state = views_state . open_views . views . get_mut (&uri)
             . expect ("registered search view exists");
-          if let Err (error) = runtime . admit_view_response (request, state) {
+          if let Err (error) = runtime . admit_view_response (request, env, state) {
             views_state . open_views . unregister_view (&uri);
             let _ = send_response_with_length_prefix (
               stream, &tag_text_response (TcpToClient::Error, &error));
@@ -433,6 +436,7 @@ fn spawn_enrichment_thread (
       graphnodestats,
       title_and_source_by_id,
       graph,
+      base_env: lease . snapshot . env . clone (),
       config: config . clone (),
       active_source_set: active_clone,
       graph_generation,

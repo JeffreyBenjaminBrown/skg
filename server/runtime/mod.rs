@@ -21,7 +21,6 @@ pub(crate) use owner::MutationControl;
 use crate::types::env::SkgEnv;
 use crate::types::store_state::{SelectedStoreState, GraphGeneration, ManifestRevision};
 
-use arc_swap::ArcSwap;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -33,13 +32,9 @@ pub struct SelectedRuntimeSnapshot {
 
 impl SelectedRuntimeSnapshot {
   fn from_env (env : &SkgEnv) -> Self {
-    let selected = env . in_rust_graph . load_full ();
-    let mut pinned_env = env . clone ();
-    pinned_env . searcher = selected . searcher . clone ()
-      . expect ("a live publication has a matching Searcher");
-    pinned_env . in_rust_graph = Arc::new (
-      ArcSwap::from (selected . clone ()));
-    Self { env: pinned_env, selected }
+    let pinned : SkgEnv = env . pinned ();
+    let selected : Arc<SelectedStoreState> = pinned . in_rust_graph . load_full ();
+    Self { env: pinned, selected }
   }
 }
 

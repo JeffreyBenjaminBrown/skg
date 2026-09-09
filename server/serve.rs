@@ -864,7 +864,7 @@ fn handle_snapshot_response (
     viewforest_to_string ( &viewforest, &payload . config )
     . expect ("search viewforest rendering never fails");
   let offer = match collateral_scheduler . stage_view_application (
-    &payload . graph,       views_state,
+    &payload . base_env,    views_state,
       &uri,
       RenderGeneration {
         graph: payload . graph_generation,

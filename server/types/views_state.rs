@@ -3,10 +3,13 @@ use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Phantom, ViewNodeKind, Vognode};
 use crate::maintenance::BufferKind;
-use super::misc::ID;
+use crate::types::env::SkgEnv;
+use crate::types::store_state::SelectedStoreState;
+use super::misc::{ID, SkgConfig};
 
 use sexp::{Atom, Sexp};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 //
 // Type declarations
@@ -37,6 +40,9 @@ pub struct OpenViews {
 /// update_view, which maintain pids in sync with the viewforest.
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
+  /// Exact semantic and path base of the accepted text. Updating a display
+  /// generation alone must not replace this older proof input.
+  pub save_base : Option<ViewSaveBase>,
   pub viewforest : ViewForest,
   pub pids   : HashSet<ID>, // the Active (Normal) vognodes in the buffer (the
                             // kind this view renders meaningfully; see
@@ -60,6 +66,35 @@ pub struct ViewState {
   /// Search membership/ranking is never rerun automatically after
   /// maintenance, independently of whether displayed node text was refreshed.
   pub search_stale           : bool,
+}
+
+#[derive(Clone)]
+pub struct ViewSaveBase {
+  pub selected : Arc<SelectedStoreState>,
+  pub config : SkgConfig,
+  pub source_set : String,
+}
+
+impl ViewSaveBase {
+  pub fn from_env (
+    env : &SkgEnv,
+    source_set : &str,
+  ) -> Self {
+    Self { selected: env . in_rust_graph . load_full (),
+      config: env . config . clone (), source_set: source_set . into (), } }
+}
+
+impl ViewState {
+  pub fn retain_save_base (
+    &mut self,
+    base : ViewSaveBase,
+  ) -> Result<(), String> {
+    if self . graph_generation != base . selected . graph_generation . get ()
+    || self . source_set != base . source_set {
+      return Err ("accepted view base differs from its graph/source authority" . into ()); }
+    self . save_base = Some (base);
+    Ok (( )) }
+
 }
 
 //
@@ -156,6 +191,7 @@ impl OpenViews {
           1, 0, 1, None, default_kind_for_uri (&uri), None,
           "all" . into (), false, false, true));
       let state : ViewState = ViewState {
+        save_base: self . views . get (&uri) . and_then (|state| state . save_base . clone ()),
         viewforest, pids, revision, root_ids: rids,
         graph_generation,
         presentation_generation,
@@ -218,6 +254,7 @@ impl OpenViews {
       else { self . views . insert (
                uri . clone (),
                ViewState { viewforest : new_viewforest,
+                           save_base: None,
                            pids,
                            root_ids: rids,
                            revision: 0,

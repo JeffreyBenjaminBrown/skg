@@ -7,6 +7,7 @@
 //! operation against the revision from which it was rendered.
 
 use crate::serve::ViewsState;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::git_ops::presentation_signature::{
   PresentationSignature, presentation_signature,
 };
@@ -26,7 +27,7 @@ use crate::types::misc::ID;
 use crate::types::save::DefineNode;
 use crate::types::store_state::GraphGeneration;
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::ViewUri;
+use crate::types::views_state::{ViewSaveBase, ViewState, ViewUri};
 use crate::update_buffer::{
   RenderCancellationTicket,
   active_ids_in_viewforest,
@@ -78,7 +79,9 @@ struct WorkerResult {
 
 #[derive(Clone)]
 struct PendingOffer {
-  root_graph : Option<std::sync::Arc<crate::dbs::in_rust_graph::InRustGraph>>,
+  /// The selected graph, manifest and matching searcher used to render this
+  /// offer.  Keep it pinned until the client ACKs the offer.
+  base_env : Option<SkgEnv>,
   uri           : ViewUri,
   base_revision : u64,
   base_view_graph_generation : u64,
@@ -237,7 +240,7 @@ impl CollateralScheduler {
     self . batch = Some (BatchContext {
       generation,
       epoch,
-      env: env . clone (),
+      env: env . pinned (),
       define_nodes: define_nodes . to_vec (),
       diff_mode_enabled: views_state . diff_mode_enabled,
       active_source_set: active_source_set . clone (),
@@ -459,7 +462,7 @@ impl CollateralScheduler {
       self . sort_queue ();
       return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
-      root_graph: Some (batch . env . in_rust_graph_snapshot ()),
+      base_env: Some (batch . env . clone ()),
       uri: finished . uri,
       base_revision: finished . base_revision,
       base_view_graph_generation: finished . base_view_graph_generation,
@@ -508,7 +511,7 @@ impl CollateralScheduler {
       self . sort_queue ();
       return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
-      root_graph: None,
+      base_env: None,
       uri: uri . clone (),
       base_revision,
       base_view_graph_generation,
@@ -550,7 +553,7 @@ impl CollateralScheduler {
       self . sort_queue ();
       return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
-      root_graph: None,
+      base_env: None,
       uri: finished . uri . clone (),
       base_revision: finished . base_revision,
       base_view_graph_generation: finished . base_view_graph_generation,
@@ -574,13 +577,18 @@ impl CollateralScheduler {
   /// eventual forest/token transition.
   pub fn stage_view_application (
     &mut self,
-    graph : &std::sync::Arc<crate::dbs::in_rust_graph::InRustGraph>,
+    base_env : &SkgEnv,
     views_state : &ViewsState,
     uri         : &ViewUri,
     generation  : RenderGeneration,
     viewforest  : impl Into<ViewForest>,
   ) -> Result<ViewApplicationOffer, String> {
-    let viewforest = viewforest . into ();
+    let pinned_base : SkgEnv = base_env . pinned ();
+    if pinned_base . in_rust_graph . load_full () . graph_generation
+       != generation . graph {
+      return Err ("staged view application base does not match its generation"
+        . into ()); }
+    let viewforest : ViewForest = viewforest . into ();
     if self . pending_offer . is_some () {
       return Err ("another view application is awaiting acknowledgement"
         . into ()); }
@@ -603,7 +611,7 @@ impl CollateralScheduler {
       resulting_source_set: state . source_set . clone (),
     };
     self . pending_offer = Some ((operation_id, PendingOffer {
-      root_graph: Some (graph . clone ()),
+      base_env: Some (pinned_base),
       uri: uri . clone (),
       base_revision: state . revision,
       base_view_graph_generation: state . graph_generation,
@@ -729,9 +737,13 @@ impl CollateralScheduler {
       let _ = current_view_for_pending (views_state, &pending)?;
       let viewforest = pending . viewforest
         . expect ("application offer carries a forest");
+      let base_env : &SkgEnv = pending . base_env . as_ref ()
+        . ok_or ("application offer lost its selected base")?;
+      let save_base : ViewSaveBase = ViewSaveBase::from_env (
+        base_env, &pending . resulting_source_set);
+      let base_graph : Arc<InRustGraph> = base_env . in_rust_graph_snapshot ();
       if ! views_state . open_views . update_view_if_revision (
-          pending . root_graph . as_deref ()
-            . ok_or ("application offer lost its selected graph")?,
+          &base_graph,
           &pending . uri, pending . base_revision, viewforest)
       { return Err ("Collateral view advanced before its ACK" . into ()); }
       views_state . open_views
@@ -741,6 +753,9 @@ impl CollateralScheduler {
         pending . generation . presentation,
         resulting_client_token,
         pending . resulting_source_set)?;
+      let state : &mut ViewState = views_state . open_views . views . get_mut (&pending . uri)
+        . expect ("acknowledged collateral view remains registered");
+      state . retain_save_base (save_base)?;
       // A newer replacement batch may have queued this URI while the exact
       // older offer was awaiting its ACK.  Applying that offer repairs its
       // own generation, but must not erase the newer retained refresh debt.
@@ -937,7 +952,7 @@ mod tests {
     let mut scheduler = CollateralScheduler::new ();
     scheduler . next_operation = 1;
     scheduler . pending_offer = Some (("collateral-1" . into (), PendingOffer {
-      root_graph: Some (std::sync::Arc::new (crate::dbs::in_rust_graph::InRustGraph::new ())),
+      base_env: None,
       uri: ViewUri::ContentView ("view-uri" . into ()),
       base_revision: 4,
       base_view_graph_generation: 1,
@@ -955,6 +970,131 @@ mod tests {
       batch_epoch: Some (1),
     }));
     scheduler
+  }
+
+  #[test]
+  fn staged_application_retains_selected_base_after_writer_advances () {
+    let tantivy : crate::types::misc::TantivyIndex =
+      crate::dbs::init::empty_in_ram_tantivy_index () . unwrap ();
+    let config = crate::types::misc::SkgConfig::from_sources (
+      HashMap::new (), "");
+    let graph_handle = crate::dbs::in_rust_graph::new_handle_with_manifest (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::new ());
+    let selected = graph_handle . load_full () . as_ref ()
+      . with_acknowledged_rebuild (
+        crate::dbs::in_rust_graph::InRustGraph::new (),
+        crate::types::store_state::SelectedPathManifest::new ())
+      . with_searcher (tantivy . reader . searcher ());
+    graph_handle . store (Arc::new (selected));
+    let env = SkgEnv {
+      config: config . clone (),
+      in_rust_graph: graph_handle . clone (),
+      searcher: tantivy . reader . searcher (),
+      tantivy_index: tantivy,
+      startup_warnings: Arc::new (Vec::new ()),
+    };
+    let uri = ViewUri::ContentView ("retained" . into ());
+    let mut views = ViewsState {
+      diff_mode_enabled: false,
+      open_views: crate::types::views_state::OpenViews::new (),
+    };
+    views . open_views . register_view_with_authority (
+      &env . in_rust_graph_snapshot (), uri . clone (), ViewForest::new (), &[],
+      2, 0, 1, crate::maintenance::BufferKind::ContentView,
+      "all" . into (), None);
+    let mut scheduler = CollateralScheduler::new ();
+    let base = env . pinned ();
+    scheduler . stage_view_application (
+      &base, &views, &uri, RenderGeneration {
+        graph: GraphGeneration::INITIAL . successor (), presentation: 1,
+      }, ViewForest::new ()) . unwrap ();
+    let retained = scheduler . pending_offer . as_ref () . unwrap () . 1
+      . base_env . as_ref () . unwrap () . in_rust_graph . load_full ();
+    let newer = Arc::new (retained . as_ref () . clone ()
+      . with_graph_preserving_disk_selection (
+        crate::dbs::in_rust_graph::InRustGraph::new ())
+      . with_searcher (base . searcher . clone ()));
+    env . in_rust_graph . store (newer);
+    let pending = scheduler . pending_offer . as_ref () . unwrap () . 1
+      . base_env . as_ref () . unwrap () . in_rust_graph . load_full ();
+    assert! (Arc::ptr_eq (&pending, &retained));
+    assert_eq! (pending . manifest, retained . manifest);
+    assert! (pending . searcher . is_some ());
+  }
+
+  #[test]
+  fn acknowledged_application_installs_its_retained_save_base () {
+    use std::net::{TcpListener, TcpStream};
+    use std::io::Read;
+
+    let tantivy : crate::types::misc::TantivyIndex =
+      crate::dbs::init::empty_in_ram_tantivy_index () . unwrap ();
+    let config = crate::types::misc::SkgConfig::from_sources (
+      HashMap::new (), "");
+    let graph_handle = crate::dbs::in_rust_graph::new_handle_with_manifest (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::new ());
+    let retained = Arc::new (graph_handle . load_full () . as_ref ()
+      . with_acknowledged_rebuild (
+        crate::dbs::in_rust_graph::InRustGraph::new (),
+        crate::types::store_state::SelectedPathManifest::new ())
+      . with_searcher (tantivy . reader . searcher ()));
+    graph_handle . store (retained . clone ());
+    let env = SkgEnv {
+      config: config . clone (),
+      in_rust_graph: graph_handle . clone (),
+      searcher: tantivy . reader . searcher (),
+      tantivy_index: tantivy,
+      startup_warnings: Arc::new (Vec::new ()),
+    };
+    let uri = ViewUri::ContentView ("retained" . into ());
+    let mut views = ViewsState {
+      diff_mode_enabled: false,
+      open_views: crate::types::views_state::OpenViews::new (),
+    };
+    views . open_views . register_view_with_authority (
+      &env . in_rust_graph_snapshot (), uri . clone (), ViewForest::new (), &[],
+      2, 0, 1, crate::maintenance::BufferKind::ContentView,
+      "all" . into (), None);
+    let mut scheduler = CollateralScheduler::new ();
+    scheduler . stage_view_application (
+      &env, &views, &uri, RenderGeneration {
+        graph: GraphGeneration::INITIAL . successor (), presentation: 1,
+      }, ViewForest::new ()) . unwrap ();
+    let newer = Arc::new (retained . as_ref () . clone ()
+      . with_graph_preserving_disk_selection (
+        crate::dbs::in_rust_graph::InRustGraph::new ())
+      . with_searcher (env . searcher . clone ()));
+    env . in_rust_graph . store (newer);
+
+    let listener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
+    let mut client = TcpStream::connect (listener . local_addr () . unwrap ())
+      . unwrap ();
+    let (mut server, _) = listener . accept () . unwrap ();
+    let request = concat! (
+      "((operation-id . \"collateral-1\") (view-uri . \"retained\") ",
+      "(applied . \"true\") (authorized . \"nil\") ",
+      "(graph-generation . \"2\") (presentation-generation . \"1\") ",
+      "(viewforest-base-revision . \"0\") ",
+      "(resulting-server-revision . \"1\") ",
+      "(view-base-graph-generation . \"2\") ",
+      "(view-base-presentation-generation . \"0\") ",
+      "(expected-client-application-token . \"1\") ",
+      "(resulting-client-application-token . \"2\") ",
+      "(client-token . \"2\") (view-base-source-set . \"all\") ",
+      "(resulting-source-set . \"all\"))");
+    scheduler . handle_apply_ack (&mut server, request, &mut views);
+    let mut response = [0u8; 512];
+    let read = client . read (&mut response) . unwrap ();
+    let response = String::from_utf8_lossy (&response[..read]);
+    assert! (response . contains ("collateral view application acknowledged"),
+      "{}", response);
+    let state = views . open_views . views . get (&uri) . unwrap ();
+    let save_base = state . save_base . as_ref () . unwrap ();
+    assert! (Arc::ptr_eq (&save_base . selected, &retained));
+    assert_eq! (save_base . selected . manifest, retained . manifest);
+    assert! (save_base . selected . searcher . is_some ());
   }
 
   #[test]
