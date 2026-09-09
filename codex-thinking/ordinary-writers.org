@@ -1,4 +1,4 @@
-* Strip-body-whitespace writer audit
+* Historical strip-body-whitespace writer audit
 
 The current 'strip_body_whitespace_and_refresh_caches' path reads every
 source from live disk, rewrites owned files one at a time, updates Tantivy
@@ -54,3 +54,22 @@ cover map construction order, semantic field order and changed source order.
 Publication and durable outcome errors explicitly block the writer reservation.
 A published pair alone cannot release admission while its operation outcome
 remains unresolved.
+
+** Recompute writer boundary
+The cyclic-root repair bypasses the durable command envelope and sends its
+terminal response before the outer owner wrapper publishes. Reuse the existing
+strip command's journal/publish/outcome ordering through a shared handler.
+Ranking repair has no source-file mutations; its index is derived from the
+selected graph and startup rebuilds it. Journal an empty source-effect batch
+before index effects, publish its paired Searcher, then persist the outcome.
+
+Startup currently tags every recovered operation as a buffer save. Command
+evidence already retains its command name. A checked evidence reader can
+recover the correct terminal response kind without changing the journal schema.
+Verify duplicate command delivery and interrupted command startup separately.
+The connection-thread/interactive-lock adapter remains a later responsiveness
+boundary, recorded in [[file:owner-responsiveness.org][the owner note]].
+
+The shared adapter now implements these command boundaries. Both commands use
+[[file:../server/serve/handlers/durable_command.rs][durable_command.rs]]; the computation and result-recovery checks are recorded
+in [[file:../TODO/partial-reload-and-magit/progress.org::* Simplify/cohere checkpoint: durable cyclic-root repair][the durable cyclic-root checkpoint]].

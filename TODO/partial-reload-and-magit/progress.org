@@ -2253,3 +2253,40 @@ warning-and-missing-snapshot behavior.
 ** choices determining the future
 Continue the remaining owner and ordinary-writer migrations one slice at a
 time. The original privacy contract is unchanged; no new question for Jeff.
+
+* Simplify/cohere checkpoint: durable cyclic-root repair
+** what's done and went well
+'b4eca85f' adds verified UUID/session envelopes for recompute commands in both
+editors; their focused wire suites each pass two tests. 'e7be6a25' exposes checked
+retained operation evidence without changing the journal schema. 'f4c344a8'
+uses that evidence to recover command response types after startup instead of
+mislabeling every outcome as a buffer save. Its test covers both commands and
+both authorized and never-authorized interruptions. The existing real save
+crash test still passes across every authorized boundary.
+
+Whitespace normalization and cyclic-root repair now share durable command
+admission, publication and terminal-outcome ordering. Rank repair journals an
+empty source-effect batch before index effects, publishes the paired Searcher
+and cyclic roots, then records its terminal outcome. A real-cycle test proves
+matching index labels, unchanged source bytes and generations, and duplicate
+replay without reranking a newer cache. All six command tests pass. Logs under
+'/tmp/simplify-cohere-baseline' include 'durable-commands-final.log',
+'recompute-durable-final.log', 'command-recovery-first.log' and
+'command-recovery-save-regression.log'.
+** Changes to the plan's envisioned order.
+Extract the already tested whitespace wrapper for its second command consumer.
+Recover the command name from its existing checked interpretation blob rather
+than introducing another journal field and migrating unrelated fixtures.
+** what's imperfect about what's done
+The initial new test referenced a nonexistent snapshot accessor and private
+owner state. After fixing those fixture errors, it incorrectly expected only
+one cyclic root in a two-node cycle; the existing ranking algorithm marks both.
+The corrected fixture verifies both labels in the selected Searcher.
+** choices determining the future
+The compatibility wrapper still runs on the connection thread and holds the
+interactive lock. Move captured command work off that path as part of the
+remaining owner responsiveness migration, without changing its durable ordering.
+See [[file:../../codex-thinking/ordinary-writers.org][the writer boundary note]]. No new question for Jeff.
+
+All Rust targets also compile after this command migration; the log is
+'durable-command-all-targets.log' in the same checkpoint directory.

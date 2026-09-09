@@ -1,3 +1,4 @@
+pub(crate) mod durable_command;
 pub mod close_view;
 pub mod client_census;
 pub mod collateral_scheduler;

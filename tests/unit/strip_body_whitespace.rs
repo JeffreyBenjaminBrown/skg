@@ -1,5 +1,5 @@
 //! Unit tests for the "strip body whitespace" request's core:
-//! the line transform, and the on-disk pass over every source.
+//! the line transform, source writes, and the shared durable command boundary.
 
 use super::{strip_body_whitespace_on_disk,
             strip_trailing_whitespace_from_body};
@@ -18,7 +18,7 @@ use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName, TantivyIndex}
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::store_state::{PathDigest, SelectedStoreState};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::net::{TcpListener, TcpStream};
@@ -26,6 +26,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use arc_swap::ArcSwap;
 use tempfile::TempDir;
+use tantivy::{Term, collector::Count, query::TermQuery, schema::IndexRecordOption};
 
 #[test]
 fn strip_preserves_interior_structure_and_trims_the_tail () {
@@ -122,6 +123,12 @@ fn strips_on_disk_only_where_needed () {
     assert! ( changed_again . is_empty () ); }}
 
 fn operation_fixture () -> (TempDir, ServerRuntime, PathBuf, PathBuf, PathBuf) {
+  operation_fixture_with_cycle (false)
+}
+
+fn operation_fixture_with_cycle (
+  cycle : bool,
+) -> (TempDir, ServerRuntime, PathBuf, PathBuf, PathBuf) {
   let tmp : TempDir = tempfile::tempdir () . unwrap ();
   let owned_dir : PathBuf = tmp . path () . join ("owned");
   let foreign_dir : PathBuf = tmp . path () . join ("foreign");
@@ -150,6 +157,12 @@ fn operation_fixture () -> (TempDir, ServerRuntime, PathBuf, PathBuf, PathBuf) {
   fs::write (&foreign_path,
     "title: foreign\npid: foreign\nbody: \"foreign  \"\n") . unwrap ();
 
+  if cycle {
+    for (path, target) in [(&dirty_one_path, "dirty-two"), (&dirty_two_path, "dirty-one")] {
+      let text : String = fs::read_to_string (path) . unwrap ();
+      fs::write (path, format! ("{}\ncontains:\n  - {}\n", text, target)) . unwrap ();
+    }
+  }
   let loaded : LoadedCorpus =
     read_all_skg_files_with_manifest (&config) . unwrap ();
   let index : TantivyIndex = empty_in_ram_tantivy_index () . unwrap ();
@@ -183,7 +196,7 @@ fn strip_request (runtime : &ServerRuntime, operation_id : &str) -> String {
     operation_id, runtime . server_session_id (), operation_id)
 }
 
-fn execute_strip (runtime : &ServerRuntime, request : &str) -> Result<String, String> {
+fn execute_command (runtime : &ServerRuntime, request : &str) -> Result<String, String> {
   let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")
     . map_err (|error| error . to_string ())?;
   let address = listener . local_addr () . map_err (|error| error . to_string ())?;
@@ -191,7 +204,10 @@ fn execute_strip (runtime : &ServerRuntime, request : &str) -> Result<String, St
     . map_err (|error| error . to_string ())?;
   let (mut server, _) : (TcpStream, std::net::SocketAddr) = listener . accept ()
     . map_err (|error| error . to_string ())?;
-  super::handle_strip_body_whitespace_request (&mut server, request, runtime);
+  if request . contains ("recompute cyclic roots") {
+    crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_roots_request (
+      &mut server, request, runtime);
+  } else { super::handle_strip_body_whitespace_request (&mut server, request, runtime); }
   let mut reader : BufReader<TcpStream> = BufReader::new (client . try_clone ()
     . map_err (|error| error . to_string ())?);
   let mut header : String = String::new ();
@@ -223,7 +239,7 @@ fn ordinary_strip_uses_selected_graph_and_publishes_matching_search () {
   fs::write (&foreign_path, "newer foreign bytes\n") . unwrap ();
   let request : String = strip_request (
     &runtime, "550e8400-e29b-41d4-a716-446655440001");
-  let response : String = execute_strip (&runtime, &request) . unwrap ();
+  let response : String = execute_command (&runtime, &request) . unwrap ();
   assert! (response . contains ("Stripped trailing whitespace from 2 of 2"));
   assert_eq! (fs::read (&foreign_path) . unwrap (), b"newer foreign bytes\n");
   let selected : Arc<SelectedRuntimeSnapshot> = runtime . selected_snapshot ();
@@ -255,7 +271,7 @@ fn ordinary_strip_conflict_refuses_the_whole_batch () {
   let before_two : Vec<u8> = fs::read (&dirty_two_path) . unwrap ();
   let request : String = strip_request (
     &runtime, "550e8400-e29b-41d4-a716-446655440002");
-  assert! (execute_strip (&runtime, &request) . is_err ());
+  assert! (execute_command (&runtime, &request) . is_err ());
   assert_eq! (fs::read (&dirty_one_path) . unwrap (), b"external changed bytes\n");
   assert_eq! (fs::read (&dirty_two_path) . unwrap (), before_two);
 }
@@ -266,9 +282,55 @@ fn ordinary_strip_duplicate_replay_does_not_overwrite_newer_bytes () {
     operation_fixture ();
   let request : String = strip_request (
     &runtime, "550e8400-e29b-41d4-a716-446655440003");
-  let first : String = execute_strip (&runtime, &request) . unwrap ();
+  let first : String = execute_command (&runtime, &request) . unwrap ();
   fs::write (&dirty_one_path, "newer external bytes\n") . unwrap ();
-  let replay : String = execute_strip (&runtime, &request) . unwrap ();
+  let replay : String = execute_command (&runtime, &request) . unwrap ();
   assert_eq! (replay, first);
   assert_eq! (fs::read (&dirty_one_path) . unwrap (), b"newer external bytes\n");
+}
+
+#[test]
+fn ordinary_recompute_records_publication_and_replays_without_reranking () {
+  let (_temp, runtime, owned_one, owned_two, foreign) :
+    (TempDir, ServerRuntime, PathBuf, PathBuf, PathBuf) = operation_fixture_with_cycle (true);
+  let before_bytes : Vec<Vec<u8>> = [&owned_one, &owned_two, &foreign] . into_iter ()
+    . map (|path| fs::read (path) . unwrap ()) . collect ();
+  let before : Arc<SelectedRuntimeSnapshot> = runtime . selected_snapshot ();
+  let operation_id : String = uuid::Uuid::new_v4 () . to_string ();
+  let request : String = strip_request (&runtime, &operation_id)
+    . replace ("strip body whitespace", "recompute cyclic roots");
+  let response : String = execute_command (&runtime, &request) . unwrap ();
+  assert! (response . contains ("recompute-cyclic-roots"), "{}", response);
+  assert! (response . contains ("committed"), "{}", response);
+  let after : Arc<SelectedRuntimeSnapshot> = runtime . selected_snapshot ();
+  assert_eq! (after . selected . cyclic_roots, BTreeSet::from ([ID::from ("dirty-one"), ID::from ("dirty-two")]));
+  assert_eq! (before . selected . graph_generation, after . selected . graph_generation);
+  assert_eq! (before . selected . manifest_revision, after . selected . manifest_revision);
+  assert_eq! (before . env . searcher . num_docs (), after . env . searcher . num_docs ());
+  let active : crate::source_sets::ActiveSourceSet = runtime . interactive . lock () . unwrap ()
+    . active_source_set . clone ();
+  let operation : crate::runtime::save_operations::SaveOperation =
+    crate::runtime::save_operations::SaveOperation::from_command (
+      &request, &after . env . config, &active) . unwrap ();
+  assert_eq! (operation . recorded_response () . unwrap (), Some (response . clone ()));
+  let cyclic_query : TermQuery = TermQuery::new (Term::from_field_text (
+    after . env . tantivy_index . context_origin_type_field, "CyclicRoot"), IndexRecordOption::Basic);
+  assert_eq! (after . env . searcher . search (&cyclic_query, &Count) . unwrap (), 2);
+  inject_stale_cyclic_cache (&runtime);
+  assert_eq! (execute_command (&runtime, &request) . unwrap (), response);
+  assert! (runtime . selected_snapshot () . selected . cyclic_roots . is_empty ());
+  let after_bytes : Vec<Vec<u8>> = [&owned_one, &owned_two, &foreign] . into_iter ()
+    . map (|path| fs::read (path) . unwrap ()) . collect ();
+  assert_eq! (before_bytes, after_bytes);
+}
+
+fn inject_stale_cyclic_cache (
+  runtime : &ServerRuntime,
+) {
+  runtime . with_store_transition (uuid::Uuid::new_v4 () . to_string (), |env, _, control| {
+    control . authorize () . unwrap ();
+    let selected : Arc<SelectedStoreState> = env . in_rust_graph . load_full ();
+    env . in_rust_graph . store (Arc::new (selected . with_cyclic_roots (
+      BTreeSet::new ())));
+  }) . unwrap ();
 }

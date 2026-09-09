@@ -590,12 +590,8 @@ fn dispatch_request (
     RequestType::EndReloadBatch =>
       handle_end_reload_batch_request (
         stream, request, runtime, owned_reload_batch_tokens),
-    RequestType::RecomputeCyclicRoots => {
-      if let Err (error) = runtime . with_store_transition (
-          format! ("recompute-roots/{}", uuid::Uuid::new_v4 ()), |env, _, control| {
-            if let Err (error) = control . authorize () { send_runtime_error (stream, &error); return; }
-            handle_recompute_cyclic_roots_request (stream, env); })
-      { send_runtime_error (stream, &error); }}
+    RequestType::RecomputeCyclicRoots =>
+      handle_recompute_cyclic_roots_request (stream, request, runtime),
     RequestType::ApplyCollateral => {
       let mut interactive = runtime . interactive . lock () . unwrap ();
       let InteractiveSession { views, collateral_scheduler, .. } =
