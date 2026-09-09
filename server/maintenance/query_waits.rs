@@ -252,6 +252,7 @@ pub struct QueryWaitResult {
   pub artifact_sha256   : String,
   pub content_sha256    : String,
   pub warnings          : Vec<String>,
+  pub presentation_generation : u64,
   pub graph_generation  : u64,
   pub manifest_revision : u64,
   pub source_set        : String,
@@ -270,7 +271,7 @@ impl QueryWaitResult {
     freshness         : QueryWaitFreshness,
   ) -> Self {
     Self { artifact_path, artifact_bytes, artifact_sha256: content_sha256 . clone (),
-      content_sha256, warnings, graph_generation,
+      content_sha256, warnings, presentation_generation: 0, graph_generation,
       manifest_revision, source_set, freshness }
   }
 
@@ -333,6 +334,8 @@ pub struct QueryWaitRecord {
   pub recipe         : QueryWaitRecipe,
   pub destination    : QueryWaitDestination,
   pub target         : QueryWaitTarget,
+  #[serde(default)]
+  pub client_recipe  : Option<String>,
   pub state          : QueryWaitState,
   #[serde(default)]
   pub resolved_target : Option<QueryWaitPublication>,
@@ -348,7 +351,8 @@ impl QueryWaitRecord {
     target       : QueryWaitTarget,
   ) -> Result<Self, String> {
     let record = Self { format_version: QUERY_WAIT_FORMAT_VERSION,
-      operation_id, recipe, destination, target, state: QueryWaitState::Pending,
+      operation_id, recipe, destination, target, client_recipe: None,
+      state: QueryWaitState::Pending,
       resolved_target: None, result: None };
     record . validate ()?;
     Ok (record)
@@ -362,6 +366,8 @@ impl QueryWaitRecord {
     self . recipe . validate ()?;
     self . destination . validate ()?;
     self . target . validate ()?;
+    if self . client_recipe . as_deref () == Some ("") {
+      return Err ("query wait client recipe is empty" . into ()); }
     if let Some (publication) = &self . resolved_target {
       publication . validate ()?; }
     if let Some (result) = &self . result {
@@ -530,7 +536,8 @@ impl QueryWaitLedger {
     if let Some (existing) = self . waits . get (&operation_id) {
       if existing . recipe == record . recipe
       && existing . destination == record . destination
-      && existing . target == record . target { return Ok (false); }
+      && existing . target == record . target
+      && existing . client_recipe == record . client_recipe { return Ok (false); }
       return Err ("query wait operation ID was reused with different contents" . into ()); }
     if record . state != QueryWaitState::Pending
     || record . resolved_target . is_some () || record . result . is_some () {
@@ -686,6 +693,9 @@ mod tests {
     assert! (!ledger . register (first . clone ()) . unwrap ());
     assert_eq! (ledger . get (&first . operation_id) . unwrap () . state,
                 QueryWaitState::Executing);
+    let mut wire_changed : QueryWaitRecord = first . clone ();
+    wire_changed . client_recipe = Some ("another exact wire recipe" . into ());
+    assert! (ledger . register (wire_changed) . is_err ());
     let mut changed : QueryWaitRecord = first;
     changed . recipe . terms = "other" . into ();
     assert! (ledger . register (changed) . is_err ());

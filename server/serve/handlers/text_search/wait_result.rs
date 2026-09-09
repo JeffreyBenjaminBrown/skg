@@ -100,6 +100,8 @@ mod tests {
   use super::*;
   use crate::runtime::query_waits::execution::indexed_query_snapshot;
   use crate::runtime::SelectedRuntimeSnapshot;
+  use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+  use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
   use crate::types::env::GraphReadSnapshot;
   use crate::types::misc::{MemberAtSource, MSV, SkgConfig, SkgfileSource, SourceName};
   use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -150,6 +152,9 @@ mod tests {
     assert! (!content . contains ("Hidden needle"));
     assert! (!content . contains ("private-node"));
     assert! (warnings . is_empty ());
+    let (parsed, errors, _) = org_to_uninterpreted_viewforest (&content) . unwrap ();
+    assert! (errors . is_empty (), "{:?}", errors);
+    assert! (maybePlaced_to_placed_viewforest (parsed) . is_ok ());
     let (body_match, _) : (String, Vec<String>) = execute (
       &snapshot . env, &recipe ("retained", None)) . unwrap ();
     assert! (body_match . contains ("Visible needle"));

@@ -7,6 +7,8 @@
 /// The advantage over Arc<Mutex<bool>>: no lock contention, no possibility of deadlock, and much cheaper (a few nanoseconds vs. potentially microseconds for mutex acquire/release). The tradeoff: atomics only work for simple values — you can't atomically update a String or a struct, which is why the enrichment payload itself uses Arc<Mutex<Option<SearchEnrichmentPayload>>>.
 
 pub mod handlers;
+#[cfg(test)]
+mod query_wait_tests;
 mod maintenance_connection;
 pub mod parse_metadata_sexp;
 pub mod protocol;
@@ -215,6 +217,7 @@ fn handle_connection (
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
+  let mut query_deliveries : handlers::query_wait::QueryDeliveries = Default::default ();
   let mut role : Option<ConnectionRole> = None;
   let mut seen_reconciliation_generation =
     current_reconciliation_generation ();
@@ -234,7 +237,7 @@ fn handle_connection (
     match reader . read_line (&mut request_header) {
       Ok (0) => break, // emacs disconnected
       Ok (_n) => {
-        tracing::info! ( request = request_header . trim_end (), "Received request" );
+        tracing::info! ("Received request");
         if let Err (error) = begin_request_context (&request_header) {
           tracing::error! ("{}", error);
           let _ = send_response_with_length_prefix (
@@ -311,7 +314,8 @@ fn handle_connection (
           &enrichment_slot,
           &search_cancelled,
           &mut snapshot_requested,
-          &mut owned_reload_batch_tokens);
+          &mut owned_reload_batch_tokens,
+          &mut query_deliveries);
         if request_type != RequestType::TextSearch {
           let _ = ensure_request_has_terminal_response (
             &mut stream, request_type); }
@@ -358,6 +362,11 @@ fn handle_connection (
             . unwrap_or (false),
           snapshot_requested,
           &mut seen_reconciliation_generation);
+        if role . as_ref () . is_some_and (ConnectionRole::interactive)
+        && runtime . interactive . lock () . unwrap () . attached_client . as_ref ()
+          . is_some_and (|client| client . census_complete) {
+          handlers::query_wait::drain (&runtime, &mut stream, &mut query_deliveries);
+        }
         if let Some (error) = take_send_failure () {
           tracing::warn! (%error,
             "server-push transport failed; retaining session work");
@@ -383,8 +392,12 @@ fn dispatch_request (
   search_cancelled  : &Arc<AtomicBool>,
   snapshot_requested : &mut bool,
   owned_reload_batch_tokens : &mut HashSet<String>,
+  query_deliveries : &mut handlers::query_wait::QueryDeliveries,
 ) {
   match request_type {
+    RequestType::QueryWait | RequestType::QueryWaitStatus
+    | RequestType::QueryWaitCancel | RequestType::QueryWaitApplied =>
+      handlers::query_wait::handle_request (runtime, stream, request, request_type, query_deliveries),
     RequestType::SingleRootContentView => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
         let InteractiveSession { views, active_source_set, .. } = interactive;

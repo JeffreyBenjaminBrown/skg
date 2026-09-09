@@ -1551,8 +1551,16 @@ fn append_current_state_fields (
       Some (Sexp::Atom (Atom::S (key))) if matches! (key . as_str (),
         "owner-publication-revision" | "current-graph-generation" | "current-manifest-revision"
         | "graph-write-admission" | "graph-transition-status"
-        | "rebuilding" | "pending-incidents"))));
+        | "rebuilding" | "pending-incidents" | "pending-query-waits"))));
   let (revision, snapshot, coordinator, failure) = runtime . publication ();
+  fields . push (Sexp::List (vec![Sexp::Atom (Atom::S ("pending-query-waits" . into ())),
+    Sexp::List (coordinator . query_waits . waits . values () . filter (|wait| matches! (
+      wait . state, crate::maintenance::query_waits::QueryWaitState::Pending
+      | crate::maintenance::query_waits::QueryWaitState::Blocked { .. }
+      | crate::maintenance::query_waits::QueryWaitState::Executing
+      | crate::maintenance::query_waits::QueryWaitState::Ready))
+      . map (|wait| Sexp::List (vec![atom_field ("query-operation-id", &wait . operation_id),
+        atom_field ("status", wait . state . label ())])) . collect ())]));
   fields . extend ([
     integer_field ("owner-publication-revision", revision),
     integer_field ("current-graph-generation", snapshot . selected . graph_generation . get ()),

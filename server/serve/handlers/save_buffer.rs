@@ -342,6 +342,7 @@ fn validate_save_authority (
     SaveError::StaleViewAuthority (reason . clone ()))?;
   let Some (state) = views_state . open_views . views . get (uri) else {
     if requested . kind == "new-empty-content-view"
+       && matches! (uri, ViewUri::ContentView (_))
        && requested . server_revision == 0
        && requested . application_token == 1
        && requested . graph_generation == current_graph_generation
@@ -763,3 +764,22 @@ fn uris_of_views_to_lock (
     . filter (|uri| *uri != saved_uri)
     . cloned ()
     . collect () }
+
+#[cfg(test)]
+mod query_authority_tests {
+  use super::*;
+  use crate::types::views_state::OpenViews;
+
+  #[test]
+  fn unregistered_query_uri_cannot_claim_new_content_save_authority () {
+    let views : ViewsState = ViewsState { diff_mode_enabled: false, open_views: OpenViews::new (), };
+    let requested : RequestedSaveAuthority = RequestedSaveAuthority {
+      buffer_id: uuid::Uuid::new_v4 () . to_string (), kind: "new-empty-content-view" . into (),
+      graph_generation: 2, server_revision: 0, application_token: 1, };
+    let content : Result<ViewUri, String> = Ok (ViewUri::ContentView (uuid::Uuid::new_v4 () . to_string ()));
+    assert! (validate_save_authority (&requested, &content, &views, 2) . is_ok ());
+    let query : Result<ViewUri, String> = Ok (ViewUri::from_client_string (
+      format! ("search:wait:{}", uuid::Uuid::new_v4 ())));
+    assert! (validate_save_authority (&requested, &query, &views, 2) . is_err ());
+  }
+}

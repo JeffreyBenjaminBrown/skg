@@ -3,14 +3,20 @@
 
 pub(crate) mod execution;
 mod worker;
+#[cfg(test)]
+pub(crate) use worker::tests::fixture as query_test_runtime;
 
 use crate::maintenance::coordinator::MaintenanceCoordinator;
 use crate::maintenance::query_waits::{QueryWaitOutcomeKind, QueryWaitRecord,
   QueryWaitState, QueryWaitTarget, QueryWaitTargetOutcome,
   canonical_incident_operation_id};
 use crate::maintenance::types::{ActiveMaintenance, CommittedIncident,
-  CoordinatorState, TerminalDisposition, TerminalMaintenance};
-use crate::runtime::SelectedRuntimeSnapshot;
+  CoordinatorState, SelectedStoreRecord, TerminalDisposition, TerminalMaintenance};
+use crate::runtime::{SelectedRuntimeSnapshot, ServerRuntime};
+use crate::types::env::GraphReadSnapshot;
+use crate::types::misc::ID;
+use std::collections::BTreeSet;
+use std::sync::Arc;
 use crate::types::misc::{SkgConfig, SkgfileSource, SourceCatalog, SourceName};
 
 use serde::{Deserialize, Serialize};
@@ -75,24 +81,7 @@ fn incident_outcome (
     if let Some (selected) = selected . filter (|selected|
       record . graph_generation == selected . selected . graph_generation
       && record . manifest_revision == selected . selected . manifest_revision) {
-      let config_snapshot : String = encode_config (&selected . env . config)?;
-      let source_catalog_snapshot : String = serde_yaml::to_string (
-        &selected . env . config . sources) . map_err (|error| error . to_string ())?;
-      if record . graph_generation == incident . g0_graph_generation {
-        QueryWaitOutcomeKind::NoChange {
-          graph_generation: record . graph_generation . get (),
-          manifest_revision: record . manifest_revision . get (),
-          source_set: wait . recipe . source_set . clone (),
-          config_snapshot, source_catalog_snapshot,
-          cyclic_root_ids: selected . selected . cyclic_roots . clone (), }
-      } else {
-        QueryWaitOutcomeKind::Published {
-          graph_generation: record . graph_generation . get (),
-          manifest_revision: record . manifest_revision . get (),
-          source_set: wait . recipe . source_set . clone (),
-          config_snapshot, source_catalog_snapshot,
-          cyclic_root_ids: selected . selected . cyclic_roots . clone (), }
-      }
+      publication_kind (incident, wait, &selected . env . config, &selected . selected . cyclic_roots)?
     } else { QueryWaitOutcomeKind::Blocked {
       reason: "the exact target snapshot requires historical recovery" . into (), } }
   } else if let Some (reason) = &incident . blocking_reason {
@@ -103,6 +92,49 @@ fn incident_outcome (
     candidate_id: incident . candidate . as_ref () . map (|candidate| candidate . id . clone ()),
     operation_id: canonical_incident_operation_id (&incident . incident_id, incident . epoch),
     outcome, }))
+}
+
+pub(crate) fn retained_outcome (
+  runtime : &ServerRuntime,
+  wait : &QueryWaitRecord,
+) -> Result<Option<QueryWaitTargetOutcome>, String> {
+  let coordinator : MaintenanceCoordinator = runtime . maintenance_snapshot ();
+  let Some (incident) : Option<&ActiveMaintenance> = target_incident (&coordinator, &wait . target)
+    else { return Ok (None); };
+  let Some (record) : &Option<SelectedStoreRecord> = &incident . selected_store else { return Ok (None); };
+  let Ok (snapshot) : Result<Arc<GraphReadSnapshot>, String> = runtime . incident_snapshot (&incident . incident_id) else { return Ok (None); };
+  if snapshot . selected . graph_generation != record . graph_generation
+  || snapshot . selected . manifest_revision != record . manifest_revision {
+    return Err ("retained query snapshot differs from its selected incident" . into ()); }
+  Ok (Some (QueryWaitTargetOutcome {
+    incident_id: incident . incident_id . clone (), epoch: incident . epoch,
+    candidate_id: incident . candidate . as_ref () . map (|candidate| candidate . id . clone ()),
+    operation_id: canonical_incident_operation_id (&incident . incident_id, incident . epoch),
+    outcome: publication_kind (incident, wait, &snapshot . config, &snapshot . cyclic_roots)?,
+  }))
+}
+
+fn publication_kind (
+  incident : &ActiveMaintenance,
+  wait : &QueryWaitRecord,
+  config : &SkgConfig,
+  cyclic_roots : &BTreeSet<ID>,
+) -> Result<QueryWaitOutcomeKind, String> {
+  let record : &SelectedStoreRecord = incident . selected_store . as_ref () . ok_or ("query incident has no selected store")?;
+  let config_snapshot : String = encode_config (config)?;
+  let source_catalog_snapshot : String = serde_yaml::to_string (&config . sources)
+    . map_err (|error| error . to_string ())?;
+  Ok (if record . graph_generation == incident . g0_graph_generation {
+    QueryWaitOutcomeKind::NoChange {
+      graph_generation: record . graph_generation . get (), manifest_revision: record . manifest_revision . get (),
+      source_set: wait . recipe . source_set . clone (), config_snapshot, source_catalog_snapshot,
+      cyclic_root_ids: cyclic_roots . clone (), }
+  } else {
+    QueryWaitOutcomeKind::Published {
+      graph_generation: record . graph_generation . get (), manifest_revision: record . manifest_revision . get (),
+      source_set: wait . recipe . source_set . clone (), config_snapshot, source_catalog_snapshot,
+      cyclic_root_ids: cyclic_roots . clone (), }
+  })
 }
 
 fn terminal_target_outcome (

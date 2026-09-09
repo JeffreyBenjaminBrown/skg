@@ -54,3 +54,22 @@ warnings. The journal retains separate artifact and content digests; a verified
 orphan artifact can finish readiness after a crash between rename and owner
 publication. Temporary staging files are not a published result. This preserves
 one result's bytes without changing ordinary search ordering in this slice.
+
+** Implemented TCP boundary
+The callable requests use spaces: 'query wait', 'query wait status',
+'query wait cancel', and 'query wait applied'. Frames use hyphens. The raw
+client recipe is retained with its digest; operation reuse requires both the
+semantic recipe and those exact wire bytes to match. A result separates the
+expected placeholder base from the resulting graph and presentation metadata.
+
+Only authenticated, census-complete connections may request delivery. Bare
+status recovers the recipe without creating a destination. Status naming the
+original clean base or the already-applied exact result enables replay. ACKs
+verify the staged content and register a read-only view; cancelled states cannot
+register one. The unknown-new-content save exception requires a content URI.
+
+Per-connection result deduplication uses the staged artifact identity, so an
+idle tick neither rereads result bytes nor retransmits them because freshness
+changed. Explicit status and reconnect enable checked replay. The first socket
+test failure was a fixture using response list pairs where requests require
+dotted pairs; correcting that fixture made lost-ACK replay pass.

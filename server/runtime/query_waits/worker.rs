@@ -23,6 +23,7 @@ struct ResultPayload {
   target : QueryWaitPublication,
   content : String,
   warnings : Vec<String>,
+  presentation_generation : u64,
 }
 
 enum ExecutionFailure {
@@ -89,7 +90,10 @@ impl ServerRuntime {
         drop (snapshot);
         let payload : ResultPayload = ResultPayload {
           format_version: 1, recipe: wait . recipe . clone (),
-          target: wait . resolved_target . clone () . expect ("acquired query target"), content, warnings, };
+          target: wait . resolved_target . clone () . expect ("acquired query target"), content, warnings,
+          presentation_generation: self . interactive . lock ()
+            . map_err (|_| ExecutionFailure::Blocked ("query presentation state is unavailable" . into ()))?
+            . collateral_scheduler . presentation_generation (), };
         let bytes : String = serde_yaml::to_string (&payload)
           . map_err (|error| ExecutionFailure::Blocked (error . to_string ()))?;
         let artifact : QueryArtifact = store . stage (&wait . operation_id, &bytes)
@@ -142,6 +146,7 @@ fn result_metadata (
   QueryWaitResult {
     artifact_path: artifact . path, artifact_bytes: artifact . bytes, artifact_sha256: artifact . sha256,
     content_sha256, warnings: payload . warnings . clone (),
+    presentation_generation: payload . presentation_generation,
     graph_generation: payload . target . graph_generation,
     manifest_revision: payload . target . manifest_revision, source_set: payload . target . source_set . clone (),
     // Transport derives current/stale/pending status from the current owner
@@ -151,7 +156,7 @@ fn result_metadata (
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
   use super::*;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::maintenance::candidate::source_catalog_blake3;
@@ -165,7 +170,7 @@ mod tests {
   use crate::types::store_state::SelectedStoreState;
   use std::collections::BTreeSet;
 
-  fn fixture () -> (tempfile::TempDir, Arc<ServerRuntime>, String) {
+  pub(crate) fn fixture () -> (tempfile::TempDir, Arc<ServerRuntime>, String) {
     fixture_with_recipe ("needle", false)
   }
 

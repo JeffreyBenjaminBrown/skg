@@ -101,14 +101,9 @@ pub fn send_response_with_length_prefix (
 ) -> std::io::Result<()> {
     let enveloped = envelope_response (response);
     let payload : &[u8] = enveloped . as_bytes ();
-    let preview_len : usize = // PITFALL: floor_char_boundary is needed
-      // because UTF-8 uses multiple bytes for some characters,
-      // and slicing mid-character panics in Rust.
-      enveloped . floor_char_boundary ( payload . len () . min (200) );
-    let preview : &str = &enveloped [..preview_len];
-    tracing::debug!("Sending response ({} bytes): {}{}",
-             payload . len (), preview,
-             if payload . len () > 200 { "..." } else { "" });
+    // Result and recipe bytes can contain private graph text. Transport logs
+    // record framing size without retaining a prefix of that content.
+    tracing::debug!("Sending response ({} bytes)", payload . len ());
     let header : String = format! ( "Content-Length: {}\r\n\r\n",
                                      payload . len () );
     if let Err (error) = stream . write_all (header . as_bytes ())

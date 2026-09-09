@@ -44,7 +44,7 @@ struct ServerProcess {
   log : PathBuf,
 }
 
-struct Client {
+pub(crate) struct Client {
   stream : TcpStream,
   reader : BufReader<TcpStream>,
   session : String,
@@ -642,7 +642,11 @@ impl Drop for ServerProcess {
 
 impl Client {
   fn connect (fixture : &Fixture) -> Self {
-    let stream : TcpStream = TcpStream::connect (("127.0.0.1", fixture . port)) . unwrap ();
+    Self::connect_port (fixture . port)
+  }
+
+  pub(crate) fn connect_port (port : u16) -> Self {
+    let stream : TcpStream = TcpStream::connect (("127.0.0.1", port)) . unwrap ();
     stream . set_read_timeout (Some (Duration::from_secs (5))) . unwrap ();
     let reader : BufReader<TcpStream> = BufReader::new (stream . try_clone () . unwrap ());
     let mut client : Self = Self { stream, reader, session: String::new (), generation: 1 };
@@ -704,7 +708,7 @@ impl Client {
     (format! ("{} (request-base-fingerprint . \"{}\"))", &intent [..intent . len () - 1], fingerprint), fingerprint, operation)
   }
 
-  fn send (&mut self, request : &str, body : Option<&str>) {
+  pub(crate) fn send (&mut self, request : &str, body : Option<&str>) {
     let session : String = if self . session . is_empty () || request . contains ("server-session-id") {
       String::new ()
     } else { format! (" (server-session-id . \"{}\")", self . session) };
@@ -717,7 +721,7 @@ impl Client {
     self . stream . flush () . unwrap ();
   }
 
-  fn receive (&mut self) -> Result<Sexp, String> { read_response (&mut self . reader) }
+  pub(crate) fn receive (&mut self) -> Result<Sexp, String> { read_response (&mut self . reader) }
 
   fn text_search (&mut self, terms : &str) -> Sexp {
     self . send (&format! (
@@ -726,7 +730,7 @@ impl Client {
     self . receive () . unwrap ()
   }
 
-  fn terminal (&mut self) -> Sexp {
+  pub(crate) fn terminal (&mut self) -> Sexp {
     loop {
       let response : Sexp = self . receive () . unwrap ();
       if field (&response, "terminal-status") . is_some () { return response; }

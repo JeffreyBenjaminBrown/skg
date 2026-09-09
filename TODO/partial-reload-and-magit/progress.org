@@ -2162,3 +2162,29 @@ delivery. Delivery must validate current source interpretation and the exact
 original destination base; results carry separate expected-base and resulting
 metadata. An editor restart exposes query status and recipe when its original
 placeholder is absent. Do not attach staged bytes to a newly invented buffer.
+
+* Simplify/cohere checkpoint: authenticated query delivery
+** what's done and went well
+'a91fcb5' adds both-editor query recovery; its focused tests pass 9 Emacs
+and 8 Neovim cases. The TCP registration/status/cancel/ACK path now delivers
+checked artifacts to the exact original or already-applied destination.
+Twenty-two query tests pass, including three actual socket tests for lost ACK,
+destination mismatch/dirty state, and cancellation before ACK. A separate save
+authority test rejects an unregistered query URI claiming new-content authority.
+Logs are 'query-tcp-final.log' under '/tmp/simplify-cohere-baseline',
+'/tmp/query-wait-tcp-tests.log', and '/tmp/query-authority-unregistered.log'.
+** Changes to the plan's envisioned order.
+Complete this query slice before another migration. Follow
+[[file:../../coding-advice/to-conserve-tokens.org][the token conservation advice]]: bounded delegates own specific tests,
+and the root stops overlapping status reads while those tests run.
+** what's imperfect about what's done
+The first socket fixture used response list pairs instead of request dotted
+pairs. Correcting the fixture made replay pass. Real editor checks exposed
+duplicate incident identity fields in requests and an outdated born-locked
+query assertion; those integration fixes are still being verified separately.
+Emacs also has a handshake failure under investigation.
+** choices determining the future
+The implemented interface is in
+[[file:../../codex-thinking/query-wait-server.org][the query server note]]. Result identity controls delivery deduplication;
+idle polling does not reread staged bytes. ACK registration grants read-only
+authority. Finish actual editor verification next; no new question for Jeff.

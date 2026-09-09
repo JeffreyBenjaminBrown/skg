@@ -7,6 +7,8 @@ pub mod export_to_org;
 pub mod get_file_path;
 pub mod herald_rules;
 pub mod maintenance_protocol;
+pub mod query_wait_protocol;
+pub(crate) mod query_wait;
 pub mod observation_hint;
 pub mod rebuild_dbs;
 pub mod recompute_cyclic_roots;
