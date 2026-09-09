@@ -1,0 +1,20 @@
+* Authority after another publication
+** Observation
+'server/serve/handlers/save_buffer.rs::validate_save_authority' currently
+requires the client's graph generation to equal the current graph generation.
+That safely refuses stale bases, but also refuses an unaffected G1 buffer
+after an unrelated G2 save. The plan explicitly requires independent release.
+** Question to resolve
+What exact retained read set proves an old view's save remains valid against
+current graph/source interpretation, including negative lookups and implicit
+neighbor effects? A set of visible normal PIDs alone may omit dependencies.
+** Candidate approaches
+Retain each view's immutable base snapshot and compare all semantic inputs
+used by save planning; or derive a validated dependency fingerprint while
+constructing/planning the view. Neither should silently grant current authority
+by changing a counter. Existing client buffer text/tick/token must still match.
+** Next bounded investigation
+Trace save planning's dependency reads and existing collateral/dependency
+tracking before choosing the proof. Keep current refusal until the proof is
+implemented and tested. This is an implementation question within the accepted
+contract, not a request to reopen its architecture.

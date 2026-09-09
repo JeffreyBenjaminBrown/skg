@@ -1,0 +1,19 @@
+* Reconstruct an old incident without reselecting it
+** Evidence already observed
+The maintenance evidence format v3 retains G0 semantic nodes, a G0 manifest,
+node delta and path delta. Hash-only manifest data cannot recover exact bytes.
+The current runtime retains G1 snapshots in memory before lifting admission,
+but those caches disappear at restart.
+** Open questions
+Does retained evidence include sufficient source/config interpretation to build
+G1 when current configuration differs? Which report classification paths need
+a reconstructed candidate before asking for the snapshot? Can exact staged
+application records finish old reports without reconstructing editor authority?
+** Safety condition for every experiment
+Fresh startup selects validated current G2. Reconstructing G0/G1 is private
+report work and must not replace the owner-selected pair or grant old-session
+buffer authority. Missing evidence must remain explicitly recoverable/blocked.
+** Next reads
+[[file:../server/maintenance/evidence.rs][evidence.rs]] around recovery payload,
+'reconstruct_evidence', load validation and build evidence; then the report
+planning paths in [[file:../server/serve/handlers/maintenance_protocol.rs][maintenance_protocol.rs]].

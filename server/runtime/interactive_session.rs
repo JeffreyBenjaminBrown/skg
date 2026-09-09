@@ -52,6 +52,7 @@ pub struct CensusDescriptor {
   /// The process which issued this buffer's live authority. Counters alone
   /// cannot distinguish a surviving server from a freshly restarted one.
   pub server_session_id    : String,
+  pub writes_admitted      : bool,
   pub kind                 : String,
   pub lifecycle            : String,
   pub disposable           : bool,

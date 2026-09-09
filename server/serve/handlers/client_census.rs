@@ -10,6 +10,8 @@ use crate::maintenance::{
   BufferKind,
   CoordinatorState,
   MaintenanceCoordinator,
+  IncidentId,
+  MaintenanceEpoch,
   ViewApplicationAcknowledgement,
   ViewSettlementRequirement,
 };
@@ -77,14 +79,14 @@ pub fn handle_verify_connection_request (
     let abandoned = runtime . transition_maintenance (|coordinator|
       Ok (coordinator . reconnected_for_session (&client_session_id)))?;
     let maintenance = runtime . maintenance_snapshot ();
-    Ok (verify_connection_response (
+    Ok (super::maintenance_protocol::with_current_state_fields (runtime, &verify_connection_response (
       &lease . snapshot . env . config,
       &lease . snapshot . env . startup_warnings,
       &lease . snapshot . env . in_rust_graph . load_full (),
       &active_source_set_name,
       census_required,
       &maintenance,
-      abandoned . as_ref (), runtime . server_session_id ()))
+      abandoned . as_ref (), runtime . server_session_id ()) )?)
   }) ();
   let response = match result {
     Ok (response) => response,
@@ -305,7 +307,7 @@ pub fn handle_client_census_request (
       }
       let descriptor_kind = validate_live_descriptor (&descriptor)?;
       let census_application = census_application_ack (
-        &env . in_rust_graph_snapshot (), &maintenance . state, &descriptor)?;
+        &env . in_rust_graph_snapshot (), &maintenance, &descriptor)?;
       if !live_uris . insert (uri . clone ()) {
         return Err (format! (
           "client census names view '{}' more than once",
@@ -405,8 +407,16 @@ fn reconcile_maintenance_census (
   runtime . transition_maintenance (|coordinator| {
     coordinator . adopt_attached_session (&attached_session_id)?;
     coordinator . reconcile_absent_preselection_retirements (live_buffer_ids);
-    if matches! (coordinator . state, CoordinatorState::Active (_)) {
-      coordinator . reconcile_absent_view_settlements (live_buffer_ids)?; }
+    for incident in coordinator . incidents () {
+      if incident . terminal_acknowledged { continue; }
+      if matches! (&coordinator . state, CoordinatorState::Terminal (terminal)
+        if terminal . incident_id == incident . incident_id) { continue; }
+      coordinator . adopt_incident_session (
+        &incident . incident_id, incident . epoch, &attached_session_id)?;
+      if incident . disposition . is_none () {
+        coordinator . reconcile_incident_view_settlements (
+          &incident . incident_id, incident . epoch, live_buffer_ids)?; }
+    }
     Ok (( ))
   })?;
   if let Some ((incident, verified)) = verified {
@@ -416,10 +426,13 @@ fn reconcile_maintenance_census (
 
 fn census_application_ack (
   graph : &crate::dbs::in_rust_graph::InRustGraph,
-  state      : &CoordinatorState,
+  coordinator : &MaintenanceCoordinator,
   descriptor : &CensusDescriptor,
-) -> Result<Option<ViewApplicationAcknowledgement>, String> {
-  let CoordinatorState::Active (active) = state else { return Ok (None); };
+) -> Result<Option<(IncidentId, MaintenanceEpoch, ViewApplicationAcknowledgement)>, String> {
+  let Some (summary) = coordinator . incidents () . into_iter () . find (|incident|
+    Some (incident . epoch . get ()) == descriptor . maintenance_epoch
+    && incident . disposition . is_none ()) else { return Ok (None); };
+  let active = coordinator . incident (&summary . incident_id, summary . epoch)?;
   let Some (record) = active . view_settlements . get (&descriptor . buffer_id)
     else { return Ok (None); };
   if record . acknowledged
@@ -481,26 +494,25 @@ fn census_application_ack (
   || described_roots != offered_roots
   {
     return Ok (None); }
-  Ok (Some (ViewApplicationAcknowledgement {
+  Ok (Some ((active . incident_id . clone (), active . epoch, ViewApplicationAcknowledgement {
     content_sha256: offered_sha,
     resulting_graph_generation: descriptor . graph_generation,
     resulting_presentation_generation: descriptor . presentation_generation,
     resulting_server_revision: descriptor . server_revision,
     resulting_application_token: descriptor . application_token,
-  }))
+  })))
 }
 
 fn reconcile_census_applications (
   runtime      : &ServerRuntime,
   interactive  : &mut InteractiveSession,
-  applications : &[(CensusDescriptor, ViewApplicationAcknowledgement)],
+  applications : &[(CensusDescriptor, (IncidentId, MaintenanceEpoch, ViewApplicationAcknowledgement))],
 ) -> Result<(), String> {
   if applications . is_empty () { return Ok (( )); }
   let coordinator = runtime . maintenance_snapshot ();
-  let CoordinatorState::Active (active) = &coordinator . state else {
-    return Err ("census application lost its active incident" . into ()); };
   let mut effects = Vec::new ();
-  for (descriptor, acknowledgement) in applications {
+  for (descriptor, (incident, epoch, acknowledgement)) in applications {
+    let active = coordinator . incident (incident, *epoch)?;
     let record = active . view_settlements . get (&descriptor . buffer_id)
       . ok_or_else (|| format! (
         "buffer '{}' lost its application settlement",
@@ -518,9 +530,9 @@ fn reconcile_census_applications (
         active, record, Some (state), Some (acknowledgement))?); }
   }
   runtime . transition_maintenance (|coordinator| {
-    for (descriptor, acknowledgement) in applications {
-      coordinator . acknowledge_view_application_from_census (
-        &descriptor . buffer_id, acknowledgement)?; }
+    for (descriptor, (incident, epoch, acknowledgement)) in applications {
+      coordinator . acknowledge_incident_application_from_census (
+        incident, *epoch, &descriptor . buffer_id, acknowledgement)?; }
     Ok (( ))
   })?;
   for effect in effects {
@@ -637,7 +649,7 @@ pub fn handle_client_census_texts_request (
     let mut census_applications = Vec::new ();
     for descriptor in &restored_descriptors {
       if let Some (ack) = census_application_ack (
-          &env . in_rust_graph_snapshot (), &maintenance . state, descriptor)?
+          &env . in_rust_graph_snapshot (), &maintenance, descriptor)?
       {
         census_applications . push ((descriptor . clone (), ack)); }
     }
@@ -682,6 +694,11 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
     result . push (CensusDescriptor {
       buffer_id,
       server_session_id: field (&record, "server-session-id")?,
+      writes_admitted: match field (&record, "view-write-authority")? . as_str () {
+        "editable" => true,
+        "read-only" => false,
+        _ => return Err ("invalid census view-write-authority" . into ()),
+      },
       kind: field (&record, "kind")?,
       lifecycle: field (&record, "lifecycle")?,
       disposable: bool_field (&record, "disposable")?,
@@ -904,7 +921,8 @@ fn state_matches_descriptor (
 ) -> bool {
   let roots : HashSet<String> = state . root_ids . iter ()
     . map (|id| id . 0 . clone ()) . collect ();
-  state . graph_generation == descriptor . graph_generation
+  state . writes_admitted == descriptor . writes_admitted
+  && state . graph_generation == descriptor . graph_generation
   && state . presentation_generation == descriptor . presentation_generation
   && state . revision == descriptor . server_revision
   && state . client_application_token == descriptor . application_token
@@ -939,7 +957,8 @@ fn unmaterialized_new_empty_authority (
   kind              : &BufferKind,
   current_generation : u64,
 ) -> bool {
-  kind == &BufferKind::NewEmptyContentView
+  descriptor . writes_admitted
+  && kind == &BufferKind::NewEmptyContentView
   && descriptor . graph_generation == current_generation
   && descriptor . server_revision == 0
   && descriptor . application_token == 1
@@ -1108,6 +1127,7 @@ mod tests {
       "(terms \\\"dog\\\"))\") ",
       "(root-ids (\"z\" \"a\" \"z\")) (source-set . \"private\") ",
       "(server-session-id . \"server-test-session\") ",
+      "(view-write-authority . \"editable\") ",
       "(graph-generation . 7) (presentation-generation . 3) ",
       "(server-revision . 11) (application-token . 5) ",
       "(dirty . \"true\") (logical-dirty . \"true\") ",
@@ -1162,6 +1182,7 @@ mod tests {
       presentation_generation: 3,
       client_application_token: 5,
       client_buffer_id: None,
+      writes_admitted: true,
       kind: BufferKind::SearchView,
       recipe: Some (descriptor . recipe . clone ()),
       source_set: "private" . into (),
@@ -1226,6 +1247,8 @@ mod tests {
     use crate::maintenance::{
       FrozenBufferRecord,
       MaintenanceCoordinator,
+  IncidentId,
+  MaintenanceEpoch,
       MaintenanceOrigin,
       MaintenancePhase,
       MaintenanceTargets,
@@ -1288,6 +1311,7 @@ mod tests {
       });
     let descriptor = CensusDescriptor {
       server_session_id: "server-test-session" . into (),
+      writes_admitted: true,
       buffer_id: "buffer" . into (), kind: "content-view" . into (),
       lifecycle: "live-view" . into (), disposable: false,
       continuation_id: None, origin_buffer_id: None, origin_view_uri: None,
@@ -1302,10 +1326,23 @@ mod tests {
       current_sha256: content_sha,
     };
     assert! (census_application_ack (
-      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator . state, &descriptor) . unwrap () . is_some ());
+      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator, &descriptor) . unwrap () . is_some ());
+    let CoordinatorState::Active (retained) = &coordinator . state else { unreachable! (); };
+    let retained = retained . clone ();
+    coordinator . state = CoordinatorState::Idle;
+    coordinator . committed_incidents . insert (retained . incident_id . clone (),
+      crate::maintenance::CommittedIncident::Settling (retained));
+    assert! (census_application_ack (
+      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator, &descriptor)
+      . unwrap () . is_some ());
+    let mut wrong_epoch = descriptor . clone ();
+    wrong_epoch . maintenance_epoch = Some (active . epoch . successor () . get ());
+    assert! (census_application_ack (
+      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator, &wrong_epoch)
+      . unwrap () . is_none ());
     let mut changed = descriptor;
     changed . current_sha256 = "f" . repeat (64);
     assert! (census_application_ack (
-      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator . state, &changed) . unwrap () . is_none ());
+      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator, &changed) . unwrap () . is_none ());
   }
 }

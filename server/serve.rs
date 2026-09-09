@@ -271,6 +271,17 @@ fn handle_connection (
               "The control role is not allowed to access that endpoint"));
           request_header . clear ();
           continue; }
+        if authenticated . interactive () && !matches! (request_type,
+          RequestType::VerifyConnection | RequestType::SaveBuffer
+          | RequestType::SaveOperationStatus | RequestType::AcknowledgeSaveResult)
+        {
+          if let Err (reason) = runtime . validate_session_authority (&request_header) {
+            let _ = send_response_with_length_prefix (
+              &mut stream, &tag_terminal_text_response (TcpToClient::Error, "failed", &reason));
+            // Closing retires any unread payload from an invalid session.
+            break;
+          }
+        }
         if authenticated . interactive ()
            && !request_allowed_before_census (request_type)
            && !runtime . interactive . lock () . unwrap ()

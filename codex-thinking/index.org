@@ -1,0 +1,5 @@
+* Open implementation questions
+These notes track uncertain boundaries during [[file:../TODO/partial-reload-and-magit/11_plan_simplify-cohere.org][plan 11 execution]].
+Established progress belongs in [[file:../TODO/partial-reload-and-magit/progress.org][progress.org]].
+** [[file:authority-across-generations.org][Authority after another publication]]
+** [[file:incident-reconstruction.org][Incident reconstruction after restart]]

@@ -81,7 +81,9 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &response_sexp ));
           return; }}
-      if !fresh_view {
+      if !fresh_view && runtime . maintenance_snapshot () . state . policy () . skg_saves_allowed
+        && value_from_request_sexp ("requested-view-write-authority", request)
+          . as_deref () != Ok ("read-only") {
       if let Some (existing_uri)
         = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
@@ -193,10 +195,9 @@ pub fn handle_single_root_view_request (
                   &menu_uri,
                   "The requested node is overridden. Choose a destination.",
                   &warnings );
-                let state = views_state . open_views . views . get (&menu_uri)
+                let state = views_state . open_views . views . get_mut (&menu_uri)
                   . expect ("registered override menu exists");
-                if let Err (error) = runtime . enroll_maintenance_view (
-                    &menu_uri, state)
+                if let Err (error) = runtime . admit_view_response (request, state)
                 {
                   views_state . open_views . unregister_view (&menu_uri);
                   return tag_text_response (TcpToClient::Error, &error); }
@@ -254,10 +255,9 @@ pub fn handle_single_root_view_request (
                 let formatted = format_buffer_response_sexp (
                   &buffer_content, &[], &warnings);
                 let formatted = if let Ok (view_uri) = &view_uri_result {
-                  let state = views_state . open_views . views . get (view_uri)
+                  let state = views_state . open_views . views . get_mut (view_uri)
                     . expect ("registered content view exists");
-                  if let Err (error) = runtime . enroll_maintenance_view (
-                      view_uri, state)
+                  if let Err (error) = runtime . admit_view_response (request, state)
                   {
                     views_state . open_views . unregister_view (view_uri);
                     return tag_text_response (TcpToClient::Error, &error); }
@@ -277,6 +277,8 @@ pub fn handle_single_root_view_request (
                     & String::new (),
                     & errors,
                     & warnings ) ) }} } ) };
+      let response : String = super::maintenance_protocol::with_current_state_fields (
+        runtime, &response) . expect ("content response is a formatted list");
       let _ = send_response_with_length_prefix (
         stream, &response ); },
     Err (err) => {

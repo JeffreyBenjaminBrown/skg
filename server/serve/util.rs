@@ -352,6 +352,8 @@ pub(crate) fn add_view_authority_to_response (
 ) -> String {
   let Ok (Sexp::List (mut fields)) = sexp::parse (response) else {
     unreachable! ("buffer response formatter produced invalid sexp"); };
+  fields . push (sexp_field ("view-write-authority",
+    if state . writes_admitted { "editable" } else { "read-only" }));
   fields . push (Sexp::List (vec![
     Sexp::Atom (Atom::S ("graph-generation" . into ())),
     Sexp::Atom (Atom::I (state . graph_generation as i64)),

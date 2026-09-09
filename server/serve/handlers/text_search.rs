@@ -291,9 +291,9 @@ pub fn handle_text_search_request (
                 SearchUglinessChoice::Include => "include",
                 SearchUglinessChoice::Exclude => "exclude",
               }))));
-          let state = views_state . open_views . views . get (&uri)
+          let state = views_state . open_views . views . get_mut (&uri)
             . expect ("registered search view exists");
-          if let Err (error) = runtime . enroll_maintenance_view (&uri, state) {
+          if let Err (error) = runtime . admit_view_response (request, state) {
             views_state . open_views . unregister_view (&uri);
             let _ = send_response_with_length_prefix (
               stream, &tag_text_response (TcpToClient::Error, &error));
@@ -302,6 +302,8 @@ pub fn handle_text_search_request (
             &mk_search_results_sexp (&rendered, &warnings, &uri),
             views_state . open_views . views . get (&uri)
               . expect ("registered search view exists"));
+          let response : String = super::maintenance_protocol::with_current_state_fields (
+            runtime, &response) . expect ("search response is a formatted list");
           let _ = send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,

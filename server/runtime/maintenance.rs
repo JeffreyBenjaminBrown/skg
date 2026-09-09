@@ -5,13 +5,15 @@
 //! ownership.  Callers still use 'ServerRuntime'; this is only an ownership
 //! boundary for readers of the implementation.
 
-use super::ServerRuntime;
+use super::{ServerRuntime, SelectedRuntimeSnapshot};
 
 use crate::maintenance::archive::VerifiedInitialArchive;
 use crate::maintenance::candidate::ObservedDiskCandidate;
 use crate::maintenance::observation::ObservationService;
 use crate::maintenance::{
   CandidateId,
+  IncidentId,
+  SelectedStoreRecord,
   CoordinatorState,
   MaintenanceCoordinator,
   QueuedObservationReason,
@@ -22,7 +24,7 @@ use crate::runtime::interactive_session::{
 };
 use crate::serve::protocol::TcpToClient;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -136,12 +138,15 @@ impl ServerRuntime {
   }
 
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
-    let protected = {
-      let coordinator : MaintenanceCoordinator = self . maintenance_snapshot ();
-      journal_candidate_id (&coordinator . state) . cloned ()
-    };
+    let coordinator : MaintenanceCoordinator = self . maintenance_snapshot ();
+    let mut protected : BTreeSet<CandidateId> = journal_candidate_id (
+      &coordinator . state) . cloned () . into_iter () . collect ();
+    for incident in coordinator . incidents () {
+      if let Ok (active) = coordinator . incident (&incident . incident_id, incident . epoch) {
+        if let Some (candidate) = &active . candidate {
+          protected . insert (candidate . id . clone ()); } } }
     let mut candidates = self . candidates . lock () . unwrap ();
-    retain_candidate_entry (&mut candidates, protected . as_ref (),
+    retain_candidate_entry (&mut candidates, &protected,
       candidate . summary . id . clone (), candidate);
   }
 
@@ -157,7 +162,6 @@ impl ServerRuntime {
     archive  : VerifiedInitialArchive,
   ) {
     let mut archives = self . verified_archives . lock () . unwrap ();
-    archives . retain (|id, _| id == &incident);
     archives . insert (incident, Arc::new (archive));
   }
 
@@ -169,27 +173,57 @@ impl ServerRuntime {
       . get (incident) . cloned ()
   }
 
+  /// Retain the exact published pair before the graph barrier is lifted.
+  /// Report workers can then finish G1 after a newer save publishes G2.
+  pub(crate) fn retain_incident_snapshot (
+    &self,
+    incident : &IncidentId,
+    record : &SelectedStoreRecord,
+  ) -> Result<(), String> {
+    let snapshot : Arc<SelectedRuntimeSnapshot> = self . selected_snapshot ();
+    if snapshot . selected . graph_generation != record . graph_generation
+    || snapshot . selected . manifest_revision != record . manifest_revision {
+      return Err ("incident retention does not match the published pair" . into ()); }
+    let mut snapshots = self . incident_snapshots . lock ()
+      . map_err (|_| "incident snapshot retention poisoned" . to_string ())?;
+    if let Some (retained) = snapshots . get (incident) {
+      if !Arc::ptr_eq (&retained . selected, &snapshot . selected) {
+        return Err ("incident already retained a different selected pair" . into ()); }
+    } else { snapshots . insert (incident . clone (), snapshot); }
+    Ok (( ))
+  }
+
+  pub(crate) fn incident_snapshot (
+    &self,
+    incident : &IncidentId,
+  ) -> Result<Arc<SelectedRuntimeSnapshot>, String> {
+    self . incident_snapshots . lock ()
+      . map_err (|_| "incident snapshot retention poisoned" . to_string ())?
+      . get (incident) . cloned () . ok_or_else (||
+        "incident pair requires evidence reconstruction after restart" . into ())
+  }
+
   pub fn queue_server_event (&self, event : QueuedServerEvent) {
     self . interactive . lock () . unwrap ()
       . queued_server_events . push_back (event);
   }
 
-  /// Persist the server-known half of a view born during maintenance before
-  /// its successful query response is put on the wire.
-  pub fn enroll_maintenance_view (
+  /// Constructors running after closure produce results outside the fixed
+  /// census. Reopening admission never upgrades those retained view records.
+  pub fn admit_view_response (
     &self,
-    uri   : &crate::types::views_state::ViewUri,
-    state : &crate::types::views_state::ViewState,
-  ) -> Result<bool, String> {
-    let enrollment = crate::maintenance::PendingViewEnrollment {
-      view_uri: uri . repr_in_client (),
-      graph_generation: state . graph_generation,
-      presentation_generation: state . presentation_generation,
-      server_revision: state . revision,
-      application_token: state . client_application_token,
-    };
-    self . transition_maintenance (|coordinator|
-      coordinator . enroll_pending_view (enrollment . clone ()))
+    request : &str,
+    state : &mut crate::types::views_state::ViewState,
+  ) -> Result<(), String> {
+    let requested : String = crate::serve::util::value_from_request_sexp (
+      "requested-view-write-authority", request)
+      . unwrap_or_else (|_| "editable" . into ());
+    if requested != "editable" && requested != "read-only" {
+      return Err ("unknown requested view write authority" . into ()); }
+    state . writes_admitted = requested == "editable"
+      && self . maintenance_snapshot () . state . policy () . skg_saves_allowed
+      && self . authority_failure () . is_none ();
+    Ok (( ))
   }
 
   /// Propose a pure coordinator transition to the process owner. Its ordered
@@ -236,11 +270,11 @@ impl ServerRuntime {
 /// it.  Unreferenced older observations remain bounded to the newest entry.
 fn retain_candidate_entry<T> (
   candidates  : &mut BTreeMap<CandidateId, T>,
-  protected   : Option<&CandidateId>,
+  protected   : &BTreeSet<CandidateId>,
   incoming_id : CandidateId,
   incoming    : T,
 ) {
-  candidates . retain (|id, _| Some (id) == protected);
+  candidates . retain (|id, _| protected . contains (id));
   candidates . insert (incoming_id, incoming);
 }
 
@@ -268,7 +302,7 @@ mod tests {
       (stale . clone (), "stale"),
     ]);
     retain_candidate_entry (
-      &mut candidates, Some (&protected), incoming . clone (), "successor");
+      &mut candidates, &BTreeSet::from ([protected . clone ()]), incoming . clone (), "successor");
     assert_eq! (candidates . len (), 2);
     assert_eq! (candidates . get (&protected), Some (&"active"));
     assert_eq! (candidates . get (&incoming), Some (&"successor"));

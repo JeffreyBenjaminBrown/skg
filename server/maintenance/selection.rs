@@ -106,6 +106,7 @@ pub fn select_archived_candidate (
       runtime, incident_id, epoch, candidate . clone ()))
   {
     Ok (record) => {
+      runtime . retain_incident_snapshot (incident_id, &record)?;
       runtime . transition_maintenance (|coordinator|
         coordinator . store_selected (incident_id, epoch, record . clone ()))?;
       Ok (CandidateSelectionResult::Selected (CandidateSelectionOutcome {
@@ -189,6 +190,7 @@ pub fn rebuild_archived_candidate (
       runtime, incident_id, epoch, candidate . clone ()))
   {
     Ok (record) => {
+      runtime . retain_incident_snapshot (incident_id, &record)?;
       runtime . transition_maintenance (|coordinator|
         coordinator . store_rebuilt (incident_id, epoch, record . clone ()))?;
       Ok (CandidateSelectionResult::Selected (CandidateSelectionOutcome {

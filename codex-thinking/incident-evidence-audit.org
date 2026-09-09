@@ -1,0 +1,129 @@
+* Incident evidence audit (Plan 11)
+
+Scope: retained server evidence and the maintenance report/application callers.
+Fresh startup still owns the current selected G2; this note only addresses private
+reconstruction/report work for an older incident.
+
+** 1. What v3 retains, and what a changed config means
+
+The durable header retains the evidence format, incident/candidate identity, G0
+graph generation and manifest revision, three change classes, warnings, and only
+these configuration fingerprints: canonical [[file:../server/maintenance/evidence.rs::51][config_identity]],
+[[file:../server/maintenance/evidence.rs::58][config_file_blake3]], and
+[[file:../server/maintenance/evidence.rs::59][source_catalog_blake3]].  The recovery
+payload retains the complete G0 path manifest and semantic node projection plus
+reversible node/path deltas ([[file:../server/maintenance/evidence.rs::81][MaintenanceRecoveryPayload]]).
+The semantic projection includes source name, title/body, aliases, all recorded
+relationships, extra IDs, telescope flag, and file properties
+([[file:../server/maintenance/candidate.rs::112][SemanticNodeEvidence]]); source outcomes
+also retain path keys, before/after digests, and candidate raw-after bytes where
+selected bytes were captured ([[file:../server/maintenance/evidence.rs::489][sources.sexp construction]]).
+
+[[file:../server/maintenance/evidence.rs::587][reconstruct_evidence]] checks every
+before value against G0 and deterministically returns G0/G1 semantic maps and
+manifests.  It does not read or interpret config.  Therefore a changed config at
+the same config path does not prevent this DTO-level reconstruction: load
+validation compares only the header's path identity, not the two recorded hashes
+([[file:../server/maintenance/evidence.rs::921][validate_header]]).  The fingerprints are
+diagnostic/contract evidence, not a saved interpretation.
+
+That is not enough to rerun the old observation or rebuild the full candidate.
+There is no serialized config/source catalog or config bytes, and no retained
+candidate fields for `config`, `definitions`, load violations, disk fence, or the
+complete selected byte inventory.  Raw-before source bytes are explicitly marked
+``unavailable``; raw-after is only present for captured selected bytes.  A changed
+source catalog therefore cannot be reconstructed for source enumeration, ownership,
+ordering, path selection, or re-folding from disk.  Current candidate publication
+also explicitly rejects changed config bytes/source catalog
+([[file:../server/maintenance/evidence.rs::415][validate_candidate_contract]]).
+
+For report classification, however, the old graph data needed by the classifier is
+smaller than a full candidate: the semantic DTOs contain all NodeComplete fields
+used to build an `InRustGraph`, and the header/delta supplies the changed PID sets.
+The missing piece is an implementation/API adapter from semantic DTOs to graph
+objects; v3 does not provide it.  Until that report-only adapter exists, “G1 can be
+reconstructed” is true for the checked evidence maps but false for the current
+runtime candidate API.
+
+** 2. Candidate/report classification without live source reads or writes
+
+The existing evidence APIs can read and checksum the private evidence directory,
+decode it, validate it against the header, and call `reconstruct_evidence`
+([[file:../server/maintenance/evidence.rs::828][load_evidence_directory and recovery validation]]).
+They cannot return an `ObservedDiskCandidate`.  Runtime candidate lookup is only a
+process-local map ([[file:../server/runtime/maintenance.rs::140][retain_candidate/candidate]]),
+and `ServerRuntime::new` initializes that map empty after restart
+([[file:../server/runtime/mod.rs::97][runtime construction]]).
+
+`plan_incident_view_settlements` consequently fails before classification when its
+caller retrieves the candidate at
+[[file:../server/serve/handlers/maintenance_protocol.rs::785][select_and_stage_candidate_payload]].
+The planner uses the candidate only for `base_graph`, `graph`, and added/deleted/
+modified IDs ([[file:../server/maintenance/view_impact.rs::67][planner call]] and
+[[file:../server/maintenance/view_impact.rs::287][classify_view_impact]]).  A minimal
+report-only candidate facade could therefore be built from:
+
+- reconstructed G0/G1 `InRustGraph` values (which requires the missing DTO-to-graph
+  adapter, not current source files or a write);
+- the header's three disjoint change sets; and
+- the candidate summary/G0 generation identity for consistency checks.
+
+The planner still needs the verified initial archive for dirty current text and the
+retained interactive forest/authority for precise clean-view classification
+([[file:../server/maintenance/view_impact.rs::41][archive and census checks]]).  Those
+are also process-local after startup: verified archives and incident snapshots are
+empty in `ServerRuntime::new`, and `incident_snapshot` explicitly reports that
+restart requires evidence reconstruction ([[file:../server/runtime/maintenance.rs::176][incident snapshot retention]]).
+Thus no existing API can currently rebuild a planner candidate after restart; with
+the small adapter plus a durable/reloadable archive and view-state route, the
+classification inputs can be made source-read-free.  Missing inputs should remain
+an explicit uncertain/blocked report, rather than falling back to current G2.
+
+** 3. What staged records can finish
+
+Once `view_settlements` has been recorded in the coordinator journal, status/report
+serialization can replay the records, including impact, uncertainty, disposition,
+ack requirement, and any staged application content
+([[file:../server/serve/handlers/maintenance_protocol.rs::1640][active_status_sexp]] and
+[[file:../server/serve/handlers/maintenance_protocol.rs::1256][settlement_sexp]]).  The
+status path does not reselect a candidate when settlements are already present.
+
+The durable server evidence transfer can also finish from its private bundle:
+`maintenance_evidence` checks the journaled server-evidence record, loads the
+declared artifacts, records the transfer, and returns the payload
+([[file:../server/serve/handlers/maintenance_protocol.rs::2076][maintenance_evidence]]).
+It needs the active owner/phase and current config path identity, but no old graph,
+searcher, candidate, or incident snapshot.  `archive_finalized` only journals the
+client checksums ([[file:../server/serve/handlers/maintenance_protocol.rs::651][archive_finalized]]),
+and `complete_maintenance` can perform the terminal transition after finalization;
+its extra Git presentation identity check is a current boundary check, not a read
+of old G1 ([[file:../server/serve/handlers/maintenance_protocol.rs::504][complete_maintenance]]).
+
+Settlement ACKs divide by requirement.  Retirement/close and release can validate
+the staged record and, when the view is gone, produce no graph effect; they do not
+need old G1/searcher.  An application ACK still needs a live matching `ViewState`
+for base-authority validation, then reparses the staged content and applies it
+against the current selected graph ([[file:../server/serve/handlers/maintenance_protocol.rs::1898][prepare_server_settlement_effect]]).
+It does not need the old searcher, but it cannot complete with no matching live
+view.  Re-running staging/rendering remains blocked because that path needs the
+candidate, verified archive, incident snapshot, and interactive forest
+([[file:../server/serve/handlers/maintenance_protocol.rs::900][stage_application_settlements_once]]).
+
+** Minimum durable addition and migration rule
+
+For classification-only recovery, the minimum addition is a versioned report DTO
+conversion contract (or serialized graph index) plus durable initial-archive/view
+facts needed for dirty text and clean accepted forests.  No config snapshot is
+needed if the report adapter consumes the already-folded semantic nodes.
+
+If the requirement is to rebuild a full `ObservedDiskCandidate`, reobserve paths, or
+rerun folding/rendering under the original interpretation, retain a versioned
+immutable config interpretation: ordered source entries with names, paths,
+abbreviations and ownership, source-set/default/owned-folder semantics, and every
+parser/fold/render setting, preferably as exact config bytes plus the canonical
+source-catalog serialization.  Hashes alone are not reversible.  Introduce this as
+a new evidence/recovery format version; readers must reject or explicitly classify
+old v3 bundles as “semantic DTO recoverable, candidate/config replay unavailable.”
+Never silently reinterpret v3 with current config or substitute current G2.  A
+failed DTO conversion, missing archive/view facts, unsupported version, or hash/
+identity mismatch should fail closed to an evidence/report-blocked state.

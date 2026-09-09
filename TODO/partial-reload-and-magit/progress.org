@@ -1884,3 +1884,31 @@ The journal suite establishes the primitive and fresh-process cleanup; its
 publication still needs the plan's final common-owner adapter audit.
 ** choices determining the future
 Continue the accepted integration; no new architecture question.
+
+* Simplify/cohere checkpoint: exact incident adapters and read-only query authority
+** what's done and went well
+Status and census application acknowledgments now name the exact retained
+incident. Global current graph/manifest and admission fields are separate from
+an old report's G1 fields, and sampled together from the owner publication.
+Terminal ACK changes its incident record without announcing global idle or
+starting an unrelated sweep. Pending candidates, verified archives and published
+incident pairs survive newer in-process work.
+
+Server query responses carry explicit editable/read-only authority. Closed
+admission downgrades constructors without enrolling them in the frozen census;
+reopening admission never upgrades these retained records. A real TCP schedule
+begins maintenance, requests an editable query, verifies the read-only result,
+cancels prearchive maintenance, and proves a forged later save is refused
+without changing the source. It passes in 0.54 seconds. All 59 focused handler
+tests pass; relevant logs are 'readonly-admission-socket-corrected2.log' and
+'incident-readonly-handler-tests2.log'.
+** Changes to the plan's envisioned order.
+Checkpoint server adapters before client fixture updates complete. Written
+investigation now isolates cross-generation save proof and restart report data.
+** what's imperfect about what's done
+The first socket schedule had two protocol-fixture mistakes (request list shape
+and the bootstrap allocated-incident field); first failures are preserved.
+Restart cache reconstruction and later-proposal dependency validation remain
+planned integration work, not established by these focused checks.
+** choices determining the future
+Continue from [[file:../../codex-thinking/index.org][focused implementation notes]].

@@ -196,6 +196,17 @@ impl CoordinatorOwner {
     self . published . load () . selected . clone ()
       . ok_or_else (|| "state owner has no selected snapshot" . into ()) }
 
+  pub(crate) fn publication (
+    &self,
+  ) -> (Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
+    let published = self . published . load ();
+    let failure : Option<String> = published . failure . clone () . or_else (||
+      published . reservation . as_ref ()
+        . and_then (|reservation| reservation . status . blocked_reason . clone ()));
+    (published . selected . clone () . expect ("live owner has a selected pair"),
+      published . coordinator . clone (), failure)
+  }
+
   pub(crate) fn failure (&self) -> Option<String> {
     self . published . load () . failure . clone () }
 

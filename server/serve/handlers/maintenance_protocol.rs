@@ -100,7 +100,7 @@ pub fn skg_save_policy_refusal (state : &CoordinatorState) -> Option<String> {
         } else { pending . details . join ("; ") }),
     },
     CoordinatorState::Active (active) => format! (
-      "maintenance incident {} is {:?}; Skg saves remain disabled until its terminal disposition",
+      "maintenance incident {} is {:?}; Skg saves remain disabled until coherent graph/search publication",
       active . incident_id, active . phase),
     CoordinatorState::Terminal (terminal) => format! (
       "maintenance incident {} is terminal ({}) and awaits client acknowledgement",
@@ -142,7 +142,7 @@ pub fn handle_maintenance_protocol_request (
     RequestType::CancelMaintenance =>
       handle_cancel_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceStatus =>
-      handle_maintenance_status_request (stream, runtime),
+      handle_maintenance_status_request (stream, request, runtime),
     RequestType::RetryMaintenance =>
       handle_retry_maintenance_request (stream, request, runtime),
     RequestType::MaintenanceEvidence =>
@@ -164,7 +164,7 @@ pub fn handle_begin_maintenance_request (
   runtime : &ServerRuntime,
 ) {
   let result = begin_maintenance (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceOffer, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceOffer, "complete", result);
 }
 
 fn begin_maintenance (
@@ -244,7 +244,7 @@ pub fn handle_maintenance_locked_census_request (
   runtime : &ServerRuntime,
 ) {
   let result = freeze_maintenance_census (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceOffer, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceOffer, "complete", result);
 }
 
 fn freeze_maintenance_census (
@@ -255,6 +255,8 @@ fn freeze_maintenance_census (
     &value_from_request_sexp ("incident-id", request)?)?;
   let epoch = MaintenanceEpoch::parse (
     &value_from_request_sexp ("maintenance-epoch", request)?)?;
+  if value_from_request_sexp ("client-constructor-admission", request)? != "closed" {
+    return Err ("locked census requires closed client constructor admission" . into ()); }
   let active = require_archive_owner (runtime, &incident, epoch)?;
   if !matches! (active . phase,
     MaintenancePhase::AwaitingLockedCensus
@@ -269,8 +271,10 @@ fn freeze_maintenance_census (
       . ok_or_else (|| "no interactive client is attached" . to_string ())?;
     if !client . census_complete {
       return Err ("locked client census is not complete" . into ()); }
-    let census = interactive . live_census . values () . cloned ()
-      . collect::<Vec<_>> ();
+    let census = interactive . live_census . values ()
+      . filter (|descriptor| descriptor . writes_admitted
+        || descriptor . maintenance_epoch == Some (epoch . get ()))
+      . cloned () . collect::<Vec<_>> ();
     (client, census)
   };
   validate_census_parentage (&census)?;
@@ -359,7 +363,7 @@ pub fn handle_maintenance_archive_ready_request (
   runtime : &ServerRuntime,
 ) {
   let result = archive_ready (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 pub fn handle_run_maintenance_origin_request (
@@ -368,7 +372,7 @@ pub fn handle_run_maintenance_origin_request (
   runtime : &ServerRuntime,
 ) {
   let result = run_maintenance_origin (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn run_maintenance_origin (
@@ -450,7 +454,7 @@ pub fn handle_finish_maintenance_origin_request (
   runtime : &ServerRuntime,
 ) {
   let result = finish_maintenance_origin (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn finish_maintenance_origin (
@@ -503,7 +507,7 @@ pub fn handle_maintenance_archive_finalized_request (
   runtime : &ServerRuntime,
 ) {
   let result = archive_finalized (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 pub fn handle_complete_maintenance_request (
@@ -512,7 +516,7 @@ pub fn handle_complete_maintenance_request (
   runtime : &ServerRuntime,
 ) {
   let result = complete_maintenance (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn complete_maintenance (
@@ -533,10 +537,9 @@ fn complete_maintenance (
   // which predates the explicit presentation-fence record.
   let (presentation_generation, signature_blake3) =
     runtime . exact_git_presentation_identity ()?;
-  let missing_fence = matches! (
-    &runtime . maintenance_snapshot ()
-      . state,
-    CoordinatorState::Active (active) if active . presentation_fence . is_none ());
+  let missing_fence : bool = runtime . maintenance_snapshot ()
+    . incident (&incident, epoch) . map (|active|
+      active . presentation_fence . is_none ()) . unwrap_or (false);
   if missing_fence {
     runtime . transition_maintenance (|coordinator|
       coordinator . record_presentation_fence (
@@ -555,7 +558,7 @@ pub fn handle_acknowledge_terminal_maintenance_request (
   runtime : &ServerRuntime,
 ) {
   let result = acknowledge_terminal_maintenance (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn acknowledge_terminal_maintenance (
@@ -569,7 +572,7 @@ fn acknowledge_terminal_maintenance (
   let attached = attached_client (runtime)?;
   {
     let coordinator = runtime . maintenance_snapshot ();
-    if let CoordinatorState::Terminal (terminal) = &coordinator . state {
+    if let Some (terminal) = coordinator . terminal_incident (&incident, epoch) {
       if terminal . controlling_session_id () != attached . session_id {
         return Err (
           "terminal acknowledgement came from a different controller session"
@@ -578,25 +581,15 @@ fn acknowledge_terminal_maintenance (
   }
   let newly_acknowledged = runtime . transition_maintenance (|coordinator|
     coordinator . acknowledge_terminal (&incident, epoch))?;
-  // Retain the compact idle record and its issuing epoch. An old terminal
-  // ACK must never erase a newer owner's publication or reset its identity.
-  let successor_queued = match runtime . schedule_full_observation (
-      crate::maintenance::QueuedObservationReason::MaintenanceCompleted)
-  {
-    Ok (( )) => true,
-    Err (error) => {
-      tracing::warn! (%error,
-        "could not queue post-maintenance successor observation");
-      false
-    }
-  };
-  Ok (Sexp::List (vec![
-    atom_field ("status", "idle"),
+  let mut fields = vec![
+    atom_field ("status", "terminal-acknowledged"),
+    atom_field ("incident-id", incident . as_str ()),
+    integer_field ("maintenance-epoch", epoch . get ()),
     atom_field ("terminal-acknowledged",
-      if newly_acknowledged { "true" } else { "already-idle" }),
-    atom_field ("successor-observation-queued",
-      if successor_queued { "true" } else { "nil" }),
-  ]) . to_string ())
+      if newly_acknowledged { "true" } else { "already-acknowledged" }),
+  ];
+  append_current_state_fields (&mut fields, runtime);
+  Ok (Sexp::List (fields) . to_string ())
 }
 
 fn require_completion_owner (
@@ -607,10 +600,7 @@ fn require_completion_owner (
 ) -> Result<(), String> {
   let attached = attached_client (runtime)?;
   let coordinator = runtime . maintenance_snapshot ();
-  match &coordinator . state {
-    CoordinatorState::Active (active) => {
-      if &active . incident_id != incident || active . epoch != epoch {
-        return Err ("completion names another active incident" . into ()); }
+  if let Ok (active) = coordinator . incident (incident, epoch) {
       if active . controlling_session_id () != attached . session_id {
         return Err ("completion came from a different controller session"
           . into ()); }
@@ -623,10 +613,7 @@ fn require_completion_owner (
         _ => Err ("completion precedes final archive acknowledgement"
           . into ()),
       }
-    }
-    CoordinatorState::Terminal (terminal) => {
-      if &terminal . incident_id != incident || terminal . epoch != epoch {
-        return Err ("completion names another terminal incident" . into ()); }
+  } else if let Some (terminal) = coordinator . terminal_incident (incident, epoch) {
       if terminal . controlling_session_id () != attached . session_id {
         return Err ("completion came from a different controller session"
           . into ()); }
@@ -635,9 +622,7 @@ fn require_completion_owner (
       {
         return Err ("completion changed the final manifest checksum" . into ()); }
       Ok (( ))
-    }
-    _ => Err ("no finalized maintenance incident can complete" . into ()),
-  }
+  } else { Err ("no finalized maintenance incident matches that identity" . into ()) }
 }
 
 fn terminal_payload (terminal : &TerminalMaintenance) -> String {
@@ -746,6 +731,16 @@ fn archive_ready (request : &str, runtime : &ServerRuntime)
 /// background origin workers call the same function after attaching their
 /// exact observation to the incident.
 pub(crate) fn select_and_stage_candidate (
+  runtime : &ServerRuntime,
+  incident : &IncidentId,
+  epoch : MaintenanceEpoch,
+  verified : &VerifiedInitialArchive,
+) -> Result<String, String> {
+  let response : String = select_and_stage_candidate_payload (runtime, incident, epoch, verified)?;
+  with_current_state_fields (runtime, &response)
+}
+
+fn select_and_stage_candidate_payload (
   runtime  : &ServerRuntime,
   incident : &IncidentId,
   epoch    : MaintenanceEpoch,
@@ -791,7 +786,7 @@ pub(crate) fn select_and_stage_candidate (
     . expect ("selected incident has candidate") . id . clone ();
   let candidate = runtime . candidate (&candidate_id)
     . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
-  let selected_snapshot = runtime . selected_snapshot ();
+  let selected_snapshot = runtime . incident_snapshot (incident)?;
   let selected_config = &selected_snapshot . env . config;
   let settlements = {
     let interactive = runtime . interactive . lock ()
@@ -914,7 +909,9 @@ fn stage_application_settlements_once (
   let selected = active . selected_store . as_ref ()
     . ok_or_else (|| "view rendering precedes coherent store selection"
       . to_string ())?;
-  let lease = runtime . query_lease ()?;
+  let lease = crate::runtime::RuntimeQueryLease {
+    snapshot: runtime . incident_snapshot (&active . incident_id)?,
+  };
   if lease . snapshot . selected . graph_generation
        != selected . graph_generation
   || lease . snapshot . selected . manifest_revision
@@ -1333,7 +1330,7 @@ pub fn handle_maintenance_archive_failed_request (
       atom_field ("reason", &reason),
     ]) . to_string ())
   })();
-  send_result (stream, TcpToClient::MaintenanceStatus,
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus,
     "needs-authorization", result);
 }
 
@@ -1359,7 +1356,7 @@ pub fn handle_approve_undo_waiver_request (
       atom_field ("waived-reason", &reason),
     ]) . to_string ())
   })();
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 pub fn handle_approve_maintenance_scalar_release_request (
@@ -1367,8 +1364,9 @@ pub fn handle_approve_maintenance_scalar_release_request (
   request : &str,
   runtime : &ServerRuntime,
 ) {
-  let result = approve_maintenance_scalar_release (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  let result = approve_maintenance_scalar_release (request, runtime)
+    . and_then (|response| with_current_state_fields (runtime, &response));
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn approve_maintenance_scalar_release (
@@ -1391,7 +1389,7 @@ fn approve_maintenance_scalar_release (
   let verified = runtime . verified_archive (&incident)
     . ok_or_else (|| "verified initial archive was not retained"
       . to_string ())?;
-  let selected_snapshot = runtime . selected_snapshot ();
+  let selected_snapshot = runtime . incident_snapshot (&incident)?;
   let selected_config = &selected_snapshot . env . config;
   if !active . pending_view_enrollments . is_empty () {
     return Ok (view_enrollment_pending_payload (&active)); }
@@ -1450,36 +1448,104 @@ pub fn handle_cancel_maintenance_request (
       integer_field ("unlock-maintenance-epoch", epoch . get ()),
     ]) . to_string ())
   })();
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 pub fn handle_maintenance_status_request (
   stream  : &mut TcpStream,
+  request : &str,
   runtime : &ServerRuntime,
 ) {
-  let result = (|| -> Result<String, String> {
-    resume_enrollment_deferred_candidate (runtime)?;
-    let coordinator = runtime . maintenance_snapshot ();
-    let selected_snapshot = runtime . selected_snapshot ();
-    let selected_config = &selected_snapshot . env . config;
-    Ok (match coordinator . state {
-      CoordinatorState::Active (active) =>
-        active_status_sexp (&active, Some (selected_config)),
-      CoordinatorState::Pending (pending) => Sexp::List (vec![
-        atom_field ("status", "pending"),
-        atom_field ("pending-reason", pending . reason . label ()),
-        atom_field ("candidate-id", pending . candidate . as_ref ()
-          . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
-      ]),
-      CoordinatorState::Terminal (terminal) =>
-        sexp::parse (&terminal_payload (&terminal))
-          . expect ("terminal payload is valid"),
-      other => Sexp::List (vec![
-        atom_field ("status", other . label ()),
-      ]),
-    } . to_string ())
-  })();
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  let result = maintenance_status (request, runtime);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
+}
+
+fn maintenance_status (
+  request : &str,
+  runtime : &ServerRuntime,
+) -> Result<String, String> {
+  resume_enrollment_deferred_candidate (runtime)?;
+  let coordinator = runtime . maintenance_snapshot ();
+  let snapshot = runtime . selected_snapshot ();
+  let requested_incident = value_from_request_sexp ("incident-id", request)
+    . ok () . map (|value| IncidentId::parse (&value)) . transpose ()?;
+  let requested_epoch = value_from_request_sexp ("maintenance-epoch", request)
+    . ok () . map (|value| MaintenanceEpoch::parse (&value)) . transpose ()?;
+  if requested_epoch . is_some () && requested_incident . is_none () {
+    return Err ("maintenance status epoch requires an incident identity" . into ()); }
+  let selected_summary = requested_incident . as_ref () . map (|id|
+    coordinator . incidents () . into_iter () . find (|entry|
+      &entry . incident_id == id
+      && requested_epoch . map (|epoch| epoch == entry . epoch) . unwrap_or (true))
+      . ok_or_else (|| "maintenance status names an unknown incident or epoch" . to_string ()))
+    . transpose ()?;
+  let response = if let Some (incident) = selected_summary {
+    if let Some (terminal) = coordinator . terminal_incident (&incident . incident_id, incident . epoch) {
+      sexp::parse (&terminal_payload (terminal)) . expect ("terminal payload is valid")
+    } else {
+      active_status_sexp (coordinator . incident (&incident . incident_id, incident . epoch)?,
+        Some (&snapshot . env . config))
+    }
+  } else { match &coordinator . state {
+    CoordinatorState::Active (active) => active_status_sexp (active, Some (&snapshot . env . config)),
+    CoordinatorState::Pending (pending) => Sexp::List (vec![
+      atom_field ("status", "pending"),
+      atom_field ("pending-reason", pending . reason . label ()),
+      atom_field ("candidate-id", pending . candidate . as_ref ()
+        . map (|candidate| candidate . id . as_str ()) . unwrap_or ("none")),
+    ]),
+    CoordinatorState::Terminal (terminal) => sexp::parse (&terminal_payload (terminal))
+      . expect ("terminal payload is valid"),
+    other => Sexp::List (vec![atom_field ("status", other . label ())]),
+  }};
+  let Sexp::List (mut fields) = response else { unreachable! (); };
+  append_current_state_fields (&mut fields, runtime);
+  Ok (Sexp::List (fields) . to_string ())
+}
+
+pub(crate) fn with_current_state_fields (
+  runtime : &ServerRuntime,
+  response : &str,
+) -> Result<String, String> {
+  let Sexp::List (mut fields) = sexp::parse (response)
+    . map_err (|_| "response metadata requires an s-expression" . to_string ())?
+    else { return Err ("response metadata requires a list" . into ()); };
+  append_current_state_fields (&mut fields, runtime);
+  Ok (Sexp::List (fields) . to_string ())
+}
+
+/// Global publication metadata is separate from any incident's retained G1.
+fn append_current_state_fields (
+  fields : &mut Vec<Sexp>,
+  runtime : &ServerRuntime,
+) {
+  fields . retain (|field| !matches! (field,
+    Sexp::List (parts) if matches! (parts . first (),
+      Some (Sexp::Atom (Atom::S (key))) if matches! (key . as_str (),
+        "current-graph-generation" | "current-manifest-revision"
+        | "graph-write-admission" | "graph-transition-status"
+        | "rebuilding" | "pending-incidents"))));
+  let (snapshot, coordinator, failure) = runtime . publication ();
+  fields . extend ([
+    integer_field ("current-graph-generation", snapshot . selected . graph_generation . get ()),
+    integer_field ("current-manifest-revision", snapshot . selected . manifest_revision . get ()),
+    atom_field ("graph-write-admission", if coordinator . state . policy () . skg_saves_allowed
+      && failure . is_none () { "open" } else { "closed" }),
+    atom_field ("graph-transition-status", coordinator . state . label ()),
+    atom_field ("rebuilding", if matches! (&coordinator . state,
+      CoordinatorState::Active (active) if matches! (active . phase,
+        MaintenancePhase::SelectingPartial | MaintenancePhase::FullRebuildExclusive))
+      { "true" } else { "nil" }),
+    Sexp::List (vec![Sexp::Atom (Atom::S ("pending-incidents" . into ())),
+      Sexp::List (coordinator . incidents () . into_iter ()
+        . filter (|incident| !incident . terminal_acknowledged)
+        . map (|incident| Sexp::List (vec![
+          atom_field ("incident-id", incident . incident_id . as_str ()),
+          integer_field ("maintenance-epoch", incident . epoch . get ()),
+          atom_field ("phase", incident . phase . as_ref () . map (|phase| phase . label ()) . unwrap_or ("terminal")),
+          atom_field ("terminal-acknowledged", "nil"),
+        ])) . collect ())]),
+  ]);
 }
 
 fn resume_enrollment_deferred_candidate (
@@ -1519,7 +1585,7 @@ pub fn handle_retry_maintenance_request (
   runtime : &ServerRuntime,
 ) {
   let result = retry_maintenance (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn retry_maintenance (
@@ -1700,7 +1766,7 @@ pub fn handle_maintenance_evidence_request (
       let _ = send_artifact_bundle_with_length_prefix (
         stream, &descriptor, &bytes); }
     Err (error) => send_result (
-      stream, TcpToClient::MaintenanceEvidence, "failed", Err (error)),
+      stream, runtime, TcpToClient::MaintenanceEvidence, "failed", Err (error)),
   }
 }
 
@@ -1710,7 +1776,7 @@ pub fn handle_maintenance_view_settled_request (
   runtime : &ServerRuntime,
 ) {
   let result = acknowledge_view_settlement (request, runtime);
-  send_result (stream, TcpToClient::MaintenanceStatus, "complete", result);
+  send_result (stream, runtime, TcpToClient::MaintenanceStatus, "complete", result);
 }
 
 fn acknowledge_view_settlement (
@@ -1790,7 +1856,9 @@ fn acknowledge_view_settlement (
         application_ack . as_ref ())
     })?;
   apply_server_settlement_effect (runtime, effect);
-  Ok (Sexp::List (vec![
+  let mut fields : Vec<Sexp> = vec![
+    atom_field ("incident-id", incident . as_str ()),
+    integer_field ("maintenance-epoch", epoch . get ()),
     atom_field ("status", if preselection && all_settled {
       "all-invalid-dirty-buffers-retired"
     } else if preselection {
@@ -1811,7 +1879,9 @@ fn acknowledge_view_settlement (
     } else {
       "settle-remaining-views"
     }),
-  ]) . to_string ())
+  ];
+  append_current_state_fields (&mut fields, runtime);
+  Ok (Sexp::List (fields) . to_string ())
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2108,13 +2178,13 @@ fn matching_active (
   epoch    : MaintenanceEpoch,
 ) -> Result<crate::maintenance::ActiveMaintenance, String> {
   let coordinator = runtime . maintenance_snapshot ();
-  let CoordinatorState::Active (active) = &coordinator . state else {
-    return Err ("no maintenance incident is active" . into ()); };
-  if &active . incident_id != incident || active . epoch != epoch {
-    return Err (format! (
-      "stale maintenance envelope; current incident is {} epoch {}",
-      active . incident_id, active . epoch . get ())); }
-  Ok (active . clone ())
+  coordinator . incident (incident, epoch) . cloned () . or_else (|error|
+    match coordinator . committed_incidents . get (incident) {
+      Some (crate::maintenance::CommittedIncident::Terminal {
+        incident: Some (active), .. }) if active . epoch == epoch =>
+          Ok (active . clone ()),
+      _ => Err (error),
+    })
 }
 
 fn attached_client (runtime : &ServerRuntime) -> Result<AttachedClient, String> {
@@ -2382,11 +2452,13 @@ fn pull_repositories_field (
 
 fn send_result (
   stream        : &mut TcpStream,
+  runtime       : &ServerRuntime,
   response_type : TcpToClient,
   status        : &str,
   result        : Result<String, String>,
 ) {
-  let response = match result {
+  let response = match result . and_then (|payload|
+    with_current_state_fields (runtime, &payload)) {
     Ok (payload) => tag_terminal_sexp_response (response_type, status, &payload),
     Err (error) => tag_terminal_text_response (
       TcpToClient::Error, "failed", &error),
@@ -2417,6 +2489,7 @@ mod tests {
   fn census_descriptor (id : &str, kind : &str) -> CensusDescriptor {
     CensusDescriptor {
       server_session_id: "server-test-session" . into (),
+      writes_admitted: true,
       buffer_id: id . into (), kind: kind . into (),
       lifecycle: if kind == "content-view" {
         "live-view" . into ()
@@ -2741,6 +2814,7 @@ mod tests {
       acknowledged: false,
     };
     let state = ViewState {
+      writes_admitted: true,
       viewforest: ViewForest::new (), pids: Default::default (), revision: 4,
       root_ids: Default::default (),
       graph_generation: 1, presentation_generation: 3,

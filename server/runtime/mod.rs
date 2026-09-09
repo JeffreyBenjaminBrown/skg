@@ -72,6 +72,8 @@ pub struct ServerRuntime {
   candidates            : Mutex<BTreeMap<CandidateId, Arc<ObservedDiskCandidate>>>,
   verified_archives     : Mutex<BTreeMap<crate::maintenance::IncidentId,
                                          Arc<VerifiedInitialArchive>>>,
+  incident_snapshots    : Mutex<BTreeMap<crate::maintenance::IncidentId,
+                                         Arc<SelectedRuntimeSnapshot>>>,
   observation           : Mutex<Option<ObservationService>>,
 }
 
@@ -104,6 +106,7 @@ impl ServerRuntime {
       interactive_slot: InteractiveConnectionSlot::new (),
       candidates: Mutex::new (BTreeMap::new ()),
       verified_archives: Mutex::new (BTreeMap::new ()),
+      incident_snapshots: Mutex::new (BTreeMap::new ()),
       observation: Mutex::new (None),
     })
   }
@@ -127,6 +130,12 @@ impl ServerRuntime {
 
   pub fn maintenance_snapshot (&self) -> MaintenanceCoordinator {
     self . owner . snapshot () }
+
+  pub(crate) fn publication (
+    &self,
+  ) -> (Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
+    self . owner . publication ()
+  }
 
   pub fn authority_failure (&self) -> Option<String> {
     self . owner . failure () . or_else (|| self . owner . mutation_status ()

@@ -346,6 +346,9 @@ fn validate_save_authority (
     return Err (SaveError::StaleViewAuthority (format! (
       "view '{}' is not registered by the server",
       uri . repr_in_client ()))); };
+  if !state . writes_admitted {
+    return Err (SaveError::StaleViewAuthority (
+      "this query result has no write authority; explicitly reopen a fresh view" . into ())); }
   if state . graph_generation != requested . graph_generation
      || state . revision != requested . server_revision
      || state . client_application_token != requested . application_token

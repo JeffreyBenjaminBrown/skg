@@ -48,6 +48,8 @@ pub struct ViewState {
   pub presentation_generation : u64,
   pub client_application_token : u64,
   pub client_buffer_id       : Option<String>,
+  /// Read-only query results never acquire authority by becoming locally writable.
+  pub writes_admitted        : bool,
   pub kind                   : BufferKind,
   pub recipe                 : Option<String>,
   pub root_ids               : HashSet<ID>,
@@ -138,7 +140,7 @@ impl OpenViews {
         . unwrap_or (0);
       let (graph_generation, presentation_generation,
            client_application_token, client_buffer_id, kind, recipe,
-           source_set, presentation_stale, search_stale) =
+           source_set, presentation_stale, search_stale, writes_admitted) =
         self . views . get (&uri) . map (|state| (
           state . graph_generation,
           state . presentation_generation,
@@ -149,15 +151,17 @@ impl OpenViews {
           state . source_set . clone (),
           state . presentation_stale,
           state . search_stale,
+          state . writes_admitted,
         )) . unwrap_or_else (|| (
           1, 0, 1, None, default_kind_for_uri (&uri), None,
-          "all" . into (), false, false));
+          "all" . into (), false, false, true));
       let state : ViewState = ViewState {
         viewforest, pids, revision, root_ids: rids,
         graph_generation,
         presentation_generation,
         client_application_token,
         client_buffer_id,
+        writes_admitted,
         kind,
         recipe,
         source_set,
@@ -221,6 +225,7 @@ impl OpenViews {
                            presentation_generation: 0,
                            client_application_token: 1,
                            client_buffer_id: None,
+                           writes_admitted: true,
                            kind: default_kind_for_uri (uri),
                            recipe: None,
                            source_set: "all" . into (),

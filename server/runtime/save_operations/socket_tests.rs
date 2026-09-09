@@ -122,6 +122,47 @@ fn socket_protocol_mismatch_cannot_inherit_a_previous_client () {
 }
 
 #[test]
+fn barrier_query_remains_read_only_after_admission_reopens () {
+  let fixture : Fixture = Fixture::new ();
+  let _process : ServerProcess = fixture . start ("none");
+  let mut client : Client = Client::connect (&fixture);
+  let (request, _, _) : (String, String, String) = client . save_request ("Alpha", "Beta");
+  client . send (&request, Some (&save_body ("Alpha", "Beta")));
+  let saved : Sexp = client . terminal ();
+  assert_eq! (field (&saved, "save-operation-state") . as_deref (), Some ("committed"));
+  client . send ("((request . \"begin maintenance\") (origin . \"explicit-partial-reload\") (ids \"a\"))", None);
+  let offer : Sexp = client . terminal ();
+  let incident : String = field (&offer, "allocated-incident-id") . unwrap_or_else (|| panic! ("maintenance incident: {}", offer));
+  let epoch : String = field (&offer, "maintenance-epoch") . expect ("maintenance epoch");
+  let uri : String = uuid::Uuid::new_v4 () . to_string ();
+  client . send (&format! (
+    "((request . \"single root content view\") (id . \"a\") (view-uri . \"{}\") (fresh-view . \"true\") (requested-view-write-authority . \"editable\"))", uri), None);
+  let view : Sexp = client . terminal ();
+  assert_eq! (field (&view, "view-write-authority") . as_deref (), Some ("read-only"), "{}", view);
+  assert_eq! (field (&view, "graph-write-admission") . as_deref (), Some ("closed"));
+  client . send (&format! (
+    "((request . \"cancel maintenance\") (incident-id . \"{}\") (maintenance-epoch . {}))", incident, epoch), None);
+  let cancelled : Sexp = client . terminal ();
+  assert_eq! (field (&cancelled, "status") . as_deref (), Some ("cancelled-before-archive"), "{}", cancelled);
+  client . send ("((request . \"maintenance status\"))", None);
+  assert_eq! (field (&client . terminal (), "graph-write-admission") . as_deref (), Some ("open"));
+  let body : String = field (&view, "content") . expect ("read-only content") . replace ("Alpha", "UnauthorizedAlpha");
+  let intent : String = format! (
+    "((request . \"save buffer\") (view-uri . \"{}\") (client-buffer-id . \"{}\") (view-kind . \"content-view\") (graph-generation . {}) (server-revision . {}) (client-application-token . {}) (server-session-id . \"{}\") (operation-id . \"{}\"))",
+    uri, uuid::Uuid::new_v4 (), field (&view, "graph-generation") . unwrap (),
+    field (&view, "server-revision") . unwrap (), field (&view, "client-application-token") . unwrap (),
+    client . session, uuid::Uuid::new_v4 ());
+  let mut digest : Sha256 = Sha256::new ();
+  digest . update (intent . as_bytes ()); digest . update ([0]); digest . update (body . as_bytes ());
+  let forged : String = format! ("{} (request-base-fingerprint . \"{:x}\"))", &intent[..intent . len () - 1], digest . finalize ());
+  client . send (&forged, Some (&body));
+  let refused : Sexp = client . terminal ();
+  assert_eq! (field (&refused, "save-operation-state") . as_deref (), Some ("refused"), "{}", refused);
+  let bytes : String = fs::read_to_string (fixture . node ("a")) . unwrap ();
+  assert! (bytes . contains ("Alpha") && !bytes . contains ("UnauthorizedAlpha"));
+}
+
+#[test]
 fn socket_process_worker () {
   let Some (root) : Option<std::ffi::OsString> = std::env::var_os (WORKER_ROOT)
     else { return; };
@@ -230,8 +271,11 @@ impl Client {
   }
 
   fn send (&mut self, request : &str, body : Option<&str>) {
-    let header : String = format! ("{} (request-id . \"{}\"))\n",
-      &request [..request . len () - 1], uuid::Uuid::new_v4 ());
+    let session : String = if self . session . is_empty () || request . contains ("server-session-id") {
+      String::new ()
+    } else { format! (" (server-session-id . \"{}\")", self . session) };
+    let header : String = format! ("{}{} (request-id . \"{}\"))\n",
+      &request [..request . len () - 1], session, uuid::Uuid::new_v4 ());
     self . stream . write_all (header . as_bytes ()) . unwrap ();
     if let Some (body) = body {
       self . stream . write_all (format! ("Content-Length: {}\r\n\r\n", body . len ()) . as_bytes ()) . unwrap ();
