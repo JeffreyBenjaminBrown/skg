@@ -1274,10 +1274,15 @@
   This is separate from the ordinary HiddenOutside membership calculation's
   private-contains suppression bug, which is fixed and covered by
   'private_contains_does_not_suppress_a_public_hiddenoutside_member'.
-* Retained proof bases currently retain query resources (2026-09-09)
+* Resolved: retained proof bases held query resources (2026-09-09)
   During plan 11 integration, 'ViewSaveBase' retains a selected state that also
   holds its Searcher; pending collateral/enrichment applications retain an
   environment. These preserve coherence, but an editor wait can keep old index
   resources alive beyond active query work. The remaining publication cleanup
   must split graph/manifest/config proof data from query resource lifetime.
   See [[file:../codex-thinking/authority-across-generations.org][the retained-base follow-up]].
+
+  Fixed by 'a5658e26', 'd10b412f' and 'fc3d4d7e': immutable manifests are shared,
+  view/application/enrichment bases retain semantic facts only, and incident
+  reports retain 'GraphReadSnapshot' without index readers. Focused application
+  and real TCP restart coverage pass; see [[file:partial-reload-and-magit/progress.org][progress.org]].

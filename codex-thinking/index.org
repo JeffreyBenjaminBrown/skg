@@ -6,5 +6,9 @@ Established progress belongs in [[file:../TODO/partial-reload-and-magit/progress
 ** [[file:incident-evidence-audit.org][Evidence capabilities and report-only conversion]]
 ** [[file:save-dependency-audit.org][Counterexamples and dependencies for later saves]]
 ** [[file:owner-responsiveness.org][Request responsiveness while workers hold reservations]]
+** [[file:query-wait-server.org][Durable query outcome and recovery boundary]]
+** [[file:query-wait-clients.org][Query destination and replay interface]]
+** [[file:ordinary-writers.org][Whitespace command transaction boundary]]
 * Process observations
 ** [[file:note-taking.org][What has helped about externalizing uncertain reasoning]]
+** [[file:token-discipline.org][Preventing repeated exploration and status polling]]
