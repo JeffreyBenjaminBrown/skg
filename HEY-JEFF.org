@@ -1,0 +1,7 @@
+* Notes about the note-taking process
+See [[file:codex-thinking/note-taking.org][working observations about externalized thinking]].
+They describe the habits which have helped during this implementation,
+with links to concrete examples, including suggestions for useful handoffs.
+
+The implementation questions themselves start at
+[[file:codex-thinking/index.org][the codex-thinking index]].

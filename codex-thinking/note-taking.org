@@ -1,0 +1,54 @@
+* Working observations about these notes
+These are observations from [[file:../TODO/partial-reload-and-magit/11_plan_simplify-cohere.org][this implementation]],
+not a measured comparison with working without notes. Update them when an
+example changes the conclusion. [[file:../HEY-JEFF.org][Entry point for Jeff]].
+
+** Start where understanding runs out
+Write the question which could change the next implementation decision.
+Established mechanics usually need a code link, not another explanation.
+The useful unit has been a boundary: retained data versus missing data,
+incident history versus current authority, or a proposed proof versus its
+unexamined dependencies.
+
+** Give the question a safety condition and a next check
+In [[file:incident-reconstruction.org][incident reconstruction]], the safety condition is that recovering G0/G1
+for a report must never select G1 over current G2 or restore old-session view
+authority. This lets several implementation approaches be explored while
+keeping the criterion for rejecting them explicit.
+Name the next file, function, or experiment which can resolve the uncertainty.
+An unanswered question without a next check is easy to carry across handoffs
+without making progress on it.
+
+** Separate evidence, hypotheses, and decisions
+A retained semantic node DTO is observed evidence. Being able to rebuild a
+whole candidate from it was a hypothesis; inspection found missing config
+interpretation. The narrower report-only adapter became the decision.
+Label these stages so a later reader does not inherit a guess as a fact.
+Link the code behind the evidence and the implementation behind the decision.
+
+** Ask for counterexamples to a proposed rule
+The [[file:save-dependency-audit.org][save-dependency audit]] was more useful than a generic review request:
+it supplied a proposed proof and asked which reads could invalidate it.
+Concrete counterexamples exposed active-source-set changes and newly added
+inbound references. Keep such examples beside the rule until implementation
+and meaningful tests address them.
+
+** Make a handoff an executable starting point
+Retain the unresolved question, strongest current hypothesis, known
+counterexample, safety condition, and next check. Include only enough context
+to start that check. A recipient should not have to reconstruct the entire
+conversation before taking a useful step.
+When the answer is settled, link its implementation or test and mark the
+question resolved. Avoid leaving obsolete uncertainty beside current advice.
+
+** Keep investigation and progress records distinct
+[[file:index.org][The thinking index]] locates questions. [[file:../TODO/partial-reload-and-magit/progress.org][The progress report]] records
+delivered behavior, checks, limitations, and consequential choices.
+This prevents an exploratory note from becoming an accidental completion
+claim, and avoids maintaining two parallel histories of the work.
+
+** Spend notes where they can prevent repeated reasoning
+A small reversible edit usually needs no note. A cross-cutting invariant or
+repeatedly interrupted investigation often does. The notes cost reading and
+maintenance too; shorten or archive resolved sections when they obscure the
+next open question. There is no measured token-saving claim here yet.

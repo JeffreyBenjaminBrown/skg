@@ -3,3 +3,7 @@ These notes track uncertain boundaries during [[file:../TODO/partial-reload-and-
 Established progress belongs in [[file:../TODO/partial-reload-and-magit/progress.org][progress.org]].
 ** [[file:authority-across-generations.org][Authority after another publication]]
 ** [[file:incident-reconstruction.org][Incident reconstruction after restart]]
+** [[file:incident-evidence-audit.org][Evidence capabilities and report-only conversion]]
+** [[file:save-dependency-audit.org][Counterexamples and dependencies for later saves]]
+* Process observations
+** [[file:note-taking.org][What has helped about externalizing uncertain reasoning]]
