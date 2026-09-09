@@ -5,3 +5,86 @@ with links to concrete examples, including suggestions for useful handoffs.
 
 The implementation questions themselves start at
 [[file:codex-thinking/index.org][the codex-thinking index]].
+
+* Estimated progress through 11_plan_simplify-cohere.org
+
+As of 2026-09-09, using the plan and the latest progress checkpoint (including
+the reported revisions bdfb976e, 8b2a7401, and 7fc04ca3), implementation plus
+required acceptance verification is estimated at 56% overall. Each of the 15
+implementation-sequence sections below has equal weight (1/15); the point
+estimates sum to 845, and 845 / 15 = 56.3%, rounded to 56%.
+
+** Execution checkpoints and starting points: 80%
+
+Baseline tracing and the working-path checkpoints are established; final
+acceptance evidence is still pending.
+
+** Establish identities and build the executable state model: 65%
+
+Identity and incident models are exercised, but the complete obsolete-worker,
+crash, and restart matrix is unfinished.
+
+** Make state ownership and journal publication exclusive: 60%
+
+Owner and journal paths are substantially migrated and tested; the full owner
+migration and normalized durable writer path remain incomplete.
+
+** Build the immutable publication boundary on every read path: 60%
+
+Selected graph/manifest publication and several read guards work; remaining
+ordinary-read dependency guards and integration are still gated.
+
+** Remove TypeDB and adapt its behavioral tests: 85%
+
+Active fixtures and setup are TypeDB-free with broad passing suites; final
+product and aggregate acceptance checks remain.
+
+** Bound observation and preserve targeted reload semantics: 55%
+
+Maximum-age debounce is implemented and reload brackets are tested, while
+targeted/bounded cancellable ordinary observation remains incomplete.
+
+** Make ordinary saves durable before enabling early release: 50%
+
+Crash slices and completion markers pass, but retained save bases and the pure
+dependency validator are uncommitted and integration remains gated.
+
+** Preserve archive, raw-file, privacy, and undo gates: 65%
+
+Archive, dirty-view, privacy, and undo protections have focused coverage; the
+repeated archive ACK/proposal issue still needs resolution.
+
+** Close admission, drain constructors, and publish the fixed census: 65%
+
+Fixed-census and read-only admission behavior is proven in focused and TCP
+checks; both-editor lifecycle acceptance is outstanding.
+
+** Implement refusal, status, and durable query waits in both clients: 40%
+
+Refusal/status adapters exist in both clients, but durable query waits and
+client multiple-incident/per-buffer restriction maps are not complete.
+
+** Settle buffers after publication with exact base checks: 45%
+
+Exact-base and scalar-gated settlement pieces work; cross-generation proposal
+validation and the full restriction lifecycle remain.
+
+** Route every maintenance entry through the same transition: 50%
+
+Several entry paths use the owner and publication contract, but integration of
+all source-changing commands and the common final boundary is unfinished.
+
+** Restore authority before exposing startup and reconnect: 55%
+
+Restart report reconstruction and fresh-session authority have focused checks;
+the complete editor/process crash acceptance matrix is not run.
+
+** Finish evidence and reports independently of new graph work: 40%
+
+Independent report/evidence records have meaningful coverage, while durable
+query waits, remaining ACK behavior, and final delivery recovery continue.
+
+** Verify behavior, then remove superseded paths and update documentation: 30%
+
+Many focused suites pass, but final all-tests acceptance for both editors and
+superseded-path removal have not completed.
