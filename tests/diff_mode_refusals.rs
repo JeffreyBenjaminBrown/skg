@@ -31,6 +31,7 @@ use skg::test_utils::run_with_shared_test_graph;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::store_state::SelectedStoreState;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
@@ -88,6 +89,7 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config)?;
+      attach_fixture_searcher (&graph, tantivy);
       let env : SkgEnv =
         skg_env_from_parts (
           config, tantivy, &graph );
@@ -163,6 +165,7 @@ async fn switch_refusals_take_the_unwinding_shape (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config)?;
+      attach_fixture_searcher (&graph, tantivy);
       let env : SkgEnv =
         skg_env_from_parts (
           config, tantivy, &graph );
@@ -207,6 +210,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           graphnodestats : AllGraphNodeStats::empty (),
           title_and_source_by_id: HashMap::new (),
           graph: env . in_rust_graph_snapshot (),
+          base_env: env . pinned (),
           config: config . clone (),
           active_source_set: active . clone (),
           graph_generation: env . in_rust_graph . load_full ()
@@ -295,6 +299,7 @@ async fn refusal_first_messages_parse_and_read_as_documented (
   // drained message list: first message, then exactly the empty
   // stream trio, then EOF.
       let graph = graph_handle_from_config (config)?;
+      attach_fixture_searcher (&graph, tantivy);
       let env : SkgEnv =
         skg_env_from_parts (
           config, tantivy, &graph );
@@ -325,3 +330,13 @@ async fn refusal_first_messages_parse_and_read_as_documented (
       assert! ( read_lp_message (&mut reader) . is_err (),
                 "nothing follows the empty stream" );
       Ok (( )) }
+
+fn attach_fixture_searcher
+(
+  graph : &InRustGraphHandle,
+  tantivy : &TantivyIndex,
+) {
+  let selected : Arc<SelectedStoreState> = graph . load_full ();
+  graph . store (Arc::new (
+    (*selected) . clone () . with_searcher (
+      tantivy . reader . searcher ()))); }

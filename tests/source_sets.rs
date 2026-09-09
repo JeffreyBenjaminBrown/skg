@@ -167,6 +167,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
       // 2. Switch to "public": R goes inactive; the view re-renders.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
+      attach_fixture_searcher (&graph, tantivy);
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
@@ -371,6 +372,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
   // open views in place instead of closing them.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
+      attach_fixture_searcher (&graph, tantivy);
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
@@ -412,6 +414,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           graphnodestats : AllGraphNodeStats::empty (),
           title_and_source_by_id: HashMap::new (),
           graph: env . in_rust_graph_snapshot (),
+          base_env: env . pinned (),
           config: config . clone (),
           active_source_set: active . clone (),
           graph_generation: env . in_rust_graph . load_full ()
@@ -1103,3 +1106,13 @@ async fn restricted_save_preserves_invisible_override_targets (
           "deleting the visible override member must leave exactly the \
            invisible one" ); }
       Ok (( )) }
+
+fn attach_fixture_searcher
+(
+  graph : &InRustGraphHandle,
+  tantivy : &TantivyIndex,
+) {
+  let selected : Arc<SelectedStoreState> = graph . load_full ();
+  graph . store (Arc::new (
+    (*selected) . clone () . with_searcher (
+      tantivy . reader . searcher ()))); }
