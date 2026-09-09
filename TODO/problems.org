@@ -1253,7 +1253,7 @@
   F, F2, and R shape and semantic override facts, but the rendered
   overriders lack the expected =Oa= herald marker.  No Rust production
   code changed in the navigation fix.
-* Historical relation-diff privacy needs source-aware captured evidence (2026-09-09)
+* Resolved: historical relation-diff privacy lacked captured source evidence (2026-09-09)
   Inspection during the selected-graph read migration found that
   'inverse_scan_for_inbound_col' scans every source's diff, including inactive
   sources. Its Modified-file arm in
@@ -1270,6 +1270,21 @@
   Fix using explicitly captured section/source identity and add a real Git
   fixture covering a private relation edit between public nodes; do not recover
   missing historical provenance by rereading current disk.
+
+  The capture boundary also needs correct source scoping when configured
+  source directories share a Git repository. 'Repository::discover' can open
+  a parent repository and Git returns repository-relative paths; joining those
+  paths to each configured source directory can misload or misattribute them.
+  A sibling public/private directory fixture must prove capture scope before
+  assigning the configured source identity.
+
+  Fixed during plan 11: all successfully parsed stage snapshots retain the
+  configured section source, and Modified relation signs use their exact
+  before/after snapshot. Active-source scans refuse missing provenance. Capture
+  filters repository-relative paths to the configured directory's direct Skg
+  files before assigning that source. Seven inverse-scan tests, the real Git
+  partner-column test and all-target compilation pass, including sibling
+  public/private directories and rendering after later worktree changes.
 
   This is separate from the ordinary HiddenOutside membership calculation's
   private-contains suppression bug, which is fixed and covered by

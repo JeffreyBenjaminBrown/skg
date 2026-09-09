@@ -41,14 +41,11 @@ use std::path::PathBuf;
 /// goal list as a phantom; a present member's Plus signs become its
 /// 'newM' marks.
 ///
-/// 'active': edge-source gating (render-and-gating, 5_plan.org). A
-/// Deleted/Added file's before/after NodeComplete carries full
-/// MemberAtSource values, so those two stages gate on the specific
-/// edge's source -- a phantom "used to link here" must not surface
-/// from a membership recorded outside the active set. The Modified
-/// stage cannot: 'NodeChanges' diff lists have their sources stripped
-/// (the historical 'leveled-lists' work item deferred this; still true
-/// here), so a Modified-file sign is emitted regardless of source. None = ungated
+/// 'active': edge-source gating (render-and-gating, 5_plan.org). The
+/// captured before/after NodeComplete for each stage carries full
+/// MemberAtSource values, so every stage gates on the specific edge's
+/// historical source -- a phantom or new member from a relation
+/// recorded outside the active set must not surface. None = ungated
 /// (every stage counts), matching every other gated accessor here.
 pub fn inverse_scan_for_inbound_col (
   owner        : &ID,
@@ -107,6 +104,17 @@ fn member_and_sign_for_owner (
           Diff_Item::New     (id) if id == owner => Some (Sign::Plus),
           Diff_Item::Removed (id) if id == owner => Some (Sign::Minus),
           _ => None } ) ?;
+      let historical_node : Option<&NodeComplete> = match sign {
+        Sign::Plus  => ncd . after_node . as_ref (),
+        Sign::Minus => ncd . before_node . as_ref (), };
+      if historical_node . is_none () && active . is_some () {
+        return None; }
+      if let Some (node) = historical_node {
+        let source : SourceName =
+          outbound_member_source_of_nodecomplete (
+            node, relation, owner ) ?;
+        if ! source_is_active (active, &source) {
+          return None; }}
       let member : ID =
         ID::from ( path . file_stem () ? . to_str () ? );
       Some ((member, sign)) },

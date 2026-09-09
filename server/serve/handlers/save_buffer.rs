@@ -711,7 +711,7 @@ pub fn compute_diff_for_every_source (
   for (source_name, source_config) in config . sources . iter () {
     let source_path : &Path =
       Path::new ( &source_config . path );
-    match compute_diff_for_source (source_path) {
+    match compute_diff_for_source (source_path, source_name) {
       Ok (diff) => {
         source_diffs . insert ( source_name . clone(), diff ); },
       Err (e) => { // Log error but continue with other sources

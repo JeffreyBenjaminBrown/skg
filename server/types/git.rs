@@ -64,13 +64,15 @@ pub struct NodeCompleteDiff {
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
   /// The "before" state of this stage: HEAD for staged, INDEX for
-  /// unstaged. Populated only for Deleted status; read by
-  /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
+  /// unstaged. Captured for every successfully parsed file, including
+  /// Modified files, so consumers can inspect historical relation
+  /// provenance without rereading the worktree.
   /// Name reflects the stage's baseline rather than always-HEAD.
   pub before_node: Option<NodeComplete>,
   /// The "after" state of this stage: INDEX for staged, worktree for
-  /// unstaged. Populated only for Added status; used for unindexed
-  /// titles of new files.
+  /// unstaged. Captured for every successfully parsed file, including
+  /// Modified files, so relation additions use the exact historical
+  /// source recorded by that stage.
   pub after_node: Option<NodeComplete>,
 }
 

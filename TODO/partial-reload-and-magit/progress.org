@@ -2222,3 +2222,34 @@ for a bufferless record whose incident was not yet known. A narrowly scoped
 query-status exception now allows that authenticated response to bind the
 retained target. Focused transport suites pass 11 Emacs and 20 Neovim cases;
 query suites still pass 9 and 8 respectively.
+
+The shared-transport checkpoint also passes the full editor suites:
+'bash bash/emacs-tests.sh' passes all 484 tests, and
+'bash bash/nvim-tests.sh' reports all suites passing. Logs are
+'query-emacs-checkpoint.log' and 'query-nvim-checkpoint.log' under
+'/tmp/simplify-cohere-baseline'.
+
+* Simplify/cohere checkpoint: captured relation-diff privacy
+** what's done and went well
+Modified Git diffs now retain their before/after node snapshots with configured
+source identity. Inbound relation signs check the captured relation source,
+and active-source scans refuse missing historical provenance. Capture scopes
+repository-relative Git paths to the configured source's direct Skg files.
+Seven focused inverse-scan tests and the real Git partner-column test pass.
+The sibling-source fixture combines public staged and private unstaged changes
+in one repository and verifies that subsequent worktree edits cannot change
+the captured result. All Rust targets compile. Logs under
+'/tmp/simplify-cohere-baseline' are 'inverse-scan-sibling-final.log',
+'git-diff-partner-cols-scope.log' and 'diff-provenance-all-targets.log'.
+** Changes to the plan's envisioned order.
+This small privacy fix follows the completed query slice. Review of the first
+fix found that parent-repository discovery also required path scoping before
+assigning provenance; that requirement stayed within the same capture boundary.
+** what's imperfect about what's done
+Synthetic ungated diffs retain their existing behavior. A gated consumer with
+missing snapshots omits the unsupported sign rather than guessing provenance
+from today's disk. Historical blob parse failures still use the existing
+warning-and-missing-snapshot behavior.
+** choices determining the future
+Continue the remaining owner and ordinary-writer migrations one slice at a
+time. The original privacy contract is unchanged; no new question for Jeff.

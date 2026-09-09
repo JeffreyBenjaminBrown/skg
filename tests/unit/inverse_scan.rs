@@ -1,10 +1,15 @@
 use super::*;
 use crate::source_sets::SourceSetName;
+use crate::git_ops::diff::compute_diff_for_source;
 use crate::types::git::NodeChanges;
 use crate::types::misc::MSV;
 use crate::types::nodes::complete::empty_node_complete;
 use crate::types::nodes::fs::NodeFS;
+use git2::{Config, Index, Oid, Repository, Signature, Tree};
 use std::collections::BTreeSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+use tempfile::TempDir;
 
 fn id (s : &str) -> ID { ID ( s . to_string () ) }
 fn src (s : &str) -> SourceName { SourceName ( s . to_string () ) }
@@ -203,3 +208,154 @@ fn edge_source_gates_deleted_stage_signs () {
     "ungated (None) scan should still see the Deleted-stage sign: {:?}",
     ungated );
 }
+
+fn real_git_relation_diff (
+  source_name : &str,
+) -> (TempDir, SourceDiff) {
+  let directory : TempDir = TempDir::new () . unwrap ();
+  let repository : Repository =
+    Repository::init (directory . path ()) . unwrap ();
+  { let mut config : Config =
+      repository . config () . unwrap ();
+    config . set_str ("user.email", "test@test.com") . unwrap ();
+    config . set_str ("user.name", "Test") . unwrap (); }
+  let member_path : PathBuf =
+    directory . path () . join ("member.skg");
+  fs::write (
+    &member_path,
+    "pid: member\ntitle: member\n" ) . unwrap ();
+  { let mut index : Index =
+      repository . index () . unwrap ();
+    index . add_path (Path::new ("member.skg")) . unwrap ();
+    index . write () . unwrap ();
+    let tree_id : Oid = index . write_tree () . unwrap ();
+    let tree : Tree =
+      repository . find_tree (tree_id) . unwrap ();
+    let signature : Signature =
+      Signature::now ("skg test", "skg@example.com") . unwrap ();
+    repository . commit (
+      Some ("HEAD"), &signature, &signature,
+      "initial", &tree, &[] ) . unwrap (); }
+  fs::write (
+    &member_path,
+    "pid: member\ntitle: member\noverrides_view_of:\n  - owner\n" )
+    . unwrap ();
+  let source : SourceName = SourceName::from (source_name);
+  let diff : SourceDiff =
+    compute_diff_for_source (directory . path (), &source) . unwrap ();
+  (directory, diff) }
+
+fn real_git_sibling_source_diffs () -> (TempDir, SourceDiff, SourceDiff) {
+  let directory : TempDir = TempDir::new () . unwrap ();
+  let repository : Repository =
+    Repository::init (directory . path ()) . unwrap ();
+  { let mut config : Config =
+      repository . config () . unwrap ();
+    config . set_str ("user.email", "test@test.com") . unwrap ();
+    config . set_str ("user.name", "Test") . unwrap (); }
+  let public_dir : PathBuf = directory . path () . join ("public");
+  let private_dir : PathBuf = directory . path () . join ("private");
+  fs::create_dir_all (&public_dir) . unwrap ();
+  fs::create_dir_all (&private_dir) . unwrap ();
+  let public_path : PathBuf = public_dir . join ("member.skg");
+  let private_path : PathBuf = private_dir . join ("member.skg");
+  let initial : &str = "pid: member\ntitle: member\n";
+  fs::write (&public_path, initial) . unwrap ();
+  fs::write (&private_path, initial) . unwrap ();
+  { let mut index : Index =
+      repository . index () . unwrap ();
+    index . add_path (Path::new ("public/member.skg")) . unwrap ();
+    index . add_path (Path::new ("private/member.skg")) . unwrap ();
+    index . write () . unwrap ();
+    let tree_id : Oid = index . write_tree () . unwrap ();
+    let tree : Tree =
+      repository . find_tree (tree_id) . unwrap ();
+    let signature : Signature =
+      Signature::now ("skg test", "skg@example.com") . unwrap ();
+    repository . commit (
+      Some ("HEAD"), &signature, &signature,
+      "initial", &tree, &[] ) . unwrap (); }
+  let relation : &str =
+    "pid: member\ntitle: member\noverrides_view_of:\n  - owner\n";
+  fs::write (&public_path, relation) . unwrap ();
+  { let mut index : Index =
+      repository . index () . unwrap ();
+    index . add_path (Path::new ("public/member.skg")) . unwrap ();
+    index . write () . unwrap (); }
+  fs::write (&private_path, relation) . unwrap ();
+  let public_source : SourceName = SourceName::from ("public");
+  let private_source : SourceName = SourceName::from ("private");
+  let public_diff : SourceDiff =
+    compute_diff_for_source (&public_dir, &public_source) . unwrap ();
+  let private_diff : SourceDiff =
+    compute_diff_for_source (&private_dir, &private_source) . unwrap ();
+  fs::write (
+    &public_path,
+    "pid: member\ntitle: member\noverrides_view_of:\n  - other\n" )
+    . unwrap ();
+  (directory, public_diff, private_diff) }
+
+#[test]
+fn modified_git_relation_sign_uses_captured_source_provenance () {
+  let (_private_dir, private_diff) : (TempDir, SourceDiff) =
+    real_git_relation_diff ("private");
+  let private_diffs : Option<HashMap<SourceName, SourceDiff>> =
+    Some ( HashMap::from ([(src ("private"), private_diff)]) );
+  let public_only : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName::from ("public"),
+    sources : BTreeSet::from ([src ("public")]) };
+  let private_entry : &NodeCompleteDiff =
+    private_diffs . as_ref () . unwrap () [ &src ("private") ]
+      . unstaged . get (Path::new ("member.skg")) . unwrap ();
+  assert_eq! (
+    private_entry . before_node . as_ref () . unwrap () . source,
+    src ("private") );
+  assert_eq! (
+    private_entry . after_node . as_ref () . unwrap () . source,
+    src ("private") );
+  let private_scan : HashMap<ID, MembershipAxes> =
+    inverse_scan_for_inbound_col (
+      &id ("owner"), NodeRelation::OverridesViewOf,
+      &private_diffs, Some (&public_only) );
+  assert! (
+    private_scan . is_empty (),
+    "an inactive relation edit must not create a public inbound member: {:?}",
+    private_scan );
+
+  let (_public_dir, public_diff) : (TempDir, SourceDiff) =
+    real_git_relation_diff ("public");
+  let public_diffs : Option<HashMap<SourceName, SourceDiff>> =
+    Some ( HashMap::from ([(src ("public"), public_diff)]) );
+  let public_scan : HashMap<ID, MembershipAxes> =
+    inverse_scan_for_inbound_col (
+      &id ("owner"), NodeRelation::OverridesViewOf,
+      &public_diffs, Some (&public_only) );
+  assert_eq! (
+    public_scan [&id ("member")],
+    MembershipAxes { staged : None, unstaged : Some (Sign::Plus) } ); }
+
+#[test]
+fn shared_repo_diff_is_scoped_to_each_source_before_provenance_capture () {
+  let (_directory, public_diff, private_diff) : (TempDir, SourceDiff, SourceDiff) =
+    real_git_sibling_source_diffs ();
+  assert_eq! (public_diff . staged . len (), 1);
+  assert! (public_diff . staged . contains_key (Path::new ("member.skg")));
+  assert! (public_diff . unstaged . is_empty ());
+  assert! (private_diff . staged . is_empty ());
+  assert_eq! (private_diff . unstaged . len (), 1);
+  assert! (private_diff . unstaged
+    . contains_key (Path::new ("member.skg")));
+  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+    Some ( HashMap::from ([
+      (src ("public"), public_diff),
+      (src ("private"), private_diff) ]) );
+  let public_only : ActiveSourceSet = ActiveSourceSet {
+    name    : SourceSetName::from ("public"),
+    sources : BTreeSet::from ([src ("public")]) };
+  let scan : HashMap<ID, MembershipAxes> =
+    inverse_scan_for_inbound_col (
+      &id ("owner"), NodeRelation::OverridesViewOf,
+      &diffs, Some (&public_only) );
+  assert_eq! (
+    scan [&id ("member")],
+    MembershipAxes { staged : Some (Sign::Plus), unstaged : None } ); }

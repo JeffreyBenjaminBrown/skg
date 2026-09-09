@@ -16,7 +16,8 @@ use std::fs;
 /// 'staged'   compares HEAD  to the index.
 /// 'unstaged' compares the index to the worktree.
 pub fn compute_diff_for_source (
-  source_path : &Path
+  source_path : &Path,
+  source_name : &SourceName,
 ) -> Result<SourceDiff, Box<dyn StdError>> {
   let repo : git2::Repository =
     match open_repo (source_path) {
@@ -26,12 +27,12 @@ pub fn compute_diff_for_source (
     build_stage_diffs (
       source_path, &repo,
       &get_staged_changed_skg_files (&repo) ?,
-      Stage::Staged ) ?;
+      Stage::Staged, source_name ) ?;
   let unstaged : HashMap<PathBuf, NodeCompleteDiff> =
     build_stage_diffs (
       source_path, &repo,
       &get_unstaged_changed_skg_files (&repo) ?,
-      Stage::Unstaged ) ?;
+      Stage::Unstaged, source_name ) ?;
   let deleted_nodes : HashMap<ID, NodeComplete> =
     collect_deleted_nodes_for_both (&staged, &unstaged);
   let added_nodes : HashMap<ID, NodeComplete> =
@@ -51,24 +52,57 @@ fn build_stage_diffs (
   repo        : &git2::Repository,
   changed     : &[PathDiffStatus],
   stage       : Stage,
+  source_name : &SourceName,
 ) -> Result<HashMap<PathBuf, NodeCompleteDiff>, Box<dyn StdError>> {
   let mut result : HashMap<PathBuf, NodeCompleteDiff> =
     HashMap::new();
   for entry in changed {
+    let source_relative_path : Option<PathBuf> =
+      source_relative_changed_path (repo, source_path, &entry . path);
+    let Some (source_relative_path) : Option<PathBuf> = source_relative_path else {
+      continue; };
     let nodecomplete_diff : NodeCompleteDiff =
       compute_nodecomplete_diff_for_stage (
-        source_path, repo, entry, stage ) ?;
-    result . insert ( entry . path . clone(), nodecomplete_diff ); }
+        source_path, repo, entry, &source_relative_path,
+        stage, source_name ) ?;
+    result . insert ( source_relative_path, nodecomplete_diff ); }
   Ok (result) }
+
+/// Return a changed path only when it is a direct `.skg` child of this
+/// configured source. Git diffs are repository-wide; source enumeration is
+/// direct-child-only, so sibling source directories must never be parsed
+/// under the current source's identity.
+fn source_relative_changed_path (
+  repo        : &git2::Repository,
+  source_path : &Path,
+  repo_path   : &Path,
+) -> Option<PathBuf> {
+  let source_relative_path : PathBuf =
+    path_relative_to_repo (repo, source_path) ?;
+  let file_relative_path : &Path =
+    if source_relative_path . as_os_str () . is_empty () {
+      repo_path
+    } else {
+      repo_path . strip_prefix (&source_relative_path) . ok () ? };
+  if file_relative_path . parent () . is_some_and (
+    |parent| ! parent . as_os_str () . is_empty () ) {
+    return None; }
+  let extension : Option<&str> = file_relative_path . extension ()
+    . and_then ( |extension| extension . to_str () );
+  if extension != Some ("skg") {
+    return None; }
+  Some (file_relative_path . to_path_buf ()) }
 
 fn compute_nodecomplete_diff_for_stage (
   source_path : &Path,
   repo        : &git2::Repository,
   entry       : &PathDiffStatus,
+  source_relative_path : &Path,
   stage       : Stage,
+  source_name : &SourceName,
 ) -> Result<NodeCompleteDiff, Box<dyn StdError>> {
   let abs_path : PathBuf =
-    source_path . join ( &entry . path );
+    source_path . join ( source_relative_path );
   let rel_path : PathBuf =
     path_relative_to_repo ( repo, &abs_path )
       . unwrap_or_else ( || entry . path . clone() );
@@ -76,12 +110,16 @@ fn compute_nodecomplete_diff_for_stage (
   // "after"  is index for staged, worktree for unstaged.
   let before_node : Option<NodeComplete> = match (&entry . status, stage) {
     (GitDiffStatus::Added, _)    => None,
-    (_, Stage::Staged)           => load_from_head  (repo, &rel_path),
-    (_, Stage::Unstaged)         => load_from_index (repo, &rel_path), };
+    (_, Stage::Staged)           =>
+      load_from_head  (repo, &rel_path, source_name),
+    (_, Stage::Unstaged)         =>
+      load_from_index (repo, &rel_path, source_name), };
   let after_node : Option<NodeComplete> = match (&entry . status, stage) {
     (GitDiffStatus::Deleted, _)  => None,
-    (_, Stage::Staged)           => load_from_index (repo, &rel_path),
-    (_, Stage::Unstaged)         => load_from_disk  (&abs_path), };
+    (_, Stage::Staged)           =>
+      load_from_index (repo, &rel_path, source_name),
+    (_, Stage::Unstaged)         =>
+      load_from_disk  (&abs_path, source_name), };
   let node_changes : Option<NodeChanges> =
     match (&before_node, &after_node) {
       (Some (old), Some (new)) => Some ( compare_nodecompletes (old, new) ),
@@ -89,30 +127,26 @@ fn compute_nodecomplete_diff_for_stage (
   Ok ( NodeCompleteDiff {
     status: entry . status . clone(),
     node_changes,
-    before_node: before_node . filter (
-      |_| entry . status == GitDiffStatus::Deleted),
-    after_node: after_node . filter (
-      |_| entry . status == GitDiffStatus::Added) }) }
+    before_node,
+    after_node }) }
 
-/// Parses a NodeFS from a YAML blob, then attaches a default
-/// (empty) source to produce a NodeComplete. This preserves today's
-/// behavior: diff.rs doesn't know the real source of its blobs,
-/// so nodes built here have source at its default. Downstream
-/// consumers that care about source do not use diff-derived nodes.
+/// Parses a NodeFS from a YAML blob, then attaches the configured source
+/// whose historical section supplied the blob.
 ///
 /// Parse failures are logged at WARN level (with path + origin for
 /// context) and returned as None — distinct from "file absent",
 /// which also returns None but without logging. Callers can't
 /// currently distinguish the two cases, but a corrupt file will at
 /// least show up in the server logs.
-fn nodefs_as_nodecomplete_with_default_source (
+fn nodefs_as_nodecomplete_with_source (
   yaml    : &str,
   origin  : &str,
   context : &Path,
+  source  : &SourceName,
 ) -> Option<NodeComplete> {
   match serde_yaml::from_str::<NodeFS> (yaml) {
     Ok (node_fs) =>
-      Some ( node_fs . into_complete_as_single_section ( SourceName::default ())),
+      Some ( node_fs . into_complete_as_single_section ( source . clone ())),
     Err (e) => {
       tracing::warn! (
         origin, path = %context . display (), error = %e,
@@ -123,25 +157,28 @@ fn nodefs_as_nodecomplete_with_default_source (
 fn load_from_head (
   repo     : &git2::Repository,
   rel_path : &Path,
+  source   : &SourceName,
 ) -> Option<NodeComplete> {
   get_file_content_at_head (repo, rel_path) . ok () . flatten ()
-    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (
-                       &s, "HEAD", rel_path) ) }
+    . and_then ( |s| nodefs_as_nodecomplete_with_source (
+                       &s, "HEAD", rel_path, source) ) }
 
 fn load_from_index (
   repo     : &git2::Repository,
   rel_path : &Path,
+  source   : &SourceName,
 ) -> Option<NodeComplete> {
   get_file_content_at_index (repo, rel_path) . ok () . flatten ()
-    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (
-                       &s, "index", rel_path) ) }
+    . and_then ( |s| nodefs_as_nodecomplete_with_source (
+                       &s, "index", rel_path, source) ) }
 
 fn load_from_disk (
   abs_path : &Path,
+  source   : &SourceName,
 ) -> Option<NodeComplete> {
   fs::read_to_string (abs_path) . ok ()
-    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (
-                       &s, "worktree", abs_path) ) }
+    . and_then ( |s| nodefs_as_nodecomplete_with_source (
+                       &s, "worktree", abs_path, source) ) }
 
 /// Collect NodeCompletes for files that were deleted in either stage.
 /// Used to look up titles and bodies for phantom nodes.
