@@ -1,0 +1,56 @@
+* Strip-body-whitespace writer audit
+
+The current 'strip_body_whitespace_and_refresh_caches' path reads every
+source from live disk, rewrites owned files one at a time, updates Tantivy
+directly, and publishes a rebuilt graph. It therefore bypasses the selected
+manifest fence and the ordinary save journal. Its caller in 'serve.rs' does
+hold a 'with_store_transition' owner reservation, but the reservation alone
+does not retain before/after bytes or produce a recoverable
+'SaveOperation' record.
+
+The smallest semantic rewrite is to enumerate 'nodecompletes_from_graph' from
+the selected graph, transform only owned nodes whose body changes, and pass
+the resulting 'DefineNode::Save' list to
+'update_graph_including_nodeMerges_with_operation'. That common path already
+preflights the selected manifest, journals the complete filesystem mutation
+when given a 'SaveOperation', updates Tantivy as one generation, and publishes
+the resulting graph/search pair.
+
+The strip request has no ordinary save content or request-base fingerprint,
+so it uses a command operation envelope with UUID operation and server-session
+fields. The command's durable fingerprint covers canonical semantic fields,
+configuration and source identity while excluding transport delivery fields.
+The handler validates the current server session before first execution,
+rechecks the command interpretation after taking the writer reservation, and
+replays an already terminal outcome before that session check.
+
+Socket-backed focused tests use a selected graph whose matching Searcher is
+retained, change owned body bytes, and assert the resulting graph, Searcher
+query, and selected manifest bytes. They also cover an unrelated newer foreign
+file, a selected-path conflict that leaves the entire batch untouched, and
+duplicate delivery after a newer external write.
+
+The command identity decision is now implemented: the strip client already
+sends UUID operation and server-session fields, and 'SaveOperation::from_command'
+binds the command's canonical semantic fields plus config/source identity while
+excluding operation, session, and delivery request IDs. The strip dispatch now
+uses that operation through the common updater, publishes before committing the
+terminal outcome, and refuses duplicate delivery by replaying the recorded
+response. Equivalent configurations inserted in different map orders produce
+the same command fingerprint, so a restart can find the original outcome.
+
+Links: [[../server/serve/handlers/strip_body_whitespace.rs][strip handler]]
+and [[../server/save.rs][ordinary save batch]] and
+[[../server/runtime/save_operations.rs][ordinary save journal]].
+
+** Replay identity check
+SourceCatalog already serializes declaration-ordered entries, and its HashMap
+compatibility constructor sorts map input. Serializing the actual SkgConfig
+therefore preserves every field and meaningful source/privacy order without a
+second hand-maintained projection. The command sorts semantic request fields
+and rejects duplicate keys; transport fields do not change its identity. Tests
+cover map construction order, semantic field order and changed source order.
+
+Publication and durable outcome errors explicitly block the writer reservation.
+A published pair alone cannot release admission while its operation outcome
+remains unresolved.

@@ -3,100 +3,211 @@
 //! blank lines from the body's tail), in every OWNED source in the
 //! config -- foreign sources are read-only, and stripping them would
 //! make them diverge from their upstreams (Jeff settled on owned
-//! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
-//! and the Tantivy index; both are refreshed here. TypeDB is
-//! untouched: it stores no body text, and the textlinks it derives
-//! from bodies cannot be changed by stripping trailing whitespace.
+//! only) -- rewriting only the .skg files whose bodies changed. The
+//! selected graph and Tantivy index are refreshed through the ordinary
+//! save batch.
 
+#[cfg(test)]
 use crate::dbs::filesystem::multiple_nodes::{
   LoadedCorpus,
   read_all_skg_files_with_manifest,
 };
-use crate::dbs::filesystem::one_node::prepare_nodecomplete_telescope;
-use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::tantivy::write::update_index_with_nodes;
-use crate::dbs::tantivy::background_writer::{
-  latest_tantivy_generation,
-  wait_for_tantivy_writes_through,
-};
+use crate::save::{nodecompletes_from_graph,
+                  update_graph_including_nodeMerges_with_operation};
+use crate::maintenance::save_journal::SaveOperationStatus;
+use crate::runtime::save_operations::SaveOperation;
+use crate::runtime::{SelectedRuntimeSnapshot, ServerRuntime};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
+use crate::serve::util::{send_response_with_length_prefix,
+                         tag_terminal_text_response,
+                         tag_text_response};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{SkgConfig, SourceName};
+use crate::types::misc::SourceName;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::save::{DefineNode, SaveNode};
+use crate::types::store_state::SelectedStoreState;
+use crate::source_sets::ActiveSourceSet;
+
+#[cfg(test)]
+use crate::dbs::filesystem::one_node::prepare_nodecomplete_telescope;
+#[cfg(test)]
+use crate::types::misc::SkgConfig;
+#[cfg(test)]
 use crate::types::store_state::SelectedPathManifest;
-
-use std::collections::BTreeMap;
-use std::net::TcpStream;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
+use std::net::TcpStream;
+use futures::executor::block_on;
 
-pub fn handle_strip_body_whitespace_request (
-  stream : &mut TcpStream,
-  env    : &mut SkgEnv,
-) {
-  tracing::info!("Stripping trailing whitespace from bodies...");
-  let msg : String =
-    match strip_body_whitespace_and_refresh_caches (env) {
-      Ok (report) => report,
-      Err (e) => {
-        tracing::error!("Body whitespace strip failed: {}", e);
-        format! ("Body whitespace strip failed: {}", e) }};
-  let _ = send_response_with_length_prefix (
-    stream,
-    & tag_text_response (
-      TcpToClient::StripBodyWhitespace, &msg )); }
-
-/// Strips on disk, then refreshes the two body-holding caches: the
-/// in-Rust graph (rebuilt whole, from the nodes already in hand) and
-/// the Tantivy index (per changed node, body search would otherwise
-/// match stale text).
-fn strip_body_whitespace_and_refresh_caches (
-  env : &mut SkgEnv,
+pub(crate) fn strip_body_whitespace_with_operation (
+  env       : &mut SkgEnv,
+  operation : &SaveOperation,
 ) -> Result<String, String> {
-  // The source scan decides the replacement graph, so classification belongs
-  // inside the same writer boundary as its disk writes and publication.
-  let _write_guard = futures::executor::block_on (
-    crate::write_lock::acquire_graph_write_lock ());
-  let tantivy_through = latest_tantivy_generation ();
-  let (all_nodes, changed, selected_manifest)
-    : (Vec<NodeComplete>, Vec<NodeComplete>, SelectedPathManifest) =
-    strip_body_whitespace_on_disk_with_manifest (& env . config) ?;
-  let owned_checked : usize =
-    all_nodes . iter ()
-    . filter ( |n| env . config . user_owns_source (& n . source) )
+  tracing::info!("Stripping trailing whitespace from bodies...");
+  let selected : Arc<SelectedStoreState> = env . in_rust_graph . load_full ();
+  let all_nodes : Vec<NodeComplete> = nodecompletes_from_graph (
+    &selected . graph);
+  let owned_checked : usize = all_nodes . iter ()
+    . filter (|node| env . config . user_owns_source (&node . source))
     . count ();
-  if changed . is_empty () {
-    return Ok ( format! (
-      "No body has trailing whitespace ({} files checked, in owned sources).",
-      owned_checked )); }
-  { let tantivy_nodes : Vec<NodeTantivy> =
-      changed . iter () . map (NodeTantivy::from) . collect ();
-    // No queued write older than this whole-graph normalization may land
-    // afterward and restore stale unstripped text.
-    if let Some (through) = tantivy_through {
-      let _ = wait_for_tantivy_writes_through (through); }
-    update_index_with_nodes (&tantivy_nodes, & env . tantivy_index)
-      . map_err ( |e| format! ("Tantivy update failed: {}", e) ) ?; }
-  { let old = env . in_rust_graph . load_full ();
-    env . in_rust_graph . store ( Arc::new (
-      old . with_acknowledged_rebuild (
-        InRustGraph::from_nodecompletes (&all_nodes),
-        selected_manifest)
-        . with_searcher (env . tantivy_index . reader . searcher ()) )); }
+  let mut changed : Vec<NodeComplete> = Vec::new ();
+  let mut definitions : Vec<DefineNode> = Vec::new ();
+  for node in all_nodes . iter () {
+    if ! env . config . user_owns_source (&node . source) { continue; }
+    let Some (body) = &node . body else { continue; };
+    let stripped : String = strip_trailing_whitespace_from_body (body);
+    if stripped == *body { continue; }
+    let mut updated : NodeComplete = node . clone ();
+    updated . body = if stripped . is_empty () {
+      None
+    } else { Some (stripped) };
+    changed . push (updated . clone ());
+    definitions . push (DefineNode::Save (SaveNode (updated)));
+  }
+  if definitions . is_empty () {
+    operation . prepare (Vec::new ())?;
+    operation . apply_authorized ()?;
+  } else {
+    block_on (update_graph_including_nodeMerges_with_operation (
+      definitions,
+      &[],
+      &[],
+      env . config . clone (),
+      &mut env . tantivy_index,
+      &env . in_rust_graph,
+      &HashSet::new (),
+      selected . graph_generation . get (),
+      Some (operation))) . map_err (|error| error . to_string ())?;
+    env . searcher = env . in_rust_graph . load_full () . searcher . clone ()
+      . expect ("completed strip has a matching Searcher");
+  }
   let breakdown : String = {
-    // BTreeMap so the report lists sources in a stable order.
     let mut counts : BTreeMap<SourceName, usize> = BTreeMap::new ();
     for node in &changed {
-      * counts . entry ( node . source . clone () ) . or_insert (0)
-        += 1; }
-    counts . iter ()
-      . map ( |(source, n)| format! ("{}: {}", source, n) )
-      . collect::<Vec<String>> ()
-      . join (", ") };
-  Ok ( format! (
-    "Stripped trailing whitespace from {} of {} files in owned sources ({}).",
-    changed . len (), owned_checked, breakdown )) }
+      * counts . entry (node . source . clone ()) . or_insert (0) += 1;
+    }
+    counts . iter () . map (|(source, count)|
+      format! ("{}: {}", source, count)) . collect::<Vec<String>> () . join (", ")
+  };
+  if changed . is_empty () {
+    Ok (format! (
+      "No body has trailing whitespace ({} files checked, in owned sources).",
+      owned_checked))
+  } else {
+    Ok (format! (
+      "Stripped trailing whitespace from {} of {} files in owned sources ({}).",
+      changed . len (), owned_checked, breakdown))
+  }
+}
+
+pub(crate) fn handle_strip_body_whitespace_request (
+  stream  : &mut TcpStream,
+  request : &str,
+  runtime : &ServerRuntime,
+) {
+  let snapshot : Arc<SelectedRuntimeSnapshot> = runtime . selected_snapshot ();
+  let active : ActiveSourceSet = runtime . interactive
+    . lock () . unwrap () . active_source_set . clone ();
+  let operation : SaveOperation = match SaveOperation::from_command (
+    request, &snapshot . env . config, &active) {
+    Ok (operation) => operation,
+    Err (reason) => { send_strip_runtime_error (stream, &reason); return; }, };
+  match operation . recorded_response () {
+    Ok (Some (response)) => {
+      let _ = send_response_with_length_prefix (stream, &response);
+      return; }
+    Err (reason) => {
+      let response : String = operation . tag_response (
+        &tag_text_response (TcpToClient::StripBodyWhitespace, &reason),
+        "blocked");
+      let _ = send_response_with_length_prefix (stream, &response);
+      return; }
+    Ok (None) => {}
+  }
+  if let Err (reason) = runtime . validate_session_authority (request) {
+    let response : String = operation . tag_response (
+      &tag_text_response (TcpToClient::StripBodyWhitespace, &reason),
+      "refused");
+    match operation . refuse (&response) {
+      Ok (()) => { let _ = send_response_with_length_prefix (stream, &response); }
+      Err (error) => send_strip_runtime_error (stream, &error), }
+    return;
+  }
+  let result : Result<Result<String, String>, String> = runtime . with_store_transition (
+    operation . operation_id . clone (), |env, interactive, control| {
+      let locked_active : ActiveSourceSet =
+        interactive . active_source_set . clone ();
+      let locked_operation : SaveOperation = SaveOperation::from_command (
+        request, &env . config, &locked_active)?;
+      if ! operation . matches_interpretation (&locked_operation) {
+        return Err ("selected save interpretation changed before execution" . into ()); }
+      let operation : SaveOperation = operation . clone ()
+        . with_control (control . clone ());
+      match strip_body_whitespace_with_operation (env, &operation) {
+        Ok (report) => {
+          let response : String = operation . tag_response (
+            &tag_text_response (TcpToClient::StripBodyWhitespace, &report),
+            "committed");
+          let recorded : Result<(), String> = runtime
+            . publish_selected_from_env (control, env) . and_then (|_|
+              operation . commit (
+                &response,
+                &format! ("graph-{}-manifest-{}",
+                  env . in_rust_graph . load_full () . graph_generation . get (),
+                  env . in_rust_graph . load_full () . manifest_revision . get ())));
+          match recorded {
+            Ok (()) => Ok (response),
+            Err (reason) => {
+              let _ = control . block (reason . clone ());
+              Err (reason)
+            }
+          }
+        }
+        Err (reason) => {
+          let dispatched : bool = match operation . status () {
+            Ok (Some (snapshot)) => matches! (
+              snapshot . status,
+              SaveOperationStatus::Authorized { .. }
+              | SaveOperationStatus::AppliedAwaitingCommit),
+            Ok (None) => false,
+            Err (_) => true,
+          };
+          if dispatched { let _ = control . block (reason . clone ()); }
+          Err (reason)
+        }
+      }
+    });
+  match result {
+    Ok (Ok (response)) => {
+      let _ = send_response_with_length_prefix (stream, &response); }
+    Ok (Err (reason)) | Err (reason) => {
+      let can_refuse : bool = match operation . status () {
+        Ok (None) => true,
+        Ok (Some (snapshot)) => matches! (
+          snapshot . status,
+          SaveOperationStatus::PreparedUnAuthorized
+          | SaveOperationStatus::StagingUnAuthorized),
+        Err (_) => false,
+      };
+      if can_refuse {
+        let response : String = operation . tag_response (
+          &tag_text_response (TcpToClient::StripBodyWhitespace, &reason),
+          "refused");
+        match operation . refuse (&response) {
+          Ok (()) => { let _ = send_response_with_length_prefix (stream, &response); }
+          Err (error) => send_strip_runtime_error (stream, &error), }
+      } else { send_strip_runtime_error (stream, &reason); }
+    }
+  }
+}
+
+fn send_strip_runtime_error (
+  stream : &mut TcpStream,
+  error  : &str,
+) {
+  let _ = send_response_with_length_prefix (
+    stream, &tag_terminal_text_response (TcpToClient::Error, "failed", error));
+}
 
 /// Reads every node from every source in the config, then strips
 /// trailing whitespace from each line of each OWNED node's body,
@@ -109,6 +220,7 @@ fn strip_body_whitespace_and_refresh_caches (
 /// field rather than carrying 'body: ""'. Returns every node read
 /// (post-strip) and separately the changed nodes (for per-node cache
 /// updates and the report).
+#[cfg(test)]
 pub fn strip_body_whitespace_on_disk (
   config : &SkgConfig,
 ) -> Result<(Vec<NodeComplete>, Vec<NodeComplete>), String> {
@@ -116,6 +228,7 @@ pub fn strip_body_whitespace_on_disk (
   Ok ((all, changed))
 }
 
+#[cfg(test)]
 fn strip_body_whitespace_on_disk_with_manifest (
   config : &SkgConfig,
 ) -> Result<(Vec<NodeComplete>, Vec<NodeComplete>, SelectedPathManifest), String> {

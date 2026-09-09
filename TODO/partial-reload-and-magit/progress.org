@@ -2078,3 +2078,26 @@ Resolved target records must retain historical config and cyclic-root ranking
 facts with the owner selection outcome; result text belongs in a verified
 private artifact. Continue from these interfaces without rereading the earlier
 search/owner exploration. No new question for Jeff.
+
+* Simplify/cohere checkpoint: durable whitespace command
+** what's done and went well
+The product whitespace command transforms owned nodes from the selected graph
+and uses the ordinary save journal and manifest preflight for its whole batch.
+It publishes the matching graph/search pair before recording a replayable
+terminal response. It requires a command UUID and verified server session.
+Duplicate delivery replays the outcome without touching newer bytes.
+Five focused strip tests and three command fingerprint tests pass. Source
+privacy order remains part of command identity; semantic request order and
+transport IDs do not. Publication or outcome-persistence failure keeps write
+admission blocked.
+** Changes to the plan's envisioned order.
+This closes the already-open whitespace slice before query wait integration.
+The offline 'trim-node-bodies' migration remains separate from the product
+handler and passes its compilation check.
+** what's imperfect about what's done
+The publication/commit error guard is reviewed directly; the focused strip
+suite does not inject an in-process journal persistence failure. Existing
+ordinary-save crash tests exercise interruption boundaries separately.
+** choices determining the future
+Continue the bounded query wait integration from the recorded interfaces in
+[[file:../../codex-thinking/query-wait-server.org][the server note]].

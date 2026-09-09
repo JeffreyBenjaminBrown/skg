@@ -13,6 +13,7 @@ use crate::types::misc::SkgConfig;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use sexp::Sexp;
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -38,7 +39,61 @@ struct Interpretation<'a> {
   content              : &'a str,
 }
 
+#[derive(Serialize)]
+struct CommandInterpretation<'a> {
+  format_version       : u32,
+  command              : &'a str,
+  config_identity      : PathBuf,
+  data_root            : &'a std::path::Path,
+  archive_identity     : &'a std::path::Path,
+  config               : &'a str,
+  source_catalog_blake3 : String,
+  source_set           : &'a str,
+  semantic_request     : &'a str,
+}
+
 impl SaveOperation {
+  pub(crate) fn from_command (
+    request : &str,
+    config  : &SkgConfig,
+    active  : &ActiveSourceSet,
+  ) -> Result<Self, String> {
+    let operation_id : String = value_from_request_sexp ("operation-id", request)?;
+    uuid::Uuid::parse_str (&operation_id)
+      . map_err (|_| "command operation-id must be a UUID" . to_string ())?;
+    let server_session_id : String =
+      value_from_request_sexp ("server-session-id", request)?;
+    uuid::Uuid::parse_str (&server_session_id)
+      . map_err (|_| "command server-session-id must be a UUID" . to_string ())?;
+    let command : String = value_from_request_sexp ("request", request)?;
+    let semantic_request : String = semantic_command_request (request)?;
+    let canonical_config : String = canonical_command_config (config)?;
+    let evidence : CommandInterpretation<'_> = CommandInterpretation {
+      format_version: 1,
+      command: &command,
+      config_identity: config_identity (config),
+      data_root: &config . data_root,
+      archive_identity: &config . maintenance_archive_identity,
+      config: &canonical_config,
+      source_catalog_blake3: source_catalog_blake3 (config),
+      source_set: &active . name . 0,
+      semantic_request: &semantic_request,
+    };
+    let evidence_bytes : Vec<u8> = serde_yaml::to_string (&evidence)
+      . map_err (|error| error . to_string ())? . into_bytes ();
+    let mut digest : Sha256 = Sha256::new ();
+    digest . update (&evidence_bytes);
+    let fingerprint : String = format! ("{:x}", digest . finalize ());
+    let interpretation : SaveInterpretationEvidence = SaveInterpretationEvidence {
+      identity: interpretation_identity (config, active),
+      bytes: evidence_bytes,
+    };
+    Ok (Self {
+      operation_id, fingerprint, server_session_id, control: None,
+      store: save_journal_for_config (config), interpretation,
+    })
+  }
+
   pub(crate) fn from_request (
     request : &str,
     content : &str,
@@ -77,6 +132,16 @@ impl SaveOperation {
   pub(crate) fn with_control (mut self, control : super::MutationControl) -> Self {
     self . control = Some (control);
     self
+  }
+
+  pub(crate) fn matches_interpretation (
+    &self,
+    other : &Self,
+  ) -> bool {
+    self . operation_id == other . operation_id
+      && self . fingerprint == other . fingerprint
+      && self . interpretation . identity == other . interpretation . identity
+      && self . interpretation . bytes == other . interpretation . bytes
   }
 
   pub(crate) fn status (&self) -> Result<Option<SaveOperationSnapshot>, String> {
@@ -167,6 +232,39 @@ impl SaveOperation {
       &tag_operation_response (response, &self . operation_id, &self . fingerprint, state),
       &self . server_session_id)
   }
+}
+
+fn canonical_command_config (
+  config : &SkgConfig,
+) -> Result<String, String> {
+  // SourceCatalog serializes its declaration-ordered entries, while its
+  // HashMap compatibility constructor already normalizes map iteration.
+  // Preserve this privacy order and every serialized configuration field.
+  serde_yaml::to_string (config) . map_err (|error| error . to_string ())
+}
+
+fn semantic_command_request (
+  request : &str,
+) -> Result<String, String> {
+  let parsed : Sexp = sexp::parse (request)
+    . map_err (|error| format! ("malformed command request: {}", error))?;
+  let Sexp::List (fields) = parsed else {
+    return Err ("command request must be a field list" . into ()); };
+  let mut keys : std::collections::BTreeSet<String> = Default::default ();
+  let mut semantic_fields : Vec<Sexp> = Vec::new ();
+  for field in fields {
+    let Sexp::List (parts) : &Sexp = &field else {
+      return Err ("command fields must be key/value pairs" . into ()); };
+    let Some (Sexp::Atom (sexp::Atom::S (key))) : Option<&Sexp> = parts . first ()
+      else { return Err ("command field must have a string key" . into ()); };
+    if ! keys . insert (key . clone ()) {
+      return Err (format! ("duplicate command field: {}", key)); }
+    if !matches! (key . as_str (),
+      "operation-id" | "server-session-id" | "request-id") {
+      semantic_fields . push (field); }
+  }
+  semantic_fields . sort_by_key (Sexp::to_string);
+  Ok (Sexp::List (semantic_fields) . to_string ())
 }
 
 #[cfg(test)]
@@ -270,6 +368,10 @@ fn validate_request_fingerprint (request : &str, content : &str) -> Result<Strin
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::source_sets::{ActiveSourceSet, SourceSetName};
+  use crate::types::misc::{SkgfileSource, SourceName};
+  use std::collections::{BTreeSet, HashMap};
+  use std::path::PathBuf;
 
   #[test]
   fn exact_utf8_intent_and_body_are_bound_before_duplicate_lookup () {
@@ -302,6 +404,105 @@ mod tests {
       &original, "new-server");
     assert_eq! (replayed, original);
     assert! (!replayed . contains ("new-server"));
+  }
+
+  #[test]
+  fn command_fingerprint_excludes_transport_request_id () {
+    let config : SkgConfig = SkgConfig::dummyFromSources (Default::default ());
+    let active : ActiveSourceSet = ActiveSourceSet {
+      name: SourceSetName::from ("all"),
+      sources: BTreeSet::new (),
+    };
+    let first : SaveOperation = SaveOperation::from_command (
+      "((request . \"strip body whitespace\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\") \
+        (request-id . \"delivery-one\"))",
+      &config, &active) . unwrap ();
+    let second : SaveOperation = SaveOperation::from_command (
+      "((request . \"strip body whitespace\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\") \
+        (request-id . \"delivery-two\"))",
+      &config, &active) . unwrap ();
+    assert_eq! (first . fingerprint, second . fingerprint);
+  }
+
+  #[test]
+  fn command_fingerprint_binds_semantic_arguments () {
+    let config : SkgConfig = SkgConfig::dummyFromSources (Default::default ());
+    let active : ActiveSourceSet = ActiveSourceSet {
+      name: SourceSetName::from ("all"),
+      sources: BTreeSet::new (),
+    };
+    let first : SaveOperation = SaveOperation::from_command (
+      "((request . \"strip body whitespace\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\") \
+        (scope . \"owned\"))",
+      &config, &active) . unwrap ();
+    let second : SaveOperation = SaveOperation::from_command (
+      "((request . \"strip body whitespace\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\") \
+        (scope . \"all\"))",
+      &config, &active) . unwrap ();
+    assert_ne! (first . fingerprint, second . fingerprint);
+    let reordered : SaveOperation = SaveOperation::from_command (
+      "((scope . \"owned\") (request . \"strip body whitespace\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\"))",
+      &config, &active) . unwrap ();
+    assert! (first . matches_interpretation (&reordered));
+    assert! (semantic_command_request (
+      "((request . \"strip body whitespace\") (scope . \"owned\") \
+        (scope . \"all\"))") . is_err ());
+  }
+
+  #[test]
+  fn command_fingerprint_is_stable_across_config_map_order_and_transport_order () {
+    let make_source = |name : &str| -> SkgfileSource {
+      SkgfileSource {
+        name: SourceName::from (name), abbreviation: None,
+        path: PathBuf::from (format! ("/tmp/{}", name)),
+        user_owns_it: true,
+      }
+    };
+    let first_config : SkgConfig = SkgConfig::from_sources (
+      HashMap::from ([
+        (SourceName::from ("z"), make_source ("z")),
+        (SourceName::from ("a"), make_source ("a")),
+      ]), "/tmp/tantivy-command-one");
+    let mut second_config : SkgConfig = SkgConfig::from_sources (
+      HashMap::from ([
+        (SourceName::from ("a"), make_source ("a")),
+        (SourceName::from ("z"), make_source ("z")),
+      ]), "/tmp/tantivy-command-one");
+    let active : ActiveSourceSet = ActiveSourceSet {
+      name: SourceSetName::from ("all"), sources: BTreeSet::new (), };
+    let first : SaveOperation = SaveOperation::from_command (
+      "((request . \"strip body whitespace\") (request-id . \"one\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\"))",
+      &first_config, &active) . unwrap ();
+    let second : SaveOperation = SaveOperation::from_command (
+      "((operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (request . \"strip body whitespace\") (server-session-id . \
+        \"550e8400-e29b-41d4-a716-446655440001\") (request-id . \"two\"))",
+      &second_config, &active) . unwrap ();
+    assert_eq! (first . fingerprint, second . fingerprint);
+    assert! (first . matches_interpretation (&second));
+    let sources : Vec<SkgfileSource> = second_config . sources . values ()
+      . cloned () . collect ();
+    second_config . sources = Default::default ();
+    for source in sources . into_iter () . rev () {
+      second_config . sources . insert (source . name . clone (), source); }
+    let reordered : SaveOperation = SaveOperation::from_command (
+      "((request . \"strip body whitespace\") \
+        (operation-id . \"550e8400-e29b-41d4-a716-446655440000\") \
+        (server-session-id . \"550e8400-e29b-41d4-a716-446655440001\"))",
+      &second_config, &active) . unwrap ();
+    assert_ne! (first . fingerprint, reordered . fingerprint);
   }
 }
 

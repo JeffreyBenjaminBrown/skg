@@ -556,12 +556,8 @@ fn dispatch_request (
         stream, &snapshot . env . config, &snapshot . selected . graph, request); }
     RequestType::RebuildDbs => {
       handle_rebuild_dbs_request (stream, runtime); }
-    RequestType::StripBodyWhitespace => {
-      if let Err (error) = runtime . with_store_transition (
-          format! ("strip-whitespace/{}", uuid::Uuid::new_v4 ()), |env, _, control| {
-            if let Err (error) = control . authorize () { send_runtime_error (stream, &error); return; }
-            handle_strip_body_whitespace_request (stream, env); })
-      { send_runtime_error (stream, &error); }}
+    RequestType::StripBodyWhitespace =>
+      handle_strip_body_whitespace_request (stream, request, runtime),
     RequestType::RerenderAllViews => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
         let InteractiveSession {
