@@ -544,7 +544,7 @@ fn build_evidence (
   }) . collect ();
   let recovery = MaintenanceRecoveryPayload {
     format_version: EVIDENCE_FORMAT_VERSION,
-    g0_manifest: selected . manifest . clone (),
+    g0_manifest: (*selected . manifest) . clone (),
     g0_nodes,
     node_delta,
     path_delta,
@@ -1376,7 +1376,7 @@ mod tests {
       config_file_blake3: config_file_blake3 (&config),
       source_catalog_blake3: source_catalog_blake3 (&config),
       config: Arc::new (config . clone ()),
-      manifest: selected . manifest . clone (),
+      manifest: (*selected . manifest) . clone (),
       base_graph: selected . graph . clone (),
       graph: Arc::new (InRustGraph::from_nodecompletes (&after_nodes)),
       definitions: Vec::new (),
@@ -1571,7 +1571,7 @@ mod tests {
       Some (&before));
     assert_eq! (reconstructed . g1_nodes . get (&pid . to_string ()),
       Some (&after));
-    assert_eq! (reconstructed . g0_manifest, selected . manifest);
+    assert_eq! (reconstructed . g0_manifest, *selected . manifest);
     assert_eq! (reconstructed . g1_manifest, candidate . manifest);
     assert! (!publication . path . join ("bundle.yaml") . exists ());
     assert! (publication . path . join (HEADER_FILENAME) . exists ());

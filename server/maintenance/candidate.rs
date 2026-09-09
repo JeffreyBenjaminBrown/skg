@@ -281,7 +281,7 @@ fn observe_complete_disk_inner (
   retain_noop_candidate : bool,
 ) -> Result<DiskObservation, String> {
   let captured = capture_selected_corpus (config)?;
-  if captured . manifest == selected . manifest && !retain_noop_candidate {
+  if captured . manifest == *selected . manifest && !retain_noop_candidate {
     return Ok (DiskObservation::ByteEquivalent); }
 
   let (nodes, violations) = fold_grouped_sections (
@@ -413,7 +413,7 @@ fn observe_targeted_disk_inner (
   // an empty target set.  It still gets a no-op candidate so its durable
   // archive can reach a terminal result carrying per-ID rejection reasons.
   let captured = capture_targeted_telescopes (config, targets)?;
-  let mut manifest = selected . manifest . clone ();
+  let mut manifest = (*selected . manifest) . clone ();
   for target in targets {
     for source in config . sources . values () {
       manifest . remove (&source . path . join (format! ("{}.skg", target))); }
@@ -925,7 +925,7 @@ mod tests {
     let DiskObservation::Valid (empty) = empty else {
       panic! ("empty resolved target set did not produce a no-op candidate"); };
     assert! (empty . definitions . is_empty ());
-    assert_eq! (empty . manifest, selected . manifest);
+    assert_eq! (empty . manifest, *selected . manifest);
 
     // The explicit operation still needs one candidate identity and the
     // archive/presentation lifecycle even when the selected bytes are exact.
@@ -936,7 +936,7 @@ mod tests {
       panic! ("byte-identical explicit target did not produce a candidate"); };
     assert! (exact . definitions . is_empty ());
     assert! (exact . summary . changed_primary_ids . is_empty ());
-    assert_eq! (exact . manifest, selected . manifest);
+    assert_eq! (exact . manifest, *selected . manifest);
 
     fs::write (&a_path, "pid: A\n\ntitle: unchanged\n") . unwrap ();
     let reformatted = observe_targeted_disk (
@@ -946,7 +946,7 @@ mod tests {
       panic! ("semantic no-op explicit target did not produce a candidate"); };
     assert! (reformatted . definitions . is_empty ());
     assert! (reformatted . summary . changed_primary_ids . is_empty ());
-    assert_ne! (reformatted . manifest, selected . manifest);
+    assert_ne! (reformatted . manifest, *selected . manifest);
   }
 
   #[test]
@@ -972,7 +972,7 @@ mod tests {
     let DiskObservation::Valid (exact) = exact else {
       panic! ("maintenance byte equality did not produce a candidate"); };
     assert! (exact . definitions . is_empty ());
-    assert_eq! (exact . manifest, selected . manifest);
+    assert_eq! (exact . manifest, *selected . manifest);
     assert! (matches! (exact . disk_fence, CandidateDiskFence::Complete));
 
     fs::write (&a_path, "pid: A\n\ntitle: unchanged\n") . unwrap ();
@@ -982,7 +982,7 @@ mod tests {
       panic! ("maintenance semantic equality did not produce a candidate"); };
     assert! (reformatted . definitions . is_empty ());
     assert! (reformatted . summary . changed_primary_ids . is_empty ());
-    assert_ne! (reformatted . manifest, selected . manifest);
+    assert_ne! (reformatted . manifest, *selected . manifest);
   }
 
   #[test]

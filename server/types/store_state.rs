@@ -89,7 +89,7 @@ pub struct SelectedStoreState {
   pub searcher          : Option<Searcher>,
   pub graph_generation  : GraphGeneration,
   pub manifest_revision : ManifestRevision,
-  pub manifest          : SelectedPathManifest,
+  pub manifest          : Arc<SelectedPathManifest>,
   pub path_outcomes     : BTreeMap<PathBuf, SelectedPathOutcome>,
   pub cyclic_roots      : BTreeSet<ID>,
 
@@ -113,7 +113,7 @@ impl SelectedStoreState {
       searcher: None,
       graph_generation,
       manifest_revision: ManifestRevision::INITIAL,
-      manifest,
+      manifest: Arc::new (manifest),
       path_outcomes,
       cyclic_roots: BTreeSet::new (),
 
@@ -145,7 +145,7 @@ impl SelectedStoreState {
   ) -> Self {
     let mut next = self . clone ();
     next . manifest_revision = self . manifest_revision . successor ();
-    next . manifest = manifest;
+    next . manifest = Arc::new (manifest);
     next
   }
 
@@ -167,7 +167,7 @@ impl SelectedStoreState {
       searcher: None,
       graph_generation,
       manifest_revision: self . manifest_revision . successor (),
-      manifest,
+      manifest: Arc::new (manifest),
       path_outcomes,
       cyclic_roots: self . cyclic_roots . clone (),
 
@@ -200,7 +200,7 @@ impl SelectedStoreState {
       searcher: None,
       graph_generation,
       manifest_revision: self . manifest_revision . successor (),
-      manifest,
+      manifest: Arc::new (manifest),
       path_outcomes,
       cyclic_roots: self . cyclic_roots . clone (),
 

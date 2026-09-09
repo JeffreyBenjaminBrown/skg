@@ -553,7 +553,7 @@ async fn select_reserved_stores (
     TantivyGenerationStatus::Pending => unreachable! (), };
   let selected : Arc<SelectedStoreState> = env . in_rust_graph . load_full ();
   if selected . graph_generation != outcome . graph_generation
-  || selected . manifest != candidate . manifest
+  || *selected . manifest != candidate . manifest
   || graph_nodes (&selected . graph) != graph_nodes (&candidate . graph)
   || !healthy (&selected . tantivy_health)
   {
@@ -606,7 +606,7 @@ async fn select_reserved_manifest (
     runtime, incident_id, epoch, &env . config, &old_selected, candidate)
     . map_err (SelectionFailure::Superseded)?;
   mutation . authorize ()?;
-  let selected : Arc<SelectedStoreState> = if old_selected . manifest == candidate . manifest {
+  let selected : Arc<SelectedStoreState> = if *old_selected . manifest == candidate . manifest {
     old_selected . clone ()
   } else {
     let selected : Arc<SelectedStoreState> = Arc::new (

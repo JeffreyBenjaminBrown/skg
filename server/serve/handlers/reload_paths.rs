@@ -133,7 +133,7 @@ async fn reload_touched_telescopes_for_incident (
   let resolve = |id : &ID| -> ID {
     graph_before . pid_of (id)
       . unwrap_or_else ( || id . clone ()) };
-  let mut manifest : SelectedPathManifest = selected_before . manifest . clone ();
+  let mut manifest : SelectedPathManifest = (*selected_before . manifest) . clone ();
   let mut captured_for_revalidation : Vec<Vec<(PathBuf, Option<Vec<u8>>)>> =
     Vec::new ();
   let mut full_manifest_for_revalidation : Option<SelectedPathManifest> = None;

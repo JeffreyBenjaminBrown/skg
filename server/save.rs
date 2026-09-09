@@ -141,7 +141,7 @@ pub(crate) async fn apply_define_nodes_to_stores_with_operation (
   let mut new_graph : InRustGraph = (*old_graph_snap) . clone ();
   apply_definenodes_to_inRustGraph (&mut new_graph, &node_defs);
   let mut selected_manifest : SelectedPathManifest =
-    reload_manifest . unwrap_or_else ( || old_selected . manifest . clone ());
+    reload_manifest . unwrap_or_else ( || (*old_selected . manifest) . clone ());
 
   if write_fs { // FS (source of truth)
     // TODO: Print per-source write information

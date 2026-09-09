@@ -73,7 +73,7 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
     &mut candidate_graph, &primary_definenodes);
   let candidate_nodes : Vec<NodeComplete> =
     nodecompletes_from_graph (&candidate_graph);
-  let mut selected_manifest = old_selected . manifest . clone ();
+  let mut selected_manifest = (*old_selected . manifest) . clone ();
 
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
