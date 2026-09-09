@@ -1,6 +1,7 @@
 pub mod generation_gate;
 pub mod interactive_session;
 mod maintenance;
+mod incident_recovery;
 mod owner;
 pub(crate) mod save_operations;
 pub use save_operations::{recover_source_effects_before_startup, commit_recovered_source_effects};

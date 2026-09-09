@@ -80,6 +80,24 @@ pub fn plan_incident_view_settlements_from_report (
   interactive : &InteractiveSession,
   report      : &ReportGraphChangeSet<'_>,
 ) -> Result<Vec<ViewSettlementRecord>, String> {
+  plan_report_settlements (active, archive, Some (interactive), report)
+}
+
+/// Fresh startup has no retained live forests from the issuing process.
+pub fn plan_recovered_incident_view_settlements (
+  active : &ActiveMaintenance,
+  archive : &VerifiedInitialArchive,
+  report : &ReportGraphChangeSet<'_>,
+) -> Result<Vec<ViewSettlementRecord>, String> {
+  plan_report_settlements (active, archive, None, report)
+}
+
+fn plan_report_settlements (
+  active : &ActiveMaintenance,
+  archive : &VerifiedInitialArchive,
+  interactive : Option<&InteractiveSession>,
+  report : &ReportGraphChangeSet<'_>,
+) -> Result<Vec<ViewSettlementRecord>, String> {
   let archived : std::collections::BTreeMap<_, _> = archive . buffers . iter ()
     . map (|snapshot| (snapshot . buffer_id . as_str (), snapshot))
     . collect ();
@@ -98,7 +116,8 @@ pub fn plan_incident_view_settlements_from_report (
       . map (|value| crate::types::views_state::ViewUri::from_client_string (
         value . clone ()));
     let state = uri . as_ref () . and_then (|uri|
-      interactive . views . open_views . views . get (uri));
+      interactive . and_then (|interactive|
+        interactive . views . open_views . views . get (uri)));
     let authority_current = state . map (|state|
       state . client_buffer_id . as_deref () == Some (buffer_id)
       && state . graph_generation == frozen . graph_generation

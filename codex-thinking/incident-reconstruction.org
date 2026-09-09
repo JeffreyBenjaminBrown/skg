@@ -4,16 +4,27 @@ The maintenance evidence format v3 retains G0 semantic nodes, a G0 manifest,
 node delta and path delta. Hash-only manifest data cannot recover exact bytes.
 The current runtime retains G1 snapshots in memory before lifting admission,
 but those caches disappear at restart.
-** Open questions
-Does retained evidence include sufficient source/config interpretation to build
-G1 when current configuration differs? Which report classification paths need
-a reconstructed candidate before asking for the snapshot? Can exact staged
-application records finish old reports without reconstructing editor authority?
+** Resolved: graphs for reports, no new candidate authority
+[[file:incident-evidence-audit.org][The evidence audit]] found enough folded semantic data to reconstruct the
+report's G0/G1 graphs, without interpreting current source files or config.
+It did not find enough config data to recreate a full observation candidate.
+[[file:../server/runtime/incident_recovery.rs][The recovery adapter]] therefore uses a report-only input and no old live
+forests. It binds the bundle to the retained incident's checksums and IDs.
+Previously staged applications remain journaled as evidence; unacknowledged
+live offers become detachment/retirement obligations after a fresh session.
+** Edge found while implementing
+A crash can lose the G1 Git presentation fence before any application was
+staged. Assigning the current G2 signature to that missing field would invent
+history. The recovered report explicitly says the fence is unavailable; after
+all old live authority is retired, it can complete without such a fence.
+This exception does not permit applying old rendered text.
+** Next checks
+Real process death after G1 publication, then a later G2 save before restart:
+recover the older report, confirm current G2 bytes/queries stay selected,
+and prove report ACKs cannot mutate a newly opened view with a reused URI.
+Follow the client report path for detached clean buffers edited after the
+initial archive: preserve their current text and native undo.
 ** Safety condition for every experiment
 Fresh startup selects validated current G2. Reconstructing G0/G1 is private
 report work and must not replace the owner-selected pair or grant old-session
 buffer authority. Missing evidence must remain explicitly recoverable/blocked.
-** Next reads
-[[file:../server/maintenance/evidence.rs][evidence.rs]] around recovery payload,
-'reconstruct_evidence', load validation and build evidence; then the report
-planning paths in [[file:../server/serve/handlers/maintenance_protocol.rs][maintenance_protocol.rs]].

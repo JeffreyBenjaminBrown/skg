@@ -662,6 +662,10 @@ pub struct ActiveMaintenance {
   /// The original archive remains addressable after configuration replacement.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub archive_root_identity : Option<PathBuf>,
+  /// A restarted process retires outstanding live offers, retaining their
+  /// bytes as evidence without allowing them to affect its fresh views.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub authority_retired_by_session : Option<String>,
   #[serde(default)]
   pub source_set        : String,
   #[serde(default = "initial_graph_generation")]

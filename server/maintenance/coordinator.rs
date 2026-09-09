@@ -448,6 +448,7 @@ impl MaintenanceCoordinator {
       controller_session_id: String::new (),
       server_session_id: None,
       archive_root_identity: None,
+      authority_retired_by_session: None,
       source_set,
       g0_graph_generation,
       g0_manifest_revision,
@@ -1098,6 +1099,37 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  pub fn retire_incident_authority (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+    server_session : &str,
+  ) -> Result<bool, String> {
+    let active : &mut ActiveMaintenance = self . matching_incident_mut (incident_id, epoch)?;
+    if active . authority_retired_by_session . is_some () { return Ok (false); }
+    if server_session . is_empty ()
+    || active . server_session_id . as_deref () == Some (server_session) {
+      return Err ("live incident authority can only be retired by a fresh server session" . into ()); }
+    if active . selected_store . is_none () || !matches! (active . phase,
+        MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive) {
+      return Err ("report recovery cannot retire unresolved graph effects" . into ()); }
+    for record in active . view_settlements . values_mut () {
+      if record . acknowledged { continue; }
+      if matches! (record . requirement,
+          ViewSettlementRequirement::ApplicationAck | ViewSettlementRequirement::ReleaseAck) {
+        record . uncertainty_reason = Some (format! (
+          "server restart retired live authority; previous planned disposition: {}",
+          record . planned_disposition . label ()));
+        record . parse_uncertain = true;
+        if record . dirty {
+          record . planned_disposition = ViewDisposition::Interrupted;
+          record . requirement = ViewSettlementRequirement::RetirementAck;
+        } else {
+          record . planned_disposition = ViewDisposition::DetachedDerived;
+          record . requirement = ViewSettlementRequirement::ReleaseAck; } } }
+    active . authority_retired_by_session = Some (server_session . into ());
+    Ok (true) }
+
   pub fn record_scalar_challenge (
     &mut self,
     incident_id : &IncidentId,
@@ -1694,7 +1726,8 @@ impl MaintenanceCoordinator {
     if disposition == TerminalDisposition::Completed
     && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
         || !active . client_evidence_acknowledged
-        || active . presentation_fence . is_none ()
+        || (active . presentation_fence . is_none ()
+          && active . authority_retired_by_session . is_none ())
         || !active . pending_view_enrollments . is_empty ())
     {
       return Err (
@@ -1825,8 +1858,10 @@ fn acknowledge_settlement (
              == ack . resulting_server_revision
         && offer . resulting_application_token
              == ack . resulting_application_token => {}
-      (None, None)
-        if record . requirement != ViewSettlementRequirement::ApplicationAck => {}
+      (_, None)
+        if record . requirement != ViewSettlementRequirement::ApplicationAck
+        && (record . application . is_none ()
+          || active . authority_retired_by_session . is_some ()) => {}
       _ => return Err (format! (
         "buffer '{}' application ACK changed its staged authority", buffer_id)),
     }
@@ -2952,6 +2987,65 @@ mod tests {
       graph_generation: graph . successor (), manifest_revision: manifest . successor (),
       tantivy_generation: 1, tantivy_outcome: "committed" . into (), }) . unwrap ();
     active }
+
+  #[test]
+  fn fresh_session_retires_old_offers_without_changing_a_newer_incident () {
+    let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+    let mut frozen : FrozenBufferRecord = frozen_dirty_view ("one");
+    frozen . dirty = false;
+    frozen . undo_required = false;
+    frozen . view_uri = Some ("uri-one" . into ());
+    frozen . presentation_generation = 0;
+    frozen . server_revision = 4;
+    frozen . application_token = 9;
+    let first : ActiveMaintenance = publish_test_incident (&mut coordinator,
+      vec![frozen], GraphGeneration::INITIAL, ManifestRevision::INITIAL);
+    let mut record : ViewSettlementRecord = settlement ("one");
+    record . dirty = false;
+    record . planned_disposition = ViewDisposition::Refreshed;
+    record . requirement = ViewSettlementRequirement::ApplicationAck;
+    record . application = Some (ViewApplicationRecord {
+      content: "retained G1 offer" . into (), content_sha256: "digest" . into (),
+      resulting_graph_generation: 2, resulting_presentation_generation: 0,
+      resulting_server_revision: 5, resulting_application_token: 10,
+      warnings: Vec::new (), });
+    coordinator . record_view_settlements (&first . incident_id, first . epoch,
+      vec![record . clone ()]) . unwrap ();
+    coordinator . matching_incident_mut (&first . incident_id, first . epoch)
+      . unwrap () . server_session_id = Some ("issuing-session" . into ());
+    assert! (coordinator . retire_incident_authority (
+      &first . incident_id, first . epoch, "issuing-session") . is_err ());
+    let next : ActiveMaintenance = publish_test_incident (&mut coordinator,
+      Vec::new (), GraphGeneration::INITIAL . successor (),
+      ManifestRevision::INITIAL . successor ());
+    let next_before : ActiveMaintenance = coordinator
+      . incident (&next . incident_id, next . epoch) . unwrap () . clone ();
+    let state_before : CoordinatorState = coordinator . state . clone ();
+    assert! (coordinator . retire_incident_authority (
+      &first . incident_id, first . epoch, "fresh-session") . unwrap ());
+    let recovered : &ActiveMaintenance = coordinator
+      . incident (&first . incident_id, first . epoch) . unwrap ();
+    let retired : &ViewSettlementRecord = &recovered . view_settlements["one"];
+    assert_eq! (retired . application, record . application);
+    assert_eq! (retired . requirement, ViewSettlementRequirement::ReleaseAck);
+    assert_eq! (retired . planned_disposition, ViewDisposition::DetachedDerived);
+    assert_eq! (retired . base_server_revision, record . base_server_revision);
+    assert! (!retired . acknowledged);
+    assert! (coordinator . acknowledge_view_settlement (&first . incident_id,
+      first . epoch, "one", ViewSettlementRequirement::ApplicationAck,
+      Some ("uri-one"), 1, 0, 4, 9, None) . is_err ());
+    assert! (coordinator . acknowledge_view_settlement (&first . incident_id,
+      first . epoch, "one", ViewSettlementRequirement::ReleaseAck,
+      Some ("uri-one"), 1, 0, 4, 9, None) . unwrap ());
+    assert! (!coordinator . retire_incident_authority (
+      &first . incident_id, first . epoch, "another-restart") . unwrap ());
+    assert_eq! (coordinator . state, state_before);
+    assert_eq! (coordinator . incident (&next . incident_id, next . epoch)
+      . unwrap (), &next_before);
+    let persisted : String = serde_yaml::to_string (&coordinator) . unwrap ();
+    let loaded : MaintenanceCoordinator = serde_yaml::from_str (&persisted) . unwrap ();
+    assert_eq! (loaded, coordinator);
+  }
 
   #[test]
   fn committed_reports_and_exact_old_acks_cannot_replace_a_newer_incident () {

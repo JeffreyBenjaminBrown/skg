@@ -545,7 +545,8 @@ fn complete_maintenance (
     runtime . exact_git_presentation_identity ()?;
   let missing_fence : bool = runtime . maintenance_snapshot ()
     . incident (&incident, epoch) . map (|active|
-      active . presentation_fence . is_none ()) . unwrap_or (false);
+      active . presentation_fence . is_none ()
+      && active . authority_retired_by_session . is_none ()) . unwrap_or (false);
   if missing_fence {
     runtime . transition_maintenance (|coordinator|
       coordinator . record_presentation_fence (
@@ -1260,6 +1261,13 @@ pub(crate) fn preselection_retirements_field (
 }
 
 fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp {
+  settlement_sexp_with_application (record, true)
+}
+
+fn settlement_sexp_with_application (
+  record : &ViewSettlementRecord,
+  include_application : bool,
+) -> Sexp {
   let mut fields = vec![
     atom_field ("buffer-id", &record . buffer_id),
     atom_field ("buffer-key", record . buffer_key . as_deref () . unwrap_or ("none")),
@@ -1293,7 +1301,9 @@ fn settlement_sexp (record : &crate::maintenance::ViewSettlementRecord) -> Sexp 
     atom_field ("acknowledged",
       if record . acknowledged { "true" } else { "nil" }),
   ];
-  if let Some (application) = &record . application {
+  if let Some (application) = record . application . as_ref ()
+    . filter (|_| include_application
+      && record . requirement == ViewSettlementRequirement::ApplicationAck) {
     fields . push (Sexp::List (vec![
       Sexp::Atom (Atom::S ("application" . into ())),
       Sexp::List (vec![
@@ -1384,6 +1394,11 @@ fn approve_maintenance_scalar_release (
   let epoch = MaintenanceEpoch::parse (
     &value_from_request_sexp ("maintenance-epoch", request)?)?;
   require_archive_owner (runtime, &incident, epoch)?;
+  runtime . recover_incident_report (&incident, epoch)?;
+  let recovered = matching_active (runtime, &incident, epoch)?;
+  if recovered . authority_retired_by_session . is_some () {
+    return Ok (active_status_sexp (&recovered,
+      Some (&runtime . selected_snapshot () . env . config)) . to_string ()); }
   let approved_pids = approved_pids_from_request (request);
   let approved_pid_strings : Vec<String> = approved_pids . iter ()
     . map (|pid| pid . to_string ()) . collect ();
@@ -1470,15 +1485,15 @@ fn maintenance_status (
   request : &str,
   runtime : &ServerRuntime,
 ) -> Result<String, String> {
-  resume_enrollment_deferred_candidate (runtime)?;
-  let coordinator = runtime . maintenance_snapshot ();
-  let snapshot = runtime . selected_snapshot ();
   let requested_incident = value_from_request_sexp ("incident-id", request)
     . ok () . map (|value| IncidentId::parse (&value)) . transpose ()?;
   let requested_epoch = value_from_request_sexp ("maintenance-epoch", request)
     . ok () . map (|value| MaintenanceEpoch::parse (&value)) . transpose ()?;
   if requested_epoch . is_some () && requested_incident . is_none () {
     return Err ("maintenance status epoch requires an incident identity" . into ()); }
+  if requested_incident . is_none () { resume_enrollment_deferred_candidate (runtime)?; }
+  let coordinator = runtime . maintenance_snapshot ();
+  let snapshot = runtime . selected_snapshot ();
   let selected_summary = requested_incident . as_ref () . map (|id|
     coordinator . incidents () . into_iter () . find (|entry|
       &entry . incident_id == id
@@ -1489,7 +1504,8 @@ fn maintenance_status (
     if let Some (terminal) = coordinator . terminal_incident (&incident . incident_id, incident . epoch) {
       sexp::parse (&terminal_payload (terminal)) . expect ("terminal payload is valid")
     } else {
-      active_status_sexp (coordinator . incident (&incident . incident_id, incident . epoch)?,
+      runtime . recover_incident_report (&incident . incident_id, incident . epoch)?;
+      active_status_sexp (runtime . maintenance_snapshot () . incident (&incident . incident_id, incident . epoch)?,
         Some (&snapshot . env . config))
     }
   } else { match &coordinator . state {
@@ -1563,6 +1579,10 @@ fn resume_enrollment_deferred_candidate (
     CoordinatorState::Active (active) => active . clone (),
     _ => return Ok (( )),
   };
+  if active . selected_store . is_some ()
+  && active . server_session_id . as_deref () != Some (runtime . server_session_id ()) {
+    runtime . recover_incident_report (&active . incident_id, active . epoch)?;
+    return Ok (( )); }
   if active . candidate . is_none ()
   || !active . pending_view_enrollments . is_empty ()
   || !matches! (active . archive_status, ArchiveStatus::Ready { .. })
@@ -1691,6 +1711,8 @@ fn active_status_sexp (
     }),
     atom_field ("started-at-utc", &active . started_at_utc),
     atom_field ("source-set", &active . source_set),
+    atom_field ("live-authority-retired",
+      if active . authority_retired_by_session . is_some () { "true" } else { "nil" }),
     integer_field ("g0-graph-generation", active . g0_graph_generation . get ()),
     integer_field ("g0-manifest-revision", active . g0_manifest_revision . get ()),
     list_field ("requested-paths", &active . targets . paths),
@@ -1729,13 +1751,19 @@ fn active_status_sexp (
     if let Some (config) = config {
       fields . push (source_inventory_field (config));
       fields . push (atom_field ("maintenance-archive-folder",
-        &config . maintenance_archive_folder . to_string_lossy ()));
+        &active . archive_root_identity . as_deref ()
+          . unwrap_or (&config . maintenance_archive_folder) . to_string_lossy ()));
       fields . push (atom_field ("maintenance-archive-identity",
-        &config . maintenance_archive_identity . to_string_lossy ()));
+        &active . archive_root_identity . as_deref ()
+          . unwrap_or (&config . maintenance_archive_identity) . to_string_lossy ()));
     }
   }
   append_presentation_fence_fields (&mut fields, active);
-  if let Some (scalar) = &active . scalar_release {
+  if active . presentation_fence . is_none ()
+  && active . authority_retired_by_session . is_some () {
+    fields . push (atom_field ("presentation-fence-status", "unavailable-after-restart")); }
+  if let Some (scalar) = active . scalar_release . as_ref ()
+    . filter (|_| active . authority_retired_by_session . is_none ()) {
     fields . push (atom_field ("operation", &scalar . operation));
     fields . push (list_field ("pids", &scalar . pids));
     fields . push (atom_field ("prompt", &scalar . prompt));
@@ -1754,7 +1782,8 @@ fn active_status_sexp (
     fields . push (Sexp::List (vec![
       Sexp::Atom (Atom::S ("view-settlements" . into ())),
       Sexp::List (active . view_settlements . values ()
-        . map (settlement_sexp) . collect ()),
+        . map (|record| settlement_sexp_with_application (record,
+          active . authority_retired_by_session . is_none ())) . collect ()),
     ]));
   }
   fields . push (requested_id_outcomes_sexp (
@@ -1823,7 +1852,10 @@ fn acknowledge_view_settlement (
         request, "resulting-application-token")?,
     })
   } else { None };
-  let active = require_archive_owner (runtime, &incident, epoch)?;
+  let mut active = require_archive_owner (runtime, &incident, epoch)?;
+  if active . selected_store . is_some () {
+    runtime . recover_incident_report (&incident, epoch)?;
+    active = require_archive_owner (runtime, &incident, epoch)?; }
   let preselection = active . phase
     == MaintenancePhase::BlockedInvalidAfterMutation
     && active . preselection_retirements . contains_key (&buffer_id);
@@ -1917,6 +1949,11 @@ pub(crate) fn prepare_server_settlement_effect (
   application_ack : Option<&ViewApplicationAcknowledgement>,
 ) -> Result<ServerSettlementEffect, String> {
   if record . acknowledged { return Ok (ServerSettlementEffect::None); }
+  if active . authority_retired_by_session . is_some () {
+    if application_ack . is_some ()
+    || record . requirement == ViewSettlementRequirement::ApplicationAck {
+      return Err ("recovered incident cannot apply old live authority" . into ()); }
+    return Ok (ServerSettlementEffect::None); }
   let uri = record . view_uri . as_ref ()
     . map (|uri| ViewUri::from_client_string (uri . clone ()));
   if record . requirement == ViewSettlementRequirement::ApplicationAck {
@@ -2881,6 +2918,14 @@ mod tests {
     wrong . content_sha256 = "f" . repeat (64);
     assert! (prepare_server_settlement_effect (
       &active, &application, Some (&changed), Some (&wrong)) . is_err ());
+    active . authority_retired_by_session = Some ("fresh-session" . into ());
+    changed . revision = 99;
+    changed . graph_generation = 100;
+    assert_eq! (prepare_server_settlement_effect (
+      &active, &record, Some (&changed), None) . unwrap (),
+      ServerSettlementEffect::None);
+    assert! (prepare_server_settlement_effect (
+      &active, &application, Some (&changed), Some (&wrong)) . is_err ());
   }
 
   #[test]
@@ -2918,6 +2963,10 @@ mod tests {
     assert! (payload . contains ("(resulting-server-revision 5)"));
     assert! (payload . contains ("(resulting-application-token 8)"));
     assert! (payload . contains ("(acknowledged nil)"));
+    let retired_payload : String = settlement_sexp_with_application (
+      &record, false) . to_string ();
+    assert! (!retired_payload . contains ("(application "));
+    assert! (!retired_payload . contains ("* title"));
     record . acknowledged = true;
     assert! (settlement_sexp (&record) . to_string () . contains (
       "(acknowledged true)"));
