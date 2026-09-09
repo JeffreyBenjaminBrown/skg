@@ -3,6 +3,7 @@
 // longer definition path. That makes it easier to find definitions.
 
 pub mod filesystem;
+pub mod graph_queries;
 pub mod init;
 pub mod in_rust_graph;
 pub mod node_lookup;

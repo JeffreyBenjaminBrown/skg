@@ -1561,3 +1561,18 @@ Native-undo package skips and full process/editor acceptance remain open.
 No new architectural question. Switch the verified graph query replacements,
 remove TypeDB, and integrate durable source effects and owner reservations
 before enabling independent release.
+
+* Simplify/cohere checkpoint: explicit graph query primitives
+** what's done and went well
+The new 'dbs/graph_queries' modules provide synchronous relation, identity,
+ancestry, path, subscription and statistics queries over an explicit graph.
+Visibility gates apply to the origin, relationship provenance and destination.
+Nine focused regressions pass, including private containment not changing
+public link classification. Evidence: '/tmp/skg-pure-graph-queries-test-final.log'.
+** Changes to the plan's envisioned order.
+The replacement query primitives are committed before active caller migration,
+so the behavioral replacement and mechanical adapter removal remain reviewable.
+** what's imperfect about what's done
+No new defect identified in this checkpoint.
+** choices determining the future
+No architectural choice. Active callers and fixtures now migrate to these APIs.
