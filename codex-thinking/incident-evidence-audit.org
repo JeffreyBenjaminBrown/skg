@@ -147,3 +147,35 @@ Focused validation covers sourced-node roundtrip, bad semantic version, unknown
 property, empty relationship ID/source, and both existing candidate/view-impact
 test groups. `cargo check --lib -j2` passes; only pre-existing dead-code warnings
 remain.
+
+** Tantivy startup path safety
+
+Config loading now validates `tantivy_folder` before source directory creation,
+archive creation, or startup index cleanup.  The check resolves existing paths
+through symlinks and extends the nearest existing ancestor for missing paths,
+then rejects structural overlap in either direction with every configured source,
+the governing config file, the maintenance archive, and the private maintenance
+journal.  It runs after fixture source overrides as well.  This prevents an index
+target such as a source parent from deleting source files during
+`create_empty_tantivy_index`.
+
+Regression coverage verifies source-tree sentinel preservation, config/archive
+overlap, private journal overlap, and the existing supported layout.  The guard
+is config/startup validation only and grants no runtime maintenance authority.
+
+The follow-up regressions add a missing descendant under a source, a Tantivy
+target reached through a source symlink, and a `load_config_with_overrides`
+source override that moves a source under the index.  `cargo check --lib -j2`
+still passes. The first follow-up test build was blocked by unrelated
+`serde_json` references in the coordinator; that failure is retained. After
+correcting the coordinator to use its existing YAML dependency, all 13 focused
+filesystem config tests passed (`tantivy-path-safety-tests.log`).
+The production wipe path is `main -> load_config -> initialize_dbs ->
+wipe_then_init_tantivy_db -> create_empty_tantivy_index`; the maintenance
+replacement caller receives configs produced by the same guarded loader (or the
+already-started guarded config).  Ordinary saves and evidence are descendants
+of `MaintenanceJournalStore::directory()` (`ordinary-saves` and `evidence`), so
+protecting that root covers both.  The guard also covers the separate fatal
+reload recovery directory (`$XDG_STATE_HOME/skg/recovery/<config-hash>` or its
+`$HOME/.local/state` fallback), which is computed with the same identity rule as
+`reload_recovery.rs`.

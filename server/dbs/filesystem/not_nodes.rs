@@ -1,6 +1,10 @@
+use crate::maintenance::journal::MaintenanceJournalStore;
 use crate::types::misc::{SkgConfig, SourceCatalog, SourceName};
 
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -184,6 +188,7 @@ pub fn load_config (
   make_paths_absolute (&mut config);
   derive_ownership_and_labels (&mut config);
   validate_source_sets (&config)?;
+  validate_tantivy_path (&config)?;
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   resolve_source_directory_identities (&mut config)?;
@@ -219,6 +224,7 @@ pub fn load_config_with_overrides (
     if ! config . sources . set_path_override (&key, new_path . clone ()) {
       return Err(format!(
         "Source '{}' not found in config", source_name) . into()); }}
+  validate_tantivy_path (&config)?;
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   resolve_source_directory_identities (&mut config)?;
@@ -319,11 +325,92 @@ fn make_paths_absolute (
       source . path = root . join (
         &source . path ); } } }
 
+/// Validate the Tantivy cleanup target before any startup helper can remove
+/// it. The target must be disjoint from source trees, the governing config,
+/// and private maintenance state/archive paths in either direction.
+pub(crate) fn validate_tantivy_path (
+  config : &SkgConfig,
+) -> io::Result<()> {
+  let index : &Path = &config . tantivy_folder;
+  if index . as_os_str () . is_empty () {
+    return Err (io::Error::new (
+      io::ErrorKind::InvalidInput,
+      "tantivy_folder may not be empty")); }
+  let mut protected : Vec<(&str, PathBuf)> = vec![
+    ("config file", config . config_path . clone ()),
+    ("maintenance archive", maintenance_archive_path (config)),
+    ("maintenance journal", MaintenanceJournalStore::for_config (
+      &config . config_path) . directory () . to_path_buf ()),
+    ("private recovery", private_recovery_path (config)),
+  ];
+  for source in config . sources . values () {
+    protected . push (("source", source . path . clone ())); }
+  let index_identity : PathBuf = path_identity_for_overlap (index)?;
+  for (kind, path) in protected {
+    let protected_identity : PathBuf = path_identity_for_overlap (&path)?;
+    if paths_overlap (&index_identity, &protected_identity) {
+      return Err (io::Error::new (
+        io::ErrorKind::InvalidInput,
+        format! (
+          "tantivy index '{}' overlaps protected {} '{}'; choose a separate directory",
+          index . display (), kind, path . display ()))); }
+  }
+  Ok (( ))
+}
+
+fn maintenance_archive_path (config : &SkgConfig) -> PathBuf {
+  if config . maintenance_archive_folder . is_absolute () {
+    config . maintenance_archive_folder . clone ()
+  } else {
+    config . data_root . join (&config . maintenance_archive_folder)
+  }
+}
+
+fn private_recovery_path (config : &SkgConfig) -> PathBuf {
+  let base : PathBuf = std::env::var_os ("XDG_STATE_HOME")
+    . map (PathBuf::from)
+    . or_else (|| std::env::var_os ("HOME")
+      . map (|home| PathBuf::from (home) . join (".local/state")))
+    . unwrap_or_else (|| std::env::temp_dir () . join ("skg-state"));
+  let identity : PathBuf = config . config_path . canonicalize ()
+    . unwrap_or_else (|_| config . config_path . clone ());
+  let key : String = blake3::hash (
+    identity . to_string_lossy () . as_bytes ())
+    . to_hex () . to_string ();
+  base . join ("skg/recovery") . join (&key[..16])
+}
+
+fn paths_overlap (left : &Path, right : &Path) -> bool {
+  left == right || left . starts_with (right) || right . starts_with (left)
+}
+
+fn path_identity_for_overlap (path : &Path) -> io::Result<PathBuf> {
+  if let Ok (identity) = fs::canonicalize (path) {
+    return Ok (identity); }
+  let mut missing : Vec<OsString> = Vec::new ();
+  let mut existing : &Path = path;
+  while ! existing . exists () {
+    let name : &OsStr = existing . file_name () . ok_or_else (|| io::Error::new (
+      io::ErrorKind::InvalidInput,
+      format! ("protected path has no existing ancestor: {}",
+        path . display ())))?;
+    missing . push (name . to_os_string ());
+    existing = existing . parent () . ok_or_else (|| io::Error::new (
+      io::ErrorKind::InvalidInput,
+      format! ("protected path has no existing ancestor: {}",
+        path . display ())))?;
+  }
+  let mut identity : PathBuf = fs::canonicalize (existing)?;
+  for component in missing . iter () . rev () {
+    identity . push (component); }
+  Ok (identity)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::types::misc::ID;
-  use tempfile::tempdir;
+  use tempfile::{tempdir, TempDir};
 
   fn write_config (
     root    : &Path,
@@ -432,6 +519,145 @@ mod tests {
     let error = load_config (path . to_str () . unwrap ())
       . err () . expect ("parent traversal was accepted") . to_string ();
     assert! (error . contains ("may not contain '..'"), "{}", error);
+  }
+
+  #[test]
+  fn tantivy_folder_may_not_remove_a_source_tree () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let source : PathBuf = temp . path () . join ("owned/notes");
+    fs::create_dir_all (&source) . unwrap ();
+    let sentinel : PathBuf = source . join ("must-survive");
+    fs::write (&sentinel, b"source data") . unwrap ();
+    let path : PathBuf = temp . path () . join ("skgconfig.toml");
+    fs::write (&path, format! (
+      "db_name = \"test\"\ntantivy_folder = \"owned\"\n\n[[sources]]\nname = \"notes\"\npath = {:?}\n",
+      Path::new ("owned/notes"))) . unwrap ();
+    let error : String = load_config (path . to_str () . unwrap ())
+      . err () . expect ("overlapping Tantivy/source paths were accepted")
+      . to_string ();
+    assert! (error . contains ("overlaps protected source"), "{}", error);
+    assert! (sentinel . exists (), "validation must precede index cleanup");
+  }
+
+  #[test]
+  fn tantivy_folder_may_not_overlap_config_or_archive () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let config_path : PathBuf = temp . path () . join ("skgconfig.toml");
+    fs::write (&config_path, concat! (
+      "db_name = \"test\"\n",
+      "tantivy_folder = \".\"\n",
+      "maintenance_archive_folder = \"archive\"\n",
+      "\n[[sources]]\nname = \"notes\"\npath = \"../foreign-notes\"\n"))
+      . unwrap ();
+    let error : String = load_config (config_path . to_str () . unwrap ())
+      . err () . expect ("Tantivy/config overlap was accepted") . to_string ();
+    assert! (error . contains ("overlaps protected config file"), "{}", error);
+
+    let archive_index : PathBuf = temp . path () . join ("archive");
+    let archive_config : PathBuf = temp . path () . join ("archive-config.toml");
+    fs::write (&archive_config, concat! (
+      "db_name = \"test\"\n",
+      "tantivy_folder = \"archive\"\n",
+      "maintenance_archive_folder = \"archive\"\n",
+      "\n[[sources]]\nname = \"notes\"\npath = \"../foreign-notes\"\n"))
+      . unwrap ();
+    let error : String = load_config (archive_config . to_str () . unwrap ())
+      . err () . expect ("Tantivy/archive overlap was accepted") . to_string ();
+    assert! (error . contains ("overlaps protected maintenance archive"),
+      "{}", error);
+    assert! (! archive_index . exists (),
+      "rejected archive/index path must not be created");
+  }
+
+  #[test]
+  fn tantivy_folder_may_not_overlap_private_maintenance_journal () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let config_path : PathBuf = temp . path () . join ("skgconfig.toml");
+    let journal : PathBuf = MaintenanceJournalStore::for_config (
+      &config_path) . directory () . to_path_buf ();
+    let mut config : SkgConfig = SkgConfig::dummyFromSources (HashMap::new ());
+    config . config_path = config_path;
+    config . data_root = temp . path () . to_path_buf ();
+    config . tantivy_folder = journal;
+    assert! (validate_tantivy_path (&config) . unwrap_err () . to_string ()
+      . contains ("overlaps protected maintenance journal"));
+  }
+
+  #[test]
+  fn tantivy_folder_may_not_overlap_private_recovery () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let config_path : PathBuf = temp . path () . join ("skgconfig.toml");
+    let mut config : SkgConfig = SkgConfig::dummyFromSources (HashMap::new ());
+    config . config_path = config_path;
+    config . data_root = temp . path () . to_path_buf ();
+    config . tantivy_folder = private_recovery_path (&config);
+    assert! (validate_tantivy_path (&config) . unwrap_err () . to_string ()
+      . contains ("overlaps protected private recovery"));
+  }
+
+  #[test]
+  fn tantivy_folder_may_not_overlap_missing_source_descendant () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let source : PathBuf = temp . path () . join ("owned/notes");
+    fs::create_dir_all (&source) . unwrap ();
+    let sentinel : PathBuf = source . join ("must-survive");
+    fs::write (&sentinel, b"source data") . unwrap ();
+    let path : PathBuf = temp . path () . join ("skgconfig.toml");
+    fs::write (&path, concat! (
+      "db_name = \"test\"\n",
+      "tantivy_folder = \"owned/notes/future/index\"\n",
+      "\n[[sources]]\nname = \"notes\"\npath = \"owned/notes\"\n"))
+      . unwrap ();
+    let index : PathBuf = temp . path () . join ("owned/notes/future/index");
+    let error : String = load_config (path . to_str () . unwrap ())
+      . err () . expect ("missing descendant overlap was accepted")
+      . to_string ();
+    assert! (error . contains ("overlaps protected source"), "{}", error);
+    assert! (sentinel . exists (), "validation must precede index cleanup");
+    assert! (! index . exists (), "rejected index descendants must not be created");
+  }
+
+  #[test]
+  fn source_override_may_not_introduce_tantivy_overlap () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let source : PathBuf = temp . path () . join ("owned/notes");
+    fs::create_dir_all (&source) . unwrap ();
+    let sentinel : PathBuf = source . join ("must-survive");
+    fs::write (&sentinel, b"source data") . unwrap ();
+    let path : PathBuf = write_config (
+      temp . path (),
+      "\n[[sources]]\nname = \"notes\"\npath = \"owned/notes\"\n" );
+    let override_path : PathBuf = temp . path () . join ("tantivy/source");
+    let error : String = load_config_with_overrides (
+      path . to_str () . unwrap (),
+      &[("notes", override_path . clone ())])
+      . err () . expect ("source override overlap was accepted")
+      . to_string ();
+    assert! (error . contains ("overlaps protected source"), "{}", error);
+    assert! (sentinel . exists (), "validation must precede source creation");
+    assert! (! override_path . exists (), "rejected override must not be created");
+  }
+
+  #[cfg(unix)]
+  #[test]
+  fn tantivy_folder_may_not_overlap_through_a_symlink () {
+    let temp : TempDir = tempdir () . unwrap ();
+    let real : PathBuf = temp . path () . join ("owned/real");
+    let alias : PathBuf = temp . path () . join ("owned/alias");
+    fs::create_dir_all (&real) . unwrap ();
+    let sentinel : PathBuf = real . join ("must-survive");
+    fs::write (&sentinel, b"source data") . unwrap ();
+    symlink (&real, &alias) . unwrap ();
+    let path : PathBuf = temp . path () . join ("skgconfig.toml");
+    fs::write (&path, concat! (
+      "db_name = \"test\"\n",
+      "tantivy_folder = \"owned/alias/index\"\n",
+      "\n[[sources]]\nname = \"real\"\npath = \"owned/real\"\n"))
+      . unwrap ();
+    let error : String = load_config (path . to_str () . unwrap ())
+      . err () . expect ("symlink overlap was accepted") . to_string ();
+    assert! (error . contains ("overlaps protected source"), "{}", error);
+    assert! (sentinel . exists (), "validation must precede index cleanup");
   }
 
   #[cfg(unix)]
