@@ -9,10 +9,13 @@ pub(crate) const VIEW_ENROLLMENT_PENDING : &str =
   "view classification awaits pending URI enrollment";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct MaintenanceCoordinator {
   pub epoch                : MaintenanceEpoch,
   pub observation_sequence : ObservationSequence,
   pub state                : CoordinatorState,
+  #[serde(default)]
+  pub committed_incidents  : BTreeMap<IncidentId, CommittedIncident>,
 }
 
 impl MaintenanceCoordinator {
@@ -21,8 +24,143 @@ impl MaintenanceCoordinator {
       epoch: MaintenanceEpoch::INITIAL,
       observation_sequence: ObservationSequence::INITIAL,
       state: CoordinatorState::Idle,
+      committed_incidents: BTreeMap::new (),
     }
   }
+
+  /// Look up one exact incident without treating an older report as the
+  /// process's current graph authority. Effect methods use active-only lookup.
+  pub fn incident (
+    &self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+  ) -> Result<&ActiveMaintenance, String> {
+    let active : Option<&ActiveMaintenance> = match &self . state {
+      CoordinatorState::Active (active) if &active . incident_id == incident_id => Some (active),
+      _ => match self . committed_incidents . get (incident_id) {
+        Some (CommittedIncident::Settling (active)) => Some (active),
+        _ => None, }, };
+    active . filter (|active| active . epoch == epoch)
+      . ok_or_else (|| "no incident matches the requested identity and epoch" . into ()) }
+
+  pub fn terminal_incident (
+    &self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+  ) -> Option<&TerminalMaintenance> {
+    let terminal : Option<&TerminalMaintenance> = match &self . state {
+      CoordinatorState::Terminal (terminal) if &terminal . incident_id == incident_id => Some (terminal),
+      _ => match self . committed_incidents . get (incident_id) {
+        Some (CommittedIncident::Terminal { record, .. }) => Some (record),
+        _ => None, }, };
+    terminal . filter (|terminal| terminal . epoch == epoch) }
+
+  /// Compact protocol inventory; full evidence and buffer records stay in the
+  /// durable ledger. Current graph work and older settlement work coexist.
+  pub fn incidents (&self) -> Vec<IncidentSummary> {
+    let mut summaries : Vec<IncidentSummary> = Vec::new ();
+    match &self . state {
+      CoordinatorState::Active (active) => summaries . push (active_summary (active)),
+      CoordinatorState::Terminal (terminal) => summaries . push (terminal_summary (terminal, false)),
+      _ => {}, }
+    for incident in self . committed_incidents . values () {
+      summaries . push (match incident {
+        CommittedIncident::Settling (active) => active_summary (active),
+        CommittedIncident::Terminal { record, acknowledged, .. } =>
+          terminal_summary (record, *acknowledged), }); }
+    summaries . sort_by_key (|summary| (summary . epoch, summary . incident_id . clone ()));
+    summaries }
+
+  /// Interpret only the known old protocol. Its original bytes remain in the
+  /// journal store; migrated obligations never become an enrollment engine.
+  pub(crate) fn migrate_known_v1 (mut self) -> Result<Self, String> {
+    match self . state . clone () {
+      CoordinatorState::Active (mut active) => {
+        if active . census_frozen || active . legacy_census_obligations . is_some () {
+          return Err ("version 1 journal contains version 2 census authority" . into ()); }
+        let phase : MaintenancePhase = active . suspended_phase . as_ref ()
+          . filter (|_| active . phase == MaintenancePhase::AwaitingClient)
+          . unwrap_or (&active . phase) . clone ();
+        active . census_frozen = phase != MaintenancePhase::AwaitingLockedCensus;
+        let presentation : BTreeMap<String, FrozenBufferRecord> =
+          if active . presentation_buffer_census . is_empty () { active . buffer_census . clone () }
+          else { active . presentation_buffer_census . clone () };
+        for (id, record) in &active . buffer_census {
+          if presentation . get (id) != Some (record) {
+            return Err ("version 1 presentation census changed a frozen archive record" . into ()); } }
+        if presentation != active . buffer_census || !active . pending_view_enrollments . is_empty () {
+          active . legacy_census_obligations = Some (LegacyCensusObligations {
+            presentation_census: presentation,
+            pending_view_enrollments: active . pending_view_enrollments . clone (), }); }
+        if active . initial_archive_manifest_sha256 . is_none () {
+          if let ArchiveStatus::Ready { manifest_sha256 } = &active . archive_status {
+            active . initial_archive_manifest_sha256 = Some (manifest_sha256 . clone ()); } }
+        if !active . pending_view_enrollments . is_empty () {
+          active . blocking_reason = Some (
+            "version 1 incident has unresolved preexisting view identities; explicit recovery required" . into ());
+          active . phase = MaintenancePhase::BlockedStoreHealth;
+          active . suspended_phase = None;
+          self . state = CoordinatorState::Active (active);
+        } else if is_report_phase (&phase) {
+          validate_committed_incident (&active)?;
+          active . phase = phase;
+          active . suspended_phase = None;
+          self . committed_incidents . insert (
+            active . incident_id . clone (), CommittedIncident::Settling (active));
+          self . state = CoordinatorState::Idle;
+        } else { self . state = CoordinatorState::Active (active); } }
+      CoordinatorState::Terminal (terminal) if self . state . policy () . skg_saves_allowed => {
+        validate_terminal_record (&terminal)?;
+        self . committed_incidents . insert (terminal . incident_id . clone (),
+          CommittedIncident::Terminal { record: terminal, acknowledged: false, incident: None });
+        self . state = CoordinatorState::Idle; }
+      _ => {}, }
+    self . validate_journal_authority ()?;
+    Ok (self) }
+
+  /// A readable YAML value is not sufficient evidence of write authority.
+  /// Check the durable identities and selection proofs before it can become
+  /// the process owner's state, including after known-version migration.
+  pub(crate) fn validate_journal_authority (&self) -> Result<(), String> {
+    let mut identities : BTreeSet<IncidentId> = BTreeSet::new ();
+    let mut epochs : BTreeSet<MaintenanceEpoch> = BTreeSet::new ();
+    for summary in self . incidents () {
+      if summary . epoch > self . epoch || !identities . insert (summary . incident_id)
+      || !epochs . insert (summary . epoch) {
+        return Err ("maintenance journal has duplicate or inconsistent incident authority" . into ()); } }
+    if let CoordinatorState::Active (active) = &self . state {
+      validate_census (active)?;
+      let phase : &MaintenancePhase = active . suspended_phase . as_ref ()
+        . filter (|_| active . phase == MaintenancePhase::AwaitingClient)
+        . unwrap_or (&active . phase);
+      if phase != &MaintenancePhase::AwaitingLockedCensus && !active . census_frozen {
+        return Err ("maintenance effect authority has no frozen census" . into ()); }
+      if matches! (phase, MaintenancePhase::ArchiveReady
+        | MaintenancePhase::RunningExternalMutation | MaintenancePhase::FinalObservation
+        | MaintenancePhase::SelectingPartial | MaintenancePhase::FullRebuildExclusive)
+      && (active . initial_archive_manifest_sha256 . as_ref () . is_none_or (String::is_empty)
+        || !matches! (active . archive_status, ArchiveStatus::Ready { .. })) {
+        return Err ("maintenance effect authority has no verified initial archive" . into ()); }
+      if is_report_phase (phase) {
+        return Err ("post-publication incident must be retained independently of graph authority" . into ()); } }
+    if let CoordinatorState::Terminal (terminal) = &self . state { validate_terminal_record (terminal)?; }
+    for (id, incident) in &self . committed_incidents {
+      match incident {
+        CommittedIncident::Settling (active) => {
+          if &active . incident_id != id || !is_report_phase (&active . phase) {
+            return Err ("committed incident has inconsistent identity or graph-changing phase" . into ()); }
+          validate_census (active)?;
+          validate_committed_incident (active)?; }
+        CommittedIncident::Terminal { record, incident, .. } => {
+          if &record . incident_id != id { return Err ("terminal ledger identity mismatch" . into ()); }
+          validate_terminal_record (record)?;
+          if let Some (active) = incident {
+            if active . incident_id != record . incident_id || active . epoch != record . epoch
+            || active . selected_store != record . selected_store {
+              return Err ("terminal report changed its committed incident authority" . into ()); }
+            validate_census (active)?;
+            validate_committed_incident (active)?; } } } }
+    Ok (( )) }
 
   pub fn next_observation_sequence (&mut self) -> ObservationSequence {
     self . observation_sequence = self . observation_sequence . successor ();
@@ -315,6 +453,8 @@ impl MaintenanceCoordinator {
       dirty_buffer_ids: Vec::new (),
       undo_required_buffer_ids: Vec::new (),
       buffer_census: Default::default (),
+      census_frozen: false,
+      legacy_census_obligations: None,
       presentation_buffer_census: Default::default (),
       pending_view_enrollments: Default::default (),
       targets,
@@ -387,141 +527,32 @@ impl MaintenanceCoordinator {
     active . undo_required_buffer_ids = undo_required_buffer_ids;
     active . presentation_buffer_census = buffer_census . clone ();
     active . buffer_census = buffer_census;
+    active . census_frozen = true;
     active . phase = MaintenancePhase::PreparingArchive;
     Ok (true)
   }
 
-  /// Journal a successful query result before its response is allowed onto
-  /// the wire.  The URI is the identity available at this boundary; a later
-  /// client census supplies the editor-owned buffer ID.
+  /// Compatibility adapter: results produced after editable admission closes
+  /// are read-only and outside the frozen incident inventory.
   pub fn enroll_pending_view (
     &mut self,
     enrollment : PendingViewEnrollment,
   ) -> Result<bool, String> {
-    let CoordinatorState::Active (active) = &mut self . state else {
-      return Ok (false); };
     if enrollment . view_uri . is_empty () {
       return Err ("pending maintenance view has an empty URI" . into ()); }
-    if active . client_evidence_transfer . is_some ()
-       || matches! (active . archive_status, ArchiveStatus::Finalized { .. })
-    {
-      return Err (
-        "a new view cannot enter maintenance after final evidence transfer"
-          . into ()); }
-    if let Some (record) = active . presentation_census () . values ()
-      . find (|record| record . view_uri . as_deref ()
-        == Some (&enrollment . view_uri))
-    {
-      if record . graph_generation == enrollment . graph_generation
-        && record . presentation_generation
-             == enrollment . presentation_generation
-        && record . server_revision == enrollment . server_revision
-        && record . application_token == enrollment . application_token
-      { return Ok (false); }
-      return Err (format! (
-        "view '{}' changed authority during maintenance enrollment",
-        enrollment . view_uri));
-    }
-    if let Some (existing) = active . pending_view_enrollments
-      . get (&enrollment . view_uri)
-    {
-      if existing == &enrollment { return Ok (false); }
-      return Err (format! (
-        "view '{}' changed pending maintenance authority",
-        enrollment . view_uri));
-    }
-    active . pending_view_enrollments
-      . insert (enrollment . view_uri . clone (), enrollment);
-    Ok (true)
-  }
+    Ok (false) }
 
-  /// Bind clean buffers born after the immutable initial archive census.
-  /// An incident-qualified census is a monotonic enrollment barrier; an
-  /// ordinary reconnect census additionally proves that an unbound response
-  /// never became a client buffer and may resolve it absent.
+  /// A later complete client census can prove existing obligations applied or
+  /// absent through the exact ACK APIs. It cannot add presentation inventory.
   pub fn enroll_presentation_census (
     &mut self,
-    records         : Vec<FrozenBufferRecord>,
+    _records : Vec<FrozenBufferRecord>,
     requested_epoch : Option<u64>,
   ) -> Result<Vec<String>, String> {
-    let CoordinatorState::Active (active) = &mut self . state else {
-      return Ok (Vec::new ()); };
-    if let Some (requested_epoch) = requested_epoch {
-      if requested_epoch != active . epoch . get () {
-        return Err (format! (
-          "client census names maintenance epoch {}, current epoch is {}",
-          requested_epoch, active . epoch . get ())); }
-    }
-    // The bootstrap census is about to become the immutable initial census;
-    // it predates the distinction between old buffers and late enrollment.
-    // `freeze_locked_census` validates and installs it in the next request.
-    if active . phase == MaintenancePhase::AwaitingLockedCensus {
-      return Ok (Vec::new ()); }
-    if active . presentation_buffer_census . is_empty ()
-       && !active . buffer_census . is_empty ()
-    {
-      active . presentation_buffer_census = active . buffer_census . clone (); }
-    let census_uris : BTreeSet<String> = records . iter ()
-      . filter_map (|record| record . view_uri . clone ()) . collect ();
-    let mut added = Vec::new ();
-    for record in records {
-      if active . presentation_buffer_census . contains_key (&record . buffer_id) {
-        continue; }
-      if record . maintenance_epoch != Some (active . epoch . get ()) {
-        return Err (format! (
-          "new buffer '{}' is not locked for maintenance epoch {}",
-          record . buffer_id, active . epoch . get ())); }
-      if record . dirty || record . logical_dirty || record . undo_required {
-        return Err (format! (
-          "new maintenance buffer '{}' is dirty but absent from the initial archive",
-          record . buffer_id)); }
-      if active . presentation_buffer_census . values () . any (|existing|
-          existing . view_uri . is_some ()
-          && existing . view_uri == record . view_uri)
-      {
-        return Err (format! (
-          "new buffer '{}' repeats a maintenance view URI", record . buffer_id)); }
-      if let Some (uri) = &record . view_uri {
-        if let Some (pending) = active . pending_view_enrollments . get (uri) {
-          if pending . graph_generation != record . graph_generation
-          || pending . presentation_generation
-               != record . presentation_generation
-          || pending . server_revision != record . server_revision
-          || pending . application_token != record . application_token
-          {
-            return Err (format! (
-              "buffer '{}' does not match pending authority for view '{}'",
-              record . buffer_id, uri)); }
-        } else if record . kind != BufferKind::NewEmptyContentView {
-          return Err (format! (
-            "buffer '{}' has no pending maintenance view enrollment",
-            record . buffer_id)); }
-      }
-      if active . selected_store . is_some ()
-         && !active . view_settlements . is_empty ()
-      {
-        let selected_generation = active . selected_store . as_ref ()
-          . expect ("checked selected store") . graph_generation . get ();
-        if record . graph_generation != selected_generation {
-          return Err (format! (
-            "G0 view '{}' reached the client after settlement planning",
-            record . buffer_id)); }
-        active . view_settlements . insert (
-          record . buffer_id . clone (), current_generation_settlement (&record));
-        if active . phase == MaintenancePhase::FinalizingArchive {
-          active . phase = MaintenancePhase::Presenting; }
-      }
-      if let Some (uri) = &record . view_uri {
-        active . pending_view_enrollments . remove (uri); }
-      added . push (record . buffer_id . clone ());
-      active . presentation_buffer_census
-        . insert (record . buffer_id . clone (), record);
-    }
-    if requested_epoch . is_none () {
-      active . pending_view_enrollments
-        . retain (|uri, _| census_uris . contains (uri)); }
-    Ok (added)
-  }
+    if let Some (epoch) = requested_epoch {
+      if !self . incidents () . iter () . any (|incident| incident . epoch . get () == epoch) {
+        return Err ("client census names an unknown maintenance epoch" . into ()); } }
+    Ok (Vec::new ()) }
 
   pub fn transition (
     &mut self,
@@ -538,31 +569,20 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
-  /// Give a selected-store transition back its archive-ready phase when an
-  /// old-generation query completed while the generation gate was draining.
-  /// The gate caller invokes this while new queries are still excluded, so a
-  /// false result is also proof that selection may cross the G0 boundary.
+  /// Modern query results never extend the fixed census. A known version 1
+  /// unbound result remains an explicit recovery obligation, not a moving gate.
   pub fn defer_selection_for_view_enrollment (
     &mut self,
     incident_id : &IncidentId,
-    epoch       : MaintenanceEpoch,
+    epoch : MaintenanceEpoch,
   ) -> Result<bool, String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active : &mut ActiveMaintenance = self . matching_active_mut (incident_id, epoch)?;
     if !matches! (active . phase,
-      MaintenancePhase::SelectingPartial
-      | MaintenancePhase::FullRebuildExclusive)
-    {
-      return Err (format! (
-        "view-enrollment selection barrier is invalid during {:?}",
-        active . phase)); }
-    if active . pending_view_enrollments . is_empty () {
-      return Ok (false); }
-    if active . selected_store . is_some () {
-      return Err (
-        "view-enrollment selection barrier followed store selection" . into ()); }
-    active . phase = MaintenancePhase::ArchiveReady;
-    Ok (true)
-  }
+      MaintenancePhase::SelectingPartial | MaintenancePhase::FullRebuildExclusive) {
+      return Err ("selection census check requires a selection phase" . into ()); }
+    if !active . pending_view_enrollments . is_empty () {
+      return Err ("legacy incident has unresolved preexisting view authority; recovery required" . into ()); }
+    Ok (false) }
 
   pub fn archive_ready (
     &mut self,
@@ -819,7 +839,7 @@ impl MaintenanceCoordinator {
     transfer_manifest_sha256 : String,
     artifact_bytes_sha256 : String,
   ) -> Result<bool, String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active = self . matching_incident_mut (incident_id, epoch)?;
     if active . phase != MaintenancePhase::FinalizingArchive {
       return Err (format! (
         "archive-finalized is invalid during {:?}", active . phase)); }
@@ -878,48 +898,59 @@ impl MaintenanceCoordinator {
     Ok (( ))
   }
 
+  /// Called only after the owner has published the complete graph/Searcher
+  /// pair. This durable record ends the graph barrier, while retaining all
+  /// evidence, scalar authorization and per-buffer settlement independently.
   pub fn store_selected (
     &mut self,
     incident_id : &IncidentId,
-    epoch       : MaintenanceEpoch,
-    selected    : SelectedStoreRecord,
+    epoch : MaintenanceEpoch,
+    selected : SelectedStoreRecord,
   ) -> Result<(), String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
-    if active . phase != MaintenancePhase::SelectingPartial {
-      return Err (format! (
-        "store selection completion is invalid during {:?}", active . phase)); }
-    if active . server_evidence . is_none () {
-      return Err ("store selection has no durable server evidence" . into ()); }
-    active . selected_store = Some (selected);
-    active . blocking_reason = None;
-    active . phase = MaintenancePhase::Presenting;
-    Ok (( ))
-  }
+    self . commit_selection (incident_id, epoch, selected, false) }
 
   pub fn store_rebuilt (
     &mut self,
     incident_id : &IncidentId,
-    epoch       : MaintenanceEpoch,
-    selected    : SelectedStoreRecord,
+    epoch : MaintenanceEpoch,
+    selected : SelectedStoreRecord,
   ) -> Result<(), String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
-    if active . origin != MaintenanceOrigin::FullRebuild
-    && !active . force_full_rebuild_recovery
-    {
-      return Err (
-        "full rebuild completion has no exclusive rebuild authority" . into ()); }
-    if active . phase != MaintenancePhase::FullRebuildExclusive
-    {
-      return Err (format! (
-        "full rebuild completion is invalid during {:?}", active . phase)); }
-    if active . server_evidence . is_none () {
-      return Err ("full rebuild has no durable server evidence" . into ()); }
+    self . commit_selection (incident_id, epoch, selected, true) }
+
+  fn commit_selection (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+    selected : SelectedStoreRecord,
+    rebuild : bool,
+  ) -> Result<(), String> {
+    if let Some (incident) = self . committed_incidents . get (incident_id) {
+      let (recorded_epoch, recorded) : (MaintenanceEpoch, Option<&SelectedStoreRecord>) = match incident {
+        CommittedIncident::Settling (active) => (active . epoch, active . selected_store . as_ref ()),
+        CommittedIncident::Terminal { record, .. } => (record . epoch, record . selected_store . as_ref ()), };
+      return if recorded_epoch == epoch && recorded == Some (&selected) { Ok (( )) }
+        else { Err ("committed selection retry changed its incident, epoch or selected record" . into ()) }; }
+    let mut active : ActiveMaintenance = self . matching_active_mut (incident_id, epoch)? . clone ();
+    let phase : &MaintenancePhase = if active . phase == MaintenancePhase::AwaitingClient {
+      active . suspended_phase . as_ref () . unwrap_or (&active . phase)
+    } else { &active . phase };
+    let expected : MaintenancePhase = if rebuild { MaintenancePhase::FullRebuildExclusive }
+      else { MaintenancePhase::SelectingPartial };
+    if phase != &expected {
+      return Err ("store selection completion has no matching selection phase" . into ()); }
+    if rebuild && active . origin != MaintenanceOrigin::FullRebuild
+       && !active . force_full_rebuild_recovery {
+      return Err ("full rebuild completion has no exclusive rebuild authority" . into ()); }
     active . selected_store = Some (selected);
+    validate_committed_incident (&active)?;
     active . blocking_reason = None;
     active . force_full_rebuild_recovery = false;
     active . phase = MaintenancePhase::Presenting;
-    Ok (( ))
-  }
+    active . suspended_phase = None;
+    self . committed_incidents . insert (
+      incident_id . clone (), CommittedIncident::Settling (active));
+    self . state = CoordinatorState::Idle;
+    Ok (( )) }
 
   /// Bind the selected G1 candidate's disk observation to the exact Git
   /// presentation seen before maintenance view classification/rendering.
@@ -932,7 +963,7 @@ impl MaintenanceCoordinator {
     signature_blake3         : String,
     presentation_generation : u64,
   ) -> Result<bool, String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active = self . matching_incident_mut (incident_id, epoch)?;
     if !matches! (active . phase,
       MaintenancePhase::Presenting
       | MaintenancePhase::AwaitingScalarAuthorization
@@ -993,7 +1024,7 @@ impl MaintenanceCoordinator {
     epoch       : MaintenanceEpoch,
     transfer    : ClientEvidenceTransferRecord,
   ) -> Result<(), String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active = self . matching_incident_mut (incident_id, epoch)?;
     if !matches! (active . phase,
       MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
     {
@@ -1023,7 +1054,7 @@ impl MaintenanceCoordinator {
     epoch       : MaintenanceEpoch,
     settlements : Vec<ViewSettlementRecord>,
   ) -> Result<(), String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active = self . matching_incident_mut (incident_id, epoch)?;
     if active . phase != MaintenancePhase::Presenting {
       return Err (format! (
         "view classification is invalid during {:?}", active . phase)); }
@@ -1031,6 +1062,19 @@ impl MaintenanceCoordinator {
     for record in settlements {
       if record . buffer_id . is_empty () {
         return Err ("view settlement has an empty buffer ID" . into ()); }
+      let frozen : &FrozenBufferRecord = active . presentation_census () . get (&record . buffer_id)
+        . ok_or ("view settlement names a buffer outside the fixed census")?;
+      if record . kind != frozen . kind || record . view_uri != frozen . view_uri
+      || record . dirty != frozen . dirty
+      || record . base_graph_generation != frozen . graph_generation
+      || record . base_presentation_generation != frozen . presentation_generation
+      || record . base_server_revision != frozen . server_revision
+      || record . base_application_token != frozen . application_token
+      || record . origin_buffer_id != frozen . origin_buffer_id
+      || record . origin_view_uri != frozen . origin_view_uri
+      || record . origin_application_token != frozen . origin_application_token
+      || record . origin_location != frozen . origin_location {
+        return Err ("view settlement changed its frozen buffer authority" . into ()); }
       let id = record . buffer_id . clone ();
       if records . insert (id . clone (), record) . is_some () {
         return Err (format! ("view settlement repeats buffer '{}'", id)); }
@@ -1058,7 +1102,7 @@ impl MaintenanceCoordinator {
     epoch       : MaintenanceEpoch,
     mut challenge : ScalarReleaseRecord,
   ) -> Result<bool, String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active = self . matching_incident_mut (incident_id, epoch)?;
     if active . phase != MaintenancePhase::Presenting {
       return Err (format! (
         "scalar challenge is invalid during {:?}", active . phase)); }
@@ -1093,7 +1137,7 @@ impl MaintenanceCoordinator {
     epoch       : MaintenanceEpoch,
     mut pids    : Vec<String>,
   ) -> Result<bool, String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let active = self . matching_incident_mut (incident_id, epoch)?;
     pids . sort ();
     pids . dedup ();
     let challenge = active . scalar_release . as_mut ()
@@ -1128,55 +1172,19 @@ impl MaintenanceCoordinator {
     application_token : u64,
     application_ack  : Option<&ViewApplicationAcknowledgement>,
   ) -> Result<bool, String> {
-    let active = self . matching_active_mut (incident_id, epoch)?;
-    if !matches! (active . phase,
-      MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
-    {
-      return Err (format! (
-        "view settlement ACK is invalid during {:?}", active . phase)); }
-    let record = active . view_settlements . get_mut (buffer_id)
-      . ok_or_else (|| format! (
-        "buffer '{}' has no planned settlement", buffer_id))?;
-    if record . requirement != requirement
-    || record . view_uri . as_deref () != view_uri
-    || record . base_graph_generation != base_graph_generation
-    || record . base_presentation_generation != base_presentation_generation
-    || record . base_server_revision != base_revision
-    || record . base_application_token != application_token
-    {
-      return Err (format! (
-        "buffer '{}' settlement ACK changed its frozen authority", buffer_id)); }
-    match (&record . application, application_ack) {
-      (Some (offer), Some (ack))
-        if record . requirement == ViewSettlementRequirement::ApplicationAck
-        && offer . content_sha256 == ack . content_sha256
-        && offer . resulting_graph_generation
-             == ack . resulting_graph_generation
-        && offer . resulting_presentation_generation
-             == ack . resulting_presentation_generation
-        && offer . resulting_server_revision
-             == ack . resulting_server_revision
-        && offer . resulting_application_token
-             == ack . resulting_application_token => {}
-      (None, None)
-        if record . requirement != ViewSettlementRequirement::ApplicationAck => {}
-      _ => return Err (format! (
-        "buffer '{}' application ACK changed its staged authority", buffer_id)),
-    }
-    if record . acknowledged {
-      return Ok (active . view_settlements . values ()
-        . all (|record| record . acknowledged)); }
-    if active . phase == MaintenancePhase::FinalizingArchive {
-      return Err (
-        "finalizing archive contains an unacknowledged view settlement"
-          . into ()); }
-    record . resolution = ViewSettlementResolution::ClientAcknowledged;
-    record . acknowledged = true;
-    let complete = active . view_settlements . values ()
-      . all (|record| record . acknowledged);
-    if complete { active . phase = MaintenancePhase::FinalizingArchive; }
-    Ok (complete)
-  }
+    if let Some (CommittedIncident::Terminal { record, incident: Some (retained), .. }) =
+        self . committed_incidents . get (incident_id) {
+      if record . epoch != epoch || !retained . view_settlements . get (buffer_id)
+          . is_some_and (|record| record . acknowledged) {
+        return Err ("terminal settlement replay has no acknowledged exact buffer" . into ()); }
+      let mut replay : ActiveMaintenance = retained . clone ();
+      return acknowledge_settlement (&mut replay, buffer_id, requirement, view_uri,
+        base_graph_generation, base_presentation_generation, base_revision,
+        application_token, application_ack); }
+    let active : &mut ActiveMaintenance = self . matching_incident_mut (incident_id, epoch)?;
+    acknowledge_settlement (active, buffer_id, requirement, view_uri,
+      base_graph_generation, base_presentation_generation, base_revision,
+      application_token, application_ack) }
 
   /// Before an external mutation yields invalid disk there is no G1 against
   /// which dirty views can prove orthogonality.  Record their conservative
@@ -1285,8 +1293,19 @@ impl MaintenanceCoordinator {
     &mut self,
     live_buffer_ids : &BTreeSet<String>,
   ) -> Result<Vec<String>, String> {
-    let CoordinatorState::Active (active) = &mut self . state else {
-      return Ok (Vec::new ()); };
+    let CoordinatorState::Active (active) : &CoordinatorState = &self . state else {
+      return Err ("view census reconciliation requires an exact incident identity" . into ()); };
+    let incident_id : IncidentId = active . incident_id . clone ();
+    let epoch : MaintenanceEpoch = active . epoch;
+    self . reconcile_incident_view_settlements (&incident_id, epoch, live_buffer_ids) }
+
+  pub fn reconcile_incident_view_settlements (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+    live_buffer_ids : &BTreeSet<String>,
+  ) -> Result<Vec<String>, String> {
+    let active : &mut ActiveMaintenance = self . matching_incident_mut (incident_id, epoch)?;
     if active . view_settlements . is_empty () {
       return Ok (Vec::new ()); }
     if !matches! (active . phase,
@@ -1313,13 +1332,26 @@ impl MaintenanceCoordinator {
   /// exact staged application whose ordinary ACK was lost.
   pub fn acknowledge_view_application_from_census (
     &mut self,
-    buffer_id       : &str,
+    buffer_id : &str,
+    application_ack : &ViewApplicationAcknowledgement,
+  ) -> Result<bool, String> {
+    let CoordinatorState::Active (active) : &CoordinatorState = &self . state else {
+      return Err ("census application requires an exact incident identity" . into ()); };
+    let incident_id : IncidentId = active . incident_id . clone ();
+    let epoch : MaintenanceEpoch = active . epoch;
+    self . acknowledge_incident_application_from_census (
+      &incident_id, epoch, buffer_id, application_ack) }
+
+  pub fn acknowledge_incident_application_from_census (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+    buffer_id : &str,
     application_ack : &ViewApplicationAcknowledgement,
   ) -> Result<bool, String> {
     let (incident_id, epoch, requirement, view_uri, base_graph,
          base_presentation, base_revision, base_token) = {
-      let CoordinatorState::Active (active) = &self . state else {
-        return Err ("census application has no active maintenance" . into ()); };
+      let active : &ActiveMaintenance = self . incident (incident_id, epoch)?;
       let record = active . view_settlements . get (buffer_id)
         . ok_or_else (|| format! (
           "buffer '{}' has no planned settlement", buffer_id))?;
@@ -1348,7 +1380,7 @@ impl MaintenanceCoordinator {
       &incident_id, epoch, buffer_id, requirement, view_uri . as_deref (),
       base_graph, base_presentation, base_revision, base_token,
       Some (application_ack))?;
-    let active = self . matching_active_mut (&incident_id, epoch)?;
+    let active = self . matching_incident_mut (&incident_id, epoch)?;
     active . view_settlements . get_mut (buffer_id)
       . expect ("acknowledged census application remains journaled")
       . resolution = ViewSettlementResolution::CensusApplied;
@@ -1614,19 +1646,43 @@ impl MaintenanceCoordinator {
     }
   }
 
+  pub fn adopt_incident_session (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+    session_id : &str,
+  ) -> Result<bool, String> {
+    if session_id . is_empty () { return Err ("replacement session ID may not be empty" . into ()); }
+    if let Some (CommittedIncident::Terminal { record, incident, .. }) =
+        self . committed_incidents . get_mut (incident_id) {
+      if record . epoch != epoch { return Err ("incident adoption names another epoch" . into ()); }
+      if record . controlling_session_id () == session_id { return Ok (false); }
+      if record . archive_manifest_sha256 . is_none () {
+        return Err ("terminal incident adoption requires its archived evidence" . into ()); }
+      record . controller_session_id = session_id . into ();
+      if let Some (active) = incident { active . controller_session_id = session_id . into (); }
+      return Ok (true); }
+    let active : &mut ActiveMaintenance = self . matching_incident_mut (incident_id, epoch)?;
+    if active . controlling_session_id () == session_id { return Ok (false); }
+    if active . initial_archive_manifest_sha256 . is_none ()
+    || !matches! (active . archive_status, ArchiveStatus::Ready { .. } | ArchiveStatus::Finalized { .. }) {
+      return Err ("incident adoption requires its verified initial archive" . into ()); }
+    active . controller_session_id = session_id . into ();
+    active . client_connected = true;
+    Ok (true) }
+
   pub fn finish (
     &mut self,
     incident_id : &IncidentId,
     epoch       : MaintenanceEpoch,
     disposition : TerminalDisposition,
   ) -> Result<TerminalMaintenance, String> {
-    if let CoordinatorState::Terminal (terminal) = &self . state {
-      if &terminal . incident_id != incident_id || terminal . epoch != epoch {
-        return Err ("terminal maintenance identity changed" . into ()); }
+    if let Some (terminal) = self . terminal_incident (incident_id, epoch) {
       if terminal . disposition != disposition {
         return Err ("terminal maintenance disposition changed" . into ()); }
       return Ok (terminal . clone ()); }
-    let active = self . matching_active_mut (incident_id, epoch)?;
+    let committed : bool = self . committed_incidents . contains_key (incident_id);
+    let active : ActiveMaintenance = self . matching_incident_mut (incident_id, epoch)? . clone ();
     if disposition == TerminalDisposition::Completed
     && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
         || !active . client_evidence_acknowledged
@@ -1653,7 +1709,10 @@ impl MaintenanceCoordinator {
       selected_store: active . selected_store . clone (),
       requested_id_outcomes: active . requested_id_outcomes . clone (),
     };
-    self . state = CoordinatorState::Terminal (terminal . clone ());
+    if committed {
+      self . committed_incidents . insert (incident_id . clone (), CommittedIncident::Terminal {
+        record: terminal . clone (), acknowledged: false, incident: Some (active), });
+    } else { self . state = CoordinatorState::Terminal (terminal . clone ()); }
     Ok (terminal)
   }
 
@@ -1662,12 +1721,20 @@ impl MaintenanceCoordinator {
     incident_id : &IncidentId,
     epoch       : MaintenanceEpoch,
   ) -> Result<bool, String> {
+    if let Some (incident) = self . committed_incidents . get_mut (incident_id) {
+      return match incident {
+        CommittedIncident::Terminal { record, acknowledged, .. } if record . epoch == epoch => {
+          let changed : bool = !*acknowledged;
+          *acknowledged = true;
+          Ok (changed) }
+        _ => Err ("terminal acknowledgement names an unsettled incident or another epoch" . into ()), }; }
     match &self . state {
-      CoordinatorState::Idle => Ok (false),
       CoordinatorState::Terminal (terminal) => {
         if &terminal . incident_id != incident_id || terminal . epoch != epoch {
           return Err ("terminal acknowledgement names another incident"
             . into ()); }
+        self . committed_incidents . insert (incident_id . clone (), CommittedIncident::Terminal {
+          record: terminal . clone (), acknowledged: true, incident: None, });
         self . state = CoordinatorState::Idle;
         Ok (true)
       }
@@ -1675,6 +1742,17 @@ impl MaintenanceCoordinator {
         . into ()),
     }
   }
+
+  fn matching_incident_mut (
+    &mut self,
+    incident_id : &IncidentId,
+    epoch : MaintenanceEpoch,
+  ) -> Result<&mut ActiveMaintenance, String> {
+    if self . committed_incidents . contains_key (incident_id) {
+      return match self . committed_incidents . get_mut (incident_id) {
+        Some (CommittedIncident::Settling (active)) if active . epoch == epoch => Ok (active),
+        _ => Err ("settlement names an obsolete incident epoch or terminal record" . into ()), }; }
+    self . matching_active_mut (incident_id, epoch) }
 
   fn matching_active_mut (
     &mut self,
@@ -1695,35 +1773,134 @@ impl MaintenanceCoordinator {
   }
 }
 
-fn current_generation_settlement (
-  record : &FrozenBufferRecord,
-) -> ViewSettlementRecord {
-  ViewSettlementRecord {
-    buffer_id: record . buffer_id . clone (),
-    buffer_key: None,
-    kind: record . kind . clone (),
-    view_uri: record . view_uri . clone (),
-    origin_buffer_id: record . origin_buffer_id . clone (),
-    origin_view_uri: record . origin_view_uri . clone (),
-    origin_application_token: record . origin_application_token,
-    origin_location: record . origin_location . clone (),
-    dirty: false,
-    impacted: false,
-    parse_uncertain: false,
-    uncertainty_reason: None,
-    observed_ids: Vec::new (),
-    resolved_primary_ids: Vec::new (),
-    base_graph_generation: record . graph_generation,
-    base_presentation_generation: record . presentation_generation,
-    base_server_revision: record . server_revision,
-    base_application_token: record . application_token,
-    planned_disposition: ViewDisposition::RetainedClean,
-    requirement: ViewSettlementRequirement::ReleaseAck,
-    application: None,
-    resolution: Default::default (),
-    acknowledged: false,
+#[allow(clippy::too_many_arguments)]
+fn acknowledge_settlement (
+  active : &mut ActiveMaintenance,
+  buffer_id : &str,
+  requirement : ViewSettlementRequirement,
+  view_uri : Option<&str>,
+  base_graph_generation : u64,
+  base_presentation_generation : u64,
+  base_revision : u64,
+  application_token : u64,
+  application_ack : Option<&ViewApplicationAcknowledgement>,
+) -> Result<bool, String> {
+    if !matches! (active . phase,
+      MaintenancePhase::Presenting | MaintenancePhase::FinalizingArchive)
+    {
+      return Err (format! (
+        "view settlement ACK is invalid during {:?}", active . phase)); }
+    let record = active . view_settlements . get_mut (buffer_id)
+      . ok_or_else (|| format! (
+        "buffer '{}' has no planned settlement", buffer_id))?;
+    if record . requirement != requirement
+    || record . view_uri . as_deref () != view_uri
+    || record . base_graph_generation != base_graph_generation
+    || record . base_presentation_generation != base_presentation_generation
+    || record . base_server_revision != base_revision
+    || record . base_application_token != application_token
+    {
+      return Err (format! (
+        "buffer '{}' settlement ACK changed its frozen authority", buffer_id)); }
+    match (&record . application, application_ack) {
+      (Some (offer), Some (ack))
+        if record . requirement == ViewSettlementRequirement::ApplicationAck
+        && offer . content_sha256 == ack . content_sha256
+        && offer . resulting_graph_generation
+             == ack . resulting_graph_generation
+        && offer . resulting_presentation_generation
+             == ack . resulting_presentation_generation
+        && offer . resulting_server_revision
+             == ack . resulting_server_revision
+        && offer . resulting_application_token
+             == ack . resulting_application_token => {}
+      (None, None)
+        if record . requirement != ViewSettlementRequirement::ApplicationAck => {}
+      _ => return Err (format! (
+        "buffer '{}' application ACK changed its staged authority", buffer_id)),
+    }
+    if record . acknowledged {
+      return Ok (active . view_settlements . values ()
+        . all (|record| record . acknowledged)); }
+    if active . phase == MaintenancePhase::FinalizingArchive {
+      return Err (
+        "finalizing archive contains an unacknowledged view settlement"
+          . into ()); }
+    record . resolution = ViewSettlementResolution::ClientAcknowledged;
+    record . acknowledged = true;
+    let complete = active . view_settlements . values ()
+      . all (|record| record . acknowledged);
+    if complete { active . phase = MaintenancePhase::FinalizingArchive; }
+    Ok (complete)
   }
-}
+
+fn is_report_phase (phase : &MaintenancePhase) -> bool {
+  matches! (phase, MaintenancePhase::Presenting
+    | MaintenancePhase::AwaitingScalarAuthorization | MaintenancePhase::FinalizingArchive) }
+
+fn validate_census (active : &ActiveMaintenance) -> Result<(), String> {
+  let ids : BTreeSet<String> = active . buffer_census . keys () . cloned () . collect ();
+  let registered : BTreeSet<String> = active . registered_buffer_ids . iter () . cloned () . collect ();
+  if ids != registered || registered . len () != active . registered_buffer_ids . len () {
+    return Err ("maintenance frozen census does not establish every registered buffer" . into ()); }
+  let dirty : BTreeSet<String> = active . buffer_census . values ()
+    . filter (|record| record . dirty) . map (|record| record . buffer_id . clone ()) . collect ();
+  let undo : BTreeSet<String> = active . buffer_census . values ()
+    . filter (|record| record . undo_required) . map (|record| record . buffer_id . clone ()) . collect ();
+  if dirty != active . dirty_buffer_ids . iter () . cloned () . collect ()
+  || dirty . len () != active . dirty_buffer_ids . len ()
+  || undo != active . undo_required_buffer_ids . iter () . cloned () . collect ()
+  || undo . len () != active . undo_required_buffer_ids . len ()
+  || !undo . is_subset (&dirty) {
+    return Err ("maintenance archive census changed dirty-work or undo obligations" . into ()); }
+  if active . presentation_census () . iter () . any (|(id, record)| id != &record . buffer_id) {
+    return Err ("maintenance census has inconsistent buffer identity" . into ()); }
+  if let Some (legacy) = &active . legacy_census_obligations {
+    if legacy . pending_view_enrollments != active . pending_view_enrollments
+    || active . buffer_census . iter () . any (|(id, record)|
+        legacy . presentation_census . get (id) != Some (record)) {
+      return Err ("legacy census obligations changed their preserved identities" . into ()); } }
+  if active . legacy_census_obligations . is_none ()
+  && (!active . pending_view_enrollments . is_empty ()
+    || (!active . presentation_buffer_census . is_empty ()
+      && active . presentation_buffer_census != active . buffer_census)) {
+    return Err ("modern maintenance cannot enlarge its fixed census" . into ()); }
+  Ok (( )) }
+
+fn validate_terminal_record (terminal : &TerminalMaintenance) -> Result<(), String> {
+  if terminal . disposition == TerminalDisposition::Completed
+  && (terminal . selected_store . is_none ()
+      || terminal . archive_manifest_sha256 . as_ref () . is_none_or (String::is_empty)) {
+    return Err ("completed incident lacks selected-store or final archive proof" . into ()); }
+  Ok (( )) }
+
+pub(crate) fn validate_committed_incident (active : &ActiveMaintenance) -> Result<(), String> {
+  if !active . census_frozen || !active . pending_view_enrollments . is_empty () {
+    return Err ("committed incident requires a fixed, fully identified census" . into ()); }
+  if active . initial_archive_manifest_sha256 . as_ref () . is_none_or (String::is_empty)
+  || !matches! (active . archive_status, ArchiveStatus::Ready { .. } | ArchiveStatus::Finalized { .. }) {
+    return Err ("committed incident requires its verified initial archive" . into ()); }
+  if active . server_evidence . as_ref () . is_none_or (|evidence|
+      evidence . bundle_sha256 . is_empty () || evidence . path . as_os_str () . is_empty ())
+  || active . selected_store . as_ref () . is_none_or (|selected| selected . tantivy_outcome . is_empty ()) {
+    return Err ("committed incident requires durable selected-store and evidence records" . into ()); }
+  Ok (( )) }
+
+fn active_summary (active : &ActiveMaintenance) -> IncidentSummary {
+  IncidentSummary {
+    incident_id: active . incident_id . clone (), epoch: active . epoch,
+    phase: Some (active . phase . clone ()), selected_store: active . selected_store . clone (),
+    disposition: None, terminal_acknowledged: false, } }
+
+fn terminal_summary (
+  terminal : &TerminalMaintenance,
+  acknowledged : bool,
+) -> IncidentSummary {
+  IncidentSummary {
+    incident_id: terminal . incident_id . clone (), epoch: terminal . epoch,
+    phase: None, selected_store: terminal . selected_store . clone (),
+    disposition: Some (terminal . disposition . clone ()),
+    terminal_acknowledged: acknowledged, } }
 
 fn utc_incident_timestamp () -> (String, String) {
   let duration = SystemTime::now () . duration_since (UNIX_EPOCH)
@@ -1784,8 +1961,6 @@ fn allowed_phase_transition (
     | (ArchiveReady, FullRebuildExclusive)
     | (RunningExternalMutation, FinalObservation)
     | (FinalObservation, SelectingPartial)
-    | (SelectingPartial, Presenting)
-    | (FullRebuildExclusive, Presenting)
     | (Presenting, AwaitingScalarAuthorization)
     | (AwaitingScalarAuthorization, Presenting)
     | (Presenting, FinalizingArchive)
@@ -1948,8 +2123,8 @@ mod tests {
         tantivy_generation: 0,
         tantivy_outcome: "synchronous-full-rebuild" . into (),
       }) . unwrap ();
-    let CoordinatorState::Active (rebuilt) = &coordinator . state else {
-      panic! ("recovered stores stopped being active"); };
+    let rebuilt : &ActiveMaintenance = coordinator . incident (
+      &active . incident_id, active . epoch) . unwrap ();
     assert_eq! (rebuilt . phase, MaintenancePhase::Presenting);
     assert! (!rebuilt . force_full_rebuild_recovery);
   }
@@ -2121,7 +2296,7 @@ mod tests {
   }
 
   #[test]
-  fn server_view_uri_binds_a_late_clean_client_buffer_monotonically () {
+  fn late_read_only_results_never_enlarge_the_frozen_census () {
     let mut coordinator = MaintenanceCoordinator::new ();
     let active = coordinator . begin (
       MaintenanceOrigin::FullRebuild, None) . unwrap ();
@@ -2134,22 +2309,22 @@ mod tests {
       view_uri: "late-view" . into (), graph_generation: 1,
       presentation_generation: 2, server_revision: 3, application_token: 4,
     };
-    assert! (coordinator . enroll_pending_view (pending . clone ()) . unwrap ());
+    assert! (!coordinator . enroll_pending_view (pending . clone ()) . unwrap ());
     assert! (!coordinator . enroll_pending_view (pending) . unwrap ());
     assert_eq! (coordinator . enroll_presentation_census (
       vec![late_clean_view ("late-buffer", "late-view", active . epoch)],
       Some (active . epoch . get ()))
-      . unwrap (), ["late-buffer"]);
+      . unwrap (), Vec::<String>::new ());
     let CoordinatorState::Active (enrolled) = &coordinator . state else {
       panic! ("late view stopped being active"); };
     assert! (enrolled . buffer_census . is_empty ());
     assert! (enrolled . registered_buffer_ids . is_empty ());
-    assert_eq! (enrolled . presentation_buffer_ids (), ["late-buffer"]);
+    assert! (enrolled . presentation_buffer_ids () . is_empty ());
     assert! (enrolled . pending_view_enrollments . is_empty ());
   }
 
   #[test]
-  fn selection_waits_for_a_query_to_bind_its_client_buffer () {
+  fn late_query_cannot_defer_a_fixed_census_selection () {
     let mut coordinator = MaintenanceCoordinator::new ();
     let candidate = candidate ();
     coordinator . set_pending_valid (candidate . clone ()) . unwrap ();
@@ -2169,19 +2344,16 @@ mod tests {
       view_uri: "late-view" . into (), graph_generation: 1,
       presentation_generation: 2, server_revision: 3, application_token: 4,
     }) . unwrap ();
-    assert! (coordinator . defer_selection_for_view_enrollment (
+    assert! (!coordinator . defer_selection_for_view_enrollment (
       &active . incident_id, active . epoch) . unwrap ());
     let CoordinatorState::Active (deferred) = &coordinator . state else {
       panic! ("deferred selection stopped being active"); };
-    assert_eq! (deferred . phase, MaintenancePhase::ArchiveReady);
+    assert_eq! (deferred . phase, MaintenancePhase::SelectingPartial);
     assert! (deferred . server_evidence . is_some ());
 
     coordinator . enroll_presentation_census (
       vec![late_clean_view ("late-buffer", "late-view", active . epoch)],
       Some (active . epoch . get ())) . unwrap ();
-    coordinator . transition (
-      &active . incident_id, active . epoch,
-      MaintenancePhase::SelectingPartial) . unwrap ();
     assert! (!coordinator . defer_selection_for_view_enrollment (
       &active . incident_id, active . epoch) . unwrap ());
     let CoordinatorState::Active (ready) = &coordinator . state else {
@@ -2190,7 +2362,7 @@ mod tests {
   }
 
   #[test]
-  fn reconnect_resolves_an_unconstructed_pending_view_but_not_dirty_work () {
+  fn reconnect_census_cannot_enroll_a_locally_modified_read_only_result () {
     let mut coordinator = MaintenanceCoordinator::new ();
     let active = coordinator . begin (
       MaintenanceOrigin::FullRebuild, None) . unwrap ();
@@ -2204,7 +2376,7 @@ mod tests {
     dirty . dirty = true;
     assert! (coordinator . enroll_presentation_census (
       vec![dirty], Some (active . epoch . get ()))
-      . unwrap_err () . contains ("absent from the initial archive"));
+      . unwrap () . is_empty ());
     let CoordinatorState::Active (enrolled) = &coordinator . state else {
       panic! ("late view stopped being active"); };
     assert! (enrolled . pending_view_enrollments . is_empty ());
@@ -2267,8 +2439,8 @@ mod tests {
     assert_eq! (coordinator . finish (
       &active . incident_id, active . epoch,
       TerminalDisposition::Completed) . unwrap (), terminal);
-    assert! (matches! (
-      coordinator . state, CoordinatorState::Terminal (_)));
+    assert_eq! (coordinator . state, CoordinatorState::Idle);
+    assert! (coordinator . terminal_incident (&active . incident_id, active . epoch) . is_some ());
     assert! (coordinator . state . policy () . skg_saves_allowed);
     assert! (coordinator . acknowledge_terminal (
       &active . incident_id, active . epoch) . unwrap ());
@@ -2306,8 +2478,8 @@ mod tests {
         tantivy_generation: 0,
         tantivy_outcome: "synchronous-full-rebuild" . into (),
       }) . unwrap ();
-    let CoordinatorState::Active (rebuilt) = &coordinator . state else {
-      panic! ("full rebuild stopped being active"); };
+    let rebuilt : &ActiveMaintenance = coordinator . incident (
+      &active . incident_id, active . epoch) . unwrap ();
     assert_eq! (rebuilt . phase, MaintenancePhase::Presenting);
     assert_eq! (rebuilt . selected_store . as_ref () . unwrap ()
       . tantivy_outcome, "synchronous-full-rebuild");
@@ -2356,8 +2528,8 @@ mod tests {
     assert! (coordinator . record_scalar_challenge (
       &active . incident_id, active . epoch, challenge . clone ())
       . unwrap ());
-    let CoordinatorState::Active (retained) = &coordinator . state else {
-      panic! ("challenge discarded incident"); };
+    let retained : &ActiveMaintenance = coordinator . incident (
+      &active . incident_id, active . epoch) . unwrap ();
     assert_eq! (retained . phase,
       MaintenancePhase::AwaitingScalarAuthorization);
     assert_eq! (retained . scalar_release . as_ref () . unwrap () . pids,
@@ -2715,6 +2887,117 @@ mod tests {
     }
   }
 
+  fn publish_test_incident (
+    coordinator : &mut MaintenanceCoordinator,
+    buffers : Vec<FrozenBufferRecord>,
+    graph : GraphGeneration,
+    manifest : ManifestRevision,
+  ) -> ActiveMaintenance {
+    let mut candidate : CandidateSummary = candidate ();
+    candidate . base_graph_generation = graph;
+    candidate . base_manifest_revision = manifest;
+    let active : ActiveMaintenance = coordinator . begin_with_archive_contract_and_targets (
+      MaintenanceOrigin::FullRebuild, Some (candidate), "session" . into (),
+      "emacs" . into (), "all" . into (), graph, manifest, buffers,
+      MaintenanceTargets::default ()) . unwrap ();
+    coordinator . archive_ready (&active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . record_server_evidence (&active . incident_id, active . epoch, ServerEvidenceRecord {
+      path: "evidence" . into (), bundle_sha256: "bundle" . into (),
+      artifact_count: 1, total_file_bytes: 2, }) . unwrap ();
+    coordinator . transition (&active . incident_id, active . epoch,
+      MaintenancePhase::FullRebuildExclusive) . unwrap ();
+    coordinator . store_rebuilt (&active . incident_id, active . epoch, SelectedStoreRecord {
+      graph_generation: graph . successor (), manifest_revision: manifest . successor (),
+      tantivy_generation: 1, tantivy_outcome: "committed" . into (), }) . unwrap ();
+    active }
+
+  #[test]
+  fn committed_reports_and_exact_old_acks_cannot_replace_a_newer_incident () {
+    let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+    let frozen = |id : &str| -> FrozenBufferRecord {
+      let mut record : FrozenBufferRecord = frozen_dirty_view (id);
+      record . view_uri = Some (format! ("uri-{}", id));
+      record . presentation_generation = 0;
+      record . server_revision = 4;
+      record . application_token = 9;
+      record };
+    let first : ActiveMaintenance = publish_test_incident (&mut coordinator,
+      vec![frozen ("one"), frozen ("two")],
+      GraphGeneration::INITIAL, ManifestRevision::INITIAL);
+    assert_eq! (coordinator . state, CoordinatorState::Idle);
+    assert! (coordinator . state . policy () . skg_saves_allowed);
+    let mut wrong_base : ViewSettlementRecord = settlement ("one");
+    wrong_base . base_server_revision = 3;
+    assert! (coordinator . record_view_settlements (&first . incident_id, first . epoch,
+      vec![wrong_base, settlement ("two")]) . is_err ());
+    coordinator . record_view_settlements (&first . incident_id, first . epoch,
+      vec![settlement ("one"), settlement ("two")]) . unwrap ();
+    let selected_first : SelectedStoreRecord = coordinator . incident (&first . incident_id, first . epoch)
+      . unwrap () . selected_store . clone () . unwrap ();
+    let mut newer_buffer : FrozenBufferRecord = frozen ("one");
+    newer_buffer . graph_generation = selected_first . graph_generation . get ();
+    newer_buffer . server_revision = 8;
+    newer_buffer . application_token = 13;
+    newer_buffer . current_sha256 = "c" . repeat (64);
+    let second : ActiveMaintenance = publish_test_incident (&mut coordinator, vec![newer_buffer],
+      selected_first . graph_generation, selected_first . manifest_revision);
+    let successor : ActiveMaintenance = coordinator . incident (&second . incident_id, second . epoch)
+      . unwrap () . clone ();
+    assert! (successor . selected_store . as_ref () . unwrap () . graph_generation
+      > selected_first . graph_generation);
+    assert! (coordinator . acknowledge_view_settlement (&first . incident_id, first . epoch,
+      "one", ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 2, 0, 8, 13, None) . is_err ());
+    assert! (!coordinator . acknowledge_view_settlement (&first . incident_id, first . epoch,
+      "one", ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 1, 0, 4, 9, None) . unwrap ());
+    assert! (coordinator . acknowledge_view_settlement (&first . incident_id, first . epoch,
+      "two", ViewSettlementRequirement::RetirementAck, Some ("uri-two"), 1, 0, 4, 9, None) . unwrap ());
+    assert_eq! (coordinator . incident (&second . incident_id, second . epoch) . unwrap (), &successor);
+    assert! (coordinator . record_observed_candidate (
+      &first . incident_id, first . epoch, candidate ()) . is_err ());
+    coordinator . store_selected (&first . incident_id, first . epoch, selected_first . clone ()) . unwrap ();
+    let mut obsolete_result : SelectedStoreRecord = selected_first . clone ();
+    obsolete_result . graph_generation = obsolete_result . graph_generation . successor ();
+    assert! (coordinator . store_selected (&first . incident_id, first . epoch, obsolete_result) . is_err ());
+    coordinator . record_presentation_fence (&first . incident_id, first . epoch,
+      "a" . repeat (64), 3) . unwrap ();
+    coordinator . record_client_evidence_transfer (&first . incident_id, first . epoch,
+      ClientEvidenceTransferRecord {
+        server_bundle_sha256: "bundle" . into (), transfer_manifest_sha256: "transfer" . into (),
+        artifact_bytes_sha256: "bytes" . into (), artifact_count: 1, artifact_bytes: 2, }) . unwrap ();
+    coordinator . archive_finalized (&first . incident_id, first . epoch,
+      "final" . into (), "transfer" . into (), "bytes" . into ()) . unwrap ();
+    coordinator . finish (&first . incident_id, first . epoch, TerminalDisposition::Completed) . unwrap ();
+    assert! (coordinator . acknowledge_terminal (&first . incident_id, first . epoch) . unwrap ());
+    assert! (!coordinator . acknowledge_terminal (&first . incident_id, first . epoch) . unwrap ());
+    let before_replay : MaintenanceCoordinator = coordinator . clone ();
+    assert! (coordinator . acknowledge_view_settlement (&first . incident_id, first . epoch,
+      "one", ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 1, 0, 4, 9, None) . unwrap ());
+    assert! (coordinator . acknowledge_view_settlement (&first . incident_id, first . epoch,
+      "one", ViewSettlementRequirement::RetirementAck, Some ("uri-one"), 2, 0, 8, 13, None) . is_err ());
+    assert_eq! (coordinator, before_replay);
+    assert_eq! (coordinator . incident (&second . incident_id, second . epoch) . unwrap (), &successor);
+    assert_eq! (coordinator . state, CoordinatorState::Idle);
+    assert_eq! (coordinator . incidents () . len (), 2);
+    coordinator . validate_journal_authority () . unwrap ();
+    let Some (CommittedIncident::Terminal { incident: Some (retained), .. }) =
+      coordinator . committed_incidents . get (&first . incident_id) else { unreachable! (); };
+    assert_eq! (retained . buffer_census, first . buffer_census);
+    assert_eq! (retained . view_settlements . len (), 2); }
+
+  #[test]
+  fn selected_record_cannot_release_graph_barrier_without_archive_and_evidence () {
+    let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+    let active : ActiveMaintenance = coordinator . begin (MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    let CoordinatorState::Active (current) : &mut CoordinatorState = &mut coordinator . state else { unreachable! (); };
+    current . phase = MaintenancePhase::FullRebuildExclusive;
+    let before : MaintenanceCoordinator = coordinator . clone ();
+    assert! (coordinator . store_rebuilt (&active . incident_id, active . epoch, SelectedStoreRecord {
+      graph_generation: GraphGeneration::INITIAL . successor (),
+      manifest_revision: ManifestRevision::INITIAL . successor (),
+      tantivy_generation: 1, tantivy_outcome: "committed" . into (), }) . is_err ());
+    assert_eq! (coordinator, before);
+    assert! (!coordinator . state . policy () . skg_saves_allowed); }
+
   #[test]
   fn exact_view_settlement_inventory_and_acks_gate_finalization () {
     let mut coordinator = MaintenanceCoordinator::new ();
@@ -2814,8 +3097,8 @@ mod tests {
     assert! (coordinator . archive_finalized (
       &active . incident_id, active . epoch, "changed-final" . into (),
       "transfer" . into (), "bytes" . into ()) . is_err ());
-    let CoordinatorState::Active (active) = &coordinator . state else {
-      panic! ("incident vanished"); };
+    let active : &ActiveMaintenance = coordinator . incident (
+      &active . incident_id, active . epoch) . unwrap ();
     assert_eq! (active . phase, MaintenancePhase::FinalizingArchive);
     assert! (active . client_evidence_acknowledged);
     assert_eq! (active . client_evidence_transfer . as_ref ()

@@ -629,6 +629,7 @@ pub struct MaintenancePresentationFence {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ActiveMaintenance {
   pub incident_id       : IncidentId,
   pub epoch             : MaintenanceEpoch,
@@ -669,12 +670,17 @@ pub struct ActiveMaintenance {
   pub undo_required_buffer_ids : Vec<String>,
   #[serde(default)]
   pub buffer_census     : BTreeMap<String, FrozenBufferRecord>,
-  /// Monotonic presentation inventory.  `buffer_census` remains the
-  /// immutable initial archive authority; clean buffers born later join only
-  /// this map.
+  #[serde(default)]
+  pub census_frozen     : bool,
+  /// Version 1 could grant late results incident authority. Keep those exact
+  /// already-existing obligations separately; new incidents never create them.
+  #[serde(default)]
+  pub legacy_census_obligations : Option<LegacyCensusObligations>,
+  /// Retained for decoding known version 1 records and transitional readers.
+  /// New incidents do not grow this inventory.
   #[serde(default)]
   pub presentation_buffer_census : BTreeMap<String, FrozenBufferRecord>,
-  /// Server-known query results waiting for their client-local buffer ID.
+  /// Version 1 server-known results whose buffer identity remains unresolved.
   #[serde(default)]
   pub pending_view_enrollments : BTreeMap<String, PendingViewEnrollment>,
   #[serde(default)]
@@ -713,6 +719,38 @@ pub struct ActiveMaintenance {
   pub terminal          : Option<TerminalDisposition>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct LegacyCensusObligations {
+  pub presentation_census : BTreeMap<String, FrozenBufferRecord>,
+  pub pending_view_enrollments : BTreeMap<String, PendingViewEnrollment>,
+}
+
+/// Graph publication ends the global admission barrier. These records retain
+/// the incident's evidence and exact buffer obligations without owning another
+/// graph transition. A terminal ACK is retained rather than deleting identity.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "status", content = "details")]
+pub enum CommittedIncident {
+  Settling (ActiveMaintenance),
+  Terminal {
+    record : TerminalMaintenance,
+    acknowledged : bool,
+    /// Modern records retain the complete incident through terminal ACK.
+    /// Known version 1 terminal records retain their existing archive proof.
+    #[serde(default)]
+    incident : Option<ActiveMaintenance>, },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct IncidentSummary {
+  pub incident_id : IncidentId,
+  pub epoch : MaintenanceEpoch,
+  pub phase : Option<MaintenancePhase>,
+  pub selected_store : Option<SelectedStoreRecord>,
+  pub disposition : Option<TerminalDisposition>,
+  pub terminal_acknowledged : bool,
+}
+
 /// A fully resolved incident retained until the owning editor confirms that
 /// it received and applied the terminal unlock instruction.  Keeping this in
 /// the durable journal makes a lost terminal response exactly replayable.
@@ -740,14 +778,12 @@ impl ActiveMaintenance {
     } else { &self . controller_session_id }
   }
 
-  /// Old journals predate the separate presentation census.  Treat their
-  /// immutable initial census as the presentation inventory until a new
-  /// enrollment causes the coordinator to materialize the new map.
+  /// Modern incidents settle exactly their frozen census. Legacy late results
+  /// remain named obligations, never a license to enroll another result.
   pub fn presentation_census (&self) -> &BTreeMap<String, FrozenBufferRecord> {
-    if self . presentation_buffer_census . is_empty ()
-       && !self . buffer_census . is_empty ()
-    { &self . buffer_census }
-    else { &self . presentation_buffer_census }
+    self . legacy_census_obligations . as_ref ()
+      . map (|legacy| &legacy . presentation_census)
+      . unwrap_or (&self . buffer_census)
   }
 
   pub fn presentation_buffer_ids (&self) -> Vec<String> {

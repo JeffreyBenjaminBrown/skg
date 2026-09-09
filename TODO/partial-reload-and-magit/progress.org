@@ -1817,3 +1817,27 @@ PowerShell syntax parsing was unavailable because 'pwsh' is not installed;
 no Windows execution claim is made.
 ** choices determining the future
 Continue integration and full acceptance on the available platform.
+
+* Simplify/cohere checkpoint: fixed census and committed incident ledger
+** what's done and went well
+The coordinator separates current graph-changing authority from older committed
+incidents. Pair readiness moves an incident into its independent ledger entry;
+reports, evidence transfer and exact buffer acknowledgments can continue while
+a newer incident or save proceeds. Frozen census validation includes exact dirty
+and undo obligations. Replayed terminal and buffer acknowledgments cannot
+mutate a successor incident with the same buffer IDs.
+
+The owner checks a readiness proposal against the graph and manifest it has
+actually published. Journal version 2 preserves and checks the exact legacy v1
+bytes before migration, retains unsupported or unprovable obligations for
+inspection, and refuses malformed active authority. All 68 focused coordinator,
+journal and owner tests pass in '/tmp/skg-incident-ledger-final-tests2.log'.
+** Changes to the plan's envisioned order.
+The pure lifecycle and owner publication checks are checkpointed before all
+server/client adapters finish adopting the incident ledger.
+** what's imperfect about what's done
+An initial combined run caught a new cross-incident fixture with inconsistent
+URI/revision/token bases. Corrected exact-base fixtures pass. Abort handling
+around unresolved external effects still needs the planned integration guard.
+** choices determining the future
+Continue the accepted lifecycle integration and restart evidence reconstruction.

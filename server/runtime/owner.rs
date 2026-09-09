@@ -4,7 +4,7 @@
 
 use crate::maintenance::coordinator::MaintenanceCoordinator;
 use crate::maintenance::journal::MaintenanceJournalStore;
-use crate::maintenance::types::{ActiveMaintenance, CandidateSummary,
+use crate::maintenance::types::{ActiveMaintenance, CandidateSummary, CommittedIncident,
   CoordinatorState, IncidentId, MaintenanceEpoch, MaintenancePhase};
 use crate::runtime::SelectedRuntimeSnapshot;
 use crate::types::env::SkgEnv;
@@ -407,11 +407,48 @@ fn admit_proposal (
   if let Some (reason) = &state . failure { return Err (reason . clone ()); }
   if journal_pending || proposal . base_revision != state . revision {
     return Err ("coordinator proposal has an obsolete publication base" . into ()); }
+  let committing_selected : bool = admit_selected_incident (state, &proposal . coordinator)?;
   if let Some (reservation) = &state . reservation {
-    admit_reserved_proposal (reservation, &proposal . coordinator . state)?; }
+    let completed_selection : bool = committing_selected
+      && matches! (reservation . kind, MutationKind::Maintenance { .. })
+      && reservation . status . stage == MutationStage::Published
+      && reservation . status . blocked_reason . is_none ()
+      && proposal . coordinator . state == CoordinatorState::Idle;
+    if !completed_selection {
+      admit_reserved_proposal (reservation, &proposal . coordinator . state)?; } }
   admit_proposal_base (state, &proposal . coordinator . state)?;
   publisher . send (proposal . coordinator . clone ())
     . map_err (|_| "journal publisher stopped; no durable success" . into ()) }
+
+/// Moving an incident out of graph authority may reopen saves. Bind that
+/// durable claim to the pair the owner has actually published, while allowing
+/// subsequent report-only updates to describe their older historical pair.
+fn admit_selected_incident (
+  state : &PublishedCoordinator,
+  next : &MaintenanceCoordinator,
+) -> Result<bool, String> {
+  let CoordinatorState::Active (previous) : &CoordinatorState = &state . coordinator . state else {
+    return Ok (false); };
+  let Some (CommittedIncident::Settling (incident)) =
+    next . committed_incidents . get (&previous . incident_id) else { return Ok (false); };
+  crate::maintenance::coordinator::validate_committed_incident (incident)?;
+  let phase : &MaintenancePhase = previous . suspended_phase . as_ref ()
+    . filter (|_| previous . phase == MaintenancePhase::AwaitingClient)
+    . unwrap_or (&previous . phase);
+  if !is_selection_phase (phase) || incident . epoch != previous . epoch
+  || incident . candidate != previous . candidate
+  || incident . buffer_census != previous . buffer_census
+  || incident . initial_archive_manifest_sha256 != previous . initial_archive_manifest_sha256
+  || incident . server_evidence != previous . server_evidence {
+    return Err ("committed incident changed its graph-transition authority" . into ()); }
+  let selected : &Arc<SelectedRuntimeSnapshot> = state . selected . as_ref ()
+    . ok_or ("committed incident has no owner-published selected pair")?;
+  let record : &crate::maintenance::types::SelectedStoreRecord = incident . selected_store . as_ref ()
+    . expect ("validated committed selected-store record");
+  if record . graph_generation != selected . selected . graph_generation
+  || record . manifest_revision != selected . selected . manifest_revision {
+    return Err ("committed incident does not name the owner-published selected pair" . into ()); }
+  Ok (true) }
 
 /// Coordinator revision alone does not fence a proposal prepared before a
 /// selected-store mutation: graph publication deliberately leaves that revision
@@ -867,6 +904,53 @@ mod tests {
     assert_eq! (owner . published . load () . revision, 0);
     assert! (owner . propose (0, proposal) . unwrap_err () . contains ("selected base"));
     assert_eq! (owner . snapshot () . state, CoordinatorState::Idle); }
+
+  #[test]
+  fn incident_readiness_requires_the_published_pair_and_old_reports_cannot_reselect_it () {
+    let before : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
+    let after : Arc<SelectedRuntimeSnapshot> = next_snapshot (&before);
+    let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+    let active : ActiveMaintenance = coordinator . begin (MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    coordinator . archive_ready (&active . incident_id, active . epoch, "initial" . into ()) . unwrap ();
+    coordinator . record_server_evidence (&active . incident_id, active . epoch,
+      crate::maintenance::types::ServerEvidenceRecord {
+        path: "evidence" . into (), bundle_sha256: "bundle" . into (),
+        artifact_count: 1, total_file_bytes: 2, }) . unwrap ();
+    coordinator . transition (&active . incident_id, active . epoch,
+      MaintenancePhase::FullRebuildExclusive) . unwrap ();
+    let owner : CoordinatorOwner = CoordinatorOwner::with_snapshot_publisher (
+      coordinator, Some (before), |_| Ok (( )));
+    let mut proposal : MaintenanceCoordinator = owner . snapshot ();
+    proposal . store_rebuilt (&active . incident_id, active . epoch,
+      crate::maintenance::types::SelectedStoreRecord {
+        graph_generation: after . selected . graph_generation,
+        manifest_revision: after . selected . manifest_revision,
+        tantivy_generation: 1, tantivy_outcome: "committed" . into (), }) . unwrap ();
+    assert! (owner . propose (0, proposal . clone ()) . unwrap_err () . contains ("published selected pair"));
+    let token : ReservationToken = reserve_current (&owner, &format! (
+      "maintenance/{}/{}", active . incident_id, active . epoch . get ())) . unwrap ();
+    owner . authorize_mutation (&token) . unwrap ();
+    owner . publish_selected (&token, after . clone ()) . unwrap ();
+    let mut wrong_manifest : MaintenanceCoordinator = proposal . clone ();
+    let Some (CommittedIncident::Settling (incident)) =
+      wrong_manifest . committed_incidents . get_mut (&active . incident_id) else { unreachable! (); };
+    incident . selected_store . as_mut () . unwrap () . manifest_revision = ManifestRevision::INITIAL;
+    assert! (owner . propose (0, wrong_manifest) . is_err ());
+    owner . propose (0, proposal) . unwrap ();
+    assert_eq! (owner . snapshot () . state, CoordinatorState::Idle);
+    assert! (reserve_current (&owner, "save") . is_err ());
+    owner . finish_mutation (&token) . unwrap ();
+    let save : ReservationToken = reserve_current (&owner, "save") . unwrap ();
+    owner . authorize_mutation (&save) . unwrap ();
+    let newer : Arc<SelectedRuntimeSnapshot> = next_snapshot (&after);
+    owner . publish_selected (&save, newer . clone ()) . unwrap ();
+    owner . finish_mutation (&save) . unwrap ();
+    owner . transition (|coordinator| coordinator . record_view_settlements (
+      &active . incident_id, active . epoch, Vec::new ())) . unwrap ();
+    assert! (Arc::ptr_eq (&owner . selected_snapshot () . unwrap () . selected, &newer . selected));
+    assert_eq! (owner . snapshot () . incident (&active . incident_id, active . epoch)
+      . unwrap () . selected_store . as_ref () . unwrap () . graph_generation,
+      after . selected . graph_generation); }
 
   #[test]
   fn selection_cannot_grant_external_mutation_and_publishes_after_disconnect () {
