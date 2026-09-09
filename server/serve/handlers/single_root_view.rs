@@ -16,11 +16,11 @@ use crate::serve::util::{
   format_override_menu_response_sexp,
   add_view_authority_to_response,
   tag_sexp_response,
-  tag_text_response};
+};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::views_state::{ViewUri, single_root_recipe};
+use crate::types::views_state::{ViewState, ViewUri, single_root_recipe};
 use crate::maintenance::BufferKind;
 use crate::runtime::ServerRuntime;
 
@@ -64,10 +64,9 @@ pub fn handle_single_root_view_request (
                 node_id,
                 active_source_set . name )],
               &[] );
-          let _ = send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &response_sexp ));
+          send_content_view_response (
+            stream, runtime, &tag_sexp_response (
+              TcpToClient::ContentView, &response_sexp), None);
           return; },
         Err (e) => {
           let response_sexp : String =
@@ -76,14 +75,18 @@ pub fn handle_single_root_view_request (
               &vec! [format! (
                 "Error checking source-set visibility: {}", e )],
               &[] );
-          let _ = send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &response_sexp ));
+          send_content_view_response (
+            stream, runtime, &tag_sexp_response (
+              TcpToClient::ContentView, &response_sexp), None);
           return; }}
-      if !fresh_view && runtime . maintenance_snapshot () . state . policy () . skg_saves_allowed
-        && value_from_request_sexp ("requested-view-write-authority", request)
-          . as_deref () != Ok ("read-only") {
+      let saves_allowed : bool = runtime . maintenance_snapshot () . state
+        . policy () . skg_saves_allowed
+        && runtime . authority_failure () . is_none ();
+      let requested_read_only : bool =
+        value_from_request_sexp ("requested-view-write-authority", request)
+          . as_deref () == Ok ("read-only");
+      if !fresh_view && saves_allowed
+        && ! requested_read_only {
       if let Some (existing_uri)
         = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
@@ -97,10 +100,11 @@ pub fn handle_single_root_view_request (
                 Sexp::Atom ( Atom::S (
                   existing_uri . repr_in_client () )) ] ) ] )
             . to_string ();
-          let _ = send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &switch_sexp ));
+          let state : Option<&ViewState> = views_state . open_views . views
+            . get (&existing_uri);
+          send_content_view_response (
+            stream, runtime, &tag_sexp_response (
+              TcpToClient::ContentView, &switch_sexp), state);
           return; }}
       let bypass_menu : bool =
         // The optional (override-choice . "menu" | "bypass") field,
@@ -121,10 +125,9 @@ pub fn handle_single_root_view_request (
                     "Unknown override-choice value: {} (expected \"menu\" or \"bypass\")",
                     other )],
                   &[] );
-              let _ = send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::ContentView, &response_sexp ));
+              send_content_view_response (
+                stream, runtime, &tag_sexp_response (
+                  TcpToClient::ContentView, &response_sexp), None);
               return; }}};
       let pid : ID = // the menu is per resolved node, extra-IDs included
         env . in_rust_graph . load_full ()
@@ -144,10 +147,13 @@ pub fn handle_single_root_view_request (
                 Sexp::Atom ( Atom::S (
                   menu_uri . repr_in_client () )) ] ) ] )
             . to_string ();
-          let _ = send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &switch_sexp ));
+          let state : Option<&ViewState> = if saves_allowed
+            && ! requested_read_only {
+            views_state . open_views . views . get (&menu_uri)
+          } else { None };
+          send_content_view_response (
+            stream, runtime, &tag_sexp_response (
+              TcpToClient::ContentView, &switch_sexp), state);
           return; }
       let approved_ugly_pids =
         approved_pids_from_request (request);
@@ -200,7 +206,7 @@ pub fn handle_single_root_view_request (
                 if let Err (error) = runtime . admit_view_response (request, env, state)
                 {
                   views_state . open_views . unregister_view (&menu_uri);
-                  return tag_text_response (TcpToClient::Error, &error); }
+                  return content_view_error_response (runtime, &error); }
                 let state = views_state . open_views . views . get (&menu_uri)
                   . expect ("enrolled override menu exists");
                 return tag_sexp_response (
@@ -208,13 +214,14 @@ pub fn handle_single_root_view_request (
                   &add_view_authority_to_response (&formatted, state)); },
               Ok (None) => {}, // not overridden (visibly): render normally
               Err (e) => {
-                return tag_sexp_response (
-                  TcpToClient::ContentView,
-                  & format_buffer_response_sexp (
-                    &String::new (),
-                    &[ format! (
-                        "Error generating override menu: {}", e ) ],
-                    &[] ) ); }}
+                let response_sexp : String = format_buffer_response_sexp (
+                  &String::new (),
+                  &[format! ("Error generating override menu: {}", e)],
+                  &[] );
+                return content_view_response_with_authority (
+                  runtime,
+                  &tag_sexp_response (TcpToClient::ContentView, &response_sexp),
+                  None); }}
             let mut render_warnings : Vec<String> = Vec::new ();
             match multi_root_view_via_env (
               env,
@@ -260,23 +267,23 @@ pub fn handle_single_root_view_request (
                   if let Err (error) = runtime . admit_view_response (request, env, state)
                   {
                     views_state . open_views . unregister_view (view_uri);
-                    return tag_text_response (TcpToClient::Error, &error); }
+                    return content_view_error_response (runtime, &error); }
                   let state = views_state . open_views . views . get (view_uri)
                     . expect ("enrolled content view exists");
                   add_view_authority_to_response (&formatted, state)
-                } else { formatted };
+                } else { add_read_only_view_authority (&formatted) };
                 tag_sexp_response (TcpToClient::ContentView, &formatted) },
               Err (e) => { // If we fail to generate the view, ship the generation error in the errors vec, with empty content so the client skips opening a main buffer.
                 let mut errors : Vec<String> = Vec::new ();
                 let warnings : Vec<String> = Vec::new ();
                 errors . push ( format! (
                   "Error generating document: {}", e ));
-                tag_sexp_response (
-                  TcpToClient::ContentView,
-                  & format_buffer_response_sexp (
-                    & String::new (),
-                    & errors,
-                    & warnings ) ) }} } ) };
+                let response_sexp : String = format_buffer_response_sexp (
+                  &String::new (), &errors, &warnings);
+                content_view_response_with_authority (
+                  runtime,
+                  &tag_sexp_response (TcpToClient::ContentView, &response_sexp),
+                  None) }} } ) };
       let response : String = super::maintenance_protocol::with_current_state_fields (
         runtime, &response) . expect ("content response is a formatted list");
       let _ = send_response_with_length_prefix (
@@ -285,10 +292,56 @@ pub fn handle_single_root_view_request (
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);
       tracing::error! ( "{}", error_msg ) ;
-      let _ = send_response_with_length_prefix (
-        stream,
-        & tag_text_response (
-          TcpToClient::ContentView, &error_msg )); } } }
+      let response : String = content_view_error_response (runtime, &error_msg);
+      let _ = send_response_with_length_prefix (stream, &response); } } }
+
+fn send_content_view_response (
+  stream : &mut TcpStream,
+  runtime : &ServerRuntime,
+  response : &str,
+  state : Option<&ViewState>,
+) {
+  let response : String = content_view_response_with_authority (
+    runtime, response, state);
+  let _ = send_response_with_length_prefix (stream, &response);
+}
+
+fn content_view_error_response (
+  runtime : &ServerRuntime,
+  error : &str,
+) -> String {
+  let response_sexp : String = format_buffer_response_sexp (
+    &String::new (), &[error . to_string ()], &[]);
+  content_view_response_with_authority (
+    runtime,
+    &tag_sexp_response (TcpToClient::ContentView, &response_sexp),
+    None)
+}
+
+fn content_view_response_with_authority (
+  runtime : &ServerRuntime,
+  response : &str,
+  state : Option<&ViewState>,
+) -> String {
+  let response : String = match state {
+    Some (state) => add_view_authority_to_response (response, state),
+    None => add_read_only_view_authority (response),
+  };
+  super::maintenance_protocol::with_current_state_fields (runtime, &response)
+    . expect ("content response is a formatted list")
+}
+
+fn add_read_only_view_authority (
+  response : &str,
+) -> String {
+  let Ok (Sexp::List (mut fields)) = sexp::parse (response) else {
+    unreachable! ("content response formatter produced invalid sexp"); };
+  fields . push (Sexp::List (vec![
+    Sexp::Atom (Atom::S ("view-write-authority" . into ())),
+    Sexp::Atom (Atom::S ("read-only" . into ())),
+  ]));
+  Sexp::List (fields) . to_string ()
+}
 
 pub fn node_id_from_single_root_view_request (
   request : &str
@@ -301,3 +354,199 @@ pub fn node_id_from_single_root_view_request (
         sexp },
     "id"
   ) . map (ID) }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
+  use crate::dbs::init::empty_in_ram_tantivy_index;
+  use crate::maintenance::MaintenanceOrigin;
+  use crate::source_sets::SourceSetName;
+  use crate::test_utils::read_lp_message;
+  use crate::types::misc::{SkgConfig, SkgfileSource, TantivyIndex};
+  use crate::types::store_state::{SelectedPathManifest, SelectedStoreState};
+  use crate::types::tree::forest::ViewForest;
+  use crate::types::views_state::OpenViews;
+  use std::collections::HashMap;
+  use std::io::BufReader;
+  use std::net::{SocketAddr, TcpListener, TcpStream};
+  use std::sync::Arc;
+  use arc_swap::ArcSwap;
+  use tempfile::{TempDir, tempdir};
+
+  fn runtime_fixture (
+  ) -> (TempDir, SkgEnv, ServerRuntime) {
+    let directory : TempDir = tempdir () . unwrap ();
+    let source : SkgfileSource = SkgfileSource {
+      name: "public" . into (),
+      abbreviation: None,
+      path: directory . path () . join ("public"),
+      user_owns_it: false, };
+    let mut config : SkgConfig = SkgConfig::dummyFromSources (
+      HashMap::from ([("public" . into (), source)]));
+    config . config_path = directory . path () . join ("config.toml");
+    config . data_root = directory . path () . to_path_buf ();
+    config . maintenance_archive_identity =
+      directory . path () . join ("archive");
+    let index : TantivyIndex = empty_in_ram_tantivy_index () . unwrap ();
+    let graph : InRustGraphHandle = Arc::new (ArcSwap::from (Arc::new (
+      SelectedStoreState::initial (
+        InRustGraph::new (), SelectedPathManifest::new ())
+        . with_searcher (index . reader . searcher ()) )));
+    let env : SkgEnv = SkgEnv {
+      config: config . clone (),
+      in_rust_graph: graph,
+      searcher: index . reader . searcher (),
+      tantivy_index: index,
+      startup_warnings: Arc::new (Vec::new ()), };
+    let runtime : ServerRuntime = ServerRuntime::new (env . clone ())
+      . unwrap ();
+    (directory, env, runtime) }
+
+  fn connected_tcp_stream_pair (
+  ) -> (TcpStream, TcpStream) {
+    let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")
+      . unwrap ();
+    let address : SocketAddr = listener . local_addr () . unwrap ();
+    let client : TcpStream = TcpStream::connect (address) . unwrap ();
+    let accepted : (TcpStream, SocketAddr) =
+      listener . accept () . unwrap ();
+    let server : TcpStream = accepted . 0;
+    (server, client) }
+
+  fn handler_response (
+    request : &str,
+    env : &SkgEnv,
+    views_state : &mut ViewsState,
+    active_source_set : &ActiveSourceSet,
+    runtime : &ServerRuntime,
+  ) -> String {
+    let (mut server, client) : (TcpStream, TcpStream) =
+      connected_tcp_stream_pair ();
+    std::thread::scope (|scope| {
+      scope . spawn (|| {
+        handle_single_root_view_request (
+          &mut server, request, env, views_state,
+          active_source_set, runtime); }); });
+    let mut reader : BufReader<TcpStream> = BufReader::new (client);
+    read_lp_message (&mut reader) . unwrap () }
+
+  fn registered_menu (
+    env : &SkgEnv,
+    views_state : &mut ViewsState,
+  ) -> ViewUri {
+    let menu_uri : ViewUri = ViewUri::OverrideMenu ("node" . into ());
+    views_state . open_views . register_view_with_authority (
+      &env . in_rust_graph_snapshot (), menu_uri . clone (),
+      ViewForest::new (), &[], 1, 0, 1,
+      BufferKind::OverrideChoiceMenu, "all" . into (), None);
+    menu_uri }
+
+  #[test]
+  fn reused_menu_handler_is_read_only_during_closed_admission () {
+    let (_directory, env, runtime) : (TempDir, SkgEnv, ServerRuntime) =
+      runtime_fixture ();
+    let active : ActiveSourceSet = ActiveSourceSet::named (
+      &env . config, SourceSetName::from ("all")) . unwrap ();
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled: false,
+      open_views: OpenViews::new (), };
+    let menu_uri : ViewUri = registered_menu (&env, &mut views_state);
+    runtime . transition_maintenance (|coordinator| {
+      coordinator . begin (MaintenanceOrigin::ExplicitPartialReload, None)
+        . map (|_| ()) }) . unwrap ();
+    let request : String = "((request . \"single root content view\") \
+      (id . \"node\") (view-uri . \"new-view\") \
+      (requested-view-write-authority . \"editable\"))" . into ();
+    let response : String = handler_response (
+      &request, &env, &mut views_state, &active, &runtime);
+    assert! (response . contains ("switch-to-view"), "{}", response);
+    assert! (response . contains ("override-menu:node"), "{}", response);
+    assert! (response . contains ("(view-write-authority read-only)"),
+      "{}", response);
+    assert! (! response . contains ("(view-write-authority editable)"),
+      "{}", response);
+    assert! (response . contains ("(current-graph-generation 1)"),
+      "{}", response);
+    assert! (views_state . open_views . views
+      . get (&menu_uri) . map (|state| state . writes_admitted) == Some (true));
+  }
+
+  #[test]
+  fn reused_menu_handler_stays_editable_when_admission_is_open () {
+    let (_directory, env, runtime) : (TempDir, SkgEnv, ServerRuntime) =
+      runtime_fixture ();
+    let active : ActiveSourceSet = ActiveSourceSet::named (
+      &env . config, SourceSetName::from ("all")) . unwrap ();
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled: false,
+      open_views: OpenViews::new (), };
+    let menu_uri : ViewUri = registered_menu (&env, &mut views_state);
+    let request : String = "((request . \"single root content view\") \
+      (id . \"node\") (view-uri . \"new-view\") \
+      (requested-view-write-authority . \"editable\"))" . into ();
+    let response : String = handler_response (
+      &request, &env, &mut views_state, &active, &runtime);
+    assert! (response . contains ("switch-to-view"), "{}", response);
+    assert! (response . contains ("override-menu:node"), "{}", response);
+    assert! (response . contains ("(view-write-authority editable)"),
+      "{}", response);
+    assert! (response . contains ("(current-graph-generation 1)"),
+      "{}", response);
+    assert! (views_state . open_views . views
+      . get (&menu_uri) . map (|state| state . writes_admitted) == Some (true));
+  }
+
+  #[test]
+  fn reused_menu_handler_honors_explicit_read_only_request () {
+    let (_directory, env, runtime) : (TempDir, SkgEnv, ServerRuntime) =
+      runtime_fixture ();
+    let active : ActiveSourceSet = ActiveSourceSet::named (
+      &env . config, SourceSetName::from ("all")) . unwrap ();
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled: false,
+      open_views: OpenViews::new (), };
+    let menu_uri : ViewUri = registered_menu (&env, &mut views_state);
+    let request : String = "((request . \"single root content view\") \
+      (id . \"node\") (view-uri . \"new-view\") \
+      (requested-view-write-authority . \"read-only\"))" . into ();
+    let response : String = handler_response (
+      &request, &env, &mut views_state, &active, &runtime);
+    assert! (response . contains ("switch-to-view"), "{}", response);
+    assert! (response . contains ("override-menu:node"), "{}", response);
+    assert! (response . contains ("(view-write-authority read-only)"),
+      "{}", response);
+    assert! (! response . contains ("(view-write-authority editable)"),
+      "{}", response);
+    assert! (views_state . open_views . views
+      . get (&menu_uri) . map (|state| state . writes_admitted) == Some (true));
+  }
+
+  #[test]
+  fn unknown_id_handler_has_current_fields_and_no_editable_uri () {
+    let (_directory, env, runtime) : (TempDir, SkgEnv, ServerRuntime) =
+      runtime_fixture ();
+    let active : ActiveSourceSet = ActiveSourceSet::named (
+      &env . config, SourceSetName::from ("public")) . unwrap ();
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled: false,
+      open_views: OpenViews::new (), };
+    let request : String = "((request . \"single root content view\") \
+      (id . \"unknown\") (view-uri . \"new-view\"))" . into ();
+    let response : String = handler_response (
+      &request, &env, &mut views_state, &active, &runtime);
+    assert! (response . contains ("(errors"), "{}", response);
+    assert! (response . contains ("not in active source-set"), "{}", response);
+    assert! (response . contains ("(view-write-authority read-only)"),
+      "{}", response);
+    assert! (! response . contains ("(view-write-authority editable)"),
+      "{}", response);
+    assert! (response . contains ("(current-graph-generation 1)"),
+      "{}", response);
+    assert! (response . contains ("owner-publication-revision"),
+      "{}", response);
+    assert! (response . contains ("current-manifest-revision"),
+      "{}", response);
+    assert! (! response . contains ("new-view"), "{}", response);
+  }
+}
