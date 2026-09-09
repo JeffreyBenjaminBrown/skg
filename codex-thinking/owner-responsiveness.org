@@ -35,3 +35,11 @@ Owner coordinator revision alone did not order graph publication or a failed
 reservation. A separate in-session publication revision now advances whenever
 the readable owner state changes. Clients must use that revision for global
 admission metadata while still processing an older incident's exact outcome.
+
+** Command registry lock scope implemented
+Durable whitespace and ranking commands now use 'with_writer_transition'.
+Their source interpretation is captured under a brief interactive lock; the
+owner reservation covers computation, effects and publication independently.
+A held-worker test verifies actual publication and reservation reuse alongside
+registry access. The compatibility 'with_store_transition' still serves older
+consumers. Same-connection scheduling remains a distinct unresolved boundary.

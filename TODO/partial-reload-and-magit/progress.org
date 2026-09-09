@@ -2290,3 +2290,31 @@ See [[file:../../codex-thinking/ordinary-writers.org][the writer boundary note]]
 
 All Rust targets also compile after this command migration; the log is
 'durable-command-all-targets.log' in the same checkpoint directory.
+
+* Simplify/cohere checkpoint: command workers release the interactive lock
+** what's done and went well
+'with_writer_transition' retains owner reservation, writer serialization and
+publication ordering without holding the interactive mutex through computation.
+The old 'with_store_transition' is a compatibility wrapper for consumers that
+still need broad interactive access. Durable commands use the shorter lock
+scope and briefly capture their source interpretation before computation.
+
+A deterministic held-worker test proves selected and maintenance reads remain
+available, the interactive registry can be acquired, a competing mutation is
+refused, the changed publication is selected, and the reservation is reusable
+after completion. All six command tests still pass. Logs are
+'/tmp/simplify-cohere-baseline/writer-transition-matched-fixture.log' and
+'/tmp/simplify-cohere-baseline/writer-transition-commands.log'.
+** Changes to the plan's envisioned order.
+Shorten the lock scope before changing connection scheduling. This keeps the
+existing command result protocol and durable ordering reviewable separately.
+** what's imperfect about what's done
+The publication test initially reused a query fixture whose owner selected G2
+while its compatibility writer environment still held G1. The owner correctly
+refused regression. The test now seeds that environment from its selected G2
+before exercising the worker; production publication behavior is unchanged.
+** choices determining the future
+The connection thread still executes the command synchronously. Same-connection
+status and read responsiveness needs request scheduling and client queue work,
+with original request identities retained through terminal delivery. Continue
+from [[file:../../codex-thinking/owner-responsiveness.org][the responsiveness boundary note]]. No question for Jeff.

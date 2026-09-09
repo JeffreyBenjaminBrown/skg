@@ -45,10 +45,11 @@ pub(crate) fn handle_durable_command_request (
       Err (error) => send_command_runtime_error (stream, &error), }
     return;
   }
-  let result : Result<Result<String, String>, String> = runtime . with_store_transition (
-    operation . operation_id . clone (), |env, interactive, control| {
-      let locked_active : ActiveSourceSet =
-        interactive . active_source_set . clone ();
+  let result : Result<Result<String, String>, String> = runtime . with_writer_transition (
+    operation . operation_id . clone (), |env, control| {
+      let locked_active : ActiveSourceSet = runtime . interactive . lock ()
+        . map_err (|_| "interactive session poisoned" . to_string ())?
+        . active_source_set . clone ();
       let locked_operation : SaveOperation = SaveOperation::from_command (
         request, &env . config, &locked_active)?;
       if ! operation . matches_interpretation (&locked_operation) {

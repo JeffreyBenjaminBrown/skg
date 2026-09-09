@@ -2,6 +2,8 @@ pub mod generation_gate;
 pub mod interactive_session;
 mod maintenance;
 mod incident_recovery;
+#[cfg(test)]
+mod writer_transition_tests;
 mod owner;
 pub(crate) mod query_waits;
 pub(crate) mod save_operations;
@@ -17,7 +19,7 @@ use crate::maintenance::candidate::ObservedDiskCandidate;
 use crate::maintenance::archive::VerifiedInitialArchive;
 use crate::maintenance::observation::ObservationService;
 use crate::runtime::interactive_session::InteractiveSession;
-use crate::runtime::owner::{CoordinatorOwner, MutationStage};
+use crate::runtime::owner::{CoordinatorOwner, MutationStage, MutationStatus};
 pub(crate) use owner::MutationControl;
 use crate::types::env::{GraphReadSnapshot, SkgEnv};
 use crate::types::store_state::{SelectedStoreState, GraphGeneration, ManifestRevision};
@@ -174,32 +176,40 @@ impl ServerRuntime {
   ) -> Result<(), String> {
     control . publish (Arc::new (SelectedRuntimeSnapshot::from_env (env))) }
 
-  /// One reservation spans preparation, authorized effects and publication.
-  /// The decision owner remains responsive while this adapter runs its worker.
+  /// Compatibility adapter for consumers that still mutate interactive state
+  /// throughout their operation. Command workers use the shorter lock scope.
   pub(crate) fn with_store_transition<T> (
     &self,
     operation_id : String,
     function : impl FnOnce (&mut SkgEnv, &mut InteractiveSession, &MutationControl) -> T,
   ) -> Result<T, String> {
-    let before = self . selected_snapshot ();
-    let control = self . reserve_mutation (operation_id,
+    self . with_writer_transition (operation_id, |env, control| {
+      let mut interactive : MutexGuard<'_, InteractiveSession> = self . interactive . lock ()
+        . map_err (|_| "interactive session poisoned" . to_string ())?;
+      Ok (function (env, &mut interactive, control))
+    })?
+  }
+
+  /// One reservation spans preparation, authorized effects and publication.
+  /// The decision owner remains responsive while this adapter runs its worker.
+  pub(crate) fn with_writer_transition<T> (
+    &self,
+    operation_id : String,
+    function : impl FnOnce (&mut SkgEnv, &MutationControl) -> T,
+  ) -> Result<T, String> {
+    let before : Arc<SelectedRuntimeSnapshot> = self . selected_snapshot ();
+    let control : MutationControl = self . reserve_mutation (operation_id,
       before . selected . graph_generation, before . selected . manifest_revision)?;
-    let mut env = match self . writer_env . lock () {
+    let mut env : MutexGuard<'_, SkgEnv> = match self . writer_env . lock () {
       Ok (env) => env,
       Err (_) => {
         control . finish ()?;
         return Err ("writer environment poisoned" . into ()); }
     };
-    let mut interactive = match self . interactive . lock () {
-      Ok (interactive) => interactive,
-      Err (_) => {
-        control . finish ()?;
-        return Err ("interactive session poisoned" . into ()); }
-    };
-    let result = function (&mut env, &mut interactive, &control);
+    let result : T = function (&mut env, &control);
     if let Some (searcher) = &env . in_rust_graph . load_full () . searcher {
       env . searcher = searcher . clone (); }
-    let status = self . owner . mutation_status ()
+    let status : MutationStatus = self . owner . mutation_status ()
       . ok_or ("mutation lost its owner reservation")?;
     if let Some (reason) = status . blocked_reason { return Err (reason); }
     if status . stage == MutationStage::Authorized {
@@ -207,7 +217,7 @@ impl ServerRuntime {
     } else if status . stage == MutationStage::Prepared
         && !Arc::ptr_eq (&before . selected, &env . in_rust_graph . load_full ())
     {
-      let reason = "worker changed selected stores without owner authorization";
+      let reason : &str = "worker changed selected stores without owner authorization";
       control . block (reason)?;
       return Err (reason . into ());
     }
