@@ -11,6 +11,16 @@ but take interactive state only for final source interpretation/publication.
 Hold a real child server before index construction; on the same TCP connection,
 check status, a save refusal with unchanged source bytes, and coherent readonly
 view/search responses. Then release the worker and check publication proceeds.
+This schedule passed, then passed ten repeated runs. The first executable run
+failed at archive acknowledgement before reaching the hold; its response was
+not included in the original assertion. A diagnostic assertion was added and
+the failure has not recurred yet. The retained journal remained in
+'preparing-archive' with an observer sequence advance. Concurrent pure owner
+proposals are a candidate explanation, not an established diagnosis.
+A deterministic held-publisher test now proves that pure archive operations
+wait and rebase after an observer publication, while journal failure stays
+blocking. See [[file:owner-proposal-ordering.org][the ordering audit]]. This fixes the code-derived race
+without claiming it proves the cause of that original socket failure.
 ** Remaining questions
 Ordinary save, normalization, and ranking adapters still run synchronously on
 the connection thread. They need captured inputs and explicit owner-checked

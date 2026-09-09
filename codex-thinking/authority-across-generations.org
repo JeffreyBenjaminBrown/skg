@@ -44,3 +44,11 @@ The open question is the exact expansion and which scalar facts outside the
 final write set can alter meaning or authorize collateral writes. The next
 audit must produce a counterexample or a bounded precise closure; no grant
 should depend on the present sketch.
+** Resource-lifetime follow-up
+The first retained-base adapter keeps an 'Arc<SelectedStoreState>', which also
+holds a Tantivy Searcher. Pending application environments retain it too.
+The proof needs graph/manifest/config facts after rendering; retaining an old
+Searcher throughout editor waits conflicts with the plan's bounded query-work
+lifetime. Split the retained semantic proof data from query resources before
+claiming that boundary complete. Avoid copying a corpus-sized manifest for
+each buffer when making that split.

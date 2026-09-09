@@ -1971,3 +1971,79 @@ introducing later-proposal validation. Missing historical state must refuse
 authority, not substitute whatever generation happens to be current. Continue
 the real restart schedule and both-editor admission corrections; no new
 architecture question for Jeff.
+
+* Simplify/cohere checkpoint: fixed client census, retained bases and responsive rebuilding
+** what's done and went well
+'bdfb976e' separates editor constructor admission from outstanding incident
+reports and removes automatic enrollment of post-census buffers. The exact
+serialized census excludes readonly outsiders and missing IDs. The checkpoint
+passed 469 Emacs tests and the full Neovim suite. '7068473d' then consumes the
+owner publication revision in both editors, preventing older status from
+replacing newer global admission metadata. Its full suites pass 472 Emacs tests
+and 396 Neovim tests. Logs are under '/tmp/simplify-cohere-baseline/' with
+'client-admission-review-final-' and 'client-admission-owner-revision-final3-'
+prefixes. '8b2a7401' adds the corresponding atomic owner publication revision;
+all 23 owner tests passed at that checkpoint.
+
+'7fc04ca3' adds an actual TCP G1 report / G2 save / SIGKILL / restart schedule.
+It reconstructs the old incident without replacing the fresh startup selection
+or newer bytes, then admits a fresh view and save. The successful test took
+1.41 seconds, 1.72 seconds wall time. '4f14f34d' retains each accepted view's
+semantic graph/manifest/config base through collateral, maintenance and census
+application ACKs. Orthogonal release keeps the old proof base. Its focused
+checks pass 9 collateral, 11 census and 14 maintenance protocol tests.
+
+'37f87ced' removes the interactive mutex from full rebuild index preparation.
+A real child server held at that boundary serves status, save refusal and
+readonly view/search requests over the same connection. A representative pass
+measured 1.6 ms status, 93.8 ms refusal, 42.0 ms view, and 165.9 ms publication
+after the hold was released. Ten repeated executable schedules passed;
+'rebuild-responsiveness-retry2.log' and 'rebuild-responsiveness-binary-repeat-*'
+retain the evidence under 'temp/simplify-cohere-baseline/'. These are disposable
+small-fixture timings, not a real-corpus performance claim.
+
+'3b9208b9' adds the pure later-selection save proof, with 15 focused tests.
+It compares complete final outputs and fork originals, structural view inputs,
+negative PID/path facts, bounded inverse dependencies, subscription endpoint
+facts and transitive overrides. '447471db' connects the proof before confirmation or source writes. Actual
+TCP tests admit an older A view after an unrelated B save, reject a conflicting
+A save without changing source bytes, and preserve a newer parent title when
+the older parent is made indefinite and a definitive child is saved.
+
+The requested Luna Low estimate is in [[file:../../HEY-JEFF.org][HEY-JEFF.org]], committed as
+'4d798d78': 56%, the rounded equal-weight mean of all 15 implementation sections.
+It includes unfinished integration and acceptance verification. Note-taking
+observations now also explain testing through the actual application/serialization
+boundary and treating overlapping dependency roles as cumulative requirements.
+** Changes to the plan's envisioned order.
+Bounded owner responsiveness and status-ordering checks accompanied the retained
+base work. A counterexample review prevented weaker inverse/override comparison
+roles from overriding structural checks, and narrowed textlink dependencies to
+actual output IDs. These corrections precede enabling cross-generation saves.
+** what's imperfect about what's done
+The first executable rebuild schedule failed at archive ACK before the hold,
+with no response printed by its original assertion. The retained journal was
+still preparing the archive while observation advanced. Later runs include
+the diagnostic response and ten repeats passed. The owner adapter can reject
+concurrent pure observer/report proposals; 'd677b0de' now verifies narrowly scoped rebase handling with a deterministic
+held publisher. Its 24 owner tests pass, including persistence failure and
+responsive status while a pure operation waits for ordered publication. The
+production occurrence remains unproven; no retry is treated as erasing it.
+
+Several checks overlapped intermediate agent edits and hit compile errors;
+their logs remain. The first all-target check found two missed enrichment
+fixture fields in 'tests/source_sets.rs' and 'tests/diff_mode_refusals.rs'.
+The next all-target check passed. The fixtures then exposed missing paired
+Searchers at runtime; 'b92fb89b' attaches each fixture's actual reader before
+pinning and passes all 22 grouped-source tests. The initial failures remain
+verification failures in the retained logs.
+
+Retained semantic proof state currently also retains its Searcher. This is
+coherent but keeps index resources alive across editor waits. The remaining
+resource-lifetime migration must separate proof data from query resources;
+see [[file:../../codex-thinking/authority-across-generations.org][the retained-base follow-up]] and [[file:../problems.org][problems.org]].
+** choices determining the future
+Finish missing response annotations. Continue durable query waits, full owner
+migration, multiple
+client incidents/restriction sets, remaining writers/observation, resource
+lifetime cleanup and required both-editor acceptance. No new choice for Jeff.

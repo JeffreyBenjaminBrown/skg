@@ -179,3 +179,21 @@ protecting that root covers both.  The guard also covers the separate fatal
 reload recovery directory (`$XDG_STATE_HOME/skg/recovery/<config-hash>` or its
 `$HOME/.local/state` fallback), which is computed with the same identity rule as
 `reload_recovery.rs`.
+
+** Save dependency proof adapter
+
+[[file:../server/serve/handlers/save_dependencies.rs::22][validate_save_dependencies]]
+is a pure report of whether a retained 'ViewSaveBase' can be planned against a
+current selected state. It compares config and source-set identity first, then
+PID/extra-ID presence, bounded direct inverse sets, subscription endpoint
+contains/home/alias facts, and both-direction override chains. Full 'NodeRust'
+facts apply to final outputs, source moves, and fork originals; ordinary
+accepted/partner nodes use role-specific structural or identity facts. Output
+PID paths compare selected manifest digest-or-absence without disk reads;
+inverse textlink sets are included for output and deleted IDs. The
+module is now wired into 'save_buffer' before Hoist and fork confirmation.
+Current parser, invariant, and filesystem gates still validate actual saves.
+Fifteen focused unit tests cover allowed indefinite-ancestor text changes and
+refusals for output, inverse referencers, aliases, subscriptions, fork
+originals, manifest absence, source-set, config changes, dangling inverse
+references, and output versus unwritten-ancestor textlinks.

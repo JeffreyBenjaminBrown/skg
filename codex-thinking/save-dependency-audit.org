@@ -171,6 +171,111 @@ still provides exact selected-byte checks immediately before authorization,
 with the documented limitation that an arbitrary writer can race after that
 check.
 
+* scalar dependencies and the finite closure
+
+The hypothesis is sound only after separating scalar reads that decide an
+instruction branch from scalar fields on an ordinary read-only headline. The
+save parser does not emit an intent for an ordinary indefinitive vognode, so
+its title and body are not automatically dependencies merely because its ID
+is present in the accepted forest. This is the case the rejected-shortcut
+note protects: a current title change on such a node need not reject an
+unrelated save.
+
+There are, however, scalar reads outside the final filesystem IDs which must
+be retained or compared as branch inputs:
+
+** [[file:../server/from_text/validate.rs::validate_and_filter_foreign_instructions][foreign-policy filtering]] calls
+  [[file:../server/from_text/validate.rs::buffernode_differs_from_disknode][buffernode_differs_from_disknode]]. A current title, body, source, or
+  explicitly requested relationship/alias change can turn a previously
+  unchanged foreign save into a fork candidate. The original foreign PID is
+  then dropped and a fresh clone PID becomes a final output, so comparing
+  only final IDs cannot detect this change.
+** [[file:../server/from_text/local_instruction_collection/mod.rs::filter_wouldbe_noop_defineNodes][the noop filter]] compares title, body, source, contains, and all
+  specified non-definitive fields. For every candidate SaveNode, the proof
+  must preserve the base/current noop decision, or compare the complete
+  scalar facts whenever the decision changes. If the current decision keeps
+  an active node in the final batch, that node is already a complete final
+  output dependency. If restricted-source suppression drops it, the scalar
+  difference changes only the warning and no filesystem effect; a policy
+  promising identical warnings must still include this branch bit.
+** [[file:../server/from_text/local_instruction_collection/validate_text_claims.rs::validate_text_claims][subscribee text claims]] read title and body for every claimed subscribee.
+  Those fields are a direct scalar dependency of the validation result even
+  when the claimed PID has no final SaveNode. A changed current claim is
+  rejected by the current parser, so omitting it does not create an unsafe
+  grant, but a proof that claims to preserve validation behavior must retain
+  the pair.
+** [[file:../server/serve/handlers/telescope_hoist.rs::candidates_from_selected][Hoist classification]] reads the selected node's
+  'ugly_telescope' flag and home source. A candidate that survives into a
+  repair Save is a final output and therefore gets the full final-node check;
+  an ordinary no-op node is not touched and cannot independently create a
+  Hoist candidate. The 'ugly_telescope' branch bit still belongs in the
+  retained facts for any ID that is touched by a merge or Save.
+
+The scalar foreign-policy case is a concrete counterexample to the current
+sketch. In G1, a foreign node N has title 'old', and an old view contains N
+unchanged while the user edits an unrelated owned node A. In G2, an unrelated
+writer changes N's title to 'new', leaving all IDs, homes, aliases, and
+relationship edges unchanged. Replanning the old buffer against G2 makes
+'buffernode_differs_from_disknode(N)' true, so the save silently becomes a
+fork of N and writes a new clone. The old N is not a final output ID, and a
+structural-only comparison therefore misses the changed behavior. The finite
+rule is: every authored or accepted ID that can enter foreign filtering must
+carry the complete selected scalar comparison, whether or not its original
+PID is later dropped.
+
+The other save-planning reads are structural or are already final-output
+reads. [[file:../server/from_text/supplement_from_disk.rs::supplement_saveintent_from_disk][disk supplementation]] reads the complete selected node for sticky
+relationship sources, endpoint homes, aliases, hides, and source moves;
+these are covered by complete relation/source facts and PID/extra-ID
+resolution. [[file:../server/from_text/local_instruction_collection/resolve_visibility.rs::resolve_visibility][visibility resolution]] and inferred hides read the subscriber's
+contains/hides/subscribes lists, each subscribee's contains list, and the
+active source-set membership. [[file:../server/nodeMerge/nodeMergeInstructionTriple.rs::nodeMerge_from_acquirer_and_acquiree][NodeMerge]] reads complete acquirer/acquiree data, but the only scalar text
+copied from outside that pair is the acquiree text, which is represented by
+the merge's fresh preservation Save and must be included in the final output
+comparison. Its subscription display calculation reads contains membership,
+not unrelated titles or bodies.
+
+'textlinks_to' is derived from title/body in [[file:../server/types/nodes/rust.rs::NodeRust]],
+and its inverse is used by context-origin labeling. A new inbound textlink
+can change a search label for a neighbor without changing authored save
+meaning or filesystem outputs. It must be in the closure if the authority
+proof promises identical search ranking; otherwise it is a publication-side
+effect that can be recomputed from the current candidate graph. It must not
+be treated as an omitted save dependency merely because it is not part of
+delete propagation, which deliberately does not rewrite textlink bodies.
+
+The precise finite expansion is therefore:
+
+** Seed the proposal
+Start with every authored/accepted ID, every PID or extra-ID spelling it
+   names, every explicit text-claim PID, and every final Save/Delete, merge,
+   fork, Hoist-repair, source-move, and delete-propagation PID.
+** Expand relevant roles
+For each base and current graph, close the set over PID resolution,
+   outbound relation members, all inverse relation partners, endpoint homes,
+   complete subscription content used for visibility and merge display, and
+   every node on both directions of the user-owned override chains. Preserve
+   negative lookup and inverse facts as well as present facts. Newly added
+   current inbound partners are deliberately included by this union.
+** Compare according to role
+Compare complete node facts for final outputs, merge/repair inputs,
+   foreign-policy candidates, and text-claim PIDs. For ordinary accepted
+   indefinitive IDs, compare only the structural/identity facts and the
+   branch predicates that can make them emit an intent, become a no-op, or
+   enter a read-only suppression warning. Do not compare their unrelated
+   title/body merely due to forest membership.
+** Recheck final outputs
+Expand the final output set after current planning and repeat the complete
+   output comparison until the set is stable. Re-run current source ownership,
+   source-set, path, fork, Hoist, and override invariants immediately before
+   the write, with the exact selected manifest fence still in force.
+
+This closure is finite for each save because it follows the finite graph
+maps and terminates override traversal with the existing seen-set cycle
+guard. A blanket full-node comparison remains unnecessarily strict for
+ordinary indefinitive headlines, but a structural-only comparison is unsafe
+for foreign-policy candidates and any other scalar-controlled branch.
+
 * implementation condition
 
 The candidate is safe to implement when the retained view state carries the
