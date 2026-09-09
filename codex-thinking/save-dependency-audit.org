@@ -1,0 +1,182 @@
+* Ordinary save authority across graph generations
+
+This audit traces the proposed relaxation of the graph-generation equality
+check. The save may use current selected semantics after another publication
+only when the old view's retained base and the current planning inputs are
+compared over a complete dependency closure. The current refusal remains the
+safe behavior until that closure is implemented.
+
+* conclusion
+
+The proposed shape is sufficient in principle for orthogonal G2 changes, but
+the phrase "all IDs ... plus their relation members" needs a precise closure.
+It must include both outbound and inverse relation partners, transitive
+override paths, every PID/extra-ID resolution consulted, and the active
+source-set identity. It must compare complete semantic node facts, including
+per-edge recording sources and absence, rather than only the set of IDs.
+
+Without those additions, a stale save can be reparsed successfully against G2
+and then overwrite a fact whose meaning changed between G1 and G2.
+
+* traced call chain
+
+The request enters the save handler
+[[file:../server/serve/handlers/save_buffer.rs::handle_save_buffer_request][handle_save_buffer_request]]
+and reaches
+[[file:../server/serve/handlers/save_buffer.rs::update_from_and_rerender_buffer_with_approvals_with_operation][update_from_and_rerender_buffer_with_approvals_with_operation]].
+The buffer is parsed and enriched against the currently selected graph by
+[[file:../server/from_text.rs::buffer_to_validated_saveplan_with_fork_sources][buffer_to_validated_saveplan_with_fork_sources]],
+then the handler derives delete-propagation saves, fork/hoist decisions, and
+the final definitions before calling
+[[file:../server/save.rs::update_graph_including_nodeMerges_with_operation][update_graph_including_nodeMerges_with_operation]].
+The latter acquires the write lock, checks the expected generation, validates
+override invariants, prepares the filesystem batch, computes index context
+labels, and publishes the new graph/search pair.
+
+The current authority gate in
+[[file:../server/serve/handlers/save_buffer.rs::validate_save_authority][validate_save_authority]]
+also checks the registered view revision, client buffer identity, and
+application token. Those checks remain necessary after a dependency proof;
+the graph generation check is the part that may become a consequence of the
+proof instead of an unconditional equality requirement.
+
+* dependency inventory
+
+** View and parser inputs
+
+Retain the exact base graph, selected path manifest, configuration/source
+interpretation, active source-set name, view recipe, and the authored/base
+forest identity. The source-set name is a separate required input: the
+interactive session passes the current
+[[file:../server/source_sets.rs::ActiveSourceSet][ActiveSourceSet]] into save
+planning, while each registered view stores its own source_set in
+[[file:../server/types/views_state.rs::ViewState][ViewState]]. A source-set
+switch changes member_is_visible, invisible-member preservation, inferred
+hides, and fork source activity without necessarily changing the graph
+generation.
+
+For every ID occurring in the authored forest, accepted forest, view recipe,
+or generated instruction, compare the complete base/current lookup result:
+primary existence, pid_of result, all extra_ids, home source, scalar fields,
+aliases, every relationship list, and each relationship member's recording
+source. An unknown ID is a value and must be compared as an explicit absence.
+The lookups are authoritative graph-only reads through
+[[file:../server/dbs/node_lookup.rs::nodecomplete_from_in_rust_graph][nodecomplete_from_in_rust_graph]];
+they do not consult newer disk.
+
+** Supplementation and visibility
+
+For every saved subscriber or node with an unspecified field, include the
+complete disk-supplement source node and every relation member consulted by
+[[file:../server/from_text/supplement_from_disk.rs::supplement_saveintent_from_disk][supplement_saveintent_from_disk]]
+and
+[[file:../server/from_text/supplement_from_disk.rs::apply_sticky_sources][apply_sticky_sources]].
+That includes sticky edge identity through pid_of, endpoint homes, alias
+text/source, source precedence, and the explaining subscriptions used by
+hide_source.
+
+For visibility signals, include the subscriber, each referenced subscribee,
+the subscribee's full contains list, and the subscriber's full
+contains/hides/subscribes_to state. These are read by
+[[file:../server/from_text/local_instruction_collection/resolve_visibility.rs::resolve_visibility][resolve_visibility]],
+including the inferred-hide pass. A one-hop dependency is enough for this
+specific code, but it must be collected for both base and current snapshots;
+the current snapshot can expose a member the old view never saw.
+
+** Merge, delete, fork, and override inputs
+
+NodeMerge construction reads complete acquirer/acquiree nodes, the contents of
+their subscribed nodes, and all affected inverse partners. See
+[[file:../server/nodeMerge/nodeMergeInstructionTriple.rs::nodeMerge_from_acquirer_and_acquiree][nodeMerge_from_acquirer_and_acquiree]],
+[[file:../server/nodeMerge/nodeMergeInstructionTriple.rs::ids_shown_through_subscriptions][ids_shown_through_subscriptions]],
+and
+[[file:../server/nodeMerge/nodeMergeInstructionTriple.rs::affected_neighbors_of_nodeMerge][affected_neighbors_of_nodeMerge]].
+The closure therefore includes all five inverse relation sets for a deleted
+or merged ID, plus the full nodes and edge sources of those partners.
+
+Delete propagation in
+[[file:../server/save.rs::apply_delete_propagation_cleanup][apply_delete_propagation_cleanup]]
+uses inverse containment, subscription, hide, and override indexes. Its
+referencer set must be computed against both G1 and G2. Comparing only the
+authored IDs is insufficient; a new G2 referencer can cause a new collateral
+write that the G1 buffer could not have intended.
+
+Override validation and marker validation use inverse overriders and
+transitive user-owned chains through
+[[file:../server/dbs/in_rust_graph/override_invariants.rs::validate_touched_override_invariants][validate_touched_override_invariants]]
+and
+[[file:../server/dbs/in_rust_graph/override_resolution.rs::resolve_override][resolve_override]].
+Include direct inverse overriders, every node reached along the chain, and
+every pid_of/extra-ID mapping at each hop. Revalidate current ownership,
+source-set, path, scalar-hoist, and override invariants immediately before
+the write.
+
+** Filesystem and source moves
+
+The selected manifest must contain exact digest-or-absence values for every
+final write, delete, telescope section cleanup, and source-move consequence.
+The current prepared output set must be expanded before comparison, including
+paths discovered from every configured owned source by
+[[file:../server/dbs/filesystem/one_node.rs::prepare_nodecomplete_telescope_with_selection][prepare_nodecomplete_telescope_with_selection]].
+Compare the complete current/base output path sets and exact before bytes;
+hashes alone cannot reconstruct missing bytes. Configuration identity must
+cover source order, ownership, source paths, and relationship-default rules,
+because those affect both path_from_pid_and_source and sticky source
+resolution.
+
+* concrete counterexamples
+
+** Active source-set omission
+
+Suppose G1 renders a subscriber under source-set all, and its buffer removes
+child X from the subscriber's visible contains list. Before the save, the
+active set changes to private while graph generation remains unchanged. G2
+planning now treats an omitted private member as invisible and
+preserve_invisible_members keeps it, or the inferred-hide path derives a
+different result. A graph/config-only comparison can authorize a proposal
+whose meaning changed solely because the active source set changed. Require
+source-set equality or force a fresh rerender/reopen before this save.
+
+** Inbound override omission
+
+In G1, X has no user-owned overrider and the old view contains X. In G2, an
+unrelated node R gains overrides_view_of = [X]. If the dependency set walks
+only the outbound members of named X, it never sees R. Current override
+resolution can now draw R in place of X, while the stale buffer still carries
+X's definitive text and may write it. Include inverse overriders and the full
+chain; a direct inbound relation closure catches this case.
+
+** Delete-propagation omission
+
+In G1, deleting X has no inbound relation. In G2, an unrelated node R
+contains X. The current delete planner discovers R through contained_by and
+adds a collateral rewrite. If the proof compares only authored IDs, it misses
+that the save's resulting filesystem batch now acts on R. Expand and compare
+inverse referencers in both snapshots, then either prove the collateral
+rewrite is unchanged or refuse as stale.
+
+* limits and non-authority reads
+
+The context-origin computation in
+[[file:../server/context.rs::context_origin_types_for_transition][context_origin_types_for_transition]]
+reads a closed one-hop containment/textlink neighborhood to update search
+labels. It can be affected by wider graph changes, but those labels do not
+choose authored filesystem bytes or save permission; they are part of the
+current graph/search publication. If the authority proof also promises an
+unchanged search ranking, it needs a separate whole-context dependency rule.
+
+The proof does not remove the uncontrolled-writer race after final fence
+validation. [[file:../server/save.rs::PreparedFilesystemUpdate::validate_selected_fence][validate_selected_fence]]
+still provides exact selected-byte checks immediately before authorization,
+with the documented limitation that an arbitrary writer can race after that
+check.
+
+* implementation condition
+
+The candidate is safe to implement when the retained view state carries the
+base graph/manifest/config/source-set identity and the validator computes a
+deterministic closure over authored IDs, generated outputs, outbound and
+inverse relation partners, transitive override links, alias/PID mappings, and
+all exact filesystem paths. It must compare full semantic facts and then
+rerun current override, source ownership, source-set, scalar-hoist, and path
+invariants before update_graph_including_nodeMerges_with_operation writes.

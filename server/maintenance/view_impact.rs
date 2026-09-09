@@ -29,6 +29,35 @@ pub struct ViewImpactAssessment {
   pub changed_primary_ids  : BTreeSet<ID>,
 }
 
+/// The smallest semantic input needed to classify retained views after the
+/// candidate cache has been lost. It carries no source/config authority.
+pub struct ReportGraphChangeSet<'a> {
+  pub g0_graph             : &'a InRustGraph,
+  pub g1_graph             : &'a InRustGraph,
+  pub added_primary_ids    : &'a BTreeSet<ID>,
+  pub deleted_primary_ids  : &'a BTreeSet<ID>,
+  pub modified_primary_ids : &'a BTreeSet<ID>,
+}
+
+impl<'a> ReportGraphChangeSet<'a> {
+  pub fn from_candidate (candidate : &'a ObservedDiskCandidate) -> Self {
+    Self {
+      g0_graph: &candidate . base_graph,
+      g1_graph: &candidate . graph,
+      added_primary_ids: &candidate . added_primary_ids,
+      deleted_primary_ids: &candidate . deleted_primary_ids,
+      modified_primary_ids: &candidate . modified_primary_ids,
+    }
+  }
+
+  pub fn changed_primary_ids (&self) -> BTreeSet<ID> {
+    self . added_primary_ids
+      . union (self . deleted_primary_ids) . cloned ()
+      . chain (self . modified_primary_ids . iter () . cloned ())
+      . collect ()
+  }
+}
+
 /// Produce the complete, deterministic settlement inventory before asking
 /// either editor to change a buffer.  Dirty current text comes only from the
 /// verified initial archive; clean views use their retained accepted forest.
@@ -37,6 +66,19 @@ pub fn plan_incident_view_settlements (
   archive     : &VerifiedInitialArchive,
   interactive : &InteractiveSession,
   candidate   : &ObservedDiskCandidate,
+) -> Result<Vec<ViewSettlementRecord>, String> {
+  let report : ReportGraphChangeSet = ReportGraphChangeSet::from_candidate (candidate);
+  plan_incident_view_settlements_from_report (
+    active, archive, interactive, &report)
+}
+
+/// Plan settlements from reconstructed semantic generations without a
+/// candidate-selection or graph-publication authority.
+pub fn plan_incident_view_settlements_from_report (
+  active      : &ActiveMaintenance,
+  archive     : &VerifiedInitialArchive,
+  interactive : &InteractiveSession,
+  report      : &ReportGraphChangeSet<'_>,
 ) -> Result<Vec<ViewSettlementRecord>, String> {
   let archived : std::collections::BTreeMap<_, _> = archive . buffers . iter ()
     . map (|snapshot| (snapshot . buffer_id . as_str (), snapshot))
@@ -65,12 +107,10 @@ pub fn plan_incident_view_settlements (
       && state . client_application_token == frozen . application_token)
       . unwrap_or (false);
     let assessment = match state {
-      Some (state) if authority_current => classify_view_impact (
+      Some (state) if authority_current => classify_view_impact_from_report (
         &state . viewforest,
         archived_buffer . map (|snapshot| snapshot . current_text . as_str ()),
-        &candidate . base_graph,
-        &candidate . graph,
-        candidate),
+        report),
       _ if is_graph_view_kind (&frozen . kind) => uncertain_assessment (
         "the frozen client authority has no exact retained server forest"),
       _ => ViewImpactAssessment {
@@ -79,7 +119,7 @@ pub fn plan_incident_view_settlements (
         uncertainty_reason: None,
         observed_ids: BTreeSet::new (),
         resolved_primary_ids: BTreeSet::new (),
-        changed_primary_ids: changed_ids (candidate),
+        changed_primary_ids: report . changed_primary_ids (),
       },
     };
     let (planned_disposition, requirement) = planned_settlement (
@@ -211,13 +251,6 @@ fn settle_attached_workflows (
   Ok (( ))
 }
 
-fn changed_ids (candidate : &ObservedDiskCandidate) -> BTreeSet<ID> {
-  candidate . added_primary_ids
-    . union (&candidate . deleted_primary_ids) . cloned ()
-    . chain (candidate . modified_primary_ids . iter () . cloned ())
-    . collect ()
-}
-
 fn uncertain_assessment (reason : &str) -> ViewImpactAssessment {
   ViewImpactAssessment {
     impacted: true,
@@ -291,6 +324,22 @@ pub fn classify_view_impact (
   g1              : &InRustGraph,
   candidate       : &ObservedDiskCandidate,
 ) -> ViewImpactAssessment {
+  let report : ReportGraphChangeSet = ReportGraphChangeSet {
+    g0_graph: g0,
+    g1_graph: g1,
+    added_primary_ids: &candidate . added_primary_ids,
+    deleted_primary_ids: &candidate . deleted_primary_ids,
+    modified_primary_ids: &candidate . modified_primary_ids,
+  };
+  classify_view_impact_from_report (accepted_forest, current_text, &report)
+}
+
+/// Classify one retained view against reconstructed semantic generations.
+pub fn classify_view_impact_from_report (
+  accepted_forest : &ViewForest,
+  current_text    : Option<&str>,
+  report          : &ReportGraphChangeSet<'_>,
+) -> ViewImpactAssessment {
   let mut observed_ids : BTreeSet<ID> =
     impact_ids_from_viewforest (accepted_forest) . into_iter () . collect ();
   let parse_result = current_text . map (impact_ids_from_current_text);
@@ -305,12 +354,12 @@ pub fn classify_view_impact (
 
   let mut resolved_primary_ids = BTreeSet::new ();
   for id in &observed_ids {
-    if let Some (pid) = g0 . pid_of (id) {
+    if let Some (pid) = report . g0_graph . pid_of (id) {
       resolved_primary_ids . insert (pid); }
-    if let Some (pid) = g1 . pid_of (id) {
+    if let Some (pid) = report . g1_graph . pid_of (id) {
       resolved_primary_ids . insert (pid); }
   }
-  let changed_primary_ids = changed_ids (candidate);
+  let changed_primary_ids = report . changed_primary_ids ();
   let semantically_intersects = resolved_primary_ids
     . iter () . any (|pid| changed_primary_ids . contains (pid));
   ViewImpactAssessment {

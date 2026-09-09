@@ -127,3 +127,23 @@ old v3 bundles as “semantic DTO recoverable, candidate/config replay unavailab
 Never silently reinterpret v3 with current config or substitute current G2.  A
 failed DTO conversion, missing archive/view facts, unsupported version, or hash/
 identity mismatch should fail closed to an evidence/report-blocked state.
+
+** Adapter implementation and checks
+
+[[file:../server/maintenance/candidate.rs::112][SemanticNodeEvidence]] now has a
+checked `TryFrom<&SemanticNodeEvidence> for NodeComplete`. It accepts only
+semantic format 1; rejects empty primary/extra/relationship IDs and relationship
+sources; accepts only the two current file-property spellings; and preserves MSV
+unspecified-vs-specified state, sourced aliases/edges, body, extra IDs, telescope
+flag, and misc properties.
+
+[[file:../server/maintenance/view_impact.rs::32][ReportGraphChangeSet]] is the
+borrowed report-only input containing G0/G1 `InRustGraph` references and the three
+PID change sets. [[file:../server/maintenance/view_impact.rs::67][The new planner]]
+accepts it directly; the existing candidate-facing planner and classifier wrappers
+delegate through it, so no fabricated candidate or publication path is involved.
+
+Focused validation covers sourced-node roundtrip, bad semantic version, unknown
+property, empty relationship ID/source, and both existing candidate/view-impact
+test groups. `cargo check --lib -j2` passes; only pre-existing dead-code warnings
+remain.

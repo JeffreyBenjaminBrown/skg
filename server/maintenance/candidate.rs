@@ -131,6 +131,115 @@ pub struct EvidenceMember {
   pub value  : String,
 }
 
+const SEMANTIC_NODE_EVIDENCE_FORMAT_VERSION : u32 = 1;
+
+impl TryFrom<&SemanticNodeEvidence> for NodeComplete {
+  type Error = String;
+
+  fn try_from (evidence : &SemanticNodeEvidence) -> Result<Self, Self::Error> {
+    if evidence . format_version != SEMANTIC_NODE_EVIDENCE_FORMAT_VERSION {
+      return Err (format! (
+        "unsupported semantic node evidence version {}",
+        evidence . format_version)); }
+    let pid : ID = evidence_id (&evidence . pid, "primary ID")?;
+    let source : SourceName = evidence_source (&evidence . source, "node source")?;
+    let extra_ids : Vec<ID> = evidence . extra_ids . iter () . enumerate ()
+      . map (| (index, value) | evidence_id (
+        value, &format! ("extra ID {}", index + 1)))
+      . collect::<Result<Vec<_>, _>>()?;
+    let aliases : MSV<MemberAtSource<String>> = evidence_msv_strings (
+      evidence . aliases . as_ref (), "alias")?;
+    let contains : Vec<MemberAtSource<ID>> = evidence_members_ids (&evidence . contains, "contains")?;
+    let subscribes_to : MSV<MemberAtSource<ID>> = evidence_msv_ids (
+      evidence . subscribes_to . as_ref (), "subscribes-to")?;
+    let hides_from_its_subscriptions : MSV<MemberAtSource<ID>> = evidence_msv_ids (
+      evidence . hides_from_its_subscriptions . as_ref (),
+      "hides-from-its-subscriptions")?;
+    let overrides_view_of : MSV<MemberAtSource<ID>> = evidence_msv_ids (
+      evidence . overrides_view_of . as_ref (), "overrides-view-of")?;
+    let misc : Vec<FileProperty> = evidence . file_properties . iter () . map (|property| match property
+      . as_str ()
+    {
+      "had-id-before-import" => Ok (FileProperty::Had_ID_Before_Import),
+      "was-overloaded" => Ok (FileProperty::Was_Overloaded),
+      other => Err (format! ("unknown semantic file property '{}'", other)),
+    }) . collect::<Result<Vec<_>, _>>()?;
+    Ok (NodeComplete {
+      title: evidence . title . clone (),
+      ugly_telescope: evidence . ugly_telescope,
+      aliases,
+      pid,
+      extra_ids,
+      body: evidence . body . clone (),
+      contains,
+      subscribes_to,
+      hides_from_its_subscriptions,
+      overrides_view_of,
+      misc,
+      source,
+    })
+  }
+}
+
+fn evidence_id (value : &str, field : &str) -> Result<ID, String> {
+  if value . is_empty () {
+    return Err (format! ("semantic node evidence has an empty {}", field)); }
+  Ok (ID::from (value))
+}
+
+fn evidence_source (value : &str, field : &str) -> Result<SourceName, String> {
+  if value . is_empty () {
+    return Err (format! ("semantic node evidence has an empty {}", field)); }
+  Ok (SourceName::from (value))
+}
+
+fn evidence_member_source (
+  member : &EvidenceMember,
+  relation : &str,
+  index : usize,
+) -> Result<SourceName, String> {
+  evidence_source (&member . source, &format! (
+    "{} member {} source", relation, index + 1))
+}
+
+fn evidence_members_ids (
+  members  : &[EvidenceMember],
+  relation : &str,
+) -> Result<Vec<MemberAtSource<ID>>, String> {
+  members . iter () . enumerate () . map (| (index, member) | {
+    let source : SourceName = evidence_member_source (member, relation, index)?;
+    let id : ID = evidence_id (&member . value, &format! (
+      "{} member {} ID", relation, index + 1))?;
+    Ok (MemberAtSource::at_source (source, id))
+  }) . collect ()
+}
+
+fn evidence_members_strings (
+  members  : &[EvidenceMember],
+  relation : &str,
+) -> Result<Vec<MemberAtSource<String>>, String> {
+  members . iter () . enumerate () . map (| (index, member) | {
+    let source : SourceName = evidence_member_source (member, relation, index)?;
+    Ok (MemberAtSource::at_source (source, member . value . clone ()))
+  }) . collect ()
+}
+
+fn evidence_msv_ids (
+  members  : Option<&Vec<EvidenceMember>>,
+  relation : &str,
+) -> Result<MSV<MemberAtSource<ID>>, String> {
+  members . map (|members| evidence_members_ids (members, relation)
+    . map (MSV::Specified)) . unwrap_or (Ok (MSV::Unspecified))
+}
+
+fn evidence_msv_strings (
+  members  : Option<&Vec<EvidenceMember>>,
+  relation : &str,
+) -> Result<MSV<MemberAtSource<String>>, String> {
+  members . map (|members| evidence_members_strings (members, relation)
+    . map (MSV::Specified)) . unwrap_or (Ok (MSV::Unspecified))
+}
+
 pub fn observe_complete_disk (
   config            : &SkgConfig,
   selected          : &SelectedStoreState,
@@ -904,5 +1013,66 @@ mod tests {
     assert_eq! (
       revalidate_candidate (&config, &candidate) . unwrap_err (),
       "candidate configuration bytes no longer match");
+  }
+
+  fn semantic_conversion_fixture () -> NodeComplete {
+    let public : SourceName = SourceName::from ("public");
+    let owned : SourceName = SourceName::from ("owned");
+    NodeComplete {
+      title: "A title" . into (),
+      ugly_telescope: true,
+      aliases: MSV::Specified (vec![
+        MemberAtSource::at_source (public . clone (), "alias" . into ())
+      ]),
+      pid: ID::from ("A"),
+      extra_ids: vec![ID::from ("old-A")],
+      body: Some ("body with [[id:B]]" . into ()),
+      contains: vec![MemberAtSource::at_source (
+        owned . clone (), ID::from ("B"))],
+      subscribes_to: MSV::Specified (vec![MemberAtSource::at_source (
+        public . clone (), ID::from ("C"))]),
+      hides_from_its_subscriptions: MSV::Unspecified,
+      overrides_view_of: MSV::Specified (vec![MemberAtSource::at_source (
+        owned, ID::from ("D"))]),
+      misc: vec![
+        FileProperty::Had_ID_Before_Import,
+        FileProperty::Was_Overloaded,
+      ],
+      source: SourceName::from ("owned"),
+    }
+  }
+
+  #[test]
+  fn semantic_node_evidence_checked_conversion_round_trips_sourced_node () {
+    let original : NodeComplete = semantic_conversion_fixture ();
+    let evidence : SemanticNodeEvidence = SemanticNodeEvidence::from (&original);
+    let converted : NodeComplete = NodeComplete::try_from (&evidence) . unwrap ();
+    assert_eq! (converted, original);
+  }
+
+  #[test]
+  fn semantic_node_evidence_checked_conversion_rejects_bad_version_and_properties () {
+    let original : NodeComplete = semantic_conversion_fixture ();
+    let evidence : SemanticNodeEvidence = SemanticNodeEvidence::from (&original);
+
+    let mut bad_version : SemanticNodeEvidence = evidence . clone ();
+    bad_version . format_version = 99;
+    assert! (NodeComplete::try_from (&bad_version) . unwrap_err ()
+      . contains ("unsupported semantic node evidence version"));
+
+    let mut bad_property : SemanticNodeEvidence = evidence . clone ();
+    bad_property . file_properties . push ("future-property" . into ());
+    assert! (NodeComplete::try_from (&bad_property) . unwrap_err ()
+      . contains ("unknown semantic file property"));
+
+    let mut bad_id : SemanticNodeEvidence = evidence . clone ();
+    bad_id . contains[0] . value . clear ();
+    assert! (NodeComplete::try_from (&bad_id) . unwrap_err ()
+      . contains ("contains member 1 ID"));
+
+    let mut bad_source : SemanticNodeEvidence = evidence;
+    bad_source . aliases . as_mut () . unwrap ()[0] . source . clear ();
+    assert! (NodeComplete::try_from (&bad_source) . unwrap_err ()
+      . contains ("alias member 1 source"));
   }
 }
