@@ -38,6 +38,26 @@ local authorization_frame_kinds = {
 ---@param payload string
 ---@return string
 function M.framed (payload)
+  if M.current_operation_id
+     and not payload:find('(operation-id ', 1, true) then
+    local frame_kind = payload:match(
+      '%(%s*"?response%-type"?%s+"?([^"%s%)]+)"?%)') or 'unknown'
+    local operation_state = ({
+      ['save-result'] = 'committed',
+      ['fork-confirmation'] = 'refused',
+      ['telescope-hoist-confirmation'] = 'refused',
+      ['ugly-telescope-confirmation'] = 'committed',
+      ['error'] = 'refused',
+    })[frame_kind]
+    if operation_state then
+      payload = payload:sub(1, -2)
+        .. string.format(
+          ' (operation-id %q) (request-base-fingerprint %q)'
+          .. ' (save-operation-state %s))',
+          M.current_operation_id, M.current_request_base_fingerprint,
+          operation_state)
+    end
+  end
   if M.current_request_id
      and not payload:find('(request-id ', 1, true) then
     local frame_kind = payload:match(
@@ -109,6 +129,10 @@ function M.fake_server (on_request)
         local request_id = line:match(
           '%(%s*request%-id%s+%.%s+"([^"]+)"%)')
         M.current_request_id = request_id
+        M.current_operation_id = line:match(
+          '%(%s*operation%-id%s+%.%s+"([^"]+)"%)')
+        M.current_request_base_fingerprint = line:match(
+          '%(%s*request%-base%-fingerprint%s+%.%s+"([^"]+)"%)')
         local respond = function (text)
           connection:write(envelope_framed_for_request(text, request_id))
         end
@@ -118,7 +142,11 @@ function M.fake_server (on_request)
           connection:write(M.framed(payload))
           M.current_request_id = previous
         end
-        if line:find('(role . "interactive")', 1, true) then
+        if line:find('(request . "acknowledge save result")', 1, true) then
+          respond(M.framed(
+            '((response-type save-operation-ack)'
+            .. ' (acknowledged true))'))
+        elseif line:find('(role . "interactive")', 1, true) then
           respond(M.framed(
             '((response-type verify-connection) (content "connected")'
             .. ' (source-inventory ()) (telescope-warnings ())'
@@ -139,6 +167,8 @@ function M.fake_server (on_request)
           on_request(line, respond, push)
         end
         M.current_request_id = nil
+        M.current_operation_id = nil
+        M.current_request_base_fingerprint = nil
       end
     end)
   end)

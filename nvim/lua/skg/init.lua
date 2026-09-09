@@ -80,6 +80,18 @@ function M.install_session_surface ()
       require('skg.reload_recovery').dismiss(
         options.args ~= '' and options.args or nil) end,
     { nargs = '?', force = true })
+  vim.api.nvim_create_user_command('SkgPendingSaveStatus',
+    function () require('skg.save').pending_save_status() end,
+    { force = true })
+  vim.api.nvim_create_user_command('SkgPendingSaveInspect',
+    function () require('skg.save').inspect_pending_save() end,
+    { force = true })
+  vim.api.nvim_create_user_command('SkgAcknowledgePendingSave',
+    function () require('skg.save').acknowledge_pending_save() end,
+    { force = true })
+  vim.api.nvim_create_user_command('SkgRetryPendingSave',
+    function () require('skg.save').retry_pending_save() end,
+    { force = true })
 end
 
 ---Initialize the client against a server config: remember the

@@ -13,6 +13,7 @@ local lock = require('skg.lock')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local metadata = require('skg.metadata')
+local pending_save = require('skg.pending_save')
 local payload = require('skg.payload')
 local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
@@ -91,6 +92,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
   if restriction then
     error('Cannot save while ' .. restriction
       .. '; nothing was saved; try again when ready') end
+  pending_save.assert_none_unresolved()
   M.confirm_save_despite_other_unsaved(save_buf)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
@@ -100,20 +102,49 @@ function M.request_save_buffer (fork_approved, fork_sources,
   focus.add_focused_marker()
   local buffer_contents = table.concat(
     vim.api.nvim_buf_get_lines(save_buf, 0, -1, false), '\n')
+  local operation_id = pending_save.new_operation_id()
+  local request_intent =
+    M.save_request_string(saved_uri, save_point_position,
+                          fork_approved, fork_sources,
+                          hoist_approved_pids,
+                          scalar_approved_pids,
+                          save_authority, operation_id)
+  local request_base_fingerprint =
+    pending_save.fingerprint(request_intent:sub(1, -2), buffer_contents)
   local request_line =
     M.save_request_string(saved_uri, save_point_position,
                           fork_approved, fork_sources,
                           hoist_approved_pids,
                           scalar_approved_pids,
-                          save_authority)
+                          save_authority, operation_id,
+                          request_base_fingerprint)
   do -- The server needs these markers, but the user doesn't.
     focus.remove_focused_marker()
     folds.remove_folded_markers()
     if not focused_had_metadata then
       M.strip_bare_skg_at_headline(focus.owning_headline_line()) end
   end
+  if lock.stream_in_progress then
+    error(string.format('skg: save blocked -- %s already in progress',
+                        lock.stream_in_progress)) end
+  local pending_record = pending_save.prepare({
+    operation_id = operation_id,
+    request_base_fingerprint = request_base_fingerprint,
+    request = request_line,
+    content = buffer_contents,
+    buffer_id = save_authority.id,
+  })
   lock.begin_stream('save')
   lock.register_stream_request_cleanup('save')
+  state.set_request_failure_handler(function (reason)
+    local ok, err = pcall(pending_save.mark_uncertain, pending_record)
+    if not ok then
+      log.log('error', 'save', 'could not retain uncertain save %s: %s',
+              operation_id, tostring(err)) end
+    vim.notify(string.format(
+      'skg: save interrupted: %s; operation %s retained',
+      reason, operation_id), vim.log.levels.ERROR)
+  end)
   -- Lock ALL skg view buffers before sending, eliminating the race
   -- window between the send and the server's early response.
   lock.lock_all_skg_buffers()
@@ -136,28 +167,45 @@ function M.request_save_buffer (fork_approved, fork_sources,
                                    'save', 'collateral-view')
     end, false)
   state.register_response_handler('save-result',
-    function (_payload_text, response)
-      M.save_result_handler(save_buf, response)
+    function (payload_text, response)
+      if M.persist_save_response(pending_record, payload_text, response)
+           == 'committed' then
+        M.save_result_handler(save_buf, response)
+        M.schedule_save_result_acknowledgement(pending_record) end
     end, true)
   -- fork-confirmation: the ALTERNATIVE terminal message. The server
   -- sends exactly one of the two; whichever fires removes the other
   -- (the fork handler also decrements the count of the never-fired
   -- save-result one-shot), so the pending count balances either way.
   state.register_response_handler('fork-confirmation',
-    function (_payload_text, response)
-      M.fork_confirmation_handler(save_buf, response)
+    function (payload_text, response)
+      if M.persist_save_response(pending_record, payload_text, response)
+           == 'refused' then
+        M.fork_confirmation_handler(save_buf, response) end
     end, false)
   state.register_response_handler('telescope-hoist-confirmation',
-    function (_payload_text, response)
-      M.telescope_hoist_confirmation_handler(
-        save_buf, response, fork_approved, fork_sources,
-        scalar_approved_pids)
+    function (payload_text, response)
+      if M.persist_save_response(pending_record, payload_text, response)
+           == 'refused' then
+        M.telescope_hoist_confirmation_handler(
+          save_buf, response, fork_approved, fork_sources,
+          scalar_approved_pids) end
     end, false)
   state.register_response_handler('ugly-telescope-confirmation',
-    function (_payload_text, response)
-      M.save_scalar_release_confirmation_handler(
-        save_buf, response, fork_approved, fork_sources,
-        hoist_approved_pids)
+    function (payload_text, response)
+      if M.persist_save_response(pending_record, payload_text, response)
+           == 'committed' then
+        M.save_scalar_release_confirmation_handler(
+          save_buf, response, fork_approved, fork_sources,
+          hoist_approved_pids)
+        M.schedule_save_result_acknowledgement(pending_record) end
+    end, false)
+  state.register_response_handler('error',
+    function (payload_text, response)
+      M.persist_save_response(pending_record, payload_text, response)
+      vim.notify('SKG request failed: '
+        .. (payload.field_text(response, 'content') or payload_text),
+        vim.log.levels.ERROR)
     end, false)
   client.submit_request(request_line, buffer_contents)
 end
@@ -172,7 +220,8 @@ end
 ---@return string
 function M.save_request_string (view_uri, position, fork_approved,
                                 fork_sources, hoist_approved_pids,
-                                scalar_approved_pids, authority)
+                                scalar_approved_pids, authority,
+                                operation_id, request_base_fingerprint)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-uri'), view_uri),
@@ -201,6 +250,9 @@ function M.save_request_string (view_uri, position, fork_approved,
     for _, pid in ipairs(scalar_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
+  if operation_id then
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('operation-id'), operation_id)) end
   if authority then
     table.insert(request, sexpr.pair(
       sexpr.symbol('client-buffer-id'), authority.id))
@@ -216,7 +268,155 @@ function M.save_request_string (view_uri, position, fork_approved,
       sexpr.symbol('client-application-token'),
       tostring(authority.application_token or 0)))
   end
+  -- This must remain final: the server removes it to reconstruct the exact
+  -- request intent hashed with NUL and the authored body.
+  if request_base_fingerprint then
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('request-base-fingerprint'),
+      request_base_fingerprint)) end
   return sexpr.to_string(request) .. '\n'
+end
+
+---Persist an explicitly classified ordinary-save response.
+---@return string committed, refused, or blocked
+function M.persist_save_response (record, payload_text, response)
+  pending_save.verify_response(record, response)
+  local operation_state = payload.field_text(response, 'save-operation-state')
+  if operation_state == 'committed' then
+    pending_save.mark_terminal(record, payload_text, false)
+  elseif operation_state == 'refused' then
+    pending_save.mark_terminal(record, payload_text, true)
+  elseif operation_state == 'blocked' then
+    pending_save.mark_uncertain(record)
+    vim.notify('Save operation ' .. pending_save.field_text(record, 'operation-id')
+      .. ' is blocked: '
+      .. (payload.field_text(response, 'reason') or 'status required'),
+      vim.log.levels.ERROR)
+  else
+    error('Skg pending save failed: save response lacks a valid '
+          .. 'save-operation-state') end
+  return operation_state
+end
+
+---Queue the separate delivery acknowledgement after local result handling.
+function M.schedule_save_result_acknowledgement (record)
+  vim.schedule(function ()
+    local ok, err = pcall(function ()
+      state.register_response_handler('save-operation-ack',
+        function (_payload_text, response)
+          pending_save.verify_response(record, response)
+          pending_save.mark_acknowledged(record)
+        end, true)
+      state.set_request_failure_handler(function () end)
+      client.submit_request(sexpr.to_string({
+        sexpr.pair(sexpr.symbol('request'), 'acknowledge save result'),
+        sexpr.pair(sexpr.symbol('operation-id'),
+                   pending_save.field_text(record, 'operation-id')),
+        sexpr.pair(sexpr.symbol('request-base-fingerprint'),
+                   pending_save.field_text(
+                     record, 'request-base-fingerprint')),
+      }) .. '\n')
+    end)
+    if not ok then
+      log.log('error', 'save',
+              'save result acknowledgement retained for recovery: %s',
+              tostring(err)) end
+  end)
+end
+
+local function choose_pending_save ()
+  local records = pending_save.unresolved_records()
+  if #records == 0 then error('There is no unresolved save') end
+  if #records == 1 then return records[1] end
+  local ids = {}
+  for _, record in ipairs(records) do
+    table.insert(ids, pending_save.field_text(record, 'operation-id')) end
+  local choices = { 'Pending save:' }
+  vim.list_extend(choices, ids)
+  local chosen = vim.fn.inputlist(choices)
+  if chosen < 1 or chosen > #records then error('No pending save selected') end
+  return records[chosen]
+end
+
+function M.inspect_pending_save ()
+  local record = choose_pending_save()
+  local archive = require('skg.recovery_archive').resolve_archive_root()
+  local path = archive .. '/pending-saves/operation-'
+    .. pending_save.field_text(record, 'operation-id') .. '.sexp'
+  vim.cmd('view ' .. vim.fn.fnameescape(path))
+end
+
+function M.pending_save_status ()
+  local record = choose_pending_save()
+  local operation_id = pending_save.field_text(record, 'operation-id')
+  state.register_response_handler('save-operation-status',
+    function (payload_text, response)
+      local updated = pending_save.apply_status(record, response)
+      local suffix = '; use :SkgPendingSaveInspect'
+      if pending_save.field_text(updated, 'fresh-view-required') == 'true' then
+        suffix = '; reopen a fresh view, then inspect and acknowledge it' end
+      vim.notify('Save operation ' .. operation_id .. ' is '
+        .. tostring(pending_save.field_text(updated, 'server-state')) .. suffix)
+    end, true)
+  client.submit_request(sexpr.to_string({
+    sexpr.pair(sexpr.symbol('request'), 'save operation status'),
+    sexpr.pair(sexpr.symbol('operation-id'), operation_id),
+    sexpr.pair(sexpr.symbol('request-base-fingerprint'),
+               pending_save.field_text(
+                 record, 'request-base-fingerprint')),
+  }) .. '\n')
+end
+
+function M.acknowledge_pending_save ()
+  local record = choose_pending_save()
+  local operation_id = pending_save.field_text(record, 'operation-id')
+  if pending_save.field_text(record, 'state') ~= 'terminal' then
+    error('Save ' .. operation_id .. ' has no inspected terminal result') end
+  state.register_response_handler('save-operation-ack',
+    function (_payload_text, response)
+      pending_save.verify_response(record, response)
+      pending_save.mark_acknowledged(record)
+      vim.notify('Save operation ' .. operation_id .. ' acknowledged')
+    end, true)
+  client.submit_request(sexpr.to_string({
+    sexpr.pair(sexpr.symbol('request'), 'acknowledge save result'),
+    sexpr.pair(sexpr.symbol('operation-id'), operation_id),
+    sexpr.pair(sexpr.symbol('request-base-fingerprint'),
+               pending_save.field_text(
+                 record, 'request-base-fingerprint')),
+  }) .. '\n')
+end
+
+function M.retry_pending_save ()
+  local record = choose_pending_save()
+  local request, content = pending_save.retry_material(record)
+  local operation_id = pending_save.field_text(record, 'operation-id')
+  lock.begin_stream('pending-save retry')
+  lock.register_stream_request_cleanup('pending-save retry')
+  state.set_request_failure_handler(function (reason)
+    pending_save.mark_uncertain(record)
+    vim.notify('Save retry interrupted: ' .. reason .. '; operation '
+      .. operation_id .. ' retained', vim.log.levels.ERROR)
+  end)
+  state.register_response_handler('save-lock', function () end, true)
+  for _, frame_kind in ipairs({
+      'save-relax-lock', 'collateral-view', 'fork-confirmation',
+      'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
+      'error' }) do
+    state.register_response_handler(frame_kind,
+      function (payload_text, response)
+        M.persist_save_response(record, payload_text, response)
+        vim.notify('Save operation ' .. operation_id
+          .. ' returned; inspect the retained outcome')
+      end, false)
+  end
+  state.register_response_handler('save-result',
+    function (payload_text, response)
+      M.persist_save_response(record, payload_text, response)
+      vim.notify('Save operation ' .. operation_id
+        .. ' returned; inspect the retained outcome')
+    end, true)
+  client.submit_request(request, content)
 end
 
 ---Point position data that survives the save redraw: the line offset

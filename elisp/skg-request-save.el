@@ -9,6 +9,7 @@
 (require 'skg-buffer)
 (require 'skg-config)
 (require 'skg-lock-buffers)
+(require 'skg-pending-save)
 
 (defvar-local skg--last-rendered-content nil
   "Last server rendering installed in this view.")
@@ -110,6 +111,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
              (not skg--disk-conflict-resolution-in-progress))
     (user-error
      "Save blocked by a disk-client conflict; run M-x skg-resolve-disk-client-conflict"))
+  (skg-pending-save-assert-none-unresolved)
   (skg--confirm-save-despite-other-unsaved)
   (when (org-before-first-heading-p)
     ;; Rather than complain, save as if point were at the first headline.
@@ -128,6 +130,15 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (saved-uri skg-view-uri)
            (save-authority skg--buffer-record)
            (buffer-contents (buffer-string))
+           (operation-id (skg-pending-save-new-operation-id))
+           (request-intent
+            (prin1-to-string
+             (skg--save-request-sexp
+              skg-view-uri save-point-position fork-approved fork-sources
+              hoist-approved-pids scalar-approved-pids save-authority
+              operation-id)))
+           (request-base-fingerprint
+            (skg-pending-save-fingerprint request-intent buffer-contents))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-uri
@@ -136,8 +147,10 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     fork-sources
                                     hoist-approved-pids
                                     scalar-approved-pids
-                                    save-authority))
-                                  "\n")))
+                                    save-authority operation-id
+                                    request-base-fingerprint))
+                                  "\n"))
+           pending-record)
       (progn ;; Rust needs these markers, but the user doesn't.
         (skg-remove-focused-marker)
         (skg-remove-folded-markers))
@@ -153,8 +166,29 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                (buffer-name)
                (if (derived-mode-p 'skg-content-view-mode) "on" "off")))
 
+      (when skg--stream-in-progress
+        (error "skg: save blocked -- %s already in progress"
+               skg--stream-in-progress))
+      (setq pending-record
+            (skg-pending-save-prepare
+             :operation-id operation-id
+             :request-base-fingerprint request-base-fingerprint
+             :request request-s-exp
+             :content buffer-contents
+             :buffer-id (skg--buffer-record-id save-authority)))
+
       (skg--begin-stream "save")
       (skg--register-stream-request-cleanup "save")
+      (skg-set-request-failure-handler
+       (lambda (reason)
+         (condition-case err
+             (skg-pending-save-mark-uncertain pending-record)
+           (error
+            (skg-log 'error 'save
+                     "could not retain uncertain save %s: %S"
+                     operation-id err)))
+         (message "skg: save interrupted: %s; operation %s retained"
+                  reason operation-id)))
 
       ;; Lock ALL skg content-view buffers immediately, before sending.
       ;; This eliminates the race window between the send and the
@@ -188,8 +222,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        nil) ;; non-one-shot: fires for each streamed collateral view
       (skg-register-response-handler
        'save-result
-       (lambda (_tcp-proc payload)
-         (skg--save-result-handler save-buffer payload))
+       (lambda (response-proc payload)
+         (when (eq (skg--persist-save-response pending-record payload)
+                   'committed)
+           (skg--save-result-handler save-buffer payload)
+           (skg--schedule-save-result-acknowledgement
+            response-proc pending-record)))
        t)
       ;; fork-confirmation: the ALTERNATIVE terminal message to
       ;; save-result. The server sends exactly one of the two. Registered
@@ -200,23 +238,40 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (skg-register-response-handler
        'fork-confirmation
        (lambda (_tcp-proc payload)
-         (skg--fork-confirmation-handler save-buffer payload))
+         (when (eq (skg--persist-save-response pending-record payload)
+                   'refused)
+           (skg--fork-confirmation-handler save-buffer payload)))
        nil)
       ;; The other alternative terminal. It carries no scalar text; after
       ;; approval, retry this same save with the exact listed PIDs.
       (skg-register-response-handler
        'telescope-hoist-confirmation
        (lambda (_tcp-proc payload)
-         (skg--telescope-hoist-confirmation-handler
-          save-buffer payload fork-approved fork-sources
-          scalar-approved-pids))
+         (when (eq (skg--persist-save-response pending-record payload)
+                   'refused)
+           (skg--telescope-hoist-confirmation-handler
+            save-buffer payload fork-approved fork-sources
+            scalar-approved-pids)))
        nil)
       (skg-register-response-handler
        'ugly-telescope-confirmation
+       (lambda (response-proc payload)
+         (pcase (skg--persist-save-response pending-record payload)
+           ('committed
+            (skg--save-scalar-release-confirmation-handler
+             save-buffer payload fork-approved fork-sources
+             hoist-approved-pids)
+            (skg--schedule-save-result-acknowledgement
+             response-proc pending-record))))
+       nil)
+      (skg-register-response-handler
+       'error
        (lambda (_tcp-proc payload)
-         (skg--save-scalar-release-confirmation-handler
-          save-buffer payload fork-approved fork-sources
-          hoist-approved-pids))
+         (let ((response (car (read-from-string payload))))
+           (skg--persist-save-response pending-record payload)
+           (ding)
+           (message "SKG request failed: %s"
+                    (or (cadr (assoc 'content response)) payload))))
        nil)
 
       (skg-submit-request tcp-proc request-s-exp buffer-contents))))
@@ -224,7 +279,8 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 (defun skg--save-request-sexp (view-uri save-point-position
                                         &optional fork-approved fork-sources
                                         hoist-approved-pids
-                                        scalar-approved-pids authority)
+                                        scalar-approved-pids authority
+                                        operation-id request-base-fingerprint)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
 include (fork-approved . \"true\") so the server commits any forks it
 finds instead of returning a fork-confirmation. FORK-SOURCES, when
@@ -254,6 +310,8 @@ field (fork-sources ((N . SOURCE) ...))."
      `((hoist-approved-pids ,@hoist-approved-pids)))
    (when scalar-approved-pids
      `((allow-ugly-telescopes ,@scalar-approved-pids)))
+   (when operation-id
+     `((operation-id . ,operation-id)))
    (when authority
      `((client-buffer-id . ,(skg--buffer-record-id authority))
        (view-kind . ,(symbol-name (skg--buffer-record-kind authority)))
@@ -265,7 +323,183 @@ field (fork-sources ((N . SOURCE) ...))."
             (or (skg--buffer-record-server-revision authority) 0)))
        (client-application-token
         . ,(number-to-string
-            (or (skg--buffer-record-application-token authority) 0)))))))
+            (or (skg--buffer-record-application-token authority) 0)))))
+   ;; This must remain the final pair: the server reconstructs the exact
+   ;; canonical intent by removing it before hashing intent + NUL + body.
+   (when request-base-fingerprint
+     `((request-base-fingerprint . ,request-base-fingerprint)))))
+
+(defun skg--persist-save-response (record payload)
+  "Persist PAYLOAD according to its explicit ordinary-save outcome."
+  (let* ((response (car (read-from-string payload)))
+         (state (cadr (assq 'save-operation-state response))))
+    (skg-pending-save-verify-response record response)
+    (pcase state
+      ('committed
+       (skg-pending-save-mark-terminal record payload)
+       'committed)
+      ('refused
+       (skg-pending-save-mark-terminal record payload t)
+       'refused)
+      ('blocked
+       (skg-pending-save-mark-uncertain record)
+       (message "Save operation %s is blocked: %s"
+                (skg-pending-save--field record 'operation-id)
+                (or (cadr (assq 'reason response)) "status required"))
+       'blocked)
+      (_ (skg-pending-save--fail
+          "save response lacks a valid save-operation-state")))))
+
+(defun skg--schedule-save-result-acknowledgement (tcp-proc record)
+  "Acknowledge RECORD after its terminal response has been handled locally."
+  (run-at-time
+   0 nil
+   (lambda ()
+     (condition-case err
+         (let ((operation-id
+                (skg-pending-save--field record 'operation-id))
+               (fingerprint
+                (skg-pending-save--field
+                 record 'request-base-fingerprint)))
+           (skg-register-response-handler
+            'save-operation-ack
+            (lambda (_ack-proc payload)
+              (let ((response (car (read-from-string payload))))
+                (skg-pending-save-verify-response record response)
+                (skg-pending-save-mark-acknowledged record)))
+            t)
+           (skg-set-request-failure-handler (lambda (_reason) nil))
+           (skg-submit-request
+            (if (process-live-p tcp-proc)
+                tcp-proc
+              (skg-tcp-connect-to-rust))
+            (concat
+             (prin1-to-string
+              `((request . "acknowledge save result")
+                (operation-id . ,operation-id)
+                (request-base-fingerprint . ,fingerprint)))
+             "\n")))
+       (error
+        (skg-log 'error 'save
+                 "save result acknowledgement retained for recovery: %S"
+                 err))))))
+
+(defun skg--choose-pending-save ()
+  (let ((records (skg-pending-save-unresolved-records)))
+    (unless records (user-error "There is no unresolved save"))
+    (if (= (length records) 1)
+        (car records)
+      (let* ((ids (mapcar (lambda (record)
+                            (skg-pending-save--field record 'operation-id))
+                          records))
+             (chosen (completing-read "Pending save: " ids nil t)))
+        (cl-find chosen records :test #'equal
+                 :key (lambda (record)
+                        (skg-pending-save--field record 'operation-id)))))))
+
+(defun skg-pending-save-inspect ()
+  "Open the private exact record for one unresolved ordinary save."
+  (interactive)
+  (let* ((record (skg--choose-pending-save))
+         (path (skg-pending-save--path
+                (skg-pending-save--root)
+                (skg-pending-save--field record 'operation-id))))
+    (find-file-read-only path)))
+
+(defun skg-pending-save-status ()
+  "Ask the server for one unresolved ordinary save's durable status."
+  (interactive)
+  (let* ((record (skg--choose-pending-save))
+         (operation-id (skg-pending-save--field record 'operation-id))
+         (fingerprint
+          (skg-pending-save--field record 'request-base-fingerprint))
+         (tcp-proc (skg-tcp-connect-to-rust)))
+    (skg-register-response-handler
+     'save-operation-status
+     (lambda (_proc payload)
+       (let* ((response (car (read-from-string payload)))
+              (updated
+               (skg-pending-save-apply-status record response))
+              (server-state
+               (skg-pending-save--field updated 'server-state)))
+         (message
+          (if (eq (skg-pending-save--field updated 'fresh-view-required)
+                  'true)
+              "Save operation %s is %s; reopen a fresh view, then inspect and acknowledge it"
+            "Save operation %s is %s; use M-x skg-pending-save-inspect")
+          operation-id server-state)))
+     t)
+    (skg-submit-request
+     tcp-proc
+     (concat
+      (prin1-to-string
+       `((request . "save operation status")
+         (operation-id . ,operation-id)
+         (request-base-fingerprint . ,fingerprint)))
+      "\n"))))
+
+(defun skg-acknowledge-pending-save ()
+  "Acknowledge an inspected terminal result and compact its local record."
+  (interactive)
+  (let* ((record (skg--choose-pending-save))
+         (operation-id (skg-pending-save--field record 'operation-id))
+         (fingerprint
+          (skg-pending-save--field record 'request-base-fingerprint))
+         (state (skg-pending-save--field record 'state))
+         (tcp-proc (skg-tcp-connect-to-rust)))
+    (unless (eq state 'terminal)
+      (user-error "Save %s has no inspected terminal result" operation-id))
+    (skg-register-response-handler
+     'save-operation-ack
+     (lambda (_proc payload)
+       (let ((response (car (read-from-string payload))))
+         (skg-pending-save-verify-response record response)
+         (skg-pending-save-mark-acknowledged record)
+         (message "Save operation %s acknowledged" operation-id)))
+     t)
+    (skg-submit-request
+     tcp-proc
+     (concat
+      (prin1-to-string
+       `((request . "acknowledge save result")
+         (operation-id . ,operation-id)
+         (request-base-fingerprint . ,fingerprint)))
+      "\n"))))
+
+(defun skg-retry-pending-save ()
+  "Explicitly retry exact bytes for an unknown/prepared save identity."
+  (interactive)
+  (let* ((record (skg--choose-pending-save))
+         (material (skg-pending-save-retry-material record))
+         (operation-id (skg-pending-save--field record 'operation-id))
+         (tcp-proc (skg-tcp-connect-to-rust)))
+    (skg--begin-stream "pending-save retry")
+    (skg--register-stream-request-cleanup "pending-save retry")
+    (skg-set-request-failure-handler
+     (lambda (reason)
+       (skg-pending-save-mark-uncertain record)
+       (message "Save retry interrupted: %s; operation %s retained"
+                reason operation-id)))
+    (skg-register-response-handler 'save-lock (lambda (&rest _) nil) t)
+    (dolist (frame-kind
+             '(save-relax-lock collateral-view fork-confirmation
+               telescope-hoist-confirmation ugly-telescope-confirmation
+               error))
+      (skg-register-response-handler
+       frame-kind
+       (lambda (_proc payload)
+         (skg--persist-save-response record payload)
+         (message "Save operation %s returned; inspect the retained outcome"
+                  operation-id))
+       nil))
+    (skg-register-response-handler
+     'save-result
+     (lambda (_proc payload)
+       (skg--persist-save-response record payload)
+       (message "Save operation %s returned; inspect the retained outcome"
+                operation-id))
+     t)
+    (skg-submit-request tcp-proc (car material) (cadr material))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:

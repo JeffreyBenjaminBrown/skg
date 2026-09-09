@@ -70,12 +70,33 @@ describe('skg.save request strings', function ()
     assert.is_truthy(line:find(
       '(allow-ugly-telescopes "ugly-a" "ugly-b")', 1, true))
   end)
+
+  it('puts operation identity on the request with fingerprint final', function ()
+    local operation_id = '11111111-2222-4333-8444-555555555555'
+    local fingerprint = string.rep('a', 64)
+    local line = save.save_request_string('uri-1', {
+      lines_below_focused_headline = 0,
+      column = 0,
+      screen_lines_below_window_start = 0,
+    }, nil, nil, nil, nil, nil, operation_id, fingerprint)
+    assert.is_truthy(line:find(
+      '(operation-id . "' .. operation_id .. '")', 1, true))
+    local ending = ' (request-base-fingerprint . "'
+      .. fingerprint .. '"))\n'
+    assert.are.equal(ending, line:sub(-#ending))
+  end)
 end)
 
 describe('skg.save pipeline', function ()
   local server
+  local pending_root
 
   before_each(function ()
+    pending_root = vim.fn.tempname()
+    vim.fn.mkdir(pending_root, 'p')
+    config.config_file_path = pending_root .. '/skgconfig.toml'
+    vim.fn.writefile({ 'port = 1731' }, config.config_file_path)
+    state.maintenance_archive_folder = 'archive'
     helpers.install_fixture_herald_rules()
     helpers.wipe_skg_buffers()
     lock.end_stream()
@@ -87,6 +108,9 @@ describe('skg.save pipeline', function ()
     helpers.wipe_skg_buffers()
     lock.end_stream()
     config.store_state = nil
+    config.config_file_path = nil
+    state.maintenance_archive_folder = nil
+    vim.fn.delete(pending_root, 'rf')
   end)
 
   it('refuses known rebuilding before taking a transient save lock',
@@ -275,6 +299,36 @@ describe('skg.save pipeline', function ()
     vim.api.nvim_buf_delete(found, { force = true })
   end)
 
+  it('keeps edited text and unresolved identity for a blocked result',
+     function ()
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        local operation_id = line:match(
+          '%(operation%-id%s+%.%s+"([^"]+)"%)')
+        local fingerprint = line:match(
+          '%(request%-base%-fingerprint%s+%.%s+"([^"]+)"%)')
+        respond(helpers.framed(
+          '((response-type save-result)'
+          .. ' (content "server replacement")'
+          .. ' (operation-id "' .. operation_id .. '")'
+          .. ' (request-base-fingerprint "' .. fingerprint .. '")'
+          .. ' (save-operation-state blocked)'
+          .. ' (reason "authorized effects require recovery"))'))
+      end
+    end)
+    local buf = open_view(
+      '* (skg (node (id root))) locally edited',
+      'skg://blocked-save', 'uri-blocked-save')
+    vim.bo[buf].modified = true
+    local before = registry.raw_text(buf)
+    save.request_save_buffer()
+    assert.is_true(vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10))
+    assert.are.equal(before, registry.raw_text(buf))
+    assert.is_true(vim.bo[buf].modified)
+    assert.are.equal(1, #require('skg.pending_save').unresolved_records())
+  end)
+
   it('refuses a second save while one streams', function ()
     server = helpers.connect_to_fake_server(function () end)
     open_view('* (skg (node (id a))) a', 'skg://guard', 'uri-guard')
@@ -287,7 +341,8 @@ describe('skg.save pipeline', function ()
     -- defense.
     local message = tostring(err)
     assert.is_truthy(message:find('already in progress')
-                     or message:find('modifiable'))
+                     or message:find('modifiable')
+                     or message:find('is unresolved'))
   end)
 
   it('refuses to save a buffer with no view uri', function ()
@@ -302,8 +357,14 @@ end)
 
 describe('skg.save fork confirmation', function ()
   local server
+  local pending_root
 
   before_each(function ()
+    pending_root = vim.fn.tempname()
+    vim.fn.mkdir(pending_root, 'p')
+    config.config_file_path = pending_root .. '/skgconfig.toml'
+    vim.fn.writefile({ 'port = 1731' }, config.config_file_path)
+    state.maintenance_archive_folder = 'archive'
     helpers.install_fixture_herald_rules()
     helpers.wipe_skg_buffers()
     lock.end_stream()
@@ -314,6 +375,9 @@ describe('skg.save fork confirmation', function ()
     helpers.reset_client_state()
     helpers.wipe_skg_buffers()
     lock.end_stream()
+    config.config_file_path = nil
+    state.maintenance_archive_folder = nil
+    vim.fn.delete(pending_root, 'rf')
   end)
 
   local fork_confirmation_payload =
