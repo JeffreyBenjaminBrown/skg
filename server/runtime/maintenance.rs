@@ -23,7 +23,7 @@ use crate::runtime::interactive_session::{
   QueuedServerEvent,
 };
 use crate::serve::protocol::TcpToClient;
-use crate::types::env::SkgEnv;
+use crate::types::env::{GraphReadSnapshot, SkgEnv};
 use crate::types::views_state::{ViewSaveBase, ViewState};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -189,16 +189,18 @@ impl ServerRuntime {
     let mut snapshots = self . incident_snapshots . lock ()
       . map_err (|_| "incident snapshot retention poisoned" . to_string ())?;
     if let Some (retained) = snapshots . get (incident) {
-      if !Arc::ptr_eq (&retained . selected, &snapshot . selected) {
+      if !Arc::ptr_eq (&retained . selected . graph, &snapshot . selected . graph)
+      || !Arc::ptr_eq (&retained . selected . manifest, &snapshot . selected . manifest) {
         return Err ("incident already retained a different selected pair" . into ()); }
-    } else { snapshots . insert (incident . clone (), snapshot); }
+    } else { snapshots . insert (incident . clone (), Arc::new (
+      GraphReadSnapshot::from_env (&snapshot . env))); }
     Ok (( ))
   }
 
   pub(crate) fn incident_snapshot (
     &self,
     incident : &IncidentId,
-  ) -> Result<Arc<SelectedRuntimeSnapshot>, String> {
+  ) -> Result<Arc<GraphReadSnapshot>, String> {
     self . incident_snapshots . lock ()
       . map_err (|_| "incident snapshot retention poisoned" . to_string ())?
       . get (incident) . cloned () . ok_or_else (||

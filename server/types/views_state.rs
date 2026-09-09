@@ -3,7 +3,7 @@ use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Phantom, ViewNodeKind, Vognode};
 use crate::maintenance::BufferKind;
-use crate::types::env::SkgEnv;
+use crate::types::env::{GraphReadSnapshot, SkgEnv};
 use crate::types::store_state::SelectedGraphBase;
 use super::misc::{ID, SkgConfig};
 
@@ -75,6 +75,13 @@ pub struct ViewSaveBase {
 }
 
 impl ViewSaveBase {
+  pub fn from_snapshot
+  ( snapshot : &GraphReadSnapshot,
+    source_set : &str,
+  ) -> Self {
+    Self { selected: snapshot . selected . clone (),
+      config: snapshot . config . clone (), source_set: source_set . into (), } }
+
   pub fn from_env
   ( env : &SkgEnv,
     source_set : &str,

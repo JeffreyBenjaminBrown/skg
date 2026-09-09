@@ -42,7 +42,7 @@ use crate::maintenance::{
 };
 use crate::from_text::buffer_to_viewnodes::uninterpreted::
   org_to_uninterpreted_viewforest;
-use crate::runtime::{SelectedRuntimeSnapshot, ServerRuntime};
+use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
 use crate::serve::handlers::client_census::source_inventory_field;
 use crate::serve::handlers::scalar_release::{
@@ -67,6 +67,7 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::types::env::GraphReadSnapshot;
 use crate::types::misc::ID;
 use crate::types::sexp::{atom_to_string, extract_string_list_from_sexp};
 use crate::types::store_state::StoreHealth;
@@ -796,7 +797,7 @@ fn select_and_stage_candidate_payload (
   let candidate = runtime . candidate (&candidate_id)
     . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
   let selected_snapshot = runtime . incident_snapshot (incident)?;
-  let selected_config = &selected_snapshot . env . config;
+  let selected_config = &selected_snapshot . config;
   #[cfg(test)]
   crate::runtime::save_operations::socket_tests::hold_maintenance_report ();
   let settlements = {
@@ -920,12 +921,11 @@ fn stage_application_settlements_once (
   let selected = active . selected_store . as_ref ()
     . ok_or_else (|| "view rendering precedes coherent store selection"
       . to_string ())?;
-  let lease = crate::runtime::RuntimeQueryLease {
-    snapshot: runtime . incident_snapshot (&active . incident_id)?,
-  };
-  if lease . snapshot . selected . graph_generation
+  let snapshot : Arc<GraphReadSnapshot> =
+    runtime . incident_snapshot (&active . incident_id)?;
+  if snapshot . selected . graph_generation
        != selected . graph_generation
-  || lease . snapshot . selected . manifest_revision
+  || snapshot . selected . manifest_revision
        != selected . manifest_revision
   {
     return Err (
@@ -974,7 +974,8 @@ fn stage_application_settlements_once (
     let (viewforest, content, warnings) = block_on (
       render_maintenance_view (
         input . viewforest,
-        &lease . snapshot . env,
+        &snapshot . config,
+        snapshot . selected . graph . clone (),
         diff_mode_enabled,
         Some (&active_source_set)))?;
     let mut candidate_pids : Vec<ID> =
@@ -1029,7 +1030,7 @@ fn stage_application_settlements_once (
       "maintenance-presentation",
       &active_source_set,
       &all_candidate_pids,
-      &lease . snapshot . selected . graph,
+      &snapshot . selected . graph,
       approved_pids)
   {
     ScalarReleaseDecision::Challenge { operation, pids, prompt } => {
@@ -1050,7 +1051,7 @@ fn stage_application_settlements_once (
         "maintenance-presentation",
         &active_source_set,
         &rendered . candidate_pids,
-        &lease . snapshot . selected . graph,
+        &snapshot . selected . graph,
         approved_pids)
     {
       ScalarReleaseDecision::Allow => {}
@@ -1415,7 +1416,7 @@ fn approve_maintenance_scalar_release (
     . ok_or_else (|| "verified initial archive was not retained"
       . to_string ())?;
   let selected_snapshot = runtime . incident_snapshot (&incident)?;
-  let selected_config = &selected_snapshot . env . config;
+  let selected_config = &selected_snapshot . config;
   if !active . pending_view_enrollments . is_empty () {
     return Ok (view_enrollment_pending_payload (&active)); }
   if !active . view_settlements . is_empty () {
@@ -2095,7 +2096,7 @@ fn apply_server_settlement_effect (
       application_token,
       search_stale,
     } => {
-      let selected_snapshot : Arc<SelectedRuntimeSnapshot> =
+      let selected_snapshot : Arc<GraphReadSnapshot> =
         runtime . incident_snapshot (incident)
         . expect ("validated maintenance application retains its G1 snapshot");
       let source_set : String = interactive . views . open_views . views . get (&uri)
@@ -2112,8 +2113,8 @@ fn apply_server_settlement_effect (
         . expect ("validated maintenance application view disappeared");
       let state : &mut ViewState = interactive . views . open_views . views . get_mut (&uri)
         . expect ("applied maintenance view remains registered");
-      state . retain_save_base (ViewSaveBase::from_env (
-        &selected_snapshot . env, &source_set))
+      state . retain_save_base (ViewSaveBase::from_snapshot (
+        &selected_snapshot, &source_set))
         . expect ("validated maintenance application retains its G1 base");
       state . search_stale |= search_stale;
     }

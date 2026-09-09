@@ -18,7 +18,7 @@ use crate::maintenance::observation::ObservationService;
 use crate::runtime::interactive_session::InteractiveSession;
 use crate::runtime::owner::{CoordinatorOwner, MutationStage};
 pub(crate) use owner::MutationControl;
-use crate::types::env::SkgEnv;
+use crate::types::env::{GraphReadSnapshot, SkgEnv};
 use crate::types::store_state::{SelectedStoreState, GraphGeneration, ManifestRevision};
 
 use std::collections::BTreeMap;
@@ -69,7 +69,7 @@ pub struct ServerRuntime {
   verified_archives     : Mutex<BTreeMap<crate::maintenance::IncidentId,
                                          Arc<VerifiedInitialArchive>>>,
   incident_snapshots    : Mutex<BTreeMap<crate::maintenance::IncidentId,
-                                         Arc<SelectedRuntimeSnapshot>>>,
+                                         Arc<GraphReadSnapshot>>>,
   observation           : Mutex<Option<ObservationService>>,
 }
 

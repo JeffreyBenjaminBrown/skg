@@ -169,18 +169,20 @@ pub(crate) async fn render_background_view
 /// Render one maintenance-locked forest without mutating the retained view.
 /// The returned text and forest are a staged offer: neither becomes authority
 /// until the editor acknowledges the exact application token.
-pub(crate) async fn render_maintenance_view (
-  mut viewforest        : ViewForest,
-  env                   : &SkgEnv,
+pub(crate) async fn render_maintenance_view
+( mut viewforest        : ViewForest,
+  config                : &SkgConfig,
+  graph                 : Arc<InRustGraph>,
   diff_mode_enabled     : bool,
   active_source_set     : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, String, Vec<String>), String> {
-  let mut context = RerenderAfterSaveContext::without_save (
-    env, diff_mode_enabled, active_source_set);
+  let mut context : RerenderAfterSaveContext<'_> =
+    RerenderAfterSaveContext::from_graph (
+      config, graph, diff_mode_enabled, &[], active_source_set);
   rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     &mut viewforest, &context . graph_snap)
     . map_err (|error| error . to_string ())?;
-  let text = rerender_view (
+  let text : String = rerender_view (
     &mut viewforest, &mut context, None, false)
     . await . map_err (|error| error . to_string ())?;
   if !context . errors . is_empty () {

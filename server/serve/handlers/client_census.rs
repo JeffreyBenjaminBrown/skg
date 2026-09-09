@@ -17,7 +17,7 @@ use crate::maintenance::{
   ViewApplicationAcknowledgement,
   ViewSettlementRequirement,
 };
-use crate::runtime::{SelectedRuntimeSnapshot, ServerRuntime};
+use crate::runtime::ServerRuntime;
 use crate::runtime::interactive_session::{
   AttachedClient,
   CensusDescriptor,
@@ -34,7 +34,7 @@ use crate::serve::util::{
   tag_terminal_text_response,
   value_from_request_sexp,
 };
-use crate::types::env::SkgEnv;
+use crate::types::env::{GraphReadSnapshot, SkgEnv};
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::misc::SkgConfig;
 use crate::types::sexp::{atom_to_string, extract_v_from_kv_pair_in_sexp};
@@ -573,7 +573,7 @@ fn reconcile_census_applications (
         uri, base_revision, viewforest, graph_generation,
         presentation_generation, application_token, search_stale,
       } => {
-        let selected_snapshot : Arc<SelectedRuntimeSnapshot> =
+        let selected_snapshot : Arc<GraphReadSnapshot> =
           runtime . incident_snapshot (&incident)?;
         let source_set : String = interactive . views . open_views . views
           . get (&uri) . expect ("census-applied view remains registered")
@@ -587,8 +587,8 @@ fn reconcile_census_applications (
           &uri, graph_generation, presentation_generation, application_token)?;
         let state : &mut ViewState = interactive . views . open_views . views . get_mut (&uri)
           . expect ("census-applied view remains registered");
-        state . retain_save_base (ViewSaveBase::from_env (
-          &selected_snapshot . env, &source_set))?;
+        state . retain_save_base (ViewSaveBase::from_snapshot (
+          &selected_snapshot, &source_set))?;
         state . search_stale |= search_stale;
       }
       _ => return Err (

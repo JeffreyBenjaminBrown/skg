@@ -2047,3 +2047,34 @@ Finish missing response annotations. Continue durable query waits, full owner
 migration, multiple
 client incidents/restriction sets, remaining writers/observation, resource
 lifetime cleanup and required both-editor acceptance. No new choice for Jeff.
+
+* Simplify/cohere checkpoint: semantic retention and narrower execution
+** what's done and went well
+'e26328f7' covers read-only content errors and menu reuse, including an explicit
+read-only request during open admission. 'a5658e26' shares immutable manifests.
+'d10b412f' removes query readers from retained view bases, collateral batches
+and offers, and completed search enrichment. Its focused verification passes
+53 tests, 22 grouped-source tests and five grouped-view tests. Evidence is in
+'temp/simplify-cohere-baseline/semantic-base-*-tests.log'.
+** Changes to the plan's envisioned order.
+Follow [[file:../../coding-advice/to-conserve-tokens.org][the new token-conservation advice]]. Finish existing fronts sequentially:
+incident semantic retention, then whitespace-command durability, then the query
+wait vertical slice. Delegates are finishing their already assigned bounded
+work and will stop at tested interfaces. No additional parallel investigations.
+** what's imperfect about what's done
+The incident snapshot map still retained query readers after the view-base
+commit. Its seven-file semantic adapter now passes 34 focused tests and the actual
+TCP G1-report/G2-save/restart regression (1.366 seconds), recorded in
+'incident-semantic-focused-tests.log' and 'incident-semantic-restart-test.log'.
+The first check in 'incident-semantic-check-first.log' found two missed imports
+in that adapter and overlapping edits in the in-progress query-wait ledger.
+The imports are fixed. Verification resumed after the ledger reached a stable compiling boundary; these are same-task failures, not external baseline failures.
+** choices determining the future
+The query ledger and editor modules are not yet wired to a complete server
+executor and delivery path. Root's draft 'text_search/wait_result.rs' is also
+unregistered and unverified; it is not completed coverage. The query design
+boundary is recorded in [[file:../../codex-thinking/query-wait-server.org][the server note]] and [[file:../../codex-thinking/query-wait-clients.org][the editor note]].
+Resolved target records must retain historical config and cyclic-root ranking
+facts with the owner selection outcome; result text belongs in a verified
+private artifact. Continue from these interfaces without rereading the earlier
+search/owner exploration. No new question for Jeff.

@@ -2,10 +2,10 @@
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::store_state::SelectedStoreState;
+use crate::types::store_state::{SelectedGraphBase, SelectedStoreState};
 use crate::telescope::invariants::TelescopeViolation;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use arc_swap::ArcSwap;
 use tantivy::Searcher;
@@ -20,6 +20,25 @@ pub struct SkgEnv {
   /// Load-time telescope warnings waiting to be presented during the
   /// connection handshake. Kept as structured data, not only a log/report.
   pub startup_warnings : Arc<Vec<(ID, TelescopeViolation)>>,
+}
+
+/// Retained rendering and proof inputs. No live index resource is needed to
+/// settle a view or finish an incident report after another publication.
+#[derive(Clone)]
+pub struct GraphReadSnapshot {
+  pub config   : SkgConfig,
+  pub selected : SelectedGraphBase,
+  pub cyclic_roots : BTreeSet<ID>, }
+
+impl GraphReadSnapshot {
+  pub fn from_env
+  ( env : &SkgEnv,
+  ) -> Self {
+    let selected : Arc<SelectedStoreState> = env . in_rust_graph . load_full ();
+    Self {
+      config: env . config . clone (),
+      selected: selected . graph_base (),
+      cyclic_roots: selected . cyclic_roots . clone (), } }
 }
 
 impl SkgEnv {
