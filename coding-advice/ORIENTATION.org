@@ -1,3 +1,10 @@
+* Pinned: conserve tokens throughout execution
+Read [[file:to-conserve-tokens.org][the token conservation advice]] and follow it throughout the task.
+Before each tool call, identify the unresolved question its result will settle.
+Finish and commit one narrow slice before opening another. While a delegate
+owns an investigation, do not duplicate its reads or repeatedly check status.
+Wait for its result unless independent work is necessary for the same slice.
+See [[file:../codex-thinking/token-discipline.org][the recorded drift and prevention rules]].
 * Welcome!
 My name's Jeff.
 It's been a pleasure working with other instances of you

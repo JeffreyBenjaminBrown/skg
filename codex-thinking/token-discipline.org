@@ -1,0 +1,26 @@
+* Token discipline across handoffs
+** Observed drift
+On 2026-09-09 Jeff reported that token use fell after adopting
+[[file:../coding-advice/to-conserve-tokens.org][the conservation advice]], then rose again. The root agent had resumed
+extra status checks and adjacent code reads while delegates ran. Acknowledging
+the advice once did not prevent that drift during execution.
+** Before another tool call
+Name the unresolved question and how the answer changes the next action.
+If neither is clear, do not make the call. Use the current slice's existing
+note and first failure log before tracing code again. Ask for only the relevant
+excerpt. Preserve useful results so a handoff does not repeat the investigation.
+** While a delegate works
+Keep one owner for each file or diagnostic question. Do not mirror its review,
+read its evolving diffs repeatedly, or poll merely to remain busy. Wait for its
+result when independent necessary work for the same slice is exhausted.
+Updates should report new evidence, not create extra investigation to fill time.
+** At a slice boundary
+Run the focused verification, inspect its first concrete failure if any, and
+commit the tested slice. Broaden tests at stable checkpoints or for an identified
+risk. Do not open an adjacent migration before the current slice is settled.
+** Handoff reminder
+State the current slice, its owner, exact first failure or passing log, and the
+next necessary action. The pinned entry at the start of
+[[file:../coding-advice/ORIENTATION.org][ORIENTATION.org]] makes this agreement discoverable without relying on
+conversation memory. This note records a working agreement, not a guarantee
+that future agents will follow it without checking their own behavior.
