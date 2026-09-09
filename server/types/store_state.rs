@@ -95,7 +95,25 @@ pub struct SelectedStoreState {
 
   pub tantivy_health    : StoreHealth, }
 
+/// Semantic proof inputs outlive rendering without retaining index readers.
+/// Both potentially large values are shared with their original publication.
+#[derive(Clone, Debug)]
+pub struct SelectedGraphBase {
+  pub graph             : Arc<InRustGraph>,
+  pub graph_generation  : GraphGeneration,
+  pub manifest_revision : ManifestRevision,
+  pub manifest          : Arc<SelectedPathManifest>, }
+
 impl SelectedStoreState {
+  pub fn graph_base
+  ( &self,
+  ) -> SelectedGraphBase {
+    SelectedGraphBase {
+      graph: self . graph . clone (),
+      graph_generation: self . graph_generation,
+      manifest_revision: self . manifest_revision,
+      manifest: self . manifest . clone (), } }
+
   pub fn initial (
     graph    : InRustGraph,
     manifest : SelectedPathManifest,

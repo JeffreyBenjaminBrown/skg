@@ -30,7 +30,7 @@ use skg::test_utils::{graph_handle_from_config, read_lp_message,
 use skg::test_utils::run_with_shared_test_graph;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::types::views_state::{OpenViews, ViewUri};
+use skg::types::views_state::{OpenViews, ViewSaveBase, ViewUri};
 use skg::types::store_state::SelectedStoreState;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
@@ -210,7 +210,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           graphnodestats : AllGraphNodeStats::empty (),
           title_and_source_by_id: HashMap::new (),
           graph: env . in_rust_graph_snapshot (),
-          base_env: env . pinned (),
+          save_base: ViewSaveBase::from_env (&env, &active . name . 0),
           config: config . clone (),
           active_source_set: active . clone (),
           graph_generation: env . in_rust_graph . load_full ()

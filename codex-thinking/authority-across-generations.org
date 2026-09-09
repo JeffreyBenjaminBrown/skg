@@ -52,3 +52,31 @@ Searcher throughout editor waits conflicts with the plan's bounded query-work
 lifetime. Split the retained semantic proof data from query resources before
 claiming that boundary complete. Avoid copying a corpus-sized manifest for
 each buffer when making that split.
+
+** Concrete resource split
+Keep the published pair intact for actual query leases. Give retained view
+proofs a separate graph-base value containing shared graph/manifest pointers
+and their identities. Share the manifest in the publication itself so making
+a proof does not clone all corpus paths per buffer. Pending application and
+enrichment payloads retain this proof, not an environment.
+
+Collateral batches also wait for client authorization, so merely removing
+the pending-offer environment is insufficient. Their renderer reads graph
+and config only. Change its context to those explicit inputs; then the whole
+retained batch can be free of Searchers, including while awaiting approval.
+The existing foreground adapters can keep accepting an environment and
+extract those same inputs. Verify publication pointers may be released while
+proofs remain, and rerun real base-ACK, source-switch and rendering coverage.
+
+** Verification and next retention boundary
+The view proof, collateral batch/offer, and enrichment payload split passes
+53 focused tests, 22 source-set tests and five grouped view tests. The pending
+application test observes the old publication being dropped while its shared
+graph/manifest facts survive. Initial compile attempts exposed the expected
+manifest type changes and one missed fixture import; their logs are retained.
+
+The separate incident snapshot map still retains complete runtime pairs
+through report work. Migrate it to semantic snapshots next, alongside durable
+query execution: report rendering needs no Searcher, while a ready query can
+create a bounded matching reader from retained or reconstructed incident
+evidence. Do not claim all historical index resources are released yet.

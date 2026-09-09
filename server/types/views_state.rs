@@ -4,12 +4,11 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Phantom, ViewNodeKind, Vognode};
 use crate::maintenance::BufferKind;
 use crate::types::env::SkgEnv;
-use crate::types::store_state::SelectedStoreState;
+use crate::types::store_state::SelectedGraphBase;
 use super::misc::{ID, SkgConfig};
 
 use sexp::{Atom, Sexp};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 //
 // Type declarations
@@ -70,17 +69,17 @@ pub struct ViewState {
 
 #[derive(Clone)]
 pub struct ViewSaveBase {
-  pub selected : Arc<SelectedStoreState>,
+  pub selected : SelectedGraphBase,
   pub config : SkgConfig,
   pub source_set : String,
 }
 
 impl ViewSaveBase {
-  pub fn from_env (
-    env : &SkgEnv,
+  pub fn from_env
+  ( env : &SkgEnv,
     source_set : &str,
   ) -> Self {
-    Self { selected: env . in_rust_graph . load_full (),
+    Self { selected: env . in_rust_graph . load_full () . graph_base (),
       config: env . config . clone (), source_set: source_set . into (), } }
 }
 

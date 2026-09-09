@@ -48,7 +48,7 @@ use skg::types::viewnode::{
   ViewNodeKind,
   viewforest_root_viewnode};
 use skg::types::viewnode::{Vognode, Phantom};
-use skg::types::views_state::{OpenViews, ViewState, ViewUri};
+use skg::types::views_state::{OpenViews, ViewSaveBase, ViewState, ViewUri};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
@@ -414,7 +414,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           graphnodestats : AllGraphNodeStats::empty (),
           title_and_source_by_id: HashMap::new (),
           graph: env . in_rust_graph_snapshot (),
-          base_env: env . pinned (),
+          save_base: ViewSaveBase::from_env (&env, &active . name . 0),
           config: config . clone (),
           active_source_set: active . clone (),
           graph_generation: env . in_rust_graph . load_full ()

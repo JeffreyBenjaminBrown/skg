@@ -431,7 +431,6 @@ mod tests {
   use crate::types::store_state::{PathDigest, SelectedPathManifest};
   use crate::types::tree::forest::ViewForest;
   use crate::types::viewnode::{mk_indefinitive_viewnode, ParentIs};
-  use std::sync::Arc;
 
   fn node (pid : &str, title : &str) -> NodeComplete {
     let mut node : NodeComplete = empty_node_complete ();
@@ -477,7 +476,7 @@ mod tests {
     changed_unrelated . extra_ids = vec![ID::new ("unrelated-alias")];
     let new : SelectedStoreState = state (&[changed_ancestor, child . clone (), changed_unrelated]);
     let base : ViewSaveBase = ViewSaveBase {
-      selected: Arc::new (old . clone ()),
+      selected: old . graph_base (),
       config: test_config (), source_set: "all" . into () };
     let forest : ViewForest = forest_with_id ("ancestor");
     let config : SkgConfig = base . config . clone ();
@@ -498,7 +497,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = forest_with_id ("ancestor");
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[], &[], &[]) . is_err ()); }
@@ -518,7 +517,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = forest_with_id ("ancestor");
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (child)], &[], &[]) . is_ok ()); }
@@ -534,7 +533,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = ViewForest::new ();
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (target)], &[], &[]) . is_err ()); }
@@ -557,7 +556,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = ViewForest::new ();
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (node ("target", "target"))], &[], &[]) . is_err ()); }
@@ -576,7 +575,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = forest_with_id ("subscribee");
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (node ("subscriber", "subscriber"))], &[], &[]) . is_err ()); }
@@ -635,7 +634,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &new, &config, &test_sources (), &forest, &forest,
       &[save (old_node)], &[], &[]);
@@ -654,7 +653,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (old_target)], &[], &[]);
@@ -671,7 +670,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[delete ("target")], &[], &[]);
@@ -688,7 +687,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = forest_with_id ("missing-target");
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[], &[], &[]) . is_err ()); }
@@ -703,7 +702,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = forest_with_id ("new-alias");
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[], &[], &[]);
@@ -724,7 +723,7 @@ mod tests {
     let config : SkgConfig = test_config ();
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (subscriber)], &[], &[]);
@@ -744,7 +743,7 @@ mod tests {
     let config : SkgConfig = test_config_with_private_source ();
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_all_sources_with_private (),
       &forest, &forest, &[save (subscriber)], &[], &[]);
@@ -764,7 +763,7 @@ mod tests {
       source_confirmed: false };
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[], &[], &[spec]);
@@ -781,7 +780,7 @@ mod tests {
     let current : SelectedStoreState = state (&[output . clone ()]);
     let forest : ViewForest = ViewForest::new ();
     let result : Result<(), String> = validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &test_sources (), &forest, &forest,
       &[save (output)], &[], &[]);
@@ -797,14 +796,14 @@ mod tests {
     let source_set : ActiveSourceSet = ActiveSourceSet {
       name: SourceSetName ("private" . into ()), sources: BTreeSet::new () };
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old . clone ()), config: config . clone (),
+      &ViewSaveBase { selected: old . graph_base (), config: config . clone (),
                       source_set: "all" . into () },
       &current, &config, &source_set, &forest, &forest,
       &[], &[], &[]) . is_err ());
     let mut changed_config : SkgConfig = config . clone ();
     changed_config . port = 1;
     assert! (validate_save_dependencies (
-      &ViewSaveBase { selected: Arc::new (old), config,
+      &ViewSaveBase { selected: old . graph_base (), config,
                       source_set: "all" . into () },
       &current, &changed_config, &test_sources (), &forest, &forest,
       &[], &[], &[]) . is_err ()); }

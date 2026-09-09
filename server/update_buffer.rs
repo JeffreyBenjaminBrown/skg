@@ -47,7 +47,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 pub struct RerenderAfterSaveContext<'a> {
-  pub env          : &'a SkgEnv,
+  pub config       : &'a SkgConfig,
   pub source_diffs : Option<HashMap<SourceName, SourceDiff>>,
   pub graph_snap   : Arc<InRustGraph>,
   pub errors       : Vec<String>,
@@ -91,14 +91,25 @@ impl<'a> RerenderAfterSaveContext<'a> {
     define_nodes      : &[DefineNode],
     active_source_set : Option<&'a ActiveSourceSet>,
   ) -> RerenderAfterSaveContext<'a> {
+    Self::from_graph (
+      &env . config, env . in_rust_graph_snapshot (), diff_mode_enabled,
+      define_nodes, active_source_set) }
+
+  fn from_graph
+  ( config            : &'a SkgConfig,
+    graph             : Arc<InRustGraph>,
+    diff_mode_enabled : bool,
+    define_nodes      : &[DefineNode],
+    active_source_set : Option<&'a ActiveSourceSet>,
+  ) -> RerenderAfterSaveContext<'a> {
     let source_diffs
       : Option<HashMap<SourceName, SourceDiff>>
       = if diff_mode_enabled
-        { Some ( compute_diff_for_every_source (&env . config)) }
+        { Some ( compute_diff_for_every_source (config)) }
         else {None};
     let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
       source_diffs . as_ref()
-      . map ( |d| deleted_ids_to_source (d, &env . config))
+      . map ( |d| deleted_ids_to_source (d, config))
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> =
       // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
@@ -109,9 +120,9 @@ impl<'a> RerenderAfterSaveContext<'a> {
         _ => None })
       . collect();
     RerenderAfterSaveContext {
-      env,
+      config,
       source_diffs,
-      graph_snap : env . in_rust_graph . load_full () . graph . clone (),
+      graph_snap : graph,
       errors : Vec::new (),
       warnings : Vec::new (),
       deleted_since_head_pid_src_map,
@@ -132,22 +143,24 @@ impl<'a> RerenderAfterSaveContext<'a> {
 /// Render one cloned open-view forest for the low-priority worker.  The
 /// caller owns generation/revision validation and client application; this
 /// function performs no registry or wire mutation.
-pub(crate) async fn render_background_view (
-  mut viewforest        : ViewForest,
+pub(crate) async fn render_background_view
+( mut viewforest        : ViewForest,
   define_nodes          : &[DefineNode],
-  env                   : &SkgEnv,
+  config                : &SkgConfig,
+  graph                 : Arc<InRustGraph>,
   diff_mode_enabled     : bool,
   active_source_set     : Option<&ActiveSourceSet>,
   create_partnerCols    : bool,
   cancellation          : RenderCancellationTicket,
 ) -> Result<(ViewForest, String, Vec<String>), String> {
-  let mut context = RerenderAfterSaveContext::for_save (
-    env, diff_mode_enabled, define_nodes, active_source_set);
+  let mut context : RerenderAfterSaveContext<'_> =
+    RerenderAfterSaveContext::from_graph (
+      config, graph, diff_mode_enabled, define_nodes, active_source_set);
   context . cancellation = Some (cancellation);
   rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     &mut viewforest, &context . graph_snap)
     . map_err (|error| error . to_string ())?;
-  let text = rerender_view (
+  let text : String = rerender_view (
     &mut viewforest, &mut context, None, create_partnerCols)
     . await . map_err (|error| error . to_string ())?;
   Ok ((viewforest, text, context . warnings))
@@ -453,7 +466,7 @@ pub async fn render_initial_view (
   let mut context : CompletionContext = CompletionContext {
     defmap                         : &mut defmap,
     source_diffs                   : &real_diffs,
-    env,
+    config                         : &env . config,
     graph_snap                     : &graph_snap,
     errors                         : &mut errors,
     deleted_since_head_pid_src_map : &deleted_src,
@@ -492,13 +505,13 @@ pub async fn rerender_view (
       // diff-aware QualCol / PartnerCol reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
       source_diffs                   : &context . source_diffs,
-      env                            : context . env,
+      config                         : context . config,
       graph_snap                     : &context . graph_snap,
       errors                         : &mut context . errors,
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       active_source_set              : context . active_source_set,
-      node_budget                    : context . env . config . initial_node_limit,
+      node_budget                    : context . config . initial_node_limit,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerCols and
       // pass false: re-creating them would change the buffer and break the save
       // round-trip (TODO/DONE/local-view-update/plan_v2.org §18). The
@@ -520,7 +533,7 @@ pub async fn rerender_view (
         "finish_viewforest" ). entered();
       finish_viewforest_cancellable (
         &context . graph_snap, viewforest,
-        &context . env . config,
+        context . config,
         context . active_source_set,
         context . cancellation . as_ref ()) . await } ?;
   if let Some (ticket) = &context . cancellation { ticket . checkpoint () ?; }

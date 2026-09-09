@@ -1,6 +1,7 @@
 pub mod render_enriched_search_buffer;
 mod coverage;
 
+use crate::types::views_state::ViewSaveBase;
 use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 
 /// PITFALL: Uses two layers of truncation.
@@ -21,7 +22,6 @@ use crate::dbs::graph_queries::all_graphnodestats::{
   fetch_all_graphnodestats};
 use crate::runtime::RuntimeQueryLease;
 use crate::runtime::ServerRuntime;
-use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
@@ -123,8 +123,8 @@ pub struct SearchEnrichmentPayload {
   pub graphnodestats : AllGraphNodeStats,
   pub title_and_source_by_id : HashMap<ID, (String, SourceName)>,
   pub graph          : Arc<InRustGraph>,
-  /// The selected graph, manifest and matching searcher used for enrichment.
-  pub base_env       : SkgEnv,
+  /// Semantic inputs used for enrichment; no index reader survives query work.
+  pub save_base      : ViewSaveBase,
   pub config         : SkgConfig,
   pub active_source_set : ActiveSourceSet,
   pub graph_generation : crate::types::store_state::GraphGeneration,
@@ -436,7 +436,7 @@ fn spawn_enrichment_thread (
       graphnodestats,
       title_and_source_by_id,
       graph,
-      base_env: lease . snapshot . env . clone (),
+      save_base: ViewSaveBase::from_env (env, &active_clone . name . 0),
       config: config . clone (),
       active_source_set: active_clone,
       graph_generation,

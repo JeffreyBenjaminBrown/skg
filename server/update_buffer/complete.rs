@@ -8,7 +8,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome};
 use crate::to_org::util::DefinitiveMap;
-use crate::types::env::SkgEnv;
+use crate::types::misc::SkgConfig;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
@@ -42,7 +42,7 @@ pub(super) struct CompletionContext<'a> {
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
-  pub(super) env                            : &'a SkgEnv,
+  pub(super) config                         : &'a SkgConfig,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
   pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
@@ -244,7 +244,7 @@ async fn visit_normal_node (
     settled = true;
   } else if had_dvr {
     match apply_definitive_draw_rule (
-      context . graph_snap, tree, treeid, &context . env . config, context . defmap ) ? {
+      context . graph_snap, tree, treeid, context . config, context . defmap ) ? {
       DrawOutcome::Deferred => {
         // Deferred to an existing Final occurrence: the node is now
         // indefinitive; the content engine (settled) will clobber+return.
@@ -253,7 +253,7 @@ async fn visit_normal_node (
         settled = true; cascade = true; } } }
   expand_true_content_at_activeNode (
     treeid, tree, context . defmap,
-    &context . env . config, context . graph_snap,
+    context . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
     context . deleted_by_this_save_pids,
     context . active_source_set,
@@ -282,19 +282,19 @@ async fn visit_normal_node (
       . unwrap_or (false);
     if ! parent_is_partner_col {
       maybe_add_partnerCol_branches (
-        context . graph_snap, tree, treeid, &context . env . config,
+        context . graph_snap, tree, treeid, context . config,
         context . active_source_set,
         context . source_diffs ) . await ?; } }
   cancellation_checkpoint (context) ?;
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
-    context . graph_snap, treeid, tree, &context . env . config, context . errors, context . active_source_set ) . await ?;
+    context . graph_snap, treeid, tree, context . config, context . errors, context . active_source_set ) . await ?;
   cancellation_checkpoint (context) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
-    context . graph_snap, tree, treeid, &context . env . config, context . active_source_set,
+    context . graph_snap, tree, treeid, context . config, context . active_source_set,
     context . source_diffs ) . await ?;
   cancellation_checkpoint (context) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,

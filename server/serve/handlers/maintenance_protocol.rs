@@ -2538,20 +2538,21 @@ mod tests {
   use crate::runtime::interactive_session::{
     ClientCapabilities,
     ClientKind,
+    InteractiveSession,
   };
   use crate::types::tree::forest::ViewForest;
   use crate::types::store_state::{
     GraphGeneration, ManifestRevision, SelectedStoreState,
   };
   use crate::types::views_state::{OpenViews, ViewSaveBase};
-  use crate::types::misc::SkgConfig;
+  use crate::types::misc::{SkgConfig, TantivyIndex};
   use crate::types::env::SkgEnv;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use arc_swap::ArcSwap;
   use std::collections::HashMap;
-  use std::sync::Arc;
-  use tempfile::tempdir;
+  use std::sync::{Arc, MutexGuard};
+  use tempfile::{TempDir, tempdir};
 
   fn census_descriptor (id : &str, kind : &str) -> CensusDescriptor {
     CensusDescriptor {
@@ -2954,19 +2955,19 @@ mod tests {
     let base_selected : Arc<SelectedStoreState> = Arc::new (
       SelectedStoreState::initial (InRustGraph::new (), Default::default ()));
     let base : ViewSaveBase = ViewSaveBase {
-      selected: base_selected . clone (),
+      selected: base_selected . graph_base (),
       config: SkgConfig::dummyFromSources (HashMap::new ()),
       source_set: "all" . into (),
     };
-    let uri = ViewUri::SearchView ("terms" . into ());
+    let uri : ViewUri = ViewUri::SearchView ("terms" . into ());
     let mut open_views : OpenViews = OpenViews::new ();
     open_views . register_view (
       &InRustGraph::new (), uri . clone (), ViewForest::new (), &[]);
     open_views . views . get_mut (&uri) . unwrap () . save_base = Some (base);
     open_views . preserve_across_maintenance (&uri, 2, true) . unwrap ();
-    let preserved = open_views . views . get (&uri) . unwrap () . save_base
+    let preserved : &ViewSaveBase = open_views . views . get (&uri) . unwrap () . save_base
       . as_ref () . unwrap ();
-    assert! (Arc::ptr_eq (&preserved . selected, &base_selected));
+    assert! (Arc::ptr_eq (&preserved . selected . graph, &base_selected . graph));
   }
 
   #[test]
@@ -3071,13 +3072,13 @@ mod tests {
 
   #[test]
   fn maintenance_application_installs_the_incident_save_base () {
-    let directory : tempfile::TempDir = tempdir () . unwrap ();
+    let directory : TempDir = tempdir () . unwrap ();
     let mut config : SkgConfig = SkgConfig::dummyFromSources (HashMap::new ());
     config . config_path = directory . path () . join ("config.toml");
     config . data_root = directory . path () . to_path_buf ();
     config . maintenance_archive_identity = directory . path ()
       . join ("archive");
-    let index : crate::types::misc::TantivyIndex =
+    let index : TantivyIndex =
       empty_in_ram_tantivy_index () . unwrap ();
     let selected : Arc<SelectedStoreState> = Arc::new (
       SelectedStoreState::initial (InRustGraph::new (), Default::default ())
@@ -3098,7 +3099,8 @@ mod tests {
     }) . unwrap ();
     let uri : ViewUri = ViewUri::ContentView ("maintenance" . into ());
     {
-      let mut interactive = runtime . interactive . lock () . unwrap ();
+      let mut interactive : MutexGuard<'_, InteractiveSession> =
+        runtime . interactive . lock () . unwrap ();
       interactive . views . open_views . register_view (
         &selected . graph, uri . clone (), ViewForest::new (), &[]);
     }
@@ -3109,11 +3111,12 @@ mod tests {
         presentation_generation: 1, application_token: 2,
         search_stale: false,
       });
-    let interactive = runtime . interactive . lock () . unwrap ();
+    let interactive : MutexGuard<'_, InteractiveSession> =
+      runtime . interactive . lock () . unwrap ();
     let state : &ViewState = interactive . views . open_views . views . get (&uri)
       . unwrap ();
     let save_base : &ViewSaveBase = state . save_base . as_ref () . unwrap ();
-    assert! (Arc::ptr_eq (&save_base . selected, &selected));
+    assert! (Arc::ptr_eq (&save_base . selected . graph, &selected . graph));
     assert_eq! (save_base . selected . manifest, selected . manifest);
     assert_eq! (state . graph_generation, 1);
   }
