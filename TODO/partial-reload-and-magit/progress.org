@@ -1912,3 +1912,62 @@ Restart cache reconstruction and later-proposal dependency validation remain
 planned integration work, not established by these focused checks.
 ** choices determining the future
 Continue from [[file:../../codex-thinking/index.org][focused implementation notes]].
+
+* Simplify/cohere checkpoint: restart report authority and selected delete facts
+** what's done and went well
+All 19 commits after the last push boundary '06f0aaf5' were rewritten to begin
+with the planning-file path and a colon/newline. Trees, parent topology, author
+and committer identities/dates, index and worktree were preserved. The branch
+reflog retains the previous HEAD. Subsequent commits follow that convention.
+
+'ca477107' adds checked semantic evidence conversion and report-only graph
+inputs. 'd6235757' records incident server/archive origins and refuses terminal
+abort/ACK paths that would release unresolved external effects. '88460100'
+connects exact old-incident status to private report reconstruction and retires
+unacknowledged old live offers without changing newer graph or view authority.
+Staged application bytes remain evidence, but retired offers are omitted from
+live status payloads. A missing historical Git presentation fence is reported
+as unavailable after restart rather than assigned the current G2 signature.
+
+The report checkpoint passes 107 maintenance tests (one pre-existing ignored
+case) and all 13 maintenance protocol tests. Logs are
+'report-recovery-maintenance-fifth.log' and 'report-recovery-handlers.log'.
+Real TCP/process restart coverage is being extended separately; these focused
+checks do not establish that acceptance criterion yet.
+
+'8b137e87' prevents Tantivy cleanup from overlapping source, config, archive,
+maintenance journal/evidence/save, or fatal recovery paths. Thirteen focused
+config tests pass, including source overrides, symlinks, and missing descendants;
+see 'tantivy-path-safety-tests.log' and 'tantivy-path-safety-final.log'.
+'a1ae6064' makes the inactive-section delete guard consume the selected
+manifest paired with its graph. No wrapper invents an empty manifest for
+production. A selected empty inactive file remains protected after disk removal;
+a later live file does not change the semantic decision. All 226 grouped unit
+tests pass, and the grouped overrides/saves/sources targets compile.
+
+[[file:../../HEY-JEFF.org][HEY-JEFF.org]] links to the requested [[file:../../codex-thinking/note-taking.org][note-taking observations]], committed as
+'0d609d64'. They distinguish observed evidence, hypotheses, decisions, safety
+conditions and concrete next checks, with examples useful across handoffs.
+** Changes to the plan's envisioned order.
+Resolve restart report reconstruction and remaining ordinary read guards
+alongside the client admission work. Review of the first client handoff found
+late constructor closure and reopening tied to terminal reports; Luna is
+correcting these before the client slice is committed.
+** what's imperfect about what's done
+The first report test builds exposed an artifact-count type mismatch and a
+test using an unavailable JSON dependency; the fixture then needed its undo
+flag corrected when changed from dirty to clean. These failures remain in
+'report-recovery-core-first.log', '-third.log', and '-fourth.log'. The final
+focused pass does not erase those initial outcomes. Some concurrent agent
+checks encountered these transient build errors; their original logs remain.
+
+Current later-save authorization still rejects every graph-generation mismatch.
+The dependency audit rejects both visible-ID-only proof and blanket scalar
+comparison for indefinite ancestors. The narrower proposal is under explicit
+counterexample review before any authority gate is relaxed.
+** choices determining the future
+Retain each accepted view's actual graph/manifest/config interpretation before
+introducing later-proposal validation. Missing historical state must refuse
+authority, not substitute whatever generation happens to be current. Continue
+the real restart schedule and both-editor admission corrections; no new
+architecture question for Jeff.

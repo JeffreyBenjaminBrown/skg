@@ -18,3 +18,29 @@ Trace save planning's dependency reads and existing collateral/dependency
 tracking before choosing the proof. Keep current refusal until the proof is
 implemented and tested. This is an implementation question within the accepted
 contract, not a request to reopen its architecture.
+** Rejected shortcuts
+Comparing only authored/visible IDs misses newly added inbound overrides and
+delete-propagation referencers: see [[file:save-dependency-audit.org][the dependency audit]].
+Comparing complete scalar nodes for every accepted headline may reject even
+a safe indefinitive conversion: an ancestor title change need not be an input
+to the descendant's save. A blanket connected-component closure could likewise
+make unrelated branches conflict through one shared ancestor.
+Tracing every graph read would avoid a manual inventory, but the graph exposes
+its maps publicly and many algorithms read them directly. Retrofitting only
+'get' and 'pid_of' would leave untracked reads while appearing comprehensive.
+** Hypothesis to audit before implementation
+Retain each view's exact accepted graph+manifest and config/source-set identity.
+Plan against current semantics; identity/revision/token/read-only gates run
+before any confirmation. Before effects, compare complete node facts for all
+actual final Save/Delete IDs, including merge/fork/Hoist/collateral outputs.
+Compare every configured source path's digest-or-absence for those PIDs.
+For accepted/authored forest IDs and final instruction IDs, compare explicit
+PID resolution and structural inputs (home, extra IDs, sourced relationships,
+aliases, properties), without making unmodified indefinite headline scalars
+an unconditional dependency. Include direct inverse sets (including negative
+facts), subscription members/home facts, and transitive override chains from
+both base/current graphs. Current invariants still run before the batch.
+The open question is the exact expansion and which scalar facts outside the
+final write set can alter meaning or authorize collateral writes. The next
+audit must produce a counterexample or a bounded precise closure; no grant
+should depend on the present sketch.
