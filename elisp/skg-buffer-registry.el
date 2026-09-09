@@ -8,7 +8,8 @@
 
 (cl-defstruct skg--buffer-record
   id kind lifecycle disposable continuation-id buffer view-uri recipe root-ids
-  source-set graph-generation presentation-generation server-revision
+  source-set server-session-id graph-generation presentation-generation
+  server-revision
   application-token last-fetched last-fetched-sha256 logical-dirty
   origin-buffer-id origin-view-uri origin-application-token origin-location
   attached-workflow-count transient-lock-reasons maintenance-epoch
@@ -93,7 +94,7 @@
             (disposable nil disposable-supplied-p)
             continuation-id origin-buffer origin-location last-fetched
             server-revision graph-generation presentation-generation
-            application-token)
+            application-token server-session-id)
   "Register BUFFER under an explicit KIND and return its durable record."
   (unless lifecycle-supplied-p
     (error "Skg buffer constructor omitted its lifecycle"))
@@ -126,6 +127,14 @@
                     :root-ids (or root-ids
                                   (skg--conservative-ids-from-text text))
                     :source-set skg--active-source-set-name
+                    :server-session-id
+                    (or server-session-id
+                        (and existing
+                             (skg--buffer-record-server-session-id existing))
+                        (and origin-record
+                             (skg--buffer-record-server-session-id
+                              origin-record))
+                        skg--server-session-id)
                     :graph-generation
                     (or graph-generation
                         (cdr (assq 'graph-generation skg--server-store-state)))
@@ -215,7 +224,8 @@
                               skg--buffer-registry))))
     (when (buffer-live-p buffer) buffer)))
 
-(defun skg-adopt-unbound-new-empty-authority (graph-generation source-set)
+(defun skg-adopt-unbound-new-empty-authority
+    (graph-generation source-set server-session-id)
   "Initialize never-connected new-empty records from their first handshake.
 Records which already name a graph generation retain it: reconnect must not
 silently rebase genuinely stale client work."
@@ -226,6 +236,8 @@ silently rebase genuinely stale client work."
                      'new-empty-content-view)
                  (null (skg--buffer-record-graph-generation
                         skg--buffer-record))
+                 (null (skg--buffer-record-server-session-id
+                        skg--buffer-record))
                  (= (skg--buffer-record-server-revision
                      skg--buffer-record) 0)
                  (= (skg--buffer-record-application-token
@@ -233,7 +245,9 @@ silently rebase genuinely stale client work."
         (setf (skg--buffer-record-graph-generation skg--buffer-record)
               graph-generation
               (skg--buffer-record-source-set skg--buffer-record)
-              source-set)))))
+              source-set
+              (skg--buffer-record-server-session-id skg--buffer-record)
+              server-session-id)))))
 
 (defun skg-acquire-generated-buffer (name)
   "Return an explicitly reusable buffer NAME, preserving every other namesake."
@@ -545,7 +559,12 @@ Reload selectors hold only transient command input, never authored state."
               (skg--buffer-record-maintenance-epoch skg--buffer-record)))
      ((and (boundp 'skg--pending-maintenance-offer)
            skg--pending-maintenance-offer)
-      "disk reconciliation is pending"))))
+      "disk reconciliation is pending")
+     ((and skg--server-session-id skg--buffer-record
+           (not (equal skg--server-session-id
+                       (skg--buffer-record-server-session-id
+                        skg--buffer-record))))
+      "this buffer belongs to an earlier server session; reopen it"))))
 
 (defun skg-buffer-status-messages ()
   "Return warnings which remain relevant to the current Skg buffer."
@@ -565,6 +584,12 @@ Reload selectors hold only transient command input, never authored state."
           "This preserved presentation may describe an older graph"))
       (when (skg--buffer-record-search-stale skg--buffer-record)
         "Search membership and ranking are stale; rerun the search explicitly")
+      (when (and skg--server-session-id
+                 (not (equal skg--server-session-id
+                             (skg--buffer-record-server-session-id
+                              skg--buffer-record))))
+        (concat "This buffer belongs to an earlier server session; "
+                "reopen it before saving"))
       (when (and (boundp 'skg--raw-file-externally-stale)
                  skg--raw-file-externally-stale)
         "This raw .skg file changed on disk; revert or reconcile before saving")))))
@@ -603,6 +628,8 @@ Reload selectors hold only transient command input, never authored state."
             ,(skg--normalized-string-list
               (skg--buffer-record-root-ids record)))
            (source-set . ,(or (skg--buffer-record-source-set record) "all"))
+           (server-session-id
+            . ,(or (skg--buffer-record-server-session-id record) "nil"))
            (graph-generation . ,(or (skg--buffer-record-graph-generation record) 0))
            (presentation-generation
             . ,(or (skg--buffer-record-presentation-generation record) 0))

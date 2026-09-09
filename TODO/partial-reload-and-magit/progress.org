@@ -1760,3 +1760,27 @@ preflight dependencies still need the common final boundary.
 No architectural question. Continue fixed census, committed-incident ledger,
 per-buffer settlement, durable query waits, command integration and final
 acceptance.
+
+* Simplify/cohere checkpoint: both clients bind authority to a server session
+** what's done and went well
+Both clients require protocol version 2 and a valid server-session UUID before
+installing handshake authority. Buffer records retain their original session;
+reconnect does not renew existing authority. Census and canonical save intents
+carry that origin, while transport-only requests carry the active connection
+session. Queued requests are stamped after verification. Stale responses are
+rejected before replacing authored text or undo.
+
+The complete Emacs suite passes 463/463 with native undo coverage; the complete
+Neovim suite passes without failures or errors. Logs are
+'emacs-protocol-v2-final.log' and 'nvim-protocol-v2-full.log'.
+** Changes to the plan's envisioned order.
+Client session enforcement follows the independently committed server protocol
+and durable-save boundary. No further change in order.
+** what's imperfect about what's done
+The passing client suites establish session validation and text preservation;
+the remaining maintenance lifecycle and process-crash acceptance are separate.
+** choices determining the future
+Continue the accepted plan. The user's budget preference survived compaction:
+use short, bounded briefs for simpler delegates, prefer Terra with high
+reasoning for suitable new coding tasks, and reuse existing context when that
+avoids redundant orientation. Retain stronger agents for cross-cutting work.

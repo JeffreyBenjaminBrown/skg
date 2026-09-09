@@ -24,6 +24,9 @@ The value is nil, `sent', `census', `census-texts', `verified',
 (defvar skg--connection-handshake-error nil
   "Exact server or transport error which prevented connection verification.")
 
+(defvar skg--server-session-id nil
+  "Server instance identity for the current verified TCP connection.")
+
 (defvar skg--connection-busy-message nil
   "Server status reported by the exceptional busy-initializing signal.")
 
@@ -127,10 +130,48 @@ An omitted field preserves the last authoritative value."
   (let ((request (car (read-from-string request-text))))
     (concat (prin1-to-string
              (append request
+                     (when (and skg--server-session-id
+                                (not (assoc 'server-session-id request))
+                                (not (equal (cdr (assoc 'request request))
+                                            "verify connection")))
+                       `((server-session-id . ,skg--server-session-id)))
                      `((request-id . ,request-id))
                      (when incident-id
                        `((incident-id . ,incident-id)))))
             "\n")))
+
+(defun skg--stamp-queued-request-wire (wire)
+  "Add the now-verified server session to a pre-handshake queued WIRE."
+  (let* ((line-end (string-match "\n" wire))
+         (line (if line-end (substring wire 0 line-end) wire))
+         (rest (if line-end (substring wire (1+ line-end)) ""))
+         (request (car (read-from-string line))))
+    (if (or (assoc 'server-session-id request)
+            (equal (cdr (assoc 'request request)) "verify connection"))
+        wire
+      (unless skg--server-session-id
+        (error "Skg cannot send a request before server session verification"))
+      (let ((result nil))
+        (dolist (field request)
+          (when (and (eq (car-safe field) 'request-id)
+                     (not (assoc 'server-session-id result)))
+            (push `(server-session-id . ,skg--server-session-id) result))
+          (push field result))
+        (concat (prin1-to-string (nreverse result)) "\n" rest)))))
+
+(defun skg-require-current-server-session (response &optional record)
+  "Return RESPONSE's current server session, or reject stale authority.
+When RECORD is non-nil, also require that its origin session matches."
+  (let ((session (cadr (assoc 'server-session-id response))))
+    (unless (and (stringp session)
+                 (equal session skg--server-session-id))
+      (error "Skg refused authority from server session %S; current session is %S"
+             session skg--server-session-id))
+    (when (and record
+               (not (equal session
+                           (skg--buffer-record-server-session-id record))))
+      (error "Skg buffer belongs to an earlier server session; reopen it"))
+    session))
 
 (defun skg-submit-request (tcp-proc request-text &optional content incident-id)
   "Submit one complete operation, queuing it behind the active request.
@@ -188,7 +229,7 @@ INCIDENT-ID keeps retries in one longer reconciliation episode."
                  (pop skg--request-queue)))
       (setq skg--active-request-id request-id)
       (condition-case err
-          (process-send-string tcp-proc wire)
+          (process-send-string tcp-proc (skg--stamp-queued-request-wire wire))
         (error
          (skg-fail-all-requests
           (format "request send failed: %s" (error-message-string err))))))))

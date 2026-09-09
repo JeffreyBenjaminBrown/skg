@@ -107,6 +107,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
   (when-let ((reason (skg-known-save-restriction)))
     (user-error "Cannot save while %s; nothing was saved; try again when ready"
                 reason))
+  (skg-tcp-connect-to-rust)
+  (unless (skg-connection-handshake-ensure)
+    (user-error "Cannot save before server session verification completes"))
+  (when-let ((reason (skg-known-save-restriction)))
+    (user-error "Cannot save while %s; nothing was saved; try again when ready"
+                reason))
   (when (and skg--disk-client-conflict
              (not skg--disk-conflict-resolution-in-progress))
     (user-error
@@ -323,7 +329,10 @@ field (fork-sources ((N . SOURCE) ...))."
             (or (skg--buffer-record-server-revision authority) 0)))
        (client-application-token
         . ,(number-to-string
-            (or (skg--buffer-record-application-token authority) 0)))))
+            (or (skg--buffer-record-application-token authority) 0)))
+       (server-session-id
+        . ,(or (skg--buffer-record-server-session-id authority)
+               (error "Skg save authority has no server session")))))
    ;; This must remain the final pair: the server reconstructs the exact
    ;; canonical intent by removing it before hashing intent + NUL + body.
    (when request-base-fingerprint
@@ -562,17 +571,21 @@ LOG-CATEGORY and HANDLER-NAME label any error."
              (buf (skg-find-buffer-by-uri uri)))
         (when buf
           (with-current-buffer buf
-            (skg--unlock-after-save)
-            (if (buffer-modified-p)
-                (progn
-                  (skg-mark-disk-client-conflict
-                   `((reason . "stream arrived after local modification")
-                     (incoming . ,content)))
-                  (ding)
-                  (skg-log 'error log-category
-                           "%s refused to overwrite newly dirty buffer %s"
-                           handler-name (buffer-name)))
-              (skg-replace-buffer-with-new-content nil content)))))
+            (let ((session
+                   (skg-require-current-server-session
+                    response skg--buffer-record)))
+              (skg--unlock-after-save)
+              (if (buffer-modified-p)
+                  (progn
+                    (skg-mark-disk-client-conflict
+                     `((reason . "stream arrived after local modification")
+                       (incoming . ,content)))
+                    (ding)
+                    (skg-log 'error log-category
+                             "%s refused to overwrite newly dirty buffer %s"
+                             handler-name (buffer-name)))
+                (skg-replace-buffer-with-new-content
+                 nil content nil (list :server-session-id session)))))))
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
 
@@ -964,6 +977,7 @@ Each message becomes its own headline."
 Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   (condition-case err
       (let* ((response (read sexp-string))
+             (_session (skg-require-current-server-session response))
              (content-value (cadr (assoc 'content response)))
              (errors-list   (cadr (assoc 'errors response)))
              (warnings-list (cadr (assoc 'warnings response)))
@@ -1012,7 +1026,9 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   "Return application authority plist from RESPONSE, or nil when absent."
   (when (assoc 'client-application-token response)
     (append
-     (list :graph-generation
+     (list :server-session-id
+           (skg-require-current-server-session response)
+           :graph-generation
            (skg--nat-from-response response 'graph-generation)
            :presentation-generation
            (skg--nat-from-response response 'presentation-generation)
@@ -1035,8 +1051,17 @@ moves point to focused headline, and removes focus marker.
 When AUTHORITY includes base fields, this is a background installation and
 every component of the registered application record must still match."
   (when (and authority skg--buffer-record)
-    (let ((expected-token (plist-get authority :expected-application-token))
+    (let ((response-session (plist-get authority :server-session-id))
+          (expected-token (plist-get authority :expected-application-token))
           (result-token (plist-get authority :application-token)))
+      (when (and response-session
+                 (not (equal response-session skg--server-session-id)))
+        (error "Skg refused authority from a stale server session"))
+      (when (and response-session
+                 (not (equal response-session
+                             (skg--buffer-record-server-session-id
+                              skg--buffer-record))))
+        (error "Skg buffer belongs to an earlier server session; reopen it"))
       (when (and (plist-get authority :client-buffer-id)
                  (not (equal (plist-get authority :client-buffer-id)
                              (skg--buffer-record-id skg--buffer-record))))
@@ -1245,6 +1270,7 @@ COLUMN is a character offset from the line's start; nil means column 0."
 (defun skg--background-collateral-offer-handler (tcp-proc payload)
   "Apply a revision-checked background view offer, then ACK or reject it."
   (let* ((response (read payload))
+         (_session (skg-require-current-server-session response))
          (operation-id
           (skg--atom-string (cadr (assoc 'operation-id response))))
          (uri (skg--atom-string (cadr (assoc 'view-uri response))))
@@ -1312,6 +1338,11 @@ COLUMN is a character offset from the line's start; nil means column 0."
               (skg-replace-buffer-with-new-content
                nil content nil
                (list :client-buffer-id client-buffer-id
+                     :server-session-id
+                     (skg-require-current-server-session
+                      response
+                      (and (buffer-live-p buf)
+                           (buffer-local-value 'skg--buffer-record buf)))
                      :view-uri uri
                      :base-server-revision base-revision
                      :base-graph-generation base-graph-generation

@@ -191,6 +191,7 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
     continuation_id = options.continuation_id,
     recipe = options.recipe,
     root_ids = options.root_ids,
+    server_session_id = options.server_session_id,
     last_fetched = org_text,
     server_revision = options.server_revision,
     graph_generation = options.graph_generation,

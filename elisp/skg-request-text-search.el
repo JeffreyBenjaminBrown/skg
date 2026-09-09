@@ -141,6 +141,7 @@ buffer to link-creation mode.")
 Sets skg-view-uri to \"search:TERMS\" and registers a
 kill-buffer-hook to send close-view to the server."
   (let* ((response (read payload))
+         (_session (skg-require-current-server-session response))
          (content (skg--as-string (cadr (assoc 'content response))))
          (warnings (cadr (assoc 'warnings response)))
          (authority (skg--view-authority-from-response response))
@@ -177,6 +178,7 @@ kill-buffer-hook to send close-view to the server."
                            (when ugly-choice
                              `((ugly-choice . ,ugly-choice))))
            :last-fetched content
+           :server-session-id (plist-get authority :server-session-id)
            :graph-generation (plist-get authority :graph-generation)
            :presentation-generation
            (plist-get authority :presentation-generation)
@@ -228,6 +230,7 @@ Modified search buffers are preserved and reported rather than overwritten."
 PAYLOAD contains response-type, terms, and content.
 Exits readonly after replacing content."
   (let* ((response (read payload))
+         (_session (skg-require-current-server-session response))
          (terms   (skg--as-string (cadr (assoc 'terms   response))))
          (content (skg--as-string (cadr (assoc 'content response))))
          (warnings (cadr (assoc 'warnings response)))
@@ -271,8 +274,10 @@ Exits readonly after replacing content."
                   (progn
                     (skg-replace-buffer-with-new-content
                      nil content nil
-                     (list
-                      :client-buffer-id client-buffer-id
+                     (list :client-buffer-id client-buffer-id
+                      :server-session-id
+                      (skg-require-current-server-session
+                       response skg--buffer-record)
                       :view-uri uri
                       :base-server-revision base-revision
                       :base-graph-generation base-graph-generation
@@ -344,6 +349,7 @@ Exits readonly after replacing content."
                     (get-buffer (skg-search-buffer-name terms))))))
     (when (and buf (buffer-live-p buf))
       (with-current-buffer buf
+        (skg-require-current-server-session response skg--buffer-record)
         (setq buffer-read-only t)
         (message "Enriching search results...")
         (let* ((record skg--buffer-record)
@@ -363,7 +369,9 @@ Exits readonly after replacing content."
                            (server-revision
                             . ,(skg--buffer-record-server-revision record))
                            (client-application-token
-                            . ,(skg--buffer-record-application-token record))))
+                            . ,(skg--buffer-record-application-token record))
+                           (server-session-id
+                            . ,(skg--buffer-record-server-session-id record))))
                         "\n")))
           (skg-submit-request-continuation
            tcp-proc request-s-exp buffer-contents))))))

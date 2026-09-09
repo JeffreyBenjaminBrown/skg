@@ -68,7 +68,7 @@ describe('skg stream consumers', function ()
           .. ' (resulting-client-application-token 2)'
           .. ' (view-base-source-set "all")'
           .. ' (resulting-source-set "all") (warnings ())'
-          .. ' (content "* (skg (node (id a))) a rerendered")))')
+          .. ' (content "* (skg (node (id a))) a rerendered"))')
       elseif line:find('apply collateral', 1, true) then
         assert.is_truthy(line:find('(authorized . "nil")', 1, true))
         assert.is_truthy(line:find(

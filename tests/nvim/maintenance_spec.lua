@@ -75,6 +75,7 @@ local function reset ()
   state.maintenance_state = nil
   state.rebuilding = false
   state.connection_handshake_state = nil
+  state.server_session_id = nil
   state.request_draft = nil
   config.source_inventory = nil
   for _, buf in ipairs(registry.buffers()) do
@@ -792,6 +793,8 @@ describe('skg Neovim maintenance handshake', function ()
     local census_submitted = false
     misc.submit_buffer_census = function () census_submitted = true end
     misc.install_connection_verification(nil, {
+      f('protocol-version', 2),
+      f('server-session-id', '11111111-2222-4333-8444-555555555555'),
       f('source-inventory', {}), f('active-source-set', 'all'),
       f('maintenance-archive-folder', 'archive'),
       f('maintenance-archive-identity', '/archive'),
@@ -809,6 +812,7 @@ describe('skg Neovim maintenance handshake', function ()
 
   it('resumes maintenance only after a completed reconnect census',
      function ()
+    state.server_session_id = '11111111-2222-4333-8444-555555555555'
     local misc = require('skg.misc_requests')
     local real_stale = maintenance.handle_census_stale
     local real_resume = maintenance.resume_after_census
@@ -816,6 +820,7 @@ describe('skg Neovim maintenance handshake', function ()
     maintenance.handle_census_stale = function (ids) stale = ids end
     maintenance.resume_after_census = function () resumed = true end
     misc.handle_buffer_census_response({}, {
+      f('server-session-id', '11111111-2222-4333-8444-555555555555'),
       f('text-required-buffer-ids', {}),
       f('stale-buffer-ids', { 'protected' }),
       f('census-complete', 'true'),

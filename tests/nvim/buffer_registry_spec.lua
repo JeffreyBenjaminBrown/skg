@@ -105,9 +105,12 @@ describe('skg maintenance buffer transitions', function ()
       recipe = { kind = 'single-root', root_id = 'root' },
       root_ids = { 'root' }, last_fetched = '',
     })
-    registry.adopt_unbound_new_empty_authority(7, 'all')
+    registry.adopt_unbound_new_empty_authority(
+      7, 'all', '11111111-2222-4333-8444-555555555555')
     assert.are.equal(7, registry.record(unbound).graph_generation)
     assert.are.equal('all', registry.record(unbound).source_set)
+    assert.are.equal('11111111-2222-4333-8444-555555555555',
+      registry.record(unbound).server_session_id)
     assert.are.equal(3, registry.record(old).graph_generation)
     assert.are.equal('server-default', registry.record(old).source_set)
     assert.are.equal(0, registry.record(content).graph_generation)

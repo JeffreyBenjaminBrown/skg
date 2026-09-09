@@ -15,6 +15,8 @@ local messages = require('skg.messages')
 local M = {}
 
 M.archive_format_version = 1
+M.protocol_version = 2
+M.connection_handshake_timeout_ms = 5000
 
 local function client_version ()
   local version = vim.version()
@@ -24,6 +26,7 @@ end
 local function handshake_request ()
   return sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'verify connection'),
+    sexpr.pair(sexpr.symbol('protocol-version'), M.protocol_version),
     sexpr.pair(sexpr.symbol('role'), 'interactive'),
     sexpr.pair(sexpr.symbol('client-kind'), 'neovim'),
     sexpr.pair(sexpr.symbol('client-version'), client_version()),
@@ -36,7 +39,41 @@ local function handshake_request ()
   }) .. '\n'
 end
 
+local function valid_server_session_id (value)
+  local uuid_pattern = '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x'
+    .. '%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'
+  return type(value) == 'string'
+    and value:match(uuid_pattern) ~= nil
+end
+
+local function handshake_authority (response)
+  local version = tonumber(payload.field_text(response, 'protocol-version'))
+  local session_id = payload.field_text(response, 'server-session-id')
+  if version ~= M.protocol_version then
+    error(string.format(
+      'Skg protocol mismatch: client requires version %d, server reported %s',
+      M.protocol_version, tostring(version))) end
+  if not valid_server_session_id(session_id) then
+    error('Skg handshake omitted a valid server-session-id') end
+  if state.server_session_id and state.server_session_id ~= session_id then
+    error('Skg server session changed on an already verified connection') end
+  return session_id
+end
+
+function M.ensure_connection_handshake ()
+  local finished = vim.wait(M.connection_handshake_timeout_ms, function ()
+    return state.connection_handshake_state == 'verified'
+      or state.connection_handshake_state == 'failed'
+  end, 10)
+  return finished and state.connection_handshake_state == 'verified'
+end
+
 function M.install_connection_verification (_payload_text, response, tcp)
+  local ok, server_session_id = pcall(handshake_authority, response)
+  if not ok then
+    state.connection_handshake_state = 'failed'
+    error(server_session_id) end
+  state.server_session_id = server_session_id
   config.install_source_inventory(
     payload.field(response, 'source-inventory'))
   state.active_source_set_name =
@@ -58,7 +95,8 @@ function M.install_connection_verification (_payload_text, response, tcp)
     tantivy_health = payload.field(response, 'tantivy-health'),
   }
   require('skg.buffer_registry').adopt_unbound_new_empty_authority(
-    config.store_state.graph_generation, state.active_source_set_name)
+    config.store_state.graph_generation, state.active_source_set_name,
+    server_session_id)
   state.connection_handshake_state = 'census'
   require('skg.maintenance').adopt_handshake_epoch()
   M.show_handshake_telescope_warnings(response)
@@ -98,6 +136,7 @@ end
 
 function M.handle_buffer_census_response (
     tcp, response, maintenance_incident_id, maintenance_epoch)
+  state.require_current_server_session(response)
   local registry = require('skg.buffer_registry')
   local required = payload.string_list(
     payload.field(response, 'text-required-buffer-ids'))
@@ -119,6 +158,7 @@ function M.handle_buffer_census_response (
     tcp, request_text, {
       ['client-census'] = {
         handler = function (_payload_text, final_response)
+          state.require_current_server_session(final_response)
           registry.mark_view_uris_presentation_stale(payload.string_list(
             payload.field(final_response, 'presentation-stale-view-uris')))
           require('skg.maintenance').handle_census_stale(

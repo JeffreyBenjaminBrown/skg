@@ -4,6 +4,8 @@
 
 local M = {}
 
+M.server_session_id = '11111111-2222-4333-8444-555555555555'
+
 ---Install the pinned herald-rule fixture (the analog of
 ---'skg-test-install-herald-rules'), so specs need no server.
 function M.install_fixture_herald_rules ()
@@ -38,6 +40,10 @@ local authorization_frame_kinds = {
 ---@param payload string
 ---@return string
 function M.framed (payload)
+  if not payload:find('(server-session-id ', 1, true) then
+    payload = payload:sub(1, -2)
+      .. string.format(' (server-session-id %q))', M.server_session_id)
+  end
   if M.current_operation_id
      and not payload:find('(operation-id ', 1, true) then
     local frame_kind = payload:match(
@@ -126,6 +132,7 @@ function M.fake_server (on_request)
         local line, rest = pending:match('^([^\n]*)\n(.*)$')
         if not line then break end
         pending = rest
+        M.last_request_line = line
         local request_id = line:match(
           '%(%s*request%-id%s+%.%s+"([^"]+)"%)')
         M.current_request_id = request_id
@@ -147,8 +154,10 @@ function M.fake_server (on_request)
             '((response-type save-operation-ack)'
             .. ' (acknowledged true))'))
         elseif line:find('(role . "interactive")', 1, true) then
+          M.last_handshake_line = line
           respond(M.framed(
             '((response-type verify-connection) (content "connected")'
+            .. ' (protocol-version 2)'
             .. ' (source-inventory ()) (telescope-warnings ())'
             .. ' (pending-recovery-incidents ()) (active-source-set all)'
             .. ' (graph-generation 1) (manifest-revision 1)'
@@ -156,6 +165,7 @@ function M.fake_server (on_request)
             .. ' (census-required true)'
             .. ' (maintenance-archive-folder archive)'
             .. ' (maintenance-archive-identity /tmp/archive)'
+            .. string.format(' (server-session-id %q)', M.server_session_id)
             .. ' (typedb-health healthy) (tantivy-health healthy))'))
         elseif line:find('(request . "client census")', 1, true)
             or line:find('(request . "client census texts")', 1, true) then
@@ -190,6 +200,7 @@ end
 ---@return table
 function M.connect_to_fake_server (on_request)
   local server = M.fake_server(on_request)
+  require('skg.state').server_session_id = M.server_session_id
   require('skg.client').port = server.port
   return server
 end
@@ -199,10 +210,13 @@ function M.reset_client_state ()
   local state = require('skg.state')
   state.close_connection()
   state.connection_handshake_state = nil
+  state.server_session_id = nil
   state.rebuilding = false
   state.clear_request_coordinator()
   state.lp_reset()
   state.connection_reset_hooks = {}
+  M.last_request_line = nil
+  M.last_handshake_line = nil
   require('skg.client').port = nil
 end
 

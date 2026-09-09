@@ -236,6 +236,10 @@ function M.register (buf, kind, options)
   vim.b[buf].skg_recipe = options.recipe or {}
   vim.b[buf].skg_root_ids = options.root_ids or conservative_ids(last_fetched)
   vim.b[buf].skg_record_source_set = state.active_source_set_name
+  vim.b[buf].skg_server_session_id = options.server_session_id
+    or vim.b[buf].skg_server_session_id
+    or (origin_record and origin_record.server_session_id)
+    or state.server_session_id
   local store_state = require('skg.config').store_state or {}
   local initial_graph_generation =
     options.graph_generation or store_state.graph_generation
@@ -299,6 +303,7 @@ function M.record (buf)
     recipe = vim.b[buf].skg_recipe,
     root_ids = vim.b[buf].skg_root_ids,
     source_set = vim.b[buf].skg_record_source_set,
+    server_session_id = vim.b[buf].skg_server_session_id,
     graph_generation = vim.b[buf].skg_graph_generation,
     presentation_generation = vim.b[buf].skg_presentation_generation,
     server_revision = vim.b[buf].skg_server_revision,
@@ -591,6 +596,7 @@ function M.census ()
       recipe = M.recipe_text(record.recipe),
       root_ids = normalized_strings(record.root_ids),
       source_set = record.source_set or 'all',
+      server_session_id = record.server_session_id or 'nil',
       graph_generation = record.graph_generation or 0,
       presentation_generation = record.presentation_generation or 0,
       server_revision = record.server_revision or 0,
@@ -638,6 +644,7 @@ function M.census_payload ()
       atom_pair(sexpr, 'recipe', descriptor.recipe),
       { sexpr.symbol('root-ids'), descriptor.root_ids },
       atom_pair(sexpr, 'source-set', descriptor.source_set),
+      atom_pair(sexpr, 'server-session-id', descriptor.server_session_id),
       atom_pair(sexpr, 'graph-generation', descriptor.graph_generation),
       atom_pair(sexpr, 'presentation-generation',
                 descriptor.presentation_generation),
@@ -671,15 +678,18 @@ function M.find_by_id (buffer_id)
   return nil
 end
 
-function M.adopt_unbound_new_empty_authority (graph_generation, source_set)
+function M.adopt_unbound_new_empty_authority (
+    graph_generation, source_set, server_session_id)
   for _, buf in ipairs(M.buffers()) do
     local record = M.record(buf)
     if record.kind == 'new-empty-content-view'
        and vim.b[buf].skg_graph_generation_unbound == true
+       and record.server_session_id == nil
        and record.server_revision == 0
        and record.application_token == 1 then
       vim.b[buf].skg_graph_generation = graph_generation
       vim.b[buf].skg_record_source_set = source_set
+      vim.b[buf].skg_server_session_id = server_session_id
       vim.b[buf].skg_graph_generation_unbound = false
     end
   end
@@ -753,6 +763,10 @@ function M.status_messages (buf)
   if record.search_stale then
     table.insert(messages,
       'Search membership and ranking are stale; rerun the search explicitly') end
+  if state.server_session_id
+     and state.server_session_id ~= record.server_session_id then
+    table.insert(messages,
+      'This buffer belongs to an earlier server session; reopen it before saving') end
   if vim.b[buf].skg_raw_externally_stale == true then
     table.insert(messages,
       'This raw .skg file changed on disk; revert or reconcile before saving') end
@@ -769,6 +783,9 @@ function M.known_save_restriction (buf)
                          record.maintenance_epoch) end
   if state.pending_maintenance_offer then
     return 'disk reconciliation is pending' end
+  if state.server_session_id and record
+     and state.server_session_id ~= record.server_session_id then
+    return 'this buffer belongs to an earlier server session; reopen it' end
   return nil
 end
 

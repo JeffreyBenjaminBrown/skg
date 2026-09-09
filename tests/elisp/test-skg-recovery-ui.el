@@ -234,7 +234,8 @@
       (skg-test-recovery--cleanup fixture))))
 
 (ert-deftest test-skg-recovery-search-opens-beside-same-terms-view ()
-  (let* ((terms "octopus")
+  (let* ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+         (terms "octopus")
          (old (generate-new-buffer (skg-search-buffer-name terms)))
          (fresh-uri "search:recovery:12345678-1234-4234-8234-123456789abc")
          fresh)
@@ -254,7 +255,9 @@
               `((response-type search-results)
                 (content "* new search\n")
                 (view-uri ,fresh-uri)
-                (warnings ())))
+                (warnings ())
+                (server-session-id
+                 "11111111-2222-4333-8444-555555555555")))
              terms t nil t nil fresh-uri))
           (setq fresh (skg-find-buffer-by-uri fresh-uri))
           (should (buffer-live-p fresh))

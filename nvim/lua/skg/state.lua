@@ -13,6 +13,7 @@ end
 
 M.client_session_id = vim.g.skg_client_session_id
 M.connection_handshake_state = nil
+M.server_session_id = nil
 M.active_source_set_name = vim.g.skg_active_source_set_name
   or 'server-default'
 M.maintenance_archive_folder = nil
@@ -33,6 +34,22 @@ function M.update_rebuilding_status (value)
   else error('Invalid rebuilding status ' .. tostring(value)) end
   vim.cmd('redrawstatus')
   return M.rebuilding
+end
+
+---Require RESPONSE to carry authority from the active server instance.
+---@param response any
+---@param record table|nil
+---@return string
+function M.require_current_server_session (response, record)
+  local payload = require('skg.payload')
+  local session_id = payload.field_text(response, 'server-session-id')
+  if not session_id or session_id ~= M.server_session_id then
+    error(string.format(
+      'Skg refused authority from server session %s; current session is %s',
+      tostring(session_id), tostring(M.server_session_id))) end
+  if record and record.server_session_id ~= session_id then
+    error('Skg buffer belongs to an earlier server session; reopen it') end
+  return session_id
 end
 
 ---The persistent TCP connection to the Rust backend: a vim.uv tcp

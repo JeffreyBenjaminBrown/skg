@@ -124,12 +124,20 @@ one stale-URI recovery attempt; STALE-URI-RETRY-P prevents an infinite
 retry."
   (condition-case err
       (let* ((response (read sexp-string))
+             (_session (skg-require-current-server-session response))
              (switch-uri (cadr (assoc 'switch-to-view response))))
         (if switch-uri
             ;; The requested ID is already a root of an open view.
-            (skg--defer-switch-to-content-view
-             tcp-proc (format "%s" switch-uri) node-id bypass-override
-             approved-pids stale-uri-retry-p fresh-view-p)
+            (let ((target (skg-find-buffer-by-uri (format "%s" switch-uri))))
+              (when (buffer-live-p target)
+                (let ((record (buffer-local-value
+                               'skg--buffer-record target)))
+                  (unless record
+                    (error "Skg refuses to switch to an unregistered view"))
+                  (skg-require-current-server-session response record)))
+              (skg--defer-switch-to-content-view
+               tcp-proc (format "%s" switch-uri) node-id bypass-override
+               approved-pids stale-uri-retry-p fresh-view-p))
           ;; Normal content view response.
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))

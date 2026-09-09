@@ -162,6 +162,7 @@ otherwise generate a new UUID."
        :view-uri uri :recipe recipe :last-fetched org-text
        :root-ids (plist-get authority :root-ids)
        :disposable (eq kind 'override-choice-menu)
+       :server-session-id (plist-get authority :server-session-id)
        :graph-generation (plist-get authority :graph-generation)
        :presentation-generation
        (plist-get authority :presentation-generation)

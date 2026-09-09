@@ -243,7 +243,8 @@
       (delete-directory directory t))))
 
 (ert-deftest test-skg-search-display-preserves-a-dirty-conventional-namesake ()
-  (let* ((name (skg-search-buffer-name "dog"))
+  (let* ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+         (name (skg-search-buffer-name "dog"))
          (existing (generate-new-buffer name))
          opened)
     (unwind-protect
@@ -256,7 +257,7 @@
             (set-buffer-modified-p t))
           (cl-letf (((symbol-function 'heralds-minor-mode) #'ignore))
             (skg--display-search-phase1
-             "((content \"* incoming\\n\") (view-uri \"search:new\") (warnings ()))"
+             "((content \"* incoming\\n\") (view-uri \"search:new\") (warnings ()) (server-session-id \"11111111-2222-4333-8444-555555555555\"))"
              "dog" nil nil nil nil))
           (setq opened (current-buffer))
           (should-not (eq existing opened))
@@ -271,14 +272,15 @@
           (kill-buffer buffer))))))
 
 (ert-deftest test-skg-streamed-update-never-overwrites-a-newly-dirty-buffer ()
-  (let ((view (generate-new-buffer "*skg late dirty test*")))
+  (let ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (view (generate-new-buffer "*skg late dirty test*")))
     (unwind-protect
         (with-current-buffer view
           (setq-local skg-view-uri "late-dirty-uri")
           (insert "local survives")
           (set-buffer-modified-p t)
           (skg--apply-streamed-view-update
-           "((view-uri late-dirty-uri) (content \"incoming\"))"
+           "((view-uri late-dirty-uri) (content \"incoming\") (server-session-id \"11111111-2222-4333-8444-555555555555\"))"
            'reload "test")
           (should (equal (buffer-string) "local survives"))
           (should (buffer-modified-p))

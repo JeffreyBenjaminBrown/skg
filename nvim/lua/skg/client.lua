@@ -34,6 +34,7 @@ function M.connect ()
   if state.tcp and not state.tcp:is_closing() then return state.tcp end
   config.source_inventory = nil
   config.store_state = nil
+  state.server_session_id = nil
   if not M.port then
     if not config.config_file() then
       error('skg: not initialized; run :SkgInit <skgconfig.toml>') end
@@ -104,6 +105,7 @@ function M.handle_rust_response (chunk)
     vim.notify(message)
     state.run_connection_reset_hooks()
     state.connection_handshake_state = nil
+    state.server_session_id = nil
     state.clear_request_coordinator()
     state.lp_reset()
   else
@@ -119,6 +121,7 @@ function M.sentinel (event)
   log.log('info', 'tcp', 'connection closed: %s', event)
   state.close_connection()
   state.connection_handshake_state = nil
+  state.server_session_id = nil
   state.run_connection_reset_hooks()
   state.clear_request_coordinator()
   state.lp_reset()
@@ -135,11 +138,32 @@ local function request_with_identity (request_text, request_id, incident_id)
   local request = request_text:match('^(.-)%s*$')
   if request:sub(-1) ~= ')' then
     error('skg: malformed outgoing request s-expression') end
-  local identity = string.format(' (request-id . %q)', request_id)
+  local identity = ''
+  if state.server_session_id
+     and not request:find('(server-session-id ', 1, true)
+     and not request:find('(request . "verify connection")', 1, true) then
+    identity = string.format(
+      ' (server-session-id . %q)', state.server_session_id) end
+  identity = identity .. string.format(' (request-id . %q)', request_id)
   if incident_id then
     identity = identity
       .. string.format(' (incident-id . %q)', incident_id) end
   return request:sub(1, -2) .. identity .. ')\n'
+end
+
+local function stamp_queued_request_wire (wire)
+  local line, rest = wire:match('^([^\n]*)\n(.*)$')
+  if not line then error('skg: outgoing request lacks newline framing') end
+  if line:find('(server-session-id ', 1, true)
+     or line:find('(request . "verify connection")', 1, true) then
+    return wire end
+  if not state.server_session_id then
+    error('skg: cannot send a request before server session verification') end
+  local request_id_at = assert(line:find(' (request-id ', 1, true),
+    'skg: outgoing request lacks request identity')
+  return line:sub(1, request_id_at - 1)
+    .. string.format(' (server-session-id . %q)', state.server_session_id)
+    .. line:sub(request_id_at) .. '\n' .. rest
 end
 
 local function request_wire (request_text, request_id, incident_id, content)
@@ -168,7 +192,8 @@ function M.submit_priority_request (
   local wire = request_wire(
     request_text, record.id, record.incident_id, content)
   state.enqueue_priority_request(
-    record, wire, function (text) write_request(tcp, text) end)
+    record, wire,
+    function (text) write_request(tcp, stamp_queued_request_wire(text)) end)
   return record.id
 end
 
@@ -180,7 +205,7 @@ function M.submit_request (request_text, content, incident_id)
   local wire = request_wire(
     request_text, record.id, record.incident_id, content)
   state.enqueue_request(record, wire,
-                        function (text) write_request(tcp, text) end)
+    function (text) write_request(tcp, stamp_queued_request_wire(text)) end)
   return record.id
 end
 
@@ -199,6 +224,7 @@ end
 function M.connection_end ()
   state.close_connection()
   state.connection_handshake_state = nil
+  state.server_session_id = nil
   state.run_connection_reset_hooks()
   state.clear_request_coordinator()
   state.lp_reset()

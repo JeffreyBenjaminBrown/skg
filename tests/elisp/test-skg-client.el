@@ -324,12 +324,16 @@
            :lifecycle 'live-view :disposable nil :view-uri "content"
            :recipe '((kind . "single-root") (root-id . "root"))
            :root-ids '("root") :last-fetched "")
-          (skg-adopt-unbound-new-empty-authority 7 "all")
+          (skg-adopt-unbound-new-empty-authority
+           7 "all" "11111111-2222-4333-8444-555555555555")
           (with-current-buffer new-empty
             (should (= 7 (skg--buffer-record-graph-generation
                           skg--buffer-record)))
             (should (equal "all" (skg--buffer-record-source-set
-                                  skg--buffer-record))))
+                                  skg--buffer-record)))
+            (should (equal "11111111-2222-4333-8444-555555555555"
+                           (skg--buffer-record-server-session-id
+                            skg--buffer-record))))
           (with-current-buffer old-new-empty
             (should (= 3 (skg--buffer-record-graph-generation
                           skg--buffer-record)))

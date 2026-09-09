@@ -7,6 +7,13 @@
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-verify-connection)
 
+(defconst skg-test-server-session-id
+  "11111111-2222-4333-8444-555555555555")
+
+(defun skg-test-stamped-response (fields)
+  (prin1-to-string
+   (append fields `((server-session-id ,skg-test-server-session-id)))))
+
 (ert-deftest test-emacs-handshake-names-missing-native-undo-clearly ()
   (cl-letf (((symbol-function 'skg--installed-undo-fu-session-version)
              (lambda () nil)))
@@ -53,7 +60,8 @@
       (should (string-match-p "No disk or server-store mutation" (cadr shown))))))
 
 (ert-deftest test-content-view-success-with-warnings-opens-content-and-shows-warning ()
-  (let ((opened nil)
+  (let ((skg--server-session-id skg-test-server-session-id)
+        (opened nil)
         (shown nil))
     (cl-letf (((symbol-function 'skg-open-org-buffer-from-text)
                (lambda (_tcp-proc content buffer-name view-uri &rest _registry)
@@ -63,10 +71,9 @@
                  (setq shown (list buffer-name message-text content)))))
       (skg-handle-content-view-sexp
        nil
-       (prin1-to-string
+       (skg-test-stamped-response
         '((content "* root\n")
-          (errors ())
-          (warnings ("audit warning"))))
+          (errors ()) (warnings ("audit warning"))))
        "view-1")
       (should (equal (car opened) "* root\n"))
       (should (equal (nth 2 opened) "view-1"))
@@ -75,7 +82,8 @@
                               (nth 2 shown))))))
 
 (ert-deftest test-content-view-failure-with-errors-shows-error_without_opening ()
-  (let ((opened nil)
+  (let ((skg--server-session-id skg-test-server-session-id)
+        (opened nil)
         (shown nil))
     (cl-letf (((symbol-function 'skg-open-org-buffer-from-text)
                (lambda (&rest _args)
@@ -85,10 +93,8 @@
                  (setq shown (list buffer-name message-text content)))))
       (skg-handle-content-view-sexp
        nil
-       (prin1-to-string
-        '((content "")
-          (errors ("inactive source"))
-          (warnings ())))
+       (skg-test-stamped-response
+        '((content "") (errors ("inactive source")) (warnings ())))
        "view-1")
       (should-not opened)
       (should (equal (car shown) "*SKG Content View Messages*"))
@@ -96,12 +102,17 @@
                               (nth 2 shown))))))
 
 (ert-deftest test-switch-to-view-is-displayed-by-deferred-callback ()
-  (let ((target (generate-new-buffer " *skg-switch-target*"))
+  (let ((skg--server-session-id skg-test-server-session-id)
+        (target (generate-new-buffer " *skg-switch-target*"))
         displayed timer-called)
     (unwind-protect
         (progn
           (with-current-buffer target
-            (setq skg-view-uri "existing-uri"))
+            (setq skg-view-uri "existing-uri")
+            (skg-register-buffer
+             target 'content-view :lifecycle 'live-view :disposable nil
+             :view-uri "existing-uri"
+             :server-session-id skg-test-server-session-id))
           (cl-letf (((symbol-function 'run-at-time)
                      (lambda (_secs _repeat function &rest args)
                        (setq timer-called t)
@@ -110,13 +121,16 @@
                      (lambda (buffer &rest _args)
                        (setq displayed buffer))))
             (skg-handle-content-view-sexp
-             nil "((switch-to-view existing-uri))" "unused-uri" "node-x")
+             nil (skg-test-stamped-response
+                  '((switch-to-view existing-uri)))
+             "unused-uri" "node-x")
             (should timer-called)
             (should (eq displayed target))))
       (when (buffer-live-p target) (kill-buffer target)))))
 
 (ert-deftest test-missing-switch-uri-closes-and-retries-only-once ()
-  (let (closed retried visible)
+  (let ((skg--server-session-id skg-test-server-session-id)
+        closed retried visible)
     (cl-letf (((symbol-function 'run-at-time)
                (lambda (_secs _repeat function &rest args)
                  (apply function args)))
@@ -128,14 +142,16 @@
                (lambda (format-string &rest args)
                  (setq visible (apply #'format format-string args)))))
       (skg-handle-content-view-sexp
-       'test-tcp "((switch-to-view stale-uri))" "unused-uri"
+       'test-tcp (skg-test-stamped-response '((switch-to-view stale-uri)))
+       "unused-uri"
        "node-x" t '("approved-pid") nil)
       (should (equal closed '(test-tcp "stale-uri")))
       (should (equal retried
                      '("node-x" test-tcp t ("approved-pid") nil t)))
       (setq closed nil retried nil)
       (skg-handle-content-view-sexp
-       'test-tcp "((switch-to-view still-stale))" "unused-uri"
+       'test-tcp (skg-test-stamped-response '((switch-to-view still-stale)))
+       "unused-uri"
        "node-x" t nil t)
       (should-not closed)
       (should-not retried)

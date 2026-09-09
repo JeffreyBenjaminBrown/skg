@@ -137,6 +137,7 @@ end
 ---@param search_terms string
 function M.display_search_phase1 (response, search_terms, regex, body,
                                   operators, ugly_choice, requested_view_uri)
+  local server_session_id = state.require_current_server_session(response)
   local content = payload.field_text(response, 'content')
   if not content then return end
   local view_uri = payload.field_text(response, 'view-uri')
@@ -154,6 +155,7 @@ function M.display_search_phase1 (response, search_terms, regex, body,
         operators = operators == true, ugly_choice = ugly_choice,
       },
       root_ids = root_ids_value and payload.string_list(root_ids_value) or nil,
+      server_session_id = server_session_id,
       graph_generation = tonumber(
         payload.field_text(response, 'graph-generation')),
       presentation_generation = tonumber(
@@ -174,6 +176,7 @@ end
 ---read-only.
 ---@param response any
 function M.display_search_enrichment (response)
+  local response_session = state.require_current_server_session(response)
   local terms = payload.field_text(response, 'terms')
   local content = payload.field_text(response, 'content')
   if not terms or not content then return end
@@ -214,6 +217,7 @@ function M.display_search_enrichment (response)
     local ok, err = pcall(
       require('skg.save').replace_buffer_with_new_content,
       buf, content, nil, {
+        server_session_id = response_session,
         client_buffer_id = client_buffer_id,
         view_uri = uri,
         base_server_revision = base_revision,
@@ -302,9 +306,10 @@ function M.handle_snapshot_request (response)
     or (terms and ('search:' .. terms))
   local buf = uri and buffer.find_buffer_by_uri(uri)
   if not buf then return end
+  local record = assert(registry.record(buf))
+  state.require_current_server_session(response, record)
   vim.bo[buf].modifiable = false
   vim.notify('Enriching search results...')
-  local record = assert(registry.record(buf))
   local contents = registry.raw_text(buf)
   client.submit_request_continuation(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'snapshot response'),
@@ -319,6 +324,8 @@ function M.handle_snapshot_request (response)
                tostring(record.server_revision)),
     sexpr.pair(sexpr.symbol('client-application-token'),
                tostring(record.application_token)),
+    sexpr.pair(sexpr.symbol('server-session-id'),
+               record.server_session_id),
   }) .. '\n', contents)
 end
 

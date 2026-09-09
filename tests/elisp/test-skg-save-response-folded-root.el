@@ -209,7 +209,8 @@ headline and not back on the focused headline."
       (kill-buffer buf))))
 
 (ert-deftest test-save-response-success-with-warnings-shows_warning_channel ()
-  (let ((buf (generate-new-buffer "*test-save-response-warning*"))
+  (let ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (buf (generate-new-buffer "*test-save-response-warning*"))
         (shown nil))
     (unwind-protect
         (with-current-buffer buf
@@ -227,7 +228,8 @@ headline and not back on the focused headline."
              (prin1-to-string
               '((content "* root\n")
                 (errors ())
-                (warnings ("audit warning")))))
+                (warnings ("audit warning"))
+                (server-session-id "11111111-2222-4333-8444-555555555555"))))
             (should (string= (buffer-string) "* root\n"))
             (should (equal (car shown) "*SKG Save Warnings*"))
             (should (string-match-p "^\\* warnings\n\\*\\* audit warning"
@@ -236,7 +238,8 @@ headline and not back on the focused headline."
 
 (ert-deftest test-save-response-advances-new-buffer-graph-baseline ()
   "A new view opened after a save inherits the save's selected generation."
-  (let ((saved (generate-new-buffer "*test-save-generation-saved*"))
+  (let ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (saved (generate-new-buffer "*test-save-generation-saved*"))
         (later (generate-new-buffer "*test-save-generation-later*"))
         (skg--buffer-registry (make-hash-table :test #'equal))
         (skg--server-store-state '((graph-generation . 1))))
@@ -256,7 +259,8 @@ headline and not back on the focused headline."
               '((content "* (skg (node (id root))) root\n")
                 (errors ()) (warnings ()) (root-ids (root))
                 (graph-generation 2) (presentation-generation 0)
-                (server-revision 1) (client-application-token 2)))))
+                (server-revision 1) (client-application-token 2)
+                (server-session-id "11111111-2222-4333-8444-555555555555")))))
           (should (= 2 (alist-get 'graph-generation
                                   skg--server-store-state)))
           (with-current-buffer later
@@ -276,7 +280,8 @@ headline and not back on the focused headline."
 
 (ert-deftest test-background-offer-normalizes-unquoted-wire-atoms ()
   "Symbol-shaped wire atoms still match string-valued buffer authority."
-  (let ((buf (generate-new-buffer "*test-background-wire-atoms*"))
+  (let ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (buf (generate-new-buffer "*test-background-wire-atoms*"))
         (skg--buffer-registry (make-hash-table :test #'equal))
         (skg--server-store-state '((graph-generation . 2)))
         (skg--active-source-set-name "all")
@@ -308,7 +313,8 @@ headline and not back on the focused headline."
  (view-base-presentation-generation 0)\
  (expected-client-application-token 2)\
  (resulting-client-application-token 3)\
- (view-base-source-set all) (resulting-source-set all))"))
+ (view-base-source-set all) (resulting-source-set all)\
+ (server-session-id \"11111111-2222-4333-8444-555555555555\"))"))
           (should (string-match-p "updated" (buffer-string)))
           (should (= 3 (skg--buffer-record-graph-generation
                         skg--buffer-record)))
@@ -319,7 +325,8 @@ headline and not back on the focused headline."
 
 (ert-deftest test-search-enrichment-normalizes-unquoted-wire-atoms ()
   "Symbol-shaped wire atoms still match string-valued search authority."
-  (let ((buf (generate-new-buffer "*test-search-wire-atoms*"))
+  (let ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (buf (generate-new-buffer "*test-search-wire-atoms*"))
         (skg--buffer-registry (make-hash-table :test #'equal))
         (skg--server-store-state '((graph-generation . 2)))
         (skg--active-source-set-name "all")
@@ -353,7 +360,8 @@ headline and not back on the focused headline."
  (view-base-presentation-generation 0)\
  (expected-client-application-token 2)\
  (resulting-client-application-token 3)\
- (view-base-source-set all) (resulting-source-set all))"
+ (view-base-source-set all) (resulting-source-set all)\
+ (server-session-id \"11111111-2222-4333-8444-555555555555\"))"
               (skg--buffer-record-id skg--buffer-record))))
           (should (string-match-p "enriched" (buffer-string)))
           (should (= 3 (skg--buffer-record-graph-generation
@@ -364,7 +372,8 @@ headline and not back on the focused headline."
       (kill-buffer buf))))
 
 (ert-deftest test-save-response-failure-with-errors-and-warnings-shows_both ()
-  (let ((buf (generate-new-buffer "*test-save-response-errors-warnings*"))
+  (let ((skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (buf (generate-new-buffer "*test-save-response-errors-warnings*"))
         (shown nil)
         (replaced nil))
     (unwind-protect
@@ -381,7 +390,8 @@ headline and not back on the focused headline."
              (prin1-to-string
               '((content nil)
                 (errors ("fatal save error"))
-                (warnings ("audit warning")))))
+                (warnings ("audit warning"))
+                (server-session-id "11111111-2222-4333-8444-555555555555"))))
             (should-not replaced)
             (should (equal (car shown) "*SKG Save Errors and Warnings*"))
             (should (string-match-p "^\\* errors\n\\*\\* fatal save error"

@@ -92,6 +92,13 @@ function M.request_save_buffer (fork_approved, fork_sources,
   if restriction then
     error('Cannot save while ' .. restriction
       .. '; nothing was saved; try again when ready') end
+  client.connect()
+  if not require('skg.misc_requests').ensure_connection_handshake() then
+    error('Cannot save before server session verification completes') end
+  restriction = registry.known_save_restriction(save_buf)
+  if restriction then
+    error('Cannot save while ' .. restriction
+      .. '; nothing was saved; try again when ready') end
   pending_save.assert_none_unresolved()
   M.confirm_save_despite_other_unsaved(save_buf)
   local focused_line = focus.owning_headline_line()
@@ -267,6 +274,10 @@ function M.save_request_string (view_uri, position, fork_approved,
     table.insert(request, sexpr.pair(
       sexpr.symbol('client-application-token'),
       tostring(authority.application_token or 0)))
+    table.insert(request, sexpr.pair(
+      sexpr.symbol('server-session-id'),
+      assert(authority.server_session_id,
+             'Skg save authority has no server session')))
   end
   -- This must remain final: the server removes it to reconstruct the exact
   -- request intent hashed with NUL and the authored body.
@@ -474,13 +485,15 @@ end
 function M.apply_streamed_view_update (_payload_text, response,
                                        log_category, handler_name)
   local ok, err = pcall(function ()
+    local session_id = state.require_current_server_session(response)
     local uri = payload.field_text(response, 'view-uri')
     local content = payload.field(response, 'content')
     local buf = uri and buffer.find_buffer_by_uri(uri) or nil
     if buf and content ~= nil and not sexpr.is_list(content) then
       lock.unlock_after_save(buf)
       M.replace_buffer_with_new_content(
-        buf, sexpr.atom_text(content), nil)
+        buf, sexpr.atom_text(content), nil,
+        { server_session_id = session_id })
     end
   end)
   if not ok then
@@ -521,9 +534,12 @@ function M.handle_save_response (save_buf, response)
     payload.string_list(payload.field(response, 'warnings'))
   if content_text then
     local root_ids_value = payload.field(response, 'root-ids')
+    local response_session = state.require_current_server_session(
+      response, registry.record(save_buf))
     M.replace_buffer_with_new_content(
       save_buf, content_text,
       M.save_point_position_from_response(response), {
+        server_session_id = response_session,
         graph_generation = tonumber(
           payload.field_text(response, 'graph-generation')),
         presentation_generation = tonumber(
@@ -573,6 +589,12 @@ function M.replace_buffer_with_new_content (buf, new_content,
                                             save_point_position, authority)
   local record = registry.record(buf)
   if authority and record then
+    if authority.server_session_id
+       and authority.server_session_id ~= state.server_session_id then
+      error('Skg refused authority from a stale server session') end
+    if authority.server_session_id
+       and authority.server_session_id ~= record.server_session_id then
+      error('Skg buffer belongs to an earlier server session; reopen it') end
     local expected_token = authority.expected_application_token
     if authority.client_buffer_id
        and authority.client_buffer_id ~= record.id then
@@ -1043,6 +1065,7 @@ end
 
 ---Apply a revision-checked background offer, then ACK or reject it.
 function M.background_collateral_offer_handler (_payload_text, response)
+  local response_session = state.require_current_server_session(response)
   local operation_id = payload.field_text(response, 'operation-id')
   local uri = payload.field_text(response, 'view-uri')
   local graph_generation = payload.field_text(response, 'graph-generation')
@@ -1101,6 +1124,7 @@ function M.background_collateral_offer_handler (_payload_text, response)
   elseif buf and content ~= nil and not sexpr.is_list(content) then
     local ok, err = pcall(M.replace_buffer_with_new_content,
       buf, sexpr.atom_text(content), nil, {
+        server_session_id = response_session,
         client_buffer_id = client_buffer_id,
         view_uri = uri,
         base_server_revision = tonumber(base_revision),

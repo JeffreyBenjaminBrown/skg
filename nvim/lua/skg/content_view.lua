@@ -8,6 +8,7 @@ local client = require('skg.client')
 local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
+local registry = require('skg.buffer_registry')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -88,6 +89,7 @@ end
 function M.handle_content_view (payload_text, response, view_uri, fresh_view,
                                 node_id)
   local ok, err = pcall(function ()
+    local server_session_id = state.require_current_server_session(response)
     local switch_uri = payload.field_text(response, 'switch-to-view')
     if switch_uri then
       -- The requested id is already a root of an open view.
@@ -96,10 +98,16 @@ function M.handle_content_view (payload_text, response, view_uri, fresh_view,
         log.log('warn', 'view',
                 'server said switch to view %s, but no buffer found',
                 switch_uri)
-      elseif buf == vim.api.nvim_get_current_buf() then
+      else
+        local record = registry.record(buf)
+        if not record then
+          error('Skg refuses to switch to an unregistered view') end
+        state.require_current_server_session(response, record)
+      end
+      if buf == vim.api.nvim_get_current_buf() then
         vim.notify(
           'Already viewing this node (it is a root of this view)')
-      else
+      elseif buf then
         vim.api.nvim_set_current_buf(buf) end
       return end
     local content = payload.field(response, 'content')
@@ -126,6 +134,7 @@ function M.handle_content_view (payload_text, response, view_uri, fresh_view,
           recipe = { kind = 'single-root', root_id = node_id },
           root_ids = root_ids_value
             and payload.string_list(root_ids_value) or nil,
+          server_session_id = server_session_id,
           graph_generation = tonumber(
             payload.field_text(response, 'graph-generation')),
           presentation_generation = tonumber(

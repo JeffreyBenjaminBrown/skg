@@ -6,6 +6,7 @@
 (require 'skg-length-prefix)
 
 (defconst skg--maintenance-archive-format-version 1)
+(defconst skg--protocol-version 2)
 
 (defconst skg-connection-handshake-timeout 5.0
   "Seconds client initialization waits for verification and census.")
@@ -57,6 +58,7 @@ This inspects the public package header without enabling any package mode."
     (concat
      (prin1-to-string
       `((request . "verify connection")
+        (protocol-version . ,skg--protocol-version)
         (role . "interactive")
         (client-kind . "emacs")
         (client-version . ,emacs-version)
@@ -68,6 +70,29 @@ This inspects the public package header without enabling any package mode."
         (native-undo-version . ,(or undo-version "not-installed"))
         (source-set . ,skg--active-source-set-name)))
      "\n")))
+
+(defun skg--valid-server-session-id-p (value)
+  "Return non-nil when VALUE is a canonical UUID string."
+  (and (stringp value)
+       (string-match-p
+        (concat "\\`[[:xdigit:]]\\{8\\}-[[:xdigit:]]\\{4\\}-"
+                "[[:xdigit:]]\\{4\\}-[[:xdigit:]]\\{4\\}-"
+                "[[:xdigit:]]\\{12\\}\\'")
+        value)))
+
+(defun skg--handshake-authority (response)
+  "Validate and return RESPONSE's protocol and server-session authority."
+  (let ((version (cadr (assoc 'protocol-version response)))
+        (session-id (cadr (assoc 'server-session-id response))))
+    (unless (equal version skg--protocol-version)
+      (error "Skg protocol mismatch: client requires version %d, server reported %S"
+             skg--protocol-version version))
+    (unless (skg--valid-server-session-id-p session-id)
+      (error "Skg handshake omitted a valid server-session-id"))
+    (when (and skg--server-session-id
+               (not (equal session-id skg--server-session-id)))
+      (error "Skg server session changed on an already verified connection"))
+    session-id))
 
 (defun skg--show-handshake-telescope-warnings (response)
   "Display structured load WARNINGS carried by RESPONSE."
@@ -119,7 +144,16 @@ This inspects the public package header without enabling any package mode."
 (defun skg--install-connection-verification (tcp-proc payload)
   "Install authoritative server state from handshake PAYLOAD."
   (let* ((response (read payload))
+         (server-session-id
+          (condition-case err
+              (skg--handshake-authority response)
+            (error
+             (setq skg--connection-handshake-state 'failed
+                   skg--connection-handshake-error
+                   (error-message-string err))
+             (signal (car err) (cdr err)))))
          (content (cadr (assoc 'content response))))
+    (setq skg--server-session-id server-session-id)
     (skg-install-source-inventory response)
     (setq skg--active-source-set-name
           (format "%s" (cadr (assoc 'active-source-set response)))
@@ -144,7 +178,8 @@ This inspects the public package header without enabling any package mode."
     (when (fboundp 'skg-adopt-unbound-new-empty-authority)
       (skg-adopt-unbound-new-empty-authority
        (cdr (assq 'graph-generation skg--server-store-state))
-       skg--active-source-set-name))
+       skg--active-source-set-name
+       server-session-id))
     (when (fboundp 'skg-maintenance-adopt-handshake-epoch)
       (skg-maintenance-adopt-handshake-epoch
        (cadr (assoc 'abandoned-prearchive-incident response))))
@@ -185,6 +220,7 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
     (tcp-proc payload &optional maintenance-incident-id maintenance-epoch)
   "Complete census or answer the server's targeted text request."
   (let* ((response (read payload))
+         (_session (skg-require-current-server-session response))
          (required (mapcar (lambda (value) (format "%s" value))
                            (or (cadr (assoc 'text-required-buffer-ids
                                            response))
@@ -222,6 +258,7 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
     (_tcp-proc payload &optional maintenance-incident-id maintenance-epoch)
   "Install the terminal disposition of requested census texts."
   (let* ((response (read payload))
+         (_session (skg-require-current-server-session response))
          (stale (or (cadr (assoc 'stale-buffer-ids response)) nil)))
     (skg-mark-view-uris-presentation-stale
      (or (cadr (assoc 'presentation-stale-view-uris response)) nil))

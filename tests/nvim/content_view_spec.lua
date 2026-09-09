@@ -112,7 +112,9 @@ describe('skg.content_view responses', function ()
   it('switches to an already-open view instead of duplicating',
      function ()
     local existing = buffer.open_org_buffer_from_text(
-      '* already open', 'skg://already open', 'uri-existing')
+      '* already open', 'skg://already open', 'uri-existing', {
+        server_session_id = helpers.server_session_id,
+      })
     local scratch = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_set_current_buf(scratch)
     serve_content(
@@ -128,7 +130,9 @@ describe('skg.content_view responses', function ()
   it('opens a fresh response in an independent same-title buffer',
      function ()
     local existing = buffer.open_org_buffer_from_text(
-      '* same title', 'skg://same title', 'uri-existing')
+      '* same title', 'skg://same title', 'uri-existing', {
+        server_session_id = helpers.server_session_id,
+      })
     serve_content(
       '((response-type content-view) (content "* same title")'
       .. ' (errors ()) (warnings ()))')
