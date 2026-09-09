@@ -7,7 +7,8 @@ use crate::maintenance::save_journal::{
   SaveInterpretationEvidence, SaveJournalError, SaveJournalStore,
   SaveOperationSnapshot,
 };
-use crate::serve::util::value_from_request_sexp;
+use crate::serve::protocol::TcpToClient;
+use crate::serve::util::{value_from_request_sexp, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::SkgConfig;
 
@@ -374,6 +375,38 @@ mod tests {
   use std::path::PathBuf;
 
   #[test]
+  fn recovered_commands_keep_their_response_kind_and_authorization_outcome () {
+    for (command, response_kind) in [
+      ("strip body whitespace", "strip-body-whitespace"),
+      ("recompute cyclic roots", "recompute-cyclic-roots"),
+    ] {
+      for authorized in [false, true] {
+        let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+        let mut config : SkgConfig = SkgConfig::dummyFromSources (Default::default ());
+        config . config_path = temp . path () . join ("skgconfig.toml");
+        config . data_root = temp . path () . to_path_buf ();
+        config . maintenance_archive_identity = temp . path () . join ("archives");
+        let active : ActiveSourceSet = ActiveSourceSet::named (&config, SourceSetName::from ("all")) . unwrap ();
+        let request : String = format! (
+          "((request . \"{}\") (operation-id . \"{}\") (server-session-id . \"{}\"))",
+          command, uuid::Uuid::new_v4 (), uuid::Uuid::new_v4 ());
+        let operation : SaveOperation = SaveOperation::from_command (&request, &config, &active) . unwrap ();
+        operation . prepare (Vec::new ()) . unwrap ();
+        if authorized {
+          operation . store . authorize (&operation . operation_id, &operation . fingerprint) . unwrap ();
+          operation . store . apply_authorized (&operation . operation_id, &operation . fingerprint) . unwrap ();
+        }
+        let recovered : StartupSaveRecovery = recover_source_effects_before_startup (&config) . unwrap ();
+        commit_recovered_source_effects (recovered, 1) . unwrap ();
+        let response : String = operation . recorded_response () . unwrap () . unwrap ();
+        assert! (response . contains (response_kind), "{}", response);
+        assert! (response . contains (if authorized { "committed" } else { "refused" }), "{}", response);
+        assert! (response . contains ("requires-fresh-view false"));
+      }
+    }
+  }
+
+  #[test]
   fn exact_utf8_intent_and_body_are_bound_before_duplicate_lookup () {
     let intent : &str = "((request . \"save buffer\") (operation-id . \"id\") (base . \"first\"))";
     let body : &str = "* café\nλ\n";
@@ -553,14 +586,26 @@ pub fn commit_recovered_source_effects (
     } else {
       "The interrupted save was never authorized; nothing was saved. Open a fresh live view before submitting new work." . into ()
     };
-    let payload : String = format_buffer_response_sexp ("", &[], &[warning]);
+    let evidence : SaveInterpretationEvidence = recovery . store . read_interpretation_evidence (
+      &operation . operation_id, &operation . request_base_fingerprint)
+      . map_err (|error| error . to_string ())?;
+    let command_kind : Option<TcpToClient> = recovered_command_kind (&evidence)?;
+    let response : String = match command_kind {
+      Some (kind) => tag_text_response (kind, if committed {
+        "The interrupted command was recovered; startup rebuilt the derived stores."
+      } else { "The interrupted command was never authorized. Run it explicitly to try again." }),
+      None => {
+        let payload : String = format_buffer_response_sexp ("", &[], &[warning]);
+        tag_sexp_response (TcpToClient::SaveResult, &payload)
+      }
+    };
     let response : String = tag_operation_response (
-      &tag_sexp_response (TcpToClient::SaveResult, &payload),
+      &response,
       &operation . operation_id, &operation . request_base_fingerprint,
       if committed { "committed" } else { "refused" });
     let response : String = format! (
-      "{} (recovered-after-restart true) (requires-fresh-view true))",
-      &response [..response . len () - 1]);
+      "{} (recovered-after-restart true) (requires-fresh-view {}))",
+      &response [..response . len () - 1], if command_kind . is_some () { "false" } else { "true" });
     let outcome : DurableSaveOutcome = DurableSaveOutcome {
       resulting_base_fingerprint: format! ("fresh-startup-graph-{}", graph_generation),
       client_result: response . into_bytes (),
@@ -575,6 +620,23 @@ pub fn commit_recovered_source_effects (
     result . map_err (|error| error . to_string ())?;
   }
   Ok (( ))
+}
+
+fn recovered_command_kind (
+  evidence : &SaveInterpretationEvidence,
+) -> Result<Option<TcpToClient>, String> {
+  // Historical ordinary-save evidence was opaque to the journal. Recognize
+  // only the explicit command wrapper, whose name is already checksum-bound.
+  let value : serde_yaml::Value = serde_yaml::from_slice (&evidence . bytes)
+    . unwrap_or (serde_yaml::Value::Null);
+  let Some (command) : Option<&serde_yaml::Value> = value . get ("command") else { return Ok (None); };
+  if value . get ("format_version") . and_then (serde_yaml::Value::as_u64) != Some (1) {
+    return Err ("unsupported interrupted command evidence version" . into ()); }
+  match command . as_str () {
+    Some ("strip body whitespace") => Ok (Some (TcpToClient::StripBodyWhitespace)),
+    Some ("recompute cyclic roots") => Ok (Some (TcpToClient::RecomputeCyclicRoots)),
+    _ => Err ("unknown interrupted command; its recovery outcome cannot be inferred" . into ()),
+  }
 }
 
 pub(crate) fn handle_save_operation_request (
