@@ -79,7 +79,7 @@ impl ServerRuntime {
     Ok (Arc::new (archive)) }
 }
 
-fn validate_report_evidence (
+pub(super) fn validate_report_evidence (
   active : &ActiveMaintenance,
   bundle : &MaintenanceEvidenceBundle,
   publication : &PublishedMaintenanceEvidence,
@@ -99,7 +99,7 @@ fn validate_report_evidence (
     return Err ("reconstructed report evidence disagrees with its durable incident" . into ()); }
   Ok (( )) }
 
-fn graph_from_evidence (
+pub(super) fn graph_from_evidence (
   evidence : &BTreeMap<String, SemanticNodeEvidence>,
 ) -> Result<InRustGraph, String> {
   let nodes : Vec<NodeComplete> = evidence . iter () . map (| (pid, node) | {

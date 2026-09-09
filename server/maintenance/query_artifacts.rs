@@ -109,6 +109,38 @@ impl QueryArtifactStore {
     String::from_utf8 (bytes)
       . map_err (|_| "query artifact is not valid UTF-8" . into ())
   }
+
+  pub fn find (&self, operation_id : &str) -> Result<Option<QueryArtifact>, String> {
+    validate_operation_id (operation_id)?;
+    match fs::symlink_metadata (&self . root) {
+      Err (error) if error . kind () == std::io::ErrorKind::NotFound => return Ok (None),
+      Err (error) => return Err (error . to_string ()),
+      Ok (_) => {},
+    }
+    require_private_directory (&self . root)?;
+    let prefix : String = format! ("{}-", operation_id);
+    let mut found : Option<QueryArtifact> = None;
+    for entry in fs::read_dir (&self . root) . map_err (|error| error . to_string ())? {
+      let entry : DirEntry = entry . map_err (|error| error . to_string ())?;
+      let path : PathBuf = entry . path ();
+      let name : String = entry . file_name () . to_string_lossy () . into_owned ();
+      if !name . starts_with (&prefix) || !name . ends_with (".result") { continue; }
+      require_private_regular_file (&path)?;
+      let bytes : Vec<u8> = fs::read (&path) . map_err (|error| error . to_string ())?;
+      let artifact : QueryArtifact = artifact_from (operation_id, path, &bytes)?;
+      let expected : PathBuf = self . root . join (format! (
+        "{}-{}.result", operation_id, artifact . sha256));
+      if artifact . path != expected {
+        return Err ("query artifact filename digest does not match its bytes" . into ()); }
+      if found . is_some () {
+        return Err ("query artifact operation ID has multiple result files" . into ()); }
+      found = Some (artifact);
+    }
+    if let Some (artifact) = &found {
+      sync_file (&artifact . path)?;
+      sync_directory (&self . root)?; }
+    Ok (found)
+  }
 }
 
 fn artifact_from (
@@ -245,6 +277,20 @@ mod tests {
     let second : QueryArtifact = store . stage (&operation_id, "one") . unwrap ();
     assert_eq! (first, second);
     assert! (store . stage (&operation_id, "two") . is_err ());
+  }
+
+  #[test]
+  fn staged_artifact_is_findable_after_store_recreation () {
+    let store : QueryArtifactStore = store ();
+    let operation_id : String = Uuid::new_v4 () . to_string ();
+    let artifact : QueryArtifact = store . stage (&operation_id, "restart result") . unwrap ();
+    let root : PathBuf = store . root . clone ();
+    drop (store);
+    let recreated : QueryArtifactStore = QueryArtifactStore { root };
+    let found : Option<QueryArtifact> = recreated . find (&operation_id) . unwrap ();
+    assert_eq! (found . as_ref (), Some (&artifact));
+    let found_artifact : &QueryArtifact = found . as_ref () . unwrap ();
+    assert_eq! (recreated . read (found_artifact) . unwrap (), "restart result");
   }
 
   #[test]

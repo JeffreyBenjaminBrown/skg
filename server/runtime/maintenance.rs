@@ -41,6 +41,7 @@ impl ServerRuntime {
     // Install the service before its first signal.  The initial scan may
     // discover that its base generation was superseded and enqueue a
     // successor scan; that reschedule must never race an uninstalled sender.
+    self . start_query_wait_worker ()?;
     self . schedule_full_observation (QueuedObservationReason::Startup)?;
     Ok (( ))
   }

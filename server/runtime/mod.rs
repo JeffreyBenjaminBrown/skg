@@ -24,6 +24,7 @@ use crate::types::store_state::{SelectedStoreState, GraphGeneration, ManifestRev
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::atomic::AtomicBool;
 
 #[derive(Clone)]
 pub struct SelectedRuntimeSnapshot {
@@ -72,6 +73,7 @@ pub struct ServerRuntime {
   incident_snapshots    : Mutex<BTreeMap<crate::maintenance::IncidentId,
                                          Arc<GraphReadSnapshot>>>,
   observation           : Mutex<Option<ObservationService>>,
+  query_worker_started  : AtomicBool,
 }
 
 impl ServerRuntime {
@@ -105,6 +107,7 @@ impl ServerRuntime {
       verified_archives: Mutex::new (BTreeMap::new ()),
       incident_snapshots: Mutex::new (BTreeMap::new ()),
       observation: Mutex::new (None),
+      query_worker_started: AtomicBool::new (false),
     })
   }
 

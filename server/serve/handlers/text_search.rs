@@ -1,5 +1,6 @@
 pub mod render_enriched_search_buffer;
 mod coverage;
+pub(crate) mod wait_result;
 
 use crate::types::views_state::ViewSaveBase;
 use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};

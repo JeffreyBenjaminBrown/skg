@@ -2115,7 +2115,7 @@ No-change selection can resolve without a larger graph counter. Historical
 configurations retain ordered source ownership, configured/canonical paths and
 runtime roots. The 25 owner tests and three query outcome/config tests pass;
 logs are 'query-owner-final-tests.log' and 'query-owner-outcome-tests.log' under
-' /tmp/simplify-cohere-baseline' (without the leading space).
+'/tmp/simplify-cohere-baseline'.
 ** Changes to the plan's envisioned order.
 Keep the query work in small tested commits: durable ledger, then target facts,
 then execution and delivery. The first owner adapter check rejected two invalid
@@ -2131,3 +2131,34 @@ Use the versioned private configuration wrapper recorded in
 [[file:../../codex-thinking/query-wait-server.org][the query server note]]. Ordinary SkgConfig deserialization reads user
 configuration and cannot itself restore skipped runtime identities or derived
 ownership. Pending waits retain no Searcher. No new question for Jeff.
+
+* Simplify/cohere checkpoint: bounded query execution and durable artifacts
+** what's done and went well
+'b179c6f8' binds target facts to incident publication. 'dea0000e' isolates the
+both-editor whitespace wire tests. '3c934104' adds private query artifacts.
+The query worker has one coalescing wake channel from the owner and executes
+outside that loop. It drops search resources before staging the versioned
+result payload. Restart discovers a verified staged payload before rerendering;
+separate artifact and content digests preserve its exact content and warnings.
+Historical query execution reconstructs G1 evidence into a private index while
+G2 remains selected, including nonempty manifest and retained cyclic-root facts.
+Focused verification passes 16 query-wait tests, 25 owner tests, two privacy
+renderer tests and five artifact tests. Logs include
+'query-wait-server-final-tests.log', 'query-worker-owner-regression.log' and
+'query-worker-render-regression.log' under '/tmp/simplify-cohere-baseline'.
+** Changes to the plan's envisioned order.
+Artifact discovery was added before TCP delivery because rerendering can produce
+different bytes after a crash. The root journal stores small result metadata;
+content, warnings, recipe and target are in a checked private artifact.
+** what's imperfect about what's done
+The first renderer fixture incorrectly expected an ordinary search result to
+expand its body; it now proves body matching while preserving normal rendering.
+The first worker fixture omitted the new selection's matching Searcher. Both
+fixture errors are fixed, and their initial logs remain. A subsequent check hit
+an overlapping recovery-test Arc type error; that same-task edit is fixed.
+** choices determining the future
+Wire the authenticated TCP registration/status/cancel/ACK paths and idle result
+delivery. Delivery must validate current source interpretation and the exact
+original destination base; results carry separate expected-base and resulting
+metadata. An editor restart exposes query status and recipe when its original
+placeholder is absent. Do not attach staged bytes to a newly invented buffer.

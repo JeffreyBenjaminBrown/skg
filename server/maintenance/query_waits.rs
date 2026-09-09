@@ -249,6 +249,7 @@ pub enum QueryWaitFreshness {
 pub struct QueryWaitResult {
   pub artifact_path     : PathBuf,
   pub artifact_bytes    : u64,
+  pub artifact_sha256   : String,
   pub content_sha256    : String,
   pub warnings          : Vec<String>,
   pub graph_generation  : u64,
@@ -268,7 +269,8 @@ impl QueryWaitResult {
     source_set        : String,
     freshness         : QueryWaitFreshness,
   ) -> Self {
-    Self { artifact_path, artifact_bytes, content_sha256, warnings, graph_generation,
+    Self { artifact_path, artifact_bytes, artifact_sha256: content_sha256 . clone (),
+      content_sha256, warnings, graph_generation,
       manifest_revision, source_set, freshness }
   }
 
@@ -280,6 +282,9 @@ impl QueryWaitResult {
     if self . content_sha256 . len () != 64
     || !self . content_sha256 . bytes () . all (|byte| byte . is_ascii_hexdigit ()) {
       return Err ("query wait result has an invalid content checksum" . into ()); }
+    if self . artifact_sha256 . len () != 64
+    || !self . artifact_sha256 . bytes () . all (|byte| byte . is_ascii_hexdigit ()) {
+      return Err ("query wait result has an invalid artifact checksum" . into ()); }
     Ok (( ))
   }
 }

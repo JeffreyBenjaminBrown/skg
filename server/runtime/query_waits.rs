@@ -1,6 +1,9 @@
 //! Small query facts are resolved in the owner publication. Index construction
 //! and result delivery never run in the owner loop.
 
+pub(crate) mod execution;
+mod worker;
+
 use crate::maintenance::coordinator::MaintenanceCoordinator;
 use crate::maintenance::query_waits::{QueryWaitOutcomeKind, QueryWaitRecord,
   QueryWaitState, QueryWaitTarget, QueryWaitTargetOutcome,
@@ -285,3 +288,6 @@ pub(super) mod tests {
     assert! (stored . resolved_target . is_none ());
   }
 }
+
+#[cfg(test)]
+mod recovery_tests;

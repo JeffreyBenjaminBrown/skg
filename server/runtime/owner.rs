@@ -88,6 +88,7 @@ enum MutationAction {
   Recover (Arc<SelectedRuntimeSnapshot>), }
 
 enum Message {
+  SubscribeQueryWaits (SyncSender<()>),
   Propose (Proposal),
   Published (Result<(), String>),
   AwaitPublication (SyncSender<Result<(), String>>),
@@ -195,6 +196,14 @@ impl CoordinatorOwner {
 
   pub(crate) fn snapshot (&self) -> MaintenanceCoordinator {
     self . published . load () . coordinator . clone () }
+
+  pub(crate) fn subscribe_query_waits (
+    &self,
+    wake : SyncSender<()>,
+  ) -> Result<(), String> {
+    self . sender . send (Message::SubscribeQueryWaits (wake))
+      . map_err (|_| "state owner stopped before query worker registration" . into ())
+  }
 
   pub(crate) fn selected_snapshot (
     &self,
@@ -396,8 +405,13 @@ fn run_owner (
   let mut state : PublishedCoordinator = (**published . load ()) . clone ();
   let mut pending : Option<Proposal> = None;
   let mut publication_waiters : Vec<SyncSender<Result<(), String>>> = Vec::new ();
+  let mut query_wait_worker : Option<SyncSender<()>> = None;
   while let Ok (message) = receiver . recv () {
     match message {
+      Message::SubscribeQueryWaits (wake) => {
+        let _ = wake . try_send (());
+        query_wait_worker = Some (wake);
+      }
       Message::Propose (mut proposal) => {
         match admit_proposal (&state, pending . is_some (), &publisher, &mut proposal) {
           Ok (( )) => { pending = Some (proposal); },
@@ -415,6 +429,9 @@ fn run_owner (
           state . failure = Some (format! (
             "journal publication failed; recovery required: {}", reason)); }
         publish_state (&published, &mut state);
+        if result . is_ok () {
+          if let Some (wake) = &query_wait_worker { let _ = wake . try_send (()); }
+        }
         let _ : Result<(), _> = proposal . reply . send (result . clone ());
         for waiter in publication_waiters . drain (..) {
           let _ : Result<(), _> = waiter . send (result . clone ()); } }

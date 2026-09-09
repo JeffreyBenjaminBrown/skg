@@ -44,3 +44,13 @@ without reading current disk. A round-trip test with foreign and owned sources
 and distinct configured/canonical paths must preserve exact SkgConfig equality.
 The owner stores this small encoding and cyclic-root IDs with the incident
 selection proposal; query execution and index construction remain worker work.
+
+** Resume staged bytes before rerendering
+Search rendering can generate fresh view identities, and equal-score matches
+currently have no stable tie ordering. Crash recovery must therefore discover
+an already published operation artifact before running its recipe again. The
+artifact contains a versioned payload with exact recipe, target, content and
+warnings. The journal retains separate artifact and content digests; a verified
+orphan artifact can finish readiness after a crash between rename and owner
+publication. Temporary staging files are not a published result. This preserves
+one result's bytes without changing ordinary search ordering in this slice.
