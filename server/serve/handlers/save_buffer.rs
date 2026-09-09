@@ -1,5 +1,6 @@
 use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
 use crate::from_text::buffer_to_validated_saveplan_with_fork_sources;
+use crate::serve::handlers::save_dependencies::validate_save_dependencies;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::{
@@ -339,14 +340,11 @@ fn validate_save_authority (
 ) -> Result<(), SaveError> {
   let uri = view_uri . as_ref () . map_err (|reason|
     SaveError::StaleViewAuthority (reason . clone ()))?;
-  if requested . graph_generation != current_graph_generation {
-    return Err (SaveError::StaleViewAuthority (format! (
-      "buffer names graph generation {}, but selected generation is {}",
-      requested . graph_generation, current_graph_generation))); }
   let Some (state) = views_state . open_views . views . get (uri) else {
     if requested . kind == "new-empty-content-view"
        && requested . server_revision == 0
        && requested . application_token == 1
+       && requested . graph_generation == current_graph_generation
     { return Ok (( )); }
     return Err (SaveError::StaleViewAuthority (format! (
       "view '{}' is not registered by the server",
@@ -354,6 +352,9 @@ fn validate_save_authority (
   if !state . writes_admitted {
     return Err (SaveError::StaleViewAuthority (
       "this query result has no write authority; explicitly reopen a fresh view" . into ())); }
+  if state . save_base . is_none () {
+    return Err (SaveError::StaleViewAuthority (
+      "this view has no retained semantic save base; preserve its text and open a fresh view" . into ())); }
   if state . graph_generation != requested . graph_generation
      || state . revision != requested . server_revision
      || state . client_application_token != requested . application_token
@@ -513,10 +514,11 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
   mut collateral_scheduler    : Option<&mut CollateralScheduler>,
   operation : Option<&crate::runtime::save_operations::SaveOperation>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  let planning_selected : Arc<SelectedStoreState> = env . in_rust_graph . load_full ();
   if let Some (authority) = requested_authority {
     validate_save_authority (
       authority, viewuri_from_request_result, views_state,
-      env . in_rust_graph . load_full () . graph_generation . get ())?; }
+      planning_selected . graph_generation . get ())?; }
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
       env . config . sources . keys() . cloned() . collect();
@@ -528,11 +530,9 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
-        let selected : Arc<SelectedStoreState> =
-          env . in_rust_graph . load_full ();
         buffer_to_validated_saveplan_with_fork_sources (
-          &selected . graph, org_buffer_text, &env . config,
-          active_source_set, fork_sources, &selected . manifest ) . await
+          &planning_selected . graph, org_buffer_text, &env . config,
+          active_source_set, fork_sources, &planning_selected . manifest ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
@@ -553,6 +553,47 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_selected (
       &env . in_rust_graph_snapshot (), &nonmerge_defineNodes, &nodeMerges, &env . config ) ?;
+  // In particular, make a dirty nodeMerge acquiree clean before the merge
+  // copies its text into a fresh preservation node and deletes it.
+  nonmerge_defineNodes . extend (
+    repair_saves_for_unwritten_candidates (
+      &hoist_candidates, &nonmerge_defineNodes, &env . in_rust_graph_snapshot ())? );
+  // Proposed forks: editing a foreign node
+  // N is a request to clone it. The clone C commits with the rest of the
+  // save -- its 'overrides_view_of = [N]' edge rides in the same
+  // DefineNodes, so the touched-override-invariant check (which reads the
+  // simulated post-save graph) sees C before validating.
+  let nonmerge_defineNodes : Vec<DefineNode> = {
+    let mut nodes : Vec<DefineNode> = nonmerge_defineNodes;
+    for spec in &fork_specs {
+      nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
+    nodes };
+
+  let define_nodes : Vec<DefineNode> = crate::save::combined_save_definitions (
+    &env . in_rust_graph_snapshot (), nonmerge_defineNodes . clone (), &nodeMerges);
+
+  let all_filesystem_outputs : Vec<DefineNode> =
+    nonmerge_defineNodes . iter () . cloned ()
+    . chain (nodeMerges . iter () . flat_map (|node_merge| node_merge . to_vec ()))
+    . collect ();
+  if requested_authority . is_some () {
+    if let Ok (uri) = viewuri_from_request_result {
+      if let Some (state) = views_state . open_views . views . get (uri) {
+        let base : &ViewSaveBase = state . save_base . as_ref ()
+          . expect ("save admission verified the retained semantic base");
+        let source_set : &ActiveSourceSet = active_source_set . ok_or_else (||
+          SaveError::StaleViewAuthority ("save requires its active source interpretation" . into ()))?;
+        validate_save_dependencies (
+          base, &planning_selected, &env . config, source_set,
+          &state . viewforest, &viewforest, &all_filesystem_outputs,
+          &source_moves, &fork_specs)
+          . map_err (|reason| {
+            tracing::debug! (%reason, "retained save dependency check refused");
+            SaveError::StaleViewAuthority (
+              "a save dependency changed since this view was accepted; preserve your edits and reopen a current view before saving" . into ()) })?;
+      }
+    }
+  }
   if hoist_needs_confirmation (
       &hoist_candidates, hoist_approved_pids ) {
     return Ok ( SaveResponse {
@@ -564,11 +605,6 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
       hoist_confirmation  : Some (hoist_candidates),
       scalar_release_confirmation : None,
     } ); }
-  // In particular, make a dirty nodeMerge acquiree clean before the merge
-  // copies its text into a fresh preservation node and deletes it.
-  nonmerge_defineNodes . extend (
-    repair_saves_for_unwritten_candidates (
-      &hoist_candidates, &nonmerge_defineNodes, &env . in_rust_graph_snapshot ())? );
   if ! fork_specs . is_empty () && ! fork_approved {
     // A save that found forks but was not pre-approved commits NOTHING.
     // Return a read-only fork-confirmation buffer; the client shows it,
@@ -586,31 +622,9 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
                   fork_specs . len () )),
       hoist_confirmation  : None,
       scalar_release_confirmation : None, } ); }
-  // Forks detected this save (approved, or none): editing a foreign node
-  // N is a request to clone it. The clone C commits with the rest of the
-  // save -- its 'overrides_view_of = [N]' edge rides in the same
-  // DefineNodes, so the touched-override-invariant check (which reads the
-  // simulated post-save graph) sees C before validating.
-  let nonmerge_defineNodes : Vec<DefineNode> = {
-    let mut nodes : Vec<DefineNode> = nonmerge_defineNodes;
-    for spec in &fork_specs {
-      nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
-    nodes };
-
-  let define_nodes : Vec<DefineNode> = crate::save::combined_save_definitions (
-    &env . in_rust_graph_snapshot (), nonmerge_defineNodes . clone (), &nodeMerges);
-
-  { // Validate the complete authored proposal before applying its final batch.
-    let all_filesystem_outputs : Vec<DefineNode> =
-      nonmerge_defineNodes . iter () . cloned ()
-      .chain ( nodeMerges . iter ()
-               . flat_map ( |node_merge| node_merge . to_vec () ) )
-      .collect ();
-    preflight_fs_from_saveinstructions_with_hoist_approval (
-      &all_filesystem_outputs,
-      &source_moves,
-      &env . config,
-      hoist_approved_pids, &env . in_rust_graph . load_full ())?; }
+  preflight_fs_from_saveinstructions_with_hoist_approval (
+    &all_filesystem_outputs, &source_moves, &env . config,
+    hoist_approved_pids, &planning_selected)?;
 
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
@@ -625,10 +639,7 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
       &mut env . tantivy_index,
       &env . in_rust_graph,
       hoist_approved_pids,
-      requested_authority . map (|authority|
-        authority . graph_generation)
-        . unwrap_or_else (|| env . in_rust_graph . load_full ()
-          . graph_generation . get ()), operation ) . await
+      planning_selected . graph_generation . get (), operation ) . await
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.

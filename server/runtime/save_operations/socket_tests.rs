@@ -165,6 +165,139 @@ fn barrier_query_remains_read_only_after_admission_reopens () {
 }
 
 #[test]
+fn socket_registered_old_editable_views_cross_an_unrelated_save () {
+  let fixture : Fixture = Fixture::new ();
+  let _process : ServerProcess = fixture . start ("none");
+  let mut client : Client = Client::connect (&fixture);
+  let (initial_request, _, _) : (String, String, String) =
+    client . save_request ("Alpha", "Beta");
+  client . send (&initial_request, Some (&save_body ("Alpha", "Beta")));
+  let initial : Sexp = client . terminal ();
+  assert_eq! (field (&initial, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", initial);
+
+  let uri_a : String = format! ("view-a-{}", uuid::Uuid::new_v4 ());
+  let uri_b : String = format! ("view-b-{}", uuid::Uuid::new_v4 ());
+  let view_a : Sexp = editable_content_view (&mut client, "a", &uri_a);
+  let view_b : Sexp = editable_content_view (&mut client, "b", &uri_b);
+  let a_generation : u64 = view_field (&view_a, "graph-generation");
+  let a_revision : u64 = view_field (&view_a, "server-revision");
+  let a_token : u64 = view_field (&view_a, "client-application-token");
+  let a_body : String = view_content (&view_a) . replace ("Alpha", "OlderAlpha");
+  let b_body : String = view_content (&view_b) . replace ("Beta", "NewerBeta");
+  let b_result : Sexp = save_registered_view (
+    &mut client, &uri_b, a_buffer_id (), view_field (&view_b, "graph-generation"),
+    view_field (&view_b, "server-revision"),
+    view_field (&view_b, "client-application-token"), &b_body);
+  assert_eq! (field (&b_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", b_result);
+  let newer_b_bytes : Vec<u8> = fs::read (fixture . node ("b")) . unwrap ();
+  let a_result : Sexp = save_registered_view (
+    &mut client, &uri_a, a_buffer_id (), a_generation, a_revision, a_token, &a_body);
+  assert_eq! (field (&a_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", a_result);
+  let a_bytes : String = fs::read_to_string (fixture . node ("a")) . unwrap ();
+  let b_bytes : Vec<u8> = fs::read (fixture . node ("b")) . unwrap ();
+  assert! (a_bytes . contains ("OlderAlpha"), "{}", a_bytes);
+  assert_eq! (b_bytes, newer_b_bytes, "A save changed newer B bytes");
+  assert! (String::from_utf8_lossy (&b_bytes) . contains ("NewerBeta"));
+  let search : Sexp = client . text_search ("NewerBeta");
+  assert! (field (&search, "content") . unwrap_or_default ()
+    . contains ("NewerBeta"), "{}", search);
+}
+
+#[test]
+fn socket_registered_old_view_is_refused_after_same_pid_save () {
+  let fixture : Fixture = Fixture::new ();
+  let _process : ServerProcess = fixture . start ("none");
+  let mut client : Client = Client::connect (&fixture);
+  let (initial_request, _, _) : (String, String, String) =
+    client . save_request ("Alpha", "Beta");
+  client . send (&initial_request, Some (&save_body ("Alpha", "Beta")));
+  let initial : Sexp = client . terminal ();
+  assert_eq! (field (&initial, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", initial);
+
+  let old_uri : String = format! ("old-a-{}", uuid::Uuid::new_v4 ());
+  let fresh_uri : String = format! ("fresh-a-{}", uuid::Uuid::new_v4 ());
+  let old_view : Sexp = editable_content_view (&mut client, "a", &old_uri);
+  let fresh_view : Sexp = editable_content_view (&mut client, "a", &fresh_uri);
+  let fresh_body : String = view_content (&fresh_view)
+    . replace ("Alpha", "FreshAlpha");
+  let fresh_result : Sexp = save_registered_view (
+    &mut client, &fresh_uri, a_buffer_id (),
+    view_field (&fresh_view, "graph-generation"),
+    view_field (&fresh_view, "server-revision"),
+    view_field (&fresh_view, "client-application-token"), &fresh_body);
+  assert_eq! (field (&fresh_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", fresh_result);
+  let before_refused_a : Vec<u8> = fs::read (fixture . node ("a")) . unwrap ();
+  let before_refused_b : Vec<u8> = fs::read (fixture . node ("b")) . unwrap ();
+  let old_body : String = view_content (&old_view) . replace ("Alpha", "OldAlpha");
+  let refused : Sexp = save_registered_view (
+    &mut client, &old_uri, a_buffer_id (),
+    view_field (&old_view, "graph-generation"),
+    view_field (&old_view, "server-revision"),
+    view_field (&old_view, "client-application-token"), &old_body);
+  assert_eq! (field (&refused, "save-operation-state") . as_deref (),
+    Some ("refused"), "{}", refused);
+  let refusal_text : String = refused . to_string ();
+  assert! (refusal_text . contains ("save dependency"), "{}", refused);
+  assert_eq! (fs::read (fixture . node ("a")) . unwrap (), before_refused_a);
+  assert_eq! (fs::read (fixture . node ("b")) . unwrap (), before_refused_b);
+}
+
+#[test]
+fn socket_child_save_survives_unwritten_parent_title_change () {
+  let fixture : Fixture = Fixture::new ();
+  let _process : ServerProcess = fixture . start ("none");
+  let mut client : Client = Client::connect (&fixture);
+  let initial_body : String = parent_child_body ("Parent", "Child");
+  let (initial_request, _, _) : (String, String, String) =
+    client . save_arbitrary_request (&initial_body);
+  client . send (&initial_request, Some (&initial_body));
+  let initial : Sexp = client . terminal ();
+  assert_eq! (field (&initial, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", initial);
+
+  let parent_uri : String = format! ("parent-{}", uuid::Uuid::new_v4 ());
+  let g2_parent_uri : String = format! ("parent-g2-{}", uuid::Uuid::new_v4 ());
+  let parent_view : Sexp = editable_content_view (&mut client, "parent", &parent_uri);
+  let g2_parent_view : Sexp = editable_content_view (&mut client, "parent", &g2_parent_uri);
+  let parent_body : String = view_content (&g2_parent_view)
+    . replace ("Parent", "ParentG2");
+  let parent_result : Sexp = save_registered_view (
+    &mut client, &g2_parent_uri, a_buffer_id (),
+    view_field (&g2_parent_view, "graph-generation"),
+    view_field (&g2_parent_view, "server-revision"),
+    view_field (&g2_parent_view, "client-application-token"), &parent_body);
+  assert_eq! (field (&parent_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", parent_result);
+  let stale_view_body : String = view_content (&parent_view);
+  let child_body : String = stale_view_body
+    . replace ("(node (id parent) (source main)",
+      "(node (id parent) (source main) indef")
+    . replace ("Child", "ChildG1");
+  assert! (child_body . contains ("Parent"), "parent title was lost: {}", child_body);
+  assert! (child_body . contains ("(id parent) (source main) indef"),
+    "parent was not made indefinite: {}", child_body);
+  assert! (child_body . contains ("ChildG1"), "child edit was lost: {}", child_body);
+  let child_result : Sexp = save_registered_view (
+    &mut client, &parent_uri, a_buffer_id (),
+    view_field (&parent_view, "graph-generation"),
+    view_field (&parent_view, "server-revision"),
+    view_field (&parent_view, "client-application-token"), &child_body);
+  assert_eq! (field (&child_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", child_result);
+  let parent_bytes : String = fs::read_to_string (
+    fixture . node ("parent")) . unwrap ();
+  let child_bytes : String = fs::read_to_string (
+    fixture . node ("child")) . unwrap ();
+  assert! (parent_bytes . contains ("ParentG2"), "{}", parent_bytes);
+  assert! (child_bytes . contains ("ChildG1"), "{}", child_bytes);
+}
+
+#[test]
 fn socket_report_recovery_reconstructs_old_pair_after_restart () {
   let fixture : Fixture = Fixture::new ();
   let hold : PathBuf = fixture . root . join ("report-staging-hold");
@@ -532,6 +665,15 @@ impl Client {
       intent, &save_body (a, b), operation)
   }
 
+  fn save_arbitrary_request (&self, body : &str) -> (String, String, String) {
+    let operation : String = uuid::Uuid::new_v4 () . to_string ();
+    let intent : String = format! (
+      "((request . \"save buffer\") (view-uri . \"{}\") (client-buffer-id . \"{}\") (view-kind . \"new-empty-content-view\") (graph-generation . {}) (server-revision . 0) (client-application-token . 1) (server-session-id . \"{}\") (operation-id . \"{}\"))",
+      uuid::Uuid::new_v4 (), uuid::Uuid::new_v4 (), self . generation,
+      self . session, operation);
+    self . save_request_from_intent (intent, body, operation)
+  }
+
   fn save_request_with_authority (
     &self,
     view_uri : &str,
@@ -599,6 +741,53 @@ impl Client {
 
 fn save_body (a : &str, b : &str) -> String {
   format! ("* (skg (node (id a) (source main))) {}\n* (skg (node (id b) (source main))) {}\n", a, b)
+}
+
+fn parent_child_body (parent : &str, child : &str) -> String {
+  format! ("* (skg (node (id parent) (source main))) {}\n** (skg (node (id child) (source main))) {}\n", parent, child)
+}
+
+fn editable_content_view (
+  client : &mut Client,
+  id     : &str,
+  uri    : &str,
+) -> Sexp {
+  client . send (&format! (
+    "((request . \"single root content view\") (id . \"{}\") (view-uri . \"{}\") (fresh-view . \"true\") (override-choice . \"bypass\") (requested-view-write-authority . \"editable\"))",
+    id, uri), None);
+  let view : Sexp = client . terminal ();
+  assert_eq! (field (&view, "view-write-authority") . as_deref (),
+    Some ("editable"), "{}", view);
+  view
+}
+
+fn view_content (view : &Sexp) -> String {
+  field (view, "content") . expect ("editable view content")
+}
+
+fn view_field (view : &Sexp, name : &str) -> u64 {
+  field (view, name) . expect (name) . parse () . expect (name)
+}
+
+fn a_buffer_id () -> String {
+  uuid::Uuid::new_v4 () . to_string ()
+}
+
+fn save_registered_view (
+  client            : &mut Client,
+  view_uri          : &str,
+  buffer_id         : String,
+  graph_generation  : u64,
+  server_revision   : u64,
+  application_token : u64,
+  body              : &str,
+) -> Sexp {
+  let (request, _, _) : (String, String, String) =
+    client . save_request_with_authority (
+      view_uri, &buffer_id, graph_generation, server_revision,
+      application_token, body);
+  client . send (&request, Some (body));
+  client . terminal ()
 }
 
 fn quoted (value : &str) -> String {
