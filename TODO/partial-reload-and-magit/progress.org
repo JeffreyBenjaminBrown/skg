@@ -1654,3 +1654,30 @@ are being corrected with retained first-failure logs.
 No new architectural question. Continue fixture migration, socket/process
 crash coverage and fresh-session authority before completing the maintenance
 lifecycle and its acceptance tests.
+
+* Simplify/cohere checkpoint: mutation reservations and owner admission
+** what's done and went well
+The decision owner now holds the selected graph/search pair and opaque
+operation reservations. It admits saves, metadata-only manifest updates and
+maintenance selection against both current and pending journal decisions.
+Compatible observation/status publication does not randomly refuse saves;
+a competing barrier or stale graph/manifest base does. Authorized work cannot
+release its reservation by dropping a worker or reporting an error.
+
+Blocked-operation recovery uses an exact status comparison and rotates the
+reservation token, invalidating abandoned worker controls. Metadata-only
+publication preserves the graph and actual Searcher identity. Selection
+publication can finish after disconnect only under its previously authorized
+incident and selection scope. Twenty-one focused owner tests pass in
+'/tmp/skg-owner-admission-tests3.log'.
+** Changes to the plan's envisioned order.
+Owner primitives are committed independently from their production save and
+selection adapters. The adapters already pass the developing full-server
+socket suite and are the next checkpoint.
+** what's imperfect about what's done
+The owner still has temporary adapter boundaries around interactive state
+and workers. This checkpoint does not claim complete UI responsiveness or
+independent post-publication incident settlement.
+** choices determining the future
+No new architectural question. Wire and verify the durable adapters, then
+move committed incident settlement off the graph-changing state.
