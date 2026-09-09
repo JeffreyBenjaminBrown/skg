@@ -1,7 +1,7 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::context::context_origin_types_for_transition;
 use crate::dbs::filesystem::one_node::{
-  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
+  PreparedTelescopeWrite, prepare_nodecomplete_telescope_with_selection,
 };
 use crate::telescope::invariants::telescope_violations_of;
 use crate::dbs::in_rust_graph::{
@@ -31,6 +31,7 @@ use crate::types::store_state::{
   GraphGeneration,
   PathDigest,
   SelectedPathManifest,
+  SelectedStoreState,
 };
 use crate::dbs::tantivy::background_writer::TantivyGeneration;
 
@@ -120,6 +121,21 @@ pub(crate) async fn apply_define_nodes_to_stores (
   reload_manifest : Option<SelectedPathManifest>,
   hoist_approved_pids : &HashSet<ID>,
 ) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
+  apply_define_nodes_to_stores_with_operation (
+    node_defs, source_moves, config, tantivy_index, graph, write_fs, reload_manifest, hoist_approved_pids, None) . await
+}
+
+pub(crate) async fn apply_define_nodes_to_stores_with_operation (
+  node_defs     : Vec<DefineNode>,
+  source_moves  : &[SourceMove],
+  config        : SkgConfig,
+  tantivy_index : &TantivyIndex,
+  graph         : &InRustGraphHandle,
+  write_fs      : bool,
+  reload_manifest : Option<SelectedPathManifest>,
+  hoist_approved_pids : &HashSet<ID>,
+  operation : Option<&crate::runtime::save_operations::SaveOperation>,
+) -> Result < StoreUpdateOutcome, Box<dyn Error> > {
   let old_selected = graph . load_full ();
   let old_graph_snap : Arc<InRustGraph> = old_selected . graph . clone ();
   let mut new_graph : InRustGraph = (*old_graph_snap) . clone ();
@@ -132,14 +148,19 @@ pub(crate) async fn apply_define_nodes_to_stores (
     tracing::info!( "Writing {} instruction(s) to disk ...",
                { let total_input : usize = node_defs . len ();
                  total_input } );
-    let prepared = prepare_fs_update (
-      &node_defs, source_moves, &config, hoist_approved_pids) ?
+    let prepared = prepare_fs_update_from_selected (
+      &node_defs, source_moves, &config, hoist_approved_pids, Some (&old_selected))?
       . with_selected_fence (&old_selected . manifest);
     prepared . validate_selected_fence ()?;
     let (deleted_count, written_count) : (usize, usize) = {
       let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_fs_from_savenode_defs") . entered ();
-      prepared . apply (&config) ? };
+      if let Some (operation) = operation {
+        operation . prepare (prepared . retained_mutations ()?)?;
+        operation . apply_authorized ()?;
+        prepared . verify_effects (&config)?;
+        (prepared . deleted_pids . len (), prepared . writes . len ())
+      } else { prepared . apply (&config)? } };
     prepared . apply_to_manifest (&mut selected_manifest);
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
@@ -210,6 +231,21 @@ pub async fn update_graph_including_nodeMerges (
   hoist_approved_pids : &HashSet<ID>,
   expected_graph_generation : u64,
 ) -> Result<(), Box<dyn Error>> {
+  update_graph_including_nodeMerges_with_operation (
+    save_instructions, nodeMerge_instructions, source_moves, config, tantivy_index, graph, hoist_approved_pids, expected_graph_generation, None) . await
+}
+
+pub(crate) async fn update_graph_including_nodeMerges_with_operation (
+  save_instructions  : Vec<DefineNode>,
+  nodeMerge_instructions : &[NodeMerge],
+  source_moves       : &[SourceMove],
+  config             : SkgConfig,
+  tantivy_index      : &mut TantivyIndex,
+  graph              : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
+  expected_graph_generation : u64,
+  operation : Option<&crate::runtime::save_operations::SaveOperation>,
+) -> Result<(), Box<dyn Error>> {
   // Serialize this store mutation against any concurrent save / reload /
   // rebuild so no RCU update is lost (last-store-wins on the ArcSwap).
   let _write_guard = crate::write_lock::acquire_graph_write_lock () . await;
@@ -236,9 +272,9 @@ pub async fn update_graph_including_nodeMerges (
       DefineNode::Delete (_) => None,
     }) . collect ();
   let config_for_telescope_gate : SkgConfig = config . clone ();
-  apply_define_nodes_to_stores (
+  apply_define_nodes_to_stores_with_operation (
     definitions, source_moves, config, tantivy_index, graph,
-    true, None, hoist_approved_pids) . await?;
+    true, None, hoist_approved_pids, operation) . await?;
   { // The save-side telescope warning gate: same primitive as the
     // init/rebuild gate, on the touched nodes only. Warnings, never
     // failures (the write has already, deliberately, happened).
@@ -468,9 +504,10 @@ pub(crate) fn preflight_fs_from_saveinstructions_with_hoist_approval (
   source_moves        : &[SourceMove],
   config              : &SkgConfig,
   hoist_approved_pids : &HashSet<ID>,
+  selected : &SelectedStoreState,
 ) -> io::Result<()> {
-  prepare_fs_update (
-    node_defs, source_moves, config, hoist_approved_pids ) ?;
+  prepare_fs_update_from_selected (
+    node_defs, source_moves, config, hoist_approved_pids, Some (selected))?;
   Ok (( ))
 }
 
@@ -534,6 +571,36 @@ impl PreparedFilesystemUpdate {
     else { Err (SaveError::DiskSelectionChanged { paths, details }) }
   }
 
+  /// Retain exactly the selected before-values, not a later filesystem read.
+  /// The journal rechecks this complete batch before effect authorization.
+  pub(crate) fn retained_mutations (
+    &self,
+  ) -> Result<Vec<crate::maintenance::save_journal::DurablePathMutation>, Box<dyn Error>> {
+    self . validate_selected_fence ()?;
+    let mut mutations = Vec::with_capacity (self . path_manifest . len ());
+    for (path, mutation) in &self . path_manifest {
+      let before : Option<Vec<u8>> = match std::fs::read (path) {
+        Ok (bytes) => Some (bytes),
+        Err (error) if error . kind () == io::ErrorKind::NotFound => None,
+        Err (error) => return Err (error . into ()),
+      };
+      let digest = before . as_ref () . map (|bytes| PathDigest::of_bytes (bytes));
+      if mutation . expected_before != Some (digest) {
+        return Err (Box::new (SaveError::DiskSelectionChanged {
+          paths: vec![path . clone ()],
+          details: vec!["source changed while retaining save recovery bytes" . into ()],
+        })); }
+      mutations . push (crate::maintenance::save_journal::DurablePathMutation {
+        path: path . clone (), before, after: mutation . proposed_after . clone (),
+      }); }
+    Ok (mutations)
+  }
+
+  fn verify_effects (&self, config : &SkgConfig) -> io::Result<()> {
+    for telescope in &self . writes { telescope . verify_hoist (config)?; }
+    Ok (( ))
+  }
+
   pub(crate) fn apply (
     &self,
     config : &SkgConfig,
@@ -580,16 +647,27 @@ pub(crate) fn prepare_fs_update (
   config              : &SkgConfig,
   hoist_approved_pids : &HashSet<ID>,
 ) -> io::Result<PreparedFilesystemUpdate> {
+  prepare_fs_update_from_selected (node_defs, source_moves, config, hoist_approved_pids, None)
+}
+
+pub(crate) fn prepare_fs_update_from_selected (
+  node_defs : &[DefineNode],
+  source_moves : &[SourceMove],
+  config : &SkgConfig,
+  hoist_approved_pids : &HashSet<ID>,
+  selected : Option<&SelectedStoreState>,
+) -> io::Result<PreparedFilesystemUpdate> {
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = DefineNode::partition_save_and_delete (node_defs);
   let prepared_writes : Vec<PreparedTelescopeWrite> =
     to_save . iter ()
     . map ( |SaveNode (node)|
-      prepare_nodecomplete_telescope (
+      prepare_nodecomplete_telescope_with_selection (
         node,
         config,
-        hoist_approved_pids . contains (&node . pid) ) )
+        hoist_approved_pids . contains (&node . pid),
+        selected . map (|selected| selected . graph . as_ref ())) )
     . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
 
   // Resolve every deletion path before applying either deletion or write.
@@ -602,7 +680,8 @@ pub(crate) fn prepare_fs_update (
       let path : String = crate::util::path_from_pid_and_source (
         config, &source, id . clone () )
         . map_err ( |e| io::Error::new (io::ErrorKind::NotFound, e) ) ?;
-      if std::path::Path::new (&path) . is_file () {
+      if selected . map (|selected| selected . manifest . contains_key (Path::new (&path)))
+        . unwrap_or_else (|| Path::new (&path) . is_file ()) {
         deleted_pids . insert ( id . clone () ); }
       prepared_deletions . push (path); }}
 

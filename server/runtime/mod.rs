@@ -2,6 +2,8 @@ pub mod generation_gate;
 pub mod interactive_session;
 mod maintenance;
 mod owner;
+pub(crate) mod save_operations;
+pub use save_operations::{recover_source_effects_before_startup, commit_recovered_source_effects};
 
 use crate::maintenance::journal::MaintenanceJournalStore;
 use crate::maintenance::evidence::MaintenanceEvidenceStore;
@@ -12,11 +14,11 @@ use crate::maintenance::{
 use crate::maintenance::candidate::ObservedDiskCandidate;
 use crate::maintenance::archive::VerifiedInitialArchive;
 use crate::maintenance::observation::ObservationService;
-use crate::runtime::generation_gate::{GenerationGate, QueryLease};
 use crate::runtime::interactive_session::InteractiveSession;
-use crate::runtime::owner::CoordinatorOwner;
+use crate::runtime::owner::{CoordinatorOwner, MutationStage};
+pub(crate) use owner::MutationControl;
 use crate::types::env::SkgEnv;
-use crate::types::store_state::SelectedStoreState;
+use crate::types::store_state::{SelectedStoreState, GraphGeneration, ManifestRevision};
 
 use arc_swap::ArcSwap;
 use std::collections::BTreeMap;
@@ -42,7 +44,6 @@ impl SelectedRuntimeSnapshot {
 
 pub struct RuntimeQueryLease {
   pub snapshot : Arc<SelectedRuntimeSnapshot>,
-  _gate_lease  : QueryLease,
 }
 
 #[derive(Debug)]
@@ -62,9 +63,8 @@ pub struct InteractiveConnectionGuard {
 }
 
 pub struct ServerRuntime {
-  selected              : ArcSwap<SelectedRuntimeSnapshot>,
+  server_session_id     : String,
   writer_env            : Mutex<SkgEnv>,
-  pub generation_gate   : GenerationGate,
   pub interactive       : Mutex<InteractiveSession>,
   owner                 : CoordinatorOwner,
   pub maintenance_evidence : MaintenanceEvidenceStore,
@@ -77,13 +77,13 @@ pub struct ServerRuntime {
 
 impl ServerRuntime {
   pub fn new (mut env : SkgEnv) -> Result<Self, String> {
+    save_operations::require_resolved_startup_saves (&env . config)?;
     env . searcher = env . tantivy_index . reader . searcher ();
     let initial = env . in_rust_graph . load_full ();
     if initial . searcher . is_none () {
       env . in_rust_graph . store (Arc::new (
         (*initial) . clone () . with_searcher (env . searcher . clone ()))); }
     let snapshot = SelectedRuntimeSnapshot::from_env (&env);
-    let graph_generation = snapshot . selected . graph_generation;
     let mut interactive = InteractiveSession::new (&env . config)?;
     if let Err (error) = interactive . collateral_scheduler . seed_presentation (&env) {
       tracing::warn! (%error, "could not seed Git presentation signature"); }
@@ -95,11 +95,11 @@ impl ServerRuntime {
     let maintenance_evidence = MaintenanceEvidenceStore::alongside (
       &maintenance_journal);
     Ok (Self {
-      selected: ArcSwap::from_pointee (snapshot),
+      server_session_id: uuid::Uuid::new_v4 () . to_string (),
       writer_env: Mutex::new (env),
-      generation_gate: GenerationGate::new (graph_generation),
       interactive: Mutex::new (interactive),
-      owner: CoordinatorOwner::start (maintenance, maintenance_journal . clone ()),
+      owner: CoordinatorOwner::start_with_snapshot (
+        maintenance, maintenance_journal . clone (), Arc::new (snapshot)),
       maintenance_evidence,
       interactive_slot: InteractiveConnectionSlot::new (),
       candidates: Mutex::new (BTreeMap::new ()),
@@ -109,31 +109,41 @@ impl ServerRuntime {
   }
 
   pub fn selected_snapshot (&self) -> Arc<SelectedRuntimeSnapshot> {
-    self . selected . load_full () }
+    self . owner . selected_snapshot ()
+      . expect ("live runtime starts with a selected graph/search pair") }
+
+  pub fn server_session_id (&self) -> &str { &self . server_session_id }
+
+  pub(crate) fn validate_session_authority (
+    &self,
+    request : &str,
+  ) -> Result<(), String> {
+    let claimed : String = crate::serve::util::value_from_request_sexp (
+      "server-session-id", request)?;
+    if claimed != self . server_session_id {
+      return Err ("this buffer belongs to an earlier server session; preserve its text and open a fresh live view" . into ()); }
+    Ok (( ))
+  }
 
   pub fn maintenance_snapshot (&self) -> MaintenanceCoordinator {
     self . owner . snapshot () }
 
   pub fn authority_failure (&self) -> Option<String> {
-    self . owner . failure () }
-
-  pub(crate) fn maintenance_admission_guard (&self)
-    -> Result<MutexGuard<'_, ()>, String>
-  {
-    self . owner . admission_guard () }
+    self . owner . failure () . or_else (|| self . owner . mutation_status ()
+      . and_then (|status| status . blocked_reason)) }
 
   pub fn query_lease (&self) -> Result<RuntimeQueryLease, String> {
-    loop {
-      let snapshot = self . selected_snapshot ();
-      if let Some (gate_lease) = self . generation_gate . acquire_query (
-          snapshot . selected . graph_generation)?
-      {
-        return Ok (RuntimeQueryLease {
-          snapshot,
-          _gate_lease: gate_lease,
-        }); }
-    }
-  }
+    Ok (RuntimeQueryLease { snapshot: self . selected_snapshot () }) }
+
+  pub(crate) fn reserve_mutation (
+    &self,
+    operation_id : impl Into<String>,
+    graph_generation : GraphGeneration,
+    manifest_revision : ManifestRevision,
+  ) -> Result<MutationControl, String> {
+    let token = self . owner . reserve_mutation (
+      operation_id, graph_generation, manifest_revision)?;
+    Ok (self . owner . mutation_control (&token)) }
 
   pub fn with_writer_env<T> (
     &self,
@@ -148,45 +158,52 @@ impl ServerRuntime {
       . map_err (|_| "writer environment poisoned" . to_string ())
   }
 
-  pub(crate) fn publish_selected_from_env (&self, env : &SkgEnv) {
-    self . selected . store (Arc::new (
-      SelectedRuntimeSnapshot::from_env (env)));
-  }
-
-  /// Run one selected-store mutation behind the generation boundary and
-  /// publish the resulting environment atomically. Existing handlers still
-  /// receive their familiar mutable arguments while ownership lives here.
-  pub fn with_store_transition<T> (
+  pub(crate) fn publish_selected_from_env (
     &self,
-    exclusive : bool,
-    function  : impl FnOnce (&mut SkgEnv, &mut InteractiveSession) -> T,
+    control : &MutationControl,
+    env : &SkgEnv,
+  ) -> Result<(), String> {
+    control . publish (Arc::new (SelectedRuntimeSnapshot::from_env (env))) }
+
+  /// One reservation spans preparation, authorized effects and publication.
+  /// The decision owner remains responsive while this adapter runs its worker.
+  pub(crate) fn with_store_transition<T> (
+    &self,
+    operation_id : String,
+    function : impl FnOnce (&mut SkgEnv, &mut InteractiveSession, &MutationControl) -> T,
   ) -> Result<T, String> {
     let before = self . selected_snapshot ();
-    let selection = self . generation_gate . begin_selection (
-      before . selected . graph_generation, exclusive)?;
-    let mut env = self . writer_env . lock ()
-      . map_err (|_| "writer environment poisoned" . to_string ())?;
-    let mut interactive = self . interactive . lock ()
-      . map_err (|_| "interactive session poisoned" . to_string ())?;
-    let result = function (&mut env, &mut interactive);
-    let after = Arc::new (SelectedRuntimeSnapshot::from_env (&env));
-    let after_generation = after . selected . graph_generation;
-    self . selected . store (after);
-    drop (interactive);
-    drop (env);
-    if after_generation == before . selected . graph_generation {
-      selection . retain_generation ();
-    } else {
-      selection . publish (after_generation)?; }
+    let control = self . reserve_mutation (operation_id,
+      before . selected . graph_generation, before . selected . manifest_revision)?;
+    let mut env = match self . writer_env . lock () {
+      Ok (env) => env,
+      Err (_) => {
+        control . finish ()?;
+        return Err ("writer environment poisoned" . into ()); }
+    };
+    let mut interactive = match self . interactive . lock () {
+      Ok (interactive) => interactive,
+      Err (_) => {
+        control . finish ()?;
+        return Err ("interactive session poisoned" . into ()); }
+    };
+    let result = function (&mut env, &mut interactive, &control);
+    if let Some (searcher) = &env . in_rust_graph . load_full () . searcher {
+      env . searcher = searcher . clone (); }
+    let status = self . owner . mutation_status ()
+      . ok_or ("mutation lost its owner reservation")?;
+    if let Some (reason) = status . blocked_reason { return Err (reason); }
+    if status . stage == MutationStage::Authorized {
+      self . publish_selected_from_env (&control, &env)?;
+    } else if status . stage == MutationStage::Prepared
+        && !Arc::ptr_eq (&before . selected, &env . in_rust_graph . load_full ())
+    {
+      let reason = "worker changed selected stores without owner authorization";
+      control . block (reason)?;
+      return Err (reason . into ());
+    }
+    control . finish ()?;
     Ok (result)
-  }
-
-  /// Publish the environment and exact SelectedStoreState together after a
-  /// writer has completed all store work.
-  pub fn refresh_selected_snapshot (&self) {
-    let env = self . writer_env . lock () . unwrap ();
-    self . selected . store (Arc::new (
-      SelectedRuntimeSnapshot::from_env (&env)));
   }
 
 }

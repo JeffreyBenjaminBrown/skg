@@ -24,6 +24,8 @@ pub fn current_reconciliation_generation () -> u64 {
 pub fn request_allowed_before_census (request_type : RequestType) -> bool {
   matches! (request_type,
     RequestType::VerifyConnection
+    | RequestType::SaveOperationStatus
+    | RequestType::AcknowledgeSaveResult
     | RequestType::ClientCensus
     | RequestType::ClientCensusTexts
     | RequestType::MaintenanceLockedCensus)

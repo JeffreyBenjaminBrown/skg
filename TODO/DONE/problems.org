@@ -1,3 +1,23 @@
+* Ordinary interactive multi-file saves now have durable source effects
+  Fixed by the document 11 server integration. Exact retained before/after
+  data, effect authorization, combined save/merge application, pair publication
+  and durable terminal outcomes are exercised by seven actual server SIGKILL
+  schedules. Startup finishes authorized effects before fresh authority.
+  Lost-result duplicates cannot overwrite a later save.
+
+** Ordinary multi-file saves lack a durable filesystem transaction boundary
+   [[file:../server/save.rs::736][PreparedFilesystemUpdate::apply]] uses direct fs::write and remove_file
+   operations, with no durable batch intent at this boundary. A crash or I/O
+   error can leave a truncated file or only a prefix of a multi-file save.
+   Cache reconstruction from disk cannot recover unwritten/truncated bytes.
+
+   This weakness predates the latest maintenance protocol. It matters to the
+   architecture review because extensive maintenance recovery does not make
+   ordinary saves equally recoverable. Safe file replacement and a recoverable
+   multi-file commit policy solve different parts of the problem; neither an
+   in-memory transaction nor simply rebuilding the caches supplies both.
+
+
 * Native undo capability rejected normally byte-compiled package installations
   Fixed during document 11 execution. 'locate-library' resolves the installed
   undo-fu-session '.elc' file; that file has no source Version header.

@@ -2416,6 +2416,7 @@ mod tests {
 
   fn census_descriptor (id : &str, kind : &str) -> CensusDescriptor {
     CensusDescriptor {
+      server_session_id: "server-test-session" . into (),
       buffer_id: id . into (), kind: kind . into (),
       lifecycle: if kind == "content-view" {
         "live-view" . into ()

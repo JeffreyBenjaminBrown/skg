@@ -144,6 +144,7 @@ fn authenticate_connection (
         return Err (
           "an interactive connection must begin with verify connection"
             . into ()); }
+      crate::serve::handlers::client_census::validate_protocol_version (request)?;
       runtime . interactive_slot . try_attach ()
         . map (|guard| ConnectionRole::Interactive { _guard: guard })
     }
@@ -206,6 +207,7 @@ fn handle_connection (
   mut stream : TcpStream,
   runtime    : Arc<ServerRuntime>,
 ) {
+  crate::serve::util::set_connection_server_session (runtime . server_session_id ());
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new ( Mutex::new (None) );
@@ -379,27 +381,70 @@ fn dispatch_request (
           stream, request, env, views, active_source_set, runtime); })
       { send_runtime_error (stream, &error); }}
     RequestType::SaveBuffer => {
-      // The same BufReader which parsed the request must consume its payload.
-      // A policy refusal is therefore implemented in the save handler itself.
-      // Retain coordinator admission across the transaction: an observation
-      // which finishes concurrently waits, then notices the selected
-      // generation change and scans again.
-      let _admission : MutexGuard<'_, ()> = match runtime . maintenance_admission_guard () {
-        Ok (guard) => guard,
-        Err (error) => { send_runtime_error (stream, &error); return; } };
-      let maintenance = runtime . maintenance_snapshot ();
-      let save_refusal = runtime . authority_failure ()
-        . or_else (|| skg_save_policy_refusal (&maintenance . state));
-      if let Err (error) = runtime . with_store_transition (
-          false, |env, interactive| {
-            let InteractiveSession {
-              views, active_source_set, collateral_scheduler, ..
-            } = interactive;
-            handle_save_buffer_request (
-              reader, stream, request, env, views,
-              active_source_set, collateral_scheduler, runtime,
-              save_refusal . as_deref ()); })
-      { send_runtime_error (stream, &error); }}
+      // Consume framing before admission, so even a refused request leaves
+      // the socket ready for its next command.
+      let content = match crate::serve::util::read_length_prefixed_content (reader) {
+        Ok (content) => content,
+        Err (error) => {
+          let response = crate::serve::handlers::save_buffer::save_refusal_response (
+            &error . to_string (), request);
+          let _ = send_response_with_length_prefix (stream, &response);
+          return;
+        }
+      };
+      let snapshot = runtime . selected_snapshot ();
+      let active = runtime . interactive . lock () . unwrap () . active_source_set . clone ();
+      let operation = match crate::runtime::save_operations::SaveOperation::from_request (
+          request, &content, &snapshot . env . config, &active) {
+        Ok (operation) => operation,
+        Err (reason) => {
+          let response = crate::serve::handlers::save_buffer::save_refusal_response (&reason, request);
+          let _ = send_response_with_length_prefix (stream, &response);
+          return;
+        }
+      };
+      match operation . recorded_response () {
+        Ok (Some (response)) => {
+          let _ = send_response_with_length_prefix (stream, &response);
+          return;
+        }
+        Err (reason) => {
+          let response = operation . tag_response (
+            &crate::serve::handlers::save_buffer::save_refusal_response (&reason, request), "blocked");
+          let _ = send_response_with_length_prefix (stream, &response);
+          return;
+        }
+        Ok (None) => {}
+      }
+      let result = runtime . with_store_transition (
+        operation . operation_id . clone (), |env, interactive, control| {
+          let maintenance = runtime . maintenance_snapshot ();
+          let refusal = runtime . authority_failure ()
+            . or_else (|| runtime . validate_session_authority (request) . err ())
+            . or_else (|| skg_save_policy_refusal (&maintenance . state));
+          let operation = operation . clone () . with_control (control . clone ());
+          let InteractiveSession { views, active_source_set, collateral_scheduler, .. } = interactive;
+          handle_save_buffer_request (stream, request, &content, env, views,
+            active_source_set, collateral_scheduler, runtime, &operation, control,
+            refusal . as_deref ());
+        });
+      if let Err (reason) = result {
+        // A refused reservation has no effects. An already dispatched worker
+        // records its own blocked outcome and retains its recovery obligation.
+        if matches! (operation . status (), Ok (None)) {
+          let response = operation . tag_response (
+            &crate::serve::handlers::save_buffer::save_refusal_response (&reason, request), "refused");
+          match operation . refuse (&response) {
+            Ok (( )) => { let _ = send_response_with_length_prefix (stream, &response); }
+            Err (error) => send_runtime_error (stream, &error),
+          }
+        }
+      }
+    }
+    RequestType::SaveOperationStatus | RequestType::AcknowledgeSaveResult => {
+      crate::runtime::save_operations::handle_save_operation_request (
+        stream, request, runtime, request_type == RequestType::AcknowledgeSaveResult);
+    }
     RequestType::CloseView => {
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_close_view_request (stream, request, &mut interactive . views); }
@@ -502,7 +547,8 @@ fn dispatch_request (
       handle_rebuild_dbs_request (stream, runtime); }
     RequestType::StripBodyWhitespace => {
       if let Err (error) = runtime . with_store_transition (
-          false, |env, _| {
+          format! ("strip-whitespace/{}", uuid::Uuid::new_v4 ()), |env, _, control| {
+            if let Err (error) = control . authorize () { send_runtime_error (stream, &error); return; }
             handle_strip_body_whitespace_request (stream, env); })
       { send_runtime_error (stream, &error); }}
     RequestType::RerenderAllViews => {
@@ -526,7 +572,8 @@ fn dispatch_request (
         stream, request, runtime, owned_reload_batch_tokens),
     RequestType::RecomputeCyclicRoots => {
       if let Err (error) = runtime . with_store_transition (
-          false, |env, _| {
+          format! ("recompute-roots/{}", uuid::Uuid::new_v4 ()), |env, _, control| {
+            if let Err (error) = control . authorize () { send_runtime_error (stream, &error); return; }
             handle_recompute_cyclic_roots_request (stream, env); })
       { send_runtime_error (stream, &error); }}
     RequestType::ApplyCollateral => {

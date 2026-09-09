@@ -122,6 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &logs_dir_for_busysignal ); } );
 
   install_shutdown_signal_handler ();
+  let save_recovery = skg::runtime::recover_source_effects_before_startup (&config)?;
 
   let ( env,
         InitContextHandoff { had_id_set,
@@ -140,6 +141,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     &env . tantivy_index, &env . in_rust_graph,
     had_id_set, all_node_ids,
     link_dests, map_to_content, map_to_containers );
+
+  skg::runtime::commit_recovered_source_effects (
+    save_recovery, env . in_rust_graph . load_full () . graph_generation . get ())?;
 
   // Runtime construction includes exact Git-presentation seeding, recovery
   // journal loading, watcher installation and worker startup.  Connections

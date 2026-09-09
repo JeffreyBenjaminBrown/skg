@@ -7,6 +7,8 @@
 pub enum RequestType {
   SingleRootContentView,
   SaveBuffer,
+  SaveOperationStatus,
+  AcknowledgeSaveResult,
   CloseView,
   TextSearch,
   SnapshotResponse,
@@ -61,6 +63,8 @@ impl RequestType {
     match s {
       "single root content view" => Ok (RequestType::SingleRootContentView),
       "save buffer"              => Ok (RequestType::SaveBuffer),
+      "save operation status"    => Ok (RequestType::SaveOperationStatus),
+      "acknowledge save result"  => Ok (RequestType::AcknowledgeSaveResult),
       "close view"               => Ok (RequestType::CloseView),
       "text search"              => Ok (RequestType::TextSearch),
       "snapshot response"        => Ok (RequestType::SnapshotResponse),

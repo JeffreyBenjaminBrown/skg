@@ -263,9 +263,18 @@ pub(crate) fn prepare_nodecomplete_telescope (
   config       : &SkgConfig,
   allow_hoist  : bool,
 ) -> io::Result<PreparedTelescopeWrite> {
+  prepare_nodecomplete_telescope_with_selection (nodecomplete, config, allow_hoist, None)
+}
+
+pub(crate) fn prepare_nodecomplete_telescope_with_selection (
+  nodecomplete : &NodeComplete,
+  config : &SkgConfig,
+  allow_hoist : bool,
+  selected_graph : Option<&InRustGraph>,
+) -> io::Result<PreparedTelescopeWrite> {
   let verify_as_hoist : bool =
     error_unless_home_is_writable (
-      nodecomplete, config, allow_hoist ) ?;
+      nodecomplete, config, allow_hoist, selected_graph ) ?;
   let prepared_writes = serialize_telescope_sections (nodecomplete, config)?;
   let offending_sources : Vec<SourceName> = {
     let mut sources : Vec<SourceName> = prepared_writes . iter ()
@@ -361,6 +370,7 @@ fn error_unless_home_is_writable (
   nodecomplete : &NodeComplete,
   config       : &SkgConfig,
   allow_hoist  : bool,
+  selected_graph : Option<&InRustGraph>,
 ) -> io::Result<bool> {
   let home : &SourceName = &nodecomplete . source;
   if ! config . user_owns_source (home) {
@@ -377,7 +387,10 @@ fn error_unless_home_is_writable (
   // SCALAR HOIST. Fold the current disk telescope with the same title/body
   // selection used by load. Looking only for a titleless home misses the
   // equally sensitive shape "title at home, body below home".
-  let disk_is_ugly : bool =
+  let disk_is_ugly : bool = if let Some (graph) = selected_graph {
+    graph . get (&nodecomplete . pid) . map (|node| node . ugly_telescope)
+      . unwrap_or (false)
+  } else {
     match telescope_from_disk (config, &nodecomplete . pid) ? {
       None => false,
       Some (telescope) => match
@@ -387,7 +400,8 @@ fn error_unless_home_is_writable (
             io::ErrorKind::InvalidData,
             format! (
               "Refusing to write '{}': its current disk telescope cannot select a title ({}), so writing the buffer's text at home '{}' would publish it without a verifiable Hoist candidate. Repair the .skg sections by hand. See telescope-warnings.org.",
-              nodecomplete . pid, error, home ))), }, };
+              nodecomplete . pid, error, home ))), }, }
+  };
   if disk_is_ugly && ! allow_hoist {
       return Err ( io::Error::new (
         io::ErrorKind::InvalidData,

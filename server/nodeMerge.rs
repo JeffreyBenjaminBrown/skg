@@ -9,7 +9,7 @@ use crate::dbs::in_rust_graph::{
 };
 use crate::save::{
   nodecompletes_from_graph,
-  prepare_fs_update,
+  prepare_fs_update_from_selected,
   update_tantivy_from_saveinstructions,
 };
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -51,8 +51,8 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
   // interactive save path first inserts and verifies an acquiree Hoist repair,
   // so a fresh reread here finds no remaining candidate.
   let candidates =
-    crate::serve::handlers::telescope_hoist::candidates_from_disk (
-      &[], nodeMerge_instructions, &config ) ?;
+    crate::serve::handlers::telescope_hoist::candidates_from_selected (
+      &graph . load_full () . graph, &[], nodeMerge_instructions, &config ) ?;
   if crate::serve::handlers::telescope_hoist::needs_confirmation (
       &candidates, hoist_approved_pids ) {
     return Err (format! (
@@ -77,11 +77,11 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
 
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
-    let prepared = prepare_fs_update (
+    let prepared = prepare_fs_update_from_selected (
       &primary_definenodes,
       &[], // No source-moves during a merge.
       &config,
-      hoist_approved_pids ) ?
+      hoist_approved_pids, Some (&old_selected))?
       . with_selected_fence (&old_selected . manifest);
     prepared . validate_selected_fence ()?;
     prepared . apply (&config) ?;

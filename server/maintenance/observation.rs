@@ -675,6 +675,7 @@ fn run_observation (
     Ok (observation) => observation,
     Err (error) => {
       tracing::error! (%error, "observation could not record its authority");
+      retry_unpublished_observation (runtime);
       return; }
   };
   if deferred {
@@ -698,8 +699,9 @@ fn run_observation (
   }
   match result {
     DiskObservation::ByteEquivalent => {
-      let _ = runtime . transition_maintenance (|coordinator|
-        coordinator . observation_equal ());
+      if runtime . transition_maintenance (|coordinator|
+        coordinator . observation_equal ()) . is_err () {
+        retry_unpublished_observation (runtime); }
     }
     DiskObservation::SemanticallyEqual { manifest, .. } => {
       match runtime . publish_semantically_equal_manifest (
@@ -708,8 +710,9 @@ fn run_observation (
           manifest)
       {
         Ok (( )) => {
-          let _ = runtime . transition_maintenance (|coordinator|
-            coordinator . observation_equal ());
+          if runtime . transition_maintenance (|coordinator|
+            coordinator . observation_equal ()) . is_err () {
+            retry_unpublished_observation (runtime); }
         }
         Err (error) => {
           let _ = runtime . schedule_full_observation (
@@ -729,6 +732,8 @@ fn run_observation (
           operation_id: format! ("candidate-{}", summary . id),
           payload: candidate_offer_payload (&summary, &reasons, &paths),
         });
+      } else {
+        retry_unpublished_observation (runtime);
       }
     }
     DiskObservation::Invalid { mut details } => {
@@ -759,7 +764,18 @@ fn publish_pending_problem (
           . observation_sequence . get ()),
       payload: pending_problem_payload (&reason, &details),
     });
+  } else {
+    retry_unpublished_observation (runtime);
   }
+}
+
+/// A competing save or journal proposal can temporarily prevent publishing
+/// an observation. Retain the hint by observing again after the bounded batch
+/// delay; a refused proposal is never evidence that disk is unchanged.
+fn retry_unpublished_observation (runtime : &ServerRuntime) {
+  if runtime . authority_failure () . is_none () {
+    let _ = runtime . schedule_full_observation (
+      QueuedObservationReason::SelectedGenerationAdvanced); }
 }
 
 fn candidate_offer_payload (

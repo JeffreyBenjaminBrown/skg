@@ -54,6 +54,8 @@ use std::collections::{BTreeSet, HashSet};
 use std::io::BufReader;
 use std::net::TcpStream;
 
+pub const PROTOCOL_VERSION : u32 = 2;
+
 pub fn handle_verify_connection_request (
   stream  : &mut TcpStream,
   request : &str,
@@ -82,7 +84,7 @@ pub fn handle_verify_connection_request (
       &active_source_set_name,
       census_required,
       &maintenance,
-      abandoned . as_ref ()))
+      abandoned . as_ref (), runtime . server_session_id ()))
   }) ();
   let response = match result {
     Ok (response) => response,
@@ -97,6 +99,9 @@ fn install_client_handshake (
   env         : &SkgEnv,
   interactive : &mut InteractiveSession,
 ) -> Result<bool, String> {
+  // A failed replacement handshake cannot inherit its predecessor's census.
+  interactive . attached_client = None;
+  validate_protocol_version (request)?;
   let kind = match value_from_request_sexp ("client-kind", request)? . as_str () {
     "emacs" => ClientKind::Emacs,
     "neovim" => ClientKind::Neovim,
@@ -139,6 +144,16 @@ fn install_client_handshake (
   Ok (census_required)
 }
 
+pub(crate) fn validate_protocol_version (request : &str) -> Result<(), String> {
+  let version : Option<u32> = value_from_request_sexp ("protocol-version", request)
+    . ok () . and_then (|version| version . parse () . ok ());
+  if version != Some (PROTOCOL_VERSION) {
+    return Err (format! (
+      "incompatible Skg protocol: server requires version {}; preserve editor text and reconnect with a compatible client",
+      PROTOCOL_VERSION)); }
+  Ok (( ))
+}
+
 fn verify_connection_response (
   config   : &SkgConfig,
   warnings : &[(crate::types::misc::ID, TelescopeViolation)],
@@ -147,6 +162,7 @@ fn verify_connection_response (
   census_required : bool,
   maintenance : &MaintenanceCoordinator,
   abandoned_prearchive : Option<&(crate::maintenance::IncidentId, String)>,
+  server_session_id : &str,
 ) -> String {
   let atom = |value : &str| -> Sexp {
     Sexp::Atom (Atom::S (value . to_string ())) };
@@ -188,6 +204,8 @@ fn verify_connection_response (
     StoreHealth::Poisoned (reason) => Sexp::List (vec! [
       atom ("poisoned"), atom (reason)]), }};
   let mut fields = vec! [
+    field ("protocol-version", Sexp::Atom (Atom::I (PROTOCOL_VERSION as i64))),
+    field ("server-session-id", atom (server_session_id)),
     field ("response-type", atom (
       TcpToClient::VerifyConnection . repr_in_client ())),
     field ("content", atom (
@@ -267,7 +285,7 @@ pub fn handle_client_census_request (
       . graph_generation . get ();
     let maintenance = runtime . maintenance_snapshot ();
     let mut live_uris : HashSet<ViewUri> = HashSet::new ();
-    let mut text_required : Vec<String> = Vec::new ();
+    let text_required : Vec<String> = Vec::new ();
     let mut stale : Vec<String> = Vec::new ();
     let mut presentation_stale : Vec<String> = Vec::new ();
     let mut census_applications = Vec::new ();
@@ -281,6 +299,10 @@ pub fn handle_client_census_request (
 
     for descriptor in descriptors {
       let Some (uri) = descriptor . view_uri . clone () else { continue; };
+      if !descriptor_has_session_authority (&descriptor, runtime . server_session_id ()) {
+        stale . push (descriptor . buffer_id . clone ());
+        continue;
+      }
       let descriptor_kind = validate_live_descriptor (&descriptor)?;
       let census_application = census_application_ack (
         &env . in_rust_graph_snapshot (), &maintenance . state, &descriptor)?;
@@ -317,11 +339,8 @@ pub fn handle_client_census_request (
           // which may materialize that text as a server view.
           enrollment_records . push (descriptor . frozen_record ()?);
         }
-        None if descriptor . graph_generation == current_generation => {
-          text_required . push (descriptor . buffer_id . clone ());
-          interactive . pending_census_texts . insert (
-            descriptor . buffer_id . clone (), descriptor);
-        }
+        // A missing regular view has no proven server base. Client-provided
+        // text and equal generation counters cannot manufacture that proof.
         None => stale . push (descriptor . buffer_id . clone ()),
       }
     }
@@ -386,7 +405,8 @@ fn reconcile_maintenance_census (
   runtime . transition_maintenance (|coordinator| {
     coordinator . adopt_attached_session (&attached_session_id)?;
     coordinator . reconcile_absent_preselection_retirements (live_buffer_ids);
-    coordinator . reconcile_absent_view_settlements (live_buffer_ids)?;
+    if matches! (coordinator . state, CoordinatorState::Active (_)) {
+      coordinator . reconcile_absent_view_settlements (live_buffer_ids)?; }
     Ok (( ))
   })?;
   if let Some ((incident, verified)) = verified {
@@ -551,7 +571,8 @@ pub fn handle_client_census_texts_request (
       else {
         return Err (format! (
           "census texts include unrequested buffer '{}'", buffer_id)); };
-      if descriptor . graph_generation != env . in_rust_graph . load_full ()
+      if !descriptor_has_session_authority (&descriptor, runtime . server_session_id ())
+      || descriptor . graph_generation != env . in_rust_graph . load_full ()
         . graph_generation . get ()
       {
         stale . push (buffer_id);
@@ -660,6 +681,7 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
     let current_sha256 = sha256_field (&record, "current-sha256")?;
     result . push (CensusDescriptor {
       buffer_id,
+      server_session_id: field (&record, "server-session-id")?,
       kind: field (&record, "kind")?,
       lifecycle: field (&record, "lifecycle")?,
       disposable: bool_field (&record, "disposable")?,
@@ -695,6 +717,14 @@ fn parse_descriptors (payload : &str) -> Result<Vec<CensusDescriptor>, String> {
     });
   }
   Ok (result)
+}
+
+fn descriptor_has_session_authority (
+  descriptor : &CensusDescriptor,
+  server_session_id : &str,
+) -> bool {
+  !server_session_id . is_empty ()
+    && descriptor . server_session_id == server_session_id
 }
 
 fn requested_maintenance_epoch (request : &str) -> Result<Option<u64>, String> {
@@ -967,6 +997,25 @@ mod tests {
   use std::path::PathBuf;
 
   #[test]
+  fn incompatible_protocol_has_no_legacy_authority_path () {
+    for request in ["()", "((protocol-version . 1))",
+                    "((protocol-version . 3))", "((protocol-version . nope))"] {
+      assert! (validate_protocol_version (request) . unwrap_err ()
+        . contains ("incompatible Skg protocol")); }
+    assert! (validate_protocol_version ("((protocol-version . 2))") . is_ok ());
+  }
+
+  #[test]
+  fn equal_counters_do_not_restore_an_old_server_session () {
+    let descriptor : CensusDescriptor = parse_descriptors (
+      &complete_descriptor ("")) . unwrap () . remove (0);
+    assert! (descriptor_has_session_authority (&descriptor, "server-test-session"));
+    assert! (!descriptor_has_session_authority (&descriptor, "restarted-server"));
+    assert_eq! (descriptor . graph_generation, 7);
+    assert_eq! (descriptor . application_token, 5);
+  }
+
+  #[test]
   fn verification_carries_the_ordered_normalized_source_inventory () {
     let mut sources = HashMap::new ();
     for (name, path, owned) in [
@@ -995,7 +1044,7 @@ mod tests {
       ]));
     let response : String = verify_connection_response (
       &config, &warnings, &selected, "all", false,
-      &MaintenanceCoordinator::new (), None);
+      &MaintenanceCoordinator::new (), None, "server-test-session");
     let first : usize = response . find ("(name first)") . unwrap ();
     let second : usize = response . find ("(name second)") . unwrap ();
     assert! (first < second, "{}", response);
@@ -1022,7 +1071,7 @@ mod tests {
       reason: "SECRET-MAINTENANCE-PAYLOAD" . into (),
     };
     let response = verify_connection_response (
-      &config, &[], &selected, "all", true, &maintenance, None);
+      &config, &[], &selected, "all", true, &maintenance, None, "server-test-session");
     assert! (response . contains (
       "(maintenance-state blocked-store-health)"), "{}", response);
     assert! (!response . contains ("SECRET-MAINTENANCE-PAYLOAD"),
@@ -1039,7 +1088,7 @@ mod tests {
     let abandoned = (incident . clone (), "explicit-partial-reload" . into ());
     let response = verify_connection_response (
       &config, &[], &selected, "all", true,
-      &MaintenanceCoordinator::new (), Some (&abandoned));
+      &MaintenanceCoordinator::new (), Some (&abandoned), "server-test-session");
     assert! (response . contains (&format! (
       "(abandoned-prearchive-incident {})", incident)), "{}", response);
     assert! (response . contains (
@@ -1058,6 +1107,7 @@ mod tests {
       "(operators \\\"true\\\") (regex \\\"true\\\") ",
       "(terms \\\"dog\\\"))\") ",
       "(root-ids (\"z\" \"a\" \"z\")) (source-set . \"private\") ",
+      "(server-session-id . \"server-test-session\") ",
       "(graph-generation . 7) (presentation-generation . 3) ",
       "(server-revision . 11) (application-token . 5) ",
       "(dirty . \"true\") (logical-dirty . \"true\") ",
@@ -1237,6 +1287,7 @@ mod tests {
         acknowledged: false,
       });
     let descriptor = CensusDescriptor {
+      server_session_id: "server-test-session" . into (),
       buffer_id: "buffer" . into (), kind: "content-view" . into (),
       lifecycle: "live-view" . into (), disposable: false,
       continuation_id: None, origin_buffer_id: None, origin_view_uri: None,

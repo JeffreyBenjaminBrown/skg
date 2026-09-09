@@ -1703,3 +1703,60 @@ skips; its log is preserved as 'native-undo-required.log'. Only the fixed run
 establishes undo coverage. Full editor acceptance will run after protocol work.
 ** choices determining the future
 No architectural question. Continue the server/editor lifecycle work.
+
+* Simplify/cohere checkpoint: durable server saves and selection adapters
+** what's done and went well
+Ordinary interactive saves retain exact request interpretation, before/after
+bytes and the combined ordinary/merge batch before effect authorization.
+Owner reservations span preparation, authorized filesystem effects, matching
+graph/search publication and durable terminal outcome. The server sends a
+successful save result only after the outcome is durable. Generated merge
+preservation nodes and acquiree deletion belong to the same batch.
+
+Startup resolves retained source effects before initializing the graph/index,
+records recovered outcomes before runtime admission, and gives the new process
+a fresh session ID. Runtime construction itself rejects unresolved save
+records, preventing alternate entry points from bypassing that ordering.
+Protocol version 2 is mandatory before interactive attachment. Census cannot
+recreate old authority merely from equal counters and client-supplied text.
+Retained duplicate outcomes keep their original issuing session.
+
+All three maintenance selection adapters now reserve through the owner;
+reader draining is gone. Failed index restoration retains the old Searcher
+for queries and keeps writes blocked. Proved restoration can release the
+reservation. Refused observation proposals requeue their exact-check hint.
+
+Hoist classification, repair text and interactive filesystem preparation use
+the selected graph. A new regression changes disk after selection and proves
+that preflight keeps the selected provenance and repair text. Offline file
+writers still explicitly inspect disk. Five Hoist tests and three selection
+restoration tests pass.
+
+Real TCP tests execute the actual runtime/request loop in a disposable child
+process, SIGKILL it after staging, authorization, each of two path effects,
+complete application, pair publication and durable commit, then start a fresh
+process against the same source/private-state directories. Each recovered
+operation permits a newer save, and the old duplicate never rewrites those
+newer bytes. Protocol mismatch is also exercised over TCP. The final focused
+run passes five tests including all seven crash schedules in 4.65 seconds:
+'durable-runtime-focused-final.log'.
+** Changes to the plan's envisioned order.
+Fresh server-session authority is integrated with durable save delivery
+because an old response cannot safely grant a new process's authority. Both
+client adapters are being checkpointed independently. Socket tests accompany
+the server integration; maintenance crash/lifecycle schedules follow it.
+** what's imperfect about what's done
+Initial socket runs exposed a test response-decoder mistake, logical versus
+transport save-envelope binding, and an overly strict owner refusal during
+compatible observer publication. Their first logs remain preserved. A full
+library run found three restoration fixtures using an obsolete synthetic
+reservation spelling; the corrected focused fixtures pass.
+
+The socket tests exercise fresh-process server recovery, but do not yet
+establish the entire editor crash and independent-release matrix. Interactive
+state/worker adapters, other source-changing commands and remaining manifest
+preflight dependencies still need the common final boundary.
+** choices determining the future
+No architectural question. Continue fixed census, committed-incident ledger,
+per-buffer settlement, durable query waits, command integration and final
+acceptance.

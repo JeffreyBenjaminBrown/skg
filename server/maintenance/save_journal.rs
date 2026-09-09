@@ -361,7 +361,11 @@ impl SaveJournalStore {
     request_base_fingerprint : &str,
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
     self . apply_authorized_with_progress_hook (
-      operation_id, request_base_fingerprint, &mut |_| {})
+      operation_id, request_base_fingerprint, &mut |_completed| {
+        #[cfg(test)]
+        crate::runtime::save_operations::socket_tests::crash_point (
+          &format! ("after-path-{}", _completed));
+      })
   }
 
   /// Persist the result that a caller may acknowledge.  The caller must have

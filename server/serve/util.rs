@@ -12,12 +12,20 @@ pub const ARTIFACT_BUNDLE_CONTENT_TYPE : &str =
   "application/x-skg-artifact-bundle";
 
 thread_local! {
+  /// Transport provenance only. This never supplies graph or view authority.
+  static CONNECTION_SERVER_SESSION : RefCell<Option<String>> =
+    const { RefCell::new (None) };
   /// The one foreground operation owned by this serial connection thread.
   /// Search keeps it across idle-loop snapshot/enrichment continuations.
   static CURRENT_REQUEST_CONTEXT : RefCell<Option<RequestContext>> =
     const { RefCell::new (None) };
   static LAST_SEND_FAILURE : RefCell<Option<String>> =
     const { RefCell::new (None) };
+}
+
+pub(crate) fn set_connection_server_session (session : &str) {
+  CONNECTION_SERVER_SESSION . with (|slot|
+    *slot . borrow_mut () = Some (session . to_string ()));
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -176,10 +184,14 @@ pub fn ensure_request_has_terminal_response (
 }
 
 fn envelope_response (response : &str) -> String {
+  let response : String = CONNECTION_SERVER_SESSION . with (|slot|
+    slot . borrow () . as_ref () . map (|session|
+      add_server_session_to_response (response, session))
+      . unwrap_or_else (|| response . to_string ()));
   let Some (context) = CURRENT_REQUEST_CONTEXT . with (
     |slot| slot . borrow () . clone ())
-  else { return response . to_string (); };
-  let Ok (Sexp::List (mut fields)) = sexp::parse (response)
+  else { return response; };
+  let Ok (Sexp::List (mut fields)) = sexp::parse (&response)
   else { return response . to_string (); };
   if field_atom (&fields, "server-push") . as_deref () == Some ("true") {
     return response . to_string (); }
@@ -195,6 +207,19 @@ fn envelope_response (response : &str) -> String {
   if field_atom (&fields, "terminal-status") . is_none () {
     if let Some (status) = inferred_terminal_status (&response_type) {
       fields . push (sexp_field ("terminal-status", status)); }}
+  Sexp::List (fields) . to_string ()
+}
+
+/// Retained terminal responses keep their original issuing session even when
+/// delivered again over a connection to a newer server process.
+pub(crate) fn add_server_session_to_response (
+  response : &str,
+  session : &str,
+) -> String {
+  let Ok (Sexp::List (mut fields)) = sexp::parse (response)
+    else { return response . to_string (); };
+  if field_atom (&fields, "server-session-id") . is_none () {
+    fields . push (sexp_field ("server-session-id", session)); }
   Sexp::List (fields) . to_string ()
 }
 

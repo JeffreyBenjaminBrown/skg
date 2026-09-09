@@ -5,7 +5,7 @@ use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::{
   apply_delete_propagation_cleanup,
   preflight_fs_from_saveinstructions_with_hoist_approval,
-  update_graph_including_nodeMerges,
+  update_graph_including_nodeMerges_with_operation,
 };
 use crate::serve::ViewsState;
 use crate::runtime::ServerRuntime;
@@ -15,7 +15,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::telescope_hoist::{
   HoistCandidate,
   approved_pids_from_request as hoist_approved_pids_from_request,
-  candidates_from_disk as hoist_candidates_from_disk,
+  candidates_from_selected as hoist_candidates_from_selected,
   confirmation_response as hoist_confirmation_response,
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
@@ -29,7 +29,6 @@ use crate::serve::util::{
   format_buffer_response_sexp,
   format_fork_confirmation_response_sexp,
   format_lock_views_sexp,
-  read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp };
@@ -47,7 +46,6 @@ use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -110,200 +108,129 @@ impl SaveResponse {
         items, point_position ); }
     response . to_string () }}
 
-/// Handles save buffer requests from Emacs.
-/// - Reads the buffer content (with length prefix).
-/// - Sends the early broad lock (uris_of_views_to_lock) before the slow pipeline.
-/// - Runs 'update_from_and_rerender_buffer' (parse + validate -> SavePlan, update
-///   the graph, then rerender + stream the saved and collateral views).
-/// - Responds to Emacs (with length prefix).
-pub fn handle_save_buffer_request (
-  reader     : &mut BufReader <TcpStream>,
-  stream     : &mut TcpStream, // PITFALL: writes to the same TCP stream as 'reader'
-  request    : &str,
-  env        : &mut SkgEnv,
+/// Execute one admitted save with its durable identity and owner reservation.
+pub(crate) fn handle_save_buffer_request (
+  stream : &mut TcpStream,
+  request : &str,
+  content : &str,
+  env : &mut SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
   collateral_scheduler : &mut CollateralScheduler,
-  runtime    : &ServerRuntime,
+  runtime : &ServerRuntime,
+  operation : &crate::runtime::save_operations::SaveOperation,
+  control : &crate::runtime::MutationControl,
   pre_parse_refusal : Option<&str>,
 ) {
-  let viewuri_from_request_result : Result<ViewUri, String> =
-    view_uri_from_request (request);
-  let requested_authority = requested_save_authority (request);
-  let save_point_position : Option<SavePointPosition> =
-    save_point_position_from_request (request);
-  let fork_approved : bool =
-    // Forking is gated on confirmation: the first save returns a
-    // fork-confirmation buffer, and the client re-issues the save with
-    // this field once the user approves (mirroring the override-menu's
-    // (override-choice . "bypass") field on a re-issued view request).
-    fork_approved_from_request (request);
-  let fork_sources : HashMap<ID, SourceName> =
-    // The per-fork clone sources the user chose in the confirmation
-    // buffer, riding back on the approve re-save. Empty otherwise.
-    fork_sources_from_request (request);
-  let hoist_approved_pids : HashSet<ID> =
-    hoist_approved_pids_from_request (request);
-  let scalar_approved_pids : HashSet<ID> =
-    scalar_approved_pids_from_request (request);
-  { // Send the early broad lock BEFORE reading the buffer, so the client's
-    // one-shot save-lock handler always fires exactly once and balances its
-    // pending-count -- even when the read below fails (otherwise only
-    // save-result would arrive, leaving the count unbalanced and wedging the
-    // next save's wait). save-result unlocks regardless. Conservative/broad
-    // here: the SavePlan is not yet computed.
-    let uris_to_lock : Vec<ViewUri> =
-      uris_of_views_to_lock (
-        &viewuri_from_request_result, views_state );
-    let lock_sexp : String =
-      format_lock_views_sexp ( &uris_to_lock );
-    let _ = send_response_with_length_prefix (
-      stream,
-      & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
-  match read_length_prefixed_content (reader) {
-    Ok (initial_buffer_content) => {
-      if let Some (reason) = pre_parse_refusal {
-        let response_sexp = empty_response_sexp (
-          reason, &[], &save_point_position) . to_string ();
-        let _ = send_response_with_length_prefix (
-          stream,
-          &tag_sexp_response (TcpToClient::SaveResult, &response_sexp));
-        return; }
-      let requested_authority = match &requested_authority {
-        Ok (authority) => authority,
-        Err (reason) => {
-          let error = SaveError::StaleViewAuthority (reason . clone ());
-          let response_sexp = empty_response_sexp (
-            &format_save_error_as_org (&error), &[], &save_point_position)
-            . to_string ();
-          let _ = send_response_with_length_prefix (
-            stream,
-            &tag_sexp_response (TcpToClient::SaveResult, &response_sexp));
-          return; }
-      };
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "update_from_and_rerender_buffer" ). entered();
-        match block_on(
-          update_from_and_rerender_buffer_with_approvals (
-            stream,
-            & initial_buffer_content,
-            env,
-            views_state . diff_mode_enabled,
-            &viewuri_from_request_result,
-            views_state,
-            Some (active_source_set),
-            fork_approved,
-            &fork_sources,
-            &hoist_approved_pids,
-            &scalar_approved_pids,
-            Some (requested_authority),
-            Some (collateral_scheduler) ))
-        { Ok (mut save_response) => {
-            save_response . save_point_position =
-              save_point_position . clone ();
-            match (&save_response . hoist_confirmation,
-                   &save_response . fork_confirmation,
-                   &save_response . scalar_release_confirmation) {
-              (Some (candidates), _, _) => {
-                let _ = send_response_with_length_prefix (
-                  stream,
-                  & tag_sexp_response (
-                    TcpToClient::TelescopeHoistConfirmation,
-                    &hoist_confirmation_response (candidates) )); },
-              (None, Some (to_minibuffer), _) => {
-                // A save that found forks and was not approved: nothing
-                // committed; send the confirmation buffer instead of a
-                // save-result.
-                let _ = send_response_with_length_prefix (
-                  stream,
-                  & tag_sexp_response (
-                    TcpToClient::ForkConfirmation,
-                    & format_fork_confirmation_response_sexp (
-                      & save_response . saved_view, to_minibuffer ))); },
-              (None, None, Some (confirmation)) => {
-                let _ = send_response_with_length_prefix (stream, confirmation); },
-              (None, None, None) => {
-                if let Ok (view_uri) = &viewuri_from_request_result {
-                  let graph_generation = env . in_rust_graph . load_full ()
-                    . graph_generation . get ();
-                  let presentation_generation = collateral_scheduler
-                    . presentation_generation ();
-                  let resulting_token = requested_authority
-                    . application_token . saturating_add (1);
-                  let _ = views_state . open_views
-                    . set_client_application_authority (
-                      view_uri, graph_generation, presentation_generation,
-                      resulting_token);
-                }
-                let mut payload = save_response . to_sexp_string ();
-                if let Ok (view_uri) = &viewuri_from_request_result {
-                  if let Some (state) =
-                    views_state . open_views . views . get (view_uri)
-                  {
-                    payload = crate::serve::util::add_view_authority_to_response (
-                      &payload, state); }}
-                let _ = send_response_with_length_prefix (
-                  stream,
-                  & tag_sexp_response (
-                    TcpToClient::SaveResult,
-                    &payload )); }, };
+  let view_uri : Result<ViewUri, String> = view_uri_from_request (request);
+  let point : Option<SavePointPosition> = save_point_position_from_request (request);
+  let authority : Result<RequestedSaveAuthority, String> = requested_save_authority (request);
+  if let Some (reason) = pre_parse_refusal {
+    let response = save_refusal_response (reason, request);
+    finish_save_response (stream, runtime, env, operation, control, &response, "refused");
+    return;
+  }
+  let authority = match authority {
+    Ok (authority) => authority,
+    Err (reason) => {
+      let response = save_refusal_response (&reason, request);
+      finish_save_response (stream, runtime, env, operation, control, &response, "refused");
+      return;
+    }
+  };
+  let uris : Vec<ViewUri> = uris_of_views_to_lock (&view_uri, views_state);
+  let _ = send_response_with_length_prefix (stream,
+    &tag_sexp_response (TcpToClient::SaveLock, &format_lock_views_sexp (&uris)));
+  let result = block_on (update_from_and_rerender_buffer_with_approvals_with_operation (
+    stream, content, env, views_state . diff_mode_enabled, &view_uri,
+    views_state, Some (active_source_set), fork_approved_from_request (request),
+    &fork_sources_from_request (request), &hoist_approved_pids_from_request (request),
+    &scalar_approved_pids_from_request (request), Some (&authority),
+    Some (collateral_scheduler), Some (operation)));
+  let (response, state) : (String, &str) = match result {
+    Ok (mut saved) => {
+      saved . save_point_position = point . clone ();
+      match (&saved . hoist_confirmation, &saved . fork_confirmation,
+             &saved . scalar_release_confirmation) {
+        (Some (candidates), _, _) => (
+          tag_sexp_response (TcpToClient::TelescopeHoistConfirmation,
+            &hoist_confirmation_response (candidates)), "refused"),
+        (None, Some (prompt), _) => (
+          tag_sexp_response (TcpToClient::ForkConfirmation,
+            &format_fork_confirmation_response_sexp (&saved . saved_view, prompt)), "refused"),
+        (None, None, Some (confirmation)) => (confirmation . clone (), "committed"),
+        (None, None, None) => {
+          if let Ok (uri) = &view_uri {
+            let _ = views_state . open_views . set_client_application_authority (
+              uri, env . in_rust_graph . load_full () . graph_generation . get (),
+              collateral_scheduler . presentation_generation (),
+              authority . application_token . saturating_add (1));
           }
-          Err (err) => { // Check if this is a SaveError that should be formatted for the client
-            if let Some (save_error) = err . downcast_ref::<SaveError>() {
-              if let SaveError::DiskSelectionChanged { paths, .. } = save_error {
-                if let Err (observation_error) = runtime
-                  . schedule_path_observation (
-                    paths . clone (),
-                    QueuedObservationReason::SaveFenceMismatch)
-                {
-                  tracing::error! (
-                    %observation_error,
-                    "save fence refused safely, but exact observation could not be queued"); }}
-              // Warnings always accompany errors (decided 2026-06-12):
-              // a failed validation carries the parse-time warnings it
-              // collected before aborting.
-              let warnings : &[String] = match save_error {
-                SaveError::BufferValidationErrors { warnings, .. } =>
-                  warnings,
-                _ => &[], };
-              let response_sexp : String =
-                empty_response_sexp (
-                  & format_save_error_as_org (save_error),
-                  warnings,
-                  & save_point_position )
-                . to_string ();
-              let _ = send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::SaveResult, & response_sexp ));
-            } else {
-              let error_msg : String =
-                format!("Error processing buffer content: {}", err);
-              tracing::error!("{}", error_msg);
-              let response_sexp : String =
-                empty_response_sexp (
-                  &error_msg,
-                  &[],
-                  &save_point_position )
-                . to_string ();
-              let _ = send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::SaveResult, &response_sexp )); }} }}; }
-    Err (err) => {
-      let error_msg : String =
-        format! ("Error reading buffer content: {}", err );
-      tracing::error! ( "{}", error_msg );
-      let response_sexp : String =
-        empty_response_sexp (
-          &error_msg,
-          &[],
-          &save_point_position )
-        . to_string ();
-      let _ = send_response_with_length_prefix (
-        stream,
-        & tag_sexp_response (
-          TcpToClient::SaveResult, &response_sexp )); }} }
+          let mut payload : String = saved . to_sexp_string ();
+          if let Ok (uri) = &view_uri {
+            if let Some (view) = views_state . open_views . views . get (uri) {
+              payload = crate::serve::util::add_view_authority_to_response (&payload, view); }
+          }
+          (tag_sexp_response (TcpToClient::SaveResult, &payload), "committed")
+        }
+      }
+    }
+    Err (error) => {
+      if let Some (SaveError::DiskSelectionChanged { paths, .. }) = error . downcast_ref::<SaveError> () {
+        if let Err (reason) = runtime . schedule_path_observation (
+            paths . clone (), QueuedObservationReason::SaveFenceMismatch) {
+          tracing::warn! (%reason, "could not schedule save-fence observation"); }
+      }
+      let details : String = error . downcast_ref::<SaveError> ()
+        . map (format_save_error_as_org) . unwrap_or_else (|| error . to_string ());
+      let state : &str = match operation . status () {
+        Ok (None) => "refused",
+        Ok (Some (snapshot)) if matches! (snapshot . status,
+          crate::maintenance::save_journal::SaveOperationStatus::PreparedUnAuthorized
+          | crate::maintenance::save_journal::SaveOperationStatus::StagingUnAuthorized) => "refused",
+        _ => "blocked",
+      };
+      (tag_sexp_response (TcpToClient::SaveResult,
+        &empty_response_sexp (&details, &[], &point) . to_string ()), state)
+    }
+  };
+  finish_save_response (stream, runtime, env, operation, control, &response, state);
+}
+
+pub(crate) fn save_refusal_response (reason : &str, request : &str) -> String {
+  tag_sexp_response (TcpToClient::SaveResult,
+    &empty_response_sexp (reason, &[], &save_point_position_from_request (request)) . to_string ())
+}
+
+fn finish_save_response (
+  stream : &mut TcpStream,
+  runtime : &ServerRuntime,
+  env : &SkgEnv,
+  operation : &crate::runtime::save_operations::SaveOperation,
+  control : &crate::runtime::MutationControl,
+  response : &str,
+  state : &str,
+) {
+  let response : String = operation . tag_response (response, state);
+  let recorded : Result<(), String> = match state {
+    "committed" => runtime . publish_selected_from_env (control, env)
+      . and_then (|_| operation . commit (&response, &format! ("graph-{}-manifest-{}",
+        env . in_rust_graph . load_full () . graph_generation . get (),
+        env . in_rust_graph . load_full () . manifest_revision . get ()))),
+    "refused" => operation . refuse (&response),
+    _ => Err ("save has unresolved authorized effects; use save operation status to recover" . into ()),
+  };
+  match recorded {
+    Ok (( )) => { let _ = send_response_with_length_prefix (stream, &response); }
+    Err (reason) => {
+      let _ = control . block (reason . clone ());
+      let blocked = operation . tag_response (
+        &tag_sexp_response (TcpToClient::SaveResult,
+          &empty_response_sexp (&reason, &[], &None) . to_string ()), "blocked");
+      let _ = send_response_with_length_prefix (stream, &blocked);
+    }
+  }
+}
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
@@ -556,7 +483,27 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   hoist_approved_pids         : &HashSet<ID>,
   scalar_approved_pids        : &HashSet<ID>,
   requested_authority         : Option<&RequestedSaveAuthority>,
+  collateral_scheduler    : Option<&mut CollateralScheduler>,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  update_from_and_rerender_buffer_with_approvals_with_operation (
+    stream, org_buffer_text, env, diff_mode_enabled, viewuri_from_request_result, views_state, active_source_set, fork_approved, fork_sources, hoist_approved_pids, scalar_approved_pids, requested_authority, collateral_scheduler, None) . await
+}
+
+pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operation (
+  stream                      : &mut TcpStream,
+  org_buffer_text             : &str,
+  env                         : &mut SkgEnv,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                  : &mut ViewsState,
+  active_source_set            : Option<&ActiveSourceSet>,
+  fork_approved                : bool,
+  fork_sources                 : &HashMap<ID, SourceName>,
+  hoist_approved_pids         : &HashSet<ID>,
+  scalar_approved_pids        : &HashSet<ID>,
+  requested_authority         : Option<&RequestedSaveAuthority>,
   mut collateral_scheduler    : Option<&mut CollateralScheduler>,
+  operation : Option<&crate::runtime::save_operations::SaveOperation>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
@@ -590,8 +537,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     apply_delete_propagation_cleanup (
       &mut nonmerge_defineNodes, &graph_snap ); }
   let hoist_candidates : Vec<HoistCandidate> =
-    hoist_candidates_from_disk (
-      &nonmerge_defineNodes, &nodeMerges, &env . config ) ?;
+    hoist_candidates_from_selected (
+      &env . in_rust_graph_snapshot (), &nonmerge_defineNodes, &nodeMerges, &env . config ) ?;
   if hoist_needs_confirmation (
       &hoist_candidates, hoist_approved_pids ) {
     return Ok ( SaveResponse {
@@ -607,7 +554,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   // copies its text into a fresh preservation node and deletes it.
   nonmerge_defineNodes . extend (
     repair_saves_for_unwritten_candidates (
-      &hoist_candidates, &nonmerge_defineNodes, &env . config ) ? );
+      &hoist_candidates, &nonmerge_defineNodes, &env . in_rust_graph_snapshot ())? );
   if ! fork_specs . is_empty () && ! fork_approved {
     // A save that found forks but was not pre-approved commits NOTHING.
     // Return a read-only fork-confirmation buffer; the client shows it,
@@ -653,14 +600,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &all_filesystem_outputs,
       &source_moves,
       &env . config,
-      hoist_approved_pids ) ?; }
+      hoist_approved_pids, &env . in_rust_graph . load_full ())?; }
 
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
     // single Tantivy index pass, so there is no separate context pass.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_graph_including_nodeMerges" ). entered();
-    update_graph_including_nodeMerges (
+    update_graph_including_nodeMerges_with_operation (
       nonmerge_defineNodes . clone(),
       &nodeMerges,
       &source_moves,
@@ -671,13 +618,13 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       requested_authority . map (|authority|
         authority . graph_generation)
         . unwrap_or_else (|| env . in_rust_graph . load_full ()
-          . graph_generation . get ()) ) . await
+          . graph_generation . get ()), operation ) . await
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ?; }
-
-
+  env . searcher = env . in_rust_graph . load_full () . searcher . clone ()
+    . expect ("completed save has a matching Searcher");
 
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(

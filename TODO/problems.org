@@ -43,17 +43,6 @@
    nonparticipating writer. Specify cooperative exclusion, a non-saving
    external-edit interval, or a weaker explicitly stated guarantee.
 
-** Ordinary multi-file saves lack a durable filesystem transaction boundary
-   [[file:../server/save.rs::736][PreparedFilesystemUpdate::apply]] uses direct fs::write and remove_file
-   operations, with no durable batch intent at this boundary. A crash or I/O
-   error can leave a truncated file or only a prefix of a multi-file save.
-   Cache reconstruction from disk cannot recover unwritten/truncated bytes.
-
-   This weakness predates the latest maintenance protocol. It matters to the
-   architecture review because extensive maintenance recovery does not make
-   ordinary saves equally recoverable. Safe file replacement and a recoverable
-   multi-file commit policy solve different parts of the problem; neither an
-   in-memory transaction nor simply rebuilding the caches supplies both.
 
 ** Normal observation hints still scan the corpus
    [[file:../server/maintenance/observation.rs::622][run_observation]] deduplicates paths but calls observe_complete_disk for

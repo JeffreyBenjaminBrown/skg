@@ -5,7 +5,7 @@
 //! ownership.  Callers still use 'ServerRuntime'; this is only an ownership
 //! boundary for readers of the implementation.
 
-use super::{ServerRuntime, SelectedRuntimeSnapshot};
+use super::ServerRuntime;
 
 use crate::maintenance::archive::VerifiedInitialArchive;
 use crate::maintenance::candidate::ObservedDiskCandidate;
@@ -207,21 +207,25 @@ impl ServerRuntime {
     expected_manifest_revision : crate::types::store_state::ManifestRevision,
     manifest : crate::types::store_state::SelectedPathManifest,
   ) -> Result<(), String> {
-    let selection = self . generation_gate . begin_selection (
-      expected_graph_generation, false)?;
-    let env = self . writer_env . lock ()
-      . map_err (|_| "writer environment poisoned" . to_string ())?;
+    let control = self . reserve_mutation (
+      format! ("manifest/{}", uuid::Uuid::new_v4 ()),
+      expected_graph_generation, expected_manifest_revision)?;
+    let env = match self . writer_env . lock () {
+      Ok (env) => env,
+      Err (_) => { control . finish ()?;
+        return Err ("writer environment poisoned" . into ()); }
+    };
     let current = env . in_rust_graph . load_full ();
     if current . graph_generation != expected_graph_generation
-    || current . manifest_revision != expected_manifest_revision
-    {
+    || current . manifest_revision != expected_manifest_revision {
+      control . finish ()?;
       return Err ("semantic no-op candidate was superseded" . into ()); }
+    control . authorize ()?;
     env . in_rust_graph . store (Arc::new (
       current . with_semantically_equal_manifest (manifest)));
-    self . selected . store (Arc::new (
-      SelectedRuntimeSnapshot::from_env (&env)));
-    drop (env);
-    selection . retain_generation ();
+    self . publish_selected_from_env (&control, &env)?;
+    control . finish ()?;
+
     Ok (( ))
   }
 }

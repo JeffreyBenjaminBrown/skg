@@ -1,13 +1,17 @@
 //! Save-time publication gate for malformed scalar placement.
 //!
 //! A buffer-authored NodeComplete has already lost the provenance of its
-//! title and body. Before writing it, reread the current disk telescope and
-//! fold the scalars with the load path. If either selected scalar lives below
+//! title and body. Interactive preparation reads its pinned graph's scalar
+//! provenance; standalone file writers explicitly classify disk. If a scalar lives below
 //! home, the save must carry an exact PID approval obtained from the typed
 //! confirmation response.
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::save::nodecomplete_from_noderust;
 use crate::telescope::fold::fold_telescope_collecting_warnings;
+use crate::telescope::types::Telescope;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, NodeMerge, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -50,6 +54,32 @@ pub fn candidates_from_disk (
   node_merges  : &[NodeMerge],
   config       : &SkgConfig,
 ) -> io::Result<Vec<HoistCandidate>> {
+  candidates_with_lookup (define_nodes, node_merges, config, |pid| {
+    let Some (telescope) : Option<Telescope> =
+      telescope_from_disk (config, pid)? else { return Ok (None); };
+    fold_telescope_collecting_warnings (telescope, &|id : &ID| id . clone ())
+      . map (|(node, _)| Some (node))
+  })
+}
+
+/// Interactive preflight uses precisely the selected scalar provenance. A
+/// later disk edit is a filesystem fence conflict, never fresh query input.
+pub(crate) fn candidates_from_selected (
+  graph : &InRustGraph,
+  define_nodes : &[DefineNode],
+  node_merges : &[NodeMerge],
+  config : &SkgConfig,
+) -> io::Result<Vec<HoistCandidate>> {
+  candidates_with_lookup (define_nodes, node_merges, config, |pid|
+    Ok (graph . get (pid) . map (nodecomplete_from_noderust)))
+}
+
+fn candidates_with_lookup (
+  define_nodes : &[DefineNode],
+  node_merges : &[NodeMerge],
+  config : &SkgConfig,
+  lookup : impl Fn (&ID) -> io::Result<Option<NodeComplete>>,
+) -> io::Result<Vec<HoistCandidate>> {
   let mut touched : HashSet<ID> = HashSet::new ();
   let mut note_save = |define_node : &DefineNode| {
     if let DefineNode::Save (SaveNode (node)) = define_node {
@@ -70,17 +100,15 @@ pub fn candidates_from_disk (
 
   let mut candidates : Vec<HoistCandidate> = Vec::new ();
   for pid in touched {
-    let Some (telescope) = telescope_from_disk (config, &pid) ?
+    let Some (node) : Option<NodeComplete> = lookup (&pid)?
       else { continue; };
-    let home : SourceName = telescope . home () . clone ();
+    let home : SourceName = node . source . clone ();
     if ! config . user_owns_source (&home) {
       return Err ( io::Error::new (
         io::ErrorKind::PermissionDenied,
         format! (
           "Refusing to offer Hoist for '{}': its selected home '{}' is not owned.",
           pid, home ))); }
-    let (node, _warnings) = fold_telescope_collecting_warnings (
-      telescope, & |id : &ID| id . clone () ) ?;
     if node . ugly_telescope {
       candidates . push ( HoistCandidate { pid, home } ); }}
   Ok (candidates)
@@ -88,14 +116,14 @@ pub fn candidates_from_disk (
 
 /// Some operations consume an ugly telescope without writing that same PID.
 /// NodeMerge is the important case: it copies the acquiree's text to a fresh
-/// preservation node and deletes the acquiree. Add a disk-folded Save first so
-/// the approved interactive pipeline genuinely Hoists and verifies that input
+/// preservation node and deletes the acquiree. Add a selected-graph Save first so
+/// the approved interactive pipeline Hoists and verifies that input
 /// before the operation consumes it. Existing buffer-authored Saves win; their
 /// edits, rather than the pre-save disk scalar, must land at home.
 pub fn repair_saves_for_unwritten_candidates (
   candidates   : &[HoistCandidate],
   define_nodes : &[DefineNode],
-  config       : &SkgConfig,
+  graph        : &InRustGraph,
 ) -> io::Result<Vec<DefineNode>> {
   let already_written : HashSet<ID> = define_nodes . iter ()
     .filter_map ( |define_node| match define_node {
@@ -106,10 +134,8 @@ pub fn repair_saves_for_unwritten_candidates (
   let mut repairs : Vec<DefineNode> = Vec::new ();
   for candidate in candidates {
     if already_written . contains (&candidate . pid) { continue; }
-    let Some (telescope) = telescope_from_disk (
-        config, &candidate . pid) ? else { continue; };
-    let (mut node, _warnings) = fold_telescope_collecting_warnings (
-      telescope, & |id : &ID| id . clone () ) ?;
+    let Some (selected) = graph . get (&candidate . pid) else { continue; };
+    let mut node : NodeComplete = nodecomplete_from_noderust (selected);
     node . ugly_telescope = false;
     repairs . push ( DefineNode::Save (SaveNode (node)) ); }
   Ok (repairs)
@@ -164,6 +190,31 @@ mod tests {
   use std::fs;
   use std::path::PathBuf;
   use tempfile::{TempDir, tempdir};
+
+  #[test]
+  fn selected_hoist_provenance_and_repair_ignore_later_disk_text () {
+    let (_temp, config, paths) : (TempDir, SkgConfig, HashMap<&'static str, PathBuf>) =
+      config_and_paths ();
+    fs::write (paths ["public"] . join ("P.skg"), "pid: P\n") . unwrap ();
+    fs::write (paths ["private"] . join ("P.skg"),
+      "pid: P\ntitle: selected title\nbody: selected body\n") . unwrap ();
+    let selected : NodeComplete = nodecomplete_from_pid_and_source (
+      &config, ID::from ("P"), &SourceName::from ("public")) . unwrap ();
+    let graph : InRustGraph = InRustGraph::from_nodecompletes (&[selected . clone ()]);
+    fs::write (paths ["public"] . join ("P.skg"),
+      "pid: P\ntitle: later disk title\nbody: later disk body\n") . unwrap ();
+    fs::remove_file (paths ["private"] . join ("P.skg")) . unwrap ();
+    let candidates : Vec<HoistCandidate> = candidates_from_selected (
+      &graph, &[DefineNode::Save (SaveNode (selected))], &[], &config) . unwrap ();
+    assert_eq! (candidates . len (), 1);
+    let repairs : Vec<DefineNode> = repair_saves_for_unwritten_candidates (
+      &candidates, &[], &graph) . unwrap ();
+    let DefineNode::Save (SaveNode (repaired)) : &DefineNode = &repairs [0]
+      else { panic! ("expected the selected input repair"); };
+    assert_eq! (repaired . title, "selected title");
+    assert_eq! (repaired . body . as_deref (), Some ("selected body"));
+    assert! (!repaired . ugly_telescope);
+  }
 
   fn config_and_paths () -> (TempDir, SkgConfig, HashMap<&'static str, PathBuf>) {
     let temp : TempDir = tempdir () . unwrap ();
